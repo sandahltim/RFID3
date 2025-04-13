@@ -80,6 +80,7 @@
                               <th class="sortable" data-col-name="date_last_scanned">Last Scanned Date</th>
                               <th class="sortable" data-col-name="last_scanned_by">Last Scanned By</th>
                               <th class="sortable" data-col-name="last_contract_num">Last Contract Num</th>
+                              <th>Actions</th>
                             </tr>
                           </thead>
                           <tbody id="grandchildTbody-{{ middle_idx }}"></tbody>
@@ -213,6 +214,7 @@ function loadSubcatData(category, commonName, page, catKey) {
           <td>${item.date_last_scanned || 'N/A'}</td>
           <td>${item.last_scanned_by || 'N/A'}</td>
           <td>${item.last_contract_num || 'N/A'}</td>
+          <td><button class="btn btn-sm btn-warning mark-sold-btn" data-tag-id="${item.tag_id}">Mark Sold</button></td>
         `;
         tbody.appendChild(tr);
       });
@@ -330,6 +332,7 @@ function refreshTable() {
                           <th class="sortable" data-col-name="date_last_scanned">Last Scanned Date</th>
                           <th class="sortable" data-col-name="last_scanned_by">Last Scanned By</th>
                           <th class="sortable" data-col-name="last_contract_num">Last Contract Num</th>
+                          <th>Actions</th>
                         </tr>
                       </thead>
                       <tbody id="grandchildTbody-${middle_idx}"></tbody>
@@ -460,6 +463,7 @@ function updateWithNewData(newData) {
                         <th class="sortable" data-col-name="date_last_scanned">Last Scanned Date</th>
                         <th class="sortable" data-col-name="last_scanned_by">Last Scanned By</th>
                         <th class="sortable" data-col-name="last_contract_num">Last Contract Num</th>
+                        <th>Actions</th>
                       </tr>
                     </thead>
                     <tbody id="grandchildTbody-${middle_idx}"></tbody>
@@ -484,6 +488,7 @@ function updateWithNewData(newData) {
               <td>${item.date_last_scanned || 'N/A'}</td>
               <td>${item.last_scanned_by || 'N/A'}</td>
               <td>${item.last_contract_num || 'N/A'}</td>
+              <td><button class="btn btn-sm btn-warning mark-sold-btn" data-tag-id="${item.tag_id}">Mark Sold</button></td>
             `;
             grandTbody.appendChild(tr);
           });
@@ -531,6 +536,28 @@ document.addEventListener('DOMContentLoaded', () => {
       if (targetEl) {
         targetEl.addEventListener("show.bs.collapse", () => target.textContent = "-");
         targetEl.addEventListener("hide.bs.collapse", () => target.textContent = "+");
+      }
+    } else if (target.classList.contains("mark-sold-btn")) {
+      const tagId = target.getAttribute("data-tag-id");
+      if (confirm(`Mark tag ${tagId} as sold?`)) {
+        fetch('/tab6/mark_sold', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: `tag_id=${encodeURIComponent(tagId)}`
+        })
+          .then(response => response.json())
+          .then(data => {
+            if (data.error) {
+              alert(`Error: ${data.error}`);
+            } else {
+              alert(data.message);
+              refreshTable();
+            }
+          })
+          .catch(error => {
+            console.error('Error marking sold:', error);
+            alert('Failed to mark tag as sold');
+          });
       }
     }
   });
