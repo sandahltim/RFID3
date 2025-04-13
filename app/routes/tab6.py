@@ -1,6 +1,7 @@
 from flask import Blueprint, render_template, request, jsonify
 from collections import defaultdict
 from db_connection import DatabaseConnection
+from datetime import datetime
 
 tab6_bp = Blueprint("tab6_bp", __name__, url_prefix="/tab6")
 
@@ -234,17 +235,17 @@ def subcat_data():
             ]
         filtered_items = [item for item in filtered_items if item.get("rental_class_num") in rental_class_nums]
 
-    category_items = [item for item in filtered_items if categorize_item(item) == category];
-    subcat_items = [item for item in category_items if item.get("common_name") == common_name] if common_name else category_items;
+    category_items = [item for item in filtered_items if categorize_item(item) == category]
+    subcat_items = [item for item in category_items if item.get("common_name") == common_name] if common_name else category_items
 
-    total_items = len(subcat_items);
-    total_pages = (total_items + per_page - 1) // per_page;
-    page = max(1, min(page, total_pages));
-    start = (page - 1) * per_page;
-    end = start + per_page;
-    paginated_items = subcat_items[start:end];
+    total_items = len(subcat_items)
+    total_pages = (total_items + per_page - 1) // per_page
+    page = max(1, min(page, total_pages))
+    start = (page - 1) * per_page
+    end = start + per_page
+    paginated_items = subcat_items[start:end]
 
-    print(f"AJAX: Category: {category}, Common Name: {common_name}, Total Items: {total_items}, Page: {page}");
+    print(f"AJAX: Category: {category}, Common Name: {common_name}, Total Items: {total_items}, Page: {page}")
 
     return jsonify({
         "items": [{
@@ -257,4 +258,31 @@ def subcat_data():
         "total_items": total_items,
         "total_pages": total_pages,
         "current_page": page
-    });
+    })
+
+@tab6_bp.route("/mark_sold", methods=["POST"])
+def mark_sold():
+    print("Hit /tab6/mark_sold endpoint")
+    tag_id = request.form.get("tag_id")
+    if not tag_id:
+        return jsonify({"error": "Missing tag_id"}), 400
+
+    try:
+        with DatabaseConnection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                UPDATE id_rfidtag
+                SET status = 'sold', date_sold = ?, reuse_count = reuse_count + 1, last_updated = ?
+                WHERE tag_id = ? AND item_type = 'resale'
+            """, (
+                datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
+                datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
+                tag_id
+            ))
+            if cursor.rowcount == 0:
+                return jsonify({"error": "Tag not found or not a resale item"}), 404
+            conn.commit()
+        return jsonify({"message": f"Tag {tag_id} marked as sold"}), 200
+    except Exception as e:
+        print(f"Error marking tag sold: {e}")
+        return jsonify({"error": str(e)}), 500
