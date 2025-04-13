@@ -1,21 +1,29 @@
 import pandas as pd
 import sqlite3
+import requests
+import io
 from datetime import datetime
 from config import DB_FILE
 
-EXCEL_FILE = "/home/tim/test_rfidpi/data/tags.xlsx"
+EXCEL_URL = "https://1drv.ms/x/c/35ee6b0cbe6f4ec9/EVSGqI3IgmhHsXQxEzgVTpsBemnqpRhD1_2_yZLyznVJ_w?e=sKg2qD"
 
 def sync_excel_to_db():
-    print(f"Syncing {EXCEL_FILE} to {DB_FILE} at {datetime.now()}")
+    print(f"Syncing cloud Excel to {DB_FILE} at {datetime.now()}")
     try:
-        xl = pd.ExcelFile(EXCEL_FILE)
+        # Download Excel from OneDrive
+        response = requests.get(EXCEL_URL, stream=True)
+        if response.status_code != 200:
+            raise Exception(f"Failed to download Excel: {response.status_code}")
+        
+        # Read Excel from stream
+        xl = pd.ExcelFile(io.BytesIO(response.content))
         conn = sqlite3.connect(DB_FILE)
         cursor = conn.cursor()
 
         for sheet_name in xl.sheet_names:
             if sheet_name.lower() == 'map':
                 continue
-            df = pd.read_excel(EXCEL_FILE, sheet_name=sheet_name)
+            df = pd.read_excel(xl, sheet_name=sheet_name)
             for _, row in df.iterrows():
                 cursor.execute("""
                     INSERT OR REPLACE INTO id_rfidtag (
@@ -31,9 +39,9 @@ def sync_excel_to_db():
                 ))
 
         conn.commit()
-        print("Excel sync completed.")
+        print("Cloud Excel sync completed.")
     except Exception as e:
-        print(f"Error syncing Excel: {e}")
+        print(f"Error syncing cloud Excel: {e}")
         conn.rollback()
     finally:
         conn.close()
