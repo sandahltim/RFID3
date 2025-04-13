@@ -34,6 +34,7 @@
             <li class="nav-item"><a class="nav-link" href="/tab4/">Full Inventory</a></li>
             <li class="nav-item"><a class="nav-link" href="/tab5/">Laundry Contracts</a></li>
             <li class="nav-item"><a class="nav-link" href="/tab6/">Resale Items WIP</a></li>
+            <li class="nav-item"><a class="nav-link" href="/tab7/">Tag Info</a></li>
         </ul>
     </nav>
     <div class="mt-2">
@@ -90,7 +91,7 @@
     document.querySelectorAll('form[action="/manual_refresh"], form[action="/manual_refresh_dev"]').forEach(form => {
         form.addEventListener('submit', function(e) {
             e.preventDefault();
-            refreshModal.show(); // Show modal immediately
+            refreshModal.show();
             fetch('/full_refresh', { method: 'POST' })
                 .then(response => response.json())
                 .then(data => {
@@ -105,7 +106,7 @@
                                     window.location.reload();
                                 }
                             });
-                    }, 1000); // Poll every 1s
+                    }, 1000);
                 })
                 .catch(error => {
                     console.error('Error triggering full refresh:', error);
@@ -116,7 +117,7 @@
 
     document.addEventListener("DOMContentLoaded", () => {
         checkReloadStatus();
-        setInterval(checkReloadStatus, 2000); // Poll every 2s
+        setInterval(checkReloadStatus, 2000);
     });
 </script>
 </body>

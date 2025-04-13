@@ -14,6 +14,7 @@ def create_app():
     from app.routes.tab4 import tab4_bp
     from app.routes.tab5 import tab5_bp
     from app.routes.tab6 import tab6_bp
+    from app.routes.tab7 import tab7_bp
 
     app.register_blueprint(root_bp)
     app.register_blueprint(tab1_bp, url_prefix="/tab1")
@@ -22,6 +23,7 @@ def create_app():
     app.register_blueprint(tab4_bp, url_prefix="/tab4")
     app.register_blueprint(tab5_bp, url_prefix="/tab5")
     app.register_blueprint(tab6_bp, url_prefix="/tab6")
+    app.register_blueprint(tab7_bp, url_prefix="/tab7")
 
     @app.route('/status', methods=['GET'])
     def status():
@@ -32,9 +34,8 @@ def create_app():
         if not LAST_REFRESH:
             return jsonify({"items": [], "transactions": [], "since": None}), 200
 
-        # Go back 5 minutes from LAST_REFRESH
         since_date = (LAST_REFRESH - timedelta(minutes=5)).strftime("%Y-%m-%d %H:%M:%S")
-        trigger_refresh(full=False)  # Trigger incremental refresh and reset 180s timer
+        trigger_refresh(full=False)
         with DatabaseConnection() as conn:
             items_query = """
                 SELECT * FROM id_item_master 
@@ -58,7 +59,7 @@ def create_app():
 
     @app.route('/full_refresh', methods=['POST'])
     def full_refresh():
-        trigger_refresh(full=True)  # Trigger full refresh and reset timer
+        trigger_refresh(full=True)
         return jsonify({"message": "Full refresh triggered", "is_reloading": IS_RELOADING}), 202
 
     @app.context_processor
@@ -69,7 +70,6 @@ def create_app():
             return url_for(request.endpoint, **args)
         return dict(update_url_param=update_url_param)
 
-    # Start background refresh thread
     from refresh_logic import background_refresh
     stop_event = threading.Event()
     refresher_thread = threading.Thread(target=background_refresh, args=(stop_event,), daemon=True)
