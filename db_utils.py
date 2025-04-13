@@ -1,21 +1,12 @@
-########################################
-# db_utils.py
-########################################
-
 import sqlite3
 import os
 from config import DB_FILE
 
 def initialize_db():
-    """
-    Creates or updates the database and tables to store all fields from the API.
-    If inventory.db already exists with an old schema, rename or remove it before running
-    this if you want a clean start.
-    """
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
 
-    # Expanded id_item_master table with all columns
+    # id_item_master
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS id_item_master (
             tag_id TEXT PRIMARY KEY,
@@ -40,7 +31,7 @@ def initialize_db():
     """)
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_contract ON id_item_master (last_contract_num)")
 
-    # Expanded id_transactions table with all columns
+    # id_transactions
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS id_transactions (
             contract_number TEXT,
@@ -81,7 +72,7 @@ def initialize_db():
     """)
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_client_date ON id_transactions (client_name, scan_date)")
 
-    # New seed_rental_classes table for SEED data
+    # seed_rental_classes
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS seed_rental_classes (
             rental_class_id TEXT PRIMARY KEY,
@@ -90,6 +81,25 @@ def initialize_db():
         )
     """)
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_common_name ON seed_rental_classes (common_name)")
+
+    # id_rfidtag
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS id_rfidtag (
+            tag_id TEXT PRIMARY KEY,
+            common_name TEXT,
+            category TEXT,
+            status TEXT,
+            item_type TEXT,
+            last_contract_num TEXT,
+            date_assigned TEXT,
+            date_sold TEXT,
+            date_discarded TEXT,
+            reuse_count INTEGER,
+            last_updated TEXT
+        )
+    """)
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_rfidtag_status ON id_rfidtag (status)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_rfidtag_category ON id_rfidtag (category)")
 
     conn.commit()
     conn.close()
