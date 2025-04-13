@@ -1,7 +1,6 @@
 from flask import Blueprint, render_template, request, jsonify
 from collections import defaultdict
 from db_connection import DatabaseConnection
-import sqlite3
 import logging
 
 tab2_bp = Blueprint("tab2_bp", __name__, url_prefix="/tab2")
@@ -283,11 +282,11 @@ def subcategorize_item(category, rental_class_id):
         if category in ['Tent Tops', 'Tables and Chairs', 'Round Linen', 'Rectangle Linen', 
                         'Concession Equipment', 'AV Equipment', 'Runners and Drapes', 
                         'Other', 'Resale']:
-            return SUBCATEGORY_MAP.get(rid, 'Unspecified Subcategory')
-        return 'Unspecified Subcategory'
+            return SUBCATEGORY_MAP.get(rid, 'Unspecified')
+        return 'Unspecified'
     except (ValueError, TypeError) as e:
         logging.error(f"Error subcategorizing item with rental_class_id {rental_class_id}: {e}")
-        return 'Unspecified Subcategory'
+        return 'Unspecified'
 
 @tab2_bp.route("/")
 def show_tab2():
@@ -330,25 +329,19 @@ def show_tab2():
         parent_data = []
         sub_map = {}
         for category, item_list in category_map.items():
-            available = sum(1 for item in item_list if item["status"] == "Ready to Rent")
-            on_rent = sum(1 for item in item_list if item["status"] in ["On Rent", "Delivered"])
+            available = sum(1 for item in item_list if item.get("status") == "Ready to Rent")
+            on_rent = sum(1 for item in item_list if item.get("status") in ["On Rent", "Delivered"])
             service = len(item_list) - available - on_rent
-            client_name = contract_map.get(item_list[0]["last_contract_num"], {}).get("client_name", "N/A") if item_list and item_list[0]["last_contract_num"] else "N/A"
-            scan_date = contract_map.get(item_list[0]["last_contract_num"], {}).get("scan_date", "N/A") if item_list and item_list[0]["last_contract_num"] else "N/A"
+            client_name = contract_map.get(item_list[0]["last_contract_num"], {}).get("client_name", "N/A") if item_list and item_list[0].get("last_contract_num") else "N/A"
+            scan_date = contract_map.get(item_list[0]["last_contract_num"], {}).get("scan_date", "N/A") if item_list and item_list[0].get("last_contract_num") else "N/A"
 
-            temp_sub_map = defaultdict(lambda: defaultdict(list))
+            temp_sub_map = defaultdict(set)
             for itm in item_list:
                 subcat = subcategorize_item(category, itm.get("rental_class_num"))
-                common_name = itm.get("common_name", "Unknown")
-                temp_sub_map[subcat][common_name].append(itm)
+                temp_sub_map[category].add(subcat)
 
-            sub_map[category] = {
-                "subcategories": {
-                    subcat: {
-                        "common_names": {cn: {"total": len(items)} for cn, items in subcat_items.items()}
-                    } for subcat, subcat_items in temp_sub_map.items()
-                }
-            }
+            sub_map[category] = {"subcategories": sorted(list(temp_sub_map[category])) if temp_sub_map[category] else ["Unspecified"]}
+            logging.debug(f"Category {category} has subcategories: {sub_map[category]['subcategories']}")
 
             parent_data.append({
                 "category": category,
@@ -362,6 +355,7 @@ def show_tab2():
 
         parent_data.sort(key=lambda x: x["category"])
         expand_category = request.args.get('expand', None)
+        logging.debug(f"Rendering tab2 with {len(parent_data)} categories")
 
         return render_template(
             "tab2.html",
@@ -378,9 +372,9 @@ def show_tab2():
         logging.error(f"Error in show_tab2: {e}")
         return jsonify({"error": str(e)}), 500
 
-@tab2_bp.route("/subcat_data", methods=["GET"])
-def subcat_data():
-    logging.debug("Hit /tab2/subcat_data endpoint")
+@tab2_bp.route("/item_data", methods=["GET"])
+def item_data():
+    logging.debug("Hit /tab2/item_data endpoint")
     category = request.args.get('category')
     subcat = request.args.get('subcat')
     page = int(request.args.get('page', 1))
@@ -388,8 +382,18 @@ def subcat_data():
 
     try:
         with DatabaseConnection() as conn:
-            rows = conn.execute("SELECT * FROM id_item_master").fetchall()
-        items = [dict(row) for row in rows]
+            query = "SELECT * FROM id_item_master WHERE 1=1"
+            params = []
+            if category:
+                rental_class_ids = [k for k, v in CATEGORY_MAP.items() if v == category]
+                if rental_class_ids:
+                    placeholders = ','.join('?' * len(rental_class_ids))
+                    query += f" AND rental_class_num IN ({placeholders})"
+                    params.extend(rental_class_ids)
+                else:
+                    query += " AND 1=0"
+            items = conn.execute(query, params).fetchall()
+        items = [dict(row) for row in items]
 
         filter_common_name = request.args.get("common_name", "").lower().strip()
         filter_tag_id = request.args.get("tag_id", "").lower().strip()
@@ -409,76 +413,16 @@ def subcat_data():
         if filter_status:
             filtered_items = [item for item in filtered_items if filter_status in (item.get("status") or "").lower()]
 
-        category_items = [item for item in filtered_items if categorize_item(item.get("rental_class_num")) == category]
-        subcat_items = [item for item in category_items if subcategorize_item(category, item.get("rental_class_num")) == subcat]
+        subcat_items = [item for item in filtered_items if subcategorize_item(category, item.get("rental_class_num")) == subcat]
 
-        common_name_map = defaultdict(list)
-        for item in subcat_items:
-            common_name_map[item.get("common_name", "Unknown")].append(item)
-
-        total_common_names = len(common_name_map)
-        total_pages = (total_common_names + per_page - 1) // per_page
-        page = max(1, min(page, total_pages))
-        start = (page - 1) * per_page
-        end = start + per_page
-        paginated_common_names = list(common_name_map.keys())[start:end]
-
-        logging.debug(f"AJAX: Category: {category}, Subcategory: {subcat}, Total Common Names: {total_common_names}, Page: {page}")
-
-        return jsonify({
-            "common_names": [{
-                "common_name": cn,
-                "total": len(common_name_map[cn])
-            } for cn in paginated_common_names],
-            "total_common_names": total_common_names,
-            "total_pages": total_pages,
-            "current_page": page
-        })
-    except Exception as e:
-        logging.error(f"Error in subcat_data: {e}")
-        return jsonify({"error": str(e)}), 500
-
-@tab2_bp.route("/item_data", methods=["GET"])
-def item_data():
-    logging.debug("Hit /tab2/item_data endpoint")
-    category = request.args.get('category')
-    subcat = request.args.get('subcat')
-    common_name = request.args.get('common_name')
-    page = int(request.args.get('page', 1))
-    per_page = 20
-
-    try:
-        with DatabaseConnection() as conn:
-            rows = conn.execute("SELECT * FROM id_item_master").fetchall()
-        items = [dict(row) for row in rows]
-
-        filter_tag_id = request.args.get("tag_id", "").lower().strip()
-        filter_bin_location = request.args.get("bin_location", "").lower().strip()
-        filter_last_contract = request.args.get("last_contract_num", "").lower().strip()
-        filter_status = request.args.get("status", "").lower().strip()
-
-        filtered_items = items
-        if filter_tag_id:
-            filtered_items = [item for item in filtered_items if filter_tag_id in (item.get("tag_id") or "").lower()]
-        if filter_bin_location:
-            filtered_items = [item for item in filtered_items if filter_bin_location in (item.get("bin_location") or "").lower()]
-        if filter_last_contract:
-            filtered_items = [item for item in filtered_items if filter_last_contract in (item.get("last_contract_num") or "").lower()]
-        if filter_status:
-            filtered_items = [item for item in filtered_items if filter_status in (item.get("status") or "").lower()]
-
-        category_items = [item for item in filtered_items if categorize_item(item.get("rental_class_num")) == category]
-        subcat_items = [item for item in category_items if subcategorize_item(category, item.get("rental_class_num")) == subcat]
-        common_items = [item for item in subcat_items if item.get("common_name", "Unknown") == common_name]
-
-        total_items = len(common_items)
+        total_items = len(subcat_items)
         total_pages = (total_items + per_page - 1) // per_page
         page = max(1, min(page, total_pages))
         start = (page - 1) * per_page
         end = start + per_page
-        paginated_items = common_items[start:end]
+        paginated_items = subcat_items[start:end]
 
-        logging.debug(f"AJAX: Category: {category}, Subcategory: {subcat}, Common Name: {common_name}, Total Items: {total_items}, Page: {page}")
+        logging.debug(f"AJAX: Category: {category}, Subcategory: {subcat}, Total Items: {total_items}, Page: {page}")
 
         return jsonify({
             "items": [{
@@ -486,11 +430,7 @@ def item_data():
                 "common_name": item["common_name"],
                 "status": item["status"],
                 "bin_location": item.get("bin_location", "N/A"),
-                "quality": item.get("quality", "N/A"),
-                "last_contract_num": item.get("last_contract_num", "N/A"),
-                "date_last_scanned": item.get("date_last_scanned", "N/A"),
-                "last_scanned_by": item.get("last_scanned_by", "N/A"),
-                "notes": item.get("notes", "N/A")
+                "quality": item.get("quality", "N/A")
             } for item in paginated_items],
             "total_items": total_items,
             "total_pages": total_pages,
@@ -499,3 +439,4 @@ def item_data():
     except Exception as e:
         logging.error(f"Error in item_data: {e}")
         return jsonify({"error": str(e)}), 500
+    

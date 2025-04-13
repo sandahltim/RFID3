@@ -34,7 +34,13 @@ def sync_excel_to_db():
                 logging.debug(f"Processing sheet: {sheet_name}")
                 df = pd.read_excel(xl, sheet_name=sheet_name)
                 for index, row in df.iterrows():
+                    # Skip if Common_Name (Column B) is empty or NaN
+                    if pd.isna(row.get('Common_Name')) or not str(row.get('Common_Name')).strip():
+                        logging.debug(f"Skipping tag {row.get('EPC', 'unknown')}: Common_Name is empty")
+                        continue
                     try:
+                        category = str(row.get('Category', 'Other')).strip()
+                        item_type = 'resale' if 'resale' in category.lower() else 'rental'
                         cursor.execute("""
                             INSERT OR REPLACE INTO id_rfidtag (
                                 tag_id, common_name, category, status, item_type,
@@ -42,12 +48,11 @@ def sync_excel_to_db():
                                 reuse_count, last_updated
                             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         """, (
-                            str(row['EPC']), str(row['Common_Name']), str(row['Category']),
-                            'active', 'resale' if sheet_name.lower() == 'resale' else 'rental',
-                            None, None, None, None, 0,
+                            str(row.get('EPC', '')), str(row.get('Common_Name', '')), category,
+                            'active', item_type, None, None, None, None, 0,
                             datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
                         ))
-                        logging.debug(f"Inserted/Updated tag: {row['EPC']}")
+                        logging.debug(f"Inserted/Updated tag: {row.get('EPC', '')}")
                     except Exception as e:
                         logging.error(f"Error inserting tag {row.get('EPC', 'unknown')}: {e}")
 
