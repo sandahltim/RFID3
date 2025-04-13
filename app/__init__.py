@@ -27,40 +27,49 @@ def create_app():
 
     @app.route('/status', methods=['GET'])
     def status():
-        return jsonify({"is_reloading": IS_RELOADING}), 200
+        try:
+            return jsonify({"is_reloading": IS_RELOADING}), 200
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
 
     @app.route('/trigger_incremental', methods=['GET'])
     def trigger_incremental():
-        if not LAST_REFRESH:
-            return jsonify({"items": [], "transactions": [], "since": None}), 200
+        try:
+            if not LAST_REFRESH:
+                return jsonify({"items": [], "transactions": [], "since": None}), 200
 
-        since_date = (LAST_REFRESH - timedelta(minutes=5)).strftime("%Y-%m-%d %H:%M:%S")
-        trigger_refresh(full=False)
-        with DatabaseConnection() as conn:
-            items_query = """
-                SELECT * FROM id_item_master 
-                WHERE date_last_scanned >= ?
-            """
-            new_items = conn.execute(items_query, (since_date,)).fetchall()
-            new_items = [dict(row) for row in new_items]
+            since_date = (LAST_REFRESH - timedelta(minutes=5)).strftime("%Y-%m-%d %H:%M:%S")
+            trigger_refresh(full=False)
+            with DatabaseConnection() as conn:
+                items_query = """
+                    SELECT * FROM id_item_master 
+                    WHERE date_last_scanned >= ?
+                """
+                new_items = conn.execute(items_query, (since_date,)).fetchall()
+                new_items = [dict(row) for row in new_items]
 
-            trans_query = """
-                SELECT * FROM id_transactions 
-                WHERE scan_date >= ?
-            """
-            new_trans = conn.execute(trans_query, (since_date,)).fetchall()
-            new_trans = [dict(row) for row in new_trans]
+                trans_query = """
+                    SELECT * FROM id_transactions 
+                    WHERE scan_date >= ?
+                """
+                new_trans = conn.execute(trans_query, (since_date,)).fetchall()
+                new_trans = [dict(row) for row in new_trans]
 
-        return jsonify({
-            "items": new_items,
-            "transactions": new_trans,
-            "since": since_date
-        }), 200
+            return jsonify({
+                "items": new_items,
+                "transactions": new_trans,
+                "since": since_date
+            }), 200
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
 
     @app.route('/full_refresh', methods=['POST'])
     def full_refresh():
-        trigger_refresh(full=True)
-        return jsonify({"message": "Full refresh triggered", "is_reloading": IS_RELOADING}), 202
+        try:
+            trigger_refresh(full=True)
+            return jsonify({"message": "Full refresh triggered", "is_reloading": IS_RELOADING}), 202
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
 
     @app.context_processor
     def utility_processor():
