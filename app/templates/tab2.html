@@ -52,7 +52,8 @@
           <div id="child-{{ cat_key }}" class="collapse" data-category="{{ parent.category }}" {% if expand_category == parent.category %}data-auto-expand="true"{% endif %}>
             <div class="mb-2 mx-2">
               <select class="form-select subcategory-dropdown" data-category="{{ parent.category }}">
-                {% for subcat in sub_map[parent.category].subcategories %}
+                <option value="">Select Subcategory</option>
+                {% for subcat in sub_map.get(parent.category, ['Unspecified']) %}
                 <option value="{{ subcat }}">{{ subcat }}</option>
                 {% endfor %}
               </select>
@@ -74,6 +75,10 @@
                     <th class="sortable" data-col-name="status">Status</th>
                     <th class="sortable" data-col-name="bin_location">Bin Location</th>
                     <th class="sortable" data-col-name="quality">Quality</th>
+                    <th class="sortable" data-col-name="last_contract_num">Last Contract Num</th>
+                    <th class="sortable" data-col-name="date_last_scanned">Last Scanned Date</th>
+                    <th class="sortable" data-col-name="last_scanned_by">Last Scanned By</th>
+                    <th class="sortable" data-col-name="notes">Notes</th>
                   </tr>
                 </thead>
                 <tbody id="childTbody-{{ cat_key }}"></tbody>
@@ -117,7 +122,7 @@ function sortTable(tableEl, colName) {
       let numA = parseFloat(cellA.replace(/[^0-9.\-]/g, ""));
       let numB = parseFloat(cellB.replace(/[^0-9.\-]/g, ""));
       if (!isNaN(numA) && !isNaN(numB)) return asc ? numA - numB : numB - numA;
-      return asc ? cellA.localeCompare(cellB) : cellB.localeCompare(cellA);
+      return asc ? cellA.localeCompare(cellB) : cellB.localeCompare(cellB);
     });
     tbody.innerHTML = "";
     pairs.forEach(pair => {
@@ -132,7 +137,7 @@ function sortTable(tableEl, colName) {
       let numA = parseFloat(cellA.replace(/[^0-9.\-]/g, ""));
       let numB = parseFloat(cellB.replace(/[^0-9.\-]/g, ""));
       if (!isNaN(numA) && !isNaN(numB)) return asc ? numA - numB : numB - numA;
-      return asc ? cellA.localeCompare(cellB) : cellB.localeCompare(cellA);
+      return asc ? cellA.localeCompare(cellB) : cellB.localeCompare(cellB);
     });
     tbody.innerHTML = "";
     rows.forEach(row => tbody.appendChild(row));
@@ -155,7 +160,7 @@ function loadSubcatData(category, subcat, page, catKey) {
     last_contract_num: urlParams.get('last_contract_num') || '',
     status: urlParams.get('status') || ''
   };
-  const url = `/tab2/item_data?${new URLSearchParams(params).toString()}`;
+  const url = `/tab2/subcat_data?${new URLSearchParams(params).toString()}`;
   console.log(`Fetching URL: ${url}`);
 
   fetch(url)
@@ -174,42 +179,49 @@ function loadSubcatData(category, subcat, page, catKey) {
       data.items.forEach(item => {
         const tr = document.createElement('tr');
         tr.innerHTML = `
-          <td>${item.tag_id}</td>
-          <td>${item.common_name}</td>
-          <td>${item.status}</td>
+          <td>${item.tag_id || 'N/A'}</td>
+          <td>${item.common_name || 'Unknown'}</td>
+          <td>${item.status || 'N/A'}</td>
           <td>${item.bin_location || 'N/A'}</td>
           <td>${item.quality || 'N/A'}</td>
+          <td>${item.last_contract_num || 'N/A'}</td>
+          <td>${item.date_last_scanned || 'N/A'}</td>
+          <td>${item.last_scanned_by || 'N/A'}</td>
+          <td>${item.notes || 'N/A'}</td>
         `;
         tbody.appendChild(tr);
       });
 
-      const pagination = document.getElementById(`pagination-${catKey}`).querySelector('.pagination');
-      pagination.innerHTML = '';
-      if (data.total_pages > 1) {
-        const prevLi = document.createElement('li');
-        prevLi.className = `page-item ${data.current_page === 1 ? 'disabled' : ''}`;
-        prevLi.innerHTML = `<a class="page-link" href="#" data-page="${data.current_page - 1}" aria-label="Previous"><span aria-hidden="true">« Prev</span></a>`;
-        pagination.appendChild(prevLi);
+      const pagination = document.getElementById(`pagination-${catKey}`);
+      if (pagination) {
+        const paginationList = pagination.querySelector('.pagination');
+        paginationList.innerHTML = '';
+        if (data.total_pages > 1) {
+          const prevLi = document.createElement('li');
+          prevLi.className = `page-item ${data.current_page === 1 ? 'disabled' : ''}`;
+          prevLi.innerHTML = `<a class="page-link" href="#" data-page="${data.current_page - 1}" aria-label="Previous"><span aria-hidden="true">« Prev</span></a>`;
+          paginationList.appendChild(prevLi);
 
-        for (let p = 1; p <= data.total_pages; p++) {
-          const li = document.createElement('li');
-          li.className = `page-item ${p === data.current_page ? 'active' : ''}`;
-          li.innerHTML = `<a class="page-link" href="#" data-page="${p}">${p}</a>`;
-          pagination.appendChild(li);
-        }
+          for (let p = 1; p <= data.total_pages; p++) {
+            const li = document.createElement('li');
+            li.className = `page-item ${p === data.current_page ? 'active' : ''}`;
+            li.innerHTML = `<a class="page-link" href="#" data-page="${p}">${p}</a>`;
+            paginationList.appendChild(li);
+          }
 
-        const nextLi = document.createElement('li');
-        nextLi.className = `page-item ${data.current_page === data.total_pages ? 'disabled' : ''}`;
-        nextLi.innerHTML = `<a class="page-link" href="#" data-page="${data.current_page + 1}" aria-label="Next"><span aria-hidden="true">Next »</span></a>`;
-        pagination.appendChild(nextLi);
+          const nextLi = document.createElement('li');
+          nextLi.className = `page-item ${data.current_page === data.total_pages ? 'disabled' : ''}`;
+          nextLi.innerHTML = `<a class="page-link" href="#" data-page="${data.current_page + 1}" aria-label="Next"><span aria-hidden="true">Next »</span></a>`;
+          paginationList.appendChild(nextLi);
 
-        pagination.querySelectorAll('.page-link').forEach(link => {
-          link.addEventListener('click', (e) => {
-            e.preventDefault();
-            const newPage = parseInt(link.getAttribute('data-page'));
-            if (!isNaN(newPage)) loadSubcatData(category, subcat, newPage, catKey);
+          pagination.querySelectorAll('.page-link').forEach(link => {
+            link.addEventListener('click', (e) => {
+              e.preventDefault();
+              const newPage = parseInt(link.getAttribute('data-page'));
+              if (!isNaN(newPage)) loadSubcatData(category, subcat, newPage, catKey);
+            });
           });
-        });
+        }
       }
       if (loading) loading.style.display = 'none';
     })
@@ -223,7 +235,7 @@ function refreshTable() {
   console.log("Refreshing Tab 2 at " + new Date().toLocaleTimeString());
   const expandedIds = Array.from(document.querySelectorAll('.collapse.show')).map(el => el.id);
   const urlParams = new URLSearchParams(window.location.search);
-  const url = `?${urlParams.toString()}`;
+  const url = `/tab2/?${urlParams.toString()}`;
 
   fetch(url)
     .then(response => {
@@ -315,9 +327,7 @@ function updateWithNewData(newData) {
           <div id="child-${cat_key}" class="collapse" data-category="${category}">
             <div class="mb-2 mx-2">
               <select class="form-select subcategory-dropdown" data-category="${category}">
-                {% for subcat in sub_map[category].subcategories %}
-                <option value="{{ subcat }}">{{ subcat }}</option>
-                {% endfor %}
+                <option value="">Select Subcategory</option>
               </select>
             </div>
             <div id="loading-${cat_key}" class="text-center my-2" style="display: none;">
@@ -335,6 +345,10 @@ function updateWithNewData(newData) {
                     <th class="sortable" data-col-name="status">Status</th>
                     <th class="sortable" data-col-name="bin_location">Bin Location</th>
                     <th class="sortable" data-col-name="quality">Quality</th>
+                    <th class="sortable" data-col-name="last_contract_num">Last Contract Num</th>
+                    <th class="sortable" data-col-name="date_last_scanned">Last Scanned Date</th>
+                    <th class="sortable" data-col-name="last_scanned_by">Last Scanned By</th>
+                    <th class="sortable" data-col-name="notes">Notes</th>
                   </tr>
                 </thead>
                 <tbody id="childTbody-${cat_key}"></tbody>
@@ -370,7 +384,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const category = targetEl.getAttribute("data-category");
         const catKey = targetId.split("child-")[1];
         const select = targetEl.querySelector(".subcategory-dropdown");
-        const subcat = select.value;
+        const subcat = select ? select.value : '';
         loadSubcatData(category, subcat, 1, catKey);
       }
       targetEl.addEventListener("show.bs.collapse", () => target.textContent = "-");
@@ -393,7 +407,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (collapse) {
       new bootstrap.Collapse(collapse, { toggle: true });
       const select = collapse.querySelector(".subcategory-dropdown");
-      const subcat = select.value;
+      const subcat = select ? select.value : '';
       loadSubcatData(expandCat, subcat, 1, expandCat.toLowerCase().replace(/[^a-z0-9]/gi, '_'));
     }
   }

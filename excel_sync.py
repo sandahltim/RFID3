@@ -16,16 +16,35 @@ def sync_excel_to_db():
     max_retries = 3
     retry_delay = 5
 
+    # Test URL accessibility
+    try:
+        logging.debug("Testing OneDrive URL accessibility")
+        response = requests.head(EXCEL_URL, timeout=10)
+        logging.debug(f"URL response status: {response.status_code}")
+        if response.status_code != 200:
+            logging.error(f"OneDrive URL inaccessible: {response.status_code}")
+            return
+    except Exception as e:
+        logging.error(f"Error accessing OneDrive URL: {e}")
+        return
+
     for attempt in range(max_retries):
         try:
             # Download Excel from OneDrive
+            logging.debug("Downloading Excel from OneDrive")
             response = requests.get(EXCEL_URL, stream=True, timeout=30)
             response.raise_for_status()
+            content_length = response.headers.get('Content-Length', 'Unknown')
+            logging.debug(f"Downloaded content length: {content_length} bytes")
             
             # Read Excel from stream
+            logging.debug("Reading Excel file into pandas")
             xl = pd.ExcelFile(io.BytesIO(response.content))
+            logging.debug(f"Excel sheets found: {xl.sheet_names}")
+            
             conn = sqlite3.connect(DB_FILE)
             cursor = conn.cursor()
+            rows_inserted = 0
 
             for sheet_name in xl.sheet_names:
                 if sheet_name.lower() == 'map':
@@ -33,14 +52,18 @@ def sync_excel_to_db():
                     continue
                 logging.debug(f"Processing sheet: {sheet_name}")
                 df = pd.read_excel(xl, sheet_name=sheet_name)
+                logging.debug(f"Sheet {sheet_name} has {len(df)} rows")
                 for index, row in df.iterrows():
                     # Skip if Common_Name (Column B) is empty or NaN
                     if pd.isna(row.get('Common_Name')) or not str(row.get('Common_Name')).strip():
-                        logging.debug(f"Skipping tag {row.get('EPC', 'unknown')}: Common_Name is empty")
+                        logging.debug(f"Row {index}: Skipping tag {row.get('EPC', 'unknown')}: Common_Name is empty")
                         continue
                     try:
+                        epc = str(row.get('EPC', '')).strip()
+                        common_name = str(row.get('Common_Name', '')).strip()
                         category = str(row.get('Category', 'Other')).strip()
                         item_type = 'resale' if 'resale' in category.lower() else 'rental'
+                        logging.debug(f"Row {index}: Processing tag - EPC: {epc}, Common Name: {common_name}, Category: {category}, Item Type: {item_type}")
                         cursor.execute("""
                             INSERT OR REPLACE INTO id_rfidtag (
                                 tag_id, common_name, category, status, item_type,
@@ -48,16 +71,17 @@ def sync_excel_to_db():
                                 reuse_count, last_updated
                             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         """, (
-                            str(row.get('EPC', '')), str(row.get('Common_Name', '')), category,
-                            'active', item_type, None, None, None, None, 0,
+                            epc, common_name, category, 'active', item_type,
+                            None, None, None, None, 0,
                             datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
                         ))
-                        logging.debug(f"Inserted/Updated tag: {row.get('EPC', '')}")
+                        rows_inserted += 1
+                        logging.debug(f"Row {index}: Inserted/Updated tag: {epc}")
                     except Exception as e:
-                        logging.error(f"Error inserting tag {row.get('EPC', 'unknown')}: {e}")
+                        logging.error(f"Row {index}: Error inserting tag {row.get('EPC', 'unknown')}: {e}")
 
             conn.commit()
-            logging.debug("Cloud Excel sync completed.")
+            logging.debug(f"Cloud Excel sync completed. Inserted/Updated {rows_inserted} rows.")
             break
         except Exception as e:
             logging.error(f"Error syncing cloud Excel (attempt {attempt + 1}/{max_retries}): {e}")
@@ -66,9 +90,11 @@ def sync_excel_to_db():
             else:
                 if 'conn' in locals():
                     conn.rollback()
+                    logging.error("All retries failed, transaction rolled back")
         finally:
             if 'conn' in locals():
                 conn.close()
+                logging.debug("Database connection closed")
 
 if __name__ == "__main__":
     sync_excel_to_db()
