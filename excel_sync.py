@@ -9,7 +9,7 @@ import logging
 
 logging.basicConfig(level=logging.DEBUG)
 
-EXCEL_URL = "https://1drv.ms/x/c/35ee6b0cbe6f4ec9/EVSGqI3IgmhHsXQxEzgVTpsBemnqpRhD1_2_yZLyznVJ_w?e=sKg2qD"
+EXCEL_URL = "https://1drv.ms/x/c/35ee6b0cbe6f4ec9/EQI9rtWjqMVCsUJBHhh1iO0BbmpPaIOn0P5k6UVNprnrzA?e=R71i5y"
 
 def sync_excel_to_db():
     logging.debug(f"Syncing cloud Excel to {DB_FILE} at {datetime.now()}")
