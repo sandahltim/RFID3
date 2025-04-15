@@ -1,6 +1,5 @@
 import os
 import logging
-import sqlite3
 import time
 import threading
 from db_utils import initialize_db
@@ -24,13 +23,19 @@ if not os.path.exists(db_path):
 else:
     print(f"Using existing database: {db_path}")
 
-# Perform full refresh
-refresh_data(full_refresh=True)  # Full API refresh
-
 # Start background refresh thread only in primary process
 if not is_running_from_reloader():
+    # Delay full refresh to avoid concurrent database access
+    def delayed_refresh():
+        time.sleep(5)  # Wait for Gunicorn workers to stabilize
+        print("Performing full API refresh...")
+        refresh_data(full_refresh=True)
+        print("Full refresh complete")
+
     refresher_thread = threading.Thread(target=background_refresh, daemon=True)
     refresher_thread.start()
+    # Run full refresh in a separate thread after delay
+    threading.Thread(target=delayed_refresh, daemon=True).start()
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
