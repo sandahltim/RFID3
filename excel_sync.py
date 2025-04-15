@@ -9,20 +9,22 @@ import logging
 
 logging.basicConfig(level=logging.DEBUG)
 
-EXCEL_URL = "https://1drv.ms/x/c/35ee6b0cbe6f4ec9/EQI9rtWjqMVCsUJBHhh1iO0BbmpPaIOn0P5k6UVNprnrzA?e=R71i5y"
+# Updated OneDrive URL (replace with direct download link if possible)
+EXCEL_URL = "https://1drv.ms/x/c/35ee6b0cbe6f4ec9/EQI9rtWjqMVCsUJBHhh1iO0BbmpPaIOn0P5k6UVNprnrzA?e=WTVXiS&nav=MTVfezRFRDI4ODI1LTNGNEQtNERENi05RkI0LTU4M0YwM0VENkVDMX0"
 
 def sync_excel_to_db():
     logging.debug(f"Syncing cloud Excel to {DB_FILE} at {datetime.now()}")
     max_retries = 3
     retry_delay = 5
 
-    # Test URL accessibility
+    # Test URL accessibility with redirect handling
+    session = requests.Session()
     try:
         logging.debug("Testing OneDrive URL accessibility")
-        response = requests.head(EXCEL_URL, timeout=10)
+        response = session.head(EXCEL_URL, allow_redirects=True, timeout=10)
         logging.debug(f"URL response status: {response.status_code}")
         if response.status_code != 200:
-            logging.error(f"OneDrive URL inaccessible: {response.status_code}")
+            logging.error(f"OneDrive URL inaccessible after redirects: {response.status_code}")
             return
     except Exception as e:
         logging.error(f"Error accessing OneDrive URL: {e}")
@@ -32,7 +34,7 @@ def sync_excel_to_db():
         try:
             # Download Excel from OneDrive
             logging.debug("Downloading Excel from OneDrive")
-            response = requests.get(EXCEL_URL, stream=True, timeout=30)
+            response = session.get(EXCEL_URL, stream=True, allow_redirects=True, timeout=30)
             response.raise_for_status()
             content_length = response.headers.get('Content-Length', 'Unknown')
             logging.debug(f"Downloaded content length: {content_length} bytes")
