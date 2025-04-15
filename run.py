@@ -1,37 +1,27 @@
 import os
-import sqlite3
 import logging
 import time
 import threading
 from db_utils import initialize_db
-from refresh_logic import refresh_data
+from refresh_logic import refresh_data, background_refresh
 from app import create_app
 from werkzeug.serving import is_running_from_reloader
 from config import DB_FILE
 from db_connection import DatabaseConnection
 
-
 # Initialize Flask app globally for Gunicorn
 app = create_app()
 
-# Force full database reload on every restart
+# Initialize database if it doesn't exist
 db_path = os.path.join(os.path.dirname(__file__), "inventory.db")
-print("Forcing full database reload on restart...")
-if os.path.exists(db_path):
-    os.remove(db_path)  # Delete existing inventory.db
-    print(f"Removed existing database: {db_path}")
-initialize_db()  # Create fresh schema
-os.chmod(db_path, 0o664)  # Set read/write for owner and group
-os.chown(db_path, os.getuid(), os.getgid())  # Set owner to current user (tim)
-# Verify write access
-try:
-    with sqlite3.connect(db_path) as conn:
-        conn.execute("CREATE TABLE IF NOT EXISTS test (id INTEGER)")
-        conn.execute("INSERT INTO test (id) VALUES (1)")
-    print("Database write access confirmed")
-except sqlite3.OperationalError as e:
-    print(f"ERROR: Database not writable: {e}")
-    raise
+if not os.path.exists(db_path):
+    print("Creating new database...")
+    initialize_db()  # Create fresh schema
+    os.chmod(db_path, 0o664)  # Set read/write for owner and group
+    os.chown(db_path, os.getuid(), os.getgid())  # Set owner to tim
+    print(f"Initialized database: {db_path}")
+else:
+    print(f"Using existing database: {db_path}")
 
 # Perform full refresh
 refresh_data(full_refresh=True)  # Full API refresh
