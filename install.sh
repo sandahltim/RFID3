@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Comprehensive install script for RFID Dashboard on Raspberry Pi
-# Run as root or with sudo on a fresh Raspberry Pi OS
+# Run as root or with sudo
 
 set -e  # Exit on any error
 
@@ -35,16 +35,18 @@ check_status() {
 
 # 1. Check disk health and filesystem
 log "Checking disk health..."
-if ! sudo dmesg | grep -i "I/O error" > /dev/null; then
-    log "No disk I/O errors detected"
-else
-    log "WARNING: Disk I/O errors found in dmesg. Check SD card."
+sudo dmesg | grep -i "I/O error" > /tmp/dmesg_errors || true
+if [ -s /tmp/dmesg_errors ]; then
+    log "WARNING: Disk I/O errors found. Check SD card with 'fsck /dev/mmcblk0p2'."
 fi
 if mount | grep "/ " | grep -q "ro,"; then
     log "ERROR: Filesystem is read-only. Attempting to remount..."
     sudo mount -o remount,rw /
     check_status "Filesystem remount"
 fi
+log "Running fsck to verify SD card..."
+sudo touch /forcefsck
+log "Filesystem check scheduled. Reboot after install if errors are found."
 
 # 2. Update system and install prerequisites
 log "Updating system and installing prerequisites..."
@@ -88,17 +90,20 @@ source venv/bin/activate
 log "Installing Python dependencies..."
 pip install --upgrade pip
 pip install -r requirements.txt
-# Ensure consistent Flask and Gunicorn versions
 pip install flask==2.2.5 gunicorn==23.0.0
 check_status "Python dependency installation"
 
 # 8. Initialize databases
 log "Initializing databases..."
+sudo mkdir -p "${INSTALL_DIR}"
+sudo chown "${USER}:${GROUP}" "${INSTALL_DIR}"
+sudo chmod 775 "${INSTALL_DIR}"
 python3 db_utils.py
 check_status "Main database initialization"
 if [ -f "${DB_FILE}" ]; then
     sudo chmod 664 "${DB_FILE}"
     sudo chown "${USER}:${GROUP}" "${DB_FILE}"
+    ls -l "${DB_FILE}"
     log "Set permissions on ${DB_FILE}"
 else
     log "ERROR: ${DB_FILE} not created"
@@ -107,6 +112,7 @@ fi
 touch "${HAND_COUNTED_DB}"
 sudo chmod 666 "${HAND_COUNTED_DB}"
 sudo chown "${USER}:${GROUP}" "${HAND_COUNTED_DB}"
+ls -l "${HAND_COUNTED_DB}"
 check_status "Hand-counted database setup"
 
 # 9. Verify database write access
@@ -122,6 +128,8 @@ conn.commit()
 conn.close()
 print("Database write test passed")
 EOL
+sudo chown "${USER}:${GROUP}" test_db.py
+sudo chmod 775 test_db.py
 python3 test_db.py
 check_status "Database write test"
 
@@ -186,10 +194,62 @@ else
     log "WARNING: OneDrive URL may be inaccessible (status: $(cat /tmp/onedrive_status))"
 fi
 
-# 14. Start the service
+# 14. Patch run.py to avoid premature DB deletion
+log "Patching run.py to ensure DB permissions..."
+cat > run.py << EOL
+import os
+import logging
+import time
+import threading
+from db_utils import initialize_db
+from refresh_logic import refresh_data
+from app import create_app
+from werkzeug.serving import is_running_from_reloader
+from config import DB_FILE
+from db_connection import DatabaseConnection
+
+# Initialize Flask app globally for Gunicorn
+app = create_app()
+
+# Initialize DB only if it doesn't exist
+db_path = os.path.join(os.path.dirname(__file__), "inventory.db")
+if not os.path.exists(db_path):
+    print("Initializing new database...")
+    initialize_db()  # Create fresh schema
+    os.chmod(db_path, 0o664)  # Set read/write for owner and group
+    os.chown(db_path, os.getuid(), os.getgid())  # Set owner to current user (tim)
+else:
+    print("Using existing database...")
+
+# Verify write access
+try:
+    with sqlite3.connect(db_path) as conn:
+        conn.execute("CREATE TABLE IF NOT EXISTS test (id INTEGER)")
+        conn.execute("INSERT INTO test (id) VALUES (1)")
+    print("Database write access confirmed")
+except sqlite3.OperationalError as e:
+    print(f"ERROR: Database not writable: {e}")
+    raise
+
+# Perform full refresh
+refresh_data(full_refresh=True)  # Full API refresh
+
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+    logging.info("Starting Flask application...")
+    try:
+        app.run(host="0.0.0.0", port=7409, debug=True)
+    except Exception as e:
+        logging.error(f"Flask failed to start: {e}")
+EOL
+sudo chown "${USER}:${GROUP}" run.py
+sudo chmod 664 run.py
+log "run.py patched"
+
+# 15. Start the service
 log "Starting ${SERVICE_NAME} service..."
 sudo systemctl start "${SERVICE_NAME}"
-sleep 10  # Wait longer for service to stabilize
+sleep 15  # Extended wait for stability
 if sudo systemctl is-active --quiet "${SERVICE_NAME}"; then
     log "${SERVICE_NAME} service started successfully"
 else
@@ -199,7 +259,7 @@ else
     exit 1
 fi
 
-# 15. Test the app
+# 16. Test the app
 log "Testing Flask app..."
 curl -s -o /dev/null -w "%{http_code}" http://localhost:7409 > /tmp/app_status
 if [ "$(cat /tmp/app_status)" -eq 200 ]; then
@@ -213,3 +273,4 @@ fi
 
 log "Installation complete! Access the dashboard at http://$(hostname -I | awk '{print $1}'):7409"
 log "Logs are at /var/log/rfid_dash.log and ${LOG_DIR}/"
+log "Reboot recommended to run fsck if disk errors were detected."
