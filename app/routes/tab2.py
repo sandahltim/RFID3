@@ -294,7 +294,12 @@ def show_tab2():
     logging.debug("Loading /tab2/ endpoint")
     try:
         with DatabaseConnection() as conn:
-            items = conn.execute("SELECT * FROM id_item_master").fetchall()
+            # Join with id_rfidtag to ensure category data
+            items = conn.execute("""
+                SELECT im.*, rt.category as rfid_category
+                FROM id_item_master im
+                LEFT JOIN id_rfidtag rt ON im.tag_id = rt.tag_id
+            """).fetchall()
             contracts = conn.execute("""
                 SELECT DISTINCT last_contract_num, client_name, MAX(date_last_scanned) as scan_date 
                 FROM id_item_master 
@@ -324,7 +329,8 @@ def show_tab2():
 
         category_map = defaultdict(list)
         for item in filtered_items:
-            cat = categorize_item(item.get("rental_class_num"))
+            # Use rfid_category if available, else fall back to rental_class_num
+            cat = item.get("rfid_category") or categorize_item(item.get("rental_class_num"))
             category_map[cat].append(item)
 
         parent_data = []
@@ -333,7 +339,6 @@ def show_tab2():
             available = sum(1 for item in item_list if item.get("status") == "Ready to Rent")
             on_rent = sum(1 for item in item_list if item.get("status") in ["On Rent", "Delivered"])
             service = len(item_list) - available - on_rent
-            # Safely handle client_name and scan_date
             client_name = "N/A"
             scan_date = "N/A"
             if item_list and item_list[0].get("last_contract_num"):
@@ -341,7 +346,6 @@ def show_tab2():
                 client_name = contract_info.get("client_name", "N/A")
                 scan_date = contract_info.get("scan_date", "N/A")
 
-            # Simplify sub_map to just a list of subcategories
             temp_sub_map = set()
             for itm in item_list:
                 subcat = subcategorize_item(category, itm.get("rental_class_num"))
@@ -389,31 +393,49 @@ def subcat_data():
 
     try:
         with DatabaseConnection() as conn:
-            rows = conn.execute("SELECT * FROM id_item_master").fetchall()
+            # Join with id_rfidtag for category data
+            query = """
+                SELECT im.*, rt.category as rfid_category
+                FROM id_item_master im
+                LEFT JOIN id_rfidtag rt ON im.tag_id = rt.tag_id
+                WHERE 1=1
+            """
+            params = []
+            if category:
+                query += " AND (rt.category = ? OR im.rental_class_num IN (SELECT key FROM (SELECT ? as key, ? as value) WHERE value = ?))"
+                params.extend([category, category, category, category])
+            if subcat:
+                query += " AND ? IN (SELECT value FROM (SELECT ? as key, ? as value) WHERE value = ?)"
+                params.extend([subcat, subcat, subcat, subcat])
+
+            filter_common_name = request.args.get("common_name", "").lower().strip()
+            filter_tag_id = request.args.get("tag_id", "").lower().strip()
+            filter_bin_location = request.args.get("bin_location", "").lower().strip()
+            filter_last_contract = request.args.get("last_contract_num", "").lower().strip()
+            filter_status = request.args.get("status", "").lower().strip()
+
+            if filter_common_name:
+                query += " AND LOWER(im.common_name) LIKE ?"
+                params.append(f"%{filter_common_name}%")
+            if filter_tag_id:
+                query += " AND LOWER(im.tag_id) LIKE ?"
+                params.append(f"%{filter_tag_id}%")
+            if filter_bin_location:
+                query += " AND LOWER(im.bin_location) LIKE ?"
+                params.append(f"%{filter_bin_location}%")
+            if filter_last_contract:
+                query += " AND LOWER(im.last_contract_num) LIKE ?"
+                params.append(f"%{filter_last_contract}%")
+            if filter_status:
+                query += " AND LOWER(im.status) LIKE ?"
+                params.append(f"%{filter_status}%")
+
+            rows = conn.execute(query, params).fetchall()
         items = [dict(row) for row in rows]
 
-        filter_common_name = request.args.get("common_name", "").lower().strip()
-        filter_tag_id = request.args.get("tag_id", "").lower().strip()
-        filter_bin_location = request.args.get("bin_location", "").lower().strip()
-        filter_last_contract = request.args.get("last_contract_num", "").lower().strip()
-        filter_status = request.args.get("status", "").lower().strip()
+        category_items = [item for item in items if (item.get("rfid_category") or categorize_item(item.get("rental_class_num"))) == category]
+        subcat_items = [item for item in category_items if subcategorize_item(category, item.get("rental_class_num")) == subcat or subcat == "Unspecified"]
 
-        filtered_items = items
-        if filter_common_name:
-            filtered_items = [item for item in filtered_items if filter_common_name in (item.get("common_name") or "").lower()]
-        if filter_tag_id:
-            filtered_items = [item for item in filtered_items if filter_tag_id in (item.get("tag_id") or "").lower()]
-        if filter_bin_location:
-            filtered_items = [item for item in filtered_items if filter_bin_location in (item.get("bin_location") or "").lower()]
-        if filter_last_contract:
-            filtered_items = [item for item in filtered_items if filter_last_contract in (item.get("last_contract_num") or "").lower()]
-        if filter_status:
-            filtered_items = [item for item in filtered_items if filter_status in (item.get("status") or "").lower()]
-
-        category_items = [item for item in filtered_items if categorize_item(item.get("rental_class_num")) == category]
-        subcat_items = [item for item in category_items if subcategorize_item(category, item.get("rental_class_num")) == subcat]
-
-        # Paginate items directly (no common_names nesting)
         total_items = len(subcat_items)
         total_pages = (total_items + per_page - 1) // per_page
         page = max(1, min(page, total_pages))
@@ -425,9 +447,9 @@ def subcat_data():
 
         return jsonify({
             "items": [{
-                "tag_id": item["tag_id"],
+                "tag_id": item["tag_id"] or "N/A",
                 "common_name": item.get("common_name", "Unknown"),
-                "status": item["status"],
+                "status": item.get("status", "N/A"),
                 "bin_location": item.get("bin_location", "N/A"),
                 "quality": item.get("quality", "N/A"),
                 "last_contract_num": item.get("last_contract_num", "N/A"),
@@ -441,67 +463,4 @@ def subcat_data():
         })
     except Exception as e:
         logging.error(f"Error in subcat_data: {e}")
-        return jsonify({"error": str(e)}), 500
-
-@tab2_bp.route("/item_data", methods=["GET"])
-def item_data():
-    logging.debug("Hit /tab2/item_data endpoint")
-    category = request.args.get('category')
-    subcat = request.args.get('subcat')
-    page = int(request.args.get('page', 1))
-    per_page = 20
-
-    try:
-        with DatabaseConnection() as conn:
-            rows = conn.execute("SELECT * FROM id_item_master").fetchall()
-        items = [dict(row) for row in rows]
-
-        filter_common_name = request.args.get("common_name", "").lower().strip()
-        filter_tag_id = request.args.get("tag_id", "").lower().strip()
-        filter_bin_location = request.args.get("bin_location", "").lower().strip()
-        filter_last_contract = request.args.get("last_contract_num", "").lower().strip()
-        filter_status = request.args.get("status", "").lower().strip()
-
-        filtered_items = items
-        if filter_common_name:
-            filtered_items = [item for item in filtered_items if filter_common_name in (item.get("common_name") or "").lower()]
-        if filter_tag_id:
-            filtered_items = [item for item in filtered_items if filter_tag_id in (item.get("tag_id") or "").lower()]
-        if filter_bin_location:
-            filtered_items = [item for item in filtered_items if filter_bin_location in (item.get("bin_location") or "").lower()]
-        if filter_last_contract:
-            filtered_items = [item for item in filtered_items if filter_last_contract in (item.get("last_contract_num") or "").lower()]
-        if filter_status:
-            filtered_items = [item for item in filtered_items if filter_status in (item.get("status") or "").lower()]
-
-        category_items = [item for item in filtered_items if categorize_item(item.get("rental_class_num")) == category]
-        subcat_items = [item for item in category_items if subcategorize_item(category, item.get("rental_class_num")) == subcat]
-
-        total_items = len(subcat_items)
-        total_pages = (total_items + per_page - 1) // per_page
-        page = max(1, min(page, total_pages))
-        start = (page - 1) * per_page
-        end = start + per_page
-        paginated_items = subcat_items[start:end]
-
-        logging.debug(f"AJAX: Category: {category}, Subcategory: {subcat}, Total Items: {total_items}, Page: {page}")
-
-        return jsonify({
-            "items": [{
-                "tag_id": item["tag_id"],
-                "common_name": item.get("common_name", "Unknown"),
-                "status": item["status"],
-                "bin_location": item.get("bin_location", "N/A"),
-                "quality": item.get("quality", "N/A"),
-                "last_contract_num": item.get("last_contract_num", "N/A"),
-                "date_last_scanned": item.get("date_last_scanned", "N/A"),
-                "last_scanned_by": item.get("last_scanned_by", "N/A"),
-                "notes": item.get("notes", "N/A")
-            } for item in paginated_items],
-            "total_items": total_items,
-            "total_pages": total_pages,
-            "current_page": page
-        })
-    except Exception as e:
-        logging.error(f"Error in item_data: {e}")
         return jsonify({"error": str(e)}), 500
