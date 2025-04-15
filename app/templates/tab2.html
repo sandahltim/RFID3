@@ -1,440 +1,399 @@
-{% extends "base.html" %}
+{% extends 'base.html' %}
 {% block content %}
-
-<h1>Inventory by Category</h1>
-
-<form method="GET" class="mb-3 row g-2">
-  <div class="col-12 col-md-2">
-    <input type="text" class="form-control" name="common_name" placeholder="Filter Common Name" value="{{ filter_common_name }}" />
-  </div>
-  <div class="col-12 col-md-2">
-    <input type="text" class="form-control" name="tag_id" placeholder="Filter Tag ID" value="{{ filter_tag_id }}" />
-  </div>
-  <div class="col-12 col-md-2">
-    <input type="text" class="form-control" name="bin_location" placeholder="Filter Bin Location" value="{{ filter_bin_location }}" />
-  </div>
-  <div class="col-12 col-md-2">
-    <input type="text" class="form-control" name="last_contract_num" placeholder="Filter Last Contract" value="{{ filter_last_contract }}" />
-  </div>
-  <div class="col-12 col-md-2">
-    <input type="text" class="form-control" name="status" placeholder="Filter Status" value="{{ filter_status }}" />
-  </div>
-  <div class="col-12 col-md-2">
-    <button type="submit" class="btn btn-primary">Apply Filters</button>
-  </div>
-</form>
-
-<div class="table-container">
-  <table class="table table-striped table-bordered" id="parentTable">
-    <thead>
-      <tr>
-        <th style="width: 50px;"></th>
-        <th class="sortable" data-col-name="category">Category</th>
-        <th class="sortable" data-col-name="total">Total Items</th>
-        <th class="sortable" data-col-name="available">Items Available</th>
-        <th class="sortable" data-col-name="on_rent">Items On Rent</th>
-        <th class="sortable" data-col-name="service">Service</th>
-      </tr>
-    </thead>
-    <tbody id="parentTableBody">
-      {% for parent in parent_data %}
-      {% set cat_key = parent.category|lower|replace('/[^a-z0-9]/gi', '_') %}
-      <tr class="table-active">
-        <td><span class="expand-toggle" data-bs-toggle="collapse" data-bs-target="#child-{{ cat_key }}">+</span></td>
-        <td>{{ parent.category }}</td>
-        <td>{{ parent.total }}</td>
-        <td>{{ parent.available }}</td>
-        <td>{{ parent.on_rent }}</td>
-        <td>{{ parent.service }}</td>
-      </tr>
-      <tr>
-        <td colspan="6" class="p-0">
-          <div id="child-{{ cat_key }}" class="collapse" data-category="{{ parent.category }}" {% if expand_category == parent.category %}data-auto-expand="true"{% endif %}>
-            <div class="mb-2 mx-2">
-              <select class="form-select subcategory-dropdown" data-category="{{ parent.category }}">
-                <option value="">Select Subcategory</option>
-                {% for subcat in sub_map.get(parent.category, ['Unspecified']) %}
-                <option value="{{ subcat }}">{{ subcat }}</option>
-                {% endfor %}
-              </select>
-            </div>
-            <div id="loading-{{ cat_key }}" class="text-center my-2" style="display: none;">
-              <div class="spinner-border text-primary" role="status">
-                <span class="visually-hidden">Loading...</span>
-              </div>
-            </div>
-            <nav aria-label="Item navigation" class="mb-2 mx-2" id="pagination-{{ cat_key }}">
-              <ul class="pagination pagination-sm justify-content-center flex-wrap"></ul>
-            </nav>
-            <div class="child-table-container">
-              <table class="table mb-0 child-table" id="childTable-{{ cat_key }}">
-                <thead>
-                  <tr>
-                    <th class="sortable" data-col-name="tag_id">Tag ID</th>
-                    <th class="sortable" data-col-name="common_name">Common Name</th>
-                    <th class="sortable" data-col-name="status">Status</th>
-                    <th class="sortable" data-col-name="bin_location">Bin Location</th>
-                    <th class="sortable" data-col-name="quality">Quality</th>
-                    <th class="sortable" data-col-name="last_contract_num">Last Contract Num</th>
-                    <th class="sortable" data-col-name="date_last_scanned">Last Scanned Date</th>
-                    <th class="sortable" data-col-name="last_scanned_by">Last Scanned By</th>
-                    <th class="sortable" data-col-name="notes">Notes</th>
-                  </tr>
-                </thead>
-                <tbody id="childTbody-{{ cat_key }}"></tbody>
-              </table>
-            </div>
-          </div>
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-</div>
-
-<script>
-function sortTable(tableEl, colName) {
-  let tbody = tableEl.querySelector("tbody");
-  if (!tbody) return;
-
-  let asc = tableEl.getAttribute("data-sort-col") === colName 
-            ? tableEl.getAttribute("data-sort-dir") !== "asc" 
-            : true;
-  tableEl.setAttribute("data-sort-col", colName);
-  tableEl.setAttribute("data-sort-dir", asc ? "asc" : "desc");
-
-  let headers = Array.from(tableEl.querySelectorAll("th"));
-  let colIndex = headers.findIndex(th => th.getAttribute("data-col-name") === colName);
-
-  if (tableEl.id === "parentTable") {
-    let rows = Array.from(tbody.children);
-    let pairs = [];
-    for (let i = 0; i < rows.length; i += 2) {
-      let parentRow = rows[i];
-      let childRow = rows[i + 1] || null;
-      if (parentRow && parentRow.classList.contains("table-active")) {
-        pairs.push({ parent: parentRow, child: childRow });
-      }
-    }
-    pairs.sort((a, b) => {
-      let cellA = a.parent.cells[colIndex]?.innerText.trim() || "";
-      let cellB = b.parent.cells[colIndex]?.innerText.trim() || "";
-      let numA = parseFloat(cellA.replace(/[^0-9.\-]/g, ""));
-      let numB = parseFloat(cellB.replace(/[^0-9.\-]/g, ""));
-      if (!isNaN(numA) && !isNaN(numB)) return asc ? numA - numB : numB - numA;
-      return asc ? cellA.localeCompare(cellB) : cellB.localeCompare(cellA);
-    });
-    tbody.innerHTML = "";
-    pairs.forEach(pair => {
-      tbody.appendChild(pair.parent);
-      if (pair.child) tbody.appendChild(pair.child);
-    });
-  } else {
-    let rows = Array.from(tbody.querySelectorAll("tr"));
-    rows.sort((a, b) => {
-      let cellA = a.cells[colIndex]?.innerText.trim() || "";
-      let cellB = b.cells[colIndex]?.innerText.trim() || "";
-      let numA = parseFloat(cellA.replace(/[^0-9.\-]/g, ""));
-      let numB = parseFloat(cellB.replace(/[^0-9.\-]/g, ""));
-      if (!isNaN(numA) && !isNaN(numB)) return asc ? numA - numB : numB - numA;
-      return asc ? cellA.localeCompare(cellB) : cellB.localeCompare(cellA);
-    });
-    tbody.innerHTML = "";
-    rows.forEach(row => tbody.appendChild(row));
-  }
-}
-
-function loadSubcatData(category, subcat, page, catKey) {
-  console.log(`Loading: Category: ${category}, Subcat: ${subcat}, Page: ${page}, CatKey: ${catKey}`);
-  const loading = document.getElementById(`loading-${catKey}`);
-  if (loading) loading.style.display = 'block';
-
-  const urlParams = new URLSearchParams(window.location.search);
-  const params = {
-    category: category,
-    subcat: subcat || 'Unspecified',
-    page: page,
-    common_name: urlParams.get('common_name') || '',
-    tag_id: urlParams.get('tag_id') || '',
-    bin_location: urlParams.get('bin_location') || '',
-    last_contract_num: urlParams.get('last_contract_num') || '',
-    status: urlParams.get('status') || ''
-  };
-  const url = `/tab2/subcat_data?${new URLSearchParams(params).toString()}`;
-  console.log(`Fetching URL: ${url}`);
-
-  fetch(url)
-    .then(response => {
-      if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
-      return response.json();
-    })
-    .then(data => {
-      console.log('AJAX Response:', data);
-      const tbody = document.getElementById(`childTbody-${catKey}`);
-      if (!tbody) {
-        console.error(`Tbody not found for CatKey: ${catKey}`);
-        return;
-      }
-      tbody.innerHTML = '';
-      if (data.items && data.items.length > 0) {
-        data.items.forEach(item => {
-          const tr = document.createElement('tr');
-          tr.innerHTML = `
-            <td>${item.tag_id || 'N/A'}</td>
-            <td>${item.common_name || 'Unknown'}</td>
-            <td>${item.status || 'N/A'}</td>
-            <td>${item.bin_location || 'N/A'}</td>
-            <td>${item.quality || 'N/A'}</td>
-            <td>${item.last_contract_num || 'N/A'}</td>
-            <td>${item.date_last_scanned || 'N/A'}</td>
-            <td>${item.last_scanned_by || 'N/A'}</td>
-            <td>${item.notes || 'N/A'}</td>
-          `;
-          tbody.appendChild(tr);
-        });
-      } else {
-        tbody.innerHTML = '<tr><td colspan="9">No items found</td></tr>';
-      }
-
-      const pagination = document.getElementById(`pagination-${catKey}`);
-      if (pagination) {
-        const paginationList = pagination.querySelector('.pagination');
-        paginationList.innerHTML = '';
-        if (data.total_pages > 1) {
-          const prevLi = document.createElement('li');
-          prevLi.className = `page-item ${data.current_page === 1 ? 'disabled' : ''}`;
-          prevLi.innerHTML = `<a class="page-link" href="#" data-page="${data.current_page - 1}" aria-label="Previous"><span aria-hidden="true">« Prev</span></a>`;
-          paginationList.appendChild(prevLi);
-
-          for (let p = 1; p <= data.total_pages; p++) {
-            const li = document.createElement('li');
-            li.className = `page-item ${p === data.current_page ? 'active' : ''}`;
-            li.innerHTML = `<a class="page-link" href="#" data-page="${p}">${p}</a>`;
-            paginationList.appendChild(li);
-          }
-
-          const nextLi = document.createElement('li');
-          nextLi.className = `page-item ${data.current_page === data.total_pages ? 'disabled' : ''}`;
-          nextLi.innerHTML = `<a class="page-link" href="#" data-page="${data.current_page + 1}" aria-label="Next"><span aria-hidden="true">Next »</span></a>`;
-          paginationList.appendChild(nextLi);
-
-          pagination.querySelectorAll('.page-link').forEach(link => {
-            link.addEventListener('click', (e) => {
-              e.preventDefault();
-              const newPage = parseInt(link.getAttribute('data-page'));
-              if (!isNaN(newPage)) loadSubcatData(category, subcat, newPage, catKey);
-            });
-          });
-        }
-      }
-      if (loading) loading.style.display = 'none';
-    })
-    .catch(error => {
-      console.error('Error loading subcat data:', error);
-      const tbody = document.getElementById(`childTbody-${catKey}`);
-      if (tbody) {
-        tbody.innerHTML = '<tr><td colspan="9">Error loading data</td></tr>';
-      }
-      if (loading) loading.style.display = 'none';
-    });
-}
-
-function refreshTable() {
-  console.log("Refreshing Tab 2 at " + new Date().toLocaleTimeString());
-  const expandedIds = Array.from(document.querySelectorAll('.collapse.show')).map(el => el.id);
-  const urlParams = new URLSearchParams(window.location.search);
-  const url = `/tab2/?${urlParams.toString()}`;
-
-  fetch(url)
-    .then(response => {
-      if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
-      return response.text();
-    })
-    .then(html => {
-      console.log("Refresh data received");
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(html, 'text/html');
-      const newTbody = doc.querySelector('#parentTableBody');
-      if (newTbody) {
-        document.getElementById('parentTableBody').innerHTML = newTbody.innerHTML;
-      }
-
-      expandedIds.forEach(id => {
-        const element = document.getElementById(id);
-        if (element) {
-          console.log(`Restoring expanded state for: ${id}`);
-          new bootstrap.Collapse(element, { toggle: false }).show();
-          const toggle = document.querySelector(`[data-bs-target="#${id}"]`);
-          if (toggle) toggle.textContent = '-';
-          const category = element.getAttribute('data-category');
-          const catKey = id.replace('child-', '');
-          const select = element.querySelector('.subcategory-dropdown');
-          if (select) {
-            const subcat = select.value || 'Unspecified';
-            loadSubcatData(category, subcat, 1, catKey);
-          }
-        }
-      });
-    })
-    .catch(error => console.error('Error refreshing table:', error));
-}
-
-function updateWithNewData(newData) {
-  console.log("Updating Tab 2 with new data:", newData);
-  const urlParams = new URLSearchParams(window.location.search);
-  const filters = {
-    common_name: urlParams.get('common_name')?.toLowerCase() || '',
-    tag_id: urlParams.get('tag_id')?.toLowerCase() || '',
-    bin_location: urlParams.get('bin_location')?.toLowerCase() || '',
-    last_contract_num: urlParams.get('last_contract_num')?.toLowerCase() || '',
-    status: urlParams.get('status')?.toLowerCase() || ''
-  };
-
-  const tbody = document.getElementById('parentTableBody');
-  const categoryTotals = {};
-  newData.items.forEach(item => {
-    const cat = item.rfid_category || 'Other';  // Use rfid_category directly
-    if (!categoryTotals[cat]) {
-      categoryTotals[cat] = { total: 0, available: 0, on_rent: 0, service: 0 };
-    }
-    if (!filters.common_name || item.common_name.toLowerCase().includes(filters.common_name)) {
-      if (!filters.tag_id || item.tag_id.toLowerCase().includes(filters.tag_id)) {
-        if (!filters.bin_location || (item.bin_location || '').toLowerCase().includes(filters.bin_location)) {
-          if (!filters.last_contract_num || (item.last_contract_num || '').toLowerCase().includes(filters.last_contract_num)) {
-            if (!filters.status || (item.status || '').toLowerCase().includes(filters.status)) {
-              categoryTotals[cat].total++;
-              if (item.status === "Ready to Rent") categoryTotals[cat].available++;
-              else if (["On Rent", "Delivered"].includes(item.status)) categoryTotals[cat].on_rent++;
-              else categoryTotals[cat].service++;
-            }
-          }
-        }
-      }
-    }
-  });
-
-  Object.entries(categoryTotals).forEach(([category, data]) => {
-    let parentRow = Array.from(tbody.querySelectorAll('.table-active'))
-      .find(row => row.cells[1].innerText === category);
-    const cat_key = category.toLowerCase().replace(/[^a-z0-9]/gi, '_');
-    if (!parentRow) {
-      parentRow = document.createElement('tr');
-      parentRow.className = 'table-active';
-      parentRow.innerHTML = `
-        <td><span class="expand-toggle" data-bs-toggle="collapse" data-bs-target="#child-${cat_key}">+</span></td>
-        <td>${category}</td>
-        <td>${data.total}</td>
-        <td>${data.available}</td>
-        <td>${data.on_rent}</td>
-        <td>${data.service}</td>
-      `;
-      const childRow = document.createElement('tr');
-      childRow.innerHTML = `
-        <td colspan="6" class="p-0">
-          <div id="child-${cat_key}" class="collapse" data-category="${category}">
-            <div class="mb-2 mx-2">
-              <select class="form-select subcategory-dropdown" data-category="${category}">
-                <option value="">Select Subcategory</option>
-              </select>
-            </div>
-            <div id="loading-${cat_key}" class="text-center my-2" style="display: none;">
-              <div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div>
-            </div>
-            <nav aria-label="Item navigation" class="mb-2 mx-2" id="pagination-${cat_key}">
-              <ul class="pagination pagination-sm justify-content-center flex-wrap"></ul>
-            </nav>
-            <div class="child-table-container">
-              <table class="table mb-0 child-table" id="childTable-${cat_key}">
-                <thead>
-                  <tr>
-                    <th class="sortable" data-col-name="tag_id">Tag ID</th>
-                    <th class="sortable" data-col-name="common_name">Common Name</th>
-                    <th class="sortable" data-col-name="status">Status</th>
-                    <th class="sortable" data-col-name="bin_location">Bin Location</th>
-                    <th class="sortable" data-col-name="quality">Quality</th>
-                    <th class="sortable" data-col-name="last_contract_num">Last Contract Num</th>
-                    <th class="sortable" data-col-name="date_last_scanned">Last Scanned Date</th>
-                    <th class="sortable" data-col-name="last_scanned_by">Last Scanned By</th>
-                    <th class="sortable" data-col-name="notes">Notes</th>
-                  </tr>
-                </thead>
-                <tbody id="childTbody-${cat_key}"></tbody>
-              </table>
-            </div>
-          </div>
-        </td>
-      `;
-      tbody.appendChild(parentRow);
-      tbody.appendChild(childRow);
-    } else {
-      parentRow.cells[2].innerText = data.total;
-      parentRow.cells[3].innerText = data.available;
-      parentRow.cells[4].innerText = data.on_rent;
-      parentRow.cells[5].innerText = data.service;
-    }
-  });
-}
-
-document.addEventListener("DOMContentLoaded", () => {
-  console.log("DOM Content Loaded - Tab 2");
-
-  document.getElementById("parentTable").addEventListener('click', (e) => {
-    const target = e.target;
-    if (target.classList.contains("sortable")) {
-      const table = target.closest('table');
-      const colName = target.getAttribute("data-col-name");
-      sortTable(table, colName);
-    } else if (target.classList.contains("expand-toggle")) {
-      const targetId = target.getAttribute('data-bs-target');
-      const targetEl = document.querySelector(targetId);
-      if (targetEl && !targetEl.classList.contains('show')) {
-        const category = targetEl.getAttribute("data-category");
-        const catKey = targetId.split("child-")[1];
-        const select = targetEl.querySelector(".subcategory-dropdown");
-        const subcat = select ? select.value || 'Unspecified' : 'Unspecified';
-        loadSubcatData(category, subcat, 1, catKey);
-      }
-      targetEl.addEventListener("show.bs.collapse", () => target.textContent = "-");
-      targetEl.addEventListener("hide.bs.collapse", () => target.textContent = "+");
-    }
-  });
-
-  document.querySelectorAll(".subcategory-dropdown").forEach(select => {
-    select.addEventListener("change", () => {
-      const category = select.getAttribute("data-category");
-      const subcat = select.value || 'Unspecified';
-      const catKey = category.toLowerCase().replace(/[^a-z0-9]/gi, '_');
-      loadSubcatData(category, subcat, 1, catKey);
-    });
-  });
-
-  let expandCat = "{{ expand_category | default('') }}";
-  if (expandCat) {
-    let collapse = document.querySelector(`#child-${expandCat.toLowerCase().replace(/[^a-z0-9]/gi, '_')}`);
-    if (collapse) {
-      new bootstrap.Collapse(collapse, { toggle: true });
-      const select = collapse.querySelector(".subcategory-dropdown");
-      const subcat = select ? select.value || 'Unspecified' : 'Unspecified';
-      loadSubcatData(expandCat, subcat, 1, expandCat.toLowerCase().replace(/[^a-z0-9]/gi, '_'));
-    }
-  }
-
-  document.addEventListener('newData', (e) => {
-    updateWithNewData(e.detail);
-  });
-
-  setInterval(refreshTable, 60000);
-});
-</script>
-
 <style>
-  body, html { height: 100%; overflow: auto; margin: 0; padding: 0; }
-  .table-container { width: 100%; overflow-y: auto; }
-  .table-container table { width: 100%; table-layout: auto; }
-  .child-table-container { width: 100%; overflow-y: auto; }
-  .child-table-container table { width: 100%; table-layout: auto; }
-  .collapse { width: 100%; }
-  @media (max-width: 768px) { .pagination .page-link { padding: 0.25rem 0.5rem; font-size: 0.9rem; } }
+    table {
+        border-collapse: collapse;
+        width: 100%;
+        margin-bottom: 20px;
+    }
+    th, td {
+        border: 1px solid #ddd;
+        padding: 8px;
+        text-align: left;
+    }
+    th {
+        background-color: #f2f2f2;
+        cursor: pointer;
+    }
+    tr:nth-child(even) {
+        background-color: #f9f9f9;
+    }
+    tr:hover {
+        background-color: #f5f5f5;
+    }
+    .expandable:hover {
+        cursor: pointer;
+    }
+    .child-row {
+        display: none;
+        background-color: #e6f3ff;
+    }
+    .child-row.visible {
+        display: table-row;
+    }
+    .child-table {
+        width: 100%;
+        margin: 10px 0;
+    }
+    .pagination {
+        margin: 10px 0;
+    }
+    .pagination a {
+        margin: 0 5px;
+        text-decoration: none;
+        color: #007bff;
+    }
+    .pagination a.active {
+        font-weight: bold;
+        color: #000;
+    }
+    .filter-container {
+        margin-bottom: 20px;
+    }
+    .filter-container input {
+        margin-right: 10px;
+        padding: 5px;
+    }
 </style>
 
+<div class="filter-container">
+    <input type="text" id="commonNameFilter" placeholder="Filter by Common Name" value="{{ filter_common_name }}">
+    <input type="text" id="tagIdFilter" placeholder="Filter by Tag ID" value="{{ filter_tag_id }}">
+    <input type="text" id="binLocationFilter" placeholder="Filter by Bin Location" value="{{ filter_bin_location }}">
+    <input type="text" id="lastContractFilter" placeholder="Filter by Last Contract" value="{{ filter_last_contract }}">
+    <input type="text" id="statusFilter" placeholder="Filter by Status" value="{{ filter_status }}">
+    <button onclick="applyFilters()">Apply Filters</button>
+</div>
+
+<table id="parentTable">
+    <thead>
+        <tr>
+            <th>Category</th>
+            <th>Total Amount</th>
+            <th>On Contract</th>
+            <th>Available</th>
+            <th>Service</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for row in parent_data %}
+        <tr class="expandable" data-category="{{ row.category | lower | replace(' ', '-') }}">
+            <td>{{ row.category }}</td>
+            <td>{{ row.total_amount }}</td>
+            <td>{{ row.on_contract }}</td>
+            <td>{{ row.available }}</td>
+            <td>{{ row.service }}</td>
+        </tr>
+        <tr id="child-{{ row.category | lower | replace(' ', '-') }}" class="child-row">
+            <td colspan="5">
+                <table class="child-table" id="subtable-{{ row.category | lower | replace(' ', '-') }}">
+                    <thead>
+                        <tr>
+                            <th>Subcategory</th>
+                            <th>Total</th>
+                            <th>On Contract</th>
+                            <th>Available</th>
+                            <th>Service</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for sub in sub_map[row.category] %}
+                        <tr class="sub-expandable" data-category="{{ row.category | lower | replace(' ', '-') }}" data-subcategory="{{ sub.subcategory | lower | replace(' ', '-') }}">
+                            <td>{{ sub.subcategory }}</td>
+                            <td>{{ sub.total }}</td>
+                            <td>{{ sub.on_contract }}</td>
+                            <td>{{ sub.available }}</td>
+                            <td>{{ sub.service }}</td>
+                        </tr>
+                        <tr id="items-{{ row.category | lower | replace(' ', '-') }}-{{ sub.subcategory | lower | replace(' ', '-') }}" class="child-row">
+                            <td colspan="5">
+                                <table class="items-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Tag ID</th>
+                                            <th>Common Name</th>
+                                            <th>Status</th>
+                                            <th>Bin Location</th>
+                                            <th>Quality</th>
+                                            <th>Last Contract</th>
+                                            <th>Client Name</th>
+                                            <th>Scanned Date</th>
+                                            <th>Scanned By</th>
+                                            <th>Notes</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody></tbody>
+                                </table>
+                                <div class="pagination" id="pagination-{{ row.category | lower | replace(' ', '-') }}-{{ sub.subcategory | lower | replace(' ', '-') }}"></div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM Content Loaded - Tab 2');
+    const expandedState = new Set();
+
+    function checkReloadStatus() {
+        fetch('/status')
+            .then(response => response.json())
+            .then(data => {
+                console.log('Reload status:', data.is_reloading);
+            })
+            .catch(error => console.error('Error checking reload status:', error));
+    }
+
+    checkReloadStatus();
+    setInterval(checkReloadStatus, 30000);
+
+    function applyFilters() {
+        const params = new URLSearchParams();
+        const filters = {
+            common_name: document.getElementById('commonNameFilter').value,
+            tag_id: document.getElementById('tagIdFilter').value,
+            bin_location: document.getElementById('binLocationFilter').value,
+            last_contract_num: document.getElementById('lastContractFilter').value,
+            status: document.getElementById('statusFilter').value
+        };
+        for (const [key, value] of Object.entries(filters)) {
+            if (value) params.set(key, value);
+        }
+        window.location.href = '/tab2/?' + params.toString();
+    }
+
+    function toggleRow(row, childId) {
+        const childRow = document.getElementById(childId);
+        if (childRow) {
+            const isVisible = childRow.classList.contains('visible');
+            childRow.classList.toggle('visible', !isVisible);
+            if (!isVisible) {
+                expandedState.add(childId);
+            } else {
+                expandedState.delete(childId);
+            }
+        }
+    }
+
+    function loadSubcategoryItems(category, subcategory, page = 1, catKey) {
+        console.log(`Loading: Category: ${category}, Subcat: ${subcategory}, Page: ${page}, CatKey: ${catKey}`);
+        const params = new URLSearchParams({
+            category: category,
+            subcategory: subcategory,
+            page: page,
+            common_name: document.getElementById('commonNameFilter').value,
+            tag_id: document.getElementById('tagIdFilter').value,
+            bin_location: document.getElementById('binLocationFilter').value,
+            last_contract_num: document.getElementById('lastContractFilter').value,
+            status: document.getElementById('statusFilter').value
+        });
+        const url = `/tab2/subcat_data?${params.toString()}`;
+        console.log(`Fetching URL: ${url}`);
+        fetch(url)
+            .then(response => response.json())
+            .then(data => {
+                console.log('AJAX Response:', data);
+                const itemsRow = document.getElementById(`items-${catKey}-${subcategory.toLowerCase().replace(/ /g, '-')}`);
+                if (!itemsRow) return;
+                const tbody = itemsRow.querySelector('.items-table tbody');
+                tbody.innerHTML = '';
+                data.items.forEach(item => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${item.tag_id}</td>
+                        <td>${item.common_name}</td>
+                        <td>${item.status}</td>
+                        <td>${item.bin_location}</td>
+                        <td>${item.quality}</td>
+                        <td>${item.last_contract_num}</td>
+                        <td>${item.client_name}</td>
+                        <td>${item.date_last_scanned}</td>
+                        <td>${item.last_scanned_by}</td>
+                        <td>${item.notes}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+
+                const pagination = document.getElementById(`pagination-${catKey}-${subcategory.toLowerCase().replace(/ /g, '-')}`);
+                if (pagination) {
+                    pagination.innerHTML = '';
+                    for (let i = 1; i <= data.total_pages; i++) {
+                        const a = document.createElement('a');
+                        a.href = '#';
+                        a.textContent = i;
+                        if (i === data.current_page) a.classList.add('active');
+                        a.addEventListener('click', (e) => {
+                            e.preventDefault();
+                            loadSubcategoryItems(category, subcategory, i, catKey);
+                        });
+                        pagination.appendChild(a);
+                    }
+                }
+            })
+            .catch(error => console.error('Error loading subcategory items:', error));
+    }
+
+    document.querySelectorAll('.expandable').forEach(row => {
+        const category = row.dataset.category;
+        row.addEventListener('click', () => toggleRow(row, `child-${category}`));
+    });
+
+    document.querySelectorAll('.sub-expandable').forEach(row => {
+        const category = row.dataset.category;
+        const subcategory = row.dataset.subcategory;
+        row.addEventListener('click', () => {
+            const childId = `items-${category}-${subcategory}`;
+            const childRow = document.getElementById(childId);
+            if (childRow) {
+                const isVisible = childRow.classList.contains('visible');
+                childRow.classList.toggle('visible', !isVisible);
+                if (!isVisible) {
+                    loadSubcategoryItems(
+                        category.replace(/-/g, ' '),
+                        subcategory.replace(/-/g, ' '),
+                        1,
+                        category
+                    );
+                    expandedState.add(childId);
+                } else {
+                    expandedState.delete(childId);
+                }
+            }
+        });
+    });
+
+    function refreshTable() {
+        console.log('Refreshing Tab 2 at', new Date().toLocaleTimeString());
+        fetch('/tab2/data?' + new URLSearchParams({
+            common_name: document.getElementById('commonNameFilter').value,
+            tag_id: document.getElementById('tagIdFilter').value,
+            bin_location: document.getElementById('binLocationFilter').value,
+            last_contract_num: document.getElementById('lastContractFilter').value,
+            status: document.getElementById('statusFilter').value
+        }))
+            .then(response => response.json())
+            .then(data => {
+                console.log('Refresh data received');
+                const tbody = document.querySelector('#parentTable tbody');
+                tbody.innerHTML = '';
+                data.parent_data.forEach(row => {
+                    const tr = document.createElement('tr');
+                    tr.className = 'expandable';
+                    tr.dataset.category = row.category.toLowerCase().replace(/ /g, '-');
+                    tr.innerHTML = `
+                        <td>${row.category}</td>
+                        <td>${row.total_amount}</td>
+                        <td>${row.on_contract}</td>
+                        <td>${row.available}</td>
+                        <td>${row.service}</td>
+                    `;
+                    tbody.appendChild(tr);
+
+                    const childTr = document.createElement('tr');
+                    childTr.id = `child-${row.category.toLowerCase().replace(/ /g, '-')}`;
+                    childTr.className = 'child-row';
+                    if (expandedState.has(childTr.id)) childTr.classList.add('visible');
+                    childTr.innerHTML = `
+                        <td colspan="5">
+                            <table class="child-table" id="subtable-${row.category.toLowerCase().replace(/ /g, '-')}" style="display: ${expandedState.has(childTr.id) ? 'table' : 'none'}">
+                                <thead>
+                                    <tr>
+                                        <th>Subcategory</th>
+                                        <th>Total</th>
+                                        <th>On Contract</th>
+                                        <th>Available</th>
+                                        <th>Service</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${data.sub_map[row.category] ? Object.values(data.sub_map[row.category]).map(sub => `
+                                        <tr class="sub-expandable" data-category="${row.category.toLowerCase().replace(/ /g, '-')}" data-subcategory="${sub.subcategory.toLowerCase().replace(/ /g, '-')}" style="display: ${expandedState.has(childTr.id) ? 'table-row' : 'none'}">
+                                            <td>${sub.subcategory}</td>
+                                            <td>${sub.total}</td>
+                                            <td>${sub.on_contract}</td>
+                                            <td>${sub.available}</td>
+                                            <td>${sub.service}</td>
+                                        </tr>
+                                        <tr id="items-${row.category.toLowerCase().replace(/ /g, '-')}-${sub.subcategory.toLowerCase().replace(/ /g, '-')}" class="child-row" style="display: ${expandedState.has(`items-${row.category.toLowerCase().replace(/ /g, '-')}-${sub.subcategory.toLowerCase().replace(/ /g, '-')}`) ? 'table-row' : 'none'}">
+                                            <td colspan="5">
+                                                <table class="items-table">
+                                                    <thead>
+                                                        <tr>
+                                                            <th>Tag ID</th>
+                                                            <th>Common Name</th>
+                                                            <th>Status</th>
+                                                            <th>Bin Location</th>
+                                                            <th>Quality</th>
+                                                            <th>Last Contract</th>
+                                                            <th>Client Name</th>
+                                                            <th>Scanned Date</th>
+                                                            <th>Scanned By</th>
+                                                            <th>Notes</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody></tbody>
+                                                </table>
+                                                <div class="pagination" id="pagination-${row.category.toLowerCase().replace(/ /g, '-')}-${sub.subcategory.toLowerCase().replace(/ /g, '-')}" style="display: ${expandedState.has(`items-${row.category.toLowerCase().replace(/ /g, '-')}-${sub.subcategory.toLowerCase().replace(/ /g, '-')}`) ? 'block' : 'none'}"></div>
+                                            </td>
+                                        </tr>
+                                    `).join('') : ''}
+                                </tbody>
+                            </table>
+                        </td>
+                    `;
+                    tbody.appendChild(childTr);
+                });
+
+                document.querySelectorAll('.expandable').forEach(row => {
+                    const category = row.dataset.category;
+                    row.addEventListener('click', () => toggleRow(row, `child-${category}`));
+                });
+
+                document.querySelectorAll('.sub-expandable').forEach(row => {
+                    const category = row.dataset.category;
+                    const subcategory = row.dataset.subcategory;
+                    row.addEventListener('click', () => {
+                        const childId = `items-${category}-${subcategory}`;
+                        const childRow = document.getElementById(childId);
+                        if (childRow) {
+                            const isVisible = childRow.classList.contains('visible');
+                            childRow.classList.toggle('visible', !isVisible);
+                            const pagination = document.getElementById(`pagination-${category}-${subcategory}`);
+                            if (pagination) pagination.style.display = !isVisible ? 'block' : 'none';
+                            const subtable = document.getElementById(`subtable-${category}`);
+                            if (subtable) subtable.style.display = !isVisible ? 'table' : 'none';
+                            if (!isVisible) {
+                                loadSubcategoryItems(
+                                    category.replace(/-/g, ' '),
+                                    subcategory.replace(/-/g, ' '),
+                                    1,
+                                    category
+                                );
+                                expandedState.add(childId);
+                            } else {
+                                expandedState.delete(childId);
+                            }
+                        }
+                    });
+                });
+
+                expandedState.forEach(id => {
+                    if (id.startsWith('items-')) {
+                        const [_, cat, subcat] = id.split('-', 3);
+                        loadSubcategoryItems(cat.replace(/-/g, ' '), subcat.replace(/-/g, ' '), 1, cat);
+                    }
+                });
+            })
+            .catch(error => console.error('Error refreshing table:', error));
+    }
+
+    setInterval(refreshTable, 60000);
+});
+</script>
 {% endblock %}
