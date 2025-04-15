@@ -1,13 +1,15 @@
 import os
+import sqlite3
 import logging
 import time
 import threading
 from db_utils import initialize_db
-from refresh_logic import refresh_data, background_refresh
+from refresh_logic import refresh_data
 from app import create_app
 from werkzeug.serving import is_running_from_reloader
 from config import DB_FILE
 from db_connection import DatabaseConnection
+
 
 # Initialize Flask app globally for Gunicorn
 app = create_app()
