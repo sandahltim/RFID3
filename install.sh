@@ -33,13 +33,26 @@ check_status() {
     fi
 }
 
-# 1. Update system and install prerequisites
+# 1. Check disk health and filesystem
+log "Checking disk health..."
+if ! sudo dmesg | grep -i "I/O error" > /dev/null; then
+    log "No disk I/O errors detected"
+else
+    log "WARNING: Disk I/O errors found in dmesg. Check SD card."
+fi
+if mount | grep "/ " | grep -q "ro,"; then
+    log "ERROR: Filesystem is read-only. Attempting to remount..."
+    sudo mount -o remount,rw /
+    check_status "Filesystem remount"
+fi
+
+# 2. Update system and install prerequisites
 log "Updating system and installing prerequisites..."
 sudo apt update && sudo apt upgrade -y
 sudo apt install -y git python3 python3-venv python3-dev libatlas-base-dev curl sqlite3
 check_status "System update and prerequisite installation"
 
-# 2. Create tim user if it doesn't exist
+# 3. Create tim user if it doesn't exist
 if ! id "${USER}" &>/dev/null; then
     log "Creating user ${USER}..."
     sudo adduser --gecos "" --disabled-password "${USER}"
@@ -47,7 +60,7 @@ if ! id "${USER}" &>/dev/null; then
     check_status "User creation"
 fi
 
-# 3. Set up install directory
+# 4. Set up install directory
 log "Setting up install directory ${INSTALL_DIR}..."
 if [ -d "${INSTALL_DIR}" ]; then
     log "Removing existing install directory..."
@@ -58,20 +71,20 @@ sudo chown "${USER}:${GROUP}" "${INSTALL_DIR}"
 sudo chmod 775 "${INSTALL_DIR}"
 cd "${INSTALL_DIR}"
 
-# 4. Clone repository
+# 5. Clone repository
 log "Cloning ${REPO_URL} (branch: ${BRANCH})..."
 git clone -b "${BRANCH}" "${REPO_URL}" .
 check_status "Git clone"
 sudo chown -R "${USER}:${GROUP}" "${INSTALL_DIR}"
 sudo chmod -R 775 "${INSTALL_DIR}"
 
-# 5. Create and activate virtual environment
+# 6. Create and activate virtual environment
 log "Setting up Python virtual environment..."
 python3 -m venv venv
 check_status "Virtual environment creation"
 source venv/bin/activate
 
-# 6. Install Python dependencies
+# 7. Install Python dependencies
 log "Installing Python dependencies..."
 pip install --upgrade pip
 pip install -r requirements.txt
@@ -79,16 +92,40 @@ pip install -r requirements.txt
 pip install flask==2.2.5 gunicorn==23.0.0
 check_status "Python dependency installation"
 
-# 7. Initialize databases
+# 8. Initialize databases
 log "Initializing databases..."
 python3 db_utils.py
 check_status "Main database initialization"
+if [ -f "${DB_FILE}" ]; then
+    sudo chmod 664 "${DB_FILE}"
+    sudo chown "${USER}:${GROUP}" "${DB_FILE}"
+    log "Set permissions on ${DB_FILE}"
+else
+    log "ERROR: ${DB_FILE} not created"
+    exit 1
+fi
 touch "${HAND_COUNTED_DB}"
 sudo chmod 666 "${HAND_COUNTED_DB}"
 sudo chown "${USER}:${GROUP}" "${HAND_COUNTED_DB}"
 check_status "Hand-counted database setup"
 
-# 8. Set up log directory
+# 9. Verify database write access
+log "Verifying database write access..."
+cat > test_db.py << EOL
+import sqlite3
+db = "${DB_FILE}"
+conn = sqlite3.connect(db)
+cursor = conn.cursor()
+cursor.execute("CREATE TABLE IF NOT EXISTS test (id INTEGER PRIMARY KEY)")
+cursor.execute("INSERT INTO test (id) VALUES (1)")
+conn.commit()
+conn.close()
+print("Database write test passed")
+EOL
+python3 test_db.py
+check_status "Database write test"
+
+# 10. Set up log directory
 log "Setting up log directory ${LOG_DIR}..."
 sudo mkdir -p "${LOG_DIR}"
 sudo chown "${USER}:${GROUP}" "${LOG_DIR}"
@@ -97,7 +134,7 @@ sudo touch /var/log/rfid_dash.log
 sudo chown "${USER}:${GROUP}" /var/log/rfid_dash.log
 sudo chmod 664 /var/log/rfid_dash.log
 
-# 9. Configure systemd service
+# 11. Configure systemd service
 log "Configuring systemd service..."
 cat > rfid_dash.service << EOL
 [Unit]
@@ -122,7 +159,7 @@ sudo systemctl daemon-reload
 sudo systemctl enable "${SERVICE_NAME}"
 check_status "Systemd service setup"
 
-# 10. Create start.sh
+# 12. Create start.sh
 log "Creating start.sh..."
 cat > start.sh << EOL
 #!/bin/bash
@@ -132,7 +169,7 @@ EOL
 chmod +x start.sh
 check_status "start.sh creation"
 
-# 11. Verify API and OneDrive connectivity
+# 13. Verify API and OneDrive connectivity
 log "Verifying API connectivity..."
 curl -s -o /dev/null -w "%{http_code}" "${API_LOGIN_URL}" > /tmp/api_status
 if [ "$(cat /tmp/api_status)" -ne 200 ] && [ "$(cat /tmp/api_status)" -ne 401 ]; then
@@ -149,10 +186,10 @@ else
     log "WARNING: OneDrive URL may be inaccessible (status: $(cat /tmp/onedrive_status))"
 fi
 
-# 12. Start the service
+# 14. Start the service
 log "Starting ${SERVICE_NAME} service..."
 sudo systemctl start "${SERVICE_NAME}"
-sleep 5  # Wait for service to start
+sleep 10  # Wait longer for service to stabilize
 if sudo systemctl is-active --quiet "${SERVICE_NAME}"; then
     log "${SERVICE_NAME} service started successfully"
 else
@@ -162,7 +199,7 @@ else
     exit 1
 fi
 
-# 13. Test the app
+# 15. Test the app
 log "Testing Flask app..."
 curl -s -o /dev/null -w "%{http_code}" http://localhost:7409 > /tmp/app_status
 if [ "$(cat /tmp/app_status)" -eq 200 ]; then
