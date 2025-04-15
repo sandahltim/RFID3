@@ -5,8 +5,12 @@ python3.11 -m venv venv || { echo "Venv creation failed"; exit 1; }
 source venv/bin/activate
 pip install -r requirements.txt || { echo "Pip install failed"; exit 1; }
 pip install flask==2.2.5 gunicorn==23.0.0 || { echo "Pip install failed"; exit 1; }
+echo "Setting directory permissions..."
+sudo chown tim:tim /home/tim/test_rfidpi
+sudo chmod 775 /home/tim/test_rfidpi
 rm -f inventory.db
-./venv/bin/python3 db_utils.py || { echo "Database creation failed"; exit 1; }
+echo "Running db_utils.py with: $(which python3)"
+./venv/bin/python3 db_utils.py > db_utils.log 2>&1 || { echo "Database creation failed. Check db_utils.log"; cat db_utils.log; exit 1; }
 if [ -f "inventory.db" ]; then
     sudo chmod 664 inventory.db
     sudo chown tim:tim inventory.db
