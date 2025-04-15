@@ -1,7 +1,6 @@
 from flask import Flask, request, url_for, jsonify
 from refresh_logic import IS_RELOADING, LAST_REFRESH, trigger_refresh
 from db_connection import DatabaseConnection
-import threading
 from datetime import timedelta
 
 def create_app():
@@ -78,10 +77,5 @@ def create_app():
             args[key] = value
             return url_for(request.endpoint, **args)
         return dict(update_url_param=update_url_param)
-
-    from refresh_logic import background_refresh
-    stop_event = threading.Event()
-    refresher_thread = threading.Thread(target=background_refresh, args=(stop_event,), daemon=True)
-    refresher_thread.start()
 
     return app
