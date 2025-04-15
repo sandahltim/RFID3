@@ -18,11 +18,18 @@ print("Forcing full database reload on restart...")
 if os.path.exists(db_path):
     os.remove(db_path)  # Delete existing inventory.db
     print(f"Removed existing database: {db_path}")
-
-# Initialize DB and set permissions
 initialize_db()  # Create fresh schema
 os.chmod(db_path, 0o664)  # Set read/write for owner and group
 os.chown(db_path, os.getuid(), os.getgid())  # Set owner to current user (tim)
+# Verify write access
+try:
+    with sqlite3.connect(db_path) as conn:
+        conn.execute("CREATE TABLE IF NOT EXISTS test (id INTEGER)")
+        conn.execute("INSERT INTO test (id) VALUES (1)")
+    print("Database write access confirmed")
+except sqlite3.OperationalError as e:
+    print(f"ERROR: Database not writable: {e}")
+    raise
 
 # Perform full refresh
 refresh_data(full_refresh=True)  # Full API refresh
