@@ -7,7 +7,7 @@ import logging
 tab2_bp = Blueprint("tab2_bp", __name__, url_prefix="/tab2")
 logging.basicConfig(level=logging.DEBUG)
 
-# Hardcoded mappings from seed data (full, as provided)
+# Hardcoded mappings from seed data
 CATEGORY_MAP = {
     4052: 'Tent Tops', 4054: 'Tent Tops', 4203: 'Tent Tops', 4204: 'Tent Tops', 4213: 'Tent Tops',
     4214: 'Tent Tops', 4292: 'Tent Tops', 4807: 'Tent Tops', 4808: 'Tent Tops', 60526: 'Tent Tops',
@@ -143,7 +143,6 @@ CATEGORY_MAP = {
     66743: 'Resale', 66747: 'Resale', 65808: 'Resale', 63440: 'Resale'
 }
 
-# Subcategory map for finer granularity (full, as provided)
 SUBCATEGORY_MAP = {
     4052: 'Sidewalls', 4054: 'Canopy Tops', 4203: 'Navi Lite Tops', 4204: 'Navi Lite Tops', 4213: 'Navi Lite Sidewalls',
     4214: 'Navi Lite Sidewalls', 4292: 'Canopy Tops', 4807: 'HP Sidewalls', 4808: 'HP Sidewalls', 60526: 'Kedar Sidewalls',
@@ -234,7 +233,7 @@ SUBCATEGORY_MAP = {
     62445: 'Spandex Linens', 62447: 'Spandex Linens', 62449: 'Spandex Linens', 62451: 'Spandex Linens',
     62452: 'Spandex Linens', 62233: 'Spandex Linens', 62234: 'Spandex Linens', 62284: 'Spandex Linens',
     62285: 'Spandex Linens', 67139: 'Spandex Linens', 67140: 'Spandex Linens', 99999: 'Miscellaneous',
-    1: 'Test', 3168: 'Chocolate', 3169: 'Chocolate', 3903: 'Cheese', 64815: 'Fog and Bubbles', 64816: 'Fog and Bubbles',
+    1: 'Test', 3168: 'Chocolate', 3169: 'Cheese', 3903: 'Cheese', 64815: 'Fog and Bubbles', 64816: 'Fog and Bubbles',
     64817: 'Fog and Bubbles', 64819: 'Fuel', 64824: 'Fuel', 64840: 'Cotton Candy Supplies', 64841: 'Cotton Candy Supplies',
     64842: 'Cotton Candy Supplies', 64843: 'Cotton Candy Supplies', 64847: 'Cotton Candy Supplies', 64848: 'Cotton Candy Supplies',
     64849: 'Cotton Candy Supplies', 64852: 'Popcorn Supplies', 64853: 'Popcorn Supplies', 64854: 'Cheese',
@@ -260,14 +259,13 @@ SUBCATEGORY_MAP = {
     64927: 'Kwik Covers 6 ft Banquet', 64928: 'Kwik Covers 6 ft Banquet', 64929: 'Kwik Covers 6 ft Banquet',
     64930: 'Kwik Covers 6 ft Banquet', 64932: 'Kwik Covers 6 ft Banquet', 64933: 'Kwik Covers 6 ft Banquet',
     64934: 'Kwik Covers 6 ft Banquet', 65493: 'Kwik Covers 6 ft Banquet', 65496: 'Kwik Covers 6 ft Banquet',
-    63440: 'Kwik Covers 6 ft Banquet', 64935: 'Kwik Covers 8 ft Banquet', 64936: 'Kwik Covers 8 ft Banquet',
-    64937: 'Kwik Covers 8 ft Banquet', 64938: 'Kwik Covers 8 ft Banquet', 64939: 'Kwik Covers 8 ft Banquet',
-    64940: 'Kwik Covers 8 ft Banquet', 64941: 'Kwik Covers 8 ft Banquet', 64942: 'Kwik Covers 8 ft Banquet',
-    64943: 'Kwik Covers 8 ft Banquet', 64944: 'Kwik Covers 8 ft Banquet', 64945: 'Kwik Covers 8 ft Banquet',
-    64946: 'Kwik Covers 8 ft Banquet', 64947: 'Kwik Covers 8 ft Banquet', 64948: 'Kwik Covers 8 ft Banquet',
-    64949: 'Kwik Covers 8 ft Banquet', 65494: 'Kwik Covers 8 ft Banquet', 65497: 'Kwik Covers 8 ft Banquet',
-    66742: 'Donut Supplies', 66743: 'Donut Supplies', 66747: 'Donut Supplies', 65808: 'Sno Cone Supplies',
-    63440: 'Kwik Covers 4 ft Round'
+    64935: 'Kwik Covers 8 ft Banquet', 64936: 'Kwik Covers 8 ft Banquet', 64937: 'Kwik Covers 8 ft Banquet',
+    64938: 'Kwik Covers 8 ft Banquet', 64939: 'Kwik Covers 8 ft Banquet', 64940: 'Kwik Covers 8 ft Banquet',
+    64941: 'Kwik Covers 8 ft Banquet', 64942: 'Kwik Covers 8 ft Banquet', 64943: 'Kwik Covers 8 ft Banquet',
+    64944: 'Kwik Covers 8 ft Banquet', 64945: 'Kwik Covers 8 ft Banquet', 64946: 'Kwik Covers 8 ft Banquet',
+    64947: 'Kwik Covers 8 ft Banquet', 64948: 'Kwik Covers 8 ft Banquet', 64949: 'Kwik Covers 8 ft Banquet',
+    65494: 'Kwik Covers 8 ft Banquet', 65497: 'Kwik Covers 8 ft Banquet', 66742: 'Donut Supplies',
+    66743: 'Donut Supplies', 66747: 'Donut Supplies', 65808: 'Sno Cone Supplies', 63440: 'Kwik Covers 4 ft Round'
 }
 
 def categorize_item(rental_class_id):
@@ -294,9 +292,8 @@ def show_tab2():
     logging.debug("Loading /tab2/ endpoint")
     try:
         with DatabaseConnection() as conn:
-            # Join with id_rfidtag to ensure category data
             items = conn.execute("""
-                SELECT im.*, rt.category as rfid_category
+                SELECT im.*, rt.item_type as rfid_item_type
                 FROM id_item_master im
                 LEFT JOIN id_rfidtag rt ON im.tag_id = rt.tag_id
             """).fetchall()
@@ -329,50 +326,50 @@ def show_tab2():
 
         category_map = defaultdict(list)
         for item in filtered_items:
-            # Use rfid_category if available, else fall back to rental_class_num
-            cat = item.get("rfid_category") or categorize_item(item.get("rental_class_num"))
-            category_map[cat].append(item)
+            category = categorize_item(item.get("rental_class_num"))
+            category_map[category].append(item)
 
         parent_data = []
-        sub_map = {}
+        middle_map = defaultdict(dict)
         for category, item_list in category_map.items():
+            total_amount = len(item_list)
+            on_contract = sum(1 for item in item_list if item.get("status") in ["Delivered", "On Rent"])
             available = sum(1 for item in item_list if item.get("status") == "Ready to Rent")
-            on_rent = sum(1 for item in item_list if item.get("status") in ["On Rent", "Delivered"])
-            service = len(item_list) - available - on_rent
-            client_name = "N/A"
-            scan_date = "N/A"
-            if item_list and item_list[0].get("last_contract_num"):
-                contract_info = contract_map.get(item_list[0]["last_contract_num"], {})
-                client_name = contract_info.get("client_name", "N/A")
-                scan_date = contract_info.get("scan_date", "N/A")
+            service = total_amount - on_contract - available
 
-            temp_sub_map = set()
-            for itm in item_list:
-                subcat = subcategorize_item(category, itm.get("rental_class_num"))
-                temp_sub_map.add(subcat)
-            subcategories = sorted(list(temp_sub_map)) if temp_sub_map else ["Unspecified"]
-            sub_map[category] = subcategories
-            logging.debug(f"Category {category} has subcategories: {subcategories}")
+            subcategory_map = defaultdict(list)
+            for item in item_list:
+                subcategory = subcategorize_item(category, item.get("rental_class_num"))
+                subcategory_map[subcategory].append(item)
+
+            middle_map[category] = {
+                subcategory: {
+                    "subcategory": subcategory,
+                    "total": len(items),
+                    "on_contract": sum(1 for item in items if item.get("status") in ["Delivered", "On Rent"]),
+                    "available": sum(1 for item in items if item.get("status") == "Ready to Rent")
+                }
+                for subcategory, items in subcategory_map.items()
+            }
 
             parent_data.append({
                 "category": category,
-                "total": len(item_list),
+                "total_amount": total_amount,
+                "on_contract": on_contract,
                 "available": available,
-                "on_rent": on_rent,
-                "service": service,
-                "client_name": client_name,
-                "scan_date": scan_date
+                "service": service
             })
 
         parent_data.sort(key=lambda x: x["category"])
-        expand_category = request.args.get('expand', None)
         logging.debug(f"Rendering tab2 with {len(parent_data)} categories")
+        for category in middle_map:
+            logging.debug(f"Category {category} has subcategories: {list(middle_map[category].keys())}")
 
         return render_template(
             "tab2.html",
             parent_data=parent_data,
-            sub_map=sub_map,
-            expand_category=expand_category,
+            middle_map=middle_map,
+            contract_map=contract_map,
             filter_common_name=filter_common_name,
             filter_tag_id=filter_tag_id,
             filter_bin_location=filter_bin_location,
@@ -383,58 +380,126 @@ def show_tab2():
         logging.error(f"Error in show_tab2: {e}")
         return jsonify({"error": str(e)}), 500
 
+@tab2_bp.route("/data", methods=["GET"])
+def tab2_data():
+    logging.debug("Loading /tab2/data endpoint")
+    try:
+        with DatabaseConnection() as conn:
+            items = conn.execute("""
+                SELECT im.*, rt.item_type as rfid_item_type
+                FROM id_item_master im
+                LEFT JOIN id_rfidtag rt ON im.tag_id = rt.tag_id
+            """).fetchall()
+        items = [dict(row) for row in items]
+
+        filter_common_name = request.args.get("common_name", "").lower().strip()
+        filter_tag_id = request.args.get("tag_id", "").lower().strip()
+        filter_bin_location = request.args.get("bin_location", "").lower().strip()
+        filter_last_contract = request.args.get("last_contract_num", "").lower().strip()
+        filter_status = request.args.get("status", "").lower().strip()
+
+        filtered_items = items
+        if filter_common_name:
+            filtered_items = [item for item in filtered_items if filter_common_name in (item.get("common_name") or "").lower()]
+        if filter_tag_id:
+            filtered_items = [item for item in filtered_items if filter_tag_id in (item.get("tag_id") or "").lower()]
+        if filter_bin_location:
+            filtered_items = [item for item in filtered_items if filter_bin_location in (item.get("bin_location") or "").lower()]
+        if filter_last_contract:
+            filtered_items = [item for item in filtered_items if filter_last_contract in (item.get("last_contract_num") or "").lower()]
+        if filter_status:
+            filtered_items = [item for item in filtered_items if filter_status in (item.get("status") or "").lower()]
+
+        category_map = defaultdict(list)
+        for item in filtered_items:
+            category = categorize_item(item.get("rental_class_num"))
+            category_map[category].append(item)
+
+        parent_data = []
+        middle_map = defaultdict(dict)
+        for category, item_list in category_map.items():
+            total_amount = len(item_list)
+            on_contract = sum(1 for item in item_list if item.get("status") in ["Delivered", "On Rent"])
+            available = sum(1 for item in item_list if item.get("status") == "Ready to Rent")
+            service = total_amount - on_contract - available
+
+            subcategory_map = defaultdict(list)
+            for item in item_list:
+                subcategory = subcategorize_item(category, item.get("rental_class_num"))
+                subcategory_map[subcategory].append(item)
+
+            middle_map[category] = {
+                subcategory: {
+                    "subcategory": subcategory,
+                    "total": len(items),
+                    "on_contract": sum(1 for item in items if item.get("status") in ["Delivered", "On Rent"]),
+                    "available": sum(1 for item in items if item.get("status") == "Ready to Rent")
+                }
+                for subcategory, items in subcategory_map.items()
+            }
+
+            parent_data.append({
+                "category": category,
+                "total_amount": total_amount,
+                "on_contract": on_contract,
+                "available": available,
+                "service": service
+            })
+
+        parent_data.sort(key=lambda x: x["category"])
+        logging.debug(f"Returning {len(parent_data)} categories for /tab2/data")
+
+        return jsonify({
+            "parent_data": parent_data,
+            "middle_map": middle_map
+        })
+    except Exception as e:
+        logging.error(f"Error in tab2_data: {e}")
+        return jsonify({"error": str(e)}), 500
+
 @tab2_bp.route("/subcat_data", methods=["GET"])
 def subcat_data():
     logging.debug("Hit /tab2/subcat_data endpoint")
     category = request.args.get('category')
-    subcat = request.args.get('subcat')
-    page = int(request.args.get('page', 1))
+    subcategory = request.args.get('subcategory')
+    try:
+        page = int(request.args.get('page', 1))
+    except ValueError:
+        page = 1
     per_page = 20
 
     try:
         with DatabaseConnection() as conn:
-            # Join with id_rfidtag for category data
-            query = """
-                SELECT im.*, rt.category as rfid_category
+            items = conn.execute("""
+                SELECT im.*, rt.item_type as rfid_item_type
                 FROM id_item_master im
                 LEFT JOIN id_rfidtag rt ON im.tag_id = rt.tag_id
-                WHERE 1=1
-            """
-            params = []
-            if category:
-                query += " AND (rt.category = ? OR im.rental_class_num IN (SELECT key FROM (SELECT ? as key, ? as value) WHERE value = ?))"
-                params.extend([category, category, category, category])
-            if subcat:
-                query += " AND ? IN (SELECT value FROM (SELECT ? as key, ? as value) WHERE value = ?)"
-                params.extend([subcat, subcat, subcat, subcat])
+            """).fetchall()
+        items = [dict(row) for row in items]
 
-            filter_common_name = request.args.get("common_name", "").lower().strip()
-            filter_tag_id = request.args.get("tag_id", "").lower().strip()
-            filter_bin_location = request.args.get("bin_location", "").lower().strip()
-            filter_last_contract = request.args.get("last_contract_num", "").lower().strip()
-            filter_status = request.args.get("status", "").lower().strip()
+        filter_common_name = request.args.get("common_name", "").lower().strip()
+        filter_tag_id = request.args.get("tag_id", "").lower().strip()
+        filter_bin_location = request.args.get("bin_location", "").lower().strip()
+        filter_last_contract = request.args.get("last_contract_num", "").lower().strip()
+        filter_status = request.args.get("status", "").lower().strip()
 
-            if filter_common_name:
-                query += " AND LOWER(im.common_name) LIKE ?"
-                params.append(f"%{filter_common_name}%")
-            if filter_tag_id:
-                query += " AND LOWER(im.tag_id) LIKE ?"
-                params.append(f"%{filter_tag_id}%")
-            if filter_bin_location:
-                query += " AND LOWER(im.bin_location) LIKE ?"
-                params.append(f"%{filter_bin_location}%")
-            if filter_last_contract:
-                query += " AND LOWER(im.last_contract_num) LIKE ?"
-                params.append(f"%{filter_last_contract}%")
-            if filter_status:
-                query += " AND LOWER(im.status) LIKE ?"
-                params.append(f"%{filter_status}%")
+        filtered_items = items
+        if filter_common_name:
+            filtered_items = [item for item in filtered_items if filter_common_name in (item.get("common_name") or "").lower()]
+        if filter_tag_id:
+            filtered_items = [item for item in filtered_items if filter_tag_id in (item.get("tag_id") or "").lower()]
+        if filter_bin_location:
+            filtered_items = [item for item in filtered_items if filter_bin_location in (item.get("bin_location") or "").lower()]
+        if filter_last_contract:
+            filtered_items = [item for item in filtered_items if filter_last_contract in (item.get("last_contract_num") or "").lower()]
+        if filter_status:
+            filtered_items = [item for item in filtered_items if filter_status in (item.get("status") or "").lower()]
 
-            rows = conn.execute(query, params).fetchall()
-        items = [dict(row) for row in rows]
-
-        category_items = [item for item in items if (item.get("rfid_category") or categorize_item(item.get("rental_class_num"))) == category]
-        subcat_items = [item for item in category_items if subcategorize_item(category, item.get("rental_class_num")) == subcat or subcat == "Unspecified"]
+        subcat_items = [
+            item for item in filtered_items
+            if categorize_item(item.get("rental_class_num")) == category
+            and subcategorize_item(category, item.get("rental_class_num")) == subcategory
+        ]
 
         total_items = len(subcat_items)
         total_pages = (total_items + per_page - 1) // per_page
@@ -443,19 +508,20 @@ def subcat_data():
         end = start + per_page
         paginated_items = subcat_items[start:end]
 
-        logging.debug(f"AJAX: Category: {category}, Subcategory: {subcat}, Total Items: {total_items}, Page: {page}")
+        logging.debug(f"AJAX: Category: {category}, Subcategory: {subcategory}, Total Items: {total_items}, Page: {page}")
 
         return jsonify({
             "items": [{
-                "tag_id": item["tag_id"] or "N/A",
-                "common_name": item.get("common_name", "Unknown"),
+                "tag_id": item.get("tag_id", "N/A"),
+                "common_name": item.get("common_name", "N/A"),
                 "status": item.get("status", "N/A"),
                 "bin_location": item.get("bin_location", "N/A"),
                 "quality": item.get("quality", "N/A"),
                 "last_contract_num": item.get("last_contract_num", "N/A"),
                 "date_last_scanned": item.get("date_last_scanned", "N/A"),
-                "last_scanned_by": item.get("last_scanned_by", "N/A"),
-                "notes": item.get("notes", "N/A")
+                "last_scanned_by": item.get("last_scanned_by", "Unknown"),
+                "notes": item.get("notes", "N/A"),
+                "client_name": item.get("client_name", "N/A")
             } for item in paginated_items],
             "total_items": total_items,
             "total_pages": total_pages,

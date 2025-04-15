@@ -4,7 +4,14 @@ sudo apt update && sudo apt install python3.11 -y || { echo "Python install fail
 python3.11 -m venv venv || { echo "Venv creation failed"; exit 1; }
 source venv/bin/activate
 pip install flask==2.3.2 gunicorn==20.1.0 pandas==2.0.3 requests==2.31.0 || { echo "Pip install failed"; exit 1; }
-sudo cp rfid_dash_dev.service /etc/systemd/system/ || { echo "Systemd copy failed"; exit 1; }
+
+# Ensure systemd service file exists
+SERVICE_FILE="/home/tim/test_rfidpi/rfid_dash_dev.service"
+if [ ! -f "$SERVICE_FILE" ]; then
+    echo "Error: $SERVICE_FILE not found in /home/tim/test_rfidpi"
+    exit 1
+fi
+sudo cp "$SERVICE_FILE" /etc/systemd/system/ || { echo "Systemd copy failed"; exit 1; }
 sudo systemctl daemon-reload
 sudo systemctl enable rfid_dash_dev || { echo "Systemd enable failed"; exit 1; }
 
