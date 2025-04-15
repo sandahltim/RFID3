@@ -1,13 +1,11 @@
 import os
 import logging
 import time
-import threading
 from db_utils import initialize_db
-from refresh_logic import refresh_data, background_refresh
+from refresh_logic import refresh_data
 from app import create_app
 from werkzeug.serving import is_running_from_reloader
 from config import DB_FILE
-from db_connection import DatabaseConnection
 
 # Initialize Flask app globally for Gunicorn
 app = create_app()
@@ -23,19 +21,15 @@ if not os.path.exists(db_path):
 else:
     print(f"Using existing database: {db_path}")
 
-# Start background refresh thread only in primary process
+# Perform single refresh on startup, no threads
 if not is_running_from_reloader():
-    # Delay full refresh to avoid concurrent database access
-    def delayed_refresh():
-        time.sleep(5)  # Wait for Gunicorn workers to stabilize
-        print("Performing full API refresh...")
+    print("Performing initial full API refresh...")
+    try:
+        time.sleep(5)  # Wait for Gunicorn to stabilize
         refresh_data(full_refresh=True)
-        print("Full refresh complete")
-
-    refresher_thread = threading.Thread(target=background_refresh, daemon=True)
-    refresher_thread.start()
-    # Run full refresh in a separate thread after delay
-    threading.Thread(target=delayed_refresh, daemon=True).start()
+        print("Initial full refresh complete")
+    except Exception as e:
+        logging.error(f"Initial refresh failed: {e}")
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
