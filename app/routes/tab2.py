@@ -29,7 +29,7 @@ CATEGORY_MAP = {
     66325: 'Tent Tops', 66326: 'Tent Tops', 67657: 'Tent Tops', 65129: 'Tent Tops', 66363: 'Tent Tops',
     72252: 'Tent Tops', 72253: 'Tent Tops', 72392: 'Tent Tops', 72401: 'Tent Tops', 72402: 'Tent Tops',
     72403: 'Tent Tops', 72404: 'Tent Tops', 72405: 'Tent Tops', 72406: 'Tent Tops', 72407: 'Tent Tops',
-    72408: 'Tent Tops', 72409: 'Tent Tops', 72410: 'Tent Tops', 72411 соц, 'Tent Tops', 72412: 'Tent Tops',
+    72408: 'Tent Tops', 72409: 'Tent Tops', 72410: 'Tent Tops', 72411: 'Tent Tops', 72412: 'Tent Tops',
     62668: 'Tent Tops', 62669: 'Tent Tops', 62681: 'Tent Tops', 62682: 'Tent Tops', 62683: 'Tent Tops',
     62684: 'Tent Tops', 62686: 'Tent Tops', 62803: 'Tent Tops', 63851: 'Tent Tops', 63852: 'Tent Tops',
     60533: 'AV Equipment', 60537: 'AV Equipment', 60731: 'AV Equipment', 60735: 'AV Equipment',
