@@ -6,7 +6,7 @@ import sqlite3
 import logging
 
 tab2_bp = Blueprint("tab2_bp", __name__, url_prefix="/tab2")
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.DEBUG, filename='/home/tim/test_rfidpi/sync.log')
 
 def categorize_item(rental_class_id):
     try:
@@ -70,7 +70,7 @@ def show_tab2():
             category_map[category].append(item)
 
         parent_data = []
-        middle_data = defaultdict(list)
+        sub_map = {}
         for category, item_list in category_map.items():
             total_amount = len(item_list)
             on_contract = sum(1 for item in item_list if item.get("status") in ["Delivered", "On Rent"])
@@ -82,8 +82,8 @@ def show_tab2():
                 subcategory = subcategorize_item(category, item.get("rental_class_num"))
                 subcategory_map[subcategory].append(item)
 
-            middle_data[category] = [
-                {
+            sub_map[category] = {
+                subcategory: {
                     "subcategory": subcategory,
                     "total": len(items),
                     "on_contract": sum(1 for item in items if item.get("status") in ["Delivered", "On Rent"]),
@@ -91,7 +91,7 @@ def show_tab2():
                     "service": len(items) - sum(1 for item in items if item.get("status") in ["Delivered", "On Rent", "Ready to Rent"])
                 }
                 for subcategory, items in subcategory_map.items()
-            ]
+            }
 
             parent_data.append({
                 "category": category,
@@ -103,13 +103,13 @@ def show_tab2():
 
         parent_data.sort(key=lambda x: x["category"])
         logging.debug(f"Rendering tab2 with {len(parent_data)} categories")
-        for category in middle_data:
-            logging.debug(f"Category {category} has subcategories: {[item['subcategory'] for item in middle_data[category]]}")
+        for category in sub_map:
+            logging.debug(f"Category {category} has subcategories: {list(sub_map[category].keys())}")
 
         return render_template(
             "tab2.html",
             parent_data=parent_data,
-            middle_data=middle_data,
+            sub_map=sub_map,
             contract_map=contract_map,
             filter_common_name=filter_common_name,
             filter_tag_id=filter_tag_id,
@@ -157,7 +157,7 @@ def tab2_data():
             category_map[category].append(item)
 
         parent_data = []
-        middle_data = defaultdict(list)
+        sub_map = {}
         for category, item_list in category_map.items():
             total_amount = len(item_list)
             on_contract = sum(1 for item in item_list if item.get("status") in ["Delivered", "On Rent"])
@@ -169,8 +169,8 @@ def tab2_data():
                 subcategory = subcategorize_item(category, item.get("rental_class_num"))
                 subcategory_map[subcategory].append(item)
 
-            middle_data[category] = [
-                {
+            sub_map[category] = {
+                subcategory: {
                     "subcategory": subcategory,
                     "total": len(items),
                     "on_contract": sum(1 for item in items if item.get("status") in ["Delivered", "On Rent"]),
@@ -178,7 +178,7 @@ def tab2_data():
                     "service": len(items) - sum(1 for item in items if item.get("status") in ["Delivered", "On Rent", "Ready to Rent"])
                 }
                 for subcategory, items in subcategory_map.items()
-            ]
+            }
 
             parent_data.append({
                 "category": category,
@@ -193,7 +193,7 @@ def tab2_data():
 
         return jsonify({
             "parent_data": parent_data,
-            "middle_data": middle_data
+            "sub_map": sub_map
         })
     except Exception as e:
         logging.error(f"Error in tab2_data: {e}")
