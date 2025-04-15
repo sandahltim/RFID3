@@ -49,18 +49,24 @@ def get_access_token():
     now = datetime.utcnow()
 
     if TOKEN and TOKEN_EXPIRY and now < TOKEN_EXPIRY:
+        logger.debug("Using cached access token")
         return TOKEN
 
     payload = {"username": API_USERNAME, "password": API_PASSWORD}
+    logger.debug(f"Requesting token from {LOGIN_URL} with username={API_USERNAME}")
     try:
         response = requests.post(LOGIN_URL, json=payload, timeout=10)
         response.raise_for_status()
-        TOKEN = response.json().get("access_token")
+        data = response.json()
+        TOKEN = data.get("access_token")
         TOKEN_EXPIRY = now + timedelta(minutes=55)
-        logger.debug("Access token refreshed.")
+        logger.debug(f"Access token received: {TOKEN[:10]}... (expires {TOKEN_EXPIRY})")
         return TOKEN
     except requests.RequestException as e:
-        logger.error(f"Error fetching access token: {e}")
+        logger.error(f"Error fetching access token: {e}, response: {getattr(e.response, 'text', 'N/A')}")
+        return None
+    except ValueError as e:
+        logger.error(f"Invalid JSON response from login: {e}")
         return None
 
 def fetch_paginated_data(url, token, since_date=None):
@@ -74,24 +80,29 @@ def fetch_paginated_data(url, token, since_date=None):
             params["filter[]"] = f"scan_date>{since_date}"
     all_data = []
 
+    logger.debug(f"Fetching data from {url} with params={params}")
     while True:
         try:
             response = requests.get(url, headers=headers, params=params, timeout=10)
             response.raise_for_status()
             data = response.json().get("data", [])
+            logger.debug(f"Fetched {len(data)} records from {url} at offset {params['offset']}")
             if not data:
-                logger.debug(f"Finished fetching {len(all_data)} records from {url}")
+                logger.debug(f"Finished fetching {len(all_data)} total records from {url}")
                 break
             all_data.extend(data)
-            logger.debug(f"Fetched {len(data)} more records, total: {len(all_data)}")
             params["offset"] += 200
         except requests.RequestException as e:
-            logger.error(f"Error fetching data from {url}: {e}")
+            logger.error(f"Error fetching data from {url}: {e}, response: {getattr(e.response, 'text', 'N/A')}")
+            return all_data
+        except ValueError as e:
+            logger.error(f"Invalid JSON response from {url}: {e}")
             return all_data
     return all_data
 
 def update_item_master(data):
     """Inserts or updates item master data in SQLite."""
+    logger.debug(f"Updating item master with {len(data)} records")
     try:
         with DatabaseConnection() as conn:
             cursor = conn.cursor()
@@ -133,7 +144,8 @@ def update_item_master(data):
                         item.get("date_last_scanned"), item.get("date_created"), item.get("date_updated"),
                     ),
                 )
-            logger.debug("Item Master data updated.")
+            conn.commit()
+            logger.debug("Item Master data updated successfully")
     except Exception as e:
         logger.error(f"Database error updating item master: {e}")
         raise
@@ -143,13 +155,14 @@ def clear_transactions(conn):
     cursor = conn.cursor()
     try:
         cursor.execute("DELETE FROM id_transactions")
-        logger.debug("Cleared id_transactions table.")
+        logger.debug("Cleared id_transactions table")
     except Exception as e:
         logger.error(f"Error clearing transactions: {e}")
         raise
 
 def update_transactions(data):
     """Inserts or updates transaction data in SQLite."""
+    logger.debug(f"Updating transactions with {len(data)} records")
     try:
         with DatabaseConnection() as conn:
             cursor = conn.cursor()
@@ -211,13 +224,15 @@ def update_transactions(data):
                         txn.get("notes")
                     ),
                 )
-            logger.debug("Transaction data updated.")
+            conn.commit()
+            logger.debug("Transaction data updated successfully")
     except Exception as e:
         logger.error(f"Database error updating transactions: {e}")
         raise
 
 def update_seed_data(data):
     """Inserts or updates SEED data in SQLite (full refresh only)."""
+    logger.debug(f"Updating seed data with {len(data)} records")
     try:
         with DatabaseConnection() as conn:
             cursor = conn.cursor()
@@ -236,7 +251,8 @@ def update_seed_data(data):
                         item.get("rental_class_id"), item.get("common_name"), item.get("bin_location"),
                     ),
                 )
-            logger.debug("SEED data updated.")
+            conn.commit()
+            logger.debug("SEED data updated successfully")
     except Exception as e:
         logger.error(f"Database error updating SEED data: {e}")
         raise
@@ -245,6 +261,7 @@ def refresh_data(full_refresh=False):
     """Refresh database: full on demand, incremental otherwise."""
     global LAST_REFRESH, IS_RELOADING
     IS_RELOADING = True
+    logger.debug(f"Starting {'full' if full_refresh else 'incremental'} refresh")
     token = get_access_token()
     if not token:
         logger.error("No access token. Aborting refresh.")
@@ -269,6 +286,7 @@ def refresh_data(full_refresh=False):
             LAST_REFRESH = datetime.utcnow()
             conn.execute("INSERT OR REPLACE INTO refresh_state (id, last_refresh) VALUES (1, ?)", 
                          (LAST_REFRESH.strftime("%Y-%m-%d %H:%M:%S"),))
+            conn.commit()
         logger.debug(f"Database refreshed at {LAST_REFRESH}")
     except Exception as e:
         logger.error(f"Error during refresh: {e}")
@@ -294,6 +312,7 @@ def background_refresh(stop_event):
 def trigger_refresh(full=False):
     """Trigger a refresh and reset the timer."""
     global STOP_EVENT
+    logger.debug(f"Triggering {'full' if full else 'incremental'} refresh")
     if STOP_EVENT:
         STOP_EVENT.set()  # Signal the background thread to stop
         time.sleep(1)  # Give it a moment to stop
