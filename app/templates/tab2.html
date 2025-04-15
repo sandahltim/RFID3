@@ -122,7 +122,7 @@ function sortTable(tableEl, colName) {
       let numA = parseFloat(cellA.replace(/[^0-9.\-]/g, ""));
       let numB = parseFloat(cellB.replace(/[^0-9.\-]/g, ""));
       if (!isNaN(numA) && !isNaN(numB)) return asc ? numA - numB : numB - numA;
-      return asc ? cellA.localeCompare(cellB) : cellB.localeCompare(cellB);
+      return asc ? cellA.localeCompare(cellB) : cellB.localeCompare(cellA);
     });
     tbody.innerHTML = "";
     pairs.forEach(pair => {
@@ -137,7 +137,7 @@ function sortTable(tableEl, colName) {
       let numA = parseFloat(cellA.replace(/[^0-9.\-]/g, ""));
       let numB = parseFloat(cellB.replace(/[^0-9.\-]/g, ""));
       if (!isNaN(numA) && !isNaN(numB)) return asc ? numA - numB : numB - numA;
-      return asc ? cellA.localeCompare(cellB) : cellB.localeCompare(cellB);
+      return asc ? cellA.localeCompare(cellB) : cellB.localeCompare(cellA);
     });
     tbody.innerHTML = "";
     rows.forEach(row => tbody.appendChild(row));
@@ -152,7 +152,7 @@ function loadSubcatData(category, subcat, page, catKey) {
   const urlParams = new URLSearchParams(window.location.search);
   const params = {
     category: category,
-    subcat: subcat,
+    subcat: subcat || 'Unspecified',
     page: page,
     common_name: urlParams.get('common_name') || '',
     tag_id: urlParams.get('tag_id') || '',
@@ -176,21 +176,25 @@ function loadSubcatData(category, subcat, page, catKey) {
         return;
       }
       tbody.innerHTML = '';
-      data.items.forEach(item => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-          <td>${item.tag_id || 'N/A'}</td>
-          <td>${item.common_name || 'Unknown'}</td>
-          <td>${item.status || 'N/A'}</td>
-          <td>${item.bin_location || 'N/A'}</td>
-          <td>${item.quality || 'N/A'}</td>
-          <td>${item.last_contract_num || 'N/A'}</td>
-          <td>${item.date_last_scanned || 'N/A'}</td>
-          <td>${item.last_scanned_by || 'N/A'}</td>
-          <td>${item.notes || 'N/A'}</td>
-        `;
-        tbody.appendChild(tr);
-      });
+      if (data.items && data.items.length > 0) {
+        data.items.forEach(item => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td>${item.tag_id || 'N/A'}</td>
+            <td>${item.common_name || 'Unknown'}</td>
+            <td>${item.status || 'N/A'}</td>
+            <td>${item.bin_location || 'N/A'}</td>
+            <td>${item.quality || 'N/A'}</td>
+            <td>${item.last_contract_num || 'N/A'}</td>
+            <td>${item.date_last_scanned || 'N/A'}</td>
+            <td>${item.last_scanned_by || 'N/A'}</td>
+            <td>${item.notes || 'N/A'}</td>
+          `;
+          tbody.appendChild(tr);
+        });
+      } else {
+        tbody.innerHTML = '<tr><td colspan="9">No items found</td></tr>';
+      }
 
       const pagination = document.getElementById(`pagination-${catKey}`);
       if (pagination) {
@@ -227,6 +231,10 @@ function loadSubcatData(category, subcat, page, catKey) {
     })
     .catch(error => {
       console.error('Error loading subcat data:', error);
+      const tbody = document.getElementById(`childTbody-${catKey}`);
+      if (tbody) {
+        tbody.innerHTML = '<tr><td colspan="9">Error loading data</td></tr>';
+      }
       if (loading) loading.style.display = 'none';
     });
 }
@@ -262,7 +270,7 @@ function refreshTable() {
           const catKey = id.replace('child-', '');
           const select = element.querySelector('.subcategory-dropdown');
           if (select) {
-            const subcat = select.value;
+            const subcat = select.value || 'Unspecified';
             loadSubcatData(category, subcat, 1, catKey);
           }
         }
@@ -285,8 +293,7 @@ function updateWithNewData(newData) {
   const tbody = document.getElementById('parentTableBody');
   const categoryTotals = {};
   newData.items.forEach(item => {
-    if (!Object.keys(CATEGORY_MAP).includes(item.rental_class_num?.toString())) return;
-    const cat = CATEGORY_MAP[item.rental_class_num] || 'Other';
+    const cat = item.rfid_category || 'Other';  // Use rfid_category directly
     if (!categoryTotals[cat]) {
       categoryTotals[cat] = { total: 0, available: 0, on_rent: 0, service: 0 };
     }
@@ -360,10 +367,10 @@ function updateWithNewData(newData) {
       tbody.appendChild(parentRow);
       tbody.appendChild(childRow);
     } else {
-      parentRow.cells[2].innerText = parseInt(parentRow.cells[2].innerText) + data.total;
-      parentRow.cells[3].innerText = parseInt(parentRow.cells[3].innerText) + data.available;
-      parentRow.cells[4].innerText = parseInt(parentRow.cells[4].innerText) + data.on_rent;
-      parentRow.cells[5].innerText = parseInt(parentRow.cells[5].innerText) + data.service;
+      parentRow.cells[2].innerText = data.total;
+      parentRow.cells[3].innerText = data.available;
+      parentRow.cells[4].innerText = data.on_rent;
+      parentRow.cells[5].innerText = data.service;
     }
   });
 }
@@ -384,7 +391,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const category = targetEl.getAttribute("data-category");
         const catKey = targetId.split("child-")[1];
         const select = targetEl.querySelector(".subcategory-dropdown");
-        const subcat = select ? select.value : '';
+        const subcat = select ? select.value || 'Unspecified' : 'Unspecified';
         loadSubcatData(category, subcat, 1, catKey);
       }
       targetEl.addEventListener("show.bs.collapse", () => target.textContent = "-");
@@ -395,7 +402,7 @@ document.addEventListener("DOMContentLoaded", () => {
   document.querySelectorAll(".subcategory-dropdown").forEach(select => {
     select.addEventListener("change", () => {
       const category = select.getAttribute("data-category");
-      const subcat = select.value;
+      const subcat = select.value || 'Unspecified';
       const catKey = category.toLowerCase().replace(/[^a-z0-9]/gi, '_');
       loadSubcatData(category, subcat, 1, catKey);
     });
@@ -407,7 +414,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (collapse) {
       new bootstrap.Collapse(collapse, { toggle: true });
       const select = collapse.querySelector(".subcategory-dropdown");
-      const subcat = select ? select.value : '';
+      const subcat = select ? select.value || 'Unspecified' : 'Unspecified';
       loadSubcatData(expandCat, subcat, 1, expandCat.toLowerCase().replace(/[^a-z0-9]/gi, '_'));
     }
   }

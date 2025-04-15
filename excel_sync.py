@@ -4,6 +4,7 @@ import requests
 import io
 from datetime import datetime
 from config import DB_FILE
+from db_connection import DatabaseConnection
 import time
 import logging
 import os
@@ -20,8 +21,8 @@ logging.basicConfig(
     ]
 )
 
-# Updated OneDrive URL (replace with direct download link)
-EXCEL_URL = "https://1drv.ms/x/c/35ee6b0cbe6f4ec9/EQI9rtWjqMVCsUJBHhh1iO0BbmpPaIOn0P5k6UVNprnrzA?e=WTVXiS&download=1"
+# Placeholder for direct download URL (replace with actual link)
+EXCEL_URL = "https://1drv.ms/x/c/35ee6b0cbe6f4ec9/EQI9rtWjqMVCsUJBHhh1iO0Br-VAztVjRCLk37VHEOm6qQ?e=NG0TFb"  # Update this after getting the direct link
 
 def sync_excel_to_db():
     logging.debug(f"Syncing cloud Excel to {DB_FILE} at {datetime.now()}")
