@@ -6,7 +6,7 @@ source venv/bin/activate
 pip install -r requirements.txt || { echo "Pip install failed"; exit 1; }
 pip install flask==2.2.5 gunicorn==23.0.0 || { echo "Pip install failed"; exit 1; }
 rm -f inventory.db
-python3 db_utils.py || { echo "Database creation failed"; exit 1; }
+./venv/bin/python3 db_utils.py || { echo "Database creation failed"; exit 1; }
 if [ -f "inventory.db" ]; then
     sudo chmod 664 inventory.db
     sudo chown tim:tim inventory.db
