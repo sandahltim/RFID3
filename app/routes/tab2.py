@@ -330,7 +330,7 @@ def show_tab2():
             category_map[category].append(item)
 
         parent_data = []
-        middle_map = defaultdict(dict)
+        middle_map = defaultdict(list)
         for category, item_list in category_map.items():
             total_amount = len(item_list)
             on_contract = sum(1 for item in item_list if item.get("status") in ["Delivered", "On Rent"])
@@ -342,15 +342,15 @@ def show_tab2():
                 subcategory = subcategorize_item(category, item.get("rental_class_num"))
                 subcategory_map[subcategory].append(item)
 
-            middle_map[category] = {
-                subcategory: {
+            middle_map[category] = [
+                {
                     "subcategory": subcategory,
                     "total": len(items),
                     "on_contract": sum(1 for item in items if item.get("status") in ["Delivered", "On Rent"]),
                     "available": sum(1 for item in items if item.get("status") == "Ready to Rent")
                 }
                 for subcategory, items in subcategory_map.items()
-            }
+            ]
 
             parent_data.append({
                 "category": category,
@@ -363,7 +363,7 @@ def show_tab2():
         parent_data.sort(key=lambda x: x["category"])
         logging.debug(f"Rendering tab2 with {len(parent_data)} categories")
         for category in middle_map:
-            logging.debug(f"Category {category} has subcategories: {list(middle_map[category].keys())}")
+            logging.debug(f"Category {category} has subcategories: {[item['subcategory'] for item in middle_map[category]]}")
 
         return render_template(
             "tab2.html",
@@ -416,7 +416,7 @@ def tab2_data():
             category_map[category].append(item)
 
         parent_data = []
-        middle_map = defaultdict(dict)
+        middle_map = defaultdict(list)
         for category, item_list in category_map.items():
             total_amount = len(item_list)
             on_contract = sum(1 for item in item_list if item.get("status") in ["Delivered", "On Rent"])
@@ -428,15 +428,15 @@ def tab2_data():
                 subcategory = subcategorize_item(category, item.get("rental_class_num"))
                 subcategory_map[subcategory].append(item)
 
-            middle_map[category] = {
-                subcategory: {
+            middle_map[category] = [
+                {
                     "subcategory": subcategory,
                     "total": len(items),
                     "on_contract": sum(1 for item in items if item.get("status") in ["Delivered", "On Rent"]),
                     "available": sum(1 for item in items if item.get("status") == "Ready to Rent")
                 }
                 for subcategory, items in subcategory_map.items()
-            }
+            ]
 
             parent_data.append({
                 "category": category,
