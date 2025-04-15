@@ -92,6 +92,8 @@
                 {% endfor %}
               </tbody>
             </table>
+            {% else %}
+            <p class="m-2">No items available</p>
             {% endif %}
           </div>
         </td>
@@ -206,18 +208,22 @@ function loadSubcatData(category, commonName, page, catKey) {
         return;
       }
       tbody.innerHTML = '';
-      data.items.forEach(item => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-          <td>${item.tag_id}</td>
-          <td>${item.common_name}</td>
-          <td>${item.date_last_scanned || 'N/A'}</td>
-          <td>${item.last_scanned_by || 'N/A'}</td>
-          <td>${item.last_contract_num || 'N/A'}</td>
-          <td><button class="btn btn-sm btn-warning mark-sold-btn" data-tag-id="${item.tag_id}">Mark Sold</button></td>
-        `;
-        tbody.appendChild(tr);
-      });
+      if (data.items && data.items.length > 0) {
+        data.items.forEach(item => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td>${item.tag_id}</td>
+            <td>${item.common_name}</td>
+            <td>${item.date_last_scanned || 'N/A'}</td>
+            <td>${item.last_scanned_by || 'N/A'}</td>
+            <td>${item.last_contract_num || 'N/A'}</td>
+            <td><button class="btn btn-sm btn-warning mark-sold-btn" data-tag-id="${item.tag_id}">Mark Sold</button></td>
+          `;
+          tbody.appendChild(tr);
+        });
+      } else {
+        tbody.innerHTML = '<tr><td colspan="6">No items found</td></tr>';
+      }
 
       const pagination = document.getElementById(`pagination-${catKey}`);
       if (pagination) {
@@ -254,6 +260,10 @@ function loadSubcatData(category, commonName, page, catKey) {
     })
     .catch(error => {
       console.error('Error loading subcat data:', error);
+      const tbody = document.getElementById(`grandchildTbody-${catKey}`);
+      if (tbody) {
+        tbody.innerHTML = '<tr><td colspan="6">Error loading data</td></tr>';
+      }
       if (loading) loading.style.display = 'none';
     });
 }
@@ -273,83 +283,85 @@ function refreshTable() {
       console.log("Refresh data received:", data);
       const tbody = document.getElementById('parentTableBody');
       tbody.innerHTML = '';
-      data.parent_data.forEach(parent => {
-        const cat_key = parent.category.toLowerCase().replace(/ /g, '_').replace('/', '_');
-        const parentRow = document.createElement('tr');
-        parentRow.className = 'table-active';
-        parentRow.innerHTML = `
-          <td><span class="expand-toggle" data-bs-toggle="collapse" data-bs-target="#middle-${cat_key}">+</span></td>
-          <td>${parent.category}</td>
-          <td>${parent.total_amount}</td>
-          <td>${parent.on_contract}</td>
-        `;
-        const middleRow = document.createElement('tr');
-        middleRow.innerHTML = `
-          <td colspan="4" class="p-0">
-            <div id="middle-${cat_key}" class="collapse" data-category="${parent.category}">
-              <table class="table mb-0 middle-table" id="middleTable-${cat_key}">
-                <thead>
-                  <tr>
-                    <th style="width: 50px;"></th>
-                    <th class="sortable" data-col-name="common_name">Common Name</th>
-                    <th class="sortable" data-col-name="total">Total</th>
-                  </tr>
-                </thead>
-                <tbody></tbody>
-              </table>
-            </div>
-          </td>
-        `;
-        tbody.appendChild(parentRow);
-        tbody.appendChild(middleRow);
+      if (data && data.parent_data) {
+        data.parent_data.forEach(parent => {
+          const cat_key = parent.category.toLowerCase().replace(/ /g, '_').replace('/', '_');
+          const parentRow = document.createElement('tr');
+          parentRow.className = 'table-active';
+          parentRow.innerHTML = `
+            <td><span class="expand-toggle" data-bs-toggle="collapse" data-bs-target="#middle-${cat_key}">+</span></td>
+            <td>${parent.category}</td>
+            <td>${parent.total_amount}</td>
+            <td>${parent.on_contract}</td>
+          `;
+          const middleRow = document.createElement('tr');
+          middleRow.innerHTML = `
+            <td colspan="4" class="p-0">
+              <div id="middle-${cat_key}" class="collapse" data-category="${parent.category}">
+                <table class="table mb-0 middle-table" id="middleTable-${cat_key}">
+                  <thead>
+                    <tr>
+                      <th style="width: 50px;"></th>
+                      <th class="sortable" data-col-name="common_name">Common Name</th>
+                      <th class="sortable" data-col-name="total">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+            </td>
+          `;
+          tbody.appendChild(parentRow);
+          tbody.appendChild(middleRow);
 
-        const middleTbody = document.getElementById(`middleTable-${cat_key}`).querySelector('tbody');
-        if (data.middle_map[parent.category] && expandedIds.includes(`middle-${cat_key}`)) {
-          data.middle_map[parent.category].forEach((middle, index) => {
-            const middle_idx = `${cat_key}_${index + 1}`;
-            const middleRow = document.createElement('tr');
-            middleRow.innerHTML = `
-              <td><span class="expand-toggle" data-bs-toggle="collapse" data-bs-target="#child-${middle_idx}">+</span></td>
-              <td>${middle.common_name}</td>
-              <td>${middle.total}</td>
-            `;
-            const grandRow = document.createElement('tr');
-            grandRow.innerHTML = `
-              <td colspan="3" class="p-0">
-                <div id="child-${middle_idx}" class="collapse" data-common-name="${middle.common_name}">
-                  <div id="loading-${middle_idx}" class="text-center my-2" style="display: none;">
-                    <div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div>
+          const middleTbody = document.getElementById(`middleTable-${cat_key}`).querySelector('tbody');
+          if (data.middle_map[parent.category] && expandedIds.includes(`middle-${cat_key}`)) {
+            data.middle_map[parent.category].forEach((middle, index) => {
+              const middle_idx = `${cat_key}_${index + 1}`;
+              const middleRow = document.createElement('tr');
+              middleRow.innerHTML = `
+                <td><span class="expand-toggle" data-bs-toggle="collapse" data-bs-target="#child-${middle_idx}">+</span></td>
+                <td>${middle.common_name}</td>
+                <td>${middle.total}</td>
+              `;
+              const grandRow = document.createElement('tr');
+              grandRow.innerHTML = `
+                <td colspan="3" class="p-0">
+                  <div id="child-${middle_idx}" class="collapse" data-common-name="${middle.common_name}">
+                    <div id="loading-${middle_idx}" class="text-center my-2" style="display: none;">
+                      <div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div>
+                    </div>
+                    <nav aria-label="Item navigation" class="mb-2 mx-2" id="pagination-${middle_idx}">
+                      <ul class="pagination pagination-sm justify-content-center flex-wrap"></ul>
+                    </nav>
+                    <div class="grandchild-table-container">
+                      <table class="table mb-0 grandchild-table" id="grandchildTable-${middle_idx}">
+                        <thead>
+                          <tr>
+                            <th class="sortable" data-col-name="tag_id">Tag ID</th>
+                            <th class="sortable" data-col-name="common_name">Common Name</th>
+                            <th class="sortable" data-col-name="date_last_scanned">Last Scanned Date</th>
+                            <th class="sortable" data-col-name="last_scanned_by">Last Scanned By</th>
+                            <th class="sortable" data-col-name="last_contract_num">Last Contract Num</th>
+                            <th>Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody id="grandchildTbody-${middle_idx}"></tbody>
+                      </table>
+                    </div>
                   </div>
-                  <nav aria-label="Item navigation" class="mb-2 mx-2" id="pagination-${middle_idx}">
-                    <ul class="pagination pagination-sm justify-content-center flex-wrap"></ul>
-                  </nav>
-                  <div class="grandchild-table-container">
-                    <table class="table mb-0 grandchild-table" id="grandchildTable-${middle_idx}">
-                      <thead>
-                        <tr>
-                          <th class="sortable" data-col-name="tag_id">Tag ID</th>
-                          <th class="sortable" data-col-name="common_name">Common Name</th>
-                          <th class="sortable" data-col-name="date_last_scanned">Last Scanned Date</th>
-                          <th class="sortable" data-col-name="last_scanned_by">Last Scanned By</th>
-                          <th class="sortable" data-col-name="last_contract_num">Last Contract Num</th>
-                          <th>Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody id="grandchildTbody-${middle_idx}"></tbody>
-                    </table>
-                  </div>
-                </div>
-              </td>
-            `;
-            middleTbody.appendChild(middleRow);
-            middleTbody.appendChild(grandRow);
+                </td>
+              `;
+              middleTbody.appendChild(middleRow);
+              middleTbody.appendChild(grandRow);
 
-            if (expandedIds.includes(`child-${middle_idx}`)) {
-              loadSubcatData(parent.category, middle.common_name, 1, middle_idx);
-            }
-          });
-        }
-      });
+              if (expandedIds.includes(`child-${middle_idx}`)) {
+                loadSubcatData(parent.category, middle.common_name, 1, middle_idx);
+              }
+            });
+          }
+        });
+      }
 
       expandedIds.forEach(id => {
         const element = document.getElementById(id);
@@ -427,8 +439,8 @@ function updateWithNewData(newData) {
       tbody.appendChild(parentRow);
       tbody.appendChild(middleRow);
     } else {
-      parentRow.cells[2].innerText = parseInt(parentRow.cells[2].innerText) + data.total;
-      parentRow.cells[3].innerText = parseInt(parentRow.cells[3].innerText) + data.on_contract;
+      parentRow.cells[2].innerText = data.total;
+      parentRow.cells[3].innerText = data.on_contract;
     }
 
     const middleTbody = document.getElementById(`middleTable-${cat_key}`).querySelector('tbody');
@@ -475,7 +487,7 @@ function updateWithNewData(newData) {
           middleTbody.appendChild(middleRow);
           middleTbody.appendChild(grandRow);
         } else {
-          middleRow.cells[2].innerText = parseInt(middleRow.cells[2].innerText) + commonData.total;
+          middleRow.cells[2].innerText = commonData.total;
         }
 
         const grandTbody = document.getElementById(`grandchildTbody-${middle_idx}`);
@@ -539,14 +551,20 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     } else if (target.classList.contains("mark-sold-btn")) {
       const tagId = target.getAttribute("data-tag-id");
+      console.log(`Attempting to mark tag ${tagId} as sold`);
       if (confirm(`Mark tag ${tagId} as sold?`)) {
         fetch('/tab6/mark_sold', {
           method: 'POST',
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
           body: `tag_id=${encodeURIComponent(tagId)}`
         })
-          .then(response => response.json())
+          .then(response => {
+            console.log(`Response status: ${response.status}`);
+            if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+            return response.json();
+          })
           .then(data => {
+            console.log('Mark sold response:', data);
             if (data.error) {
               alert(`Error: ${data.error}`);
             } else {
@@ -556,7 +574,7 @@ document.addEventListener('DOMContentLoaded', () => {
           })
           .catch(error => {
             console.error('Error marking sold:', error);
-            alert('Failed to mark tag as sold');
+            alert(`Failed to mark tag as sold: ${error.message}`);
           });
       }
     }

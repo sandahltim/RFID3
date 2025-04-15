@@ -9,9 +9,11 @@ logging.basicConfig(level=logging.DEBUG)
 
 def get_resale_items(conn):
     query = """
-        SELECT * FROM id_item_master
-        WHERE LOWER(bin_location) = 'resale'
-        ORDER BY last_contract_num, tag_id
+        SELECT im.*, rt.item_type
+        FROM id_item_master im
+        LEFT JOIN id_rfidtag rt ON im.tag_id = rt.tag_id
+        WHERE LOWER(im.bin_location) = 'resale'
+        ORDER BY im.last_contract_num, im.tag_id
     """
     return conn.execute(query).fetchall()
 
@@ -238,18 +240,29 @@ def mark_sold():
     try:
         with DatabaseConnection() as conn:
             cursor = conn.cursor()
+            # Verify tag exists in id_rfidtag
+            cursor.execute("SELECT item_type FROM id_rfidtag WHERE tag_id = ?", (tag_id,))
+            row = cursor.fetchone()
+            if not row:
+                logging.warning(f"Tag {tag_id} not found in id_rfidtag")
+                return jsonify({"error": "Tag not found"}), 404
+            if row[0] != 'resale':
+                logging.warning(f"Tag {tag_id} is not a resale item")
+                return jsonify({"error": "Tag is not a resale item"}), 400
+
+            # Update id_rfidtag
             cursor.execute("""
                 UPDATE id_rfidtag
                 SET status = 'sold', date_sold = ?, reuse_count = reuse_count + 1, last_updated = ?
-                WHERE tag_id = ? AND item_type = 'resale'
+                WHERE tag_id = ?
             """, (
                 datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
                 datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
                 tag_id
             ))
             if cursor.rowcount == 0:
-                logging.warning(f"Tag {tag_id} not found or not a resale item")
-                return jsonify({"error": "Tag not found or not a resale item"}), 404
+                logging.warning(f"Failed to update tag {tag_id}")
+                return jsonify({"error": "Failed to mark tag as sold"}), 500
             conn.commit()
         logging.debug(f"Tag {tag_id} marked as sold")
         return jsonify({"message": f"Tag {tag_id} marked as sold"}), 200
