@@ -6,21 +6,18 @@ from config import LOGIN_URL, DB_FILE, SEED_URL, ITEM_MASTER_URL, TRANSACTION_UR
 import sqlite3
 import logging
 
-# Configure logging
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.DEBUG, filename='/home/tim/test_rfidpi/sync.log')
 logger = logging.getLogger(__name__)
 
 TOKEN = None
 TOKEN_EXPIRY = None
 LAST_REFRESH = None
 IS_RELOADING = False
-REFRESH_INTERVAL = 180  # 180 seconds
+REFRESH_INTERVAL = 180
 
-# Single DB connection
 DB_CONN = None
 
 def init_db_connection():
-    """Initialize a single SQLite connection with WAL mode."""
     global DB_CONN
     if DB_CONN is None:
         DB_CONN = sqlite3.connect(DB_FILE, timeout=10)
@@ -31,7 +28,6 @@ def init_db_connection():
     return DB_CONN
 
 def close_db_connection():
-    """Close the single DB connection."""
     global DB_CONN
     if DB_CONN:
         DB_CONN.commit()
@@ -40,7 +36,6 @@ def close_db_connection():
         logger.debug("Closed single DB connection")
 
 def init_refresh_state():
-    """Initialize refresh_state table and load LAST_REFRESH."""
     global LAST_REFRESH
     logger.debug("Initializing refresh state")
     try:
@@ -67,14 +62,11 @@ def init_refresh_state():
         raise
 
 def get_access_token():
-    """Fetch and cache API access token."""
     global TOKEN, TOKEN_EXPIRY
     now = datetime.utcnow()
-
     if TOKEN and TOKEN_EXPIRY and now < TOKEN_EXPIRY:
         logger.debug("Using cached access token")
         return TOKEN
-
     payload = {"username": API_USERNAME, "password": API_PASSWORD}
     logger.debug(f"Requesting token from {LOGIN_URL} with username={API_USERNAME}")
     try:
@@ -93,7 +85,6 @@ def get_access_token():
         return None
 
 def fetch_paginated_data(url, token, since_date=None):
-    """Fetch data from API with optional date filter."""
     headers = {"Authorization": f"Bearer {token}"}
     params = {"limit": 200, "offset": 0}
     if since_date:
@@ -102,7 +93,6 @@ def fetch_paginated_data(url, token, since_date=None):
         elif "transactions" in url:
             params["filter[]"] = f"scan_date>{since_date}"
     all_data = []
-
     logger.debug(f"Fetching data from {url} with params={params}")
     while True:
         try:
@@ -124,7 +114,6 @@ def fetch_paginated_data(url, token, since_date=None):
     return all_data
 
 def update_item_master(data):
-    """Inserts or updates item master data in SQLite."""
     logger.debug(f"Updating item master with {len(data)} records")
     try:
         conn = init_db_connection()
@@ -174,7 +163,6 @@ def update_item_master(data):
         raise
 
 def clear_transactions():
-    """Clears all rows from id_transactions before a full refresh."""
     try:
         conn = init_db_connection()
         cursor = conn.cursor()
@@ -186,7 +174,6 @@ def clear_transactions():
         raise
 
 def update_transactions(data):
-    """Inserts or updates transaction data in SQLite."""
     logger.debug(f"Updating transactions with {len(data)} records")
     try:
         conn = init_db_connection()
@@ -256,7 +243,6 @@ def update_transactions(data):
         raise
 
 def update_seed_data(data):
-    """Inserts or updates SEED data in SQLite (full refresh only)."""
     logger.debug(f"Updating seed data with {len(data)} records")
     try:
         conn = init_db_connection()
@@ -283,7 +269,6 @@ def update_seed_data(data):
         raise
 
 def refresh_data(full_refresh=False):
-    """Refresh database: full on demand, incremental otherwise."""
     global LAST_REFRESH, IS_RELOADING
     IS_RELOADING = True
     logger.debug(f"Starting {'full' if full_refresh else 'incremental'} refresh")
@@ -292,14 +277,11 @@ def refresh_data(full_refresh=False):
         if not token:
             logger.error("No access token. Aborting refresh.")
             return
-
         since_date = None if full_refresh else LAST_REFRESH
         if since_date:
             since_date = since_date.strftime("%Y-%m-%d %H:%M:%S")
-
         item_master_data = fetch_paginated_data(ITEM_MASTER_URL, token, since_date)
         transactions_data = fetch_paginated_data(TRANSACTION_URL, token, since_date)
-        
         if full_refresh:
             clear_transactions()
             seed_data = fetch_paginated_data(SEED_URL, token)
@@ -319,6 +301,5 @@ def refresh_data(full_refresh=False):
         IS_RELOADING = False
 
 def trigger_refresh(full=False):
-    """Trigger a refresh."""
     logger.debug(f"Triggering {'full' if full else 'incremental'} refresh")
     refresh_data(full_refresh=full)
