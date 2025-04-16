@@ -1,297 +1,453 @@
+{% extends 'base.html' %}
+{% block content %}
+<style>
+    table {
+        border-collapse: collapse;
+        width: 100%;
+        margin-bottom: 20px;
+    }
+    th, td {
+        border: 1px solid #ddd;
+        padding: 8px;
+        text-align: left;
+    }
+    th {
+        background-color: #f2f2f2;
+        cursor: pointer;
+    }
+    tr:nth-child(even) {
+        background-color: #f9f9f9;
+    }
+    tr:hover {
+        background-color: #f5f5f5;
+    }
+    .expandable:hover {
+        cursor: pointer;
+    }
+    .child-row {
+        display: none;
+        background-color: #e6f3ff;
+    }
+    .child-row.visible {
+        display: table-row;
+    }
+    .child-table {
+        width: 100%;
+        margin: 10px 0;
+    }
+    .pagination {
+        margin: 10px 0;
+    }
+    .pagination a {
+        margin: 0 5px;
+        text-decoration: none;
+        color: #007bff;
+    }
+    .pagination a.active {
+        font-weight: bold;
+        color: #000;
+    }
+    .filter-container {
+        margin-bottom: 20px;
+    }
+    .filter-container input {
+        margin-right: 10px;
+        padding: 5px;
+    }
+    .loading {
+        color: #888;
+        font-style: italic;
+    }
+    @media print {
+        .no-print {
+            display: none !important;
+        }
+        table, th, td {
+            border: 1px solid black;
+            font-size: 12px;
+        }
+        .child-row.visible {
+            display: table-row !important;
+        }
+    }
+</style>
+
+<div class="filter-container no-print">
+    <input type="text" id="commonNameFilter" placeholder="Filter by Common Name" value="{{ filter_common_name }}">
+    <input type="text" id="tagIdFilter" placeholder="Filter by Tag ID" value="{{ filter_tag_id }}">
+    <input type="text" id="binLocationFilter" placeholder="Filter by Bin Location" value="{{ filter_bin_location }}">
+    <input type="text" id="lastContractFilter" placeholder="Filter by Last Contract" value="{{ filter_last_contract }}">
+    <input type="text" id="statusFilter" placeholder="Filter by Status" value="{{ filter_status }}">
+    <button onclick="applyFilters()">Apply Filters</button>
+    <button onclick="printTable()" style="margin-left: 10px;">Print Table</button>
+</div>
+
+<table id="parentTable">
+    <thead>
+        <tr>
+            <th>Category</th>
+            <th>Total Amount</th>
+            <th>On Contract</th>
+            <th>Available</th>
+            <th>Service</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for row in parent_data %}
+        <tr class="expandable" data-category="{{ row.category | lower | replace(' ', '-') }}">
+            <td>{{ row.category }}</td>
+            <td>{{ row.total_amount }}</td>
+            <td>{{ row.on_contract }}</td>
+            <td>{{ row.available }}</td>
+            <td>{{ row.service }}</td>
+        </tr>
+        <tr id="child-{{ row.category | lower | replace(' ', '-') }}" class="child-row">
+            <td colspan="5">
+                <table class="child-table" id="subtable-{{ row.category | lower | replace(' ', '-') }}">
+                    <thead>
+                        <tr>
+                            <th>Subcategory</th>
+                            <th>Total</th>
+                            <th>On Contract</th>
+                            <th>Available</th>
+                            <th>Service</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for sub in sub_map[row.category] %}
+                        <tr class="sub-expandable" data-category="{{ row.category | lower | replace(' ', '-') }}" data-subcategory="{{ sub.subcategory | lower | replace(' ', '-') }}">
+                            <td>{{ sub.subcategory }}</td>
+                            <td>{{ sub.total }}</td>
+                            <td>{{ sub.on_contract }}</td>
+                            <td>{{ sub.available }}</td>
+                            <td>{{ sub.service }}</td>
+                        </tr>
+                        <tr id="items-{{ row.category | lower | replace(' ', '-') }}-{{ sub.subcategory | lower | replace(' ', '-') }}" class="child-row">
+                            <td colspan="5">
+                                <table class="items-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Tag ID</th>
+                                            <th>Common Name</th>
+                                            <th>Status</th>
+                                            <th>Bin Location</th>
+                                            <th>Quality</th>
+                                            <th>Last Contract</th>
+                                            <th>Client Name</th>
+                                            <th>Scanned Date</th>
+                                            <th>Scanned By</th>
+                                            <th>Notes</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody></tbody>
+                                </table>
+                                <div class="pagination no-print" id="pagination-{{ row.category | lower | replace(' ', '-') }}-{{ sub.subcategory | lower | replace(' ', '-') }}"></div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const expandedState = new Set();
-    
-        function checkReloadStatus() {
-            fetch('/status')
-                .then(response => response.json())
-                .then(data => {
-                    if (!data.is_reloading) {
-                        document.getElementById("loading-overlay").style.display = "none";
-                    } else {
-                        setTimeout(checkReloadStatus, 1000);
-                    }
-                })
-                .catch(error => {
+document.addEventListener('DOMContentLoaded', function() {
+    const expandedState = new Set();
+
+    function checkReloadStatus() {
+        fetch('/status')
+            .then(response => response.json())
+            .then(data => {
+                if (!data.is_reloading) {
+                    document.getElementById("loading-overlay").style.display = "none";
+                } else {
                     setTimeout(checkReloadStatus, 1000);
-                });
+                }
+            })
+            .catch(error => {
+                setTimeout(checkReloadStatus, 1000);
+            });
+    }
+
+    checkReloadStatus();
+    setInterval(checkReloadStatus, 30000);
+
+    function applyFilters() {
+        const params = new URLSearchParams();
+        const filters = {
+            common_name: document.getElementById('commonNameFilter').value,
+            tag_id: document.getElementById('tagIdFilter').value,
+            bin_location: document.getElementById('binLocationFilter').value,
+            last_contract_num: document.getElementById('lastContractFilter').value,
+            status: document.getElementById('statusFilter').value
+        };
+        for (const [key, value] of Object.entries(filters)) {
+            if (value) params.set(key, value);
         }
-    
-        checkReloadStatus();
-        setInterval(checkReloadStatus, 30000);
-    
-        function applyFilters() {
-            const params = new URLSearchParams();
-            const filters = {
-                common_name: document.getElementById('commonNameFilter').value,
-                tag_id: document.getElementById('tagIdFilter').value,
-                bin_location: document.getElementById('binLocationFilter').value,
-                last_contract_num: document.getElementById('lastContractFilter').value,
-                status: document.getElementById('statusFilter').value
-            };
-            for (const [key, value] of Object.entries(filters)) {
-                if (value) params.set(key, value);
+        window.location.href = '/tab2/?' + params.toString();
+    }
+
+    function toggleRow(row, childId) {
+        const childRow = document.getElementById(childId);
+        if (childRow) {
+            const isVisible = childRow.classList.contains('visible');
+            childRow.classList.toggle('visible', !isVisible);
+            const subtable = document.getElementById(`subtable-${row.dataset.category}`);
+            if (subtable) subtable.style.display = !isVisible ? 'table' : 'none';
+            if (!isVisible) {
+                expandedState.add(childId);
+            } else {
+                expandedState.delete(childId);
             }
-            window.location.href = '/tab2/?' + params.toString();
         }
-    
-        function toggleRow(row, childId) {
+    }
+
+    function loadSubcategoryItems(category, subcategory, page = 1, catKey, retries = 3) {
+        const params = new URLSearchParams({
+            category: category,
+            subcategory: subcategory,
+            page: page,
+            common_name: document.getElementById('commonNameFilter').value,
+            tag_id: document.getElementById('tagIdFilter').value,
+            bin_location: document.getElementById('binLocationFilter').value,
+            last_contract_num: document.getElementById('lastContractFilter').value,
+            status: document.getElementById('statusFilter').value
+        });
+        const url = `/tab2/subcat_data?${params.toString()}`;
+
+        const itemsRow = document.getElementById(`items-${catKey}-${subcategory.toLowerCase().replace(/ /g, '-')}`);
+        if (itemsRow) {
+            const tbody = itemsRow.querySelector('.items-table tbody');
+            tbody.innerHTML = '<tr><td colspan="10" class="loading">Loading...</td></tr>';
+        }
+
+        fetch(url)
+            .then(response => response.json())
+            .then(data => {
+                renderSubcategoryItems(category, subcategory, catKey, data);
+            })
+            .catch(error => {
+                if (retries > 0) {
+                    setTimeout(() => loadSubcategoryItems(category, subcategory, page, catKey, retries - 1), 1000);
+                } else if (itemsRow) {
+                    const tbody = itemsRow.querySelector('.items-table tbody');
+                    tbody.innerHTML = '<tr><td colspan="10">No items available</td></tr>';
+                }
+            });
+    }
+
+    function renderSubcategoryItems(category, subcategory, catKey, data) {
+        const itemsRow = document.getElementById(`items-${catKey}-${subcategory.toLowerCase().replace(/ /g, '-')}`);
+        if (!itemsRow) return;
+        const tbody = itemsRow.querySelector('.items-table tbody');
+        tbody.innerHTML = '';
+        if (data.items.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="10">No items available</td></tr>';
+        } else {
+            data.items.forEach(item => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${item.tag_id}</td>
+                    <td>${item.common_name}</td>
+                    <td>${item.status}</td>
+                    <td>${item.bin_location}</td>
+                    <td>${item.quality}</td>
+                    <td>${item.last_contract_num}</td>
+                    <td>${item.client_name}</td>
+                    <td>${item.date_last_scanned}</td>
+                    <td>${item.last_scanned_by}</td>
+                    <td>${item.notes}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        const pagination = document.getElementById(`pagination-${catKey}-${subcategory.toLowerCase().replace(/ /g, '-')}`);
+        if (pagination) {
+            pagination.innerHTML = '';
+            for (let i = 1; i <= data.total_pages; i++) {
+                const a = document.createElement('a');
+                a.href = '#';
+                a.textContent = i;
+                if (i === data.current_page) a.classList.add('active');
+                a.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    loadSubcategoryItems(category, subcategory, i, catKey);
+                });
+                pagination.appendChild(a);
+            }
+        }
+    }
+
+    function printTable() {
+        document.querySelectorAll('.child-row').forEach(row => {
+            row.classList.add('visible');
+            const subtable = row.querySelector('.child-table');
+            if (subtable) subtable.style.display = 'table';
+        });
+        window.print();
+    }
+
+    document.querySelectorAll('.expandable').forEach(row => {
+        const category = row.dataset.category;
+        row.addEventListener('click', () => toggleRow(row, `child-${category}`));
+    });
+
+    document.querySelectorAll('.sub-expandable').forEach(row => {
+        const category = row.dataset.category;
+        const subcategory = row.dataset.subcategory;
+        row.addEventListener('click', () => {
+            const childId = `items-${category}-${subcategory}`;
             const childRow = document.getElementById(childId);
             if (childRow) {
                 const isVisible = childRow.classList.contains('visible');
                 childRow.classList.toggle('visible', !isVisible);
-                const subtable = document.getElementById(`subtable-${row.dataset.category}`);
+                const pagination = document.getElementById(`pagination-${category}-${subcategory}`);
+                if (pagination) pagination.style.display = !isVisible ? 'block' : 'none';
+                const subtable = document.getElementById(`subtable-${category}`);
                 if (subtable) subtable.style.display = !isVisible ? 'table' : 'none';
                 if (!isVisible) {
+                    loadSubcategoryItems(
+                        category.replace(/-/g, ' '),
+                        subcategory.replace(/-/g, ' '),
+                        1,
+                        category
+                    );
                     expandedState.add(childId);
                 } else {
                     expandedState.delete(childId);
                 }
             }
-        }
-    
-        function loadSubcategoryItems(category, subcategory, page = 1, catKey, retries = 3) {
-            const params = new URLSearchParams({
-                category: category,
-                subcategory: subcategory,
-                page: page,
-                common_name: document.getElementById('commonNameFilter').value,
-                tag_id: document.getElementById('tagIdFilter').value,
-                bin_location: document.getElementById('binLocationFilter').value,
-                last_contract_num: document.getElementById('lastContractFilter').value,
-                status: document.getElementById('statusFilter').value
-            });
-            const url = `/tab2/subcat_data?${params.toString()}`;
-    
-            const itemsRow = document.getElementById(`items-${catKey}-${subcategory.toLowerCase().replace(/ /g, '-')}`);
-            if (itemsRow) {
-                const tbody = itemsRow.querySelector('.items-table tbody');
-                tbody.innerHTML = '<tr><td colspan="10" class="loading">Loading...</td></tr>';
-            }
-    
-            fetch(url)
-                .then(response => response.json())
-                .then(data => {
-                    renderSubcategoryItems(category, subcategory, catKey, data);
-                })
-                .catch(error => {
-                    if (retries > 0) {
-                        setTimeout(() => loadSubcategoryItems(category, subcategory, page, catKey, retries - 1), 1000);
-                    } else if (itemsRow) {
-                        const tbody = itemsRow.querySelector('.items-table tbody');
-                        tbody.innerHTML = '<tr><td colspan="10">No items available</td></tr>';
-                    }
-                });
-        }
-    
-        function renderSubcategoryItems(category, subcategory, catKey, data) {
-            const itemsRow = document.getElementById(`items-${catKey}-${subcategory.toLowerCase().replace(/ /g, '-')}`);
-            if (!itemsRow) return;
-            const tbody = itemsRow.querySelector('.items-table tbody');
-            tbody.innerHTML = '';
-            if (data.items.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="10">No items available</td></tr>';
-            } else {
-                data.items.forEach(item => {
+        });
+    });
+
+    function refreshTable() {
+        fetch('/tab2/data?' + new URLSearchParams({
+            common_name: document.getElementById('commonNameFilter').value,
+            tag_id: document.getElementById('tagIdFilter').value,
+            bin_location: document.getElementById('binLocationFilter').value,
+            last_contract_num: document.getElementById('lastContractFilter').value,
+            status: document.getElementById('statusFilter').value
+        }))
+            .then(response => response.json())
+            .then(data => {
+                const tbody = document.querySelector('#parentTable tbody');
+                tbody.innerHTML = '';
+                data.parent_data.forEach(row => {
                     const tr = document.createElement('tr');
+                    tr.className = 'expandable';
+                    tr.dataset.category = row.category.toLowerCase().replace(/ /g, '-');
                     tr.innerHTML = `
-                        <td>${item.tag_id}</td>
-                        <td>${item.common_name}</td>
-                        <td>${item.status}</td>
-                        <td>${item.bin_location}</td>
-                        <td>${item.quality}</td>
-                        <td>${item.last_contract_num}</td>
-                        <td>${item.client_name}</td>
-                        <td>${item.date_last_scanned}</td>
-                        <td>${item.last_scanned_by}</td>
-                        <td>${item.notes}</td>
+                        <td>${row.category}</td>
+                        <td>${row.total_amount}</td>
+                        <td>${row.on_contract}</td>
+                        <td>${row.available}</td>
+                        <td>${row.service}</td>
                     `;
                     tbody.appendChild(tr);
-                });
-            }
-    
-            const pagination = document.getElementById(`pagination-${catKey}-${subcategory.toLowerCase().replace(/ /g, '-')}`);
-            if (pagination) {
-                pagination.innerHTML = '';
-                for (let i = 1; i <= data.total_pages; i++) {
-                    const a = document.createElement('a');
-                    a.href = '#';
-                    a.textContent = i;
-                    if (i === data.current_page) a.classList.add('active');
-                    a.addEventListener('click', (e) => {
-                        e.preventDefault();
-                        loadSubcategoryItems(category, subcategory, i, catKey);
-                    });
-                    pagination.appendChild(a);
-                }
-            }
-        }
-    
-        function printTable() {
-            document.querySelectorAll('.child-row').forEach(row => {
-                row.classList.add('visible');
-                const subtable = row.querySelector('.child-table');
-                if (subtable) subtable.style.display = 'table';
-            });
-            window.print();
-        }
-    
-        document.querySelectorAll('.expandable').forEach(row => {
-            const category = row.dataset.category;
-            row.addEventListener('click', () => toggleRow(row, `child-${category}`));
-        });
-    
-        document.querySelectorAll('.sub-expandable').forEach(row => {
-            const category = row.dataset.category;
-            const subcategory = row.dataset.subcategory;
-            row.addEventListener('click', () => {
-                const childId = `items-${category}-${subcategory}`;
-                const childRow = document.getElementById(childId);
-                if (childRow) {
-                    const isVisible = childRow.classList.contains('visible');
-                    childRow.classList.toggle('visible', !isVisible);
-                    const pagination = document.getElementById(`pagination-${category}-${subcategory}`);
-                    if (pagination) pagination.style.display = !isVisible ? 'block' : 'none';
-                    const subtable = document.getElementById(`subtable-${category}`);
-                    if (subtable) subtable.style.display = !isVisible ? 'table' : 'none';
-                    if (!isVisible) {
-                        loadSubcategoryItems(
-                            category.replace(/-/g, ' '),
-                            subcategory.replace(/-/g, ' '),
-                            1,
-                            category
-                        );
-                        expandedState.add(childId);
-                    } else {
-                        expandedState.delete(childId);
-                    }
-                }
-            });
-        });
-    
-        function refreshTable() {
-            fetch('/tab2/data?' + new URLSearchParams({
-                common_name: document.getElementById('commonNameFilter').value,
-                tag_id: document.getElementById('tagIdFilter').value,
-                bin_location: document.getElementById('binLocationFilter').value,
-                last_contract_num: document.getElementById('lastContractFilter').value,
-                status: document.getElementById('statusFilter').value
-            }))
-                .then(response => response.json())
-                .then(data => {
-                    const tbody = document.querySelector('#parentTable tbody');
-                    tbody.innerHTML = '';
-                    data.parent_data.forEach(row => {
-                        const tr = document.createElement('tr');
-                        tr.className = 'expandable';
-                        tr.dataset.category = row.category.toLowerCase().replace(/ /g, '-');
-                        tr.innerHTML = `
-                            <td>${row.category}</td>
-                            <td>${row.total_amount}</td>
-                            <td>${row.on_contract}</td>
-                            <td>${row.available}</td>
-                            <td>${row.service}</td>
-                        `;
-                        tbody.appendChild(tr);
-    
-                        const childTr = document.createElement('tr');
-                        childTr.id = `child-${row.category.toLowerCase().replace(/ /g, '-')}`;
-                        childTr.className = 'child-row';
-                        if (expandedState.has(childTr.id)) childTr.classList.add('visible');
-                        childTr.innerHTML = `
-                            <td colspan="5">
-                                <table class="child-table" id="subtable-${row.category.toLowerCase().replace(/ /g, '-')}" style="display: ${expandedState.has(childTr.id) ? 'table' : 'none'}">
-                                    <thead>
-                                        <tr>
-                                            <th>Subcategory</th>
-                                            <th>Total</th>
-                                            <th>On Contract</th>
-                                            <th>Available</th>
-                                            <th>Service</th>
+
+                    const childTr = document.createElement('tr');
+                    childTr.id = `child-${row.category.toLowerCase().replace(/ /g, '-')}`;
+                    childTr.className = 'child-row';
+                    if (expandedState.has(childTr.id)) childTr.classList.add('visible');
+                    childTr.innerHTML = `
+                        <td colspan="5">
+                            <table class="child-table" id="subtable-${row.category.toLowerCase().replace(/ /g, '-')}" style="display: ${expandedState.has(childTr.id) ? 'table' : 'none'}">
+                                <thead>
+                                    <tr>
+                                        <th>Subcategory</th>
+                                        <th>Total</th>
+                                        <th>On Contract</th>
+                                        <th>Available</th>
+                                        <th>Service</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${data.sub_map[row.category] ? Object.values(data.sub_map[row.category]).map(sub => `
+                                        <tr class="sub-expandable" data-category="${row.category.toLowerCase().replace(/ /g, '-')}" data-subcategory="${sub.subcategory.toLowerCase().replace(/ /g, '-')}" style="display: ${expandedState.has(childTr.id) ? 'table-row' : 'none'}">
+                                            <td>${sub.subcategory}</td>
+                                            <td>${sub.total}</td>
+                                            <td>${sub.on_contract}</td>
+                                            <td>${sub.available}</td>
+                                            <td>${sub.service}</td>
                                         </tr>
-                                    </thead>
-                                    <tbody>
-                                        ${data.sub_map[row.category] ? Object.values(data.sub_map[row.category]).map(sub => `
-                                            <tr class="sub-expandable" data-category="${row.category.toLowerCase().replace(/ /g, '-')}" data-subcategory="${sub.subcategory.toLowerCase().replace(/ /g, '-')}" style="display: ${expandedState.has(childTr.id) ? 'table-row' : 'none'}">
-                                                <td>${sub.subcategory}</td>
-                                                <td>${sub.total}</td>
-                                                <td>${sub.on_contract}</td>
-                                                <td>${sub.available}</td>
-                                                <td>${sub.service}</td>
-                                            </tr>
-                                            <tr id="items-${row.category.toLowerCase().replace(/ /g, '-')}-${sub.subcategory.toLowerCase().replace(/ /g, '-')}" class="child-row" style="display: ${expandedState.has(`items-${row.category.toLowerCase().replace(/ /g, '-')}-${sub.subcategory.toLowerCase().replace(/ /g, '-')}`) ? 'table-row' : 'none'}">
-                                                <td colspan="5">
-                                                    <table class="items-table">
-                                                        <thead>
-                                                            <tr>
-                                                                <th>Tag ID</th>
-                                                                <th>Common Name</th>
-                                                                <th>Status</th>
-                                                                <th>Bin Location</th>
-                                                                <th>Quality</th>
-                                                                <th>Last Contract</th>
-                                                                <th>Client Name</th>
-                                                                <th>Scanned Date</th>
-                                                                <th>Scanned By</th>
-                                                                <th>Notes</th>
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody></tbody>
-                                                    </table>
-                                                    <div class="pagination no-print" id="pagination-${row.category.toLowerCase().replace(/ /g, '-')}-${sub.subcategory.toLowerCase().replace(/ /g, '-')}" style="display: ${expandedState.has(`items-${row.category.toLowerCase().replace(/ /g, '-')}-${sub.subcategory.toLowerCase().replace(/ /g, '-')}`) ? 'block' : 'none'}"></div>
-                                                </td>
-                                            </tr>
-                                        `).join('') : ''}
-                                    </tbody>
-                                </table>
-                            </td>
-                        `;
-                        tbody.appendChild(childTr);
-                    });
-    
-                    document.querySelectorAll('.expandable').forEach(row => {
-                        const category = row.dataset.category;
-                        row.addEventListener('click', () => toggleRow(row, `child-${category}`));
-                    });
-    
-                    document.querySelectorAll('.sub-expandable').forEach(row => {
-                        const category = row.dataset.category;
-                        const subcategory = row.dataset.subcategory;
-                        row.addEventListener('click', () => {
-                            const childId = `items-${category}-${subcategory}`;
-                            const childRow = document.getElementById(childId);
-                            if (childRow) {
-                                const isVisible = childRow.classList.contains('visible');
-                                childRow.classList.toggle('visible', !isVisible);
-                                const pagination = document.getElementById(`pagination-${category}-${subcategory}`);
-                                if (pagination) pagination.style.display = !isVisible ? 'block' : 'none';
-                                const subtable = document.getElementById(`subtable-${category}`);
-                                if (subtable) subtable.style.display = !isVisible ? 'table' : 'none';
-                                if (!isVisible) {
-                                    loadSubcategoryItems(
-                                        category.replace(/-/g, ' '),
-                                        subcategory.replace(/-/g, ' '),
-                                        1,
-                                        category
-                                    );
-                                    expandedState.add(childId);
-                                } else {
-                                    expandedState.delete(childId);
-                                }
+                                        <tr id="items-${row.category.toLowerCase().replace(/ /g, '-')}-${sub.subcategory.toLowerCase().replace(/ /g, '-')}" class="child-row" style="display: ${expandedState.has(`items-${row.category.toLowerCase().replace(/ /g, '-')}-${sub.subcategory.toLowerCase().replace(/ /g, '-')}`) ? 'table-row' : 'none'}">
+                                            <td colspan="5">
+                                                <table class="items-table">
+                                                    <thead>
+                                                        <tr>
+                                                            <th>Tag ID</th>
+                                                            <th>Common Name</th>
+                                                            <th>Status</th>
+                                                            <th>Bin Location</th>
+                                                            <th>Quality</th>
+                                                            <th>Last Contract</th>
+                                                            <th>Client Name</th>
+                                                            <th>Scanned Date</th>
+                                                            <th>Scanned By</th>
+                                                            <th>Notes</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody></tbody>
+                                                </table>
+                                                <div class="pagination no-print" id="pagination-${row.category.toLowerCase().replace(/ /g, '-')}-${sub.subcategory.toLowerCase().replace(/ /g, '-')}" style="display: ${expandedState.has(`items-${row.category.toLowerCase().replace(/ /g, '-')}-${sub.subcategory.toLowerCase().replace(/ /g, '-')}`) ? 'block' : 'none'}"></div>
+                                            </td>
+                                        </tr>
+                                    `).join('') : ''}
+                                </tbody>
+                            </table>
+                        </td>
+                    `;
+                    tbody.appendChild(childTr);
+                });
+
+                document.querySelectorAll('.expandable').forEach(row => {
+                    const category = row.dataset.category;
+                    row.addEventListener('click', () => toggleRow(row, `child-${category}`));
+                });
+
+                document.querySelectorAll('.sub-expandable').forEach(row => {
+                    const category = row.dataset.category;
+                    const subcategory = row.dataset.subcategory;
+                    row.addEventListener('click', () => {
+                        const childId = `items-${category}-${subcategory}`;
+                        const childRow = document.getElementById(childId);
+                        if (childRow) {
+                            const isVisible = childRow.classList.contains('visible');
+                            childRow.classList.toggle('visible', !isVisible);
+                            const pagination = document.getElementById(`pagination-${category}-${subcategory}`);
+                            if (pagination) pagination.style.display = !isVisible ? 'block' : 'none';
+                            const subtable = document.getElementById(`subtable-${category}`);
+                            if (subtable) subtable.style.display = !isVisible ? 'table' : 'none';
+                            if (!isVisible) {
+                                loadSubcategoryItems(
+                                    category.replace(/-/g, ' '),
+                                    subcategory.replace(/-/g, ' '),
+                                    1,
+                                    category
+                                );
+                                expandedState.add(childId);
+                            } else {
+                                expandedState.delete(childId);
                             }
-                        });
-                    });
-    
-                    expandedState.forEach(id => {
-                        if (id.startsWith('items-')) {
-                            const [_, cat, subcat] = id.split('-', 3);
-                            loadSubcategoryItems(cat.replace(/-/g, ' '), subcat.replace(/-/g, ' '), 1, cat);
                         }
                     });
-                })
-                .catch(error => {});
-        }
-    
-        setInterval(refreshTable, 60000);
-    });
-    </script>
+                });
+
+                expandedState.forEach(id => {
+                    if (id.startsWith('items-')) {
+                        const [_, cat, subcat] = id.split('-', 3);
+                        loadSubcategoryItems(cat.replace(/-/g, ' '), subcat.replace(/-/g, ' '), 1, cat);
+                    }
+                });
+            })
+            .catch(error => {});
+    }
+
+    setInterval(refreshTable, 60000);
+});
+</script>
+{% endblock %}
