@@ -74,6 +74,8 @@ def init_db_schema():
                 date_updated TEXT
             )
         """)
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_rental_class ON id_item_master (rental_class_num)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_status ON id_item_master (status)")
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS id_rfidtag (
                 tag_id TEXT PRIMARY KEY,
@@ -89,6 +91,7 @@ def init_db_schema():
                 last_updated TEXT
             )
         """)
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_rfid_tag_id ON id_rfidtag (tag_id)")
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS refresh_state (
                 id INTEGER PRIMARY KEY,
@@ -228,13 +231,6 @@ def fetch_paginated_data(url, token, since_date=None):
     logger.error(f"Failed to fetch data from {url} after 3 attempts")
     return all_data
 
-# Fallback data if API fails
-FALLBACK_DATA = [
-    {"tag_id": "TAG001", "rental_class_num": 62037, "common_name": "90x132 Linen", "bin_location": "Warehouse", "status": "Ready to Rent", "date_last_scanned": "2025-03-31 10:00:00"},
-    {"tag_id": "TAG002", "rental_class_num": 62706, "common_name": "HP Top", "bin_location": "Tent Storage", "status": "Ready to Rent", "date_last_scanned": "2025-03-31 10:00:00"},
-    {"tag_id": "TAG003", "rental_class_num": 64815, "common_name": "Fog Machine", "bin_location": "resale", "status": "Ready to Rent", "date_last_scanned": "2025-03-31 10:00:00"},
-]
-
 def update_item_master(data):
     logger.debug(f"Updating item master with {len(data)} records")
     try:
@@ -279,15 +275,18 @@ def update_item_master(data):
                         item.get("date_last_scanned"), item.get("date_created"), item.get("date_updated"),
                     ),
                 )
+                conn.commit()  # Commit after each item to ensure data persists
             except Exception as e:
                 logger.error(f"Failed to insert item {item.get('tag_id')}: {e}")
-        conn.commit()
+                conn.rollback()
         cursor.execute("SELECT count(*) FROM id_item_master")
         count = cursor.fetchone()[0]
         logger.debug(f"Item Master updated, total rows: {count}")
     except Exception as e:
         logger.error(f"Database error updating item master: {e}")
         raise
+    finally:
+        close_db_connection()
 
 def clear_transactions():
     try:
@@ -299,6 +298,8 @@ def clear_transactions():
     except Exception as e:
         logger.error(f"Error clearing transactions: {e}")
         raise
+    finally:
+        close_db_connection()
 
 def update_transactions(data):
     logger.debug(f"Updating transactions with {len(data)} records")
@@ -364,15 +365,18 @@ def update_transactions(data):
                         txn.get("notes")
                     ),
                 )
+                conn.commit()
             except Exception as e:
                 logger.error(f"Failed to insert transaction {txn.get('tag_id')}: {e}")
-        conn.commit()
+                conn.rollback()
         cursor.execute("SELECT count(*) FROM id_transactions")
         count = cursor.fetchone()[0]
         logger.debug(f"Transactions updated, total rows: {count}")
     except Exception as e:
         logger.error(f"Database error updating transactions: {e}")
         raise
+    finally:
+        close_db_connection()
 
 def update_seed_data(data):
     logger.debug(f"Updating seed data with {len(data)} records")
@@ -395,15 +399,18 @@ def update_seed_data(data):
                         item.get("rental_class_id"), item.get("common_name"), item.get("bin_location"),
                     ),
                 )
+                conn.commit()
             except Exception as e:
                 logger.error(f"Failed to insert seed item {item.get('rental_class_id')}: {e}")
-        conn.commit()
+                conn.rollback()
         cursor.execute("SELECT count(*) FROM seed_rental_classes")
         count = cursor.fetchone()[0]
         logger.debug(f"SEED data updated, total rows: {count}")
     except Exception as e:
         logger.error(f"Database error updating SEED data: {e}")
         raise
+    finally:
+        close_db_connection()
 
 def refresh_data(full_refresh=False):
     global LAST_REFRESH, IS_RELOADING
@@ -412,23 +419,19 @@ def refresh_data(full_refresh=False):
     try:
         token = get_access_token()
         if not token:
-            logger.error("No access token. Using fallback data.")
-            item_master_data = FALLBACK_DATA
-            transactions_data = []
-            seed_data = []
-        else:
-            since_date = None if full_refresh else LAST_REFRESH
-            if since_date:
-                since_date = since_date.strftime("%Y-%m-%d %H:%M:%S")
-            item_master_data = fetch_paginated_data(ITEM_MASTER_URL, token, since_date)
-            transactions_data = fetch_paginated_data(TRANSACTION_URL, token, since_date)
-            if full_refresh:
-                seed_data = fetch_paginated_data(SEED_URL, token)
-            else:
-                seed_data = []
+            logger.error("No access token. Aborting refresh.")
+            return
+        since_date = None if full_refresh else LAST_REFRESH
+        if since_date:
+            since_date = since_date.strftime("%Y-%m-%d %H:%M:%S")
+        item_master_data = fetch_paginated_data(ITEM_MASTER_URL, token, since_date)
+        transactions_data = fetch_paginated_data(TRANSACTION_URL, token, since_date)
         if full_refresh:
+            seed_data = fetch_paginated_data(SEED_URL, token)
             clear_transactions()
             update_seed_data(seed_data)
+        else:
+            seed_data = []
         update_transactions(transactions_data)
         update_item_master(item_master_data)
         LAST_REFRESH = datetime.utcnow()
