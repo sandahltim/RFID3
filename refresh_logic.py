@@ -77,7 +77,16 @@ def init_db_schema():
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS id_rfidtag (
                 tag_id TEXT PRIMARY KEY,
-                item_type TEXT
+                item_type TEXT,
+                common_name TEXT,
+                category TEXT,
+                status TEXT,
+                last_contract_num TEXT,
+                date_assigned TEXT,
+                date_sold TEXT,
+                date_discarded TEXT,
+                reuse_count INTEGER,
+                last_updated TEXT
             )
         """)
         cursor.execute("""
@@ -164,10 +173,11 @@ def get_access_token():
         logger.debug("Using cached access token")
         return TOKEN
     payload = {"username": API_USERNAME, "password": API_PASSWORD}
-    logger.debug(f"Requesting token from {LOGIN_URL}")
+    logger.debug(f"Requesting token from {LOGIN_URL} with username={API_USERNAME}")
     for attempt in range(5):
         try:
             response = requests.post(LOGIN_URL, json=payload, timeout=20)
+            logger.debug(f"Token attempt {attempt+1}: Status {response.status_code}, Response: {response.text[:100]}...")
             response.raise_for_status()
             data = response.json()
             TOKEN = data.get("access_token")
@@ -198,6 +208,7 @@ def fetch_paginated_data(url, token, since_date=None):
         try:
             while True:
                 response = requests.get(url, headers=headers, params=params, timeout=20)
+                logger.debug(f"Fetch attempt {attempt+1} for {url}: Status {response.status_code}, Response: {response.text[:100]}...")
                 response.raise_for_status()
                 data = response.json().get("data", [])
                 logger.debug(f"Fetched {len(data)} records from {url} at offset {params['offset']}")
