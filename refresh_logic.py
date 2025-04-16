@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 from config import LOGIN_URL, DB_FILE, SEED_URL, ITEM_MASTER_URL, TRANSACTION_URL, API_PASSWORD, API_USERNAME
 import sqlite3
 import logging
+import threading
 
 logging.basicConfig(level=logging.DEBUG, filename='/home/tim/test_rfidpi/sync.log', filemode='a')
 logger = logging.getLogger(__name__)
@@ -14,43 +15,33 @@ TOKEN_EXPIRY = None
 LAST_REFRESH = None
 IS_RELOADING = False
 REFRESH_INTERVAL = 180
+DB_LOCK = threading.Lock()
 
-DB_CONN = None
+def get_db_connection():
+    try:
+        conn = sqlite3.connect(DB_FILE, timeout=15)
+        conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA busy_timeout=15000")
+        logger.debug("Opened new DB connection with WAL mode")
+        return conn
+    except sqlite3.OperationalError as e:
+        logger.error(f"Failed to open DB connection: {e}")
+        raise
 
-def init_db_connection():
-    global DB_CONN
-    if DB_CONN is None:
-        for attempt in range(5):
-            try:
-                DB_CONN = sqlite3.connect(DB_FILE, timeout=15)
-                DB_CONN.row_factory = sqlite3.Row
-                DB_CONN.execute("PRAGMA journal_mode=WAL")
-                DB_CONN.execute("PRAGMA busy_timeout=15000")
-                logger.debug("Initialized single DB connection with WAL mode")
-                return DB_CONN
-            except sqlite3.OperationalError as e:
-                logger.error(f"DB connection attempt {attempt+1} failed: {e}")
-                if attempt < 4:
-                    time.sleep(2)
-                else:
-                    raise
-    return DB_CONN
-
-def close_db_connection():
-    global DB_CONN
-    if DB_CONN:
+def close_db_connection(conn):
+    if conn:
         try:
-            DB_CONN.commit()
-            DB_CONN.close()
-            logger.debug("Closed single DB connection")
+            conn.commit()
+            conn.close()
+            logger.debug("Closed DB connection")
         except Exception as e:
             logger.error(f"Error closing DB connection: {e}")
-        finally:
-            DB_CONN = None
 
 def init_db_schema():
+    conn = None
     try:
-        conn = init_db_connection()
+        conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS id_item_master (
@@ -149,12 +140,15 @@ def init_db_schema():
     except Exception as e:
         logger.error(f"Failed to initialize DB schema: {e}")
         raise
+    finally:
+        close_db_connection(conn)
 
 def init_refresh_state():
     global LAST_REFRESH
     logger.debug("Initializing refresh state")
+    conn = None
     try:
-        conn = init_db_connection()
+        conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute("SELECT last_refresh FROM refresh_state WHERE id = 1")
         row = cursor.fetchone()
@@ -169,6 +163,8 @@ def init_refresh_state():
     except Exception as e:
         logger.error(f"Failed to initialize refresh state: {e}")
         raise
+    finally:
+        close_db_connection(conn)
 
 def get_access_token():
     global TOKEN, TOKEN_EXPIRY
@@ -234,184 +230,194 @@ def fetch_paginated_data(url, token, since_date=None):
 
 def update_item_master(data):
     logger.debug(f"Updating item master with {len(data)} records")
-    try:
-        conn = init_db_connection()
-        cursor = conn.cursor()
-        # Clear existing data to avoid duplicates
-        cursor.execute("DELETE FROM id_item_master")
-        conn.commit()
-        inserted = 0
-        for item in data:
-            try:
-                cursor.execute(
-                    """
-                    INSERT INTO id_item_master (
-                        tag_id, uuid_accounts_fk, serial_number, client_name, rental_class_num,
-                        common_name, quality, bin_location, status, last_contract_num,
-                        last_scanned_by, notes, status_notes, long, lat, date_last_scanned,
-                        date_created, date_updated
+    with DB_LOCK:
+        conn = None
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            # Clear existing data to avoid duplicates
+            cursor.execute("DELETE FROM id_item_master")
+            conn.commit()
+            inserted = 0
+            for item in data:
+                try:
+                    cursor.execute(
+                        """
+                        INSERT INTO id_item_master (
+                            tag_id, uuid_accounts_fk, serial_number, client_name, rental_class_num,
+                            common_name, quality, bin_location, status, last_contract_num,
+                            last_scanned_by, notes, status_notes, long, lat, date_last_scanned,
+                            date_created, date_updated
+                        )
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            item.get("tag_id"), item.get("uuid_accounts_fk"), item.get("serial_number"),
+                            item.get("client_name"), item.get("rental_class_num"), item.get("common_name"),
+                            item.get("quality"), item.get("bin_location"), item.get("status"),
+                            item.get("last_contract_num"), item.get("last_scanned_by"), item.get("notes"),
+                            item.get("status_notes"), item.get("long"), item.get("lat"),
+                            item.get("date_last_scanned"), item.get("date_created"), item.get("date_updated"),
+                        ),
                     )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    (
-                        item.get("tag_id"), item.get("uuid_accounts_fk"), item.get("serial_number"),
-                        item.get("client_name"), item.get("rental_class_num"), item.get("common_name"),
-                        item.get("quality"), item.get("bin_location"), item.get("status"),
-                        item.get("last_contract_num"), item.get("last_scanned_by"), item.get("notes"),
-                        item.get("status_notes"), item.get("long"), item.get("lat"),
-                        item.get("date_last_scanned"), item.get("date_created"), item.get("date_updated"),
-                    ),
-                )
-                inserted += 1
-                if inserted % 200 == 0:  # Commit every 200 items
-                    conn.commit()
-                    logger.debug(f"Committed {inserted} items to id_item_master")
-            except Exception as e:
-                logger.error(f"Failed to insert item {item.get('tag_id')}: {e}")
-                conn.rollback()
-        conn.commit()  # Final commit
-        cursor.execute("SELECT count(*) FROM id_item_master")
-        count = cursor.fetchone()[0]
-        logger.debug(f"Item Master updated, total rows: {count}")
-    except Exception as e:
-        logger.error(f"Database error updating item master: {e}")
-        raise
-    finally:
-        close_db_connection()
+                    inserted += 1
+                    if inserted % 200 == 0:  # Commit every 200 items
+                        conn.commit()
+                        logger.debug(f"Committed {inserted} items to id_item_master")
+                except Exception as e:
+                    logger.error(f"Failed to insert item {item.get('tag_id')}: {e}")
+                    conn.rollback()
+            conn.commit()  # Final commit
+            cursor.execute("SELECT count(*) FROM id_item_master")
+            count = cursor.fetchone()[0]
+            logger.debug(f"Item Master updated, total rows: {count}")
+            if count != len(data):
+                logger.error(f"Mismatch: Expected {len(data)} rows, but inserted {count} rows")
+        except Exception as e:
+            logger.error(f"Database error updating item master: {e}")
+            raise
+        finally:
+            close_db_connection(conn)
 
 def clear_transactions():
-    try:
-        conn = init_db_connection()
-        cursor = conn.cursor()
-        cursor.execute("DELETE FROM id_transactions")
-        conn.commit()
-        logger.debug("Cleared id_transactions table")
-    except Exception as e:
-        logger.error(f"Error clearing transactions: {e}")
-        raise
-    finally:
-        close_db_connection()
+    with DB_LOCK:
+        conn = None
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM id_transactions")
+            conn.commit()
+            logger.debug("Cleared id_transactions table")
+        except Exception as e:
+            logger.error(f"Error clearing transactions: {e}")
+            raise
+        finally:
+            close_db_connection(conn)
 
 def update_transactions(data):
     logger.debug(f"Updating transactions with {len(data)} records")
-    try:
-        conn = init_db_connection()
-        cursor = conn.cursor()
-        inserted = 0
-        for txn in data:
-            try:
-                cursor.execute(
-                    """
-                    INSERT INTO id_transactions (
-                        contract_number, client_name, tag_id, common_name, bin_location,
-                        scan_type, status, scan_date, scan_by, location_of_repair,
-                        quality, dirty_or_mud, leaves, oil, mold, stain, oxidation,
-                        other, rip_or_tear, sewing_repair_needed, grommet, rope,
-                        buckle, date_created, date_updated, uuid_accounts_fk,
-                        serial_number, rental_class_num, long, lat, wet,
-                        service_required, notes
+    with DB_LOCK:
+        conn = None
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            inserted = 0
+            for txn in data:
+                try:
+                    cursor.execute(
+                        """
+                        INSERT INTO id_transactions (
+                            contract_number, client_name, tag_id, common_name, bin_location,
+                            scan_type, status, scan_date, scan_by, location_of_repair,
+                            quality, dirty_or_mud, leaves, oil, mold, stain, oxidation,
+                            other, rip_or_tear, sewing_repair_needed, grommet, rope,
+                            buckle, date_created, date_updated, uuid_accounts_fk,
+                            serial_number, rental_class_num, long, lat, wet,
+                            service_required, notes
+                        )
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        ON CONFLICT(contract_number, tag_id, scan_type, scan_date) DO UPDATE SET
+                            client_name = excluded.client_name,
+                            common_name = excluded.common_name,
+                            bin_location = excluded.bin_location,
+                            status = excluded.status,
+                            scan_by = excluded.scan_by,
+                            location_of_repair = excluded.location_of_repair,
+                            quality = excluded.quality,
+                            dirty_or_mud = excluded.dirty_or_mud,
+                            leaves = excluded.leaves,
+                            oil = excluded.oil,
+                            mold = excluded.mold,
+                            stain = excluded.stain,
+                            oxidation = excluded.oxidation,
+                            other = excluded.other,
+                            rip_or_tear = excluded.rip_or_tear,
+                            sewing_repair_needed = excluded.sewing_repair_needed,
+                            grommet = excluded.grommet,
+                            rope = excluded.rope,
+                            buckle = excluded.buckle,
+                            date_created = excluded.date_created,
+                            date_updated = excluded.date_updated,
+                            uuid_accounts_fk = excluded.uuid_accounts_fk,
+                            serial_number = excluded.serial_number,
+                            rental_class_num = excluded.rental_class_num,
+                            long = excluded.long,
+                            lat = excluded.lat,
+                            wet = excluded.wet,
+                            service_required = excluded.service_required,
+                            notes = excluded.notes
+                        """,
+                        (
+                            txn.get("contract_number"), txn.get("client_name"), txn.get("tag_id"),
+                            txn.get("common_name"), txn.get("bin_location"), txn.get("scan_type"),
+                            txn.get("status"), txn.get("scan_date"), txn.get("scan_by"),
+                            txn.get("location_of_repair"), txn.get("quality"), txn.get("dirty_or_mud"),
+                            txn.get("leaves"), txn.get("oil"), txn.get("mold"), txn.get("stain"),
+                            txn.get("oxidation"), txn.get("other"), txn.get("rip_or_tear"),
+                            txn.get("sewing_repair_needed"), txn.get("grommet"), txn.get("rope"),
+                            txn.get("buckle"), txn.get("date_created"), txn.get("date_updated"),
+                            txn.get("uuid_accounts_fk"), txn.get("serial_number"), txn.get("rental_class_num"),
+                            txn.get("long"), txn.get("lat"), txn.get("wet"), txn.get("service_required"),
+                            txn.get("notes")
+                        ),
                     )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    ON CONFLICT(contract_number, tag_id, scan_type, scan_date) DO UPDATE SET
-                        client_name = excluded.client_name,
-                        common_name = excluded.common_name,
-                        bin_location = excluded.bin_location,
-                        status = excluded.status,
-                        scan_by = excluded.scan_by,
-                        location_of_repair = excluded.location_of_repair,
-                        quality = excluded.quality,
-                        dirty_or_mud = excluded.dirty_or_mud,
-                        leaves = excluded.leaves,
-                        oil = excluded.oil,
-                        mold = excluded.mold,
-                        stain = excluded.stain,
-                        oxidation = excluded.oxidation,
-                        other = excluded.other,
-                        rip_or_tear = excluded.rip_or_tear,
-                        sewing_repair_needed = excluded.sewing_repair_needed,
-                        grommet = excluded.grommet,
-                        rope = excluded.rope,
-                        buckle = excluded.buckle,
-                        date_created = excluded.date_created,
-                        date_updated = excluded.date_updated,
-                        uuid_accounts_fk = excluded.uuid_accounts_fk,
-                        serial_number = excluded.serial_number,
-                        rental_class_num = excluded.rental_class_num,
-                        long = excluded.long,
-                        lat = excluded.lat,
-                        wet = excluded.wet,
-                        service_required = excluded.service_required,
-                        notes = excluded.notes
-                    """,
-                    (
-                        txn.get("contract_number"), txn.get("client_name"), txn.get("tag_id"),
-                        txn.get("common_name"), txn.get("bin_location"), txn.get("scan_type"),
-                        txn.get("status"), txn.get("scan_date"), txn.get("scan_by"),
-                        txn.get("location_of_repair"), txn.get("quality"), txn.get("dirty_or_mud"),
-                        txn.get("leaves"), txn.get("oil"), txn.get("mold"), txn.get("stain"),
-                        txn.get("oxidation"), txn.get("other"), txn.get("rip_or_tear"),
-                        txn.get("sewing_repair_needed"), txn.get("grommet"), txn.get("rope"),
-                        txn.get("buckle"), txn.get("date_created"), txn.get("date_updated"),
-                        txn.get("uuid_accounts_fk"), txn.get("serial_number"), txn.get("rental_class_num"),
-                        txn.get("long"), txn.get("lat"), txn.get("wet"), txn.get("service_required"),
-                        txn.get("notes")
-                    ),
-                )
-                inserted += 1
-                if inserted % 200 == 0:
-                    conn.commit()
-                    logger.debug(f"Committed {inserted} transactions")
-            except Exception as e:
-                logger.error(f"Failed to insert transaction {txn.get('tag_id')}: {e}")
-                conn.rollback()
-        conn.commit()
-        cursor.execute("SELECT count(*) FROM id_transactions")
-        count = cursor.fetchone()[0]
-        logger.debug(f"Transactions updated, total rows: {count}")
-    except Exception as e:
-        logger.error(f"Database error updating transactions: {e}")
-        raise
-    finally:
-        close_db_connection()
+                    inserted += 1
+                    if inserted % 200 == 0:
+                        conn.commit()
+                        logger.debug(f"Committed {inserted} transactions")
+                except Exception as e:
+                    logger.error(f"Failed to insert transaction {txn.get('tag_id')}: {e}")
+                    conn.rollback()
+            conn.commit()
+            cursor.execute("SELECT count(*) FROM id_transactions")
+            count = cursor.fetchone()[0]
+            logger.debug(f"Transactions updated, total rows: {count}")
+        except Exception as e:
+            logger.error(f"Database error updating transactions: {e}")
+            raise
+        finally:
+            close_db_connection(conn)
 
 def update_seed_data(data):
     logger.debug(f"Updating seed data with {len(data)} records")
-    try:
-        conn = init_db_connection()
-        cursor = conn.cursor()
-        inserted = 0
-        for item in data:
-            try:
-                cursor.execute(
-                    """
-                    INSERT INTO seed_rental_classes (
-                        rental_class_id, common_name, bin_location
+    with DB_LOCK:
+        conn = None
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            inserted = 0
+            for item in data:
+                try:
+                    cursor.execute(
+                        """
+                        INSERT INTO seed_rental_classes (
+                            rental_class_id, common_name, bin_location
+                        )
+                        VALUES (?, ?, ?)
+                        ON CONFLICT(rental_class_id) DO UPDATE SET
+                            common_name = excluded.common_name,
+                            bin_location = excluded.bin_location
+                        """,
+                        (
+                            item.get("rental_class_id"), item.get("common_name"), item.get("bin_location"),
+                        ),
                     )
-                    VALUES (?, ?, ?)
-                    ON CONFLICT(rental_class_id) DO UPDATE SET
-                        common_name = excluded.common_name,
-                        bin_location = excluded.bin_location
-                    """,
-                    (
-                        item.get("rental_class_id"), item.get("common_name"), item.get("bin_location"),
-                    ),
-                )
-                inserted += 1
-                if inserted % 200 == 0:
-                    conn.commit()
-                    logger.debug(f"Committed {inserted} seed items")
-            except Exception as e:
-                logger.error(f"Failed to insert seed item {item.get('rental_class_id')}: {e}")
-                conn.rollback()
-        conn.commit()
-        cursor.execute("SELECT count(*) FROM seed_rental_classes")
-        count = cursor.fetchone()[0]
-        logger.debug(f"SEED data updated, total rows: {count}")
-    except Exception as e:
-        logger.error(f"Database error updating SEED data: {e}")
-        raise
-    finally:
-        close_db_connection()
+                    inserted += 1
+                    if inserted % 200 == 0:
+                        conn.commit()
+                        logger.debug(f"Committed {inserted} seed items")
+                except Exception as e:
+                    logger.error(f"Failed to insert seed item {item.get('rental_class_id')}: {e}")
+                    conn.rollback()
+            conn.commit()
+            cursor.execute("SELECT count(*) FROM seed_rental_classes")
+            count = cursor.fetchone()[0]
+            logger.debug(f"SEED data updated, total rows: {count}")
+        except Exception as e:
+            logger.error(f"Database error updating SEED data: {e}")
+            raise
+        finally:
+            close_db_connection(conn)
 
 def refresh_data(full_refresh=False):
     global LAST_REFRESH, IS_RELOADING
@@ -436,17 +442,19 @@ def refresh_data(full_refresh=False):
         update_transactions(transactions_data)
         update_item_master(item_master_data)
         LAST_REFRESH = datetime.utcnow()
-        conn = init_db_connection()
-        conn.execute("INSERT OR REPLACE INTO refresh_state (id, last_refresh) VALUES (1, ?)", 
-                     (LAST_REFRESH.strftime("%Y-%m-%d %H:%M:%S"),))
-        conn.commit()
-        logger.debug(f"Database refreshed at {LAST_REFRESH}, items: {len(item_master_data)}")
+        conn = get_db_connection()
+        try:
+            conn.execute("INSERT OR REPLACE INTO refresh_state (id, last_refresh) VALUES (1, ?)", 
+                         (LAST_REFRESH.strftime("%Y-%m-%d %H:%M:%S"),))
+            conn.commit()
+            logger.debug(f"Database refreshed at {LAST_REFRESH}, items: {len(item_master_data)}")
+        finally:
+            close_db_connection(conn)
     except Exception as e:
         logger.error(f"Error during refresh: {e}")
         raise
     finally:
         IS_RELOADING = False
-        close_db_connection()
 
 def trigger_refresh(full=False):
     logger.debug(f"Triggering {'full' if full else 'incremental'} refresh")
