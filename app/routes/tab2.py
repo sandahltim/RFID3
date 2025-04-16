@@ -85,12 +85,12 @@ def show_tab2():
             sub_map[category] = {
                 subcategory: {
                     "subcategory": subcategory,
-                    "total": len(items),
-                    "on_contract": sum(1 for item in items if item.get("status") in ["Delivered", "On Rent"]),
-                    "available": sum(1 for item in items if item.get("status") == "Ready to Rent"),
-                    "service": len(items) - sum(1 for item in items if item.get("status") in ["Delivered", "On Rent", "Ready to Rent"])
+                    "total": len(sub_items),
+                    "on_contract": sum(1 for item in sub_items if item.get("status") in ["Delivered", "On Rent"]),
+                    "available": sum(1 for item in sub_items if item.get("status") == "Ready to Rent"),
+                    "service": len(sub_items) - sum(1 for item in sub_items if item.get("status") in ["Delivered", "On Rent", "Ready to Rent"])
                 }
-                for subcategory, items in subcategory_map.items()
+                for subcategory, sub_items in subcategory_map.items()
             }
 
             parent_data.append({
@@ -102,7 +102,7 @@ def show_tab2():
             })
 
         parent_data.sort(key=lambda x: x["category"])
-        logging.debug(f"Rendering tab2 with {len(parent_data)} categories")
+        logging.debug(f"Rendering tab2 with {len(parent_data)} categories, items fetched: {len(items)}")
         for category in sub_map:
             logging.debug(f"Category {category} has subcategories: {list(sub_map[category].keys())}")
 
@@ -172,12 +172,12 @@ def tab2_data():
             sub_map[category] = {
                 subcategory: {
                     "subcategory": subcategory,
-                    "total": len(items),
-                    "on_contract": sum(1 for item in items if item.get("status") in ["Delivered", "On Rent"]),
-                    "available": sum(1 for item in items if item.get("status") == "Ready to Rent"),
-                    "service": len(items) - sum(1 for item in items if item.get("status") in ["Delivered", "On Rent", "Ready to Rent"])
+                    "total": len(sub_items),
+                    "on_contract": sum(1 for item in sub_items if item.get("status") in ["Delivered", "On Rent"]),
+                    "available": sum(1 for item in sub_items if item.get("status") == "Ready to Rent"),
+                    "service": len(sub_items) - sum(1 for item in sub_items if item.get("status") in ["Delivered", "On Rent", "Ready to Rent"])
                 }
-                for subcategory, items in subcategory_map.items()
+                for subcategory, sub_items in subcategory_map.items()
             }
 
             parent_data.append({
@@ -189,7 +189,7 @@ def tab2_data():
             })
 
         parent_data.sort(key=lambda x: x["category"])
-        logging.debug(f"Returning {len(parent_data)} categories for /tab2/data")
+        logging.debug(f"Returning {len(parent_data)} categories for /tab2/data, items fetched: {len(items)}")
 
         return jsonify({
             "parent_data": parent_data,
@@ -201,15 +201,15 @@ def tab2_data():
 
 @tab2_bp.route("/subcat_data", methods=["GET"])
 def subcat_data():
-    logging.debug("Hit /tab2/subcat_data endpoint")
-    category = request.args.get('category')
-    subcategory = request.args.get('subcategory')
+    category = request.args.get('category', '').strip()
+    subcategory = request.args.get('subcategory', '').strip()
     try:
         page = int(request.args.get('page', 1))
     except ValueError:
         page = 1
     per_page = 20
 
+    logging.debug(f"Hit /tab2/subcat_data: category={category}, subcategory={subcategory or 'ALL'}, page={page}")
     try:
         with DatabaseConnection() as conn:
             items = conn.execute("""
@@ -218,6 +218,7 @@ def subcat_data():
                 LEFT JOIN id_rfidtag rt ON im.tag_id = rt.tag_id
             """).fetchall()
         items = [dict(row) for row in items]
+        logging.debug(f"Fetched {len(items)} items from id_item_master")
 
         filter_common_name = request.args.get("common_name", "").lower().strip()
         filter_tag_id = request.args.get("tag_id", "").lower().strip()
@@ -237,11 +238,13 @@ def subcat_data():
         if filter_status:
             filtered_items = [item for item in filtered_items if filter_status in (item.get("status") or "").lower()]
 
-        subcat_items = [
-            item for item in filtered_items
-            if categorize_item(item.get("rental_class_num")) == category
-            and subcategorize_item(category, item.get("rental_class_num")) == subcategory
-        ]
+        subcat_items = []
+        for item in filtered_items:
+            item_category = categorize_item(item.get("rental_class_num")).lower()
+            item_subcategory = subcategorize_item(item_category, item.get("rental_class_num")).lower()
+            if item_category == category.lower():
+                if not subcategory or item_subcategory == subcategory.lower():
+                    subcat_items.append(item)
 
         total_items = len(subcat_items)
         total_pages = (total_items + per_page - 1) // per_page
@@ -250,7 +253,7 @@ def subcat_data():
         end = start + per_page
         paginated_items = subcat_items[start:end]
 
-        logging.debug(f"AJAX: Category: {category}, Subcategory: {subcategory}, Total Items: {total_items}, Page: {page}")
+        logging.debug(f"Filtered {total_items} items for category={category}, subcategory={subcategory or 'ALL'}, page={page}")
 
         return jsonify({
             "items": [{
