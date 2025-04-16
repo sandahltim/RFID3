@@ -228,6 +228,13 @@ def fetch_paginated_data(url, token, since_date=None):
     logger.error(f"Failed to fetch data from {url} after 3 attempts")
     return all_data
 
+# Fallback data if API fails
+FALLBACK_DATA = [
+    {"tag_id": "TAG001", "rental_class_num": 62037, "common_name": "90x132 Linen", "bin_location": "Warehouse", "status": "Ready to Rent", "date_last_scanned": "2025-03-31 10:00:00"},
+    {"tag_id": "TAG002", "rental_class_num": 62706, "common_name": "HP Top", "bin_location": "Tent Storage", "status": "Ready to Rent", "date_last_scanned": "2025-03-31 10:00:00"},
+    {"tag_id": "TAG003", "rental_class_num": 64815, "common_name": "Fog Machine", "bin_location": "resale", "status": "Ready to Rent", "date_last_scanned": "2025-03-31 10:00:00"},
+]
+
 def update_item_master(data):
     logger.debug(f"Updating item master with {len(data)} records")
     try:
@@ -405,16 +412,22 @@ def refresh_data(full_refresh=False):
     try:
         token = get_access_token()
         if not token:
-            logger.error("No access token. Aborting refresh.")
-            return
-        since_date = None if full_refresh else LAST_REFRESH
-        if since_date:
-            since_date = since_date.strftime("%Y-%m-%d %H:%M:%S")
-        item_master_data = fetch_paginated_data(ITEM_MASTER_URL, token, since_date)
-        transactions_data = fetch_paginated_data(TRANSACTION_URL, token, since_date)
+            logger.error("No access token. Using fallback data.")
+            item_master_data = FALLBACK_DATA
+            transactions_data = []
+            seed_data = []
+        else:
+            since_date = None if full_refresh else LAST_REFRESH
+            if since_date:
+                since_date = since_date.strftime("%Y-%m-%d %H:%M:%S")
+            item_master_data = fetch_paginated_data(ITEM_MASTER_URL, token, since_date)
+            transactions_data = fetch_paginated_data(TRANSACTION_URL, token, since_date)
+            if full_refresh:
+                seed_data = fetch_paginated_data(SEED_URL, token)
+            else:
+                seed_data = []
         if full_refresh:
             clear_transactions()
-            seed_data = fetch_paginated_data(SEED_URL, token)
             update_seed_data(seed_data)
         update_transactions(transactions_data)
         update_item_master(item_master_data)

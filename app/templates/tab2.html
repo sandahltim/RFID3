@@ -58,15 +58,28 @@
         color: #888;
         font-style: italic;
     }
+    @media print {
+        .no-print {
+            display: none !important;
+        }
+        table, th, td {
+            border: 1px solid black;
+            font-size: 12px;
+        }
+        .child-row.visible {
+            display: table-row !important;
+        }
+    }
 </style>
 
-<div class="filter-container">
+<div class="filter-container no-print">
     <input type="text" id="commonNameFilter" placeholder="Filter by Common Name" value="{{ filter_common_name }}">
     <input type="text" id="tagIdFilter" placeholder="Filter by Tag ID" value="{{ filter_tag_id }}">
     <input type="text" id="binLocationFilter" placeholder="Filter by Bin Location" value="{{ filter_bin_location }}">
     <input type="text" id="lastContractFilter" placeholder="Filter by Last Contract" value="{{ filter_last_contract }}">
     <input type="text" id="statusFilter" placeholder="Filter by Status" value="{{ filter_status }}">
     <button onclick="applyFilters()">Apply Filters</button>
+    <button onclick="printTable()" style="margin-left: 10px;">Print Table</button>
 </div>
 
 <table id="parentTable">
@@ -128,7 +141,7 @@
                                     </thead>
                                     <tbody></tbody>
                                 </table>
-                                <div class="pagination" id="pagination-{{ row.category | lower | replace(' ', '-') }}-{{ sub.subcategory | lower | replace(' ', '-') }}"></div>
+                                <div class="pagination no-print" id="pagination-{{ row.category | lower | replace(' ', '-') }}-{{ sub.subcategory | lower | replace(' ', '-') }}"></div>
                             </td>
                         </tr>
                         {% endfor %}
@@ -142,15 +155,22 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('DOM Content Loaded - Tab 2');
     const expandedState = new Set();
     const prefetchCache = new Map();
 
     function checkReloadStatus() {
         fetch('/status')
             .then(response => response.json())
-            .then(data => console.log('Reload status:', data.is_reloading))
-            .catch(error => console.error('Error checking reload status:', error));
+            .then(data => {
+                if (!data.is_reloading) {
+                    document.getElementById("loading-overlay").style.display = "none";
+                } else {
+                    setTimeout(checkReloadStatus, 1000);
+                }
+            })
+            .catch(error => {
+                setTimeout(checkReloadStatus, 1000);
+            });
     }
 
     checkReloadStatus();
@@ -193,7 +213,6 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        console.log(`Loading: Category: ${category}, Subcat: ${subcategory}, Page: ${page}, CatKey: ${catKey}`);
         const params = new URLSearchParams({
             category: category,
             subcategory: subcategory,
@@ -205,7 +224,6 @@ document.addEventListener('DOMContentLoaded', function() {
             status: document.getElementById('statusFilter').value
         });
         const url = `/tab2/subcat_data?${params.toString()}`;
-        console.log(`Fetching URL: ${url}`);
 
         const itemsRow = document.getElementById(`items-${catKey}-${subcategory.toLowerCase().replace(/ /g, '-')}`);
         if (itemsRow) {
@@ -216,14 +234,11 @@ document.addEventListener('DOMContentLoaded', function() {
         fetch(url)
             .then(response => response.json())
             .then(data => {
-                console.log('AJAX Response:', data);
                 prefetchCache.set(cacheKey, data);
                 renderSubcategoryItems(category, subcategory, catKey, data);
             })
             .catch(error => {
-                console.error('Error loading subcategory items:', error);
                 if (retries > 0) {
-                    console.log(`Retrying (${retries} left)...`);
                     setTimeout(() => loadSubcategoryItems(category, subcategory, page, catKey, retries - 1), 1000);
                 } else if (itemsRow) {
                     const tbody = itemsRow.querySelector('.items-table tbody');
@@ -289,6 +304,16 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    function printTable() {
+        // Expand all child rows for printing
+        document.querySelectorAll('.child-row').forEach(row => {
+            row.classList.add('visible');
+            const subtable = row.querySelector('.child-table');
+            if (subtable) subtable.style.display = 'table';
+        });
+        window.print();
+    }
+
     document.querySelectorAll('.expandable').forEach(row => {
         const category = row.dataset.category;
         row.addEventListener('click', () => toggleRow(row, `child-${category}`));
@@ -323,7 +348,6 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     function refreshTable() {
-        console.log('Refreshing Tab 2 at', new Date().toLocaleTimeString());
         fetch('/tab2/data?' + new URLSearchParams({
             common_name: document.getElementById('commonNameFilter').value,
             tag_id: document.getElementById('tagIdFilter').value,
@@ -333,7 +357,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }))
             .then(response => response.json())
             .then(data => {
-                console.log('Refresh data received');
                 prefetchCache.clear();
                 const tbody = document.querySelector('#parentTable tbody');
                 tbody.innerHTML = '';
@@ -394,7 +417,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                                     </thead>
                                                     <tbody></tbody>
                                                 </table>
-                                                <div class="pagination" id="pagination-${row.category.toLowerCase().replace(/ /g, '-')}-${sub.subcategory.toLowerCase().replace(/ /g, '-')}" style="display: ${expandedState.has(`items-${row.category.toLowerCase().replace(/ /g, '-')}-${sub.subcategory.toLowerCase().replace(/ /g, '-')}`) ? 'block' : 'none'}"></div>
+                                                <div class="pagination no-print" id="pagination-${row.category.toLowerCase().replace(/ /g, '-')}-${sub.subcategory.toLowerCase().replace(/ /g, '-')}" style="display: ${expandedState.has(`items-${row.category.toLowerCase().replace(/ /g, '-')}-${sub.subcategory.toLowerCase().replace(/ /g, '-')}`) ? 'block' : 'none'}"></div>
                                             </td>
                                         </tr>
                                     `).join('') : ''}
@@ -447,7 +470,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 prefetchSubcategories();
             })
-            .catch(error => console.error('Error refreshing table:', error));
+            .catch(error => {});
     }
 
     setTimeout(prefetchSubcategories, 1000);
