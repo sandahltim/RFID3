@@ -52,11 +52,14 @@ def get_tab5_data(filter_contract="", filter_common_name=""):
     ]
     hand_counted = [dict(row) for row in hand_counted_items] if hand_counted_items else []
 
-    filtered_items = laundry_items + hand_counted
+    filtered_items = laundry_items
     if filter_contract:
         filtered_items = [item for item in filtered_items if filter_contract in item["last_contract_num"].lower()]
     if filter_common_name:
         filtered_items = [item for item in filtered_items if filter_common_name in item.get("common_name", "").lower()]
+
+    # Add hand-counted items to filtered_items
+    filtered_items.extend(hand_counted)
 
     logging.debug("Merging data")
     contract_map = defaultdict(list)
@@ -70,14 +73,16 @@ def get_tab5_data(filter_contract="", filter_common_name=""):
         logging.debug(f"Processing contract: {contract}")
         rental_class_map = defaultdict(list)
         for item in item_list:
-            # Use a unique key combining rental_class_id (or id for hand-counted) and common_name
-            rental_class_id = item.get("rental_class_id", "unknown") or item.get("id", "hand_" + str(item.get("id")))
-            unique_key = f"{rental_class_id}_{item.get('common_name', 'unknown')}"
-            rental_class_map[unique_key].append(item)
+            # Use a unique key for hand-counted items: id_common_name
+            if item.get("tag_id") is None:  # Hand-counted item
+                rental_class_id = f"hand_{item.get('id')}_{item.get('common_name', 'unknown').replace(' ', '_')}"
+            else:
+                rental_class_id = item.get("rental_class_num", "unknown")
+            rental_class_map[rental_class_id].append(item)
 
         child_data = {}
-        for unique_key, items in rental_class_map.items():
-            rental_class_id, common_name = unique_key.split('_', 1) if '_' in unique_key else (unique_key, 'unknown')
+        for rental_class_id, items in rental_class_map.items():
+            common_name = items[0]["common_name"]
             rfid_items = [i for i in items if i.get("tag_id") is not None]
             hand_items = [i for i in items if i.get("tag_id") is None]
             total_rfid = len(rfid_items)
