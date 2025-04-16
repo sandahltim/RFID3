@@ -76,6 +76,7 @@ def init_db_schema():
         """)
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_rental_class ON id_item_master (rental_class_num)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_status ON id_item_master (status)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_bin_location ON id_item_master (bin_location)")
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS id_rfidtag (
                 tag_id TEXT PRIMARY KEY,
@@ -236,6 +237,10 @@ def update_item_master(data):
     try:
         conn = init_db_connection()
         cursor = conn.cursor()
+        # Clear existing data to avoid duplicates
+        cursor.execute("DELETE FROM id_item_master")
+        conn.commit()
+        inserted = 0
         for item in data:
             try:
                 cursor.execute(
@@ -247,24 +252,6 @@ def update_item_master(data):
                         date_created, date_updated
                     )
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    ON CONFLICT(tag_id) DO UPDATE SET
-                        uuid_accounts_fk = excluded.uuid_accounts_fk,
-                        serial_number = excluded.serial_number,
-                        client_name = excluded.client_name,
-                        rental_class_num = excluded.rental_class_num,
-                        common_name = excluded.common_name,
-                        quality = excluded.quality,
-                        bin_location = excluded.bin_location,
-                        status = excluded.status,
-                        last_contract_num = excluded.last_contract_num,
-                        last_scanned_by = excluded.last_scanned_by,
-                        notes = excluded.notes,
-                        status_notes = excluded.status_notes,
-                        long = excluded.long,
-                        lat = excluded.lat,
-                        date_last_scanned = excluded.date_last_scanned,
-                        date_created = excluded.date_created,
-                        date_updated = excluded.date_updated
                     """,
                     (
                         item.get("tag_id"), item.get("uuid_accounts_fk"), item.get("serial_number"),
@@ -275,10 +262,14 @@ def update_item_master(data):
                         item.get("date_last_scanned"), item.get("date_created"), item.get("date_updated"),
                     ),
                 )
-                conn.commit()  # Commit after each item to ensure data persists
+                inserted += 1
+                if inserted % 200 == 0:  # Commit every 200 items
+                    conn.commit()
+                    logger.debug(f"Committed {inserted} items to id_item_master")
             except Exception as e:
                 logger.error(f"Failed to insert item {item.get('tag_id')}: {e}")
                 conn.rollback()
+        conn.commit()  # Final commit
         cursor.execute("SELECT count(*) FROM id_item_master")
         count = cursor.fetchone()[0]
         logger.debug(f"Item Master updated, total rows: {count}")
@@ -306,6 +297,7 @@ def update_transactions(data):
     try:
         conn = init_db_connection()
         cursor = conn.cursor()
+        inserted = 0
         for txn in data:
             try:
                 cursor.execute(
@@ -365,10 +357,14 @@ def update_transactions(data):
                         txn.get("notes")
                     ),
                 )
-                conn.commit()
+                inserted += 1
+                if inserted % 200 == 0:
+                    conn.commit()
+                    logger.debug(f"Committed {inserted} transactions")
             except Exception as e:
                 logger.error(f"Failed to insert transaction {txn.get('tag_id')}: {e}")
                 conn.rollback()
+        conn.commit()
         cursor.execute("SELECT count(*) FROM id_transactions")
         count = cursor.fetchone()[0]
         logger.debug(f"Transactions updated, total rows: {count}")
@@ -383,6 +379,7 @@ def update_seed_data(data):
     try:
         conn = init_db_connection()
         cursor = conn.cursor()
+        inserted = 0
         for item in data:
             try:
                 cursor.execute(
@@ -399,10 +396,14 @@ def update_seed_data(data):
                         item.get("rental_class_id"), item.get("common_name"), item.get("bin_location"),
                     ),
                 )
-                conn.commit()
+                inserted += 1
+                if inserted % 200 == 0:
+                    conn.commit()
+                    logger.debug(f"Committed {inserted} seed items")
             except Exception as e:
                 logger.error(f"Failed to insert seed item {item.get('rental_class_id')}: {e}")
                 conn.rollback()
+        conn.commit()
         cursor.execute("SELECT count(*) FROM seed_rental_classes")
         count = cursor.fetchone()[0]
         logger.debug(f"SEED data updated, total rows: {count}")
