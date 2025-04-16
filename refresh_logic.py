@@ -20,18 +20,18 @@ DB_CONN = None
 def init_db_connection():
     global DB_CONN
     if DB_CONN is None:
-        for attempt in range(3):
+        for attempt in range(5):
             try:
-                DB_CONN = sqlite3.connect(DB_FILE, timeout=10)
+                DB_CONN = sqlite3.connect(DB_FILE, timeout=15)
                 DB_CONN.row_factory = sqlite3.Row
                 DB_CONN.execute("PRAGMA journal_mode=WAL")
-                DB_CONN.execute("PRAGMA busy_timeout=10000")
+                DB_CONN.execute("PRAGMA busy_timeout=15000")
                 logger.debug("Initialized single DB connection with WAL mode")
                 return DB_CONN
             except sqlite3.OperationalError as e:
                 logger.error(f"DB connection attempt {attempt+1} failed: {e}")
-                if attempt < 2:
-                    time.sleep(1)
+                if attempt < 4:
+                    time.sleep(2)
                 else:
                     raise
     return DB_CONN
@@ -165,9 +165,9 @@ def get_access_token():
         return TOKEN
     payload = {"username": API_USERNAME, "password": API_PASSWORD}
     logger.debug(f"Requesting token from {LOGIN_URL}")
-    for attempt in range(3):
+    for attempt in range(5):
         try:
-            response = requests.post(LOGIN_URL, json=payload, timeout=15)
+            response = requests.post(LOGIN_URL, json=payload, timeout=20)
             response.raise_for_status()
             data = response.json()
             TOKEN = data.get("access_token")
@@ -176,12 +176,12 @@ def get_access_token():
             return TOKEN
         except requests.RequestException as e:
             logger.error(f"Token attempt {attempt+1} failed: {e}, response: {getattr(e.response, 'text', 'N/A')}")
-            if attempt < 2:
-                time.sleep(2)
+            if attempt < 4:
+                time.sleep(3)
         except ValueError as e:
             logger.error(f"Invalid JSON response from login: {e}")
             return None
-    logger.error("Failed to fetch access token after 3 attempts")
+    logger.error("Failed to fetch access token after 5 attempts")
     return None
 
 def fetch_paginated_data(url, token, since_date=None):
@@ -194,23 +194,27 @@ def fetch_paginated_data(url, token, since_date=None):
             params["filter[]"] = f"scan_date>{since_date}"
     all_data = []
     logger.debug(f"Fetching data from {url} with params={params}")
-    while True:
+    for attempt in range(3):
         try:
-            response = requests.get(url, headers=headers, params=params, timeout=15)
-            response.raise_for_status()
-            data = response.json().get("data", [])
-            logger.debug(f"Fetched {len(data)} records from {url} at offset {params['offset']}")
-            if not data:
-                logger.debug(f"Finished fetching {len(all_data)} total records from {url}")
-                break
-            all_data.extend(data)
-            params["offset"] += 200
-        except requests.RequestException as e:
-            logger.error(f"Error fetching data from {url}: {e}, response: {getattr(e.response, 'text', 'N/A')}")
+            while True:
+                response = requests.get(url, headers=headers, params=params, timeout=20)
+                response.raise_for_status()
+                data = response.json().get("data", [])
+                logger.debug(f"Fetched {len(data)} records from {url} at offset {params['offset']}")
+                if not data:
+                    logger.debug(f"Finished fetching {len(all_data)} total records from {url}")
+                    break
+                all_data.extend(data)
+                params["offset"] += 200
             return all_data
+        except requests.RequestException as e:
+            logger.error(f"Fetch attempt {attempt+1} for {url} failed: {e}, response: {getattr(e.response, 'text', 'N/A')}")
+            if attempt < 2:
+                time.sleep(3)
         except ValueError as e:
             logger.error(f"Invalid JSON response from {url}: {e}")
             return all_data
+    logger.error(f"Failed to fetch data from {url} after 3 attempts")
     return all_data
 
 def update_item_master(data):
@@ -418,14 +422,14 @@ def refresh_data(full_refresh=False):
 
 def trigger_refresh(full=False):
     logger.debug(f"Triggering {'full' if full else 'incremental'} refresh")
-    for attempt in range(3):
+    for attempt in range(5):
         try:
             init_db_schema()
             refresh_data(full_refresh=full)
             break
         except Exception as e:
             logger.error(f"Refresh attempt {attempt+1} failed: {e}")
-            if attempt < 2:
-                time.sleep(2)
+            if attempt < 4:
+                time.sleep(3)
             else:
                 raise
