@@ -54,6 +54,10 @@
         margin-right: 10px;
         padding: 5px;
     }
+    .loading {
+        color: #888;
+        font-style: italic;
+    }
 </style>
 
 <div class="filter-container">
@@ -140,13 +144,12 @@
 document.addEventListener('DOMContentLoaded', function() {
     console.log('DOM Content Loaded - Tab 2');
     const expandedState = new Set();
+    const prefetchCache = new Map();
 
     function checkReloadStatus() {
         fetch('/status')
             .then(response => response.json())
-            .then(data => {
-                console.log('Reload status:', data.is_reloading);
-            })
+            .then(data => console.log('Reload status:', data.is_reloading))
             .catch(error => console.error('Error checking reload status:', error));
     }
 
@@ -173,6 +176,8 @@ document.addEventListener('DOMContentLoaded', function() {
         if (childRow) {
             const isVisible = childRow.classList.contains('visible');
             childRow.classList.toggle('visible', !isVisible);
+            const subtable = document.getElementById(`subtable-${row.dataset.category}`);
+            if (subtable) subtable.style.display = !isVisible ? 'table' : 'none';
             if (!isVisible) {
                 expandedState.add(childId);
             } else {
@@ -181,7 +186,13 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    function loadSubcategoryItems(category, subcategory, page = 1, catKey) {
+    function loadSubcategoryItems(category, subcategory, page = 1, catKey, retries = 3) {
+        const cacheKey = `${category}:${subcategory}:${page}`;
+        if (prefetchCache.has(cacheKey)) {
+            renderSubcategoryItems(category, subcategory, catKey, prefetchCache.get(cacheKey));
+            return;
+        }
+
         console.log(`Loading: Category: ${category}, Subcat: ${subcategory}, Page: ${page}, CatKey: ${catKey}`);
         const params = new URLSearchParams({
             category: category,
@@ -195,48 +206,87 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         const url = `/tab2/subcat_data?${params.toString()}`;
         console.log(`Fetching URL: ${url}`);
+
+        const itemsRow = document.getElementById(`items-${catKey}-${subcategory.toLowerCase().replace(/ /g, '-')}`);
+        if (itemsRow) {
+            const tbody = itemsRow.querySelector('.items-table tbody');
+            tbody.innerHTML = '<tr><td colspan="10" class="loading">Loading...</td></tr>';
+        }
+
         fetch(url)
             .then(response => response.json())
             .then(data => {
                 console.log('AJAX Response:', data);
-                const itemsRow = document.getElementById(`items-${catKey}-${subcategory.toLowerCase().replace(/ /g, '-')}`);
-                if (!itemsRow) return;
-                const tbody = itemsRow.querySelector('.items-table tbody');
-                tbody.innerHTML = '';
-                data.items.forEach(item => {
-                    const tr = document.createElement('tr');
-                    tr.innerHTML = `
-                        <td>${item.tag_id}</td>
-                        <td>${item.common_name}</td>
-                        <td>${item.status}</td>
-                        <td>${item.bin_location}</td>
-                        <td>${item.quality}</td>
-                        <td>${item.last_contract_num}</td>
-                        <td>${item.client_name}</td>
-                        <td>${item.date_last_scanned}</td>
-                        <td>${item.last_scanned_by}</td>
-                        <td>${item.notes}</td>
-                    `;
-                    tbody.appendChild(tr);
-                });
-
-                const pagination = document.getElementById(`pagination-${catKey}-${subcategory.toLowerCase().replace(/ /g, '-')}`);
-                if (pagination) {
-                    pagination.innerHTML = '';
-                    for (let i = 1; i <= data.total_pages; i++) {
-                        const a = document.createElement('a');
-                        a.href = '#';
-                        a.textContent = i;
-                        if (i === data.current_page) a.classList.add('active');
-                        a.addEventListener('click', (e) => {
-                            e.preventDefault();
-                            loadSubcategoryItems(category, subcategory, i, catKey);
-                        });
-                        pagination.appendChild(a);
-                    }
-                }
+                prefetchCache.set(cacheKey, data);
+                renderSubcategoryItems(category, subcategory, catKey, data);
             })
-            .catch(error => console.error('Error loading subcategory items:', error));
+            .catch(error => {
+                console.error('Error loading subcategory items:', error);
+                if (retries > 0) {
+                    console.log(`Retrying (${retries} left)...`);
+                    setTimeout(() => loadSubcategoryItems(category, subcategory, page, catKey, retries - 1), 1000);
+                } else if (itemsRow) {
+                    const tbody = itemsRow.querySelector('.items-table tbody');
+                    tbody.innerHTML = '<tr><td colspan="10">No items available</td></tr>';
+                }
+            });
+    }
+
+    function renderSubcategoryItems(category, subcategory, catKey, data) {
+        const itemsRow = document.getElementById(`items-${catKey}-${subcategory.toLowerCase().replace(/ /g, '-')}`);
+        if (!itemsRow) return;
+        const tbody = itemsRow.querySelector('.items-table tbody');
+        tbody.innerHTML = '';
+        if (data.items.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="10">No items available</td></tr>';
+        } else {
+            data.items.forEach(item => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${item.tag_id}</td>
+                    <td>${item.common_name}</td>
+                    <td>${item.status}</td>
+                    <td>${item.bin_location}</td>
+                    <td>${item.quality}</td>
+                    <td>${item.last_contract_num}</td>
+                    <td>${item.client_name}</td>
+                    <td>${item.date_last_scanned}</td>
+                    <td>${item.last_scanned_by}</td>
+                    <td>${item.notes}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        const pagination = document.getElementById(`pagination-${catKey}-${subcategory.toLowerCase().replace(/ /g, '-')}`);
+        if (pagination) {
+            pagination.innerHTML = '';
+            for (let i = 1; i <= data.total_pages; i++) {
+                const a = document.createElement('a');
+                a.href = '#';
+                a.textContent = i;
+                if (i === data.current_page) a.classList.add('active');
+                a.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    loadSubcategoryItems(category, subcategory, i, catKey);
+                });
+                pagination.appendChild(a);
+            }
+        }
+    }
+
+    function prefetchSubcategories() {
+        const categories = Array.from(document.querySelectorAll('.expandable')).map(row => ({
+            category: row.dataset.category.replace(/-/g, ' '),
+            catKey: row.dataset.category
+        }));
+        categories.forEach(({category, catKey}) => {
+            const subcategories = Array.from(document.querySelectorAll(`.sub-expandable[data-category="${catKey}"]`))
+                .map(row => row.dataset.subcategory.replace(/-/g, ' '));
+            subcategories.forEach(subcategory => {
+                loadSubcategoryItems(category, subcategory, 1, catKey, 1);
+            });
+        });
     }
 
     document.querySelectorAll('.expandable').forEach(row => {
@@ -253,6 +303,10 @@ document.addEventListener('DOMContentLoaded', function() {
             if (childRow) {
                 const isVisible = childRow.classList.contains('visible');
                 childRow.classList.toggle('visible', !isVisible);
+                const pagination = document.getElementById(`pagination-${category}-${subcategory}`);
+                if (pagination) pagination.style.display = !isVisible ? 'block' : 'none';
+                const subtable = document.getElementById(`subtable-${category}`);
+                if (subtable) subtable.style.display = !isVisible ? 'table' : 'none';
                 if (!isVisible) {
                     loadSubcategoryItems(
                         category.replace(/-/g, ' '),
@@ -280,6 +334,7 @@ document.addEventListener('DOMContentLoaded', function() {
             .then(response => response.json())
             .then(data => {
                 console.log('Refresh data received');
+                prefetchCache.clear();
                 const tbody = document.querySelector('#parentTable tbody');
                 tbody.innerHTML = '';
                 data.parent_data.forEach(row => {
@@ -389,10 +444,13 @@ document.addEventListener('DOMContentLoaded', function() {
                         loadSubcategoryItems(cat.replace(/-/g, ' '), subcat.replace(/-/g, ' '), 1, cat);
                     }
                 });
+
+                prefetchSubcategories();
             })
             .catch(error => console.error('Error refreshing table:', error));
     }
 
+    setTimeout(prefetchSubcategories, 1000);
     setInterval(refreshTable, 60000);
 });
 </script>
