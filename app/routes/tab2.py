@@ -255,7 +255,7 @@ def subcat_data():
         logging.debug(f"Items after subcategory filter ({subcategory}): {len(subcat_items)}")
 
         if common_name and common_name != "Unknown":
-            common_items = [item for item in subcat_items if item.get("common_name") == common_name]
+            common_items = [item for item in subcat_items if item.get("common_name", "").lower() == common_name.lower()]
         else:
             common_items = subcat_items
         logging.debug(f"Items after common_name filter ({common_name}): {len(common_items)}")

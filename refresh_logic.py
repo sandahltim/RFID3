@@ -235,15 +235,12 @@ def update_item_master(data):
         try:
             conn = get_db_connection()
             cursor = conn.cursor()
-            # Clear existing data to avoid duplicates
-            cursor.execute("DELETE FROM id_item_master")
-            conn.commit()
             inserted = 0
             for item in data:
                 try:
                     cursor.execute(
                         """
-                        INSERT INTO id_item_master (
+                        INSERT OR REPLACE INTO id_item_master (
                             tag_id, uuid_accounts_fk, serial_number, client_name, rental_class_num,
                             common_name, quality, bin_location, status, last_contract_num,
                             last_scanned_by, notes, status_notes, long, lat, date_last_scanned,
@@ -252,33 +249,44 @@ def update_item_master(data):
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         """,
                         (
-                            item.get("tag_id"), item.get("uuid_accounts_fk"), item.get("serial_number"),
-                            item.get("client_name"), item.get("rental_class_num"), item.get("common_name"),
-                            item.get("quality"), item.get("bin_location"), item.get("status"),
-                            item.get("last_contract_num"), item.get("last_scanned_by"), item.get("notes"),
-                            item.get("status_notes"), item.get("long"), item.get("lat"),
-                            item.get("date_last_scanned"), item.get("date_created"), item.get("date_updated"),
-                        ),
+                            item.get("tag_id"),
+                            item.get("uuid_accounts_fk"),
+                            item.get("serial_number"),
+                            item.get("client_name"),
+                            item.get("rental_class_num"),
+                            item.get("common_name"),
+                            item.get("quality"),
+                            item.get("bin_location"),
+                            item.get("status"),
+                            item.get("last_contract_num"),
+                            item.get("last_scanned_by"),
+                            item.get("notes"),
+                            item.get("status_notes"),
+                            item.get("long"),
+                            item.get("lat"),
+                            item.get("date_last_scanned"),
+                            item.get("date_created"),
+                            item.get("date_updated")
+                        )
                     )
                     inserted += 1
                     if inserted % 200 == 0:  # Commit every 200 items
                         conn.commit()
                         logger.debug(f"Committed {inserted} items to id_item_master")
                 except Exception as e:
-                    logger.error(f"Failed to insert item {item.get('tag_id')}: {e}")
+                    logger.error(f"Failed to insert/replace item {item.get('tag_id')}: {e}")
                     conn.rollback()
             conn.commit()  # Final commit
-            cursor.execute("SELECT count(*) FROM id_item_master")
+            cursor.execute("SELECT COUNT(*) FROM id_item_master")
             count = cursor.fetchone()[0]
             logger.debug(f"Item Master updated, total rows: {count}")
             if count != len(data):
-                logger.error(f"Mismatch: Expected {len(data)} rows, but inserted {count} rows")
+                logger.warning(f"Mismatch: Expected {len(data)} rows, but inserted {count} rows (some duplicates replaced)")
         except Exception as e:
             logger.error(f"Database error updating item master: {e}")
             raise
         finally:
             close_db_connection(conn)
-
 def clear_transactions():
     with DB_LOCK:
         conn = None
