@@ -70,7 +70,7 @@ def show_tab2():
 
         parent_data = []
         middle_map = {}
-        common_name_map = defaultdict(lambda: defaultdict(list))
+        common_name_map = defaultdict(lambda: defaultdict(dict))
         for category, item_list in category_map.items():
             total_amount = len(item_list)
             on_contract = sum(1 for item in item_list if item.get("status") in ["Delivered", "On Rent"])
@@ -82,7 +82,9 @@ def show_tab2():
                 subcategory = subcategorize_item(category, item.get("rental_class_num"))
                 subcategory_map[subcategory].append(item)
                 common_name = item.get("common_name", "Unknown")
-                common_name_map[category][subcategory].append({"name": common_name, "count": 1})
+                if common_name not in common_name_map[category][subcategory]:
+                    common_name_map[category][subcategory][common_name] = {"name": common_name, "total": 0}
+                common_name_map[category][subcategory][common_name]["total"] += 1
 
             middle_map[category] = [
                 {
@@ -156,7 +158,7 @@ def tab2_data():
 
         parent_data = []
         middle_map = {}
-        common_name_map = defaultdict(lambda: defaultdict(list))
+        common_name_map = defaultdict(lambda: defaultdict(dict))
         for category, item_list in category_map.items():
             total_amount = len(item_list)
             on_contract = sum(1 for item in item_list if item.get("status") in ["Delivered", "On Rent"])
@@ -168,7 +170,9 @@ def tab2_data():
                 subcategory = subcategorize_item(category, item.get("rental_class_num"))
                 subcategory_map[subcategory].append(item)
                 common_name = item.get("common_name", "Unknown")
-                common_name_map[category][subcategory].append({"name": common_name, "count": 1})
+                if common_name not in common_name_map[category][subcategory]:
+                    common_name_map[category][subcategory][common_name] = {"name": common_name, "total": 0}
+                common_name_map[category][subcategory][common_name]["total"] += 1
 
             middle_map[category] = [
                 {
@@ -197,7 +201,7 @@ def tab2_data():
         return jsonify({
             "parent_data": parent_data,
             "middle_map": middle_map,
-            "common_name_map": {k: {k2: [{"name": name, "count": len([c for c in v2 if c["name"] == name])} for name in set(c["name"] for c in v2)] for k2, v2 in v.items()} for k, v in common_name_map.items()}
+            "common_name_map": {k: {k2: list(v2.values()) for k2, v2 in v.items()} for k, v in common_name_map.items()}
         })
     except Exception as e:
         logging.error(f"Error in tab2_data: {e}")
@@ -242,7 +246,7 @@ def subcat_data():
 
         category_items = [item for item in filtered_items if categorize_item(item.get("rental_class_num")) == category]
         subcat_items = [item for item in category_items if subcategorize_item(category, item.get("rental_class_num")) == subcategory]
-        common_items = [item for item in subcat_items if item.get("common_name") == common_name] if common_name else subcat_items
+        common_items = [item for item in subcat_items if not common_name or item.get("common_name") == common_name]
 
         total_items = len(common_items)
         total_pages = (total_items + per_page - 1) // per_page

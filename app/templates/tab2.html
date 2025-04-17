@@ -89,17 +89,17 @@
                           </tr>
                         </thead>
                         <tbody>
-                          {% for common in common_name_map[parent.category][middle.subcategory] %}
+                          {% for common_name, data in common_name_map[parent.category][middle.subcategory].items() %}
                           {% set common_idx = middle_idx ~ '_' ~ loop.index %}
                           <tr>
-                            <td><span class="expand-toggle" data-bs-toggle="collapse" data-bs-target="#child-{{ common_idx }}">+</span></td>
-                            <td>{{ common.name }}</td>
-                            <td>{{ common_name_map[parent.category][middle.subcategory]|selectattr('name', 'equalto', common.name)|map(attribute='count')|sum or 0 }}</td>
-                            <td><button class="btn btn-sm btn-primary print-btn" data-level="common" data-category="{{ parent.category }}" data-subcategory="{{ middle.subcategory }}" data-common-name="{{ common.name }}">Print</button></td>
+                            <td><span class="expand-toggle" data-bs-toggle="collapse" data-bs-target="#items-{{ common_idx }}">+</span></td>
+                            <td>{{ data.name }}</td>
+                            <td>{{ data.total }}</td>
+                            <td><button class="btn btn-sm btn-primary print-btn" data-level="common" data-category="{{ parent.category }}" data-subcategory="{{ middle.subcategory }}" data-common-name="{{ data.name }}">Print</button></td>
                           </tr>
                           <tr>
                             <td colspan="4" class="p-0">
-                              <div id="child-{{ common_idx }}" class="collapse" data-common-name="{{ common.name }}">
+                              <div id="items-{{ common_idx }}" class="collapse" data-common-name="{{ data.name }}">
                                 <div id="loading-{{ common_idx }}" class="text-center my-2" style="display: none;">
                                   <div class="spinner-border text-primary" role="status">
                                     <span class="visually-hidden">Loading...</span>
@@ -213,8 +213,8 @@ function sortTable(tableEl, colName) {
     const pairs = [];
     for (let i = 0; i < rows.length; i += 2) {
       const commonRow = rows[i];
-      const grandRow = rows[i + 1] || null;
-      if (commonRow) pairs.push({ common: commonRow, grand: grandRow });
+      const itemsRow = rows[i + 1] || null;
+      if (commonRow) pairs.push({ common: commonRow, items: itemsRow });
     }
     pairs.sort((a, b) => {
       const cellA = a.common.cells[colIndex]?.innerText.trim() || "";
@@ -227,7 +227,7 @@ function sortTable(tableEl, colName) {
     tbody.innerHTML = "";
     pairs.forEach(pair => {
       tbody.appendChild(pair.common);
-      if (pair.grand) tbody.appendChild(pair.grand);
+      if (pair.items) tbody.appendChild(pair.items);
     });
   } else {
     const rows = Array.from(tbody.querySelectorAll("tr"));
@@ -342,6 +342,7 @@ function loadSubcatData(category, subcategory, commonName, page, catKey) {
 }
 
 function printTable(level, category, subcategory, commonName) {
+  console.log(`Printing ${level}: ${category}, ${subcategory}, ${commonName}`);
   const urlParams = new URLSearchParams(window.location.search);
   fetch(`/tab2/data?${urlParams.toString()}`)
     .then(response => {
@@ -387,11 +388,10 @@ function printTable(level, category, subcategory, commonName) {
           <tbody><tr><td>${subcategory}</td><td>${middle.total}</td><td>${middle.on_contract}</td><td>${middle.available}</td><td>${middle.service}</td></tr></tbody>
         `;
       } else if (level === 'common') {
-        const commonNames = data.common_name_map[category][subcategory] || [];
-        const total = commonNames.filter(cn => cn.name === commonName).reduce((sum, cn) => sum + cn.count, 0);
+        const commonData = data.common_name_map[category][subcategory][commonName];
         html += `
           <thead><tr><th>Common Name</th><th>Total</th></tr></thead>
-          <tbody><tr><td>${commonName}</td><td>${total}</td></tr></tbody>
+          <tbody><tr><td>${commonName}</td><td>${commonData.total}</td></tr></tbody>
         `;
       } else {
         return fetch(`/tab2/subcat_data?category=${encodeURIComponent(category)}&subcategory=${encodeURIComponent(subcategory)}&common_name=${encodeURIComponent(commonName)}&page=1&${urlParams.toString()}`)
@@ -401,27 +401,31 @@ function printTable(level, category, subcategory, commonName) {
               <thead><tr><th>Tag ID</th><th>Common Name</th><th>Status</th><th>Bin Location</th><th>Quality</th><th>Last Contract Num</th><th>Client Name</th><th>Scanned Date</th><th>Scanned By</th><th>Notes</th></tr></thead>
               <tbody>
             `;
-            data.items.forEach(item => {
-              html += `
-                <tr>
-                  <td>${item.tag_id || 'N/A'}</td>
-                  <td>${item.common_name}</td>
-                  <td>${item.status || 'N/A'}</td>
-                  <td>${item.bin_location || 'N/A'}</td>
-                  <td>${item.quality || 'N/A'}</td>
-                  <td>${item.last_contract_num || 'N/A'}</td>
-                  <td>${item.client_name || 'N/A'}</td>
-                  <td>${item.date_last_scanned || 'N/A'}</td>
-                  <td>${item.last_scanned_by || 'N/A'}</td>
-                  <td>${item.notes || 'N/A'}</td>
-                </tr>
-              `;
-            });
+            if (data.items && data.items.length > 0) {
+              data.items.forEach(item => {
+                html += `
+                  <tr>
+                    <td>${item.tag_id || 'N/A'}</td>
+                    <td>${item.common_name}</td>
+                    <td>${item.status || 'N/A'}</td>
+                    <td>${item.bin_location || 'N/A'}</td>
+                    <td>${item.quality || 'N/A'}</td>
+                    <td>${item.last_contract_num || 'N/A'}</td>
+                    <td>${item.client_name || 'N/A'}</td>
+                    <td>${item.date_last_scanned || 'N/A'}</td>
+                    <td>${item.last_scanned_by || 'N/A'}</td>
+                    <td>${item.notes || 'N/A'}</td>
+                  </tr>
+                `;
+              });
+            } else {
+              html += '<tr><td colspan="10">No items found</td></tr>';
+            }
             html += '</tbody>';
             finishPrint(html);
           })
           .catch(error => {
-            console.error('Error fetching grandchild data for print:', error);
+            console.error('Error fetching items for print:', error);
             alert('Failed to load items for printing.');
           });
       }
@@ -546,20 +550,20 @@ function refreshTable() {
 
               const commonTbody = document.getElementById(`commonTable-${middle_idx}`).querySelector('tbody');
               if (expandedIds.includes(`common-${middle_idx}`)) {
-                const commonNames = data.common_name_map[parent.category][middle.subcategory] || [];
-                commonNames.forEach((common, commonIndex) => {
-                  const common_idx = `${middle_idx}_${commonIndex + 1}`;
+                const commonNames = data.common_name_map[parent.category][middle.subcategory].values();
+                for (const [index, common] of Array.from(commonNames).entries()) {
+                  const common_idx = `${middle_idx}_${index + 1}`;
                   const commonRow = document.createElement('tr');
                   commonRow.innerHTML = `
-                    <td><span class="expand-toggle" data-bs-toggle="collapse" data-bs-target="#child-${common_idx}">+</span></td>
+                    <td><span class="expand-toggle" data-bs-toggle="collapse" data-bs-target="#items-${common_idx}">+</span></td>
                     <td>${common.name}</td>
-                    <td>${common.count or 0}</td>
+                    <td>${common.total}</td>
                     <td><button class="btn btn-sm btn-primary print-btn" data-level="common" data-category="${parent.category}" data-subcategory="${middle.subcategory}" data-common-name="${common.name}">Print</button></td>
                   `;
-                  const grandRow = document.createElement('tr');
-                  grandRow.innerHTML = `
+                  const itemsRow = document.createElement('tr');
+                  itemsRow.innerHTML = `
                     <td colspan="4" class="p-0">
-                      <div id="child-${common_idx}" class="collapse" data-common-name="${common.name}">
+                      <div id="items-${common_idx}" class="collapse" data-common-name="${common.name}">
                         <div id="loading-${common_idx}" class="text-center my-2" style="display: none;">
                           <div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div>
                         </div>
@@ -589,12 +593,12 @@ function refreshTable() {
                     </td>
                   `;
                   commonTbody.appendChild(commonRow);
-                  commonTbody.appendChild(grandRow);
+                  commonTbody.appendChild(itemsRow);
 
-                  if (expandedIds.includes(`child-${common_idx}`)) {
+                  if (expandedIds.includes(`items-${common_idx}`)) {
                     loadSubcatData(parent.category, middle.subcategory, common.name, 1, common_idx);
                   }
-                });
+                }
               }
             });
           }
@@ -752,15 +756,15 @@ function updateWithNewData(newData) {
             if (!commonRow) {
               commonRow = document.createElement('tr');
               commonRow.innerHTML = `
-                <td><span class="expand-toggle" data-bs-toggle="collapse" data-bs-target="#child-${common_idx}">+</span></td>
+                <td><span class="expand-toggle" data-bs-toggle="collapse" data-bs-target="#items-${common_idx}">+</span></td>
                 <td>${common}</td>
                 <td>${commonData.total}</td>
                 <td><button class="btn btn-sm btn-primary print-btn" data-level="common" data-category="${category}" data-subcategory="${subcat}" data-common-name="${common}">Print</button></td>
               `;
-              const grandRow = document.createElement('tr');
-              grandRow.innerHTML = `
+              const itemsRow = document.createElement('tr');
+              itemsRow.innerHTML = `
                 <td colspan="4" class="p-0">
-                  <div id="child-${common_idx}" class="collapse" data-common-name="${common}">
+                  <div id="items-${common_idx}" class="collapse" data-common-name="${common}">
                     <div id="loading-${common_idx}" class="text-center my-2" style="display: none;">
                       <div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div>
                     </div>
@@ -790,13 +794,13 @@ function updateWithNewData(newData) {
                 </td>
               `;
               commonTbody.appendChild(commonRow);
-              commonTbody.appendChild(grandRow);
+              commonTbody.appendChild(itemsRow);
             } else {
               commonRow.cells[2].innerText = commonData.total;
             }
 
-            const grandTbody = document.getElementById(`grandchildTbody-${common_idx}`);
-            if (grandTbody && grandTbody.closest('.collapse').classList.contains('show')) {
+            const itemsTbody = document.getElementById(`grandchildTbody-${common_idx}`);
+            if (itemsTbody && itemsTbody.closest('.collapse').classList.contains('show')) {
               commonData.items.forEach(item => {
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
@@ -811,7 +815,7 @@ function updateWithNewData(newData) {
                   <td>${item.last_scanned_by || 'N/A'}</td>
                   <td>${item.notes || 'N/A'}</td>
                 `;
-                grandTbody.appendChild(tr);
+                itemsTbody.appendChild(tr);
               });
             }
           });
@@ -821,16 +825,19 @@ function updateWithNewData(newData) {
   });
 }
 
-function categorizeItem(rental_class_num):
-    return CATEGORY_MAP.get(parseInt(rental_class_num), "Other")
+function categorizeItem(rental_class_num) {
+  return CATEGORY_MAP.get(parseInt(rental_class_num), "Other");
+}
 
-function subcategorizeItem(category, rental_class_num):
-    const rid = parseInt(rental_class_num)
-    if (category in ['Tent Tops', 'Tables and Chairs', 'Round Linen', 'Rectangle Linen', 
-                     'Concession Equipment', 'AV Equipment', 'Runners and Drapes', 
-                     'Other', 'Resale']):
-        return SUBCATEGORY_MAP.get(rid, 'Unspecified')
-    return 'Unspecified'
+function subcategorizeItem(category, rental_class_num) {
+  const rid = parseInt(rental_class_num);
+  if (category in ['Tent Tops', 'Tables and Chairs', 'Round Linen', 'Rectangle Linen', 
+                   'Concession Equipment', 'AV Equipment', 'Runners and Drapes', 
+                   'Other', 'Resale']) {
+    return SUBCATEGORY_MAP.get(rid, 'Unspecified');
+  }
+  return 'Unspecified';
+}
 
 document.addEventListener('DOMContentLoaded', () => {
   console.log("DOM Content Loaded - Tab 2");
@@ -844,11 +851,11 @@ document.addEventListener('DOMContentLoaded', () => {
     } else if (target.classList.contains("expand-toggle")) {
       const targetId = target.getAttribute('data-bs-target');
       const targetEl = document.querySelector(targetId);
-      if (targetEl && !targetEl.classList.contains('show') && targetId.startsWith('#child-')) {
+      if (targetEl && !targetEl.classList.contains('show') && targetId.startsWith('#items-')) {
         const category = targetEl.closest(".collapse[data-category]").getAttribute("data-category");
         const subcategory = targetEl.closest(".collapse[data-subcategory]").getAttribute("data-subcategory");
         const commonName = targetEl.getAttribute("data-common-name");
-        const catKey = targetId.split("child-")[1];
+        const catKey = targetId.split("items-")[1];
         loadSubcatData(category, subcategory, commonName, 1, catKey);
       }
       if (targetEl) {
