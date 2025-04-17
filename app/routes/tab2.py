@@ -201,6 +201,7 @@ def subcat_data():
     try:
         category = request.args.get('category')
         subcategory = request.args.get('subcategory')
+        common_name = request.args.get('common_name')  # New layer
         page = int(request.args.get('page', 1))
         per_page = 20
 
@@ -213,7 +214,7 @@ def subcat_data():
             items = get_all_items(conn)
         items = [dict(row) for row in items]
 
-        filter_common_name = request.args.get("common_name", "").lower().strip()
+        filter_common_name = request.args.get("common_name_filter", "").lower().strip()
         filter_tag_id = request.args.get("tag_id", "").lower().strip()
         filter_bin_location = request.args.get("bin_location", "").lower().strip()
         filter_last_contract = request.args.get("last_contract_num", "").lower().strip()
@@ -233,15 +234,16 @@ def subcat_data():
 
         category_items = [item for item in filtered_items if categorize_item(item.get("rental_class_num")) == category]
         subcat_items = [item for item in category_items if subcategorize_item(category, item.get("rental_class_num")) == subcategory]
+        common_items = [item for item in subcat_items if not common_name or item.get("common_name") == common_name]
 
-        total_items = len(subcat_items)
+        total_items = len(common_items)
         total_pages = (total_items + per_page - 1) // per_page
         page = max(1, min(page, total_pages))
         start = (page - 1) * per_page
         end = start + per_page
-        paginated_items = subcat_items[start:end]
+        paginated_items = common_items[start:end]
 
-        logging.debug(f"AJAX: Category: {category}, Subcategory: {subcategory}, Total Items: {total_items}, Page: {page}")
+        logging.debug(f"AJAX: Category: {category}, Subcategory: {subcategory}, Common Name: {common_name}, Total Items: {total_items}, Page: {page}")
 
         return jsonify({
             "items": [{
