@@ -89,12 +89,12 @@
                           </tr>
                         </thead>
                         <tbody>
-                          {% for common in middle_map[parent.category]|selectattr('subcategory', 'equalto', middle.subcategory)|list|map(attribute='common_name')|unique|list %}
+                          {% for common in common_name_map[parent.category][middle.subcategory]|unique %}
                           {% set common_idx = middle_idx ~ '_' ~ loop.index %}
                           <tr>
                             <td><span class="expand-toggle" data-bs-toggle="collapse" data-bs-target="#child-{{ common_idx }}">+</span></td>
                             <td>{{ common }}</td>
-                            <td>{{ middle_map[parent.category]|selectattr('subcategory', 'equalto', middle.subcategory)|list|selectattr('common_name', 'equalto', common)|list|length }}</td>
+                            <td>{{ common_name_map[parent.category][middle.subcategory]|select('eq', common)|list|length }}</td>
                             <td><button class="btn btn-sm btn-primary print-btn" data-level="common" data-category="{{ parent.category }}" data-subcategory="{{ middle.subcategory }}" data-common-name="{{ common }}">Print</button></td>
                           </tr>
                           <tr>
@@ -342,59 +342,89 @@ function loadSubcatData(category, subcategory, commonName, page, catKey) {
 }
 
 function printTable(level, category, subcategory, commonName) {
-  let html = `
-    <html>
-    <head>
-      <title>Tab 2 Print - ${level === 'parent' ? category : level === 'middle' ? `${category} - ${subcategory}` : level === 'common' ? `${category} - ${subcategory} - ${commonName}` : 'Items'}</title>
-      <style>
-        @page { size: A4; margin: 20mm; }
-        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; }
-        .header { display: flex; justify-content: space-between; margin-bottom: 20px; }
-        .title { font-size: 18px; }
-        .company { font-size: 14px; text-align: right; }
-        table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-        th, td { border: 1px solid black; padding: 8px; text-align: left; }
-        th { background-color: #f2f2f2; }
-        .signature { margin-top: 40px; }
-        .signature-line { width: 300px; border-bottom: 1px solid black; margin-bottom: 10px; }
-      </style>
-    </head>
-    <body>
-      <div class="header">
-        <div class="title">Broadway Tent & Event - ${level} Print</div>
-        <div class="company">Broadway Tent and Event</div>
-      </div>
-      <table>
-  `;
+  // Fetch the latest data to ensure accuracy
+  const urlParams = new URLSearchParams(window.location.search);
+  fetch(`/tab2/data?${urlParams.toString()}`)
+    .then(response => response.json())
+    .then(data => {
+      let html = `
+        <html>
+        <head>
+          <title>Tab 2 Print - ${level === 'parent' ? category : level === 'middle' ? \`${category} - ${subcategory}\` : level === 'common' ? \`${category} - ${subcategory} - ${commonName}\` : 'Items'}</title>
+          <style>
+            @page { size: A4; margin: 20mm; }
+            body { font-family: Arial, sans-serif; margin: 0; padding: 20px; }
+            .header { display: flex; justify-content: space-between; margin-bottom: 20px; }
+            .title { font-size: 18px; }
+            .company { font-size: 14px; text-align: right; }
+            table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+            th, td { border: 1px solid black; padding: 8px; text-align: left; }
+            th { background-color: #f2f2f2; }
+            .signature { margin-top: 40px; }
+            .signature-line { width: 300px; border-bottom: 1px solid black; margin-bottom: 10px; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div class="title">Broadway Tent & Event - ${level} Print</div>
+            <div class="company">Broadway Tent and Event</div>
+          </div>
+          <table>
+      `;
 
-  if (level === 'parent') {
-    html += `
-        <thead><tr><th>Category</th><th>Total Amount</th><th>On Contract</th><th>Available</th><th>Service</th></tr></thead>
-        <tbody><tr><td>${category}</td><td>${parent_data|selectattr('category', 'equalto', category)|first.total_amount}</td><td>${parent_data|selectattr('category', 'equalto', category)|first.on_contract}</td><td>${parent_data|selectattr('category', 'equalto', category)|first.available}</td><td>${parent_data|selectattr('category', 'equalto', category)|first.service}</td></tr></tbody>
-    `;
-  } else if (level === 'middle') {
-    html += `
-        <thead><tr><th>Subcategory</th><th>Total</th><th>On Contract</th><th>Available</th><th>Service</th></tr></thead>
-        <tbody><tr><td>${subcategory}</td><td>${middle_map[category]|selectattr('subcategory', 'equalto', subcategory)|first.total}</td><td>${middle_map[category]|selectattr('subcategory', 'equalto', subcategory)|first.on_contract}</td><td>${middle_map[category]|selectattr('subcategory', 'equalto', subcategory)|first.available}</td><td>${middle_map[category]|selectattr('subcategory', 'equalto', subcategory)|first.service}</td></tr></tbody>
-    `;
-  } else if (level === 'common') {
-    html += `
-        <thead><tr><th>Common Name</th><th>Total</th></tr></thead>
-        <tbody><tr><td>${commonName}</td><td>${middle_map[category]|selectattr('subcategory', 'equalto', subcategory)|list|selectattr('common_name', 'equalto', commonName)|list|length}</td></tr></tbody>
-    `;
-  } else { // Grandchild
-    const tbody = document.getElementById(`grandchildTbody-${cat_key}`).querySelector('tbody');
-    html += '<thead><tr><th>Tag ID</th><th>Common Name</th><th>Status</th><th>Bin Location</th><th>Quality</th><th>Last Contract Num</th><th>Client Name</th><th>Scanned Date</th><th>Scanned By</th><th>Notes</th></tr></thead><tbody>';
-    tbody.querySelectorAll('tr').forEach(row => {
-      html += '<tr>';
-      row.querySelectorAll('td').forEach(cell => {
-        html += `<td>${cell.innerText}</td>`;
-      });
-      html += '</tr>';
+      if (level === 'parent') {
+        const parent = data.parent_data.find(p => p.category === category);
+        html += `
+          <thead><tr><th>Category</th><th>Total Amount</th><th>On Contract</th><th>Available</th><th>Service</th></tr></thead>
+          <tbody><tr><td>${category}</td><td>${parent.total_amount}</td><td>${parent.on_contract}</td><td>${parent.available}</td><td>${parent.service}</td></tr></tbody>
+        `;
+      } else if (level === 'middle') {
+        const middle = data.middle_map[category].find(m => m.subcategory === subcategory);
+        html += `
+          <thead><tr><th>Subcategory</th><th>Total</th><th>On Contract</th><th>Available</th><th>Service</th></tr></thead>
+          <tbody><tr><td>${subcategory}</td><td>${middle.total}</td><td>${middle.on_contract}</td><td>${middle.available}</td><td>${middle.service}</td></tr></tbody>
+        `;
+      } else if (level === 'common') {
+        const items = fetch(`/tab2/subcat_data?category=${encodeURIComponent(category)}&subcategory=${encodeURIComponent(subcategory)}&common_name=${encodeURIComponent(commonName)}&page=1`)
+          .then(res => res.json())
+          .then(data => {
+            const total = data.total_items;
+            html += `
+              <thead><tr><th>Common Name</th><th>Total</th></tr></thead>
+              <tbody><tr><td>${commonName}</td><td>${total}</td></tr></tbody>
+            `;
+            finishPrint(html);
+          });
+        return; // Exit early to wait for async fetch
+      } else {
+        const tbody = document.getElementById(`grandchildTbody-${cat_key}`);
+        if (tbody) {
+          html += `
+            <thead><tr><th>Tag ID</th><th>Common Name</th><th>Status</th><th>Bin Location</th><th>Quality</th><th>Last Contract Num</th><th>Client Name</th><th>Scanned Date</th><th>Scanned By</th><th>Notes</th></tr></thead>
+            <tbody>
+          `;
+          tbody.querySelectorAll('tr').forEach(row => {
+            html += '<tr>';
+            row.querySelectorAll('td').forEach(cell => {
+              html += `<td>${cell.innerText}</td>`;
+            });
+            html += '</tr>';
+          });
+          html += '</tbody>';
+        } else {
+          html += '<thead><tr><th>No Items</th></tr></thead><tbody><tr><td>No items available</td></tr></tbody>';
+        }
+      }
+
+      finishPrint(html);
+    })
+    .catch(error => {
+      console.error('Error fetching data for print:', error);
+      alert('Failed to load data for printing.');
     });
-    html += '</tbody>';
-  }
+}
 
+function finishPrint(html) {
   html += `
       </table>
       <div class="signature">
@@ -504,14 +534,14 @@ function refreshTable() {
 
               const commonTbody = document.getElementById(`commonTable-${middle_idx}`).querySelector('tbody');
               if (expandedIds.includes(`common-${middle_idx}`)) {
-                const uniqueCommonNames = [...new Set(data.middle_map[parent.category].filter(m => m.subcategory === middle.subcategory).map(m => m.common_name || 'Unknown'))];
+                const uniqueCommonNames = [...new Set(data.common_name_map[parent.category][middle.subcategory] || [])];
                 uniqueCommonNames.forEach((common, commonIndex) => {
                   const common_idx = `${middle_idx}_${commonIndex + 1}`;
                   const commonRow = document.createElement('tr');
                   commonRow.innerHTML = `
                     <td><span class="expand-toggle" data-bs-toggle="collapse" data-bs-target="#child-${common_idx}">+</span></td>
                     <td>${common}</td>
-                    <td>${data.middle_map[parent.category].filter(m => m.subcategory === middle.subcategory && m.common_name === common).length}</td>
+                    <td>${data.common_name_map[parent.category][middle.subcategory].filter(cn => cn === common).length}</td>
                     <td><button class="btn btn-sm btn-primary print-btn" data-level="common" data-category="${parent.category}" data-subcategory="${middle.subcategory}" data-common-name="${common}">Print</button></td>
                   `;
                   const grandRow = document.createElement('tr');
@@ -605,7 +635,7 @@ function updateWithNewData(newData) {
     if (["Delivered", "On Rent"].includes(item.status)) categoryTotals[cat].subcategories[subcat].on_contract++;
     if (item.status === "Ready to Rent") categoryTotals[cat].subcategories[subcat].available++;
     if (!["Delivered", "On Rent", "Ready to Rent"].includes(item.status)) categoryTotals[cat].subcategories[subcat].service++;
-    const common = item.common_name;
+    const common = item.common_name || 'Unknown';
     if (!categoryTotals[cat].subcategories[subcat].common_names[common]) categoryTotals[cat].subcategories[subcat].common_names[common] = { total: 0, items: [] };
     categoryTotals[cat].subcategories[subcat].common_names[common].total++;
     categoryTotals[cat].subcategories[subcat].common_names[common].items.push(item);
