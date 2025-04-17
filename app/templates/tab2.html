@@ -266,7 +266,10 @@ function loadSubcatData(category, subcategory, commonName, page, catKey) {
 
   fetch(url)
     .then(response => {
-      if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+      if (!response.ok) {
+        console.error(`Fetch failed with status: ${response.status}`);
+        throw new Error(`HTTP error! Status: ${response.status}`);
+      }
       return response.json();
     })
     .then(data => {
@@ -278,11 +281,13 @@ function loadSubcatData(category, subcategory, commonName, page, catKey) {
       }
       tbody.innerHTML = '';
       if (data.items && data.items.length > 0) {
+        console.log(`Rendering ${data.items.length} items for ${commonName}`);
         data.items.forEach(item => {
+          console.log(`Rendering item: ${item.tag_id}, Common Name: ${item.common_name}`);
           const tr = document.createElement('tr');
           tr.innerHTML = `
             <td>${item.tag_id || 'N/A'}</td>
-            <td>${item.common_name}</td>
+            <td>${item.common_name || 'N/A'}</td>
             <td>${item.status || 'N/A'}</td>
             <td>${item.bin_location || 'N/A'}</td>
             <td>${item.quality || 'N/A'}</td>
@@ -295,6 +300,7 @@ function loadSubcatData(category, subcategory, commonName, page, catKey) {
           tbody.appendChild(tr);
         });
       } else {
+        console.warn(`No items found for common_name: ${commonName}`);
         tbody.innerHTML = '<tr><td colspan="10">No items found</td></tr>';
       }
 
@@ -303,6 +309,7 @@ function loadSubcatData(category, subcategory, commonName, page, catKey) {
         const paginationList = pagination.querySelector('.pagination');
         paginationList.innerHTML = '';
         if (data.total_pages > 1) {
+          console.log(`Adding pagination for ${data.total_pages} pages`);
           const prevLi = document.createElement('li');
           prevLi.className = `page-item ${data.current_page === 1 ? 'disabled' : ''}`;
           prevLi.innerHTML = `<a class="page-link" href="#" data-page="${data.current_page - 1}" aria-label="Previous"><span aria-hidden="true">« Prev</span></a>`;
@@ -335,7 +342,7 @@ function loadSubcatData(category, subcategory, commonName, page, catKey) {
       console.error('Error loading subcat data:', error);
       const tbody = document.getElementById(`grandchildTbody-${catKey}`);
       if (tbody) {
-        tbody.innerHTML = '<tr><td colspan="10">Error loading data</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="10">Error loading data: ' + error.message + '</td></tr>';
       }
       if (loading) loading.style.display = 'none';
     });
@@ -388,7 +395,7 @@ function printTable(level, category, subcategory, commonName) {
           <tbody><tr><td>${subcategory}</td><td>${middle.total}</td><td>${middle.on_contract}</td><td>${middle.available}</td><td>${middle.service}</td></tr></tbody>
         `;
       } else if (level === 'common') {
-        const commonData = data.common_name_map[category][subcategory][commonName];
+        const commonData = data.common_name_map[category][subcategory].find(c => c.name === commonName);
         html += `
           <thead><tr><th>Common Name</th><th>Total</th></tr></thead>
           <tbody><tr><td>${commonName}</td><td>${commonData.total}</td></tr></tbody>
@@ -550,9 +557,9 @@ function refreshTable() {
 
               const commonTbody = document.getElementById(`commonTable-${middle_idx}`).querySelector('tbody');
               if (expandedIds.includes(`common-${middle_idx}`)) {
-                const commonNames = data.common_name_map[parent.category][middle.subcategory].values();
-                for (const [index, common] of Array.from(commonNames).entries()) {
-                  const common_idx = `${middle_idx}_${index + 1}`;
+                const commonNames = data.common_name_map[parent.category][middle.subcategory] || [];
+                commonNames.forEach((common, commonIndex) => {
+                  const common_idx = `${middle_idx}_${commonIndex + 1}`;
                   const commonRow = document.createElement('tr');
                   commonRow.innerHTML = `
                     <td><span class="expand-toggle" data-bs-toggle="collapse" data-bs-target="#items-${common_idx}">+</span></td>
@@ -598,7 +605,7 @@ function refreshTable() {
                   if (expandedIds.includes(`items-${common_idx}`)) {
                     loadSubcatData(parent.category, middle.subcategory, common.name, 1, common_idx);
                   }
-                }
+                });
               }
             });
           }
@@ -659,7 +666,7 @@ function updateWithNewData(newData) {
 
   Object.entries(categoryTotals).forEach(([category, data]) => {
     let parentRow = Array.from(tbody.querySelectorAll('.table-active'))
-      .find(row => row.cells[1].innerText === category);
+      .find(row => row.cells[1]?.innerText === category);
     const cat_key = category.toLowerCase().replace(/ /g, '_');
     if (!parentRow) {
       parentRow = document.createElement('tr');
