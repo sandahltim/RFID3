@@ -94,7 +94,7 @@
                           <tr>
                             <td><span class="expand-toggle" data-bs-toggle="collapse" data-bs-target="#child-{{ common_idx }}">+</span></td>
                             <td>{{ common.name }}</td>
-                            <td>{{ common_name_map[parent.category][middle.subcategory]|selectattr('name', 'equalto', common.name)|map(attribute='count')|sum }}</td>
+                            <td>{{ common_name_map[parent.category][middle.subcategory]|selectattr('name', 'equalto', common.name)|map(attribute='count')|sum or 0 }}</td>
                             <td><button class="btn btn-sm btn-primary print-btn" data-level="common" data-category="{{ parent.category }}" data-subcategory="{{ middle.subcategory }}" data-common-name="{{ common.name }}">Print</button></td>
                           </tr>
                           <tr>
@@ -251,9 +251,9 @@ function loadSubcatData(category, subcategory, commonName, page, catKey) {
 
   const urlParams = new URLSearchParams(window.location.search);
   const params = {
-    category: category,
-    subcategory: subcategory,
-    common_name: commonName,
+    category: encodeURIComponent(category),
+    subcategory: encodeURIComponent(subcategory),
+    common_name: encodeURIComponent(commonName || ''),
     page: page,
     common_name_filter: urlParams.get('common_name') || '',
     tag_id: urlParams.get('tag_id') || '',
@@ -387,13 +387,14 @@ function printTable(level, category, subcategory, commonName) {
           <tbody><tr><td>${subcategory}</td><td>${middle.total}</td><td>${middle.on_contract}</td><td>${middle.available}</td><td>${middle.service}</td></tr></tbody>
         `;
       } else if (level === 'common') {
-        const total = data.common_name_map[category][subcategory].filter(cn => cn.name === commonName).length;
+        const commonNames = data.common_name_map[category][subcategory] || [];
+        const total = commonNames.filter(cn => cn.name === commonName).reduce((sum, cn) => sum + cn.count, 0);
         html += `
           <thead><tr><th>Common Name</th><th>Total</th></tr></thead>
           <tbody><tr><td>${commonName}</td><td>${total}</td></tr></tbody>
         `;
       } else {
-        fetch(`/tab2/subcat_data?category=${encodeURIComponent(category)}&subcategory=${encodeURIComponent(subcategory)}&common_name=${encodeURIComponent(commonName)}&page=1&${urlParams.toString()}`)
+        return fetch(`/tab2/subcat_data?category=${encodeURIComponent(category)}&subcategory=${encodeURIComponent(subcategory)}&common_name=${encodeURIComponent(commonName)}&page=1&${urlParams.toString()}`)
           .then(res => res.json())
           .then(data => {
             html += `
@@ -418,11 +419,16 @@ function printTable(level, category, subcategory, commonName) {
             });
             html += '</tbody>';
             finishPrint(html);
+          })
+          .catch(error => {
+            console.error('Error fetching grandchild data for print:', error);
+            alert('Failed to load items for printing.');
           });
-        return; // Exit early for async grandchild fetch
       }
 
-      finishPrint(html);
+      if (level !== 'grandchild') {
+        finishPrint(html);
+      }
     })
     .catch(error => {
       console.error('Error fetching data for print:', error);
@@ -547,7 +553,7 @@ function refreshTable() {
                   commonRow.innerHTML = `
                     <td><span class="expand-toggle" data-bs-toggle="collapse" data-bs-target="#child-${common_idx}">+</span></td>
                     <td>${common.name}</td>
-                    <td>${common_name_map[parent.category][middle.subcategory]|selectattr('name', 'equalto', common.name)|map(attribute='count')|sum or 0}</td>
+                    <td>${common.count or 0}</td>
                     <td><button class="btn btn-sm btn-primary print-btn" data-level="common" data-category="${parent.category}" data-subcategory="${middle.subcategory}" data-common-name="${common.name}">Print</button></td>
                   `;
                   const grandRow = document.createElement('tr');
@@ -815,19 +821,16 @@ function updateWithNewData(newData) {
   });
 }
 
-function categorizeItem(rental_class_num) {
-  return CATEGORY_MAP.get(parseInt(rental_class_num), "Other");
-}
+function categorizeItem(rental_class_num):
+    return CATEGORY_MAP.get(parseInt(rental_class_num), "Other")
 
-function subcategorizeItem(category, rental_class_num) {
-  const rid = parseInt(rental_class_num);
-  if (category in ['Tent Tops', 'Tables and Chairs', 'Round Linen', 'Rectangle Linen', 
-                   'Concession Equipment', 'AV Equipment', 'Runners and Drapes', 
-                   'Other', 'Resale']) {
-    return SUBCATEGORY_MAP.get(rid, 'Unspecified');
-  }
-  return 'Unspecified';
-}
+function subcategorizeItem(category, rental_class_num):
+    const rid = parseInt(rental_class_num)
+    if (category in ['Tent Tops', 'Tables and Chairs', 'Round Linen', 'Rectangle Linen', 
+                     'Concession Equipment', 'AV Equipment', 'Runners and Drapes', 
+                     'Other', 'Resale']):
+        return SUBCATEGORY_MAP.get(rid, 'Unspecified')
+    return 'Unspecified'
 
 document.addEventListener('DOMContentLoaded', () => {
   console.log("DOM Content Loaded - Tab 2");

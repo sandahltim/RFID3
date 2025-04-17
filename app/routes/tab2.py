@@ -197,7 +197,7 @@ def tab2_data():
         return jsonify({
             "parent_data": parent_data,
             "middle_map": middle_map,
-            "common_name_map": {k: {k2: list(set([d['name'] for d in v2])) for k2, v2 in v.items()} for k, v in common_name_map.items()}
+            "common_name_map": {k: {k2: [{"name": name, "count": len([c for c in v2 if c["name"] == name])} for name in set(c["name"] for c in v2)] for k2, v2 in v.items()} for k, v in common_name_map.items()}
         })
     except Exception as e:
         logging.error(f"Error in tab2_data: {e}")
@@ -242,7 +242,7 @@ def subcat_data():
 
         category_items = [item for item in filtered_items if categorize_item(item.get("rental_class_num")) == category]
         subcat_items = [item for item in category_items if subcategorize_item(category, item.get("rental_class_num")) == subcategory]
-        common_items = [item for item in subcat_items if item.get("common_name") == common_name]
+        common_items = [item for item in subcat_items if item.get("common_name") == common_name] if common_name else subcat_items
 
         total_items = len(common_items)
         total_pages = (total_items + per_page - 1) // per_page
