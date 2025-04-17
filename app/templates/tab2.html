@@ -89,17 +89,17 @@
                           </tr>
                         </thead>
                         <tbody>
-                          {% for common in common_name_map[parent.category][middle.subcategory]|unique %}
+                          {% for common in common_name_map[parent.category][middle.subcategory] %}
                           {% set common_idx = middle_idx ~ '_' ~ loop.index %}
                           <tr>
                             <td><span class="expand-toggle" data-bs-toggle="collapse" data-bs-target="#child-{{ common_idx }}">+</span></td>
-                            <td>{{ common }}</td>
-                            <td>{{ common_name_map[parent.category][middle.subcategory]|select('eq', common)|list|length }}</td>
-                            <td><button class="btn btn-sm btn-primary print-btn" data-level="common" data-category="{{ parent.category }}" data-subcategory="{{ middle.subcategory }}" data-common-name="{{ common }}">Print</button></td>
+                            <td>{{ common.name }}</td>
+                            <td>{{ common_name_map[parent.category][middle.subcategory]|selectattr('name', 'equalto', common.name)|map(attribute='count')|sum }}</td>
+                            <td><button class="btn btn-sm btn-primary print-btn" data-level="common" data-category="{{ parent.category }}" data-subcategory="{{ middle.subcategory }}" data-common-name="{{ common.name }}">Print</button></td>
                           </tr>
                           <tr>
                             <td colspan="4" class="p-0">
-                              <div id="child-{{ common_idx }}" class="collapse" data-common-name="{{ common }}">
+                              <div id="child-{{ common_idx }}" class="collapse" data-common-name="{{ common.name }}">
                                 <div id="loading-{{ common_idx }}" class="text-center my-2" style="display: none;">
                                   <div class="spinner-border text-primary" role="status">
                                     <span class="visually-hidden">Loading...</span>
@@ -281,7 +281,7 @@ function loadSubcatData(category, subcategory, commonName, page, catKey) {
         data.items.forEach(item => {
           const tr = document.createElement('tr');
           tr.innerHTML = `
-            <td>${item.tag_id}</td>
+            <td>${item.tag_id || 'N/A'}</td>
             <td>${item.common_name}</td>
             <td>${item.status || 'N/A'}</td>
             <td>${item.bin_location || 'N/A'}</td>
@@ -342,10 +342,12 @@ function loadSubcatData(category, subcategory, commonName, page, catKey) {
 }
 
 function printTable(level, category, subcategory, commonName) {
-  // Fetch the latest data to ensure accuracy
   const urlParams = new URLSearchParams(window.location.search);
   fetch(`/tab2/data?${urlParams.toString()}`)
-    .then(response => response.json())
+    .then(response => {
+      if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+      return response.json();
+    })
     .then(data => {
       let html = `
         <html>
@@ -376,7 +378,7 @@ function printTable(level, category, subcategory, commonName) {
         const parent = data.parent_data.find(p => p.category === category);
         html += `
           <thead><tr><th>Category</th><th>Total Amount</th><th>On Contract</th><th>Available</th><th>Service</th></tr></thead>
-          <tbody><tr><td>${category}</td><td>${parent.total_amount}</td><td>${parent.on_contract}</td><td>${parent.available}</td><td>${parent.service}</td></tr></tbody>
+          <tbody><tr><td>${parent.category}</td><td>${parent.total_amount}</td><td>${parent.on_contract}</td><td>${parent.available}</td><td>${parent.service}</td></tr></tbody>
         `;
       } else if (level === 'middle') {
         const middle = data.middle_map[category].find(m => m.subcategory === subcategory);
@@ -385,35 +387,39 @@ function printTable(level, category, subcategory, commonName) {
           <tbody><tr><td>${subcategory}</td><td>${middle.total}</td><td>${middle.on_contract}</td><td>${middle.available}</td><td>${middle.service}</td></tr></tbody>
         `;
       } else if (level === 'common') {
-        const items = fetch(`/tab2/subcat_data?category=${encodeURIComponent(category)}&subcategory=${encodeURIComponent(subcategory)}&common_name=${encodeURIComponent(commonName)}&page=1`)
+        const total = data.common_name_map[category][subcategory].filter(cn => cn.name === commonName).length;
+        html += `
+          <thead><tr><th>Common Name</th><th>Total</th></tr></thead>
+          <tbody><tr><td>${commonName}</td><td>${total}</td></tr></tbody>
+        `;
+      } else {
+        fetch(`/tab2/subcat_data?category=${encodeURIComponent(category)}&subcategory=${encodeURIComponent(subcategory)}&common_name=${encodeURIComponent(commonName)}&page=1&${urlParams.toString()}`)
           .then(res => res.json())
           .then(data => {
-            const total = data.total_items;
             html += `
-              <thead><tr><th>Common Name</th><th>Total</th></tr></thead>
-              <tbody><tr><td>${commonName}</td><td>${total}</td></tr></tbody>
+              <thead><tr><th>Tag ID</th><th>Common Name</th><th>Status</th><th>Bin Location</th><th>Quality</th><th>Last Contract Num</th><th>Client Name</th><th>Scanned Date</th><th>Scanned By</th><th>Notes</th></tr></thead>
+              <tbody>
             `;
+            data.items.forEach(item => {
+              html += `
+                <tr>
+                  <td>${item.tag_id || 'N/A'}</td>
+                  <td>${item.common_name}</td>
+                  <td>${item.status || 'N/A'}</td>
+                  <td>${item.bin_location || 'N/A'}</td>
+                  <td>${item.quality || 'N/A'}</td>
+                  <td>${item.last_contract_num || 'N/A'}</td>
+                  <td>${item.client_name || 'N/A'}</td>
+                  <td>${item.date_last_scanned || 'N/A'}</td>
+                  <td>${item.last_scanned_by || 'N/A'}</td>
+                  <td>${item.notes || 'N/A'}</td>
+                </tr>
+              `;
+            });
+            html += '</tbody>';
             finishPrint(html);
           });
-        return; // Exit early to wait for async fetch
-      } else {
-        const tbody = document.getElementById(`grandchildTbody-${cat_key}`);
-        if (tbody) {
-          html += `
-            <thead><tr><th>Tag ID</th><th>Common Name</th><th>Status</th><th>Bin Location</th><th>Quality</th><th>Last Contract Num</th><th>Client Name</th><th>Scanned Date</th><th>Scanned By</th><th>Notes</th></tr></thead>
-            <tbody>
-          `;
-          tbody.querySelectorAll('tr').forEach(row => {
-            html += '<tr>';
-            row.querySelectorAll('td').forEach(cell => {
-              html += `<td>${cell.innerText}</td>`;
-            });
-            html += '</tr>';
-          });
-          html += '</tbody>';
-        } else {
-          html += '<thead><tr><th>No Items</th></tr></thead><tbody><tr><td>No items available</td></tr></tbody>';
-        }
+        return; // Exit early for async grandchild fetch
       }
 
       finishPrint(html);
@@ -534,20 +540,20 @@ function refreshTable() {
 
               const commonTbody = document.getElementById(`commonTable-${middle_idx}`).querySelector('tbody');
               if (expandedIds.includes(`common-${middle_idx}`)) {
-                const uniqueCommonNames = [...new Set(data.common_name_map[parent.category][middle.subcategory] || [])];
-                uniqueCommonNames.forEach((common, commonIndex) => {
+                const commonNames = data.common_name_map[parent.category][middle.subcategory] || [];
+                commonNames.forEach((common, commonIndex) => {
                   const common_idx = `${middle_idx}_${commonIndex + 1}`;
                   const commonRow = document.createElement('tr');
                   commonRow.innerHTML = `
                     <td><span class="expand-toggle" data-bs-toggle="collapse" data-bs-target="#child-${common_idx}">+</span></td>
-                    <td>${common}</td>
-                    <td>${data.common_name_map[parent.category][middle.subcategory].filter(cn => cn === common).length}</td>
-                    <td><button class="btn btn-sm btn-primary print-btn" data-level="common" data-category="${parent.category}" data-subcategory="${middle.subcategory}" data-common-name="${common}">Print</button></td>
+                    <td>${common.name}</td>
+                    <td>${common_name_map[parent.category][middle.subcategory]|selectattr('name', 'equalto', common.name)|map(attribute='count')|sum or 0}</td>
+                    <td><button class="btn btn-sm btn-primary print-btn" data-level="common" data-category="${parent.category}" data-subcategory="${middle.subcategory}" data-common-name="${common.name}">Print</button></td>
                   `;
                   const grandRow = document.createElement('tr');
                   grandRow.innerHTML = `
                     <td colspan="4" class="p-0">
-                      <div id="child-${common_idx}" class="collapse" data-common-name="${common}">
+                      <div id="child-${common_idx}" class="collapse" data-common-name="${common.name}">
                         <div id="loading-${common_idx}" class="text-center my-2" style="display: none;">
                           <div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div>
                         </div>
@@ -580,7 +586,7 @@ function refreshTable() {
                   commonTbody.appendChild(grandRow);
 
                   if (expandedIds.includes(`child-${common_idx}`)) {
-                    loadSubcatData(parent.category, middle.subcategory, common, 1, common_idx);
+                    loadSubcatData(parent.category, middle.subcategory, common.name, 1, common_idx);
                   }
                 });
               }
@@ -788,7 +794,7 @@ function updateWithNewData(newData) {
               commonData.items.forEach(item => {
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
-                  <td>${item.tag_id}</td>
+                  <td>${item.tag_id || 'N/A'}</td>
                   <td>${item.common_name}</td>
                   <td>${item.status || 'N/A'}</td>
                   <td>${item.bin_location || 'N/A'}</td>
