@@ -217,6 +217,8 @@ def subcat_data():
         page = int(request.args.get('page', 1))
         per_page = 20
 
+        logging.debug(f"Parameters received: category={category}, subcategory={subcategory}, common_name={common_name}, page={page}")
+
         rental_classes = [k for k, v in SUBCATEGORY_MAP.items() if v == subcategory and CATEGORY_MAP.get(k, 'Other') == category]
         if not rental_classes:
             logging.warning(f"No rental classes found for category: {category}, subcategory: {subcategory}")
@@ -225,6 +227,7 @@ def subcat_data():
         with DatabaseConnection() as conn:
             items = get_all_items(conn)
         items = [dict(row) for row in items]
+        logging.debug(f"Total items fetched from DB: {len(items)}")
 
         filter_common_name = request.args.get("common_name_filter", "").lower().strip()
         filter_tag_id = request.args.get("tag_id", "").lower().strip()
@@ -243,10 +246,19 @@ def subcat_data():
             filtered_items = [item for item in filtered_items if filter_last_contract in (item.get("last_contract_num") or "").lower()]
         if filter_status:
             filtered_items = [item for item in filtered_items if filter_status in (item.get("status") or "").lower()]
+        logging.debug(f"Items after global filters: {len(filtered_items)}")
 
         category_items = [item for item in filtered_items if categorize_item(item.get("rental_class_num")) == category]
+        logging.debug(f"Items after category filter ({category}): {len(category_items)}")
+
         subcat_items = [item for item in category_items if subcategorize_item(category, item.get("rental_class_num")) == subcategory]
-        common_items = [item for item in subcat_items if not common_name or item.get("common_name") == common_name]
+        logging.debug(f"Items after subcategory filter ({subcategory}): {len(subcat_items)}")
+
+        if common_name and common_name != "Unknown":
+            common_items = [item for item in subcat_items if item.get("common_name") == common_name]
+        else:
+            common_items = subcat_items
+        logging.debug(f"Items after common_name filter ({common_name}): {len(common_items)}")
 
         total_items = len(common_items)
         total_pages = (total_items + per_page - 1) // per_page
@@ -254,10 +266,9 @@ def subcat_data():
         start = (page - 1) * per_page
         end = start + per_page
         paginated_items = common_items[start:end]
+        logging.debug(f"Paginated items (page {page}): {len(paginated_items)}")
 
-        logging.debug(f"AJAX: Category: {category}, Subcategory: {subcategory}, Common Name: {common_name}, Total Items: {total_items}, Page: {page}")
-
-        return jsonify({
+        response = {
             "items": [{
                 "tag_id": item["tag_id"],
                 "common_name": item["common_name"],
@@ -273,7 +284,9 @@ def subcat_data():
             "total_items": total_items,
             "total_pages": total_pages,
             "current_page": page
-        })
+        }
+        logging.debug(f"Returning response: {response}")
+        return jsonify(response)
     except Exception as e:
         logging.error(f"Error in subcat_data: {e}")
         return jsonify({"error": str(e)}), 500
