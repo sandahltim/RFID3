@@ -348,14 +348,6 @@
         });
     }
     
-    // Manual test trigger to debug fetch
-    function testSubcatData() {
-      const category = "Rectangle Linen";
-      const subcategory = "60x120";
-      const commonName = "60x120 OCEAN BLUE LINEN";
-      loadSubcatData(category, subcategory, commonName, 1, "testKey");
-    }
-    
     function printTable(level, category, subcategory, commonName) {
       console.log(`Printing ${level}: ${category}, ${subcategory}, ${commonName}`);
       const urlParams = new URLSearchParams(window.location.search);
@@ -654,13 +646,13 @@
       const tbody = document.getElementById('parentTableBody');
       const categoryTotals = {};
       filteredItems.forEach(item => {
-        const cat = item.category || 'Other'; // Placeholder until server provides category
+        const cat = parent_data.find(p => p.category === categorize_item(item.rental_class_num))?.category || 'Other'; // Fallback
         if (!categoryTotals[cat]) categoryTotals[cat] = { total: 0, on_contract: 0, available: 0, service: 0, subcategories: {} };
         categoryTotals[cat].total++;
         if (["Delivered", "On Rent"].includes(item.status)) categoryTotals[cat].on_contract++;
         if (item.status === "Ready to Rent") categoryTotals[cat].available++;
         if (!["Delivered", "On Rent", "Ready to Rent"].includes(item.status)) categoryTotals[cat].service++;
-        const subcat = item.subcategory || 'Unspecified'; // Placeholder until server provides subcategory
+        const subcat = middle_map[cat]?.find(m => m.subcategory === subcategorize_item(cat, item.rental_class_num))?.subcategory || 'Unspecified';
         if (!categoryTotals[cat].subcategories[subcat]) categoryTotals[cat].subcategories[subcat] = { total: 0, on_contract: 0, available: 0, service: 0, common_names: {} };
         categoryTotals[cat].subcategories[subcat].total++;
         if (["Delivered", "On Rent"].includes(item.status)) categoryTotals[cat].subcategories[subcat].on_contract++;
@@ -691,7 +683,7 @@
           const middleRow = document.createElement('tr');
           middleRow.innerHTML = `
             <td colspan="7" class="p-0">
-              <div id="middle-${cat_key}" class="collapse" data-category="${category}">
+              <div id="middle-${cat_key}" class="collapse" data-category="${parent.category}">
                 <table class="table mb-0 middle-table" id="middleTable-${cat_key}">
                   <thead>
                     <tr>
@@ -816,22 +808,7 @@
     
                 const itemsTbody = document.getElementById(`grandchildTbody-${common_idx}`);
                 if (itemsTbody && itemsTbody.closest('.collapse').classList.contains('show')) {
-                  commonData.items.forEach(item => {
-                    const tr = document.createElement('tr');
-                    tr.innerHTML = `
-                      <td>${item.tag_id || 'N/A'}</td>
-                      <td>${item.common_name}</td>
-                      <td>${item.status || 'N/A'}</td>
-                      <td>${item.bin_location || 'N/A'}</td>
-                      <td>${item.quality || 'N/A'}</td>
-                      <td>${item.last_contract_num || 'N/A'}</td>
-                      <td>${item.client_name || 'N/A'}</td>
-                      <td>${item.date_last_scanned || 'N/A'}</td>
-                      <td>${item.last_scanned_by || 'N/A'}</td>
-                      <td>${item.notes || 'N/A'}</td>
-                    `;
-                    itemsTbody.appendChild(tr);
-                  });
+                  loadSubcatData(category, subcat, common, 1, common_idx); // Trigger fetch on expand
                 }
               });
             }
@@ -842,13 +819,6 @@
     
     document.addEventListener('DOMContentLoaded', () => {
       console.log("DOM Content Loaded - Tab 2");
-    
-      // Add a button to manually test the fetch
-      const testButton = document.createElement('button');
-      testButton.textContent = 'Test Subcat Data';
-      testButton.className = 'btn btn-secondary mb-3';
-      testButton.addEventListener('click', testSubcatData);
-      document.querySelector('.table-container').insertAdjacentElement('beforebegin', testButton);
     
       document.getElementById("parentTable").addEventListener('click', (e) => {
         const target = e.target;
