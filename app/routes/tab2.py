@@ -218,15 +218,17 @@ def subcat_data():
         rental_classes = [k for k, v in SUBCATEGORY_MAP.items() if v == subcategory and CATEGORY_MAP.get(k, 'Other') == category]
         if not rental_classes:
             logger.warning(f"No rental classes found for category: {category}, subcategory: {subcategory}")
-            return jsonify({'items': [], 'current_page': page, 'total_pages': 0, 'total_items': 0})
+            return jsonify({'items': [], 'current_page': page, 'total_pages': 0, 'total_items': 0, 'grouped_items': {}})
 
-        # Optimized query: filter rental_class_num first, limit joins
+        # Optimized query: filter rental_class_num and limit joins
         query = """
             SELECT im.tag_id, im.common_name, im.status, im.bin_location, im.quality,
                    im.last_contract_num, im.client_name, im.date_last_scanned, im.last_scanned_by,
                    it.notes
             FROM id_item_master im
-            LEFT JOIN id_transactions it ON im.tag_id = it.tag_id
+            LEFT JOIN id_transactions it ON im.tag_id = it.tag_id AND it.scan_date = (
+                SELECT MAX(scan_date) FROM id_transactions it2 WHERE it2.tag_id = im.tag_id
+            )
             WHERE im.rental_class_num IN %s
         """
         params = [tuple(rental_classes)]
@@ -257,6 +259,11 @@ def subcat_data():
             items = [dict(row) for row in cursor.fetchall()]
             logger.debug(f"Filtered {len(items)} items for category: {category}, subcategory: {subcategory}")
 
+            # Group items by common_name for aggregation and individual listing
+            grouped_items = defaultdict(list)
+            for item in items:
+                grouped_items[item['common_name']].append(item)
+
             total_items = len(items)
             total_pages = (total_items + per_page - 1) // per_page
             start = (page - 1) * per_page
@@ -267,7 +274,8 @@ def subcat_data():
                 'items': paginated_items,
                 'current_page': page,
                 'total_pages': max(total_pages, 1),
-                'total_items': total_items
+                'total_items': total_items,
+                'grouped_items': dict(grouped_items)  # Add grouped data for great-grandchild
             })
     except Exception as e:
         logger.error(f"Error in subcat_data route: {str(e)}")
