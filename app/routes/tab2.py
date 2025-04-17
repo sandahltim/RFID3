@@ -8,6 +8,16 @@ import logging
 tab2_bp = Blueprint("tab2_bp", __name__, url_prefix="/tab2")
 logging.basicConfig(level=logging.DEBUG, filename='/home/tim/test_rfidpi/sync.log')
 
+def get_all_items(conn):
+    query = """
+        SELECT im.tag_id, im.common_name, im.status, im.bin_location, im.quality,
+               im.last_contract_num, im.client_name, im.date_last_scanned, im.last_scanned_by,
+               im.rental_class_num, rt.item_type as rfid_item_type
+        FROM id_item_master im
+        LEFT JOIN id_rfidtag rt ON im.tag_id = rt.tag_id
+    """
+    return conn.execute(query).fetchall()
+
 def categorize_item(rental_class_id):
     try:
         return CATEGORY_MAP.get(int(rental_class_id or 0), 'Other')
@@ -32,19 +42,8 @@ def show_tab2():
     logging.debug("Loading /tab2/ endpoint")
     try:
         with DatabaseConnection() as conn:
-            items = conn.execute("""
-                SELECT im.*, rt.item_type as rfid_item_type
-                FROM id_item_master im
-                LEFT JOIN id_rfidtag rt ON im.tag_id = rt.tag_id
-            """).fetchall()
-            contracts = conn.execute("""
-                SELECT DISTINCT last_contract_num, client_name, MAX(date_last_scanned) as scan_date 
-                FROM id_item_master 
-                WHERE last_contract_num IS NOT NULL 
-                GROUP BY last_contract_num
-            """).fetchall()
+            items = get_all_items(conn)
         items = [dict(row) for row in items]
-        contract_map = {c["last_contract_num"]: {"client_name": c["client_name"], "scan_date": c["scan_date"]} for c in contracts}
 
         filter_common_name = request.args.get("common_name", "").lower().strip()
         filter_tag_id = request.args.get("tag_id", "").lower().strip()
@@ -70,7 +69,7 @@ def show_tab2():
             category_map[category].append(item)
 
         parent_data = []
-        sub_map = {}
+        middle_map = {}
         for category, item_list in category_map.items():
             total_amount = len(item_list)
             on_contract = sum(1 for item in item_list if item.get("status") in ["Delivered", "On Rent"])
@@ -82,8 +81,8 @@ def show_tab2():
                 subcategory = subcategorize_item(category, item.get("rental_class_num"))
                 subcategory_map[subcategory].append(item)
 
-            sub_map[category] = {
-                subcategory: {
+            middle_map[category] = [
+                {
                     "subcategory": subcategory,
                     "total": len(sub_items),
                     "on_contract": sum(1 for item in sub_items if item.get("status") in ["Delivered", "On Rent"]),
@@ -91,7 +90,7 @@ def show_tab2():
                     "service": len(sub_items) - sum(1 for item in sub_items if item.get("status") in ["Delivered", "On Rent", "Ready to Rent"])
                 }
                 for subcategory, sub_items in subcategory_map.items()
-            }
+            ]
 
             parent_data.append({
                 "category": category,
@@ -102,15 +101,14 @@ def show_tab2():
             })
 
         parent_data.sort(key=lambda x: x["category"])
+        for category in middle_map:
+            middle_map[category].sort(key=lambda x: x["subcategory"])
         logging.debug(f"Rendering tab2 with {len(parent_data)} categories, items fetched: {len(items)}")
-        for category in sub_map:
-            logging.debug(f"Category {category} has subcategories: {list(sub_map[category].keys())}")
 
         return render_template(
             "tab2.html",
             parent_data=parent_data,
-            sub_map=sub_map,
-            contract_map=contract_map,
+            middle_map=middle_map,
             filter_common_name=filter_common_name,
             filter_tag_id=filter_tag_id,
             filter_bin_location=filter_bin_location,
@@ -126,11 +124,7 @@ def tab2_data():
     logging.debug("Loading /tab2/data endpoint")
     try:
         with DatabaseConnection() as conn:
-            items = conn.execute("""
-                SELECT im.*, rt.item_type as rfid_item_type
-                FROM id_item_master im
-                LEFT JOIN id_rfidtag rt ON im.tag_id = rt.tag_id
-            """).fetchall()
+            items = get_all_items(conn)
         items = [dict(row) for row in items]
 
         filter_common_name = request.args.get("common_name", "").lower().strip()
@@ -157,7 +151,7 @@ def tab2_data():
             category_map[category].append(item)
 
         parent_data = []
-        sub_map = {}
+        middle_map = {}
         for category, item_list in category_map.items():
             total_amount = len(item_list)
             on_contract = sum(1 for item in item_list if item.get("status") in ["Delivered", "On Rent"])
@@ -169,8 +163,8 @@ def tab2_data():
                 subcategory = subcategorize_item(category, item.get("rental_class_num"))
                 subcategory_map[subcategory].append(item)
 
-            sub_map[category] = {
-                subcategory: {
+            middle_map[category] = [
+                {
                     "subcategory": subcategory,
                     "total": len(sub_items),
                     "on_contract": sum(1 for item in sub_items if item.get("status") in ["Delivered", "On Rent"]),
@@ -178,7 +172,7 @@ def tab2_data():
                     "service": len(sub_items) - sum(1 for item in sub_items if item.get("status") in ["Delivered", "On Rent", "Ready to Rent"])
                 }
                 for subcategory, sub_items in subcategory_map.items()
-            }
+            ]
 
             parent_data.append({
                 "category": category,
@@ -189,94 +183,83 @@ def tab2_data():
             })
 
         parent_data.sort(key=lambda x: x["category"])
+        for category in middle_map:
+            middle_map[category].sort(key=lambda x: x["subcategory"])
         logging.debug(f"Returning {len(parent_data)} categories for /tab2/data, items fetched: {len(items)}")
 
         return jsonify({
             "parent_data": parent_data,
-            "sub_map": sub_map
+            "middle_map": middle_map
         })
     except Exception as e:
         logging.error(f"Error in tab2_data: {e}")
         return jsonify({"error": str(e)}), 500
 
-@tab2_bp.route('/subcat_data')
+@tab2_bp.route("/subcat_data", methods=["GET"])
 def subcat_data():
+    logging.debug("Hit /tab2/subcat_data endpoint")
     try:
-        category = request.args.get('category', '')
-        subcategory = request.args.get('subcategory', '')
+        category = request.args.get('category')
+        subcategory = request.args.get('subcategory')
         page = int(request.args.get('page', 1))
-        per_page = 10
-
-        filters = {
-            'common_name': request.args.get('common_name', ''),
-            'tag_id': request.args.get('tag_id', ''),
-            'bin_location': request.args.get('bin_location', ''),
-            'last_contract_num': request.args.get('last_contract_num', ''),
-            'status': request.args.get('status', '')
-        }
+        per_page = 20
 
         rental_classes = [k for k, v in SUBCATEGORY_MAP.items() if v == subcategory and CATEGORY_MAP.get(k, 'Other') == category]
         if not rental_classes:
-            logger.warning(f"No rental classes found for category: {category}, subcategory: {subcategory}")
-            return jsonify({'items': [], 'current_page': page, 'total_pages': 0, 'total_items': 0, 'grouped_items': {}})
-
-        # Optimized query: filter rental_class_num and limit joins
-        query = """
-            SELECT im.tag_id, im.common_name, im.status, im.bin_location, im.quality,
-                   im.last_contract_num, im.client_name, im.date_last_scanned, im.last_scanned_by,
-                   it.notes
-            FROM id_item_master im
-            LEFT JOIN id_transactions it ON im.tag_id = it.tag_id AND it.scan_date = (
-                SELECT MAX(scan_date) FROM id_transactions it2 WHERE it2.tag_id = im.tag_id
-            )
-            WHERE im.rental_class_num IN %s
-        """
-        params = [tuple(rental_classes)]
-
-        conditions = []
-        if filters['common_name']:
-            conditions.append("im.common_name LIKE ?")
-            params.append(f"%{filters['common_name']}%")
-        if filters['tag_id']:
-            conditions.append("im.tag_id LIKE ?")
-            params.append(f"%{filters['tag_id']}%")
-        if filters['bin_location']:
-            conditions.append("im.bin_location LIKE ?")
-            params.append(f"%{filters['bin_location']}%")
-        if filters['last_contract_num']:
-            conditions.append("im.last_contract_num LIKE ?")
-            params.append(f"%{filters['last_contract_num']}%")
-        if filters['status']:
-            conditions.append("im.status = ?")
-            params.append(filters['status'])
-
-        if conditions:
-            query += " AND " + " AND ".join(conditions)
+            logging.warning(f"No rental classes found for category: {category}, subcategory: {subcategory}")
+            return jsonify({'items': [], 'current_page': page, 'total_pages': 0, 'total_items': 0})
 
         with DatabaseConnection() as conn:
-            cursor = conn.cursor()
-            cursor.execute(query, params)
-            items = [dict(row) for row in cursor.fetchall()]
-            logger.debug(f"Filtered {len(items)} items for category: {category}, subcategory: {subcategory}")
+            items = get_all_items(conn)
+        items = [dict(row) for row in items]
 
-            # Group items by common_name for aggregation and individual listing
-            grouped_items = defaultdict(list)
-            for item in items:
-                grouped_items[item['common_name']].append(item)
+        filter_common_name = request.args.get("common_name", "").lower().strip()
+        filter_tag_id = request.args.get("tag_id", "").lower().strip()
+        filter_bin_location = request.args.get("bin_location", "").lower().strip()
+        filter_last_contract = request.args.get("last_contract_num", "").lower().strip()
+        filter_status = request.args.get("status", "").lower().strip()
 
-            total_items = len(items)
-            total_pages = (total_items + per_page - 1) // per_page
-            start = (page - 1) * per_page
-            end = start + per_page
-            paginated_items = items[start:end]
+        filtered_items = items
+        if filter_common_name:
+            filtered_items = [item for item in filtered_items if filter_common_name in (item.get("common_name") or "").lower()]
+        if filter_tag_id:
+            filtered_items = [item for item in filtered_items if filter_tag_id in (item.get("tag_id") or "").lower()]
+        if filter_bin_location:
+            filtered_items = [item for item in filtered_items if filter_bin_location in (item.get("bin_location") or "").lower()]
+        if filter_last_contract:
+            filtered_items = [item for item in filtered_items if filter_last_contract in (item.get("last_contract_num") or "").lower()]
+        if filter_status:
+            filtered_items = [item for item in filtered_items if filter_status in (item.get("status") or "").lower()]
 
-            return jsonify({
-                'items': paginated_items,
-                'current_page': page,
-                'total_pages': max(total_pages, 1),
-                'total_items': total_items,
-                'grouped_items': dict(grouped_items)  # Add grouped data for great-grandchild
-            })
+        category_items = [item for item in filtered_items if categorize_item(item.get("rental_class_num")) == category]
+        subcat_items = [item for item in category_items if subcategorize_item(category, item.get("rental_class_num")) == subcategory]
+
+        total_items = len(subcat_items)
+        total_pages = (total_items + per_page - 1) // per_page
+        page = max(1, min(page, total_pages))
+        start = (page - 1) * per_page
+        end = start + per_page
+        paginated_items = subcat_items[start:end]
+
+        logging.debug(f"AJAX: Category: {category}, Subcategory: {subcategory}, Total Items: {total_items}, Page: {page}")
+
+        return jsonify({
+            "items": [{
+                "tag_id": item["tag_id"],
+                "common_name": item["common_name"],
+                "status": item["status"],
+                "bin_location": item["bin_location"],
+                "quality": item["quality"],
+                "last_contract_num": item["last_contract_num"],
+                "client_name": item["client_name"],
+                "date_last_scanned": item["date_last_scanned"],
+                "last_scanned_by": item["last_scanned_by"],
+                "notes": item.get("notes", "N/A")
+            } for item in paginated_items],
+            "total_items": total_items,
+            "total_pages": total_pages,
+            "current_page": page
+        })
     except Exception as e:
-        logger.error(f"Error in subcat_data route: {str(e)}")
+        logging.error(f"Error in subcat_data: {e}")
         return jsonify({"error": str(e)}), 500
