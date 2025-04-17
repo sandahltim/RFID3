@@ -33,6 +33,7 @@
         <th class="sortable" data-col-name="on_contract">On Contract</th>
         <th class="sortable" data-col-name="available">Available</th>
         <th class="sortable" data-col-name="service">Service</th>
+        <th>Actions</th>
       </tr>
     </thead>
     <tbody id="parentTableBody">
@@ -45,9 +46,10 @@
         <td>{{ parent.on_contract }}</td>
         <td>{{ parent.available }}</td>
         <td>{{ parent.service }}</td>
+        <td><button class="btn btn-sm btn-primary print-btn" data-level="parent" data-category="{{ parent.category }}">Print</button></td>
       </tr>
       <tr>
-        <td colspan="6" class="p-0">
+        <td colspan="7" class="p-0">
           <div id="middle-{{ cat_key }}" class="collapse" data-category="{{ parent.category }}">
             {% if middle_map[parent.category] %}
             <table class="table mb-0 middle-table" id="middleTable-{{ cat_key }}">
@@ -59,49 +61,78 @@
                   <th class="sortable" data-col-name="on_contract">On Contract</th>
                   <th class="sortable" data-col-name="available">Available</th>
                   <th class="sortable" data-col-name="service">Service</th>
+                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {% for middle in middle_map[parent.category] %}
                 {% set middle_idx = cat_key ~ '_' ~ loop.index %}
                 <tr>
-                  <td><span class="expand-toggle" data-bs-toggle="collapse" data-bs-target="#child-{{ middle_idx }}">+</span></td>
+                  <td><span class="expand-toggle" data-bs-toggle="collapse" data-bs-target="#common-{{ middle_idx }}">+</span></td>
                   <td>{{ middle.subcategory }}</td>
                   <td>{{ middle.total }}</td>
                   <td>{{ middle.on_contract }}</td>
                   <td>{{ middle.available }}</td>
                   <td>{{ middle.service }}</td>
+                  <td><button class="btn btn-sm btn-primary print-btn" data-level="middle" data-category="{{ parent.category }}" data-subcategory="{{ middle.subcategory }}">Print</button></td>
                 </tr>
                 <tr>
-                  <td colspan="6" class="p-0">
-                    <div id="child-{{ middle_idx }}" class="collapse" data-subcategory="{{ middle.subcategory }}">
-                      <div id="loading-{{ middle_idx }}" class="text-center my-2" style="display: none;">
-                        <div class="spinner-border text-primary" role="status">
-                          <span class="visually-hidden">Loading...</span>
-                        </div>
-                      </div>
-                      <nav aria-label="Item navigation" class="mb-2 mx-2" id="pagination-{{ middle_idx }}">
-                        <ul class="pagination pagination-sm justify-content-center flex-wrap"></ul>
-                      </nav>
-                      <div class="grandchild-table-container">
-                        <table class="table mb-0 grandchild-table" id="grandchildTable-{{ middle_idx }}">
-                          <thead>
-                            <tr>
-                              <th class="sortable" data-col-name="tag_id">Tag ID</th>
-                              <th class="sortable" data-col-name="common_name">Common Name</th>
-                              <th class="sortable" data-col-name="status">Status</th>
-                              <th class="sortable" data-col-name="bin_location">Bin Location</th>
-                              <th class="sortable" data-col-name="quality">Quality</th>
-                              <th class="sortable" data-col-name="last_contract_num">Last Contract Num</th>
-                              <th class="sortable" data-col-name="client_name">Client Name</th>
-                              <th class="sortable" data-col-name="date_last_scanned">Scanned Date</th>
-                              <th class="sortable" data-col-name="last_scanned_by">Scanned By</th>
-                              <th class="sortable" data-col-name="notes">Notes</th>
-                            </tr>
-                          </thead>
-                          <tbody id="grandchildTbody-{{ middle_idx }}"></tbody>
-                        </table>
-                      </div>
+                  <td colspan="7" class="p-0">
+                    <div id="common-{{ middle_idx }}" class="collapse" data-subcategory="{{ middle.subcategory }}">
+                      <table class="table mb-0 common-table" id="commonTable-{{ middle_idx }}">
+                        <thead>
+                          <tr>
+                            <th style="width: 50px;"></th>
+                            <th class="sortable" data-col-name="common_name">Common Name</th>
+                            <th class="sortable" data-col-name="total">Total</th>
+                            <th>Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {% for common in middle_map[parent.category]|selectattr('subcategory', 'equalto', middle.subcategory)|list|map(attribute='common_name')|unique|list %}
+                          {% set common_idx = middle_idx ~ '_' ~ loop.index %}
+                          <tr>
+                            <td><span class="expand-toggle" data-bs-toggle="collapse" data-bs-target="#child-{{ common_idx }}">+</span></td>
+                            <td>{{ common }}</td>
+                            <td>{{ middle_map[parent.category]|selectattr('subcategory', 'equalto', middle.subcategory)|list|selectattr('common_name', 'equalto', common)|list|length }}</td>
+                            <td><button class="btn btn-sm btn-primary print-btn" data-level="common" data-category="{{ parent.category }}" data-subcategory="{{ middle.subcategory }}" data-common-name="{{ common }}">Print</button></td>
+                          </tr>
+                          <tr>
+                            <td colspan="4" class="p-0">
+                              <div id="child-{{ common_idx }}" class="collapse" data-common-name="{{ common }}">
+                                <div id="loading-{{ common_idx }}" class="text-center my-2" style="display: none;">
+                                  <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                  </div>
+                                </div>
+                                <nav aria-label="Item navigation" class="mb-2 mx-2" id="pagination-{{ common_idx }}">
+                                  <ul class="pagination pagination-sm justify-content-center flex-wrap"></ul>
+                                </nav>
+                                <div class="grandchild-table-container">
+                                  <table class="table mb-0 grandchild-table" id="grandchildTable-{{ common_idx }}">
+                                    <thead>
+                                      <tr>
+                                        <th class="sortable" data-col-name="tag_id">Tag ID</th>
+                                        <th class="sortable" data-col-name="common_name">Common Name</th>
+                                        <th class="sortable" data-col-name="status">Status</th>
+                                        <th class="sortable" data-col-name="bin_location">Bin Location</th>
+                                        <th class="sortable" data-col-name="quality">Quality</th>
+                                        <th class="sortable" data-col-name="last_contract_num">Last Contract Num</th>
+                                        <th class="sortable" data-col-name="client_name">Client Name</th>
+                                        <th class="sortable" data-col-name="date_last_scanned">Scanned Date</th>
+                                        <th class="sortable" data-col-name="last_scanned_by">Scanned By</th>
+                                        <th class="sortable" data-col-name="notes">Notes</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody id="grandchildTbody-{{ common_idx }}"></tbody>
+                                  </table>
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                          {% endfor %}
+                        </tbody>
+                      </table>
                     </div>
                   </td>
                 </tr>
@@ -161,8 +192,8 @@ function sortTable(tableEl, colName) {
     const pairs = [];
     for (let i = 0; i < rows.length; i += 2) {
       const middleRow = rows[i];
-      const grandRow = rows[i + 1] || null;
-      if (middleRow) pairs.push({ middle: middleRow, grand: grandRow });
+      const commonRow = rows[i + 1] || null;
+      if (middleRow) pairs.push({ middle: middleRow, common: commonRow });
     }
     pairs.sort((a, b) => {
       const cellA = a.middle.cells[colIndex]?.innerText.trim() || "";
@@ -175,6 +206,27 @@ function sortTable(tableEl, colName) {
     tbody.innerHTML = "";
     pairs.forEach(pair => {
       tbody.appendChild(pair.middle);
+      if (pair.common) tbody.appendChild(pair.common);
+    });
+  } else if (tableEl.classList.contains("common-table")) {
+    const rows = Array.from(tbody.children);
+    const pairs = [];
+    for (let i = 0; i < rows.length; i += 2) {
+      const commonRow = rows[i];
+      const grandRow = rows[i + 1] || null;
+      if (commonRow) pairs.push({ common: commonRow, grand: grandRow });
+    }
+    pairs.sort((a, b) => {
+      const cellA = a.common.cells[colIndex]?.innerText.trim() || "";
+      const cellB = b.common.cells[colIndex]?.innerText.trim() || "";
+      const numA = parseFloat(cellA.replace(/[^0-9.\-]/g, ""));
+      const numB = parseFloat(cellB.replace(/[^0-9.\-]/g, ""));
+      if (!isNaN(numA) && !isNaN(numB)) return asc ? numA - numB : numB - numA;
+      return asc ? cellA.localeCompare(cellB) : cellB.localeCompare(cellA);
+    });
+    tbody.innerHTML = "";
+    pairs.forEach(pair => {
+      tbody.appendChild(pair.common);
       if (pair.grand) tbody.appendChild(pair.grand);
     });
   } else {
@@ -192,8 +244,8 @@ function sortTable(tableEl, colName) {
   }
 }
 
-function loadSubcatData(category, subcategory, page, catKey) {
-  console.log(`Loading: Category: ${category}, Subcategory: ${subcategory}, Page: ${page}, CatKey: ${catKey}`);
+function loadSubcatData(category, subcategory, commonName, page, catKey) {
+  console.log(`Loading: Category: ${category}, Subcategory: ${subcategory}, Common Name: ${commonName}, Page: ${page}, CatKey: ${catKey}`);
   const loading = document.getElementById(`loading-${catKey}`);
   if (loading) loading.style.display = 'block';
 
@@ -201,8 +253,9 @@ function loadSubcatData(category, subcategory, page, catKey) {
   const params = {
     category: category,
     subcategory: subcategory,
+    common_name: commonName,
     page: page,
-    common_name: urlParams.get('common_name') || '',
+    common_name_filter: urlParams.get('common_name') || '',
     tag_id: urlParams.get('tag_id') || '',
     bin_location: urlParams.get('bin_location') || '',
     last_contract_num: urlParams.get('last_contract_num') || '',
@@ -271,7 +324,7 @@ function loadSubcatData(category, subcategory, page, catKey) {
             link.addEventListener('click', (e) => {
               e.preventDefault();
               const newPage = parseInt(link.getAttribute('data-page'));
-              if (!isNaN(newPage)) loadSubcatData(category, subcategory, newPage, catKey);
+              if (!isNaN(newPage)) loadSubcatData(category, subcategory, commonName, newPage, catKey);
             });
           });
         }
@@ -286,6 +339,79 @@ function loadSubcatData(category, subcategory, page, catKey) {
       }
       if (loading) loading.style.display = 'none';
     });
+}
+
+function printTable(level, category, subcategory, commonName) {
+  let html = `
+    <html>
+    <head>
+      <title>Tab 2 Print - ${level === 'parent' ? category : level === 'middle' ? `${category} - ${subcategory}` : level === 'common' ? `${category} - ${subcategory} - ${commonName}` : 'Items'}</title>
+      <style>
+        @page { size: A4; margin: 20mm; }
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; }
+        .header { display: flex; justify-content: space-between; margin-bottom: 20px; }
+        .title { font-size: 18px; }
+        .company { font-size: 14px; text-align: right; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+        th, td { border: 1px solid black; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        .signature { margin-top: 40px; }
+        .signature-line { width: 300px; border-bottom: 1px solid black; margin-bottom: 10px; }
+      </style>
+    </head>
+    <body>
+      <div class="header">
+        <div class="title">Broadway Tent & Event - ${level} Print</div>
+        <div class="company">Broadway Tent and Event</div>
+      </div>
+      <table>
+  `;
+
+  if (level === 'parent') {
+    html += `
+        <thead><tr><th>Category</th><th>Total Amount</th><th>On Contract</th><th>Available</th><th>Service</th></tr></thead>
+        <tbody><tr><td>${category}</td><td>${parent_data|selectattr('category', 'equalto', category)|first.total_amount}</td><td>${parent_data|selectattr('category', 'equalto', category)|first.on_contract}</td><td>${parent_data|selectattr('category', 'equalto', category)|first.available}</td><td>${parent_data|selectattr('category', 'equalto', category)|first.service}</td></tr></tbody>
+    `;
+  } else if (level === 'middle') {
+    html += `
+        <thead><tr><th>Subcategory</th><th>Total</th><th>On Contract</th><th>Available</th><th>Service</th></tr></thead>
+        <tbody><tr><td>${subcategory}</td><td>${middle_map[category]|selectattr('subcategory', 'equalto', subcategory)|first.total}</td><td>${middle_map[category]|selectattr('subcategory', 'equalto', subcategory)|first.on_contract}</td><td>${middle_map[category]|selectattr('subcategory', 'equalto', subcategory)|first.available}</td><td>${middle_map[category]|selectattr('subcategory', 'equalto', subcategory)|first.service}</td></tr></tbody>
+    `;
+  } else if (level === 'common') {
+    html += `
+        <thead><tr><th>Common Name</th><th>Total</th></tr></thead>
+        <tbody><tr><td>${commonName}</td><td>${middle_map[category]|selectattr('subcategory', 'equalto', subcategory)|list|selectattr('common_name', 'equalto', commonName)|list|length}</td></tr></tbody>
+    `;
+  } else { // Grandchild
+    const tbody = document.getElementById(`grandchildTbody-${cat_key}`).querySelector('tbody');
+    html += '<thead><tr><th>Tag ID</th><th>Common Name</th><th>Status</th><th>Bin Location</th><th>Quality</th><th>Last Contract Num</th><th>Client Name</th><th>Scanned Date</th><th>Scanned By</th><th>Notes</th></tr></thead><tbody>';
+    tbody.querySelectorAll('tr').forEach(row => {
+      html += '<tr>';
+      row.querySelectorAll('td').forEach(cell => {
+        html += `<td>${cell.innerText}</td>`;
+      });
+      html += '</tr>';
+    });
+    html += '</tbody>';
+  }
+
+  html += `
+      </table>
+      <div class="signature">
+        <div class="signature-line"></div>
+        <p>Signature</p>
+        <div class="signature-line"></div>
+        <p>Date</p>
+      </div>
+    </body>
+    </html>
+  `;
+
+  const printWindow = window.open('', '_blank');
+  printWindow.document.write(html);
+  printWindow.document.close();
+  printWindow.focus();
+  printWindow.print();
 }
 
 function refreshTable() {
@@ -315,10 +441,11 @@ function refreshTable() {
             <td>${parent.on_contract}</td>
             <td>${parent.available}</td>
             <td>${parent.service}</td>
+            <td><button class="btn btn-sm btn-primary print-btn" data-level="parent" data-category="${parent.category}">Print</button></td>
           `;
           const middleRow = document.createElement('tr');
           middleRow.innerHTML = `
-            <td colspan="6" class="p-0">
+            <td colspan="7" class="p-0">
               <div id="middle-${cat_key}" class="collapse" data-category="${parent.category}">
                 <table class="table mb-0 middle-table" id="middleTable-${cat_key}">
                   <thead>
@@ -329,6 +456,7 @@ function refreshTable() {
                       <th class="sortable" data-col-name="on_contract">On Contract</th>
                       <th class="sortable" data-col-name="available">Available</th>
                       <th class="sortable" data-col-name="service">Service</th>
+                      <th>Actions</th>
                     </tr>
                   </thead>
                   <tbody></tbody>
@@ -345,50 +473,86 @@ function refreshTable() {
               const middle_idx = `${cat_key}_${index + 1}`;
               const middleRow = document.createElement('tr');
               middleRow.innerHTML = `
-                <td><span class="expand-toggle" data-bs-toggle="collapse" data-bs-target="#child-${middle_idx}">+</span></td>
+                <td><span class="expand-toggle" data-bs-toggle="collapse" data-bs-target="#common-${middle_idx}">+</span></td>
                 <td>${middle.subcategory}</td>
                 <td>${middle.total}</td>
                 <td>${middle.on_contract}</td>
                 <td>${middle.available}</td>
                 <td>${middle.service}</td>
+                <td><button class="btn btn-sm btn-primary print-btn" data-level="middle" data-category="${parent.category}" data-subcategory="${middle.subcategory}">Print</button></td>
               `;
-              const grandRow = document.createElement('tr');
-              grandRow.innerHTML = `
-                <td colspan="6" class="p-0">
-                  <div id="child-${middle_idx}" class="collapse" data-subcategory="${middle.subcategory}">
-                    <div id="loading-${middle_idx}" class="text-center my-2" style="display: none;">
-                      <div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div>
-                    </div>
-                    <nav aria-label="Item navigation" class="mb-2 mx-2" id="pagination-${middle_idx}">
-                      <ul class="pagination pagination-sm justify-content-center flex-wrap"></ul>
-                    </nav>
-                    <div class="grandchild-table-container">
-                      <table class="table mb-0 grandchild-table" id="grandchildTable-${middle_idx}">
-                        <thead>
-                          <tr>
-                            <th class="sortable" data-col-name="tag_id">Tag ID</th>
-                            <th class="sortable" data-col-name="common_name">Common Name</th>
-                            <th class="sortable" data-col-name="status">Status</th>
-                            <th class="sortable" data-col-name="bin_location">Bin Location</th>
-                            <th class="sortable" data-col-name="quality">Quality</th>
-                            <th class="sortable" data-col-name="last_contract_num">Last Contract Num</th>
-                            <th class="sortable" data-col-name="client_name">Client Name</th>
-                            <th class="sortable" data-col-name="date_last_scanned">Scanned Date</th>
-                            <th class="sortable" data-col-name="last_scanned_by">Scanned By</th>
-                            <th class="sortable" data-col-name="notes">Notes</th>
-                          </tr>
-                        </thead>
-                        <tbody id="grandchildTbody-${middle_idx}"></tbody>
-                      </table>
-                    </div>
+              const commonRow = document.createElement('tr');
+              commonRow.innerHTML = `
+                <td colspan="7" class="p-0">
+                  <div id="common-${middle_idx}" class="collapse" data-subcategory="${middle.subcategory}">
+                    <table class="table mb-0 common-table" id="commonTable-${middle_idx}">
+                      <thead>
+                        <tr>
+                          <th style="width: 50px;"></th>
+                          <th class="sortable" data-col-name="common_name">Common Name</th>
+                          <th class="sortable" data-col-name="total">Total</th>
+                          <th>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody></tbody>
+                    </table>
                   </div>
                 </td>
               `;
               middleTbody.appendChild(middleRow);
-              middleTbody.appendChild(grandRow);
+              middleTbody.appendChild(commonRow);
 
-              if (expandedIds.includes(`child-${middle_idx}`)) {
-                loadSubcatData(parent.category, middle.subcategory, 1, middle_idx);
+              const commonTbody = document.getElementById(`commonTable-${middle_idx}`).querySelector('tbody');
+              if (expandedIds.includes(`common-${middle_idx}`)) {
+                const uniqueCommonNames = [...new Set(data.middle_map[parent.category].filter(m => m.subcategory === middle.subcategory).map(m => m.common_name || 'Unknown'))];
+                uniqueCommonNames.forEach((common, commonIndex) => {
+                  const common_idx = `${middle_idx}_${commonIndex + 1}`;
+                  const commonRow = document.createElement('tr');
+                  commonRow.innerHTML = `
+                    <td><span class="expand-toggle" data-bs-toggle="collapse" data-bs-target="#child-${common_idx}">+</span></td>
+                    <td>${common}</td>
+                    <td>${data.middle_map[parent.category].filter(m => m.subcategory === middle.subcategory && m.common_name === common).length}</td>
+                    <td><button class="btn btn-sm btn-primary print-btn" data-level="common" data-category="${parent.category}" data-subcategory="${middle.subcategory}" data-common-name="${common}">Print</button></td>
+                  `;
+                  const grandRow = document.createElement('tr');
+                  grandRow.innerHTML = `
+                    <td colspan="4" class="p-0">
+                      <div id="child-${common_idx}" class="collapse" data-common-name="${common}">
+                        <div id="loading-${common_idx}" class="text-center my-2" style="display: none;">
+                          <div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div>
+                        </div>
+                        <nav aria-label="Item navigation" class="mb-2 mx-2" id="pagination-${common_idx}">
+                          <ul class="pagination pagination-sm justify-content-center flex-wrap"></ul>
+                        </nav>
+                        <div class="grandchild-table-container">
+                          <table class="table mb-0 grandchild-table" id="grandchildTable-${common_idx}">
+                            <thead>
+                              <tr>
+                                <th class="sortable" data-col-name="tag_id">Tag ID</th>
+                                <th class="sortable" data-col-name="common_name">Common Name</th>
+                                <th class="sortable" data-col-name="status">Status</th>
+                                <th class="sortable" data-col-name="bin_location">Bin Location</th>
+                                <th class="sortable" data-col-name="quality">Quality</th>
+                                <th class="sortable" data-col-name="last_contract_num">Last Contract Num</th>
+                                <th class="sortable" data-col-name="client_name">Client Name</th>
+                                <th class="sortable" data-col-name="date_last_scanned">Scanned Date</th>
+                                <th class="sortable" data-col-name="last_scanned_by">Scanned By</th>
+                                <th class="sortable" data-col-name="notes">Notes</th>
+                              </tr>
+                            </thead>
+                            <tbody id="grandchildTbody-${common_idx}"></tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </td>
+                  `;
+                  commonTbody.appendChild(commonRow);
+                  commonTbody.appendChild(grandRow);
+
+                  if (expandedIds.includes(`child-${common_idx}`)) {
+                    loadSubcatData(parent.category, middle.subcategory, common, 1, common_idx);
+                  }
+                });
               }
             });
           }
@@ -436,12 +600,15 @@ function updateWithNewData(newData) {
     if (item.status === "Ready to Rent") categoryTotals[cat].available++;
     if (!["Delivered", "On Rent", "Ready to Rent"].includes(item.status)) categoryTotals[cat].service++;
     const subcat = subcategorizeItem(cat, item.rental_class_num);
-    if (!categoryTotals[cat].subcategories[subcat]) categoryTotals[cat].subcategories[subcat] = { total: 0, on_contract: 0, available: 0, service: 0, items: [] };
+    if (!categoryTotals[cat].subcategories[subcat]) categoryTotals[cat].subcategories[subcat] = { total: 0, on_contract: 0, available: 0, service: 0, common_names: {} };
     categoryTotals[cat].subcategories[subcat].total++;
     if (["Delivered", "On Rent"].includes(item.status)) categoryTotals[cat].subcategories[subcat].on_contract++;
     if (item.status === "Ready to Rent") categoryTotals[cat].subcategories[subcat].available++;
     if (!["Delivered", "On Rent", "Ready to Rent"].includes(item.status)) categoryTotals[cat].subcategories[subcat].service++;
-    categoryTotals[cat].subcategories[subcat].items.push(item);
+    const common = item.common_name;
+    if (!categoryTotals[cat].subcategories[subcat].common_names[common]) categoryTotals[cat].subcategories[subcat].common_names[common] = { total: 0, items: [] };
+    categoryTotals[cat].subcategories[subcat].common_names[common].total++;
+    categoryTotals[cat].subcategories[subcat].common_names[common].items.push(item);
   });
 
   Object.entries(categoryTotals).forEach(([category, data]) => {
@@ -458,10 +625,11 @@ function updateWithNewData(newData) {
         <td>${data.on_contract}</td>
         <td>${data.available}</td>
         <td>${data.service}</td>
+        <td><button class="btn btn-sm btn-primary print-btn" data-level="parent" data-category="${category}">Print</button></td>
       `;
       const middleRow = document.createElement('tr');
       middleRow.innerHTML = `
-        <td colspan="6" class="p-0">
+        <td colspan="7" class="p-0">
           <div id="middle-${cat_key}" class="collapse" data-category="${category}">
             <table class="table mb-0 middle-table" id="middleTable-${cat_key}">
               <thead>
@@ -472,6 +640,7 @@ function updateWithNewData(newData) {
                   <th class="sortable" data-col-name="on_contract">On Contract</th>
                   <th class="sortable" data-col-name="available">Available</th>
                   <th class="sortable" data-col-name="service">Service</th>
+                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody></tbody>
@@ -497,47 +666,34 @@ function updateWithNewData(newData) {
         if (!middleRow) {
           middleRow = document.createElement('tr');
           middleRow.innerHTML = `
-            <td><span class="expand-toggle" data-bs-toggle="collapse" data-bs-target="#child-${middle_idx}">+</span></td>
+            <td><span class="expand-toggle" data-bs-toggle="collapse" data-bs-target="#common-${middle_idx}">+</span></td>
             <td>${subcat}</td>
             <td>${subData.total}</td>
             <td>${subData.on_contract}</td>
             <td>${subData.available}</td>
             <td>${subData.service}</td>
+            <td><button class="btn btn-sm btn-primary print-btn" data-level="middle" data-category="${category}" data-subcategory="${subcat}">Print</button></td>
           `;
-          const grandRow = document.createElement('tr');
-          grandRow.innerHTML = `
-            <td colspan="6" class="p-0">
-              <div id="child-${middle_idx}" class="collapse" data-subcategory="${subcat}">
-                <div id="loading-${middle_idx}" class="text-center my-2" style="display: none;">
-                  <div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div>
-                </div>
-                <nav aria-label="Item navigation" class="mb-2 mx-2" id="pagination-${middle_idx}">
-                  <ul class="pagination pagination-sm justify-content-center flex-wrap"></ul>
-                </nav>
-                <div class="grandchild-table-container">
-                  <table class="table mb-0 grandchild-table" id="grandchildTable-${middle_idx}">
-                    <thead>
-                      <tr>
-                        <th class="sortable" data-col-name="tag_id">Tag ID</th>
-                        <th class="sortable" data-col-name="common_name">Common Name</th>
-                        <th class="sortable" data-col-name="status">Status</th>
-                        <th class="sortable" data-col-name="bin_location">Bin Location</th>
-                        <th class="sortable" data-col-name="quality">Quality</th>
-                        <th class="sortable" data-col-name="last_contract_num">Last Contract Num</th>
-                        <th class="sortable" data-col-name="client_name">Client Name</th>
-                        <th class="sortable" data-col-name="date_last_scanned">Scanned Date</th>
-                        <th class="sortable" data-col-name="last_scanned_by">Scanned By</th>
-                        <th class="sortable" data-col-name="notes">Notes</th>
-                      </tr>
-                    </thead>
-                    <tbody id="grandchildTbody-${middle_idx}"></tbody>
-                  </table>
-                </div>
+          const commonRow = document.createElement('tr');
+          commonRow.innerHTML = `
+            <td colspan="7" class="p-0">
+              <div id="common-${middle_idx}" class="collapse" data-subcategory="${subcat}">
+                <table class="table mb-0 common-table" id="commonTable-${middle_idx}">
+                  <thead>
+                    <tr>
+                      <th style="width: 50px;"></th>
+                      <th class="sortable" data-col-name="common_name">Common Name</th>
+                      <th class="sortable" data-col-name="total">Total</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody></tbody>
+                </table>
               </div>
             </td>
           `;
           middleTbody.appendChild(middleRow);
-          middleTbody.appendChild(grandRow);
+          middleTbody.appendChild(commonRow);
         } else {
           middleRow.cells[2].innerText = subData.total;
           middleRow.cells[3].innerText = subData.on_contract;
@@ -545,23 +701,77 @@ function updateWithNewData(newData) {
           middleRow.cells[5].innerText = subData.service;
         }
 
-        const grandTbody = document.getElementById(`grandchildTbody-${middle_idx}`);
-        if (grandTbody && grandTbody.closest('.collapse').classList.contains('show')) {
-          subData.items.forEach(item => {
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-              <td>${item.tag_id}</td>
-              <td>${item.common_name}</td>
-              <td>${item.status || 'N/A'}</td>
-              <td>${item.bin_location || 'N/A'}</td>
-              <td>${item.quality || 'N/A'}</td>
-              <td>${item.last_contract_num || 'N/A'}</td>
-              <td>${item.client_name || 'N/A'}</td>
-              <td>${item.date_last_scanned || 'N/A'}</td>
-              <td>${item.last_scanned_by || 'N/A'}</td>
-              <td>${item.notes || 'N/A'}</td>
-            `;
-            grandTbody.appendChild(tr);
+        const commonTbody = document.getElementById(`commonTable-${middle_idx}`).querySelector('tbody');
+        if (commonTbody.closest('.collapse').classList.contains('show')) {
+          Object.entries(subData.common_names).forEach(([common, commonData], commonIndex) => {
+            let commonRow = Array.from(commonTbody.querySelectorAll('tr'))
+              .find(row => row.cells[1]?.innerText === common);
+            const common_idx = `${middle_idx}_${commonIndex + 1}`;
+            if (!commonRow) {
+              commonRow = document.createElement('tr');
+              commonRow.innerHTML = `
+                <td><span class="expand-toggle" data-bs-toggle="collapse" data-bs-target="#child-${common_idx}">+</span></td>
+                <td>${common}</td>
+                <td>${commonData.total}</td>
+                <td><button class="btn btn-sm btn-primary print-btn" data-level="common" data-category="${category}" data-subcategory="${subcat}" data-common-name="${common}">Print</button></td>
+              `;
+              const grandRow = document.createElement('tr');
+              grandRow.innerHTML = `
+                <td colspan="4" class="p-0">
+                  <div id="child-${common_idx}" class="collapse" data-common-name="${common}">
+                    <div id="loading-${common_idx}" class="text-center my-2" style="display: none;">
+                      <div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div>
+                    </div>
+                    <nav aria-label="Item navigation" class="mb-2 mx-2" id="pagination-${common_idx}">
+                      <ul class="pagination pagination-sm justify-content-center flex-wrap"></ul>
+                    </nav>
+                    <div class="grandchild-table-container">
+                      <table class="table mb-0 grandchild-table" id="grandchildTable-${common_idx}">
+                        <thead>
+                          <tr>
+                            <th class="sortable" data-col-name="tag_id">Tag ID</th>
+                            <th class="sortable" data-col-name="common_name">Common Name</th>
+                            <th class="sortable" data-col-name="status">Status</th>
+                            <th class="sortable" data-col-name="bin_location">Bin Location</th>
+                            <th class="sortable" data-col-name="quality">Quality</th>
+                            <th class="sortable" data-col-name="last_contract_num">Last Contract Num</th>
+                            <th class="sortable" data-col-name="client_name">Client Name</th>
+                            <th class="sortable" data-col-name="date_last_scanned">Scanned Date</th>
+                            <th class="sortable" data-col-name="last_scanned_by">Scanned By</th>
+                            <th class="sortable" data-col-name="notes">Notes</th>
+                          </tr>
+                        </thead>
+                        <tbody id="grandchildTbody-${common_idx}"></tbody>
+                      </table>
+                    </div>
+                  </div>
+                </td>
+              `;
+              commonTbody.appendChild(commonRow);
+              commonTbody.appendChild(grandRow);
+            } else {
+              commonRow.cells[2].innerText = commonData.total;
+            }
+
+            const grandTbody = document.getElementById(`grandchildTbody-${common_idx}`);
+            if (grandTbody && grandTbody.closest('.collapse').classList.contains('show')) {
+              commonData.items.forEach(item => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                  <td>${item.tag_id}</td>
+                  <td>${item.common_name}</td>
+                  <td>${item.status || 'N/A'}</td>
+                  <td>${item.bin_location || 'N/A'}</td>
+                  <td>${item.quality || 'N/A'}</td>
+                  <td>${item.last_contract_num || 'N/A'}</td>
+                  <td>${item.client_name || 'N/A'}</td>
+                  <td>${item.date_last_scanned || 'N/A'}</td>
+                  <td>${item.last_scanned_by || 'N/A'}</td>
+                  <td>${item.notes || 'N/A'}</td>
+                `;
+                grandTbody.appendChild(tr);
+              });
+            }
           });
         }
       });
@@ -570,7 +780,7 @@ function updateWithNewData(newData) {
 }
 
 function categorizeItem(rental_class_num) {
-  return CATEGORY_MAP[parseInt(rental_class_num)] || "Other";
+  return CATEGORY_MAP.get(parseInt(rental_class_num), "Other");
 }
 
 function subcategorizeItem(category, rental_class_num) {
@@ -578,7 +788,7 @@ function subcategorizeItem(category, rental_class_num) {
   if (category in ['Tent Tops', 'Tables and Chairs', 'Round Linen', 'Rectangle Linen', 
                    'Concession Equipment', 'AV Equipment', 'Runners and Drapes', 
                    'Other', 'Resale']) {
-    return SUBCATEGORY_MAP[rid] || 'Unspecified';
+    return SUBCATEGORY_MAP.get(rid, 'Unspecified');
   }
   return 'Unspecified';
 }
@@ -597,14 +807,21 @@ document.addEventListener('DOMContentLoaded', () => {
       const targetEl = document.querySelector(targetId);
       if (targetEl && !targetEl.classList.contains('show') && targetId.startsWith('#child-')) {
         const category = targetEl.closest(".collapse[data-category]").getAttribute("data-category");
-        const subcategory = targetEl.getAttribute("data-subcategory");
+        const subcategory = targetEl.closest(".collapse[data-subcategory]").getAttribute("data-subcategory");
+        const commonName = targetEl.getAttribute("data-common-name");
         const catKey = targetId.split("child-")[1];
-        loadSubcatData(category, subcategory, 1, catKey);
+        loadSubcatData(category, subcategory, commonName, 1, catKey);
       }
       if (targetEl) {
         targetEl.addEventListener("show.bs.collapse", () => target.textContent = "-");
         targetEl.addEventListener("hide.bs.collapse", () => target.textContent = "+");
       }
+    } else if (target.classList.contains("print-btn")) {
+      const level = target.getAttribute("data-level");
+      const category = target.getAttribute("data-category");
+      const subcategory = target.getAttribute("data-subcategory") || '';
+      const commonName = target.getAttribute("data-common-name") || '';
+      printTable(level, category, subcategory, commonName);
     }
   });
 
