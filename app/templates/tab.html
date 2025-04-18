@@ -1,0 +1,40 @@
+{% extends 'base.html' %}
+{% block title %}Tab {{ tab_num }}{% endblock %}
+{% block content %}
+    <h1>Tab {{ tab_num }}</h1>
+    {% if error %}
+        <div class="alert alert-danger">{{ error }}</div>
+    {% else %}
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Category</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for cat in categories %}
+                    <tr>
+                        <td>{{ cat.common_name }}</td>
+                        <td>
+                            <button class="btn btn-sm btn-primary" 
+                                    hx-get="/tab/{{ tab_num }}/data" 
+                                    hx-target="#data-{{ cat.rental_class_id }}"
+                                    onclick="showLoading('{{ cat.rental_class_id }}')">
+                                Load
+                            </button>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td colspan="2">
+                            <div id="data-{{ cat.rental_class_id }}" style="display:none;"></div>
+                            <div id="loading-{{ cat.rental_class_id }}" style="display:none;">Loading...</div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% endif %}
+{% endblock %}

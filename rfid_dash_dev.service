@@ -4,12 +4,11 @@ After=network.target
 
 [Service]
 User=tim
+Group=www-data
 WorkingDirectory=/home/tim/test_rfidpi
-ExecStart=/home/tim/test_rfidpi/start.sh
+Environment="PATH=/home/tim/test_rfidpi/venv/bin"
+ExecStart=/home/tim/test_rfidpi/venv/bin/gunicorn --workers 1 --bind 0.0.0.0:7409 --chdir /home/tim/test_rfidpi run:app
 Restart=always
-RestartSec=5
-StandardOutput=append:/var/log/rfid_dash.log
-StandardError=append:/var/log/rfid_dash.log
 
 [Install]
 WantedBy=multi-user.target
