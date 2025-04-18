@@ -1,0 +1,48 @@
+{% extends 'base.html' %}
+{% block title %}Home{% endblock %}
+{% block content %}
+    <h1>RFID Dashboard</h1>
+    {% if error %}
+        <div class="alert alert-danger">{{ error }}</div>
+    {% else %}
+        <div class="row">
+            <div class="col-md-4">
+                <div class="card mb-4">
+                    <div class="card-header">Total Items</div>
+                    <div class="card-body">
+                        <h5 class="card-title">{{ total_items }}</h5>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card mb-4">
+                    <div class="card-header">Status Counts</div>
+                    <div class="card-body">
+                        <ul class="list-group">
+                            {% for status, count in status_counts %}
+                            <li class="list-group-item">{{ status }}: {{ count }}</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card mb-4">
+                    <div class="card-header">Recent Scans</div>
+                    <div class="card-body">
+                        <ul class="list-group">
+                            {% for item in recent_scans %}
+                            <li class="list-group-item">
+                                {{ item.common_name }} ({{ item.date_last_scanned }})
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <button class="btn btn-primary" hx-get="{{ url_for('home.index') }}" hx-target="body">
+            Refresh Stats
+        </button>
+    {% endif %}
+{% endblock %}

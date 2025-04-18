@@ -1,81 +1,30 @@
-from flask import Flask, request, url_for, jsonify
-from refresh_logic import IS_RELOADING, LAST_REFRESH, trigger_refresh
-from db_connection import DatabaseConnection
-from datetime import timedelta
+from flask import Blueprint, render_template
+from app.models.db_models import ItemMaster
+from app import db, cache
+from sqlalchemy import func
 
-def create_app():
-    app = Flask(__name__, template_folder="templates", static_folder="static")
+home_bp = Blueprint('home', __name__)
 
-    from app.routes.root import root_bp
-    from app.routes.tab1 import tab1_bp
-    from app.routes.tab2 import tab2_bp
-    from app.routes.tab3 import tab3_bp
-    from app.routes.tab4 import tab4_bp
-    from app.routes.tab5 import tab5_bp
-    from app.routes.tab6 import tab6_bp
-    from app.routes.tab7 import tab7_bp
+@home_bp.route('/')
+@cache.cached(timeout=30)
+def index():
+    try:
+        # Summary stats
+        total_items = db.session.query(func.count(ItemMaster.tag_id)).scalar()
+        status_counts = db.session.query(
+            ItemMaster.status, func.count(ItemMaster.tag_id)
+        ).group_by(ItemMaster.status).all()
+        recent_scans = db.session.query(ItemMaster).order_by(
+            ItemMaster.date_last_scanned.desc()
+        ).limit(5).all()
 
-    app.register_blueprint(root_bp)
-    app.register_blueprint(tab1_bp, url_prefix="/tab1")
-    app.register_blueprint(tab2_bp, url_prefix="/tab2")
-    app.register_blueprint(tab3_bp, url_prefix="/tab3")
-    app.register_blueprint(tab4_bp, url_prefix="/tab4")
-    app.register_blueprint(tab5_bp, url_prefix="/tab5")
-    app.register_blueprint(tab6_bp, url_prefix="/tab6")
-    app.register_blueprint(tab7_bp, url_prefix="/tab7")
-
-    @app.route('/status', methods=['GET'])
-    def status():
-        try:
-            return jsonify({"is_reloading": IS_RELOADING}), 200
-        except Exception as e:
-            return jsonify({"error": str(e)}), 500
-
-    @app.route('/trigger_incremental', methods=['GET'])
-    def trigger_incremental():
-        try:
-            if not LAST_REFRESH:
-                return jsonify({"items": [], "transactions": [], "since": None}), 200
-
-            since_date = (LAST_REFRESH - timedelta(minutes=5)).strftime("%Y-%m-%d %H:%M:%S")
-            trigger_refresh(full=False)
-            with DatabaseConnection() as conn:
-                items_query = """
-                    SELECT * FROM id_item_master 
-                    WHERE date_last_scanned >= ?
-                """
-                new_items = conn.execute(items_query, (since_date,)).fetchall()
-                new_items = [dict(row) for row in new_items]
-
-                trans_query = """
-                    SELECT * FROM id_transactions 
-                    WHERE scan_date >= ?
-                """
-                new_trans = conn.execute(trans_query, (since_date,)).fetchall()
-                new_trans = [dict(row) for row in new_trans]
-
-            return jsonify({
-                "items": new_items,
-                "transactions": new_trans,
-                "since": since_date
-            }), 200
-        except Exception as e:
-            return jsonify({"error": str(e)}), 500
-
-    @app.route('/full_refresh', methods=['POST'])
-    def full_refresh():
-        try:
-            trigger_refresh(full=True)
-            return jsonify({"message": "Full refresh triggered", "is_reloading": IS_RELOADING}), 202
-        except Exception as e:
-            return jsonify({"error": str(e)}), 500
-
-    @app.context_processor
-    def utility_processor():
-        def update_url_param(key, value):
-            args = request.args.copy()
-            args[key] = value
-            return url_for(request.endpoint, **args)
-        return dict(update_url_param=update_url_param)
-
-    return app
+        return render_template(
+            'home.html',
+            total_items=total_items,
+            status_counts=status_counts,
+            recent_scans=recent_scans
+        )
+    except Exception as e:
+        app = home_bp.app
+        app.logger.error(f"Error loading home page: {str(e)}")
+        return render_template('home.html', error="Failed to load stats")
