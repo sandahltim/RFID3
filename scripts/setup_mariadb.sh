@@ -1,5 +1,5 @@
 #!/bin/bash
-# Setup MariaDB and Redis on Raspberry Pi 5 with Bookworm
+# Setup MariaDB and Redis on Raspberry Pi with Bookworm
 
 # Update and install MariaDB and Redis
 sudo apt update
@@ -24,10 +24,12 @@ y
 y
 EOF
 
-# Create database and user
+# Check if rfid_inventory database exists, create if not
+sudo mysql -u root -prfid_root_password -e "CREATE DATABASE IF NOT EXISTS rfid_inventory;"
+
+# Create or update user and privileges
 sudo mysql -u root -prfid_root_password <<EOF
-CREATE DATABASE rfid_inventory;
-CREATE USER 'rfid_user'@'localhost' IDENTIFIED BY 'rfid_user_password';
+CREATE USER IF NOT EXISTS 'rfid_user'@'localhost' IDENTIFIED BY 'rfid_user_password';
 GRANT ALL PRIVILEGES ON rfid_inventory.* TO 'rfid_user'@'localhost';
 FLUSH PRIVILEGES;
 EOF
