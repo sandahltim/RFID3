@@ -4,6 +4,7 @@ from flask_caching import Cache
 import logging
 from logging.handlers import TimedRotatingFileHandler
 import os
+from app.services.scheduler import init_scheduler
 
 db = SQLAlchemy()
 cache = Cache()
@@ -57,5 +58,9 @@ def create_app():
     except ImportError as e:
         app.logger.error(f"Failed to import refresh_bp: {str(e)}")
         raise
+
+    # Initialize scheduler
+    with app.app_context():
+        init_scheduler()
 
     return app
