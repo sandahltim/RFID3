@@ -59,8 +59,8 @@ class APIClient:
             if response.status_code != 200:
                 logger.error(f"Request failed: {response.status_code} {response.reason}, response: {data}")
                 raise Exception(f"{response.status_code} {response.reason}")
-            records = data.get('results', [])
-            total_count = data.get('count', 0)
+            records = data.get('data', [])  # Updated to parse 'data' instead of 'results'
+            total_count = data.get('totalcount', 0)  # Updated to parse 'totalcount' instead of 'count'
             offset = params['offset']
             logger.debug(f"Fetched {len(records)} records, Total Count: {total_count}, Offset: {offset}")
             all_data.extend(records)
