@@ -29,12 +29,10 @@ def create_app():
     # Register blueprints
     from app.routes.home import home_bp
     from app.routes.tabs import tabs_bp
-    from app.routes.refresh import refresh_bp
-    from app.routes.categories import categories_bp
+    from app.services.refresh import refresh_bp  # Corrected import path
     app.register_blueprint(home_bp)
     app.register_blueprint(tabs_bp)
     app.register_blueprint(refresh_bp)
-    app.register_blueprint(categories_bp)
     
     return app
 
