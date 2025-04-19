@@ -1,94 +1,72 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RFID Dashboard - Tab {{ tab_num }}</title>
-    <link href="{{ url_for('static', filename='lib/bootstrap/bootstrap.min.css') }}" rel="stylesheet">
-    <style>
-        .loading { color: #888; font-style: italic; }
-        .table-bordered th, .table-bordered td { border: 1px solid #dee2e6; }
-        .filter-bar { display: flex; gap: 10px; }
-    </style>
-</head>
-<body>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
-        <div class="container-fluid">
-            <a class="navbar-brand" href="/">RFID DASHBOARD</a>
-            <div class="navbar-nav">
-                <a class="nav-link" href="/">Home</a>
-                <a class="nav-link" href="/tab/1">Tab 1</a>
-                <a class="nav-link" href="/tab/2">Tab 2</a>
-                <a class="nav-link" href="/tab/3">Tab 3</a>
-                <a class="nav-link" href="/tab/4">Tab 4</a>
-                <a class="nav-link" href="/tab/5">Tab 5</a>
-                <a class="nav-link" href="/tab/6">Tab 6</a>
-                <a class="nav-link" href="/categories">Manage Categories</a>
-            </div>
-        </div>
-    </nav>
-    <div class="container mt-4">
-        <h1>Tab {{ tab_num }}</h1>
-        {% if error %}
-            <div class="alert alert-danger">{{ error }}</div>
-        {% endif %}
-        <div class="filter-bar mb-3">
-            <input type="text" id="filter-input" class="form-control d-inline-block w-25" placeholder="Search common name, tag ID, etc." onkeyup="applyFilters()">
-            <select id="category-filter" class="form-control d-inline-block w-25" onchange="applyFilters()">
-                <option value="">ALL CLASSES</option>
-                {% for category in categories %}
-                    <option value="{{ category }}">{{ category }}</option>
-                {% endfor %}
-            </select>
-            <select id="status-filter" class="form-control d-inline-block w-25" onchange="applyFilters()">
-                <option value="">ALL STATUSES</option>
-                <option value="On Rent">On Rent</option>
-                <option value="Ready">Ready</option>
-                <option value="Repair">Repair</option>
-            </select>
-            <select id="bin-location-filter" class="form-control d-inline-block w-25" onchange="applyFilters()">
-                <option value="">ALL BIN LOCATIONS</option>
-                {% for loc in bin_locations %}
-                    <option value="{{ loc }}">{{ loc }}</option>
-                {% endfor %}
-            </select>
-        </div>
+{% extends 'base.html' %}
 
-        <div id="category-table" hx-get="/tab/{{ tab_num }}/subcat_data" hx-trigger="load" hx-swap="innerHTML">
-            {% for category in categories %}
-            <table class="table table-bordered">
-                <thead>
-                    <tr>
-                        <th>Category</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td>{{ category }}</td>
-                        <td>
-                            <button class="btn btn-primary"
-                                    hx-get="/tab/{{ tab_num }}/subcat_data?category={{ category }}"
-                                    hx-target="#subcat-{{ category|lower|replace(' ', '_') }}"
-                                    hx-swap="innerHTML"
-                                    onclick="showLoading('{{ category|lower|replace(' ', '_') }}')">
-                                Expand
-                            </button>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td colspan="2">
-                            <div id="subcat-{{ category|lower|replace(' ', '_') }}" style="display:none;"></div>
-                            <div id="loading-{{ category|lower|replace(' ', '_') }}" style="display:none;" class="loading">Loading...</div>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-            {% endfor %}
-        </div>
-    </div>
+{% block title %}Tab {{ tab_num }}{% endblock %}
 
-    <script src="{{ url_for('static', filename='lib/htmx/htmx.min.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/tab.js') }}?v={{ cache_bust }}"></script>
-</body>
-</html>
+{% block extra_head %}
+<style>
+    .loading { color: #888; font-style: italic; }
+    .table-bordered th, .table-bordered td { border: 1px solid #dee2e6; }
+    .filter-bar { display: flex; gap: 10px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<h1>Tab {{ tab_num }}</h1>
+{% if error %}
+    <div class="alert alert-danger">{{ error }}</div>
+{% endif %}
+<div class="filter-bar mb-3">
+    <input type="text" id="filter-input" class="form-control d-inline-block w-25" placeholder="Search common name, tag ID, etc." onkeyup="applyFilters()">
+    <select id="category-filter" class="form-control d-inline-block w-25" onchange="applyFilters()">
+        <option value="">ALL CLASSES</option>
+        {% for category in categories %}
+            <option value="{{ category }}">{{ category }}</option>
+        {% endfor %}
+    </select>
+    <select id="status-filter" class="form-control d-inline-block w-25" onchange="applyFilters()">
+        <option value="">ALL STATUSES</option>
+        <option value="On Rent">On Rent</option>
+        <option value="Ready">Ready</option>
+        <option value="Repair">Repair</option>
+    </select>
+    <select id="bin-location-filter" class="form-control d-inline-block w-25" onchange="applyFilters()">
+        <option value="">ALL BIN LOCATIONS</option>
+        {% for loc in bin_locations %}
+            <option value="{{ loc }}">{{ loc }}</option>
+        {% endfor %}
+    </select>
+</div>
+
+<div id="category-table" hx-get="/tab/{{ tab_num }}/subcat_data" hx-trigger="load" hx-swap="innerHTML">
+    {% for category in categories %}
+    <table class="table table-bordered">
+        <thead>
+            <tr>
+                <th>Category</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>{{ category }}</td>
+                <td>
+                    <button class="btn btn-primary"
+                            hx-get="/tab/{{ tab_num }}/subcat_data?category={{ category }}"
+                            hx-target="#subcat-{{ category|lower|replace(' ', '_') }}"
+                            hx-swap="innerHTML"
+                            onclick="showLoading('{{ category|lower|replace(' ', '_') }}')">
+                        Expand
+                    </button>
+                </td>
+            </tr>
+            <tr>
+                <td colspan="2">
+                    <div id="subcat-{{ category|lower|replace(' ', '_') }}" style="display:none;"></div>
+                    <div id="loading-{{ category|lower|replace(' ', '_') }}" style="display:none;" class="loading">Loading...</div>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+    {% endfor %}
+</div>
+{% endblock %}
