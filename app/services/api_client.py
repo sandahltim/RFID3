@@ -1,18 +1,16 @@
 import requests
-import os
 from datetime import datetime
+from config import API_USERNAME, API_PASSWORD, LOGIN_URL, ITEM_MASTER_URL, TRANSACTION_URL, SEED_URL
 
 class APIClient:
     def __init__(self):
         self.base_url = "https://cs.iot.ptshome.com/api/v1/data/"
-        self.auth_url = "https://login.cloud.ptshome.com/api/v1/login"
+        self.auth_url = LOGIN_URL
         self.token = None
         self.authenticate()
 
     def authenticate(self):
-        username = os.environ.get('API_USERNAME', 'your_username')
-        password = os.environ.get('API_PASSWORD', 'your_password')
-        response = requests.post(self.auth_url, json={'username': username, 'password': password})
+        response = requests.post(self.auth_url, json={'username': API_USERNAME, 'password': API_PASSWORD})
         response.raise_for_status()
         self.token = response.json().get('access_token')
         print(f"Authenticated successfully with token: {self.token[:10]}...")
