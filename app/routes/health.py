@@ -1,6 +1,7 @@
 from flask import Blueprint, jsonify, current_app
 from app import db, cache
 from app.services.api_client import APIClient
+from sqlalchemy.sql import text
 import redis
 
 health_bp = Blueprint('health', __name__)
@@ -16,7 +17,7 @@ def health_check():
 
     # Check database
     try:
-        db.session.execute("SELECT 1")
+        db.session.execute(text("SELECT 1"))
         status["database"] = "healthy"
     except Exception as e:
         current_app.logger.error(f"Database health check failed: {str(e)}")

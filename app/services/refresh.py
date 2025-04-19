@@ -36,7 +36,13 @@ def update_item_master(items):
 
 def update_transactions(transactions):
     current_app.logger.info(f"Updating {len(transactions)} transactions in id_transactions")
+    skipped = 0
     for trans in transactions:
+        # Skip transactions with missing contract_number
+        if trans.get('contract_number') is None:
+            skipped += 1
+            current_app.logger.warning(f"Skipping transaction with tag_id {trans.get('tag_id')} due to missing contract_number")
+            continue
         try:
             db.session.merge(Transaction(
                 contract_number=trans.get('contract_number'),
@@ -76,6 +82,8 @@ def update_transactions(transactions):
         except Exception as e:
             current_app.logger.error(f"Failed to update transaction {trans.get('contract_number')}: {str(e)}")
             raise
+    if skipped > 0:
+        current_app.logger.info(f"Skipped {skipped} transactions due to missing contract_number")
 
 def update_seed_data(seeds):
     current_app.logger.info(f"Updating {len(seeds)} seeds in seed_rental_classes")
@@ -114,7 +122,6 @@ def full_refresh():
                 db.session.add(state)
             else:
                 state.last_refresh = datetime.utcnow().isoformat()
-            # Removed inner db.session.commit() to let context manager handle it
         
         cache.clear()
         current_app.logger.info("Full refresh completed successfully")
@@ -145,7 +152,6 @@ def incremental_refresh():
             else:
                 state = RefreshState(last_refresh=datetime.utcnow().isoformat())
                 db.session.add(state)
-            # Removed inner db.session.commit()
         
         cache.clear()
         current_app.logger.info("Incremental refresh completed successfully")
