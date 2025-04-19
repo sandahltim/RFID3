@@ -58,6 +58,13 @@ def create_app():
         app.logger.error(f"Failed to import refresh_bp: {str(e)}")
         raise
 
+    try:
+        from app.routes.health import health_bp
+        app.register_blueprint(health_bp)
+    except ImportError as e:
+        app.logger.error(f"Failed to import health_bp: {str(e)}")
+        raise
+
     # Initialize scheduler
     try:
         from app.services.scheduler import init_scheduler

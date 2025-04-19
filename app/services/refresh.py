@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify
+from flask import Blueprint, jsonify, current_app
 from app.models.db_models import ItemMaster, Transaction, SeedRentalClass, RefreshState
 from app.services.api_client import APIClient
 from app import db, cache
@@ -32,7 +32,7 @@ def update_item_master(items):
             ))
         except Exception as e:
             current_app.logger.error(f"Failed to update item {item.get('tag_id')}: {str(e)}")
-    db.session.commit()
+            raise
 
 def update_transactions(transactions):
     current_app.logger.info(f"Updating {len(transactions)} transactions in id_transactions")
@@ -75,7 +75,7 @@ def update_transactions(transactions):
             ))
         except Exception as e:
             current_app.logger.error(f"Failed to update transaction {trans.get('contract_number')}: {str(e)}")
-    db.session.commit()
+            raise
 
 def update_seed_data(seeds):
     current_app.logger.info(f"Updating {len(seeds)} seeds in seed_rental_classes")
@@ -88,7 +88,7 @@ def update_seed_data(seeds):
             ))
         except Exception as e:
             current_app.logger.error(f"Failed to update seed {seed.get('rental_class_id')}: {str(e)}")
-    db.session.commit()
+            raise
 
 @refresh_bp.route('/full_refresh', methods=['POST'])
 def full_refresh():
@@ -114,6 +114,7 @@ def full_refresh():
                 db.session.add(state)
             else:
                 state.last_refresh = datetime.utcnow().isoformat()
+            # Removed inner db.session.commit() to let context manager handle it
         
         cache.clear()
         current_app.logger.info("Full refresh completed successfully")
@@ -144,6 +145,7 @@ def incremental_refresh():
             else:
                 state = RefreshState(last_refresh=datetime.utcnow().isoformat())
                 db.session.add(state)
+            # Removed inner db.session.commit()
         
         cache.clear()
         current_app.logger.info("Incremental refresh completed successfully")
