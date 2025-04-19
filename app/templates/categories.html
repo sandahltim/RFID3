@@ -1,99 +1,79 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RFID Dashboard - Manage Categories</title>
-    <link href="{{ url_for('static', filename='lib/bootstrap/bootstrap.min.css') }}" rel="stylesheet">
-    <style>
-        .form-row { display: flex; gap: 10px; margin-bottom: 10px; }
-        .form-row input, .form-row select { flex: 1; }
-        .alert { display: none; }
-    </style>
-</head>
-<body>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
-        <div class="container-fluid">
-            <a class="navbar-brand" href="/">RFID DASHBOARD</a>
-            <div class="navbar-nav">
-                <a class="nav-link" href="/">Home</a>
-                <a class="nav-link" href="/tab/1">Tab 1</a>
-                <a class="nav-link" href="/tab/2">Tab 2</a>
-                <a class="nav-link" href="/tab/3">Tab 3</a>
-                <a class="nav-link" href="/tab/4">Tab 4</a>
-                <a class="nav-link" href="/tab/5">Tab 5</a>
-                <a class="nav-link" href="/tab/6">Tab 6</a>
-                <a class="nav-link active" href="/categories">Manage Categories</a>
-            </div>
-        </div>
-    </nav>
-    <div class="container mt-4">
-        <h1>Manage Categories</h1>
-        <div id="alert" class="alert"></div>
-        {% for rc in rental_classes %}
-        <div class="form-row">
-            <select class="form-control rental-class" onchange="loadMapping(this)">
-                <option value="{{ rc }}">{{ rc }}</option>
-            </select>
-            <input type="text" class="form-control category" placeholder="Category (e.g., Linen)">
-            <input type="text" class="form-control subcategory" placeholder="Subcategory (e.g., Round Linen)">
-            <button class="btn btn-primary" onclick="updateMapping(this)">Update</button>
-        </div>
-        {% endfor %}
-    </div>
+{% extends 'base.html' %}
 
-    <script>
-        function loadMapping(select) {
-            const rentalClass = select.value;
-            const row = select.closest('.form-row');
-            const categoryInput = row.querySelector('.category');
-            const subcategoryInput = row.querySelector('.subcategory');
-            
-            fetch(`/categories/mapping?rental_class_id=${rentalClass}`)
-                .then(response => response.json())
-                .then(data => {
-                    categoryInput.value = data.category || '';
-                    subcategoryInput.value = data.subcategory || '';
-                })
-                .catch(error => console.error('Error loading mapping:', error));
-        }
+{% block title %}Manage Categories{% endblock %}
 
-        function updateMapping(button) {
-            const row = button.closest('.form-row');
-            const rentalClass = row.querySelector('.rental-class').value;
-            const category = row.querySelector('.category').value;
-            const subcategory = row.querySelector('.subcategory').value;
-            const alert = document.getElementById('alert');
-            
-            const formData = new FormData();
-            formData.append('rental_class_id', rentalClass);
-            formData.append('category', category);
-            formData.append('subcategory', subcategory);
-            
-            fetch('/categories/update', {
-                method: 'POST',
-                body: formData
-            })
+{% block extra_head %}
+<style>
+    .form-row { display: flex; gap: 10px; margin-bottom: 10px; }
+    .form-row input, .form-row select { flex: 1; }
+    .alert { display: none; }
+</style>
+{% endblock %}
+
+{% block content %}
+<h1>Manage Categories</h1>
+<div id="alert" class="alert"></div>
+{% for rc in rental_classes %}
+<div class="form-row">
+    <select class="form-control rental-class" onchange="loadMapping(this)">
+        <option value="{{ rc }}">{{ rc }}</option>
+    </select>
+    <input type="text" class="form-control category" placeholder="Category (e.g., Linen)">
+    <input type="text" class="form-control subcategory" placeholder="Subcategory (e.g., Round Linen)">
+    <button class="btn btn-primary" onclick="updateMapping(this)">Update</button>
+</div>
+{% endfor %}
+
+<script>
+    function loadMapping(select) {
+        const rentalClass = select.value;
+        const row = select.closest('.form-row');
+        const categoryInput = row.querySelector('.category');
+        const subcategoryInput = row.querySelector('.subcategory');
+        
+        fetch(`/categories/mapping?rental_class_id=${rentalClass}`)
             .then(response => response.json())
             .then(data => {
-                alert.className = `alert alert-${data.status === 'success' ? 'success' : 'danger'}`;
-                alert.textContent = data.message;
-                alert.style.display = 'block';
-                setTimeout(() => alert.style.display = 'none', 3000);
+                categoryInput.value = data.category || '';
+                subcategoryInput.value = data.subcategory || '';
             })
-            .catch(error => {
-                alert.className = 'alert alert-danger';
-                alert.textContent = 'Failed to update mapping';
-                alert.style.display = 'block';
-                setTimeout(() => alert.style.display = 'none', 3000);
-            });
-        }
+            .catch(error => console.error('Error loading mapping:', error));
+    }
 
-        // Load mappings for all rental classes on page load
-        document.addEventListener('DOMContentLoaded', () => {
-            document.querySelectorAll('.rental-class').forEach(select => loadMapping(select));
+    function updateMapping(button) {
+        const row = button.closest('.form-row');
+        const rentalClass = row.querySelector('.rental-class').value;
+        const category = row.querySelector('.category').value;
+        const subcategory = row.querySelector('.subcategory').value;
+        const alert = document.getElementById('alert');
+        
+        const formData = new FormData();
+        formData.append('rental_class_id', rentalClass);
+        formData.append('category', category);
+        formData.append('subcategory', subcategory);
+        
+        fetch('/categories/update', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            alert.className = `alert alert-${data.status === 'success' ? 'success' : 'danger'}`;
+            alert.textContent = data.message;
+            alert.style.display = 'block';
+            setTimeout(() => alert.style.display = 'none', 3000);
+        })
+        .catch(error => {
+            alert.className = 'alert alert-danger';
+            alert.textContent = 'Failed to update mapping';
+            alert.style.display = 'block';
+            setTimeout(() => alert.style.display = 'none', 3000);
         });
-    </script>
-    <script src="{{ url_for('static', filename='js/tab.js') }}?v={{ cache_bust }}"></script>
-</body>
-</html>
+    }
+
+    // Load mappings for all rental classes on page load
+    document.addEventListener('DOMContentLoaded', () => {
+        document.querySelectorAll('.rental-class').forEach(select => loadMapping(select));
+    });
+</script>
+{% endblock %}

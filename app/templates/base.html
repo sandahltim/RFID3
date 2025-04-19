@@ -8,6 +8,7 @@
     <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
     <script src="{{ url_for('static', filename='lib/bootstrap/bootstrap.bundle.min.js') }}"></script>
     <script src="{{ url_for('static', filename='lib/htmx/htmx.min.js') }}"></script>
+    {% block extra_head %}{% endblock %}
 </head>
 <body>
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
@@ -19,13 +20,16 @@
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav">
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('home.index') }}">Home</a>
+                        <a class="nav-link {% if request.endpoint == 'home.index' %}active{% endif %}" href="{{ url_for('home.index') }}">Home</a>
                     </li>
                     {% for i in range(1, 7) %}
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('tabs.tab', tab_num=i) }}">Tab {{ i }}</a>
+                        <a class="nav-link {% if request.endpoint == 'tabs.tab' and tab_num == i %}active{% endif %}" href="{{ url_for('tabs.tab', tab_num=i) }}">Tab {{ i }}</a>
                     </li>
                     {% endfor %}
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.endpoint == 'categories.manage_categories' %}active{% endif %}" href="{{ url_for('categories.manage_categories') }}">Manage Categories</a>
+                    </li>
                 </ul>
             </div>
         </div>
@@ -34,6 +38,6 @@
         {% block content %}
         {% endblock %}
     </div>
-    <script src="{{ url_for('static', filename='js/tab.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/tab.js') }}?v={{ cache_bust }}"></script>
 </body>
 </html>
