@@ -48,7 +48,6 @@ def create_app():
 
     # Initialize scheduler within application context
     from app.services.scheduler import init_scheduler
-    with app.app_context():
-        init_scheduler()
+    init_scheduler(app)  # Pass the app instance directly
 
     return app

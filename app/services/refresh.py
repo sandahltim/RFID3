@@ -2,13 +2,10 @@ import time
 from flask import Blueprint, jsonify, current_app
 from app.models.db_models import ItemMaster, Transaction, SeedRentalClass, RefreshState
 from app.services.api_client import APIClient
-from app import db, cache, create_app  # Import create_app to get the app instance
+from app import db, cache
 from datetime import datetime
 
 refresh_bp = Blueprint('refresh', __name__)
-
-# Create the app instance to use for context
-app = create_app()
 
 def update_item_master(items):
     current_app.logger.info(f"Updating {len(items)} items in id_item_master")
@@ -138,30 +135,29 @@ def full_refresh():
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 def incremental_refresh():
-    with app.app_context():  # Add application context
-        try:
-            current_app.logger.info("Starting incremental refresh")
-            state = RefreshState.query.first()
-            since_date = state.last_refresh if state else None
+    try:
+        current_app.logger.info("Starting incremental refresh")
+        state = RefreshState.query.first()
+        since_date = state.last_refresh if state else None
+        
+        client = APIClient()
+        items = client.get_item_master(since_date)
+        transactions = client.get_transactions(since_date)
+        seeds = client.get_seed_data(since_date)
+        
+        with db.session.begin():
+            update_item_master(items)
+            update_transactions(transactions)
+            update_seed_data(seeds)
             
-            client = APIClient()
-            items = client.get_item_master(since_date)
-            transactions = client.get_transactions(since_date)
-            seeds = client.get_seed_data(since_date)
-            
-            with db.session.begin():
-                update_item_master(items)
-                update_transactions(transactions)
-                update_seed_data(seeds)
-                
-                if state:
-                    state.last_refresh = datetime.utcnow().isoformat()
-                else:
-                    state = RefreshState(last_refresh=datetime.utcnow().isoformat())
-                    db.session.add(state)
-            
-            cache.clear()
-            current_app.logger.info("Incremental refresh completed successfully")
-        except Exception as e:
-            current_app.logger.error(f"Incremental refresh failed: {str(e)}")
-            db.session.rollback()
+            if state:
+                state.last_refresh = datetime.utcnow().isoformat()
+            else:
+                state = RefreshState(last_refresh=datetime.utcnow().isoformat())
+                db.session.add(state)
+        
+        cache.clear()
+        current_app.logger.info("Incremental refresh completed successfully")
+    except Exception as e:
+        current_app.logger.error(f"Incremental refresh failed: {str(e)}")
+        db.session.rollback()
