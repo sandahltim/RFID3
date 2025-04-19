@@ -4,7 +4,6 @@ from flask_caching import Cache
 import logging
 from logging.handlers import TimedRotatingFileHandler
 import os
-from app.services.scheduler import init_scheduler
 
 db = SQLAlchemy()
 cache = Cache()
@@ -60,7 +59,12 @@ def create_app():
         raise
 
     # Initialize scheduler
-    with app.app_context():
-        init_scheduler()
+    try:
+        from app.services.scheduler import init_scheduler
+        with app.app_context():
+            init_scheduler()
+    except ImportError as e:
+        app.logger.error(f"Failed to initialize scheduler: {str(e)}")
+        raise
 
     return app
