@@ -10,10 +10,18 @@ class APIClient:
         self.authenticate()
 
     def authenticate(self):
-        response = requests.post(self.auth_url, json={'username': API_USERNAME, 'password': API_PASSWORD})
-        response.raise_for_status()
-        self.token = response.json().get('access_token')
-        print(f"Authenticated successfully with token: {self.token[:10]}...")
+        payload = {'username': API_USERNAME, 'password': API_PASSWORD}
+        print(f"Attempting authentication with payload: {payload}")
+        try:
+            response = requests.post(self.auth_url, json=payload)
+            print(f"Authentication response status: {response.status_code}")
+            print(f"Authentication response body: {response.text}")
+            response.raise_for_status()
+            self.token = response.json().get('access_token')
+            print(f"Authenticated successfully with token: {self.token[:10]}...")
+        except requests.exceptions.RequestException as e:
+            print(f"Authentication failed: {str(e)}")
+            raise
 
     def _make_request(self, endpoint_id, params=None):
         if not self.token:
