@@ -9,7 +9,7 @@ db = SQLAlchemy()
 cache = Cache()
 
 def create_app():
-    app = Flask(__name__)
+    app = Flask(__name__, static_folder='static')
 
     # Configuration
     app.config['SQLALCHEMY_DATABASE_URI'] = (

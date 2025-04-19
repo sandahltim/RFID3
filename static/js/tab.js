@@ -1,29 +1,247 @@
-function showLoading(catKey) {
-    const loading = document.getElementById(`loading-${catKey}`);
+function showLoading(key) {
+    const loading = document.getElementById(`loading-${key}`);
     if (loading) loading.style.display = 'block';
 }
 
+function hideLoading(key) {
+    const loading = document.getElementById(`loading-${key}`);
+    if (loading) loading.style.display = 'none';
+}
+
 function sortTable(column, tableId) {
-    // Placeholder for sorting logic
-    console.log(`Sorting ${tableId} by ${column}`);
+    const table = document.getElementById(tableId);
+    const rows = Array.from(table.querySelectorAll('tbody tr'));
+    const index = Array.from(table.querySelector('thead tr').children).findIndex(th => th.textContent === column);
+    
+    rows.sort((a, b) => {
+        const aText = a.children[index].textContent.trim();
+        const bText = b.children[index].textContent.trim();
+        return aText.localeCompare(bText);
+    });
+    
+    const tbody = table.querySelector('tbody');
+    tbody.innerHTML = '';
+    rows.forEach(row => tbody.appendChild(row));
+}
+
+function filterTable(tableId, query) {
+    const table = document.getElementById(tableId);
+    const rows = table.querySelectorAll('tbody tr');
+    const lowerQuery = query.toLowerCase();
+    
+    rows.forEach(row => {
+        const text = Array.from(row.children).map(cell => cell.textContent.toLowerCase()).join(' ');
+        row.style.display = text.includes(lowerQuery) ? '' : 'none';
+    });
+}
+
+function applyFilters() {
+    const textQuery = document.getElementById('filter-input').value.toLowerCase();
+    const categoryFilter = document.getElementById('category-filter').value.toLowerCase();
+    const statusFilter = document.getElementById('status-filter').value.toLowerCase();
+    
+    const tables = document.querySelectorAll('table');
+    tables.forEach(table => {
+        const rows = table.querySelectorAll('tbody tr');
+        rows.forEach(row => {
+            const text = Array.from(row.children).map(cell => cell.textContent.toLowerCase()).join(' ');
+            const categoryCell = row.querySelector('td:first-child') ? row.querySelector('td:first-child').textContent.toLowerCase() : '';
+            const statusCell = row.querySelector('td:nth-child(4)') ? row.querySelector('td:nth-child(4)').textContent.toLowerCase() : '';
+            
+            const matchesText = text.includes(textQuery);
+            const matchesCategory = !categoryFilter || categoryCell.includes(categoryFilter);
+            const matchesStatus = !statusFilter || statusCell.includes(statusFilter);
+            
+            row.style.display = (matchesText && matchesCategory && matchesStatus) ? '' : 'none';
+        });
+    });
 }
 
 function printTable(level, id) {
-    // Placeholder for printing logic
-    console.log(`Printing ${level} with ID ${id}`);
+    const element = document.getElementById(id);
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(`
+        <html>
+            <head>
+                <title>Print ${level} - RFID Dashboard</title>
+                <link href="/static/lib/bootstrap/bootstrap.min.css" rel="stylesheet">
+                <style>
+                    body { font-family: Arial, sans-serif; margin: 20px; }
+                    h2 { text-align: center; }
+                    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                    th { background-color: #f2f2f2; }
+                    .print-header { text-align: center; margin-bottom: 20px; }
+                </style>
+            </head>
+            <body>
+                <div class="print-header">
+                    <h1>RFID Dashboard Report</h1>
+                    <p>Generated on ${new Date().toLocaleString()}</p>
+                    <h2>${level}</h2>
+                </div>
+                ${element.outerHTML}
+                <script>
+                    window.onload = function() { window.print(); window.close(); }
+                </script>
+            </body>
+        </html>
+    `);
+    printWindow.document.close();
 }
 
-// Debounced refresh
 let isRefreshing = false;
 function refreshTable(tabNum) {
     if (isRefreshing) return;
     isRefreshing = true;
-    htmx.trigger(`#tab-${tabNum}`, 'htmx:load');
+    htmx.trigger(`#category-table`, 'htmx:load');
     setTimeout(() => { isRefreshing = false; }, 1000);
 }
 
-// Initialize refresh
 document.addEventListener('DOMContentLoaded', () => {
     const tabNum = document.querySelector('h1').textContent.match(/\d+/)[0];
     setInterval(() => refreshTable(tabNum), 30000);
+
+    // Handle htmx:afterRequest to hide loading indicators
+    document.body.addEventListener('htmx:afterRequest', (event) => {
+        const targetId = event.detail.target.id;
+        const catKey = targetId.replace('subcat-', '').replace('items-', '');
+        hideLoading(catKey);
+    });
 });
+
+document.body.addEventListener('htmx:afterSwap', (event) => {
+    if (event.detail.target.id.startsWith('subcat-')) {
+        const category = event.detail.target.id.replace('subcat-', '');
+        const data = JSON.parse(event.detail.xhr.responseText);
+        loadSubcatData(category, data);
+    } else if (event.detail.target.id.startsWith('items-')) {
+        const container = document.getElementById(event.detail.target.id);
+        container.style.display = 'block';
+        const data = JSON.parse(event.detail.xhr.responseText);
+        
+        let html = `
+            <table class="table table-bordered ms-3 mt-2" id="items-table-${event.detail.target.id}">
+                <thead>
+                    <tr>
+                        <th>Tag ID</th>
+                        <th>Common Name</th>
+                        <th>Bin Location</th>
+                        <th>Status</th>
+                        <th>Last Contract</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+        
+        data.forEach(item => {
+            html += `
+                <tr>
+                    <td>${item.tag_id}</td>
+                    <td>${item.common_name}</td>
+                    <td>${item.bin_location}</td>
+                    <td>${item.status}</td>
+                    <td>${item.last_contract_num || ''}</td>
+                    <td>
+                        <button class="btn btn-sm btn-info" onclick="printTable('Item', 'items-table-${event.detail.target.id}')">
+                            Print
+                        </button>
+                    </td>
+                </tr>
+            `;
+        });
+        
+        html += `
+                </tbody>
+            </table>
+        `;
+        container.innerHTML = html;
+        applyFilters(); // Re-apply filters after loading items
+    }
+});
+
+function loadSubcatData(category, subcatData) {
+    const container = document.getElementById(`subcat-${category.toLowerCase().replace(/[^a-z0-9-]/g, '_')}`);
+    container.style.display = 'block';
+    let html = '<div class="ms-3">';
+    
+    subcatData.forEach(sub => {
+        const subId = `${category}_${sub.subcategory}`.toLowerCase().replace(/[^a-z0-9-]/g, '_');
+        html += `
+            <table class="table table-bordered mt-2" id="subcat-table-${subId}">
+                <thead>
+                    <tr>
+                        <th>Subcategory</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>${sub.subcategory}</td>
+                        <td>
+                            <button class="btn btn-sm btn-secondary"
+                                    hx-get="/tab/${document.querySelector('h1').textContent.match(/\d+/)[0]}/data?category=${encodeURIComponent(category)}&subcategory=${encodeURIComponent(sub.subcategory)}"
+                                    hx-target="#items-${subId}"
+                                    hx-swap="innerHTML"
+                                    onclick="showLoading('${subId}')">
+                                Load Items
+                            </button>
+                            <button class="btn btn-sm btn-info" onclick="printTable('Subcategory', 'subcat-table-${subId}')">
+                                Print
+                            </button>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td colspan="2">
+                            <div id="common-${subId}" style="display:none;"></div>
+                            <div id="items-${subId}" style="display:none;"></div>
+                            <div id="loading-${subId}" style="display:none;" class="loading">Loading...</div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        `;
+        
+        sub.common_names.forEach(cn => {
+            const cnId = `${subId}_${cn}`.toLowerCase().replace(/[^a-z0-9-]/g, '_');
+            html += `
+                <table class="table table-bordered ms-3 mt-2" id="common-table-${cnId}">
+                    <thead>
+                        <tr>
+                            <th>Common Name</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>${cn}</td>
+                            <td>
+                                <button class="btn btn-sm btn-secondary"
+                                        hx-get="/tab/${document.querySelector('h1').textContent.match(/\d+/)[0]}/data?category=${encodeURIComponent(category)}&subcategory=${encodeURIComponent(sub.subcategory)}&common_name=${encodeURIComponent(cn)}"
+                                        hx-target="#items-${cnId}"
+                                        hx-swap="innerHTML"
+                                        onclick="showLoading('${cnId}')">
+                                    Load Items
+                                </button>
+                                <button class="btn btn-sm btn-info" onclick="printTable('Common Name', 'common-table-${cnId}')">
+                                    Print
+                                </button>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td colspan="2">
+                                <div id="items-${cnId}" style="display:none;"></div>
+                                <div id="loading-${cnId}" style="display:none;" class="loading">Loading...</div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            `;
+        });
+    });
+    
+    html += '</div>';
+    container.innerHTML = html;
+    applyFilters(); // Re-apply filters after loading subcategories
+}
