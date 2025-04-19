@@ -161,3 +161,4 @@ def incremental_refresh():
     except Exception as e:
         current_app.logger.error(f"Incremental refresh failed: {str(e)}")
         db.session.rollback()
+        
