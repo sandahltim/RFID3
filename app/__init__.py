@@ -36,42 +36,19 @@ def create_app():
     app.logger.addHandler(handler)
     app.logger.setLevel(logging.DEBUG)
 
-    # Register blueprints with error handling
-    try:
-        from app.routes.home import home_bp
-        app.register_blueprint(home_bp)
-    except ImportError as e:
-        app.logger.error(f"Failed to import home_bp: {str(e)}")
-        raise
+    # Register blueprints
+    from app.routes.home import home_bp
+    app.register_blueprint(home_bp)
+    from app.routes.tabs import tabs_bp
+    app.register_blueprint(tabs_bp)
+    from app.services.refresh import refresh_bp
+    app.register_blueprint(refresh_bp)
+    from app.routes.health import health_bp
+    app.register_blueprint(health_bp)
 
-    try:
-        from app.routes.tabs import tabs_bp
-        app.register_blueprint(tabs_bp)
-    except ImportError as e:
-        app.logger.error(f"Failed to import tabs_bp: {str(e)}")
-        raise
-
-    try:
-        from app.services.refresh import refresh_bp
-        app.register_blueprint(refresh_bp)
-    except ImportError as e:
-        app.logger.error(f"Failed to import refresh_bp: {str(e)}")
-        raise
-
-    try:
-        from app.routes.health import health_bp
-        app.register_blueprint(health_bp)
-    except ImportError as e:
-        app.logger.error(f"Failed to import health_bp: {str(e)}")
-        raise
-
-    # Initialize scheduler
-    try:
-        from app.services.scheduler import init_scheduler
-        with app.app_context():
-            init_scheduler()
-    except ImportError as e:
-        app.logger.error(f"Failed to initialize scheduler: {str(e)}")
-        raise
+    # Initialize scheduler within application context
+    from app.services.scheduler import init_scheduler
+    with app.app_context():
+        init_scheduler()
 
     return app
