@@ -1,6 +1,6 @@
-from flask import Blueprint, jsonify, request, current_app
+from flask import Blueprint, jsonify, request, current_app, render_template  # Added render_template
 from .. import db, cache
-from ..models.db_models import ItemMaster, RentalClassMapping  # Corrected import
+from ..models.db_models import ItemMaster, RentalClassMapping
 from sqlalchemy import func
 
 tabs_bp = Blueprint('tabs', __name__)
