@@ -198,8 +198,10 @@ function loadSubcatData(category, subcatData) {
     let html = '<div class="ms-3">';
     
     subcatData.forEach(sub => {
-        console.debug(`Rendering subcategory for ${category}: ${sub.subcategory}`); // Debug log
+        console.log(`Rendering subcategory for ${category}: ${sub.subcategory}`); // Changed to console.log
         const subId = `${category}_${sub.subcategory}`.toLowerCase().replace(/[^a-z0-9-]/g, '_');
+        // Escape HTML characters in subcategory to prevent rendering issues
+        const escapedSubcategory = sub.subcategory.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
         html += `
             <table class="table table-bordered mt-2" id="subcat-table-${subId}">
                 <thead>
@@ -210,7 +212,7 @@ function loadSubcatData(category, subcatData) {
                 </thead>
                 <tbody>
                     <tr>
-                        <td>${sub.subcategory}</td>
+                        <td>${escapedSubcategory}</td>
                         <td>
                             <button class="btn btn-sm btn-secondary"
                                     hx-get="/tab/${cachedTabNum}/data?category=${encodeURIComponent(category)}&subcategory=${encodeURIComponent(sub.subcategory)}"
@@ -237,6 +239,7 @@ function loadSubcatData(category, subcatData) {
         
         sub.common_names.forEach(cn => {
             const cnId = `${subId}_${cn}`.toLowerCase().replace(/[^a-z0-9-]/g, '_');
+            const escapedCommonName = cn.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
             html += `
                 <table class="table table-bordered ms-3 mt-2" id="common-table-${cnId}">
                     <thead>
@@ -247,7 +250,7 @@ function loadSubcatData(category, subcatData) {
                     </thead>
                     <tbody>
                         <tr>
-                            <td>${cn}</td>
+                            <td>${escapedCommonName}</td>
                             <td>
                                 <button class="btn btn-sm btn-secondary"
                                         hx-get="/tab/${cachedTabNum}/data?category=${encodeURIComponent(category)}&subcategory=${encodeURIComponent(sub.subcategory)}&common_name=${encodeURIComponent(cn)}"
