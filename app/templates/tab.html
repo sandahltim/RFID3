@@ -12,9 +12,9 @@
                     <input type="text" id="filter-input" class="form-control" placeholder="Search common name, tag ID, etc.">
                 </div>
                 <div class="col-md-3">
-                    <label for="category-filter" class="form-label">Filter by Category</label>
+                    <label for="category-filter" class="form-label">Filter by Rental Class</label>
                     <select id="category-filter" class="form-select">
-                        <option value="">All Categories</option>
+                        <option value="">All Rental Classes</option>
                         {% for cat in categories %}
                         <option value="{{ cat }}">{{ cat }}</option>
                         {% endfor %}
@@ -44,7 +44,7 @@
             <table class="table table-striped" id="category-table">
                 <thead>
                     <tr>
-                        <th>Category</th>
+                        <th>Rental Class</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
