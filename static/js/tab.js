@@ -1,5 +1,5 @@
 // Cache the tab number globally to avoid repeated DOM queries
-let cachedTabNum = '1'; // Default to '1' if h1 is not found
+let cachedTabNum = '1'; // Default to '1' if h1 is not found or no number is present
 
 function showLoading(key) {
     const loading = document.getElementById(`loading-${key}`);
@@ -107,9 +107,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const h1Element = document.querySelector('h1');
     if (h1Element) {
         const tabNumMatch = h1Element.textContent.match(/\d+/);
-        if (tabNumMatch) {
+        if (tabNumMatch && tabNumMatch[0]) { // Add null check for tabNumMatch
             cachedTabNum = tabNumMatch[0];
             setInterval(() => refreshTable(cachedTabNum), 30000);
+        } else {
+            console.warn('No tab number found in h1 element. Using default tab number 1.');
         }
     } else {
         console.warn('No h1 element found on the page. Using default tab number 1.');
