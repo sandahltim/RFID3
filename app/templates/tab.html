@@ -89,6 +89,6 @@
     </div>
 
     <script src="{{ url_for('static', filename='lib/htmx/htmx.min.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/tab.js') }}?v={{ 'now'|strftime('%s') }}"></script>
+    <script src="{{ url_for('static', filename='js/tab.js') }}?v={{ cache_bust }}"></script>
 </body>
 </html>

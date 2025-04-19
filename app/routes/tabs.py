@@ -3,6 +3,7 @@ from app.models.db_models import ItemMaster, RentalClassMapping
 from app import db, cache
 from sqlalchemy import func
 import re
+from time import time  # Add this import for timestamp
 
 tabs_bp = Blueprint('tabs', __name__)
 
@@ -37,11 +38,15 @@ def tab(tab_num):
         current_app.logger.info(f"Fetched {len(categories)} categories")
         current_app.logger.info(f"Fetched {len(bin_locations)} bin locations")
         
+        # Generate a timestamp for cache-busting
+        cache_bust = int(time())
+        
         return render_template(
             'tab.html',
             tab_num=tab_num,
             categories=categories,
-            bin_locations=[b.bin_location for b in bin_locations]
+            bin_locations=[b.bin_location for b in bin_locations],
+            cache_bust=cache_bust  # Pass the timestamp to the template
         )
     except Exception as e:
         current_app.logger.error(f"Error loading tab {tab_num}: {str(e)}")

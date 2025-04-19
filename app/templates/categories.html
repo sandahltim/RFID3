@@ -94,5 +94,6 @@
             document.querySelectorAll('.rental-class').forEach(select => loadMapping(select));
         });
     </script>
+    <script src="{{ url_for('static', filename='js/tab.js') }}?v={{ cache_bust }}"></script>
 </body>
 </html>

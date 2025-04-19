@@ -1,6 +1,7 @@
 from flask import Blueprint, render_template, request, jsonify, current_app
 from app.models.db_models import RentalClassMapping, SeedRentalClass
 from app import db
+from time import time  # Add this import for timestamp
 
 categories_bp = Blueprint('categories', __name__)
 
@@ -13,7 +14,10 @@ def manage_categories():
     mappings = RentalClassMapping.query.all()
     mapping_dict = {m.rental_class_id: {'category': m.category, 'subcategory': m.subcategory} for m in mappings}
     
-    return render_template('categories.html', rental_classes=rental_classes, mappings=mapping_dict)
+    # Generate a timestamp for cache-busting
+    cache_bust = int(time())
+    
+    return render_template('categories.html', rental_classes=rental_classes, mappings=mapping_dict, cache_bust=cache_bust)
 
 @categories_bp.route('/categories/update', methods=['POST'])
 def update_category():

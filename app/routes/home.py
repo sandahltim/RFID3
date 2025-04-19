@@ -2,6 +2,7 @@ from flask import Blueprint, render_template
 from app.models.db_models import ItemMaster
 from app import db, cache
 from sqlalchemy import func
+from time import time  # Add this import for timestamp
 
 home_bp = Blueprint('home', __name__)
 
@@ -18,13 +19,17 @@ def index():
             ItemMaster.date_last_scanned.desc()
         ).limit(5).all()
 
+        # Generate a timestamp for cache-busting
+        cache_bust = int(time())
+
         return render_template(
             'home.html',
             total_items=total_items,
             status_counts=status_counts,
-            recent_scans=recent_scans
+            recent_scans=recent_scans,
+            cache_bust=cache_bust  # Pass the timestamp to the template
         )
     except Exception as e:
         app = home_bp.app
         app.logger.error(f"Error loading home page: {str(e)}")
-        return render_template('home.html', error="Failed to load stats")
+        return render_template('home.html', error="Failed to load stats", cache_bust=int(time()))
