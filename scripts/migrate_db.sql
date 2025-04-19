@@ -1,10 +1,55 @@
--- Schema for rfid_inventory database
+-- Drop existing tables if they exist
+DROP TABLE IF EXISTS id_transactions;
+DROP TABLE IF EXISTS id_item_master;
+DROP TABLE IF EXISTS id_rfidtag;
+DROP TABLE IF EXISTS seed_rental_classes;
+DROP TABLE IF EXISTS refresh_state;
+
+-- Create id_transactions table
+CREATE TABLE id_transactions (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    contract_number VARCHAR(255),
+    tag_id VARCHAR(255) NOT NULL,
+    scan_type VARCHAR(50) NOT NULL,
+    scan_date DATETIME NOT NULL,
+    client_name VARCHAR(255),
+    common_name VARCHAR(255) NOT NULL,
+    bin_location VARCHAR(255),
+    status VARCHAR(50),
+    scan_by VARCHAR(255),
+    location_of_repair VARCHAR(255),
+    quality VARCHAR(50),
+    dirty_or_mud BOOLEAN,
+    leaves BOOLEAN,
+    oil BOOLEAN,
+    mold BOOLEAN,
+    stain BOOLEAN,
+    oxidation BOOLEAN,
+    other TEXT,
+    rip_or_tear BOOLEAN,
+    sewing_repair_needed BOOLEAN,
+    grommet BOOLEAN,
+    rope BOOLEAN,
+    buckle BOOLEAN,
+    date_created DATETIME,
+    date_updated DATETIME,
+    uuid_accounts_fk VARCHAR(255),
+    serial_number VARCHAR(255),
+    rental_class_num VARCHAR(255),
+    longitude DECIMAL(9,6),
+    latitude DECIMAL(9,6),
+    wet BOOLEAN,
+    service_required BOOLEAN,
+    notes TEXT
+);
+
+-- Create id_item_master table
 CREATE TABLE id_item_master (
     tag_id VARCHAR(255) PRIMARY KEY,
     uuid_accounts_fk VARCHAR(255),
     serial_number VARCHAR(255),
     client_name VARCHAR(255),
-    rental_class_num INT,
+    rental_class_num VARCHAR(255),
     common_name VARCHAR(255),
     quality VARCHAR(50),
     bin_location VARCHAR(255),
@@ -13,75 +58,45 @@ CREATE TABLE id_item_master (
     last_scanned_by VARCHAR(255),
     notes TEXT,
     status_notes TEXT,
-    longitude FLOAT,
-    latitude FLOAT,
-    date_last_scanned VARCHAR(50),
-    date_created VARCHAR(50),
-    date_updated VARCHAR(50)
+    longitude DECIMAL(9,6),
+    latitude DECIMAL(9,6),
+    date_last_scanned DATETIME,
+    date_created DATETIME,
+    date_updated DATETIME
 );
-CREATE INDEX idx_rental_class ON id_item_master (rental_class_num);
-CREATE INDEX idx_status ON id_item_master (status);
-CREATE INDEX idx_bin_location ON id_item_master (bin_location);
 
+-- Create id_rfidtag table
 CREATE TABLE id_rfidtag (
     tag_id VARCHAR(255) PRIMARY KEY,
-    item_type VARCHAR(255),
-    common_name VARCHAR(255),
+    uuid_accounts_fk VARCHAR(255),
     category VARCHAR(255),
-    status VARCHAR(50),
-    last_contract_num VARCHAR(255),
-    date_assigned VARCHAR(50),
-    date_sold VARCHAR(50),
-    date_discarded VARCHAR(50),
-    reuse_count INT,
-    last_updated VARCHAR(50)
-);
-CREATE INDEX idx_rfid_tag_id ON id_rfidtag (tag_id);
-
-CREATE TABLE id_transactions (
-    contract_number VARCHAR(255),
-    tag_id VARCHAR(255),
-    scan_type VARCHAR(50),
-    scan_date VARCHAR(50),
+    serial_number VARCHAR(255),
     client_name VARCHAR(255),
+    rental_class_num VARCHAR(255),
     common_name VARCHAR(255),
+    quality VARCHAR(50),
     bin_location VARCHAR(255),
     status VARCHAR(50),
-    scan_by VARCHAR(255),
-    location_of_repair VARCHAR(255),
-    quality VARCHAR(50),
-    dirty_or_mud VARCHAR(50),
-    leaves VARCHAR(50),
-    oil VARCHAR(50),
-    mold VARCHAR(50),
-    stain VARCHAR(50),
-    oxidation VARCHAR(50),
-    other VARCHAR(255),
-    rip_or_tear VARCHAR(50),
-    sewing_repair_needed VARCHAR(50),
-    grommet VARCHAR(50),
-    rope VARCHAR(50),
-    buckle VARCHAR(50),
-    date_created VARCHAR(50),
-    date_updated VARCHAR(50),
-    uuid_accounts_fk VARCHAR(255),
-    serial_number VARCHAR(255),
-    rental_class_num INT,
-    longitude FLOAT,
-    latitude FLOAT,
-    wet VARCHAR(50),
-    service_required VARCHAR(50),
+    last_contract_num VARCHAR(255),
+    last_scanned_by VARCHAR(255),
     notes TEXT,
-    PRIMARY KEY (contract_number, tag_id, scan_type, scan_date)
+    status_notes TEXT,
+    longitude DECIMAL(9,6),
+    latitude DECIMAL(9,6),
+    date_last_scanned DATETIME,
+    date_created DATETIME,
+    date_updated DATETIME
 );
 
+-- Create seed_rental_classes table
 CREATE TABLE seed_rental_classes (
-    rental_class_id INT AUTO_INCREMENT PRIMARY KEY,
+    rental_class_id VARCHAR(255) PRIMARY KEY,
     common_name VARCHAR(255),
     bin_location VARCHAR(255)
 );
 
+-- Create refresh_state table
 CREATE TABLE refresh_state (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    last_refresh VARCHAR(50)
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    last_refresh VARCHAR(255) NOT NULL
 );
