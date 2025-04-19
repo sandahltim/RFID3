@@ -1,6 +1,6 @@
 from flask import Blueprint, jsonify, request, current_app
 from .. import db, cache
-from ..models import ItemMaster, RentalClassMapping
+from ..db_models import ItemMaster, RentalClassMapping  # Updated import
 from sqlalchemy import func
 
 tabs_bp = Blueprint('tabs', __name__)
@@ -27,7 +27,7 @@ def tab_view(tab_num):
         return jsonify({'error': 'Failed to load tab'}), 500
 
 @tabs_bp.route('/tab/<int:tab_num>/subcat_data', methods=['GET'])
-@cache.cached(timeout=30)
+# @cache.cached(timeout=30)  # Temporarily disabled caching
 def subcat_data(tab_num):
     try:
         category = request.args.get('category')
@@ -78,7 +78,7 @@ def subcat_data(tab_num):
         return jsonify({'error': 'Failed to fetch subcategories'}), 500
 
 @tabs_bp.route('/tab/<int:tab_num>/data', methods=['GET'])
-# @cache.cached(timeout=30)  # Temporarily disable caching
+# @cache.cached(timeout=30)  # Temporarily disabled caching
 def tab_data(tab_num):
     try:
         category = request.args.get('category')
