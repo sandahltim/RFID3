@@ -1,8 +1,8 @@
-from flask import Blueprint, render_template
+from flask import Blueprint, render_template, current_app  # Add current_app import
 from app.models.db_models import ItemMaster
 from app import db, cache
 from sqlalchemy import func
-from time import time  # Add this import for timestamp
+from time import time
 
 home_bp = Blueprint('home', __name__)
 
@@ -27,9 +27,8 @@ def index():
             total_items=total_items,
             status_counts=status_counts,
             recent_scans=recent_scans,
-            cache_bust=cache_bust  # Pass the timestamp to the template
+            cache_bust=cache_bust
         )
     except Exception as e:
-        app = home_bp.app
-        app.logger.error(f"Error loading home page: {str(e)}")
+        current_app.logger.error(f"Error loading home page: {str(e)}")  # Use current_app
         return render_template('home.html', error="Failed to load stats", cache_bust=int(time()))

@@ -24,7 +24,7 @@
                     </li>
                     {% for i in range(1, 7) %}
                     <li class="nav-item">
-                        <a class="nav-link {% if request.endpoint == 'tabs.tab' and tab_num == i %}active{% endif %}" href="{{ url_for('tabs.tab', tab_num=i) }}">Tab {{ i }}</a>
+                        <a class="nav-link {% if request.endpoint == 'tabs.tab_view' and tab_num == i %}active{% endif %}" href="{{ url_for('tabs.tab_view', tab_num=i) }}">Tab {{ i }}</a>
                     </li>
                     {% endfor %}
                     <li class="nav-item">
