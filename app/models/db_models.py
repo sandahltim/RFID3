@@ -1,6 +1,4 @@
-from flask_sqlalchemy import SQLAlchemy
-
-db = SQLAlchemy()
+from app import db  # Import db from app/__init__.py
 
 class ItemMaster(db.Model):
     __tablename__ = 'id_item_master'
