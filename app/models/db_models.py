@@ -91,3 +91,4 @@ class RefreshState(db.Model):
     __tablename__ = 'refresh_state'
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     last_refresh = db.Column(db.String(255), nullable=False)
+    

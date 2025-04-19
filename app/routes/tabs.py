@@ -1,5 +1,5 @@
 from flask import Blueprint, render_template, jsonify, request, current_app
-from app.models.db_models import ItemMaster, SeedRentalClass
+from app.models.db_models import RFIDTag, ItemMaster
 from app import db, cache
 import re
 
@@ -16,12 +16,12 @@ def tab(tab_num):
         current_app.logger.info(f"Loading tab {tab_num}")
         # Fetch categories (group by category from id_rfidtag)
         categories_query = db.session.query(
-            ItemMaster.category.distinct().label('category')
-        ).filter(ItemMaster.category.isnot(None))
+            RFIDTag.category.distinct().label('category')
+        ).filter(RFIDTag.category.isnot(None))
         categories = categories_query.all()
         current_app.logger.info(f"Fetched {len(categories)} categories")
         
-        # Fetch bin locations
+        # Fetch bin locations from ItemMaster
         bin_locations_query = db.session.query(
             ItemMaster.bin_location.distinct().label('bin_location')
         ).filter(ItemMaster.bin_location.isnot(None))
@@ -46,13 +46,13 @@ def tab_data(tab_num):
         subcategory = request.args.get('subcategory')
         common_name = request.args.get('common_name')
         
-        query = db.session.query(ItemMaster)
+        query = db.session.query(RFIDTag)
         if category:
-            query = query.filter(ItemMaster.category.ilike(category))
+            query = query.filter(RFIDTag.category.ilike(category))
         if subcategory:
-            query = query.filter(ItemMaster.bin_location.ilike(subcategory))
+            query = query.filter(RFIDTag.bin_location.ilike(subcategory))
         if common_name:
-            query = query.filter(ItemMaster.common_name.ilike(common_name))
+            query = query.filter(RFIDTag.common_name.ilike(common_name))
         
         items = query.all()
         current_app.logger.info(f"Fetched {len(items)} items for tab {tab_num}")
@@ -78,18 +78,18 @@ def subcat_data(tab_num):
         
         # Fetch subcategories (bin_location) for the category
         subcategories = db.session.query(
-            ItemMaster.bin_location.distinct().label('subcategory')
-        ).filter(ItemMaster.category.ilike(category)).all()
+            RFIDTag.bin_location.distinct().label('subcategory')
+        ).filter(RFIDTag.category.ilike(category)).all()
         current_app.logger.info(f"Fetched {len(subcategories)} subcategories for category {category}")
         
         # Fetch common names for each subcategory
         result = []
         for sub in subcategories:
             common_names = db.session.query(
-                ItemMaster.common_name.distinct().label('common_name')
+                RFIDTag.common_name.distinct().label('common_name')
             ).filter(
-                ItemMaster.category.ilike(category),
-                ItemMaster.bin_location.ilike(sub.subcategory)
+                RFIDTag.category.ilike(category),
+                RFIDTag.bin_location.ilike(sub.subcategory)
             ).all()
             result.append({
                 'subcategory': sub.subcategory,
