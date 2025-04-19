@@ -145,19 +145,4 @@ def incremental_refresh():
         transactions = client.get_transactions(since_date)
         seeds = client.get_seed_data(since_date)
         
-        with db.session.begin():
-            update_item_master(items)
-            update_transactions(transactions)
-            update_seed_data(seeds)
-            
-            if state:
-                state.last_refresh = datetime.utcnow().isoformat()
-            else:
-                state = RefreshState(last_refresh=datetime.utcnow().isoformat())
-                db.session.add(state)
-        
-        cache.clear()
-        current_app.logger.info("Incremental refresh completed successfully")
-    except Exception as e:
-        current_app.logger.error(f"Incremental refresh failed: {str(e)}")
-        db.session.rollback()
+        with db.session.begin
