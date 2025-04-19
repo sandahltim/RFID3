@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify, request, current_app, render_template  # Added render_template
+from flask import Blueprint, jsonify, request, current_app, render_template
 from .. import db, cache
 from ..models.db_models import ItemMaster, RentalClassMapping
 from sqlalchemy import func
@@ -48,6 +48,7 @@ def subcat_data(tab_num):
             RentalClassMapping.subcategory
         ).all()
 
+        current_app.logger.debug(f"Raw subcategory counts for category {category}: {subcategory_counts}")
         subcategories = [sub[0] for sub, _ in subcategory_counts if sub[0]]
         current_app.logger.info(f"Fetched {len(subcategories)} subcategories for category {category}")
 
