@@ -2,55 +2,40 @@ from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_caching import Cache
 import logging
-from logging.handlers import TimedRotatingFileHandler
-import os
+from logging.handlers import RotatingFileHandler
 
 db = SQLAlchemy()
-cache = Cache()
+cache = Cache(config={'CACHE_TYPE': 'simple'})
 
 def create_app():
-    app = Flask(__name__, static_folder='static')
-
-    # Configuration
-    app.config['SQLALCHEMY_DATABASE_URI'] = (
-        f"mysql+pymysql://{os.environ.get('DB_USER', 'rfid_user')}:{os.environ.get('DB_PASSWORD', 'rfid_user_password')}@"
-        f"localhost/rfid_inventory?charset=utf8mb4"
-    )
+    app = Flask(__name__)
+    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:////home/tim/test_rfidpi/rfidpi.db'
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-    app.config['CACHE_TYPE'] = 'redis'
-    app.config['CACHE_REDIS_URL'] = 'redis://localhost:6379/0'
-
+    app.config['SECRET_KEY'] = 'your-secret-key'
+    
     # Initialize extensions
     db.init_app(app)
     cache.init_app(app)
-
-    # Logging
-    os.makedirs(os.path.join(app.root_path, '..', 'logs'), exist_ok=True)
-    handler = TimedRotatingFileHandler(
-        os.path.join(app.root_path, '..', 'logs', 'rfid_dashboard.log'),
-        when='midnight',
-        interval=1,
-        backupCount=7
-    )
-    handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+    
+    # Setup logging
+    handler = RotatingFileHandler('/home/tim/test_rfidpi/logs/app.log', maxBytes=10000, backupCount=1)
+    handler.setLevel(logging.INFO)
     app.logger.addHandler(handler)
-    app.logger.setLevel(logging.DEBUG)
-
+    
+    # Create database tables
+    with app.app_context():
+        db.create_all()
+    
     # Register blueprints
     from app.routes.home import home_bp
-    app.register_blueprint(home_bp)
     from app.routes.tabs import tabs_bp
+    from app.routes.refresh import refresh_bp
+    from app.routes.categories import categories_bp
+    app.register_blueprint(home_bp)
     app.register_blueprint(tabs_bp)
-    from app.services.refresh import refresh_bp
     app.register_blueprint(refresh_bp)
-    from app.routes.health import health_bp
-    app.register_blueprint(health_bp)
-
+    app.register_blueprint(categories_bp)
+    
     return app
 
-# Create app instance
 app = create_app()
-
-# Initialize scheduler after app is fully created
-from app.services.scheduler import init_scheduler
-init_scheduler(app)
