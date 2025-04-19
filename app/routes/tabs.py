@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, jsonify, request
+from flask import Blueprint, render_template, jsonify, request, current_app
 from app.models.db_models import ItemMaster, SeedRentalClass
 from app import db, cache
 import re
@@ -13,14 +13,21 @@ def sanitize_id(text):
 @cache.cached(timeout=30)
 def tab(tab_num):
     try:
+        current_app.logger.info(f"Loading tab {tab_num}")
         # Fetch categories (group by category from id_rfidtag)
-        categories = db.session.query(
+        categories_query = db.session.query(
             ItemMaster.category.distinct().label('category')
-        ).filter(ItemMaster.category.isnot(None)).all()
+        ).filter(ItemMaster.category.isnot(None))
+        categories = categories_query.all()
+        current_app.logger.info(f"Fetched {len(categories)} categories")
+        
         # Fetch bin locations
-        bin_locations = db.session.query(
+        bin_locations_query = db.session.query(
             ItemMaster.bin_location.distinct().label('bin_location')
-        ).filter(ItemMaster.bin_location.isnot(None)).all()
+        ).filter(ItemMaster.bin_location.isnot(None))
+        bin_locations = bin_locations_query.all()
+        current_app.logger.info(f"Fetched {len(bin_locations)} bin locations")
+        
         return render_template(
             'tab.html',
             tab_num=tab_num,
@@ -28,9 +35,8 @@ def tab(tab_num):
             bin_locations=[b.bin_location for b in bin_locations]
         )
     except Exception as e:
-        app = tabs_bp.app
-        app.logger.error(f"Error loading tab {tab_num}: {str(e)}")
-        return render_template('tab.html', tab_num=tab_num, error="Failed to load data")
+        current_app.logger.error(f"Error loading tab {tab_num}: {str(e)}")
+        return render_template('tab.html', tab_num=tab_num, error=f"Failed to load data: {str(e)}")
 
 @tabs_bp.route('/tab/<int:tab_num>/data', methods=['GET'])
 @cache.cached(timeout=30)
@@ -49,6 +55,7 @@ def tab_data(tab_num):
             query = query.filter(ItemMaster.common_name.ilike(common_name))
         
         items = query.all()
+        current_app.logger.info(f"Fetched {len(items)} items for tab {tab_num}")
         data = [{
             'tag_id': item.tag_id,
             'common_name': item.common_name,
@@ -58,8 +65,7 @@ def tab_data(tab_num):
         } for item in items]
         return jsonify(data)
     except Exception as e:
-        app = tabs_bp.app
-        app.logger.error(f"Error fetching tab {tab_num} data: {str(e)}")
+        current_app.logger.error(f"Error fetching tab {tab_num} data: {str(e)}")
         return jsonify({'error': 'Failed to fetch data'}), 500
 
 @tabs_bp.route('/tab/<int:tab_num>/subcat_data', methods=['GET'])
@@ -74,6 +80,7 @@ def subcat_data(tab_num):
         subcategories = db.session.query(
             ItemMaster.bin_location.distinct().label('subcategory')
         ).filter(ItemMaster.category.ilike(category)).all()
+        current_app.logger.info(f"Fetched {len(subcategories)} subcategories for category {category}")
         
         # Fetch common names for each subcategory
         result = []
@@ -91,6 +98,5 @@ def subcat_data(tab_num):
         
         return jsonify(result)
     except Exception as e:
-        app = tabs_bp.app
-        app.logger.error(f"Error fetching subcat data for tab {tab_num}: {str(e)}")
+        current_app.logger.error(f"Error fetching subcat data for tab {tab_num}: {str(e)}")
         return jsonify({'error': 'Failed to fetch subcategory data'}), 500
