@@ -92,10 +92,10 @@ def update_seed_data(seeds):
     current_app.logger.info(f"Updating {len(seeds)} seeds in seed_rental_classes")
     for seed in seeds:
         try:
+            rental_class_id = seed.get('rental_class_id')
             db.session.merge(SeedRentalClass(
-                rental_class_id=seed.get('rental_class_id'),
-                common_name=seed.get('common_name'),
-                bin_location=seed.get('bin_location')
+                rental_class_id=rental_class_id,
+                common_name=seed.get('common_name')
             ))
         except Exception as e:
             current_app.logger.error(f"Failed to update seed {seed.get('rental_class_id')}: {str(e)}")
@@ -161,4 +161,3 @@ def incremental_refresh():
     except Exception as e:
         current_app.logger.error(f"Incremental refresh failed: {str(e)}")
         db.session.rollback()
-        
