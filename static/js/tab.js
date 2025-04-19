@@ -103,18 +103,21 @@ function refreshTable(tabNum) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Cache the tab number on page load
+    // Cache the tab number on page load, but only on tab pages
     const h1Element = document.querySelector('h1');
-    if (h1Element) {
-        const tabNumMatch = h1Element.textContent.match(/\d+/);
-        if (tabNumMatch && tabNumMatch[0]) { // Add null check for tabNumMatch
-            cachedTabNum = tabNumMatch[0];
+    if (h1Element && window.location.pathname.startsWith('/tab/')) {
+        const h1Text = h1Element.textContent.trim();
+        const tabNumMatch = h1Text.match(/Tab\s+(\d+)/i); // Match "Tab 1", "Tab 2", etc.
+        if (tabNumMatch && tabNumMatch[1]) {
+            cachedTabNum = tabNumMatch[1];
             setInterval(() => refreshTable(cachedTabNum), 30000);
         } else {
-            console.warn('No tab number found in h1 element. Using default tab number 1.');
+            console.warn('No tab number found in h1 element, using default tab number 1.');
         }
+    } else if (!window.location.pathname.startsWith('/tab/')) {
+        console.debug('Not a tab page, skipping tab number detection.');
     } else {
-        console.warn('No h1 element found on the page. Using default tab number 1.');
+        console.warn('No h1 element found on the page, using default tab number 1.');
     }
 
     // Handle htmx:afterRequest to hide loading indicators
@@ -135,7 +138,6 @@ document.body.addEventListener('htmx:afterSwap', (event) => {
         if (container) {
             container.style.display = 'block';
             const data = JSON.parse(event.detail.xhr.responseText);
-            
             let html = `
                 <table class="table table-bordered ms-3 mt-2" id="items-table-${event.detail.target.id}">
                     <thead>
@@ -150,30 +152,36 @@ document.body.addEventListener('htmx:afterSwap', (event) => {
                     </thead>
                     <tbody>
             `;
-            
-            data.forEach(item => {
+            if (data.length === 0) {
                 html += `
                     <tr>
-                        <td>${item.tag_id || ''}</td>
-                        <td>${item.common_name || ''}</td>
-                        <td>${item.bin_location || ''}</td>
-                        <td>${item.status || ''}</td>
-                        <td>${item.last_contract_num || ''}</td>
-                        <td>
-                            <button class="btn btn-sm btn-info" onclick="printTable('Item', 'items-table-${event.detail.target.id}')">
-                                Print
-                            </button>
-                        </td>
+                        <td colspan="6">No items found for this subcategory.</td>
                     </tr>
                 `;
-            });
-            
+            } else {
+                data.forEach(item => {
+                    html += `
+                        <tr>
+                            <td>${item.tag_id || ''}</td>
+                            <td>${item.common_name || ''}</td>
+                            <td>${item.bin_location || ''}</td>
+                            <td>${item.status || ''}</td>
+                            <td>${item.last_contract_num || ''}</td>
+                            <td>
+                                <button class="btn btn-sm btn-info" onclick="printTable('Item', 'items-table-${event.detail.target.id}')">
+                                    Print
+                                </button>
+                            </td>
+                        </tr>
+                    `;
+                });
+            }
             html += `
                     </tbody>
                 </table>
             `;
             container.innerHTML = html;
-            applyFilters(); // Re-apply filters after loading items
+            applyFilters();
         } else {
             console.warn(`Container with ID '${event.detail.target.id}' not found.`);
         }
@@ -266,5 +274,5 @@ function loadSubcatData(category, subcatData) {
     
     html += '</div>';
     container.innerHTML = html;
-    applyFilters(); // Re-apply filters after loading subcategories
+    applyFilters();
 }

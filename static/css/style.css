@@ -1,7 +1,13 @@
 .table-responsive {
-    margin-top: 20px;
+    overflow-x: auto;
 }
 .loading {
-    font-style: italic;
     color: #888;
+    font-style: italic;
+}
+/* Ensure table cells have enough width to display content */
+.table-bordered th,
+.table-bordered td {
+    min-width: 150px; /* Adjust as needed */
+    white-space: nowrap; /* Prevent text wrapping */
 }
