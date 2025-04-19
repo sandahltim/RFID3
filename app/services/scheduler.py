@@ -1,9 +1,9 @@
 from apscheduler.schedulers.background import BackgroundScheduler
-from app.services.refresh import incremental_refresh
 from flask import current_app
 
 def init_scheduler():
     """Initialize APScheduler for incremental refreshes."""
+    from app.services.refresh import incremental_refresh  # Delayed import
     scheduler = BackgroundScheduler()
     scheduler.add_job(
         func=incremental_refresh,
