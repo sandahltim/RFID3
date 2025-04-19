@@ -57,7 +57,7 @@ class APIClient:
             response = requests.get(url, headers=headers, params=params, timeout=20)
             data = response.json()
             if response.status_code != 200:
-                logger.error(f"Request failed: {response.status_code} {response.reason}")
+                logger.error(f"Request failed: {response.status_code} {response.reason}, response: {data}")
                 raise Exception(f"{response.status_code} {response.reason}")
             records = data.get('results', [])
             total_count = data.get('count', 0)
@@ -73,23 +73,23 @@ class APIClient:
     def get_item_master(self, since_date=None):
         params = {}
         if since_date:
-            # Format the date to exclude microseconds and use space instead of T
-            since_date = datetime.fromisoformat(since_date).strftime('%Y-%m-%d %H:%M:%S')
-            params['filter[]'] = f"date_last_scanned>{since_date}"
+            # Try ISO format with T and wrap in quotes
+            since_date = datetime.fromisoformat(since_date).strftime('%Y-%m-%dT%H:%M:%S')
+            params['filter[]'] = f"date_last_scanned>'{since_date}'"
         return self._make_request("14223767938169344381", params)
 
     def get_transactions(self, since_date=None):
         params = {}
         if since_date:
-            # Format the date to exclude microseconds and use space instead of T
-            since_date = datetime.fromisoformat(since_date).strftime('%Y-%m-%d %H:%M:%S')
-            params['filter[]'] = f"date_updated>{since_date}"
+            # Try ISO format with T and wrap in quotes
+            since_date = datetime.fromisoformat(since_date).strftime('%Y-%m-%dT%H:%M:%S')
+            params['filter[]'] = f"date_updated>'{since_date}'"
         return self._make_request("14223767938169346196", params)
 
     def get_seed_data(self, since_date=None):
         params = {}
         if since_date:
-            # Format the date to exclude microseconds and use space instead of T
-            since_date = datetime.fromisoformat(since_date).strftime('%Y-%m-%d %H:%M:%S')
-            params['filter[]'] = f"date_updated>{since_date}"
+            # Try ISO format with T and wrap in quotes
+            since_date = datetime.fromisoformat(since_date).strftime('%Y-%m-%dT%H:%M:%S')
+            params['filter[]'] = f"date_updated>'{since_date}'"
         return self._make_request("14223767938169215907", params)
