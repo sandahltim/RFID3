@@ -16,92 +16,81 @@ class APIClient:
         self.authenticate()
 
     def authenticate(self):
-        now = datetime.utcnow()
-        if self.token and self.token_expiry and now < self.token_expiry:
-            logger.debug("Using cached access token")
-            return self.token
         payload = {"username": API_USERNAME, "password": API_PASSWORD}
-        logger.debug(f"Requesting token from {self.auth_url} with username={API_USERNAME}")
         for attempt in range(5):
             try:
+                logger.debug(f"Requesting token from {self.auth_url} with username={API_USERNAME}")
                 response = requests.post(self.auth_url, json=payload, timeout=20)
-                logger.debug(f"Token attempt {attempt+1}: Status {response.status_code}, Response: {response.text[:100]}...")
-                response.raise_for_status()
                 data = response.json()
-                self.token = data.get("access_token")
-                self.token_expiry = now + timedelta(minutes=55)
-                logger.debug(f"Access token received: {self.token[:10]}... (expires {self.token_expiry})")
-                return self.token
+                logger.debug(f"Token attempt {attempt + 1}: Status {response.status_code}, Response: {data}")
+                if response.status_code == 200 and data.get('result'):
+                    self.token = data.get('access_token')
+                    self.token_expiry = datetime.now() + timedelta(minutes=30)
+                    logger.debug(f"Access token received: {self.token[:20]}... (expires {self.token_expiry})")
+                    return
+                else:
+                    logger.error(f"Token attempt {attempt + 1} failed: {response.status_code} {response.reason}, response: {data}")
+                    if attempt < 4:
+                        time.sleep(3)
             except requests.RequestException as e:
-                logger.error(f"Token attempt {attempt+1} failed: {e}, response: {getattr(e.response, 'text', 'N/A')}")
+                logger.error(f"Token attempt {attempt + 1} failed with exception: {str(e)}")
                 if attempt < 4:
                     time.sleep(3)
-            except ValueError as e:
-                logger.error(f"Invalid JSON response from login: {e}")
-                return None
         logger.error("Failed to fetch access token after 5 attempts")
         raise Exception("Failed to fetch access token after 5 attempts")
 
     def _make_request(self, endpoint_id, params=None):
-        if not self.token:
+        if not params:
+            params = {}
+        params['offset'] = params.get('offset', 0)
+        params['limit'] = params.get('limit', 200)
+        params['returncount'] = params.get('returncount', True)
+
+        if self.token_expiry and datetime.now() >= self.token_expiry:
             self.authenticate()
-        headers = {'Authorization': f'Bearer {self.token}'}
+
+        headers = {"Authorization": f"Bearer {self.token}"}
         url = f"{self.base_url}{endpoint_id}"
-        logger.debug(f"Making request to {url} with params: {params}")
-        response = requests.get(url, headers=headers, params=params, timeout=20)
-        response.raise_for_status()
-        return response.json()
+        all_data = []
+        while True:
+            logger.debug(f"Making request to {url} with params: {params}")
+            response = requests.get(url, headers=headers, params=params, timeout=20)
+            data = response.json()
+            if response.status_code != 200:
+                logger.error(f"Request failed: {response.status_code} {response.reason}")
+                raise Exception(f"{response.status_code} {response.reason}")
+            records = data.get('results', [])
+            total_count = data.get('count', 0)
+            offset = params['offset']
+            logger.debug(f"Fetched {len(records)} records, Total Count: {total_count}, Offset: {offset}")
+            all_data.extend(records)
+            if len(records) < params['limit'] or offset + len(records) >= total_count:
+                break
+            params['offset'] += len(records)
+        logger.debug(f"Total records fetched: {len(all_data)}")
+        return all_data
 
     def get_item_master(self, since_date=None):
-        items = []
-        offset = 0
-        limit = 200
-        while True:
-            params = {'offset': offset, 'limit': limit, 'returncount': True}
-            if since_date:
-                params['filter[]'] = f"date_last_scanned>{since_date}"
-            data = self._make_request("14223767938169344381", params=params)
-            items.extend(data.get('data', []))
-            total_count = int(data.get('totalcount', 0))
-            logger.debug(f"Item Master: Fetched {len(data.get('data', []))} records, Total Count: {total_count}, Offset: {offset}")
-            offset += limit
-            if len(data.get('data', [])) == 0 or offset >= total_count:
-                break
-        logger.debug(f"Total Item Master records fetched: {len(items)}")
-        return items
+        params = {}
+        if since_date:
+            # Format the date to exclude microseconds and ensure compatibility
+            since_date = datetime.fromisoformat(since_date).strftime('%Y-%m-%dT%H:%M:%S')
+            params['filter[]'] = f"date_last_scanned>{since_date}"
+        return self._make_request("14223767938169344381", params)
 
     def get_transactions(self, since_date=None):
-        transactions = []
-        offset = 0
-        limit = 200
-        while True:
-            params = {'offset': offset, 'limit': limit, 'returncount': True}
-            if since_date:
-                params['filter[]'] = f"scan_date>{since_date}"
-            data = self._make_request("14223767938169346196", params=params)
-            transactions.extend(data.get('data', []))
-            total_count = int(data.get('totalcount', 0))
-            logger.debug(f"Transactions: Fetched {len(data.get('data', []))} records, Total Count: {total_count}, Offset: {offset}")
-            offset += limit
-            if len(data.get('data', [])) == 0 or offset >= total_count:
-                break
-        logger.debug(f"Total Transactions records fetched: {len(transactions)}")
-        return transactions
+        params = {}
+        if since_date:
+            # Format the date to exclude microseconds and ensure compatibility
+            since_date = datetime.fromisoformat(since_date).strftime('%Y-%m-%dT%H:%M:%S')
+            params['filter[]'] = f"date_updated>{since_date}"
+        return self._make_request("14223767938169346196", params)
 
     def get_seed_data(self, since_date=None):
-        seeds = []
-        offset = 0
-        limit = 200
-        while True:
-            params = {'offset': offset, 'limit': limit, 'returncount': True}
-            if since_date:
-                params['filter[]'] = f"date_updated>{since_date}"
-            data = self._make_request("14223767938169215907", params=params)
-            seeds.extend(data.get('data', []))
-            total_count = int(data.get('totalcount', 0))
-            logger.debug(f"Seed Data: Fetched {len(data.get('data', []))} records, Total Count: {total_count}, Offset: {offset}")
-            offset += limit
-            if len(data.get('data', [])) == 0 or offset >= total_count:
-                break
-        logger.debug(f"Total Seed Data records fetched: {len(seeds)}")
-        return seeds
+        params = {}
+        if since_date:
+            # Format the date to exclude microseconds and ensure compatibility
+            since_date = datetime.fromisoformat(since_date).strftime('%Y-%m-%dT%H:%M:%S')
+            params['filter[]'] = f"date_updated>{since_date}"
+        return self._make_request("14223767938169215907", params)
+    
