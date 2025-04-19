@@ -11,10 +11,19 @@ class APIClient:
 
     def authenticate(self):
         payload = {'username': API_USERNAME, 'password': API_PASSWORD}
-        headers = {'Content-Type': 'application/json'}
-        print(f"Attempting authentication with payload: {payload}")
+        headers = {
+            'Content-Type': 'application/json',
+            'User-Agent': 'curl/7.68.0'  # Match the user-agent from the curl command
+        }
+        print(f"Attempting authentication with URL: {self.auth_url}")
+        print(f"Payload: {payload}")
         print(f"Headers: {headers}")
         try:
+            # Enable debugging for requests to log the raw HTTP request
+            import http.client as http_client
+            http_client.HTTPConnection.debuglevel = 1
+            requests.logging.getLogger().setLevel(requests.logging.DEBUG)
+
             response = requests.post(self.auth_url, json=payload, headers=headers)
             print(f"Authentication response status: {response.status_code}")
             print(f"Authentication response body: {response.text}")
