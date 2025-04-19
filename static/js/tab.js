@@ -91,8 +91,15 @@ function refreshTable(tabNum) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    const tabNum = document.querySelector('h1').textContent.match(/\d+/)[0];
-    setInterval(() => refreshTable(tabNum), 30000);
+    // Only run refreshTable on tab pages (where <h1> exists)
+    const h1Element = document.querySelector('h1');
+    if (h1Element) {
+        const tabNumMatch = h1Element.textContent.match(/\d+/);
+        if (tabNumMatch) {
+            const tabNum = tabNumMatch[0];
+            setInterval(() => refreshTable(tabNum), 30000);
+        }
+    }
 
     // Handle htmx:afterRequest to hide loading indicators
     document.body.addEventListener('htmx:afterRequest', (event) => {
@@ -173,7 +180,7 @@ function loadSubcatData(category, subcatData) {
                         <td>${sub.subcategory}</td>
                         <td>
                             <button class="btn btn-sm btn-secondary"
-                                    hx-get="/tab/${document.querySelector('h1').textContent.match(/\d+/)[0]}/data?category=${encodeURIComponent(category)}&subcategory=${encodeURIComponent(sub.subcategory)}"
+                                    hx-get="/tab/${document.querySelector('h1') ? document.querySelector('h1').textContent.match(/\d+/)[0] : '1'}/data?category=${encodeURIComponent(category)}&subcategory=${encodeURIComponent(sub.subcategory)}"
                                     hx-target="#items-${subId}"
                                     hx-swap="innerHTML"
                                     onclick="showLoading('${subId}')">
@@ -210,7 +217,7 @@ function loadSubcatData(category, subcatData) {
                             <td>${cn}</td>
                             <td>
                                 <button class="btn btn-sm btn-secondary"
-                                        hx-get="/tab/${document.querySelector('h1').textContent.match(/\d+/)[0]}/data?category=${encodeURIComponent(category)}&subcategory=${encodeURIComponent(sub.subcategory)}&common_name=${encodeURIComponent(cn)}"
+                                        hx-get="/tab/${document.querySelector('h1') ? document.querySelector('h1').textContent.match(/\d+/)[0] : '1'}/data?category=${encodeURIComponent(category)}&subcategory=${encodeURIComponent(sub.subcategory)}&common_name=${encodeURIComponent(cn)}"
                                         hx-target="#items-${cnId}"
                                         hx-swap="innerHTML"
                                         onclick="showLoading('${cnId}')">
