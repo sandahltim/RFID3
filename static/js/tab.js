@@ -198,6 +198,7 @@ function loadSubcatData(category, subcatData) {
     let html = '<div class="ms-3">';
     
     subcatData.forEach(sub => {
+        console.debug(`Rendering subcategory for ${category}: ${sub.subcategory}`); // Debug log
         const subId = `${category}_${sub.subcategory}`.toLowerCase().replace(/[^a-z0-9-]/g, '_');
         html += `
             <table class="table table-bordered mt-2" id="subcat-table-${subId}">
