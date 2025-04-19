@@ -24,8 +24,8 @@ def update_item_master(items):
                 last_scanned_by=item.get('last_scanned_by'),
                 notes=item.get('notes'),
                 status_notes=item.get('status_notes'),
-                longitude=item.get('longitude'),
-                latitude=item.get('latitude'),
+                longitude=item.get('long'),
+                latitude=item.get('lat'),
                 date_last_scanned=item.get('date_last_scanned'),
                 date_created=item.get('date_created'),
                 date_updated=item.get('date_updated')
@@ -36,14 +36,12 @@ def update_item_master(items):
 
 def update_transactions(transactions):
     current_app.logger.info(f"Updating {len(transactions)} transactions in id_transactions")
-    skipped = 0
     for trans in transactions:
-        # Skip transactions with missing contract_number
-        if trans.get('contract_number') is None:
-            skipped += 1
-            current_app.logger.warning(f"Skipping transaction with tag_id {trans.get('tag_id')} due to missing contract_number")
-            continue
         try:
+            # Ensure required fields are present
+            if not all([trans.get('tag_id'), trans.get('common_name'), trans.get('scan_date')]):
+                current_app.logger.warning(f"Skipping transaction with tag_id {trans.get('tag_id')} due to missing required fields")
+                continue
             db.session.merge(Transaction(
                 contract_number=trans.get('contract_number'),
                 tag_id=trans.get('tag_id'),
@@ -56,34 +54,32 @@ def update_transactions(transactions):
                 scan_by=trans.get('scan_by'),
                 location_of_repair=trans.get('location_of_repair'),
                 quality=trans.get('quality'),
-                dirty_or_mud=trans.get('dirty_or_mud'),
-                leaves=trans.get('leaves'),
-                oil=trans.get('oil'),
-                mold=trans.get('mold'),
-                stain=trans.get('stain'),
-                oxidation=trans.get('oxidation'),
+                dirty_or_mud=trans.get('dirty_or_mud') == 'True',
+                leaves=trans.get('leaves') == 'True',
+                oil=trans.get('oil') == 'True',
+                mold=trans.get('mold') == 'True',
+                stain=trans.get('stain') == 'True',
+                oxidation=trans.get('oxidation') == 'True',
                 other=trans.get('other'),
-                rip_or_tear=trans.get('rip_or_tear'),
-                sewing_repair_needed=trans.get('sewing_repair_needed'),
-                grommet=trans.get('grommet'),
-                rope=trans.get('rope'),
-                buckle=trans.get('buckle'),
+                rip_or_tear=trans.get('rip_or_tear') == 'True',
+                sewing_repair_needed=trans.get('sewing_repair_needed') == 'True',
+                grommet=trans.get('grommet') == 'True',
+                rope=trans.get('rope') == 'True',
+                buckle=trans.get('buckle') == 'True',
                 date_created=trans.get('date_created'),
                 date_updated=trans.get('date_updated'),
                 uuid_accounts_fk=trans.get('uuid_accounts_fk'),
                 serial_number=trans.get('serial_number'),
                 rental_class_num=trans.get('rental_class_num'),
-                longitude=trans.get('longitude'),
-                latitude=trans.get('latitude'),
-                wet=trans.get('wet'),
-                service_required=trans.get('service_required'),
+                longitude=trans.get('long'),
+                latitude=trans.get('lat'),
+                wet=trans.get('wet') == 'True',
+                service_required=trans.get('service_required') == 'True',
                 notes=trans.get('notes')
             ))
         except Exception as e:
-            current_app.logger.error(f"Failed to update transaction {trans.get('contract_number')}: {str(e)}")
+            current_app.logger.error(f"Failed to update transaction {trans.get('tag_id')}: {str(e)}")
             raise
-    if skipped > 0:
-        current_app.logger.info(f"Skipped {skipped} transactions due to missing contract_number")
 
 def update_seed_data(seeds):
     current_app.logger.info(f"Updating {len(seeds)} seeds in seed_rental_classes")

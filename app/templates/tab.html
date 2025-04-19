@@ -27,7 +27,15 @@
                         <option value="available">Available</option>
                         <option value="rented">Rented</option>
                         <option value="repair">Repair</option>
-                        <!-- Add more statuses as needed -->
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label for="bin-location-filter" class="form-label">Filter by Bin Location</label>
+                    <select id="bin-location-filter" class="form-select">
+                        <option value="">All Bin Locations</option>
+                        {% for bin in bin_locations %}
+                        <option value="{{ bin }}">{{ bin }}</option>
+                        {% endfor %}
                     </select>
                 </div>
             </div>
@@ -68,7 +76,7 @@
     <script>
         // Initialize filters
         document.getElementById('filter-input').addEventListener('input', function() {
-            filterTable('category-table', this.value);
+            applyFilters();
         });
 
         document.getElementById('category-filter').addEventListener('change', function() {
@@ -76,6 +84,10 @@
         });
 
         document.getElementById('status-filter').addEventListener('change', function() {
+            applyFilters();
+        });
+
+        document.getElementById('bin-location-filter').addEventListener('change', function() {
             applyFilters();
         });
     </script>

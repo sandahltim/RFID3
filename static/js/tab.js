@@ -24,21 +24,11 @@ function sortTable(column, tableId) {
     rows.forEach(row => tbody.appendChild(row));
 }
 
-function filterTable(tableId, query) {
-    const table = document.getElementById(tableId);
-    const rows = table.querySelectorAll('tbody tr');
-    const lowerQuery = query.toLowerCase();
-    
-    rows.forEach(row => {
-        const text = Array.from(row.children).map(cell => cell.textContent.toLowerCase()).join(' ');
-        row.style.display = text.includes(lowerQuery) ? '' : 'none';
-    });
-}
-
 function applyFilters() {
     const textQuery = document.getElementById('filter-input').value.toLowerCase();
     const categoryFilter = document.getElementById('category-filter').value.toLowerCase();
     const statusFilter = document.getElementById('status-filter').value.toLowerCase();
+    const binLocationFilter = document.getElementById('bin-location-filter').value.toLowerCase();
     
     const tables = document.querySelectorAll('table');
     tables.forEach(table => {
@@ -47,12 +37,14 @@ function applyFilters() {
             const text = Array.from(row.children).map(cell => cell.textContent.toLowerCase()).join(' ');
             const categoryCell = row.querySelector('td:first-child') ? row.querySelector('td:first-child').textContent.toLowerCase() : '';
             const statusCell = row.querySelector('td:nth-child(4)') ? row.querySelector('td:nth-child(4)').textContent.toLowerCase() : '';
+            const binLocationCell = row.querySelector('td:nth-child(3)') ? row.querySelector('td:nth-child(3)').textContent.toLowerCase() : '';
             
             const matchesText = text.includes(textQuery);
             const matchesCategory = !categoryFilter || categoryCell.includes(categoryFilter);
             const matchesStatus = !statusFilter || statusCell.includes(statusFilter);
+            const matchesBinLocation = !binLocationFilter || binLocationCell.includes(binLocationFilter);
             
-            row.style.display = (matchesText && matchesCategory && matchesStatus) ? '' : 'none';
+            row.style.display = (matchesText && matchesCategory && matchesStatus && matchesBinLocation) ? '' : 'none';
         });
     });
 }

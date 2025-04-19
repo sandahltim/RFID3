@@ -7,7 +7,7 @@ User=tim
 Group=www-data
 WorkingDirectory=/home/tim/test_rfidpi
 Environment="PATH=/home/tim/test_rfidpi/venv/bin"
-ExecStart=/home/tim/test_rfidpi/venv/bin/gunicorn --workers 1 --bind 0.0.0.0:8101 --chdir /home/tim/test_rfidpi run:app
+ExecStart=/home/tim/test_rfidpi/venv/bin/gunicorn --workers 1 --bind 0.0.0.0:8101 --chdir /home/tim/test_rfidpi --log-level debug run:app
 Restart=always
 
 [Install]
