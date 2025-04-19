@@ -1,5 +1,5 @@
 from flask import Blueprint, render_template, jsonify, request, current_app
-from app.models.db_models import RFIDTag, ItemMaster
+from app.models.db_models import ItemMaster
 from app import db, cache
 import re
 
@@ -14,12 +14,12 @@ def sanitize_id(text):
 def tab(tab_num):
     try:
         current_app.logger.info(f"Loading tab {tab_num}")
-        # Fetch categories (group by category from id_rfidtag)
-        categories_query = db.session.query(
-            RFIDTag.category.distinct().label('category')
-        ).filter(RFIDTag.category.isnot(None))
-        categories = categories_query.all()
-        current_app.logger.info(f"Fetched {len(categories)} categories")
+        # Fetch rental class numbers (group by rental_class_num from id_item_master)
+        rental_classes_query = db.session.query(
+            ItemMaster.rental_class_num.distinct().label('rental_class_num')
+        ).filter(ItemMaster.rental_class_num.isnot(None))
+        rental_classes = rental_classes_query.all()
+        current_app.logger.info(f"Fetched {len(rental_classes)} rental classes")
         
         # Fetch bin locations from ItemMaster
         bin_locations_query = db.session.query(
@@ -31,7 +31,7 @@ def tab(tab_num):
         return render_template(
             'tab.html',
             tab_num=tab_num,
-            categories=[c.category for c in categories],
+            categories=[c.rental_class_num for c in rental_classes],
             bin_locations=[b.bin_location for b in bin_locations]
         )
     except Exception as e:
@@ -42,17 +42,17 @@ def tab(tab_num):
 @cache.cached(timeout=30)
 def tab_data(tab_num):
     try:
-        category = request.args.get('category')
-        subcategory = request.args.get('subcategory')
+        category = request.args.get('category')  # rental_class_num
+        subcategory = request.args.get('subcategory')  # bin_location
         common_name = request.args.get('common_name')
         
-        query = db.session.query(RFIDTag)
+        query = db.session.query(ItemMaster)
         if category:
-            query = query.filter(RFIDTag.category.ilike(category))
+            query = query.filter(ItemMaster.rental_class_num.ilike(category))
         if subcategory:
-            query = query.filter(RFIDTag.bin_location.ilike(subcategory))
+            query = query.filter(ItemMaster.bin_location.ilike(subcategory))
         if common_name:
-            query = query.filter(RFIDTag.common_name.ilike(common_name))
+            query = query.filter(ItemMaster.common_name.ilike(common_name))
         
         items = query.all()
         current_app.logger.info(f"Fetched {len(items)} items for tab {tab_num}")
@@ -72,24 +72,24 @@ def tab_data(tab_num):
 @cache.cached(timeout=30)
 def subcat_data(tab_num):
     try:
-        category = request.args.get('category')
+        category = request.args.get('category')  # rental_class_num
         if not category:
-            return jsonify({'error': 'Category required'}), 400
+            return jsonify({'error': 'Rental class required'}), 400
         
-        # Fetch subcategories (bin_location) for the category
+        # Fetch subcategories (bin_location) for the rental class
         subcategories = db.session.query(
-            RFIDTag.bin_location.distinct().label('subcategory')
-        ).filter(RFIDTag.category.ilike(category)).all()
-        current_app.logger.info(f"Fetched {len(subcategories)} subcategories for category {category}")
+            ItemMaster.bin_location.distinct().label('subcategory')
+        ).filter(ItemMaster.rental_class_num.ilike(category)).all()
+        current_app.logger.info(f"Fetched {len(subcategories)} subcategories for rental class {category}")
         
         # Fetch common names for each subcategory
         result = []
         for sub in subcategories:
             common_names = db.session.query(
-                RFIDTag.common_name.distinct().label('common_name')
+                ItemMaster.common_name.distinct().label('common_name')
             ).filter(
-                RFIDTag.category.ilike(category),
-                RFIDTag.bin_location.ilike(sub.subcategory)
+                ItemMaster.rental_class_num.ilike(category),
+                ItemMaster.bin_location.ilike(sub.subcategory)
             ).all()
             result.append({
                 'subcategory': sub.subcategory,
