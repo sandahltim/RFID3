@@ -11,9 +11,11 @@ class APIClient:
 
     def authenticate(self):
         payload = {'username': API_USERNAME, 'password': API_PASSWORD}
+        headers = {'Content-Type': 'application/json'}
         print(f"Attempting authentication with payload: {payload}")
+        print(f"Headers: {headers}")
         try:
-            response = requests.post(self.auth_url, json=payload)
+            response = requests.post(self.auth_url, json=payload, headers=headers)
             print(f"Authentication response status: {response.status_code}")
             print(f"Authentication response body: {response.text}")
             response.raise_for_status()
