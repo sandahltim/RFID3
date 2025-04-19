@@ -10,6 +10,9 @@ def update_item_master(items):
     current_app.logger.info(f"Updating {len(items)} items in id_item_master")
     for item in items:
         try:
+            # Convert empty strings to None for DECIMAL fields
+            longitude = item.get('long') if item.get('long') else None
+            latitude = item.get('lat') if item.get('lat') else None
             db.session.merge(ItemMaster(
                 tag_id=item.get('tag_id'),
                 uuid_accounts_fk=item.get('uuid_accounts_fk'),
@@ -24,8 +27,8 @@ def update_item_master(items):
                 last_scanned_by=item.get('last_scanned_by'),
                 notes=item.get('notes'),
                 status_notes=item.get('status_notes'),
-                longitude=item.get('long'),
-                latitude=item.get('lat'),
+                longitude=longitude,
+                latitude=latitude,
                 date_last_scanned=item.get('date_last_scanned'),
                 date_created=item.get('date_created'),
                 date_updated=item.get('date_updated')
@@ -42,6 +45,9 @@ def update_transactions(transactions):
             if not all([trans.get('tag_id'), trans.get('common_name'), trans.get('scan_date')]):
                 current_app.logger.warning(f"Skipping transaction with tag_id {trans.get('tag_id')} due to missing required fields")
                 continue
+            # Convert empty strings to None for DECIMAL fields
+            longitude = trans.get('long') if trans.get('long') else None
+            latitude = trans.get('lat') if trans.get('lat') else None
             db.session.merge(Transaction(
                 contract_number=trans.get('contract_number'),
                 tag_id=trans.get('tag_id'),
@@ -71,8 +77,8 @@ def update_transactions(transactions):
                 uuid_accounts_fk=trans.get('uuid_accounts_fk'),
                 serial_number=trans.get('serial_number'),
                 rental_class_num=trans.get('rental_class_num'),
-                longitude=trans.get('long'),
-                latitude=trans.get('lat'),
+                longitude=longitude,
+                latitude=latitude,
                 wet=trans.get('wet') == 'True',
                 service_required=trans.get('service_required') == 'True',
                 notes=trans.get('notes')
