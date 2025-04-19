@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, request, jsonify, current_app
 from app.models.db_models import RentalClassMapping, SeedRentalClass
 from app import db
-from time import time  # Add this import for timestamp
+from time import time
 
 categories_bp = Blueprint('categories', __name__)
 
@@ -10,14 +10,30 @@ def manage_categories():
     # Fetch all rental classes and their mappings
     rental_classes = db.session.query(SeedRentalClass.rental_class_id).distinct().all()
     rental_classes = [rc[0] for rc in rental_classes]
-    
+
     mappings = RentalClassMapping.query.all()
     mapping_dict = {m.rental_class_id: {'category': m.category, 'subcategory': m.subcategory} for m in mappings}
-    
+
     # Generate a timestamp for cache-busting
     cache_bust = int(time())
-    
+
     return render_template('categories.html', rental_classes=rental_classes, mappings=mapping_dict, cache_bust=cache_bust)
+
+@categories_bp.route('/categories/mapping', methods=['GET'])
+def get_mapping():
+    try:
+        rental_class_id = request.args.get('rental_class_id')
+        if not rental_class_id:
+            return jsonify({'error': 'Rental class ID required'}), 400
+
+        mapping = RentalClassMapping.query.get(rental_class_id)
+        if mapping:
+            return jsonify({'category': mapping.category, 'subcategory': mapping.subcategory})
+        else:
+            return jsonify({'category': '', 'subcategory': ''})
+    except Exception as e:
+        current_app.logger.error(f"Error fetching mapping for rental_class_id {rental_class_id}: {str(e)}")
+        return jsonify({'error': 'Failed to fetch mapping'}), 500
 
 @categories_bp.route('/categories/update', methods=['POST'])
 def update_category():
@@ -25,10 +41,10 @@ def update_category():
         rental_class_id = request.form.get('rental_class_id')
         category = request.form.get('category')
         subcategory = request.form.get('subcategory')
-        
+
         if not all([rental_class_id, category, subcategory]):
             return jsonify({'status': 'error', 'message': 'All fields are required'}), 400
-        
+
         mapping = RentalClassMapping.query.get(rental_class_id)
         if mapping:
             mapping.category = category
@@ -40,7 +56,7 @@ def update_category():
                 subcategory=subcategory
             )
             db.session.add(mapping)
-        
+
         db.session.commit()
         current_app.logger.info(f"Updated mapping for rental_class_id {rental_class_id}: {category}/{subcategory}")
         return jsonify({'status': 'success', 'message': 'Mapping updated'})
