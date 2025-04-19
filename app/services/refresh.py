@@ -7,6 +7,16 @@ from datetime import datetime
 
 refresh_bp = Blueprint('refresh', __name__)
 
+def parse_date(date_str):
+    """Parse a date string in 'YYYY-MM-DD HH:MM:SS' format to a datetime object."""
+    if date_str and isinstance(date_str, str):
+        try:
+            return datetime.strptime(date_str, '%Y-%m-%d %H:%M:%S')
+        except ValueError as e:
+            current_app.logger.error(f"Failed to parse date '{date_str}': {str(e)}")
+            return None
+    return None
+
 def update_item_master(items):
     current_app.logger.info(f"Updating {len(items)} items in id_item_master")
     for item in items:
@@ -14,6 +24,10 @@ def update_item_master(items):
             # Convert empty strings to None for DECIMAL fields
             longitude = item.get('long') if item.get('long') else None
             latitude = item.get('lat') if item.get('lat') else None
+            # Parse date strings to datetime objects
+            date_last_scanned = parse_date(item.get('date_last_scanned'))
+            date_created = parse_date(item.get('date_created'))
+            date_updated = parse_date(item.get('date_updated'))
             db.session.merge(ItemMaster(
                 tag_id=item.get('tag_id'),
                 uuid_accounts_fk=item.get('uuid_accounts_fk'),
@@ -30,9 +44,9 @@ def update_item_master(items):
                 status_notes=item.get('status_notes'),
                 longitude=longitude,
                 latitude=latitude,
-                date_last_scanned=item.get('date_last_scanned'),
-                date_created=item.get('date_created'),
-                date_updated=item.get('date_updated')
+                date_last_scanned=date_last_scanned,
+                date_created=date_created,
+                date_updated=date_updated
             ))
         except Exception as e:
             current_app.logger.error(f"Failed to update item {item.get('tag_id')}: {str(e)}")
@@ -49,11 +63,18 @@ def update_transactions(transactions):
             # Convert empty strings to None for DECIMAL fields
             longitude = trans.get('long') if trans.get('long') else None
             latitude = trans.get('lat') if trans.get('lat') else None
+            # Parse date strings to datetime objects
+            scan_date = parse_date(trans.get('scan_date'))
+            date_created = parse_date(trans.get('date_created'))
+            date_updated = parse_date(trans.get('date_updated'))
+            if not scan_date:  # Skip if scan_date cannot be parsed
+                current_app.logger.warning(f"Skipping transaction with tag_id {trans.get('tag_id')} due to invalid scan_date")
+                continue
             db.session.merge(Transaction(
                 contract_number=trans.get('contract_number'),
                 tag_id=trans.get('tag_id'),
                 scan_type=trans.get('scan_type'),
-                scan_date=trans.get('scan_date'),
+                scan_date=scan_date,
                 client_name=trans.get('client_name'),
                 common_name=trans.get('common_name'),
                 bin_location=trans.get('bin_location'),
@@ -73,8 +94,8 @@ def update_transactions(transactions):
                 grommet=trans.get('grommet') == 'True',
                 rope=trans.get('rope') == 'True',
                 buckle=trans.get('buckle') == 'True',
-                date_created=trans.get('date_created'),
-                date_updated=trans.get('date_updated'),
+                date_created=date_created,
+                date_updated=date_updated,
                 uuid_accounts_fk=trans.get('uuid_accounts_fk'),
                 serial_number=trans.get('serial_number'),
                 rental_class_num=trans.get('rental_class_num'),
