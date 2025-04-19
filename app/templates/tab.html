@@ -37,7 +37,7 @@
     </select>
 </div>
 
-<div id="category-table" hx-get="/tab/{{ tab_num }}/subcat_data" hx-trigger="load" hx-swap="innerHTML">
+<div id="category-table">
     {% for category in categories %}
     <table class="table table-bordered">
         <thead>
