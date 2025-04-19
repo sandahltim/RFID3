@@ -19,3 +19,4 @@ def init_scheduler(app):
     )
     scheduler.start()
     app.logger.info("Background scheduler started for incremental refresh")
+    

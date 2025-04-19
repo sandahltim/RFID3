@@ -46,8 +46,11 @@ def create_app():
     from app.routes.health import health_bp
     app.register_blueprint(health_bp)
 
-    # Initialize scheduler within application context
-    from app.services.scheduler import init_scheduler
-    init_scheduler(app)  # Pass the app instance directly
-
     return app
+
+# Create app instance
+app = create_app()
+
+# Initialize scheduler after app is fully created
+from app.services.scheduler import init_scheduler
+init_scheduler(app)
