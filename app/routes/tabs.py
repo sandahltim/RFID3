@@ -1,46 +1,30 @@
-from flask import Blueprint, render_template, request, jsonify, current_app
-from app.models.db_models import ItemMaster, RentalClassMapping
-from app import db, cache
+from flask import Blueprint, jsonify, request, current_app
+from .. import db, cache
+from ..models import ItemMaster, RentalClassMapping
 from sqlalchemy import func
-import re
-from time import time
 
 tabs_bp = Blueprint('tabs', __name__)
 
-def sanitize_id(text):
-    """Sanitize text for use in HTML IDs."""
-    return re.sub(r'[^\w-]', '_', text.replace('"', '').replace('.', '_').lower())
-
-@tabs_bp.route('/tab/<int:tab_num>')
+@tabs_bp.route('/tab/<int:tab_num>', methods=['GET'])
 @cache.cached(timeout=30)
-def tab(tab_num):
+def tab_view(tab_num):
     try:
         current_app.logger.info(f"Loading tab {tab_num}")
-        # Fetch categories from RentalClassMapping directly
-        categories_query = db.session.query(RentalClassMapping.category).distinct().order_by(RentalClassMapping.category)
-        categories = [cat[0] for cat in categories_query.all() if cat[0]]
-
-        # Fetch bin locations from ItemMaster
-        bin_locations_query = db.session.query(
-            ItemMaster.bin_location.distinct().label('bin_location')
-        ).filter(ItemMaster.bin_location.isnot(None))
-        bin_locations = bin_locations_query.all()
+        categories = db.session.query(RentalClassMapping.category).distinct().order_by(RentalClassMapping.category).all()
+        categories = [cat[0] for cat in categories if cat[0]]
         current_app.logger.info(f"Fetched {len(categories)} categories")
+
+        bin_locations = db.session.query(ItemMaster.bin_location).distinct().order_by(ItemMaster.bin_location).all()
+        bin_locations = [loc[0] for loc in bin_locations if loc[0]]
         current_app.logger.info(f"Fetched {len(bin_locations)} bin locations")
 
-        # Generate a timestamp for cache-busting
-        cache_bust = int(time())
+        statuses = db.session.query(ItemMaster.status).distinct().order_by(ItemMaster.status).all()
+        statuses = [status[0] for status in statuses if status[0]]
 
-        return render_template(
-            'tab.html',
-            tab_num=tab_num,
-            categories=categories,
-            bin_locations=[b.bin_location for b in bin_locations],
-            cache_bust=cache_bust
-        )
+        return render_template('tab.html', tab_num=tab_num, categories=categories, statuses=statuses, bin_locations=bin_locations)
     except Exception as e:
         current_app.logger.error(f"Error loading tab {tab_num}: {str(e)}")
-        return render_template('tab.html', tab_num=tab_num, error=f"Failed to load data: {str(e)}")
+        return jsonify({'error': 'Failed to load tab'}), 500
 
 @tabs_bp.route('/tab/<int:tab_num>/subcat_data', methods=['GET'])
 @cache.cached(timeout=30)
@@ -48,9 +32,8 @@ def subcat_data(tab_num):
     try:
         category = request.args.get('category')
         if not category:
-            return jsonify({'error': 'Category required'}), 400
+            return jsonify({'error': 'Category is required'}), 400
 
-        # Fetch subcategories with item counts
         subcategory_counts = db.session.query(
             RentalClassMapping.subcategory,
             func.count(ItemMaster.tag_id).label('item_count')
@@ -64,44 +47,45 @@ def subcat_data(tab_num):
             func.count(ItemMaster.tag_id).desc(),
             RentalClassMapping.subcategory
         ).all()
-        subcategories = [sub[0] for sub, _ in subcategory_counts if sub[0]]
 
-        # Fetch common names for each subcategory
-        result = []
-        for sub in subcategories:
-            common_name_counts = db.session.query(
-                ItemMaster.common_name,
-                func.count(ItemMaster.tag_id).label('item_count')
+        subcategories = [sub[0] for sub, _ in subcategory_counts if sub[0]]
+        current_app.logger.info(f"Fetched {len(subcategories)} subcategories for category {category}")
+
+        data = []
+        for subcategory in subcategories:
+            common_names = db.session.query(
+                ItemMaster.common_name
             ).join(
-                RentalClassMapping, ItemMaster.rental_class_num == RentalClassMapping.rental_class_id, isouter=True
+                RentalClassMapping, ItemMaster.rental_class_num == RentalClassMapping.rental_class_id
             ).filter(
                 RentalClassMapping.category.ilike(category),
-                RentalClassMapping.subcategory.ilike(sub)
+                RentalClassMapping.subcategory.ilike(subcategory)
             ).group_by(
                 ItemMaster.common_name
             ).order_by(
-                func.count(ItemMaster.tag_id).desc(),
                 ItemMaster.common_name
             ).all()
-            common_names = [cn[0] for cn, _ in common_name_counts if cn[0]]
-            result.append({
-                'subcategory': sub,
+            common_names = [cn[0] for cn in common_names if cn[0]]
+            data.append({
+                'subcategory': subcategory,
                 'common_names': common_names
             })
 
-        current_app.logger.info(f"Fetched {len(subcategories)} subcategories for category {category}")
-        return jsonify(result)
+        current_app.logger.debug(f"Subcategory data for category {category}: {data}")
+        return jsonify(data)
     except Exception as e:
-        current_app.logger.error(f"Error fetching subcat data for tab {tab_num}: {str(e)}")
-        return jsonify({'error': 'Failed to fetch subcategory data'}), 500
+        current_app.logger.error(f"Error fetching subcategories for tab {tab_num}: {str(e)}")
+        return jsonify({'error': 'Failed to fetch subcategories'}), 500
 
 @tabs_bp.route('/tab/<int:tab_num>/data', methods=['GET'])
-@cache.cached(timeout=30)
+# @cache.cached(timeout=30)  # Temporarily disable caching
 def tab_data(tab_num):
     try:
         category = request.args.get('category')
         subcategory = request.args.get('subcategory')
         common_name = request.args.get('common_name')
+
+        current_app.logger.debug(f"Received request for tab {tab_num} data: category={category}, subcategory={subcategory}, common_name={common_name}")
 
         query = db.session.query(ItemMaster)
         if category and subcategory:
@@ -123,6 +107,7 @@ def tab_data(tab_num):
             'status': item.status,
             'last_contract_num': item.last_contract_num
         } for item in items]
+        current_app.logger.debug(f"Returning item data: {data}")
         return jsonify(data)
     except Exception as e:
         current_app.logger.error(f"Error fetching tab {tab_num} data: {str(e)}")
