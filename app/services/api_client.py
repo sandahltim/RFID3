@@ -15,12 +15,14 @@ class APIClient:
         response = requests.post(self.auth_url, json={'username': username, 'password': password})
         response.raise_for_status()
         self.token = response.json().get('access_token')
+        print(f"Authenticated successfully with token: {self.token[:10]}...")
 
     def _make_request(self, endpoint_id, params=None):
         if not self.token:
             self.authenticate()
         headers = {'Authorization': f'Bearer {self.token}'}
         url = f"{self.base_url}{endpoint_id}"
+        print(f"Making request to {url} with params: {params}")
         response = requests.get(url, headers=headers, params=params)
         response.raise_for_status()
         return response.json()
@@ -35,10 +37,12 @@ class APIClient:
                 params['filter[]'] = f"date_last_scanned>{since_date}"
             data = self._make_request("14223767938169344381", params=params)
             items.extend(data.get('data', []))
-            total_count = int(data.get('totalcount', 0))  # Ensure totalcount is an integer
+            total_count = int(data.get('totalcount', 0))
+            print(f"Item Master: Fetched {len(data.get('data', []))} records, Total Count: {total_count}, Offset: {offset}")
             offset += limit
-            if offset >= total_count:
+            if len(data.get('data', [])) == 0 or offset >= total_count:
                 break
+        print(f"Total Item Master records fetched: {len(items)}")
         return items
 
     def get_transactions(self, since_date=None):
@@ -52,9 +56,11 @@ class APIClient:
             data = self._make_request("14223767938169346196", params=params)
             transactions.extend(data.get('data', []))
             total_count = int(data.get('totalcount', 0))
+            print(f"Transactions: Fetched {len(data.get('data', []))} records, Total Count: {total_count}, Offset: {offset}")
             offset += limit
-            if offset >= total_count:
+            if len(data.get('data', [])) == 0 or offset >= total_count:
                 break
+        print(f"Total Transactions records fetched: {len(transactions)}")
         return transactions
 
     def get_seed_data(self, since_date=None):
@@ -68,7 +74,9 @@ class APIClient:
             data = self._make_request("14223767938169215907", params=params)
             seeds.extend(data.get('data', []))
             total_count = int(data.get('totalcount', 0))
+            print(f"Seed Data: Fetched {len(data.get('data', []))} records, Total Count: {total_count}, Offset: {offset}")
             offset += limit
-            if offset >= total_count:
+            if len(data.get('data', [])) == 0 or offset >= total_count:
                 break
+        print(f"Total Seed Data records fetched: {len(seeds)}")
         return seeds
