@@ -4,6 +4,7 @@ DROP TABLE IF EXISTS id_item_master;
 DROP TABLE IF EXISTS id_rfidtag;
 DROP TABLE IF EXISTS seed_rental_classes;
 DROP TABLE IF EXISTS refresh_state;
+DROP TABLE IF EXISTS rental_class_mappings;
 
 -- Create id_transactions table
 CREATE TABLE id_transactions (
@@ -99,4 +100,11 @@ CREATE TABLE seed_rental_classes (
 CREATE TABLE refresh_state (
     id INT PRIMARY KEY AUTO_INCREMENT,
     last_refresh VARCHAR(255) NOT NULL
+);
+
+-- Create rental_class_mappings table
+CREATE TABLE rental_class_mappings (
+    rental_class_id VARCHAR(50) PRIMARY KEY,
+    category VARCHAR(100) NOT NULL,
+    subcategory VARCHAR(100) NOT NULL
 );
