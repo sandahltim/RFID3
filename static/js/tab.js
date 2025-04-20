@@ -102,6 +102,141 @@ function refreshTable(tabNum) {
     setTimeout(() => { isRefreshing = false; }, 1000);
 }
 
+function hideOtherSubcats(currentCategory) {
+    const allSubcatDivs = document.querySelectorAll('div[id^="subcat-"]');
+    allSubcatDivs.forEach(div => {
+        if (div.id !== `subcat-${currentCategory.toLowerCase().replace(/[^a-z0-9-]/g, '_')}`) {
+            div.style.display = 'none';
+            div.innerHTML = '';  // Clear content to prevent bleed-over
+        }
+    });
+}
+
+function loadSubcatData(category, subcatData) {
+    hideOtherSubcats(category);
+    const container = document.getElementById(`subcat-${category.toLowerCase().replace(/[^a-z0-9-]/g, '_')}`);
+    if (!container) {
+        console.warn(`Container with ID 'subcat-${category.toLowerCase().replace(/[^a-z0-9-]/g, '_')}' not found.`);
+        return;
+    }
+    container.innerHTML = '';
+    container.style.display = 'block';
+    let html = '<div class="ms-3">';
+    
+    subcatData.forEach(sub => {
+        console.log(`Rendering subcategory for ${category}: ${sub.subcategory}`);
+        const subId = `${category}_${sub.subcategory}`.toLowerCase().replace(/[^a-z0-9-]/g, '_');
+        const escapedSubcategory = sub.subcategory.replace(/&/g, '&').replace(/</g, '<').replace(/>/g, '>').replace(/"/g, '"').replace(/'/g, '');
+        html += `
+            <table class="table table-bordered mt-2" id="subcat-table-${subId}">
+                <thead>
+                    <tr>
+                        <th>Subcategory</th>
+                        <th>Total Items</th>
+                        <th>Items on Contracts</th>
+                        <th>Items in Service</th>
+                        <th>Items Available</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>${escapedSubcategory}</td>
+                        <td>${sub.total_items}</td>
+                        <td>${sub.on_contracts}</td>
+                        <td>${sub.in_service}</td>
+                        <td>${sub.available}</td>
+                        <td>
+                            <button class="btn btn-sm btn-secondary"
+                                    hx-get="/tab/${cachedTabNum}/common_names?category=${encodeURIComponent(category)}&subcategory=${encodeURIComponent(sub.subcategory)}"
+                                    hx-target="#common-${subId}"
+                                    hx-swap="innerHTML"
+                                    onclick="showLoading('${subId}')">
+                                Load Items
+                            </button>
+                            <button class="btn btn-sm btn-info" onclick="printTable('Subcategory', 'subcat-table-${subId}')">
+                                Print
+                            </button>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td colspan="6">
+                            <div id="common-${subId}" style="display:none;"></div>
+                            <div id="items-${subId}" style="display:none;"></div>
+                            <div id="loading-${subId}" style="display:none;" class="loading">Loading...</div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        `;
+    });
+    
+    html += '</div>';
+    container.innerHTML = html;
+    applyFilters();
+}
+
+function loadCommonNames(category, subcategory, commonNamesData) {
+    const subId = `${category}_${subcategory}`.toLowerCase().replace(/[^a-z0-9-]/g, '_');
+    const container = document.getElementById(`common-${subId}`);
+    if (!container) {
+        console.warn(`Container with ID 'common-${subId}' not found.`);
+        return;
+    }
+    container.style.display = 'block';
+    hideLoading(subId);
+
+    let html = '';
+    commonNamesData.common_names.forEach(cn => {
+        const cnId = `${subId}_${cn.name}`.toLowerCase().replace(/[^a-z0-9-]/g, '_');
+        const escapedCommonName = cn.name.replace(/&/g, '&').replace(/</g, '<').replace(/>/g, '>').replace(/"/g, '"').replace(/'/g, '');
+        html += `
+            <table class="table table-bordered ms-3 mt-2" id="common-table-${cnId}">
+                <thead>
+                    <tr>
+                        <th>Common Name</th>
+                        <th>Total Items</th>
+                        <th>Items on Contracts</th>
+                        <th>Items in Service</th>
+                        <th>Items Available</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>${escapedCommonName}</td>
+                        <td>${cn.total_items}</td>
+                        <td>${cn.on_contracts}</td>
+                        <td>${cn.in_service}</td>
+                        <td>${cn.available}</td>
+                        <td>
+                            <button class="btn btn-sm btn-secondary"
+                                    hx-get="/tab/${cachedTabNum}/data?category=${encodeURIComponent(category)}&subcategory=${encodeURIComponent(subcategory)}&common_name=${encodeURIComponent(cn.name)}"
+                                    hx-target="#items-${cnId}"
+                                    hx-swap="innerHTML"
+                                    onclick="showLoading('${cnId}')">
+                                Load Items
+                            </button>
+                            <button class="btn btn-sm btn-info" onclick="printTable('Common Name', 'common-table-${cnId}')">
+                                Print
+                            </button>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td colspan="6">
+                            <div id="items-${cnId}" style="display:none;"></div>
+                            <div id="loading-${cnId}" style="display:none;" class="loading">Loading...</div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        `;
+    });
+
+    container.innerHTML = html;
+    applyFilters();
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     // Cache the tab number on page load, but only on tab pages
     const h1Element = document.querySelector('h1');
@@ -123,23 +258,29 @@ document.addEventListener('DOMContentLoaded', () => {
     // Handle htmx:afterRequest to hide loading indicators
     document.body.addEventListener('htmx:afterRequest', (event) => {
         const targetId = event.detail.target.id;
-        const catKey = targetId.replace('subcat-', '').replace('items-', '');
+        const catKey = targetId.replace('subcat-', '').replace('common-', '').replace('items-', '');
         hideLoading(catKey);
     });
 });
 
 document.body.addEventListener('htmx:afterSwap', (event) => {
-    if (event.detail.target.id.startsWith('subcat-')) {
-        const category = event.detail.target.id.replace('subcat-', '');
+    const targetId = event.detail.target.id;
+    if (targetId.startsWith('subcat-')) {
+        const category = targetId.replace('subcat-', '');
         const data = JSON.parse(event.detail.xhr.responseText);
         loadSubcatData(category, data);
-    } else if (event.detail.target.id.startsWith('items-')) {
-        const container = document.getElementById(event.detail.target.id);
+    } else if (targetId.startsWith('common-')) {
+        const category = event.detail.requestConfig.elt.getAttribute('hx-get').match(/category=([^&]+)/)[1];
+        const subcategory = event.detail.requestConfig.elt.getAttribute('hx-get').match(/subcategory=([^&]+)/)[1];
+        const data = JSON.parse(event.detail.xhr.responseText);
+        loadCommonNames(decodeURIComponent(category), decodeURIComponent(subcategory), data);
+    } else if (targetId.startsWith('items-')) {
+        const container = document.getElementById(targetId);
         if (container) {
             container.style.display = 'block';
             const data = JSON.parse(event.detail.xhr.responseText);
             let html = `
-                <table class="table table-bordered ms-3 mt-2" id="items-table-${event.detail.target.id}">
+                <table class="table table-bordered ms-3 mt-2" id="items-table-${targetId}">
                     <thead>
                         <tr>
                             <th>Tag ID</th>
@@ -147,6 +288,9 @@ document.body.addEventListener('htmx:afterSwap', (event) => {
                             <th>Bin Location</th>
                             <th>Status</th>
                             <th>Last Contract</th>
+                            <th>Last Scanned Date</th>
+                            <th>Quality</th>
+                            <th>Notes</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
@@ -155,7 +299,7 @@ document.body.addEventListener('htmx:afterSwap', (event) => {
             if (data.length === 0) {
                 html += `
                     <tr>
-                        <td colspan="6">No items found for this subcategory.</td>
+                        <td colspan="9">No items found for this common name.</td>
                     </tr>
                 `;
             } else {
@@ -167,8 +311,11 @@ document.body.addEventListener('htmx:afterSwap', (event) => {
                             <td>${item.bin_location || ''}</td>
                             <td>${item.status || ''}</td>
                             <td>${item.last_contract_num || ''}</td>
+                            <td>${item.last_scanned_date || ''}</td>
+                            <td>${item.quality || ''}</td>
+                            <td>${item.notes || ''}</td>
                             <td>
-                                <button class="btn btn-sm btn-info" onclick="printTable('Item', 'items-table-${event.detail.target.id}')">
+                                <button class="btn btn-sm btn-info" onclick="printTable('Item', 'items-table-${targetId}')">
                                     Print
                                 </button>
                             </td>
@@ -183,100 +330,7 @@ document.body.addEventListener('htmx:afterSwap', (event) => {
             container.innerHTML = html;
             applyFilters();
         } else {
-            console.warn(`Container with ID '${event.detail.target.id}' not found.`);
+            console.warn(`Container with ID '${targetId}' not found.`);
         }
     }
 });
-
-function loadSubcatData(category, subcatData) {
-    const container = document.getElementById(`subcat-${category.toLowerCase().replace(/[^a-z0-9-]/g, '_')}`);
-    if (!container) {
-        console.warn(`Container with ID 'subcat-${category.toLowerCase().replace(/[^a-z0-9-]/g, '_')}' not found.`);
-        return;
-    }
-    container.style.display = 'block';
-    let html = '<div class="ms-3">';
-    
-    subcatData.forEach(sub => {
-        console.log(`Rendering subcategory for ${category}: ${sub.subcategory}`); // Changed to console.log
-        const subId = `${category}_${sub.subcategory}`.toLowerCase().replace(/[^a-z0-9-]/g, '_');
-        // Escape HTML characters in subcategory to prevent rendering issues
-        const escapedSubcategory = sub.subcategory.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-        html += `
-            <table class="table table-bordered mt-2" id="subcat-table-${subId}">
-                <thead>
-                    <tr>
-                        <th>Subcategory</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td>${escapedSubcategory}</td>
-                        <td>
-                            <button class="btn btn-sm btn-secondary"
-                                    hx-get="/tab/${cachedTabNum}/data?category=${encodeURIComponent(category)}&subcategory=${encodeURIComponent(sub.subcategory)}"
-                                    hx-target="#items-${subId}"
-                                    hx-swap="innerHTML"
-                                    onclick="showLoading('${subId}')">
-                                Load Items
-                            </button>
-                            <button class="btn btn-sm btn-info" onclick="printTable('Subcategory', 'subcat-table-${subId}')">
-                                Print
-                            </button>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td colspan="2">
-                            <div id="common-${subId}" style="display:none;"></div>
-                            <div id="items-${subId}" style="display:none;"></div>
-                            <div id="loading-${subId}" style="display:none;" class="loading">Loading...</div>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-        `;
-        
-        sub.common_names.forEach(cn => {
-            const cnId = `${subId}_${cn}`.toLowerCase().replace(/[^a-z0-9-]/g, '_');
-            const escapedCommonName = cn.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-            html += `
-                <table class="table table-bordered ms-3 mt-2" id="common-table-${cnId}">
-                    <thead>
-                        <tr>
-                            <th>Common Name</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td>${escapedCommonName}</td>
-                            <td>
-                                <button class="btn btn-sm btn-secondary"
-                                        hx-get="/tab/${cachedTabNum}/data?category=${encodeURIComponent(category)}&subcategory=${encodeURIComponent(sub.subcategory)}&common_name=${encodeURIComponent(cn)}"
-                                        hx-target="#items-${cnId}"
-                                        hx-swap="innerHTML"
-                                        onclick="showLoading('${cnId}')">
-                                    Load Items
-                                </button>
-                                <button class="btn btn-sm btn-info" onclick="printTable('Common Name', 'common-table-${cnId}')">
-                                    Print
-                                </button>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td colspan="2">
-                                <div id="items-${cnId}" style="display:none;"></div>
-                                <div id="loading-${cnId}" style="display:none;" class="loading">Loading...</div>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            `;
-        });
-    });
-    
-    html += '</div>';
-    container.innerHTML = html;
-    applyFilters();
-}

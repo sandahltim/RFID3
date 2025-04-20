@@ -48,29 +48,11 @@ def subcat_data(tab_num):
         ).all()
 
         current_app.logger.debug(f"Raw subcategory counts for category {category}: {subcategory_counts}")
-        subcategories = [sub for sub, _ in subcategory_counts if sub]  # Fixed line
+        subcategories = [sub for sub, _ in subcategory_counts if sub]
         current_app.logger.info(f"Fetched {len(subcategories)} subcategories for category {category}")
         current_app.logger.debug(f"Subcategories list before loop: {subcategories}")
 
-        data = []
-        for subcategory in subcategories:
-            common_names = db.session.query(
-                ItemMaster.common_name
-            ).join(
-                RentalClassMapping, ItemMaster.rental_class_num == RentalClassMapping.rental_class_id
-            ).filter(
-                RentalClassMapping.category.ilike(category),
-                RentalClassMapping.subcategory.ilike(subcategory)
-            ).group_by(
-                ItemMaster.common_name
-            ).order_by(
-                ItemMaster.common_name
-            ).all()
-            common_names = [cn[0] for cn in common_names if cn[0]]
-            data.append({
-                'subcategory': subcategory,
-                'common_names': common_names
-            })
+        data = [{'subcategory': subcategory} for subcategory in subcategories]  # Only include subcategories
 
         current_app.logger.debug(f"Subcategory data for category {category}: {data}")
         return jsonify(data)
@@ -78,8 +60,35 @@ def subcat_data(tab_num):
         current_app.logger.error(f"Error fetching subcategories for tab {tab_num}: {str(e)}")
         return jsonify({'error': 'Failed to fetch subcategories'}), 500
 
+@tabs_bp.route('/tab/<int:tab_num>/common_names', methods=['GET'])
+def common_names(tab_num):
+    try:
+        category = request.args.get('category')
+        subcategory = request.args.get('subcategory')
+        if not category or not subcategory:
+            return jsonify({'error': 'Category and subcategory are required'}), 400
+
+        common_names = db.session.query(
+            ItemMaster.common_name
+        ).join(
+            RentalClassMapping, ItemMaster.rental_class_num == RentalClassMapping.rental_class_id
+        ).filter(
+            RentalClassMapping.category.ilike(category),
+            RentalClassMapping.subcategory.ilike(subcategory)
+        ).group_by(
+            ItemMaster.common_name
+        ).order_by(
+            ItemMaster.common_name
+        ).all()
+        common_names = [cn[0] for cn in common_names if cn[0]]
+
+        current_app.logger.debug(f"Common names for category {category}, subcategory {subcategory}: {common_names}")
+        return jsonify({'common_names': common_names})
+    except Exception as e:
+        current_app.logger.error(f"Error fetching common names for tab {tab_num}: {str(e)}")
+        return jsonify({'error': 'Failed to fetch common names'}), 500
+
 @tabs_bp.route('/tab/<int:tab_num>/data', methods=['GET'])
-# @cache.cached(timeout=30)  # Temporarily disabled caching
 def tab_data(tab_num):
     try:
         category = request.args.get('category')
