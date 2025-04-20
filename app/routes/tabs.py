@@ -31,7 +31,7 @@ def tab_view(tab_num):
                 'total_items': total_items,
                 'on_contracts': on_contracts,
                 'in_service': in_service,
-                'available': max(total_items - on_contracts - in_service, 0)  # Ensure available is not negative
+                'available': max(total_items - on_contracts - in_service, 0)
             }
             for category, total_items, on_contracts, in_service in categories_data
         ]
@@ -69,6 +69,54 @@ def tab_view(tab_num):
     except Exception as e:
         current_app.logger.error(f"Error loading tab {tab_num}: {str(e)}")
         return jsonify({'error': 'Failed to load tab data'}), 500
+
+@tabs_bp.route('/tab/<int:tab_num>/categories')
+def tab_categories(tab_num):
+    try:
+        categories_data = db.session.query(
+            RentalClassMapping.category,
+            func.count(ItemMaster.tag_id).label('total_items'),
+            func.coalesce(func.sum(func.cast(func.lower(ItemMaster.status).in_(['on rent', 'delivered']), db.Integer)), 0).label('on_contracts'),
+            func.coalesce(func.sum(func.cast(func.lower(ItemMaster.status).in_(['repair']), db.Integer)), 0).label('in_service')
+        ).outerjoin(
+            ItemMaster, RentalClassMapping.rental_class_id == ItemMaster.rental_class_num
+        ).group_by(
+            RentalClassMapping.category
+        ).order_by(
+            RentalClassMapping.category
+        ).all()
+
+        categories = [
+            {
+                'name': category,
+                'total_items': total_items,
+                'on_contracts': on_contracts,
+                'in_service': in_service,
+                'available': max(total_items - on_contracts - in_service, 0)
+            }
+            for category, total_items, on_contracts, in_service in categories_data
+        ]
+
+        html = ''
+        for category in categories:
+            cat_id = category['name'].lower().replace('[^a-z0-9-]', '_')
+            html += f'''
+                <tr>
+                    <td>{category['name']}</td>
+                    <td>{category['total_items']}</td>
+                    <td>{category['on_contracts']}</td>
+                    <td>{category['in_service']}</td>
+                    <td>{category['available']}</td>
+                    <td>
+                        <button class="btn btn-sm btn-secondary" hx-get="/tab/{tab_num}/subcat_data?category={category['name']}" hx-target="#subcat-{cat_id}" hx-swap="innerHTML" onclick="showLoading('{cat_id}')">Expand</button>
+                        <button class="btn btn-sm btn-info" onclick="printTable('Category', 'category-table')">Print</button>
+                    </td>
+                </tr>
+            '''
+        return html
+    except Exception as e:
+        current_app.logger.error(f"Error fetching categories for tab {tab_num}: {str(e)}")
+        return '<tr><td colspan="6">Error loading categories</td></tr>'
 
 @tabs_bp.route('/tab/<int:tab_num>/subcat_data')
 def subcat_data(tab_num):
@@ -132,6 +180,8 @@ def common_names(tab_num):
             ItemMaster.common_name
         ).all()
 
+        current_app.logger.debug(f"Common names for category {category}, subcategory {subcategory}: {common_names}")
+
         common_names_data = [
             {
                 'name': name,
@@ -141,7 +191,10 @@ def common_names(tab_num):
                 'available': max(total_items - on_contracts - in_service, 0)
             }
             for name, total_items, on_contracts, in_service in common_names
+            if name is not None
         ]
+
+        current_app.logger.debug(f"Common names data: {common_names_data}")
 
         return jsonify({'common_names': common_names_data})
     except Exception as e:
@@ -164,8 +217,10 @@ def tab_data(tab_num):
         ).filter(
             RentalClassMapping.category == category,
             RentalClassMapping.subcategory == subcategory,
-            func.lower(func.trim(ItemMaster.common_name)) == func.lower(func.trim(common_name))
+            ItemMaster.common_name == common_name
         ).all()
+
+        current_app.logger.debug(f"Items for category {category}, subcategory {subcategory}, common_name {common_name}: {len(items)} items found")
 
         items_data = [
             {
