@@ -72,10 +72,13 @@ class APIClient:
 
     def get_item_master(self, since_date=None):
         params = {}
+        # Temporarily remove filter to test API
         if since_date:
             since_date = datetime.fromisoformat(since_date).strftime('%Y-%m-%d %H:%M:%S')
             logger.debug(f"Item master filter since_date: {since_date}")
-            params['filter[]'] = f"date_last_scanned,gt,\"{since_date}\""
+            filter_param = f"date_last_scanned,gt,\"{since_date}\""
+            logger.debug(f"Constructed filter parameter: {filter_param}")
+            # params['filter[]'] = filter_param  # Commented out to test without filter
         return self._make_request("14223767938169344381", params)
 
     def get_transactions(self, since_date=None):
@@ -83,7 +86,9 @@ class APIClient:
         if since_date:
             since_date = datetime.fromisoformat(since_date).strftime('%Y-%m-%d %H:%M:%S')
             logger.debug(f"Transactions filter since_date: {since_date}")
-            params['filter[]'] = f"date_updated,gt,\"{since_date}\""
+            filter_param = f"date_updated,gt,\"{since_date}\""
+            logger.debug(f"Constructed filter parameter: {filter_param}")
+            # params['filter[]'] = filter_param  # Commented out to test without filter
         return self._make_request("14223767938169346196", params)
 
     def get_seed_data(self, since_date=None):
@@ -91,5 +96,7 @@ class APIClient:
         if since_date:
             since_date = datetime.fromisoformat(since_date).strftime('%Y-%m-%d %H:%M:%S')
             logger.debug(f"Seed data filter since_date: {since_date}")
-            params['filter[]'] = f"date_updated,gt,\"{since_date}\""
+            filter_param = f"date_updated,gt,\"{since_date}\""
+            logger.debug(f"Constructed filter parameter: {filter_param}")
+            # params['filter[]'] = filter_param  # Commented out to test without filter
         return self._make_request("14223767938169215907", params)
