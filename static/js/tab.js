@@ -134,7 +134,7 @@ function loadSubcatData(category, subcatData) {
     subcatData.forEach(sub => {
         console.log(`Rendering subcategory for ${category}: ${sub.subcategory}`);
         const subId = `${category}_${sub.subcategory}`.toLowerCase().replace(/[^a-z0-9-]/g, '_');
-        const escapedSubcategory = sub.subcategory.replace(/&/g, '&').replace(/</g, '<').replace(/>/g, '>').replace(/"/g, '"').replace(/'/g, '');
+        const escapedSubcategory = sub.subcategory.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
         const hxGetUrl = `/tab/${cachedTabNum}/common_names?category=${encodeURIComponent(category)}&subcategory=${encodeURIComponent(sub.subcategory)}`;
         console.log(`Generated hx-get URL for subcategory ${sub.subcategory}: ${hxGetUrl}`);
         html += `
@@ -201,7 +201,7 @@ function loadCommonNames(category, subcategory, commonNamesData) {
     if (commonNamesData.common_names && Array.isArray(commonNamesData.common_names)) {
         commonNamesData.common_names.forEach(cn => {
             const cnId = `${subId}_${cn.name}`.toLowerCase().replace(/[^a-z0-9-]/g, '_');
-            const escapedCommonName = cn.name.replace(/&/g, '&').replace(/</g, '<').replace(/>/g, '>').replace(/"/g, '"').replace(/'/g, '');
+            const escapedCommonName = cn.name.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
             const hxGetUrl = `/tab/${cachedTabNum}/data?category=${encodeURIComponent(category)}&subcategory=${encodeURIComponent(subcategory)}&common_name=${encodeURIComponent(cn.name)}`;
             console.log(`Generated hx-get URL for common name ${cn.name}: ${hxGetUrl}`);
             html += `
