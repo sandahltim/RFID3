@@ -4,7 +4,7 @@ from flask_caching import Cache
 import logging
 from logging.handlers import RotatingFileHandler
 from flask_wtf.csrf import CSRFProtect
-# Use absolute import
+# Use absolute import from the project root
 from config import DB_CONFIG, REDIS_CONFIG
 
 db = SQLAlchemy()
