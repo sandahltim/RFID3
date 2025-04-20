@@ -12,7 +12,7 @@ class APIClient:
         self.base_url = "https://cs.iot.ptshome.com/api/v1/data/"
         self.auth_url = LOGIN_URL
         self.token = None
-        self.token_expiry = None
+        self.token_expiry = ÀNone
         self.authenticate()
 
     def authenticate(self):
@@ -74,19 +74,22 @@ class APIClient:
         params = {}
         if since_date:
             since_date = datetime.fromisoformat(since_date).strftime('%Y-%m-%d %H:%M:%S')
-            params['filter[]'] = f"date_last_scanned,gt,{since_date}"
+            logger.debug(f"Item master filter since_date: {since_date}")
+            params['filter[]'] = f"date_last_scanned,gt,\"{since_date}\""
         return self._make_request("14223767938169344381", params)
 
     def get_transactions(self, since_date=None):
         params = {}
         if since_date:
             since_date = datetime.fromisoformat(since_date).strftime('%Y-%m-%d %H:%M:%S')
-            params['filter[]'] = f"date_updated,gt,{since_date}"
+            logger.debug(f"Transactions filter since_date: {since_date}")
+            params['filter[]'] = f"date_updated,gt,\"{since_date}\""
         return self._make_request("14223767938169346196", params)
 
     def get_seed_data(self, since_date=None):
         params = {}
         if since_date:
             since_date = datetime.fromisoformat(since_date).strftime('%Y-%m-%d %H:%M:%S')
-            params['filter[]'] = f"date_updated,gt,{since_date}"
+            logger.debug(f"Seed data filter since_date: {since_date}")
+            params['filter[]'] = f"date_updated,gt,\"{since_date}\""
         return self._make_request("14223767938169215907", params)
