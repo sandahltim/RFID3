@@ -217,6 +217,11 @@ function loadSubcatData(category, subcatData) {
     if (typeof htmx !== 'undefined') {
         htmx.process(container);
         console.log('HTMX processed new elements in loadSubcatData');
+        // Verify the button has the correct attributes
+        const buttons = container.querySelectorAll('button[hx-get]');
+        buttons.forEach(button => {
+            console.log(`Button hx-get: ${button.getAttribute('hx-get')}, hx-target: ${button.getAttribute('hx-target')}`);
+        });
     } else {
         console.error('HTMX not available when processing new elements in loadSubcatData');
     }
@@ -322,6 +327,11 @@ function loadCommonNames(category, subcategory, commonNamesData) {
     if (typeof htmx !== 'undefined') {
         htmx.process(container);
         console.log('HTMX processed new elements in loadCommonNames');
+        // Verify the button has the correct attributes
+        const buttons = container.querySelectorAll('button[hx-get]');
+        buttons.forEach(button => {
+            console.log(`Button hx-get: ${button.getAttribute('hx-get')}, hx-target: ${button.getAttribute('hx-target')}`);
+        });
     } else {
         console.error('HTMX not available when processing new elements in loadCommonNames');
     }
