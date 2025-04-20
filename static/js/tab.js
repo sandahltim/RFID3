@@ -197,10 +197,8 @@ function loadSubcatData(category, subcatData) {
         console.log(`Rendering subcategory for ${category}: ${sub.subcategory}`);
         const subId = `${category}_${sub.subcategory}`.toLowerCase().replace(/[^a-z0-9-]/g, '_');
         const escapedSubcategory = escapeHtmlAttribute(sub.subcategory);
-        const hxGetUrl = `/tab/${cachedTabNum}/common_names?category=${encodeURIComponent(category)}&subcategory=${encodeURIComponent(sub.subcategory)}`;
-        console.log(`Generated URL for subcategory ${sub.subcategory}: ${hxGetUrl}`);
-        
-        const escapedHxGetUrl = escapeHtmlAttribute(hxGetUrl);
+        const escapedCategory = encodeURIComponent(category);
+        const escapedSubcategoryParam = encodeURIComponent(sub.subcategory);
         const escapedSubId = escapeJsString(subId);
         html += `
             <table class="table table-bordered mt-2" id="subcat-table-${subId}">
@@ -222,7 +220,7 @@ function loadSubcatData(category, subcatData) {
                         <td>${sub.in_service !== undefined ? sub.in_service : 'N/A'}</td>
                         <td>${sub.available !== undefined ? sub.available : 'N/A'}</td>
                         <td>
-                            <button class="btn btn-sm btn-secondary" onclick="loadCommonNames('${encodeURIComponent(category)}', '${encodeURIComponent(sub.subcategory)}', 'common-${subId}')">Load Items</button>
+                            <button class="btn btn-sm btn-secondary" onclick="loadCommonNames('${escapedCategory}', '${escapedSubcategoryParam}', 'common-${subId}')">Load Items</button>
                             <button id="print-btn-${subId}" class="btn btn-sm btn-info print-btn" data-print-level="Subcategory" data-print-id="subcat-table-${subId}">Print</button>
                             <div id="loading-${subId}" style="display:none;" class="loading">Loading...</div>
                         </td>
@@ -273,10 +271,9 @@ function loadCommonNames(category, subcategory, targetId) {
                 data.common_names.forEach(cn => {
                     const cnId = `${targetId.replace('common-', '')}_${cn.name}`.toLowerCase().replace(/[^a-z0-9-]/g, '_');
                     const escapedCommonName = escapeHtmlAttribute(cn.name);
-                    const fetchUrl = `/tab/${cachedTabNum}/data?category=${category}&subcategory=${subcategory}&common_name=${encodeURIComponent(cn.name)}`;
-                    console.log(`Generated URL for common name ${cn.name}: ${fetchUrl}`);
-                    
-                    const escapedFetchUrl = escapeHtmlAttribute(fetchUrl);
+                    const escapedCategory = encodeURIComponent(category);
+                    const escapedSubcategory = encodeURIComponent(subcategory);
+                    const escapedCommonNameParam = encodeURIComponent(cn.name);
                     const escapedCnId = escapeJsString(cnId);
                     html += `
                         <table class="table table-bordered ms-3 mt-2" id="common-table-${cnId}">
@@ -298,7 +295,7 @@ function loadCommonNames(category, subcategory, targetId) {
                                     <td>${cn.in_service !== undefined ? cn.in_service : 'N/A'}</td>
                                     <td>${cn.available !== undefined ? cn.available : 'N/A'}</td>
                                     <td>
-                                        <button class="btn btn-sm btn-secondary" onclick="loadItems('${category}', '${subcategory}', '${encodeURIComponent(cn.name)}', 'items-${cnId}')">Load Items</button>
+                                        <button class="btn btn-sm btn-secondary" onclick="loadItems('${escapedCategory}', '${escapedSubcategory}', '${escapedCommonNameParam}', 'items-${cnId}')">Load Items</button>
                                         <button id="print-btn-${cnId}" class="btn btn-sm btn-info print-btn" data-print-level="Common Name" data-print-id="common-table-${cnId}">Print</button>
                                         <div id="loading-${cnId}" style="display:none;" class="loading">Loading...</div>
                                     </td>
@@ -417,23 +414,31 @@ function expandCategory(category, targetId) {
     
     // Test fetch to /health to verify network functionality
     console.log('Testing network with fetch to /health');
-    fetch('/health')
-        .then(response => {
-            console.log('Health fetch status:', response.status, response.statusText);
-            return response.json();
-        })
-        .then(data => console.log('Health fetch response:', data))
-        .catch(error => console.error('Health fetch error:', error));
+    try {
+        fetch('/health')
+            .then(response => {
+                console.log('Health fetch status:', response.status, response.statusText);
+                return response.json();
+            })
+            .then(data => console.log('Health fetch response:', data))
+            .catch(error => console.error('Health fetch error:', error));
+    } catch (error) {
+        console.error('Error in health fetch:', error);
+    }
 
     // Test fetch to /tab/1/categories to verify if the issue is specific to /tab/1/subcat_data
     console.log('Testing fetch to /tab/1/categories');
-    fetch(`/tab/${cachedTabNum}/categories`)
-        .then(response => {
-            console.log('Categories fetch status:', response.status, response.statusText);
-            return response.text();
-        })
-        .then(data => console.log('Categories fetch response:', data.slice(0, 100) + '...'))
-        .catch(error => console.error('Categories fetch error:', error));
+    try {
+        fetch(`/tab/${cachedTabNum}/categories`)
+            .then(response => {
+                console.log('Categories fetch status:', response.status, response.statusText);
+                return response.text();
+            })
+            .then(data => console.log('Categories fetch response:', data.slice(0, 100) + '...'))
+            .catch(error => console.error('Categories fetch error:', error));
+    } catch (error) {
+        console.error('Error in categories fetch:', error);
+    }
 
     // Fetch subcategory data manually
     const url = `/tab/${cachedTabNum}/subcat_data?category=${category}`;
@@ -443,37 +448,45 @@ function expandCategory(category, targetId) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 5000); // 5-second timeout
 
-    fetch(url, {
-        method: 'GET',
-        headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-        },
-        signal: controller.signal
-    })
-        .then(response => {
-            clearTimeout(timeoutId);
-            console.log('Subcat fetch status:', response.status, response.statusText);
-            if (!response.ok) {
-                throw new Error(`Subcat fetch failed with status ${response.status}`);
-            }
-            return response.json();
+    try {
+        fetch(url, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            signal: controller.signal
         })
-        .then(data => {
-            console.log('Subcat fetch response:', data);
-            const categoryName = targetId.replace('subcat-', '');
-            loadSubcatData(categoryName, data);
-        })
-        .catch(error => {
-            console.error('Subcat fetch error:', error);
-            if (error.name === 'AbortError') {
-                console.error('Subcat fetch timed out after 5 seconds');
-            }
-        })
-        .finally(() => {
-            hideLoading(targetId.replace('subcat-', ''));
-        });
+            .then(response => {
+                clearTimeout(timeoutId);
+                console.log('Subcat fetch status:', response.status, response.statusText);
+                if (!response.ok) {
+                    throw new Error(`Subcat fetch failed with status ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log('Subcat fetch response:', data);
+                const categoryName = targetId.replace('subcat-', '');
+                loadSubcatData(categoryName, data);
+            })
+            .catch(error => {
+                console.error('Subcat fetch error:', error);
+                if (error.name === 'AbortError') {
+                    console.error('Subcat fetch timed out after 5 seconds');
+                }
+            })
+            .finally(() => {
+                hideLoading(targetId.replace('subcat-', ''));
+            });
+    } catch (error) {
+        console.error('Error in subcat fetch:', error);
+        hideLoading(targetId.replace('subcat-', ''));
+    }
 }
+
+// Attach expandCategory to the window object to ensure global accessibility
+window.expandCategory = expandCategory;
 
 document.addEventListener('DOMContentLoaded', () => {
     console.log('Document loaded, initializing script');
@@ -506,8 +519,12 @@ document.addEventListener('DOMContentLoaded', () => {
         console.debug('Not a tab page, skipping tab-specific logic.');
     }
 
+    // Confirm expandCategory is defined
+    console.log('expandCategory defined:', typeof window.expandCategory === 'function');
+
     // Direct click listener for print-btn buttons
     document.querySelectorAll('.print-btn').forEach(button => {
+        console.log('Setting up print button listener for:', button);
         button.addEventListener('click', (event) => {
             console.log('Direct click on print-btn:', button);
             console.log('Event details:', event);

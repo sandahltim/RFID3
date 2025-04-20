@@ -101,7 +101,8 @@ def tab_categories(tab_num):
         html = ''
         for category in categories:
             cat_id = category['name'].lower().replace('[^a-z0-9-]', '_')
-            encoded_category = quote(category['name'])
+            # Properly escape the category name for use in JavaScript
+            encoded_category = quote(category['name']).replace("'", "\\'")
             html += f'''
                 <tr>
                     <td>{category['name']}</td>
