@@ -22,7 +22,7 @@ def get_mapping():
     try:
         mappings = RentalClassMapping.query.all()
         data = [{
-            'id': m.id,
+            'id': m.rental_class_id,  # Changed from m.id to m.rental_class_id
             'category': m.category,
             'subcategory': m.subcategory,
             'rental_class_id': m.rental_class_id
