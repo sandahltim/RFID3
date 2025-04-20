@@ -179,7 +179,7 @@ function loadSubcatData(category, subcatData) {
                         <td>${sub.available !== undefined ? sub.available : 'N/A'}</td>
                         <td>
                             <button class="btn btn-sm btn-secondary" hx-get="${escapedHxGetUrl}" hx-target="#common-${subId}" hx-swap="innerHTML">Load Items</button>
-                            <button class="btn btn-sm btn-info" onclick="printTable('Subcategory', 'subcat-table-${subId}')">Print</button>
+                            <button class="btn btn-sm btn-info print-btn" data-print-level="Subcategory" data-print-id="subcat-table-${subId}">Print</button>
                             <div id="loading-${subId}" style="display:none;" class="loading">Loading...</div>
                         </td>
                     </tr>
@@ -198,7 +198,12 @@ function loadSubcatData(category, subcatData) {
     container.innerHTML = html;
     console.log('Subcategory HTML rendered:', container.innerHTML);
     // Process HTMX attributes on the newly added content
-    htmx.process(container);
+    if (typeof htmx !== 'undefined') {
+        htmx.process(container);
+        console.log('HTMX processed subcategory container');
+    } else {
+        console.error('HTMX not available when processing subcategory container');
+    }
     applyFilters();
 }
 
@@ -243,7 +248,7 @@ function loadCommonNames(category, subcategory, commonNamesData) {
                             <td>${cn.available !== undefined ? cn.available : 'N/A'}</td>
                             <td>
                                 <button class="btn btn-sm btn-secondary" hx-get="${escapedHxGetUrl}" hx-target="#items-${cnId}" hx-swap="innerHTML">Load Items</button>
-                                <button class="btn btn-sm btn-info" onclick="printTable('Common Name', 'common-table-${cnId}')">Print</button>
+                                <button class="btn btn-sm btn-info print-btn" data-print-level="Common Name" data-print-id="common-table-${cnId}">Print</button>
                                 <div id="loading-${cnId}" style="display:none;" class="loading">Loading...</div>
                             </td>
                         </tr>
@@ -263,7 +268,12 @@ function loadCommonNames(category, subcategory, commonNamesData) {
     container.innerHTML = html;
     console.log('Common names HTML rendered:', container.innerHTML);
     // Process HTMX attributes on the newly added content
-    htmx.process(container);
+    if (typeof htmx !== 'undefined') {
+        htmx.process(container);
+        console.log('HTMX processed common names container');
+    } else {
+        console.error('HTMX not available when processing common names container');
+    }
     applyFilters();
 }
 
@@ -292,15 +302,31 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log('HTMX library loaded successfully');
     }
 
-    // Debug button clicks
+    // Debug button clicks and HTMX attributes
     document.querySelectorAll('button[hx-get]').forEach(button => {
         button.addEventListener('click', (event) => {
             console.log(`Button clicked: ${button.textContent}, hx-get: ${button.getAttribute('hx-get')}`);
+            console.log('HTMX attributes on button:', {
+                hxGet: button.getAttribute('hx-get'),
+                hxTarget: button.getAttribute('hx-target'),
+                hxSwap: button.getAttribute('hx-swap')
+            });
             const keyMatch = button.getAttribute('hx-target')?.match(/#subcat-(.+)$/);
             if (keyMatch) {
                 showLoading(keyMatch[1]);
             }
         });
+    });
+
+    // Event delegation for print buttons
+    document.addEventListener('click', (event) => {
+        const button = event.target.closest('.print-btn');
+        if (button) {
+            const level = button.getAttribute('data-print-level');
+            const id = button.getAttribute('data-print-id');
+            console.log(`Print button clicked: level=${level}, id=${id}`);
+            printTable(level, id);
+        }
     });
 
     document.body.addEventListener('htmx:afterRequest', (event) => {
@@ -318,6 +344,10 @@ document.addEventListener('DOMContentLoaded', () => {
     document.body.addEventListener('htmx:responseError', (event) => {
         console.error('HTMX response error:', event.detail.xhr.status, event.detail.xhr.statusText, event.detail.xhr.responseText);
     });
+
+    document.body.addEventListener('htmx:configRequest', (event) => {
+        console.log('HTMX configRequest event:', event.detail);
+    });
 });
 
 document.body.addEventListener('htmx:afterSwap', (event) => {
@@ -327,7 +357,22 @@ document.body.addEventListener('htmx:afterSwap', (event) => {
         // Process HTMX attributes on the newly loaded category table content
         const container = document.getElementById('category-table-body');
         if (container) {
-            htmx.process(container);
+            if (typeof htmx !== 'undefined') {
+                htmx.process(container);
+                console.log('HTMX processed category table body');
+                // Debug HTMX-processed elements
+                const buttons = container.querySelectorAll('button[hx-get]');
+                console.log(`Found ${buttons.length} buttons with hx-get after processing`);
+                buttons.forEach(button => {
+                    console.log('HTMX-processed button:', {
+                        text: button.textContent,
+                        hxGet: button.getAttribute('hx-get'),
+                        hxTarget: button.getAttribute('hx-target')
+                    });
+                });
+            } else {
+                console.error('HTMX not available when processing category table body');
+            }
         }
     }
     if (targetId.startsWith('subcat-')) {
@@ -387,7 +432,7 @@ document.body.addEventListener('htmx:afterSwap', (event) => {
                             <td>${item.quality || ''}</td>
                             <td>${item.notes || ''}</td>
                             <td>
-                                <button class="btn btn-sm btn-info" onclick="printTable('Item', 'items-table-${targetId}')">
+                                <button class="btn btn-sm btn-info print-btn" data-print-level="Item" data-print-id="items-table-${targetId}">
                                     Print
                                 </button>
                             </td>
@@ -402,7 +447,12 @@ document.body.addEventListener('htmx:afterSwap', (event) => {
             container.innerHTML = html;
             console.log(`Items table rendered for target ${targetId}:`, container.innerHTML);
             // Process HTMX attributes on the newly added content
-            htmx.process(container);
+            if (typeof htmx !== 'undefined') {
+                htmx.process(container);
+                console.log('HTMX processed items container');
+            } else {
+                console.error('HTMX not available when processing items container');
+            }
             applyFilters();
         } else {
             console.warn(`Container with ID '${targetId}' not found.`);

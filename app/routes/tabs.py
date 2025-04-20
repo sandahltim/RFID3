@@ -111,7 +111,7 @@ def tab_categories(tab_num):
                     <td>{category['available']}</td>
                     <td>
                         <button class="btn btn-sm btn-secondary" hx-get="/tab/{tab_num}/subcat_data?category={encoded_category}" hx-target="#subcat-{cat_id}" hx-swap="innerHTML">Expand</button>
-                        <button class="btn btn-sm btn-info" onclick="printTable('Category', 'category-table')">Print</button>
+                        <button class="btn btn-sm btn-info print-btn" data-print-level="Category" data-print-id="category-table">Print</button>
                         <div id="loading-{cat_id}" style="display:none;" class="loading">Loading...</div>
                     </td>
                 </tr>
