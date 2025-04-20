@@ -1,5 +1,6 @@
 from flask import Flask, request
 from app import create_app
+import time
 
 app = create_app()
 
@@ -12,6 +13,8 @@ def add_header(response):
         response.headers['Expires'] = '-1'
         # Prevent Cloudflare caching
         response.headers['CF-Cache-Control'] = 'no-cache'
+        # Add a dynamic ETag to force revalidation
+        response.headers['ETag'] = f'"{int(time.time())}"'
     return response
 
 if __name__ == '__main__':

@@ -119,6 +119,16 @@ function hideOtherSubcats(currentCategory) {
     });
 }
 
+function escapeHtmlAttribute(value) {
+    // Escape special characters for safe HTML attribute inclusion
+    return value
+        .replace(/&/g, '&amp;')
+        .replace(/'/g, '&#x27;')
+        .replace(/"/g, '&quot;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+}
+
 function loadSubcatData(category, subcatData) {
     console.log(`Loading subcategories for category: ${category}`, subcatData);
     hideOtherSubcats(category);
@@ -134,12 +144,12 @@ function loadSubcatData(category, subcatData) {
     subcatData.forEach(sub => {
         console.log(`Rendering subcategory for ${category}: ${sub.subcategory}`);
         const subId = `${category}_${sub.subcategory}`.toLowerCase().replace(/[^a-z0-9-]/g, '_');
-        const escapedSubcategory = sub.subcategory.replace(/&/g, '&').replace(/</g, '<').replace(/>/g, '>').replace(/"/g, '"').replace(/'/g, '');
+        const escapedSubcategory = escapeHtmlAttribute(sub.subcategory);
         const hxGetUrl = `/tab/${cachedTabNum}/common_names?category=${encodeURIComponent(category)}&subcategory=${encodeURIComponent(sub.subcategory)}`;
         console.log(`Generated hx-get URL for subcategory ${sub.subcategory}: ${hxGetUrl}`);
         
-        // Escape quotes in the URL to prevent SyntaxError
-        const escapedHxGetUrl = hxGetUrl.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+        // Escape the URL for safe HTML attribute inclusion
+        const escapedHxGetUrl = escapeHtmlAttribute(hxGetUrl);
         html += `
             <table class="table table-bordered mt-2" id="subcat-table-${subId}">
                 <thead>
@@ -197,12 +207,12 @@ function loadCommonNames(category, subcategory, commonNamesData) {
     if (commonNamesData.common_names && Array.isArray(commonNamesData.common_names)) {
         commonNamesData.common_names.forEach(cn => {
             const cnId = `${subId}_${cn.name}`.toLowerCase().replace(/[^a-z0-9-]/g, '_');
-            const escapedCommonName = cn.name.replace(/&/g, '&').replace(/</g, '<').replace(/>/g, '>').replace(/"/g, '"').replace(/'/g, '');
+            const escapedCommonName = escapeHtmlAttribute(cn.name);
             const hxGetUrl = `/tab/${cachedTabNum}/data?category=${encodeURIComponent(category)}&subcategory=${encodeURIComponent(subcategory)}&common_name=${encodeURIComponent(cn.name)}`;
             console.log(`Generated hx-get URL for common name ${cn.name}: ${hxGetUrl}`);
             
-            // Escape quotes in the URL to prevent SyntaxError
-            const escapedHxGetUrl = hxGetUrl.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+            // Escape the URL for safe HTML attribute inclusion
+            const escapedHxGetUrl = escapeHtmlAttribute(hxGetUrl);
             html += `
                 <table class="table table-bordered ms-3 mt-2" id="common-table-${cnId}">
                     <thead>
