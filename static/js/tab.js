@@ -1,14 +1,14 @@
 // Global variable to cache the tab number, extracted from the h1 element
-if (typeof cachedTabNum === 'undefined') {
-    var cachedTabNum = '1'; // Default to '1' if h1 is not found or no number is present
+if (typeof window.cachedTabNum === 'undefined') {
+    window.cachedTabNum = '1'; // Default to '1' if h1 is not found or no number is present
 }
 
 // Log script loading
-console.log('tab.js loaded, cachedTabNum:', cachedTabNum);
+console.log('tab.js loaded, cachedTabNum:', window.cachedTabNum);
 
 // Sort a table by a specified column
 function sortTable(column, tableId) {
-    console.log(`Sorting table ${tableId} by column: ${column}`);
+    console.log('Sorting table ' + tableId + ' by column: ' + column);
     const table = document.getElementById(tableId);
     const rows = Array.from(table.querySelectorAll('tbody tr'));
     const index = Array.from(table.querySelector('thead tr').children).findIndex(th => th.textContent === column);
@@ -24,39 +24,12 @@ function sortTable(column, tableId) {
     rows.forEach(row => tbody.appendChild(row));
 }
 
-// Apply filters to all tables based on user input (text, category, status, bin location)
-function applyFilters() {
-    console.log('Applying filters');
-    const textQuery = document.getElementById('filter-input')?.value.toLowerCase() || '';
-    const categoryFilter = document.getElementById('category-filter')?.value.toLowerCase() || '';
-    const statusFilter = document.getElementById('status-filter')?.value.toLowerCase() || '';
-    const binLocationFilter = document.getElementById('bin-location-filter')?.value.toLowerCase() || '';
-    
-    const tables = document.querySelectorAll('table');
-    tables.forEach(table => {
-        const rows = table.querySelectorAll('tbody tr');
-        rows.forEach(row => {
-            const text = Array.from(row.children).map(cell => cell.textContent.toLowerCase()).join(' ');
-            const categoryCell = row.querySelector('td:first-child') ? row.querySelector('td:first-child').textContent.toLowerCase() : '';
-            const statusCell = row.querySelector('td:nth-child(4)') ? row.querySelector('td:nth-child(4)').textContent.toLowerCase() : '';
-            const binLocationCell = row.querySelector('td:nth-child(3)') ? row.querySelector('td:nth-child(3)').textContent.toLowerCase() : '';
-            
-            const matchesText = text.includes(textQuery);
-            const matchesCategory = !categoryFilter || categoryCell.includes(categoryFilter);
-            const matchesStatus = !statusFilter || statusCell.includes(statusFilter);
-            const matchesBinLocation = !binLocationFilter || binLocationCell.includes(binLocationFilter);
-            
-            row.style.display = (matchesText && matchesCategory && matchesStatus && matchesBinLocation) ? '' : 'none';
-        });
-    });
-}
-
 // Print the table content in the current window
 function printTable(level, id) {
-    console.log(`Printing table: ${level}, ID: ${id}`);
+    console.log('Printing table: ' + level + ', ID: ' + id);
     const element = document.getElementById(id);
     if (!element) {
-        console.warn(`Element with ID '${id}' not found for printing.`);
+        console.warn('Element with ID "' + id + '" not found for printing.');
         return;
     }
 
@@ -71,22 +44,22 @@ function printTable(level, id) {
     printContainer.style.width = '100%';
     printContainer.style.background = 'white';
     printContainer.style.zIndex = '1000';
-    printContainer.innerHTML = `
-        <div class="print-header">
-            <h1>RFID Dashboard Report</h1>
-            <p>Generated on ${new Date().toLocaleString()}</p>
-            <h2>${level}</h2>
-        </div>
-        ${element.outerHTML}
-        <style>
-            body { font-family: Arial, sans-serif; margin: 20px; }
-            h2 { text-align: center; }
-            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-            th { background-color: #f2f2f2; }
-            .print-header { text-align: center; margin-bottom: 20px; }
-        </style>
-    `;
+    printContainer.innerHTML = [
+        '<div class="print-header">',
+            '<h1>RFID Dashboard Report</h1>',
+            '<p>Generated on ' + new Date().toLocaleString() + '</p>',
+            '<h2>' + level + '</h2>',
+        '</div>',
+        element.outerHTML,
+        '<style>',
+            'body { font-family: Arial, sans-serif; margin: 20px; }',
+            'h2 { text-align: center; }',
+            'table { width: 100%; border-collapse: collapse; margin-top: 20px; }',
+            'th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }',
+            'th { background-color: #f2f2f2; }',
+            '.print-header { text-align: center; margin-bottom: 20px; }',
+        '</style>'
+    ].join('');
 
     // Hide the main content and show the print content
     const originalContent = document.body.innerHTML;
@@ -106,24 +79,27 @@ function printTable(level, id) {
 }
 
 // Refresh the category table by triggering a manual fetch
-let isRefreshing = false;
+if (typeof window.isRefreshing === 'undefined') {
+    window.isRefreshing = false;
+}
+
 function refreshTable(tabNum) {
-    if (isRefreshing) return;
-    isRefreshing = true;
-    console.log(`Refreshing table for tab ${tabNum}`);
+    if (window.isRefreshing) return;
+    window.isRefreshing = true;
+    console.log('Refreshing table for tab ' + tabNum);
     const categoryTableBody = document.getElementById('category-table-body');
     if (!categoryTableBody) {
         console.warn('Category table body not found for refresh.');
-        setTimeout(() => { isRefreshing = false; }, 1000);
+        setTimeout(() => { window.isRefreshing = false; }, 1000);
         return;
     }
 
     // Manually fetch the categories
-    fetch(`/tab/${tabNum}/categories`)
+    fetch('/tab/' + tabNum + '/categories')
         .then(response => {
             console.log('Refresh fetch status:', response.status, response.statusText);
             if (!response.ok) {
-                throw new Error(`Refresh fetch failed with status ${response.status}`);
+                throw new Error('Refresh fetch failed with status ' + response.status);
             }
             return response.text();
         })
@@ -135,7 +111,7 @@ function refreshTable(tabNum) {
             console.error('Refresh fetch error:', error);
         })
         .finally(() => {
-            setTimeout(() => { isRefreshing = false; }, 1000);
+            setTimeout(() => { window.isRefreshing = false; }, 1000);
         });
 }
 
@@ -149,11 +125,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const h1Text = h1Element.textContent.trim();
             const tabNumMatch = h1Text.match(/Tab\s+(\d+)/i);
             if (tabNumMatch && tabNumMatch[1]) {
-                cachedTabNum = tabNumMatch[1];
-                console.log(`Extracted tab number: ${cachedTabNum}`);
+                window.cachedTabNum = tabNumMatch[1];
+                console.log('Extracted tab number: ' + window.cachedTabNum);
                 // Only set up the refresh interval on tab pages
                 if (window.location.pathname.startsWith('/tab/')) {
-                    setInterval(() => refreshTable(cachedTabNum), 30000);
+                    setInterval(() => refreshTable(window.cachedTabNum), 30000);
                 }
             } else {
                 console.warn('No tab number found in h1 element, using default tab number 1.');
@@ -178,7 +154,7 @@ document.addEventListener('DOMContentLoaded', () => {
             console.log('Event details:', event);
             const level = button.getAttribute('data-print-level');
             const id = button.getAttribute('data-print-id');
-            console.log(`Print button clicked: level=${level}, id=${id}`);
+            console.log('Print button clicked: level=' + level + ', id=' + id);
             printTable(level, id);
         });
     });
