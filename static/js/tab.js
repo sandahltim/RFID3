@@ -121,11 +121,11 @@ function hideOtherSubcats(currentCategory) {
 
 function escapeHtmlAttribute(value) {
     return value
-        .replace(/&/g, '&amp;')
-        .replace(/'/g, '&apos;')
-        .replace(/"/g, '&quot;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;');
+        .replace(/&/g, '&')
+        .replace(/'/g, ''')
+        .replace(/"/g, '"')
+        .replace(/</g, '<')
+        .replace(/>/g, '>');
 }
 
 function escapeJsString(value) {
@@ -178,15 +178,15 @@ function loadSubcatData(category, subcatData) {
                         <td>${sub.in_service !== undefined ? sub.in_service : 'N/A'}</td>
                         <td>${sub.available !== undefined ? sub.available : 'N/A'}</td>
                         <td>
-                            <button class="btn btn-sm btn-secondary" hx-get="${escapedHxGetUrl}" hx-target="#common-${subId}" hx-swap="innerHTML" onclick="showLoading('${escapedSubId}')">Load Items</button>
+                            <button class="btn btn-sm btn-secondary" hx-get="${escapedHxGetUrl}" hx-target="#common-${subId}" hx-swap="innerHTML">Load Items</button>
                             <button class="btn btn-sm btn-info" onclick="printTable('Subcategory', 'subcat-table-${subId}')">Print</button>
+                            <div id="loading-${subId}" style="display:none;" class="loading">Loading...</div>
                         </td>
                     </tr>
                     <tr>
                         <td colspan="6">
                             <div id="common-${subId}" style="display:none;"></div>
                             <div id="items-${subId}" style="display:none;"></div>
-                            <div id="loading-${subId}" style="display:none;" class="loading">Loading...</div>
                         </td>
                     </tr>
                 </tbody>
@@ -209,7 +209,6 @@ function loadCommonNames(category, subcategory, commonNamesData) {
         return;
     }
     container.style.display = 'block';
-    hideLoading(subId);
 
     let html = '';
     if (commonNamesData.common_names && Array.isArray(commonNamesData.common_names)) {
@@ -241,14 +240,14 @@ function loadCommonNames(category, subcategory, commonNamesData) {
                             <td>${cn.in_service !== undefined ? cn.in_service : 'N/A'}</td>
                             <td>${cn.available !== undefined ? cn.available : 'N/A'}</td>
                             <td>
-                                <button class="btn btn-sm btn-secondary" hx-get="${escapedHxGetUrl}" hx-target="#items-${cnId}" hx-swap="innerHTML" onclick="showLoading('${escapedCnId}')">Load Items</button>
+                                <button class="btn btn-sm btn-secondary" hx-get="${escapedHxGetUrl}" hx-target="#items-${cnId}" hx-swap="innerHTML">Load Items</button>
                                 <button class="btn btn-sm btn-info" onclick="printTable('Common Name', 'common-table-${cnId}')">Print</button>
+                                <div id="loading-${cnId}" style="display:none;" class="loading">Loading...</div>
                             </td>
                         </tr>
                         <tr>
                             <td colspan="6">
                                 <div id="items-${cnId}" style="display:none;"></div>
-                                <div id="loading-${cnId}" style="display:none;" class="loading">Loading...</div>
                             </td>
                         </tr>
                     </tbody>
@@ -293,6 +292,10 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('button[hx-get]').forEach(button => {
         button.addEventListener('click', (event) => {
             console.log(`Button clicked: ${button.textContent}, hx-get: ${button.getAttribute('hx-get')}`);
+            const keyMatch = button.getAttribute('hx-target')?.match(/#subcat-(.+)$/);
+            if (keyMatch) {
+                showLoading(keyMatch[1]);
+            }
         });
     });
 
