@@ -10,11 +10,18 @@ home_bp = Blueprint('home', __name__)
 @cache.cached(timeout=30)
 def index():
     try:
+        # Create a new session for this request
         total_items = db.session.query(func.count(ItemMaster.tag_id)).scalar() or 0
+        current_app.logger.debug(f"Total items: {total_items}")
+
         status_counts = db.session.query(
-            ItemMaster.status,
+            func.coalesce(ItemMaster.status, 'Unknown').label('status'),
             func.count(ItemMaster.tag_id).label('count')
-        ).group_by(ItemMaster.status).all()
+        ).group_by(
+            func.coalesce(ItemMaster.status, 'Unknown')
+        ).all()
+        current_app.logger.debug(f"Status counts: {status_counts}")
+
         status_breakdown = {status: count for status, count in status_counts}
 
         recent_scans = db.session.query(ItemMaster).order_by(
@@ -24,14 +31,15 @@ def index():
             {
                 'tag_id': item.tag_id,
                 'common_name': item.common_name,
-                'date_last_scanned': item.date_last_scanned.isoformat() if item.date_last_scanned else None
+                'date_last_scanned': item.date_last_scanned.isoformat().replace('T', ' ') if item.date_last_scanned else None
             } for item in recent_scans
         ]
+        current_app.logger.debug(f"Recent scans: {recent_scans}")
 
         return render_template(
             'home.html',
             total_items=total_items,
-            status_breakdown=status_breakdown,
+            status_counts=status_counts,
             recent_scans=recent_scans,
             cache_bust=int(time()),
             timestamp=lambda: int(time())
