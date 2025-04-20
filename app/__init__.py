@@ -38,8 +38,8 @@ def create_app():
         db.create_all()
 
     # Register blueprints
-    from .routes import home, tabs, categories, health
-    from .services.refresh import refresh_bp
+    from app.routes import home, tabs, categories, health
+    from app.services.refresh import refresh_bp
     app.register_blueprint(home.home_bp)
     app.register_blueprint(tabs.tabs_bp)
     app.register_blueprint(refresh_bp)
@@ -47,7 +47,7 @@ def create_app():
     app.register_blueprint(health.health_bp)
 
     # Initialize scheduler
-    from .scheduler import init_scheduler
+    from app.services.scheduler import init_scheduler
     init_scheduler(app)
 
     return app
