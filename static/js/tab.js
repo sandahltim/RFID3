@@ -157,16 +157,8 @@ function loadSubcatData(category, subcatData) {
                         <td>${sub.in_service !== undefined ? sub.in_service : 'N/A'}</td>
                         <td>${sub.available !== undefined ? sub.available : 'N/A'}</td>
                         <td>
-                            <button class="btn btn-sm btn-secondary"
-                                    hx-get='${hxGetUrl}'
-                                    hx-target="#common-${subId}"
-                                    hx-swap="innerHTML"
-                                    onclick="showLoading('${subId}')">
-                                Load Items
-                            </button>
-                            <button class="btn btn-sm btn-info" onclick="printTable('Subcategory', 'subcat-table-${subId}')">
-                                Print
-                            </button>
+                            <button class="btn btn-sm btn-secondary" hx-get="${hxGetUrl}" hx-target="#common-${subId}" hx-swap="innerHTML" onclick="showLoading('${subId}')">Load Items</button>
+                            <button class="btn btn-sm btn-info" onclick="printTable('Subcategory', 'subcat-table-${subId}')">Print</button>
                         </td>
                     </tr>
                     <tr>
@@ -224,16 +216,8 @@ function loadCommonNames(category, subcategory, commonNamesData) {
                             <td>${cn.in_service !== undefined ? cn.in_service : 'N/A'}</td>
                             <td>${cn.available !== undefined ? cn.available : 'N/A'}</td>
                             <td>
-                                <button class="btn btn-sm btn-secondary"
-                                        hx-get='${hxGetUrl}'
-                                        hx-target="#items-${cnId}"
-                                        hx-swap="innerHTML"
-                                        onclick="showLoading('${cnId}')">
-                                    Load Items
-                                </button>
-                                <button class="btn btn-sm btn-info" onclick="printTable('Common Name', 'common-table-${cnId}')">
-                                    Print
-                                </button>
+                                <button class="btn btn-sm btn-secondary" hx-get="${hxGetUrl}" hx-target="#items-${cnId}" hx-swap="innerHTML" onclick="showLoading('${cnId}')">Load Items</button>
+                                <button class="btn btn-sm btn-info" onclick="printTable('Common Name', 'common-table-${cnId}')">Print</button>
                             </td>
                         </tr>
                         <tr>
