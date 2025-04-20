@@ -60,6 +60,50 @@ function applyFilters() {
     });
 }
 
+// Fallback print method using the current window
+function printInCurrentWindow(level, id) {
+    console.log(`Printing in current window: ${level}, ID: ${id}`);
+    const element = document.getElementById(id);
+    if (!element) {
+        console.warn(`Element with ID '${id}' not found for printing.`);
+        return;
+    }
+
+    // Create a temporary container for the print content
+    const printContainer = document.createElement('div');
+    printContainer.style.position = 'absolute';
+    printContainer.style.top = '0';
+    printContainer.style.left = '0';
+    printContainer.style.width = '100%';
+    printContainer.style.background = 'white';
+    printContainer.style.zIndex = '1000';
+    printContainer.innerHTML = `
+        <div class="print-header">
+            <h1>RFID Dashboard Report</h1>
+            <p>Generated on ${new Date().toLocaleString()}</p>
+            <h2>${level}</h2>
+        </div>
+        ${element.outerHTML}
+        <style>
+            body { font-family: Arial, sans-serif; margin: 20px; }
+            h2 { text-align: center; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+            th { background-color: #f2f2f2; }
+            .print-header { text-align: center; margin-bottom: 20px; }
+        </style>
+    `;
+
+    // Hide the main content and show the print content
+    const originalContent = document.body.innerHTML;
+    document.body.innerHTML = '';
+    document.body.appendChild(printContainer);
+
+    // Trigger print and restore original content
+    window.print();
+    document.body.innerHTML = originalContent;
+}
+
 // Open a print window with the specified table content
 function printTable(level, id) {
     console.log(`Printing table: ${level}, ID: ${id}`);
@@ -69,8 +113,8 @@ function printTable(level, id) {
         return;
     }
 
-    // Alert to check if popup blocker is interfering
-    alert('Opening print window... If no window appears, check your browser\'s popup blocker settings.');
+    // Alert to guide the user on allowing popups
+    alert('Attempting to open a print window...\n\nIf no window appears, please allow popups for this site:\n1. Click the lock icon in the address bar\n2. Go to Site Settings\n3. Set Pop-ups and redirects to Allow\n4. Try again');
 
     // Test a minimal window.open() to isolate popup blocker issues
     const testWindow = window.open('', '_blank');
@@ -78,15 +122,18 @@ function printTable(level, id) {
         testWindow.document.write('<html><body><h1>Test Window</h1></body></html>');
         testWindow.document.close();
         console.log('Test window opened successfully');
+        testWindow.close();
     } else {
-        console.error('Test window failed to open. Popup blocker may be preventing window.open().');
+        console.error('Test window failed to open. Falling back to current window print.');
+        printInCurrentWindow(level, id);
         return;
     }
 
     // Proceed with the actual print window
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
-        console.error('Print window failed to open. Popup blocker may be preventing window.open().');
+        console.error('Print window failed to open. Falling back to current window print.');
+        printInCurrentWindow(level, id);
         return;
     }
 
@@ -130,6 +177,7 @@ function printTable(level, id) {
     } catch (error) {
         console.error('Error writing to print window:', error);
         printWindow.close();
+        printInCurrentWindow(level, id);
     }
 }
 
@@ -322,70 +370,6 @@ function loadCommonNames(category, subcategory, commonNamesData) {
     applyFilters();
 }
 
-// Handle manual fetching of subcategory data when "Expand" is clicked
-function expandCategory(category, targetId) {
-    console.log(`Expanding category: ${category}, target: ${targetId}`);
-    
-    // Test fetch to /health to verify network functionality (already confirmed working)
-    console.log('Testing network with fetch to /health');
-    fetch('/health')
-        .then(response => {
-            console.log('Health fetch status:', response.status, response.statusText);
-            return response.json();
-        })
-        .then(data => console.log('Health fetch response:', data))
-        .catch(error => console.error('Health fetch error:', error));
-
-    // Test fetch to /tab/1/categories to verify if the issue is specific to /tab/1/subcat_data
-    console.log('Testing fetch to /tab/1/categories');
-    fetch(`/tab/${cachedTabNum}/categories`)
-        .then(response => {
-            console.log('Categories fetch status:', response.status, response.statusText);
-            return response.text(); // Expect HTML, not JSON
-        })
-        .then(data => console.log('Categories fetch response:', data.slice(0, 100) + '...')) // Log first 100 chars
-        .catch(error => console.error('Categories fetch error:', error));
-
-    // Fetch subcategory data manually with enhanced options
-    const url = `/tab/${cachedTabNum}/subcat_data?category=${category}`;
-    console.log(`Fetching subcategory data from: ${url}`);
-    showLoading(targetId.replace('subcat-', '')); // Show loading indicator
-
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5-second timeout
-
-    fetch(url, {
-        method: 'GET',
-        headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-        },
-        signal: controller.signal
-    })
-        .then(response => {
-            clearTimeout(timeoutId);
-            console.log('Subcat fetch status:', response.status, response.statusText);
-            if (!response.ok) {
-                throw new Error(`Subcat fetch failed with status ${response.status}`);
-            }
-            return response.json();
-        })
-        .then(data => {
-            console.log('Subcat fetch response:', data);
-            const categoryName = targetId.replace('subcat-', '');
-            loadSubcatData(categoryName, data);
-            hideLoading(targetId.replace('subcat-', ''));
-        })
-        .catch(error => {
-            clearTimeout(timeoutId);
-            console.error('Subcat fetch error:', error);
-            if (error.name === 'AbortError') {
-                console.error('Subcat fetch timed out after 5 seconds');
-            }
-            hideLoading(targetId.replace('subcat-', ''));
-        });
-}
-
 document.addEventListener('DOMContentLoaded', () => {
     console.log('Document loaded, initializing HTMX listeners');
     const h1Element = document.querySelector('h1');
@@ -411,6 +395,22 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log('HTMX library loaded successfully');
         console.log('HTMX version:', htmx.version);
     }
+
+    // Debug button clicks and HTMX attributes
+    document.querySelectorAll('button[hx-get]').forEach(button => {
+        button.addEventListener('click', (event) => {
+            console.log(`Button clicked: ${button.textContent}, hx-get: ${button.getAttribute('hx-get')}`);
+            console.log('HTMX attributes on button:', {
+                hxGet: button.getAttribute('hx-get'),
+                hxTarget: button.getAttribute('hx-target'),
+                hxSwap: button.getAttribute('hx-swap')
+            });
+            const keyMatch = button.getAttribute('hx-target')?.match(/#subcat-(.+)$/);
+            if (keyMatch) {
+                showLoading(keyMatch[1]);
+            }
+        });
+    });
 
     // Direct click listener for print-btn buttons
     document.querySelectorAll('.print-btn').forEach(button => {

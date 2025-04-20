@@ -111,7 +111,7 @@ def tab_categories(tab_num):
                     <td>{category['available']}</td>
                     <td>
                         <button class="btn btn-sm btn-secondary" hx-get="/tab/{tab_num}/subcat_data?category={encoded_category}" hx-target="#subcat-{cat_id}" hx-swap="innerHTML">Expand</button>
-                        <button class="btn btn-sm btn-info print-btn" data-print-level="Category" data-print-id="category-table">Print</button>
+                        <button id="print-btn-{cat_id}" class="btn btn-sm btn-info print-btn" data-print-level="Category" data-print-id="category-table">Print</button>
                         <div id="loading-{cat_id}" style="display:none;" class="loading">Loading...</div>
                     </td>
                 </tr>
@@ -124,8 +124,10 @@ def tab_categories(tab_num):
 @tabs_bp.route('/tab/<int:tab_num>/subcat_data')
 def subcat_data(tab_num):
     try:
+        current_app.logger.info(f"Received request for /tab/{tab_num}/subcat_data")
         category = request.args.get('category')
         if not category:
+            current_app.logger.error("Category parameter is missing")
             return jsonify({'error': 'Category parameter is required'}), 400
 
         subcategories = db.session.query(
