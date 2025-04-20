@@ -59,8 +59,8 @@ class APIClient:
             if response.status_code != 200:
                 logger.error(f"Request failed: {response.status_code} {response.reason}, response: {data}")
                 raise Exception(f"{response.status_code} {response.reason}")
-            records = data.get('data', [])  # Updated to parse 'data' instead of 'results'
-            total_count = data.get('totalcount', 0)  # Updated to parse 'totalcount' instead of 'count'
+            records = data.get('data', [])
+            total_count = data.get('totalcount', 0)
             offset = params['offset']
             logger.debug(f"Fetched {len(records)} records, Total Count: {total_count}, Offset: {offset}")
             all_data.extend(records)
@@ -73,23 +73,23 @@ class APIClient:
     def get_item_master(self, since_date=None):
         params = {}
         if since_date:
-            # Format the date as YYYY-MM-DD HH:MM:SS (space-separated, no quotes)
-            since_date = datetime.fromisoformat(since_date).strftime('%Y-%m-%d %H:%M:%S')
-            params['filter[]'] = f"date_last_scanned>{since_date}"
+            # Format the date as YYYY-MM-DDTHH:MM:SSZ and wrap in quotes
+            since_date = datetime.fromisoformat(since_date).strftime('%Y-%m-%dT%H:%M:%SZ')
+            params['filter[]'] = f"date_last_scanned>'{since_date}'"
         return self._make_request("14223767938169344381", params)
 
     def get_transactions(self, since_date=None):
         params = {}
         if since_date:
-            # Format the date as YYYY-MM-DD HH:MM:SS (space-separated, no quotes)
-            since_date = datetime.fromisoformat(since_date).strftime('%Y-%m-%d %H:%M:%S')
-            params['filter[]'] = f"date_updated>{since_date}"
+            # Format the date as YYYY-MM-DDTHH:MM:SSZ and wrap in quotes
+            since_date = datetime.fromisoformat(since_date).strftime('%Y-%m-%dT%H:%M:%SZ')
+            params['filter[]'] = f"date_updated>'{since_date}'"
         return self._make_request("14223767938169346196", params)
 
     def get_seed_data(self, since_date=None):
         params = {}
         if since_date:
-            # Format the date as YYYY-MM-DD HH:MM:SS (space-separated, no quotes)
-            since_date = datetime.fromisoformat(since_date).strftime('%Y-%m-%d %H:%M:%S')
-            params['filter[]'] = f"date_updated>{since_date}"
+            # Format the date as YYYY-MM-DDTHH:MM:SSZ and wrap in quotes
+            since_date = datetime.fromisoformat(since_date).strftime('%Y-%m-%dT%H:%M:%SZ')
+            params['filter[]'] = f"date_updated>'{since_date}'"
         return self._make_request("14223767938169215907", params)
