@@ -59,7 +59,7 @@
     </thead>
     <tbody id="category-table-body"
         hx-get="/tab/{{ tab_num }}/categories"
-        hx-trigger="load, htmx:load from:body every 30s"
+        hx-trigger="load, every 30s"
         hx-target="#category-table-body"
         hx-swap="innerHTML">
         <tr>

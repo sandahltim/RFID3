@@ -99,11 +99,11 @@ function refreshTable(tabNum) {
     if (isRefreshing) return;
     isRefreshing = true;
     console.log(`Refreshing table for tab ${tabNum}`);
-    const categoryTable = document.getElementById('category-table');
+    const categoryTable = document.getElementById('category-table-body');
     if (categoryTable) {
-        htmx.trigger('#category-table', 'htmx:load');
+        htmx.trigger('#category-table-body', 'htmx:load');
     } else {
-        console.warn('Category table not found for refresh.');
+        console.warn('Category table body not found for refresh.');
     }
     setTimeout(() => { isRefreshing = false; }, 1000);
 }
@@ -284,9 +284,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (typeof htmx === 'undefined') {
         console.error('HTMX library not loaded. Please ensure htmx.min.js is included in the page.');
+        return;
     } else {
         console.log('HTMX library loaded successfully');
     }
+
+    // Debug button clicks
+    document.querySelectorAll('button[hx-get]').forEach(button => {
+        button.addEventListener('click', (event) => {
+            console.log(`Button clicked: ${button.textContent}, hx-get: ${button.getAttribute('hx-get')}`);
+        });
+    });
 
     document.body.addEventListener('htmx:afterRequest', (event) => {
         console.log('HTMX request completed for target:', event.detail.target.id);
