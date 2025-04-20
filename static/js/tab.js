@@ -135,8 +135,8 @@ function loadSubcatData(category, subcatData) {
         console.log(`Rendering subcategory for ${category}: ${sub.subcategory}`);
         const subId = `${category}_${sub.subcategory}`.toLowerCase().replace(/[^a-z0-9-]/g, '_');
         const escapedSubcategory = sub.subcategory.replace(/&/g, '&').replace(/</g, '<').replace(/>/g, '>').replace(/"/g, '"').replace(/'/g, '');
-        const encodedCategory = encodeURIComponent(category).replace(/'/g, "\\'").replace(/"/g, '&quot;');
-        const encodedSubcategory = encodeURIComponent(sub.subcategory).replace(/'/g, "\\'").replace(/"/g, '&quot;');
+        const encodedCategory = btoa(category);
+        const encodedSubcategory = btoa(sub.subcategory);
         const hxGetUrl = `/tab/${cachedTabNum}/common_names?category=${encodedCategory}&subcategory=${encodedSubcategory}`;
         console.log(`Generated hx-get URL for subcategory ${sub.subcategory}: ${hxGetUrl}`);
         html += `
@@ -197,9 +197,9 @@ function loadCommonNames(category, subcategory, commonNamesData) {
         commonNamesData.common_names.forEach(cn => {
             const cnId = `${subId}_${cn.name}`.toLowerCase().replace(/[^a-z0-9-]/g, '_');
             const escapedCommonName = cn.name.replace(/&/g, '&').replace(/</g, '<').replace(/>/g, '>').replace(/"/g, '"').replace(/'/g, '');
-            const encodedCategory = encodeURIComponent(category).replace(/'/g, "\\'").replace(/"/g, '&quot;');
-            const encodedSubcategory = encodeURIComponent(subcategory).replace(/'/g, "\\'").replace(/"/g, '&quot;');
-            const encodedCommonName = encodeURIComponent(cn.name).replace(/'/g, "\\'").replace(/"/g, '&quot;');
+            const encodedCategory = btoa(category);
+            const encodedSubcategory = btoa(subcategory);
+            const encodedCommonName = btoa(cn.name);
             const hxGetUrl = `/tab/${cachedTabNum}/data?category=${encodedCategory}&subcategory=${encodedSubcategory}&common_name=${encodedCommonName}`;
             console.log(`Generated hx-get URL for common name ${cn.name}: ${hxGetUrl}`);
             html += `
@@ -304,10 +304,10 @@ document.body.addEventListener('htmx:afterSwap', (event) => {
             console.error('Failed to parse category or subcategory from hx-get:', event.detail.requestConfig.elt.getAttribute('hx-get'));
             return;
         }
-        const category = categoryMatch[1];
-        const subcategory = subcategoryMatch[1];
+        const category = atob(categoryMatch[1]);
+        const subcategory = atob(subcategoryMatch[1]);
         const data = JSON.parse(event.detail.xhr.responseText);
-        loadCommonNames(decodeURIComponent(category), decodeURIComponent(subcategory), data);
+        loadCommonNames(category, subcategory, data);
     } else if (targetId.startsWith('items-')) {
         const container = document.getElementById(targetId);
         if (container) {
@@ -362,4 +362,9 @@ document.body.addEventListener('htmx:afterSwap', (event) => {
                 </table>
             `;
             container.innerHTML = html;
-            applyFilter
+            applyFilters();
+        } else {
+            console.warn(`Container with ID '${targetId}' not found.`);
+        }
+    }
+});
