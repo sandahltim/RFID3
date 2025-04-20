@@ -1,18 +1,21 @@
-// Cache the tab number globally to avoid repeated DOM queries
+// Global variable to cache the tab number, extracted from the h1 element
 let cachedTabNum = '1'; // Default to '1' if h1 is not found or no number is present
 
+// Show a loading indicator for a given key (e.g., category ID)
 function showLoading(key) {
     console.log(`Showing loading for key: ${key}`);
     const loading = document.getElementById(`loading-${key}`);
     if (loading) loading.style.display = 'block';
 }
 
+// Hide the loading indicator for a given key
 function hideLoading(key) {
     console.log(`Hiding loading for key: ${key}`);
     const loading = document.getElementById(`loading-${key}`);
     if (loading) loading.style.display = 'none';
 }
 
+// Sort a table by a specified column
 function sortTable(column, tableId) {
     console.log(`Sorting table ${tableId} by column: ${column}`);
     const table = document.getElementById(tableId);
@@ -30,6 +33,7 @@ function sortTable(column, tableId) {
     rows.forEach(row => tbody.appendChild(row));
 }
 
+// Apply filters to all tables based on user input (text, category, status, bin location)
 function applyFilters() {
     console.log('Applying filters');
     const textQuery = document.getElementById('filter-input')?.value.toLowerCase() || '';
@@ -56,6 +60,7 @@ function applyFilters() {
     });
 }
 
+// Open a print window with the specified table content
 function printTable(level, id) {
     console.log(`Printing table: ${level}, ID: ${id}`);
     const element = document.getElementById(id);
@@ -63,37 +68,72 @@ function printTable(level, id) {
         console.warn(`Element with ID '${id}' not found for printing.`);
         return;
     }
+
+    // Alert to check if popup blocker is interfering
+    alert('Opening print window... If no window appears, check your browser\'s popup blocker settings.');
+
+    // Test a minimal window.open() to isolate popup blocker issues
+    const testWindow = window.open('', '_blank');
+    if (testWindow) {
+        testWindow.document.write('<html><body><h1>Test Window</h1></body></html>');
+        testWindow.document.close();
+        console.log('Test window opened successfully');
+    } else {
+        console.error('Test window failed to open. Popup blocker may be preventing window.open().');
+        return;
+    }
+
+    // Proceed with the actual print window
     const printWindow = window.open('', '_blank');
-    printWindow.document.write(`
-        <html>
-            <head>
-                <title>Print ${level} - RFID Dashboard</title>
-                <link href="/static/lib/bootstrap/bootstrap.min.css" rel="stylesheet">
-                <style>
-                    body { font-family: Arial, sans-serif; margin: 20px; }
-                    h2 { text-align: center; }
-                    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-                    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-                    th { background-color: #f2f2f2; }
-                    .print-header { text-align: center; margin-bottom: 20px; }
-                </style>
-            </head>
-            <body>
-                <div class="print-header">
-                    <h1>RFID Dashboard Report</h1>
-                    <p>Generated on ${new Date().toLocaleString()}</p>
-                    <h2>${level}</h2>
-                </div>
-                ${element.outerHTML}
-                <script>
-                    window.onload = function() { window.print(); window.close(); }
-                </script>
-            </body>
-        </html>
-    `);
-    printWindow.document.close();
+    if (!printWindow) {
+        console.error('Print window failed to open. Popup blocker may be preventing window.open().');
+        return;
+    }
+
+    try {
+        printWindow.document.write(`
+            <html>
+                <head>
+                    <title>Print ${level} - RFID Dashboard</title>
+                    <link href="/static/lib/bootstrap/bootstrap.min.css" rel="stylesheet">
+                    <style>
+                        body { font-family: Arial, sans-serif; margin: 20px; }
+                        h2 { text-align: center; }
+                        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                        th { background-color: #f2f2f2; }
+                        .print-header { text-align: center; margin-bottom: 20px; }
+                    </style>
+                </head>
+                <body>
+                    <div class="print-header">
+                        <h1>RFID Dashboard Report</h1>
+                        <p>Generated on ${new Date().toLocaleString()}</p>
+                        <h2>${level}</h2>
+                    </div>
+                    ${element.outerHTML}
+                    <script>
+                        window.onload = function() { 
+                            try {
+                                window.print();
+                                window.close();
+                            } catch (e) {
+                                console.error('Error in print window:', e);
+                            }
+                        }
+                    </script>
+                </body>
+            </html>
+        `);
+        printWindow.document.close();
+        console.log('Print window content written successfully');
+    } catch (error) {
+        console.error('Error writing to print window:', error);
+        printWindow.close();
+    }
 }
 
+// Refresh the category table by triggering an HTMX load event
 let isRefreshing = false;
 function refreshTable(tabNum) {
     if (isRefreshing) return;
@@ -108,6 +148,7 @@ function refreshTable(tabNum) {
     setTimeout(() => { isRefreshing = false; }, 1000);
 }
 
+// Hide all subcategory sections except the current one
 function hideOtherSubcats(currentCategory) {
     console.log(`Hiding other subcategories except for: ${currentCategory}`);
     const allSubcatDivs = document.querySelectorAll('div[id^="subcat-"]');
@@ -119,6 +160,7 @@ function hideOtherSubcats(currentCategory) {
     });
 }
 
+// Escape HTML attributes to prevent XSS
 function escapeHtmlAttribute(value) {
     return value
         .replace(/&/g, '&')
@@ -128,6 +170,7 @@ function escapeHtmlAttribute(value) {
         .replace(/>/g, '>');
 }
 
+// Escape JavaScript strings to prevent injection
 function escapeJsString(value) {
     return value
         .replace(/\\/g, '\\\\')
@@ -137,6 +180,7 @@ function escapeJsString(value) {
         .replace(/\r/g, '\\r');
 }
 
+// Load subcategory data into the specified container
 function loadSubcatData(category, subcatData) {
     console.log(`Loading subcategories for category: ${category}`, subcatData);
     hideOtherSubcats(category);
@@ -179,7 +223,7 @@ function loadSubcatData(category, subcatData) {
                         <td>${sub.available !== undefined ? sub.available : 'N/A'}</td>
                         <td>
                             <button class="btn btn-sm btn-secondary" hx-get="${escapedHxGetUrl}" hx-target="#common-${subId}" hx-swap="innerHTML">Load Items</button>
-                            <button class="btn btn-sm btn-info print-btn" data-print-level="Subcategory" data-print-id="subcat-table-${subId}">Print</button>
+                            <button id="print-btn-${subId}" class="btn btn-sm btn-info print-btn" data-print-level="Subcategory" data-print-id="subcat-table-${subId}">Print</button>
                             <div id="loading-${subId}" style="display:none;" class="loading">Loading...</div>
                         </td>
                     </tr>
@@ -207,6 +251,7 @@ function loadSubcatData(category, subcatData) {
     applyFilters();
 }
 
+// Load common names data into the specified container
 function loadCommonNames(category, subcategory, commonNamesData) {
     console.log(`Loading common names for category: ${category}, subcategory: ${subcategory}`, commonNamesData);
     const subId = `${category}_${subcategory}`.toLowerCase().replace(/[^a-z0-9-]/g, '_');
@@ -248,7 +293,7 @@ function loadCommonNames(category, subcategory, commonNamesData) {
                             <td>${cn.available !== undefined ? cn.available : 'N/A'}</td>
                             <td>
                                 <button class="btn btn-sm btn-secondary" hx-get="${escapedHxGetUrl}" hx-target="#items-${cnId}" hx-swap="innerHTML">Load Items</button>
-                                <button class="btn btn-sm btn-info print-btn" data-print-level="Common Name" data-print-id="common-table-${cnId}">Print</button>
+                                <button id="print-btn-${cnId}" class="btn btn-sm btn-info print-btn" data-print-level="Common Name" data-print-id="common-table-${cnId}">Print</button>
                                 <div id="loading-${cnId}" style="display:none;" class="loading">Loading...</div>
                             </td>
                         </tr>
@@ -277,6 +322,70 @@ function loadCommonNames(category, subcategory, commonNamesData) {
     applyFilters();
 }
 
+// Handle manual fetching of subcategory data when "Expand" is clicked
+function expandCategory(category, targetId) {
+    console.log(`Expanding category: ${category}, target: ${targetId}`);
+    
+    // Test fetch to /health to verify network functionality (already confirmed working)
+    console.log('Testing network with fetch to /health');
+    fetch('/health')
+        .then(response => {
+            console.log('Health fetch status:', response.status, response.statusText);
+            return response.json();
+        })
+        .then(data => console.log('Health fetch response:', data))
+        .catch(error => console.error('Health fetch error:', error));
+
+    // Test fetch to /tab/1/categories to verify if the issue is specific to /tab/1/subcat_data
+    console.log('Testing fetch to /tab/1/categories');
+    fetch(`/tab/${cachedTabNum}/categories`)
+        .then(response => {
+            console.log('Categories fetch status:', response.status, response.statusText);
+            return response.text(); // Expect HTML, not JSON
+        })
+        .then(data => console.log('Categories fetch response:', data.slice(0, 100) + '...')) // Log first 100 chars
+        .catch(error => console.error('Categories fetch error:', error));
+
+    // Fetch subcategory data manually with enhanced options
+    const url = `/tab/${cachedTabNum}/subcat_data?category=${category}`;
+    console.log(`Fetching subcategory data from: ${url}`);
+    showLoading(targetId.replace('subcat-', '')); // Show loading indicator
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5-second timeout
+
+    fetch(url, {
+        method: 'GET',
+        headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+        },
+        signal: controller.signal
+    })
+        .then(response => {
+            clearTimeout(timeoutId);
+            console.log('Subcat fetch status:', response.status, response.statusText);
+            if (!response.ok) {
+                throw new Error(`Subcat fetch failed with status ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log('Subcat fetch response:', data);
+            const categoryName = targetId.replace('subcat-', '');
+            loadSubcatData(categoryName, data);
+            hideLoading(targetId.replace('subcat-', ''));
+        })
+        .catch(error => {
+            clearTimeout(timeoutId);
+            console.error('Subcat fetch error:', error);
+            if (error.name === 'AbortError') {
+                console.error('Subcat fetch timed out after 5 seconds');
+            }
+            hideLoading(targetId.replace('subcat-', ''));
+        });
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     console.log('Document loaded, initializing HTMX listeners');
     const h1Element = document.querySelector('h1');
@@ -300,110 +409,20 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
     } else {
         console.log('HTMX library loaded successfully');
-        // Log HTMX version for debugging
         console.log('HTMX version:', htmx.version);
     }
 
-    // Debug button clicks and HTMX attributes
-    document.querySelectorAll('button[hx-get]').forEach(button => {
-        button.addEventListener('click', (event) => {
-            console.log(`Button clicked: ${button.textContent}, hx-get: ${button.getAttribute('hx-get')}`);
-            console.log('HTMX attributes on button:', {
-                hxGet: button.getAttribute('hx-get'),
-                hxTarget: button.getAttribute('hx-target'),
-                hxSwap: button.getAttribute('hx-swap')
-            });
-            // Force HTMX reprocessing on click
-            if (typeof htmx !== 'undefined') {
-                htmx.process(button);
-                console.log('Reprocessed HTMX attributes on button click');
-                // Manually trigger the HTMX request as a fallback
-                htmx.trigger(button, 'click');
-                // Fallback to manual fetch if HTMX fails
-                setTimeout(() => {
-                    if (!button.classList.contains('htmx-request')) {
-                        console.warn('HTMX did not initiate request, falling back to manual fetch');
-                        const url = button.getAttribute('hx-get');
-                        const targetId = button.getAttribute('hx-target').replace('#', '');
-                        const swap = button.getAttribute('hx-swap');
-                        fetch(url)
-                            .then(response => {
-                                console.log('Fetch response status:', response.status, response.statusText);
-                                if (!response.ok) {
-                                    throw new Error(`Fetch failed with status ${response.status}`);
-                                }
-                                return response.json();
-                            })
-                            .then(data => {
-                                console.log('Manual fetch response:', data);
-                                if (swap === 'innerHTML') {
-                                    const target = document.getElementById(targetId);
-                                    if (target) {
-                                        if (targetId.startsWith('subcat-')) {
-                                            const category = targetId.replace('subcat-', '');
-                                            loadSubcatData(category, data);
-                                        } else if (targetId.startsWith('common-')) {
-                                            const categoryMatch = url.match(/category=([^&]+)/);
-                                            const subcategoryMatch = url.match(/subcategory=([^&]+)/);
-                                            if (categoryMatch && subcategoryMatch) {
-                                                const category = decodeURIComponent(categoryMatch[1]);
-                                                const subcategory = decodeURIComponent(subcategoryMatch[1]);
-                                                loadCommonNames(category, subcategory, data);
-                                            }
-                                        } else if (targetId.startsWith('items-')) {
-                                            target.innerHTML = JSON.stringify(data);
-                                        }
-                                    }
-                                }
-                            })
-                            .catch(error => {
-                                console.error('Manual fetch error:', error);
-                            });
-                    }
-                }, 500);
-            } else {
-                console.error('HTMX not available during button click');
-            }
-            const keyMatch = button.getAttribute('hx-target')?.match(/#subcat-(.+)$/);
-            if (keyMatch) {
-                showLoading(keyMatch[1]);
-            }
-        });
-    });
-
-    // Direct click listener for print-btn debugging
+    // Direct click listener for print-btn buttons
     document.querySelectorAll('.print-btn').forEach(button => {
         button.addEventListener('click', (event) => {
             console.log('Direct click on print-btn:', button);
             console.log('Event details:', event);
+            const level = button.getAttribute('data-print-level');
+            const id = button.getAttribute('data-print-id');
+            console.log(`Print button clicked: level=${level}, id=${id}`);
+            printTable(level, id);
         });
     });
-
-    // Event delegation for print buttons on the category table
-    const categoryTable = document.getElementById('category-table');
-    if (categoryTable) {
-        categoryTable.addEventListener('click', (event) => {
-            console.log('Click event on category-table:', event.target);
-            console.log('Event propagation stopped:', event.cancelBubble);
-            const button = event.target.closest('.print-btn');
-            if (button) {
-                const level = button.getAttribute('data-print-level');
-                const id = button.getAttribute('data-print-id');
-                console.log(`Print button clicked: level=${level}, id=${id}`);
-                printTable(level, id);
-            } else {
-                console.log('No print-btn found for click event on category-table');
-                const closestTd = event.target.closest('td');
-                if (closestTd) {
-                    console.log('Closest td content:', closestTd.innerHTML);
-                    const printBtn = closestTd.querySelector('.print-btn');
-                    console.log('Print button in td:', printBtn ? printBtn.outerHTML : 'None');
-                }
-            }
-        });
-    } else {
-        console.warn('Category table not found for print button event delegation');
-    }
 
     document.body.addEventListener('htmx:afterRequest', (event) => {
         console.log('HTMX request completed for target:', event.detail.target.id);
@@ -425,7 +444,6 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log('HTMX configRequest event:', event.detail);
     });
 
-    // Debug HTMX initialization
     document.body.addEventListener('htmx:load', (event) => {
         console.log('HTMX load event:', event.detail.elt);
     });
@@ -435,13 +453,11 @@ document.body.addEventListener('htmx:afterSwap', (event) => {
     console.log('HTMX afterSwap event for target:', event.detail.target.id, 'Response:', event.detail.xhr.responseText);
     const targetId = event.detail.target.id;
     if (targetId === 'category-table-body') {
-        // Process HTMX attributes on the newly loaded category table content
         const container = document.getElementById('category-table-body');
         if (container) {
             if (typeof htmx !== 'undefined') {
                 htmx.process(container);
                 console.log('HTMX processed category table body');
-                // Debug HTMX-processed elements
                 const buttons = container.querySelectorAll('button[hx-get]');
                 console.log(`Found ${buttons.length} buttons with hx-get after processing`);
                 buttons.forEach(button => {
@@ -513,7 +529,7 @@ document.body.addEventListener('htmx:afterSwap', (event) => {
                             <td>${item.quality || ''}</td>
                             <td>${item.notes || ''}</td>
                             <td>
-                                <button class="btn btn-sm btn-info print-btn" data-print-level="Item" data-print-id="items-table-${targetId}">
+                                <button id="print-btn-items-${targetId}" class="btn btn-sm btn-info print-btn" data-print-level="Item" data-print-id="items-table-${targetId}">
                                     Print
                                 </button>
                             </td>
@@ -527,7 +543,6 @@ document.body.addEventListener('htmx:afterSwap', (event) => {
             `;
             container.innerHTML = html;
             console.log(`Items table rendered for target ${targetId}:`, container.innerHTML);
-            // Process HTMX attributes on the newly added content
             if (typeof htmx !== 'undefined') {
                 htmx.process(container);
                 console.log('HTMX processed items container');
