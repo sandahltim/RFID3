@@ -39,5 +39,6 @@
         {% endblock %}
     </div>
     <script src="{{ url_for('static', filename='js/tab.js') }}?v={{ cache_bust if cache_bust is defined else timestamp() }}"></script>
+    <script src="{{ url_for('static', filename='js/expand.js') }}?v={{ cache_bust if cache_bust is defined else timestamp() }}"></script>
 </body>
 </html>

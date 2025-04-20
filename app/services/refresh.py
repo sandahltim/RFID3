@@ -125,6 +125,8 @@ def update_seed_data(session, seeds):
 
 @refresh_bp.route('/full_refresh', methods=['POST'])
 def full_refresh():
+    # Create a new session for this request
+    session = Session(bind=db.engine)
     try:
         current_app.logger.info("Starting full refresh")
         client = APIClient()
@@ -136,25 +138,28 @@ def full_refresh():
         seeds = client.get_seed_data()
         
         current_app.logger.info("Updating database")
-        with db.session.begin():
-            update_item_master(db.session, items)
-            update_transactions(db.session, transactions)
-            update_seed_data(db.session, seeds)
-            
-            state = RefreshState.query.first()
-            if not state:
-                state = RefreshState(last_refresh=datetime.utcnow().isoformat())
-                db.session.add(state)
-            else:
-                state.last_refresh = datetime.utcnow().isoformat()
+        session.begin()
+        update_item_master(session, items)
+        update_transactions(session, transactions)
+        update_seed_data(session, seeds)
         
+        state = session.query(RefreshState).first()
+        if not state:
+            state = RefreshState(last_refresh=datetime.utcnow().isoformat())
+            session.add(state)
+        else:
+            state.last_refresh = datetime.utcnow().isoformat()
+        
+        session.commit()
         cache.clear()
         current_app.logger.info("Full refresh completed successfully")
         return jsonify({'status': 'success', 'message': 'Database refreshed'})
     except Exception as e:
         current_app.logger.error(f"Full refresh failed: {str(e)}")
-        db.session.rollback()
+        session.rollback()
         return jsonify({'status': 'error', 'message': str(e)}), 500
+    finally:
+        session.close()
 
 def incremental_refresh():
     # Create a new session for this background task
