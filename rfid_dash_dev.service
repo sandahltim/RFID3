@@ -7,8 +7,7 @@ User=tim
 Group=www-data
 WorkingDirectory=/home/tim/test_rfidpi
 Environment="PATH=/home/tim/test_rfidpi/venv/bin"
-ExecStart=/home/tim/test_rfidpi/venv/bin/gunicorn --workers 1 --bind 0.0.0.0:3609 --chdir /home/tim/test_rfidpi --log-level debug run:app
-Restart=always
+ExecStart=/home/tim/test_rfidpi/venv/bin/gunicorn --workers 1 --bind 0.0.0.0:3607 -c gunicorn.conf.py run:app
 
 [Install]
 WantedBy=multi-user.target
