@@ -120,17 +120,15 @@ function hideOtherSubcats(currentCategory) {
 }
 
 function escapeHtmlAttribute(value) {
-    // Escape special characters for safe HTML attribute inclusion
     return value
         .replace(/&/g, '&amp;')
-        .replace(/'/g, '&#39;')
+        .replace(/'/g, '&apos;')
         .replace(/"/g, '&quot;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;');
 }
 
 function escapeJsString(value) {
-    // Escape special characters for safe inclusion in JavaScript strings
     return value
         .replace(/\\/g, '\\\\')
         .replace(/'/g, '\\\'')
@@ -158,9 +156,7 @@ function loadSubcatData(category, subcatData) {
         const hxGetUrl = `/tab/${cachedTabNum}/common_names?category=${encodeURIComponent(category)}&subcategory=${encodeURIComponent(sub.subcategory)}`;
         console.log(`Generated hx-get URL for subcategory ${sub.subcategory}: ${hxGetUrl}`);
         
-        // Escape the URL for safe HTML attribute inclusion
         const escapedHxGetUrl = escapeHtmlAttribute(hxGetUrl);
-        // Escape subId for safe inclusion in JavaScript string
         const escapedSubId = escapeJsString(subId);
         html += `
             <table class="table table-bordered mt-2" id="subcat-table-${subId}">
@@ -223,9 +219,7 @@ function loadCommonNames(category, subcategory, commonNamesData) {
             const hxGetUrl = `/tab/${cachedTabNum}/data?category=${encodeURIComponent(category)}&subcategory=${encodeURIComponent(subcategory)}&common_name=${encodeURIComponent(cn.name)}`;
             console.log(`Generated hx-get URL for common name ${cn.name}: ${hxGetUrl}`);
             
-            // Escape the URL for safe HTML attribute inclusion
             const escapedHxGetUrl = escapeHtmlAttribute(hxGetUrl);
-            // Escape cnId for safe inclusion in JavaScript string
             const escapedCnId = escapeJsString(cnId);
             html += `
                 <table class="table table-bordered ms-3 mt-2" id="common-table-${cnId}">
@@ -272,11 +266,10 @@ function loadCommonNames(category, subcategory, commonNamesData) {
 
 document.addEventListener('DOMContentLoaded', () => {
     console.log('Document loaded, initializing HTMX listeners');
-    // Cache the tab number on page load, but only on tab pages
     const h1Element = document.querySelector('h1');
     if (h1Element && window.location.pathname.startsWith('/tab/')) {
         const h1Text = h1Element.textContent.trim();
-        const tabNumMatch = h1Text.match(/Tab\s+(\d+)/i); // Match "Tab 1", "Tab 2", etc.
+        const tabNumMatch = h1Text.match(/Tab\s+(\d+)/i);
         if (tabNumMatch && tabNumMatch[1]) {
             cachedTabNum = tabNumMatch[1];
             setInterval(() => refreshTable(cachedTabNum), 30000);
@@ -289,27 +282,24 @@ document.addEventListener('DOMContentLoaded', () => {
         console.warn('No h1 element found on the page, using default tab number 1.');
     }
 
-    // Verify HTMX is loaded
     if (typeof htmx === 'undefined') {
         console.error('HTMX library not loaded. Please ensure htmx.min.js is included in the page.');
     } else {
         console.log('HTMX library loaded successfully');
     }
 
-    // Handle htmx:afterRequest to hide loading indicators
     document.body.addEventListener('htmx:afterRequest', (event) => {
         console.log('HTMX request completed for target:', event.detail.target.id);
+        console.log('Response:', event.detail.xhr.responseText);
         const targetId = event.detail.target.id;
         const catKey = targetId.replace('subcat-', '').replace('common-', '').replace('items-', '');
         hideLoading(catKey);
     });
 
-    // Handle htmx:beforeRequest to log the request
     document.body.addEventListener('htmx:beforeRequest', (event) => {
         console.log('HTMX request initiated:', event.detail.elt.getAttribute('hx-get'));
     });
 
-    // Handle htmx:responseError to log any errors
     document.body.addEventListener('htmx:responseError', (event) => {
         console.error('HTMX response error:', event.detail.xhr.status, event.detail.xhr.statusText, event.detail.xhr.responseText);
     });
@@ -338,6 +328,7 @@ document.body.addEventListener('htmx:afterSwap', (event) => {
         if (container) {
             container.style.display = 'block';
             const data = JSON.parse(event.detail.xhr.responseText);
+            console.log(`Rendering items for target ${targetId}:`, data);
             let html = `
                 <table class="table table-bordered ms-3 mt-2" id="items-table-${targetId}">
                     <thead>
@@ -387,6 +378,7 @@ document.body.addEventListener('htmx:afterSwap', (event) => {
                 </table>
             `;
             container.innerHTML = html;
+            console.log(`Items table rendered for target ${targetId}:`, container.innerHTML);
             applyFilters();
         } else {
             console.warn(`Container with ID '${targetId}' not found.`);
