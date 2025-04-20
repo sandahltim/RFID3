@@ -135,6 +135,8 @@ function loadSubcatData(category, subcatData) {
         console.log(`Rendering subcategory for ${category}: ${sub.subcategory}`);
         const subId = `${category}_${sub.subcategory}`.toLowerCase().replace(/[^a-z0-9-]/g, '_');
         const escapedSubcategory = sub.subcategory.replace(/&/g, '&').replace(/</g, '<').replace(/>/g, '>').replace(/"/g, '"').replace(/'/g, '');
+        const encodedCategory = encodeURIComponent(category);
+        const encodedSubcategory = encodeURIComponent(sub.subcategory);
         html += `
             <table class="table table-bordered mt-2" id="subcat-table-${subId}">
                 <thead>
@@ -156,7 +158,7 @@ function loadSubcatData(category, subcatData) {
                         <td>${sub.available !== undefined ? sub.available : 'N/A'}</td>
                         <td>
                             <button class="btn btn-sm btn-secondary"
-                                    hx-get="/tab/${cachedTabNum}/common_names?category=${encodeURIComponent(category)}&subcategory=${encodeURIComponent(sub.subcategory)}"
+                                    hx-get="/tab/${cachedTabNum}/common_names?category=${encodedCategory}&subcategory=${encodedSubcategory}"
                                     hx-target="#common-${subId}"
                                     hx-swap="innerHTML"
                                     onclick="showLoading('${subId}')">
@@ -200,6 +202,9 @@ function loadCommonNames(category, subcategory, commonNamesData) {
         commonNamesData.common_names.forEach(cn => {
             const cnId = `${subId}_${cn.name}`.toLowerCase().replace(/[^a-z0-9-]/g, '_');
             const escapedCommonName = cn.name.replace(/&/g, '&').replace(/</g, '<').replace(/>/g, '>').replace(/"/g, '"').replace(/'/g, '');
+            const encodedCategory = encodeURIComponent(category);
+            const encodedSubcategory = encodeURIComponent(subcategory);
+            const encodedCommonName = encodeURIComponent(cn.name);
             html += `
                 <table class="table table-bordered ms-3 mt-2" id="common-table-${cnId}">
                     <thead>
@@ -221,7 +226,7 @@ function loadCommonNames(category, subcategory, commonNamesData) {
                             <td>${cn.available !== undefined ? cn.available : 'N/A'}</td>
                             <td>
                                 <button class="btn btn-sm btn-secondary"
-                                        hx-get="/tab/${cachedTabNum}/data?category=${encodeURIComponent(category)}&subcategory=${encodeURIComponent(subcategory)}&common_name=${encodeURIComponent(cn.name)}"
+                                        hx-get="/tab/${cachedTabNum}/data?category=${encodedCategory}&subcategory=${encodedSubcategory}&common_name=${encodedCommonName}"
                                         hx-target="#items-${cnId}"
                                         hx-swap="innerHTML"
                                         onclick="showLoading('${cnId}')">
@@ -303,8 +308,14 @@ document.body.addEventListener('htmx:afterSwap', (event) => {
         const data = JSON.parse(event.detail.xhr.responseText);
         loadSubcatData(category, data);
     } else if (targetId.startsWith('common-')) {
-        const category = event.detail.requestConfig.elt.getAttribute('hx-get').match(/category=([^&]+)/)[1];
-        const subcategory = event.detail.requestConfig.elt.getAttribute('hx-get').match(/subcategory=([^&]+)/)[1];
+        const categoryMatch = event.detail.requestConfig.elt.getAttribute('hx-get').match(/category=([^&]+)/);
+        const subcategoryMatch = event.detail.requestConfig.elt.getAttribute('hx-get').match(/subcategory=([^&]+)/);
+        if (!categoryMatch || !subcategoryMatch) {
+            console.error('Failed to parse category or subcategory from hx-get:', event.detail.requestConfig.elt.getAttribute('hx-get'));
+            return;
+        }
+        const category = categoryMatch[1];
+        const subcategory = subcategoryMatch[1];
         const data = JSON.parse(event.detail.xhr.responseText);
         loadCommonNames(decodeURIComponent(category), decodeURIComponent(subcategory), data);
     } else if (targetId.startsWith('items-')) {

@@ -75,10 +75,6 @@ def subcat_data(tab_num):
         ).all()
 
         current_app.logger.debug(f"Raw subcategory counts for category {category}: {subcategory_counts}")
-        subcategories = [sub for sub, _, _, _ in subcategory_counts if sub]
-        current_app.logger.info(f"Fetched {len(subcategories)} subcategories for category {category}")
-        current_app.logger.debug(f"Subcategories list before loop: {subcategories}")
-
         data = []
         for sub, total_items, on_contracts, in_service in subcategory_counts:
             if sub:
@@ -94,6 +90,7 @@ def subcat_data(tab_num):
                     'available': available
                 })
 
+        current_app.logger.info(f"Fetched {len(data)} subcategories for category {category}")
         current_app.logger.debug(f"Subcategory data for category {category}: {data}")
         return jsonify(data)
     except Exception as e:
