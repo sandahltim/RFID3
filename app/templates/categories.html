@@ -1,79 +1,85 @@
-{% extends 'base.html' %}
+{% extends "base.html" %}
 
 {% block title %}Manage Categories{% endblock %}
 
-{% block extra_head %}
-<style>
-    .form-row { display: flex; gap: 10px; margin-bottom: 10px; }
-    .form-row input, .form-row select { flex: 1; }
-    .alert { display: none; }
-</style>
-{% endblock %}
-
 {% block content %}
 <h1>Manage Categories</h1>
-<div id="alert" class="alert"></div>
-{% for rc in rental_classes %}
-<div class="form-row">
-    <select class="form-control rental-class" onchange="loadMapping(this)">
-        <option value="{{ rc }}">{{ rc }}</option>
-    </select>
-    <input type="text" class="form-control category" placeholder="Category (e.g., Linen)">
-    <input type="text" class="form-control subcategory" placeholder="Subcategory (e.g., Round Linen)">
-    <button class="btn btn-primary" onclick="updateMapping(this)">Update</button>
+<div id="category-mappings">
+    <table class="table table-bordered">
+        <thead>
+            <tr>
+                <th>Category</th>
+                <th>Subcategory</th>
+                <th>Rental Class ID</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody id="mappings-table">
+        </tbody>
+    </table>
+    <button class="btn btn-primary" onclick="addMappingRow()">Add Mapping</button>
+    <button class="btn btn-success" onclick="saveMappings()">Save Mappings</button>
 </div>
-{% endfor %}
 
 <script>
-    function loadMapping(select) {
-        const rentalClass = select.value;
-        const row = select.closest('.form-row');
-        const categoryInput = row.querySelector('.category');
-        const subcategoryInput = row.querySelector('.subcategory');
-        
-        fetch(`/categories/mapping?rental_class_id=${rentalClass}`)
-            .then(response => response.json())
-            .then(data => {
-                categoryInput.value = data.category || '';
-                subcategoryInput.value = data.subcategory || '';
-            })
-            .catch(error => console.error('Error loading mapping:', error));
+    let mappings = [];
+
+    function addMappingRow(mapping = {category: '', subcategory: '', rental_class_id: ''}) {
+        const tableBody = document.getElementById('mappings-table');
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td><input type="text" class="form-control category-input" value="${mapping.category}"></td>
+            <td><input type="text" class="form-control subcategory-input" value="${mapping.subcategory}"></td>
+            <td><input type="text" class="form-control rental-class-id-input" value="${mapping.rental_class_id}"></td>
+            <td><button class="btn btn-danger" onclick="removeMappingRow(this)">Remove</button></td>
+        `;
+        tableBody.appendChild(row);
     }
 
-    function updateMapping(button) {
-        const row = button.closest('.form-row');
-        const rentalClass = row.querySelector('.rental-class').value;
-        const category = row.querySelector('.category').value;
-        const subcategory = row.querySelector('.subcategory').value;
-        const alert = document.getElementById('alert');
-        
-        const formData = new FormData();
-        formData.append('rental_class_id', rentalClass);
-        formData.append('category', category);
-        formData.append('subcategory', subcategory);
-        
+    function removeMappingRow(button) {
+        button.parentElement.parentElement.remove();
+    }
+
+    function saveMappings() {
+        const rows = document.querySelectorAll('#mappings-table tr');
+        const mappings = Array.from(rows).map(row => {
+            return {
+                category: row.querySelector('.category-input').value,
+                subcategory: row.querySelector('.subcategory-input').value,
+                rental_class_id: row.querySelector('.rental-class-id-input').value
+            };
+        });
+
         fetch('/categories/update', {
             method: 'POST',
-            body: formData
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(mappings)
         })
         .then(response => response.json())
         .then(data => {
-            alert.className = `alert alert-${data.status === 'success' ? 'success' : 'danger'}`;
-            alert.textContent = data.message;
-            alert.style.display = 'block';
-            setTimeout(() => alert.style.display = 'none', 3000);
+            if (data.error) {
+                alert('Error: ' + data.error);
+            } else {
+                alert(data.message);
+            }
         })
         .catch(error => {
-            alert.className = 'alert alert-danger';
-            alert.textContent = 'Failed to update mapping';
-            alert.style.display = 'block';
-            setTimeout(() => alert.style.display = 'none', 3000);
+            console.error('Error saving mappings:', error);
+            alert('Failed to save mappings');
         });
     }
 
-    // Load mappings for all rental classes on page load
-    document.addEventListener('DOMContentLoaded', () => {
-        document.querySelectorAll('.rental-class').forEach(select => loadMapping(select));
-    });
+    // Load existing mappings
+    fetch('/categories/mapping')
+        .then(response => response.json())
+        .then(data => {
+            data.forEach(mapping => addMappingRow(mapping));
+        })
+        .catch(error => {
+            console.error('Error loading mappings:', error);
+            alert('Failed to load mappings');
+        });
 </script>
 {% endblock %}

@@ -122,11 +122,11 @@ function hideOtherSubcats(currentCategory) {
 function escapeHtmlAttribute(value) {
     // Escape special characters for safe HTML attribute inclusion
     return value
-        .replace(/&/g, '&amp;')
-        .replace(/'/g, '&#x27;')
-        .replace(/"/g, '&quot;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;');
+        .replace(/&/g, '&')
+        .replace(/'/g, ''')
+        .replace(/"/g, '"')
+        .replace(/</g, '<')
+        .replace(/>/g, '>');
 }
 
 function loadSubcatData(category, subcatData) {

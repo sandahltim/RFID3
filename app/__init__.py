@@ -3,13 +3,11 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_caching import Cache
 import logging
 from logging.handlers import RotatingFileHandler
-from flask_wtf.csrf import CSRFProtect
-# Use absolute import from the project root
+# Removed Flask-WTF import
 from config import DB_CONFIG, REDIS_CONFIG
 
 db = SQLAlchemy()
 cache = Cache()
-csrf = CSRFProtect()
 
 def create_app():
     app = Flask(__name__)
@@ -27,13 +25,9 @@ def create_app():
     app.config['CACHE_REDIS_PORT'] = REDIS_CONFIG['port']
     app.config['CACHE_REDIS_DB'] = REDIS_CONFIG['db']
 
-    # Secret key for CSRF protection
-    app.config['SECRET_KEY'] = 'your-secret-key-here'  # Replace with a secure key
-
     # Initialize extensions
     db.init_app(app)
     cache.init_app(app)
-    csrf.init_app(app)
 
     # Set up logging
     handler = RotatingFileHandler('/home/tim/test_rfidpi/logs/app.log', maxBytes=10000, backupCount=1)
