@@ -1,4 +1,3 @@
-# -rfidpi
 test_rfidpi/ RFID2
 ├── app/
 │   ├── __init__.py
@@ -22,8 +21,14 @@ test_rfidpi/ RFID2
 │   └── css/
 │   │   └── style.css
 │   └── js/
-│   │   └── tab.js
+│   │   ├── tab.js
+│   │   └── expand.js
 │   └── lib/
+│        ├── htmx/
+│        │   └── htmx.min.js
+│        └── bootstrap/
+│            ├── bootstrap.min.css
+│            └── bootstrap.bundle.min.js
 ├── scripts/
 │   ├── migrate_db.sql
 │   └── setup_mariadb.sh
