@@ -113,8 +113,8 @@ function printTable(level, id) {
         return;
     }
 
-    // Alert to guide the user on allowing popups
-    alert('Attempting to open a print window...\n\nIf no window appears, please allow popups for this site:\n1. Click the lock icon in the address bar\n2. Go to Site Settings\n3. Set Pop-ups and redirects to Allow\n4. Try again');
+    // Alert to guide the user on allowing popups in Chrome
+    alert('Attempting to open a print window...\n\nIf no window appears, please allow popups for this site:\n1. Click the lock icon in the address bar (left of "pi5:3609")\n2. Click "Site settings"\n3. Find "Pop-ups and redirects" and set to "Allow"\n4. Reload the page and try again\n\nAlternatively, printing will proceed in the current window.');
 
     // Test a minimal window.open() to isolate popup blocker issues
     const testWindow = window.open('', '_blank');
@@ -372,20 +372,33 @@ function loadCommonNames(category, subcategory, commonNamesData) {
 
 document.addEventListener('DOMContentLoaded', () => {
     console.log('Document loaded, initializing HTMX listeners');
+    
+    // Safely extract the tab number from the h1 element
     const h1Element = document.querySelector('h1');
-    if (h1Element && window.location.pathname.startsWith('/tab/')) {
-        const h1Text = h1Element.textContent.trim();
-        const tabNumMatch = h1Text.match(/Tab\s+(\d+)/i);
-        if (tabNumMatch && tabNumMatch[1]) {
-            cachedTabNum = tabNumMatch[1];
-            setInterval(() => refreshTable(cachedTabNum), 30000);
-        } else {
-            console.warn('No tab number found in h1 element, using default tab number 1.');
+    if (h1Element) {
+        try {
+            const h1Text = h1Element.textContent.trim();
+            const tabNumMatch = h1Text.match(/Tab\s+(\d+)/i);
+            if (tabNumMatch && tabNumMatch[1]) {
+                cachedTabNum = tabNumMatch[1];
+                console.log(`Extracted tab number: ${cachedTabNum}`);
+                // Only set up the refresh interval on tab pages
+                if (window.location.pathname.startsWith('/tab/')) {
+                    setInterval(() => refreshTable(cachedTabNum), 30000);
+                }
+            } else {
+                console.warn('No tab number found in h1 element, using default tab number 1.');
+            }
+        } catch (error) {
+            console.error('Error extracting tab number from h1:', error);
         }
-    } else if (!window.location.pathname.startsWith('/tab/')) {
-        console.debug('Not a tab page, skipping tab number detection.');
     } else {
         console.warn('No h1 element found on the page, using default tab number 1.');
+    }
+
+    // Skip tab-specific logic on non-tab pages
+    if (!window.location.pathname.startsWith('/tab/')) {
+        console.debug('Not a tab page, skipping tab-specific logic.');
     }
 
     if (typeof htmx === 'undefined') {
@@ -396,7 +409,7 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log('HTMX version:', htmx.version);
     }
 
-    // Debug button clicks and HTMX attributes
+    // Debug button clicks and HTMX attributes, with manual fetch fallback
     document.querySelectorAll('button[hx-get]').forEach(button => {
         button.addEventListener('click', (event) => {
             console.log(`Button clicked: ${button.textContent}, hx-get: ${button.getAttribute('hx-get')}`);
@@ -405,6 +418,57 @@ document.addEventListener('DOMContentLoaded', () => {
                 hxTarget: button.getAttribute('hx-target'),
                 hxSwap: button.getAttribute('hx-swap')
             });
+            // Force HTMX reprocessing on click
+            if (typeof htmx !== 'undefined') {
+                htmx.process(button);
+                console.log('Reprocessed HTMX attributes on button click');
+                // Manually trigger the HTMX request
+                htmx.trigger(button, 'click');
+                // Fallback to manual fetch if HTMX fails
+                setTimeout(() => {
+                    if (!button.classList.contains('htmx-request')) {
+                        console.warn('HTMX did not initiate request, falling back to manual fetch');
+                        const url = button.getAttribute('hx-get');
+                        const targetId = button.getAttribute('hx-target').replace('#', '');
+                        const swap = button.getAttribute('hx-swap');
+                        fetch(url)
+                            .then(response => {
+                                console.log('Manual fetch status:', response.status, response.statusText);
+                                if (!response.ok) {
+                                    throw new Error(`Manual fetch failed with status ${response.status}`);
+                                }
+                                return response.json();
+                            })
+                            .then(data => {
+                                console.log('Manual fetch response:', data);
+                                if (swap === 'innerHTML') {
+                                    const target = document.getElementById(targetId);
+                                    if (target) {
+                                        if (targetId.startsWith('subcat-')) {
+                                            const category = targetId.replace('subcat-', '');
+                                            loadSubcatData(category, data);
+                                        } else if (targetId.startsWith('common-')) {
+                                            const categoryMatch = url.match(/category=([^&]+)/);
+                                            const subcategoryMatch = url.match(/subcategory=([^&]+)/);
+                                            if (categoryMatch && subcategoryMatch) {
+                                                const category = decodeURIComponent(categoryMatch[1]);
+                                                const subcategory = decodeURIComponent(subcategoryMatch[1]);
+                                                loadCommonNames(category, subcategory, data);
+                                            }
+                                        } else if (targetId.startsWith('items-')) {
+                                            target.innerHTML = JSON.stringify(data);
+                                        }
+                                    }
+                                }
+                            })
+                            .catch(error => {
+                                console.error('Manual fetch error:', error);
+                            });
+                    }
+                }, 500);
+            } else {
+                console.error('HTMX not available during button click');
+            }
             const keyMatch = button.getAttribute('hx-target')?.match(/#subcat-(.+)$/);
             if (keyMatch) {
                 showLoading(keyMatch[1]);
@@ -423,6 +487,13 @@ document.addEventListener('DOMContentLoaded', () => {
             printTable(level, id);
         });
     });
+
+    // Force HTMX reprocessing on the category table after load
+    const categoryTableBody = document.getElementById('category-table-body');
+    if (categoryTableBody && typeof htmx !== 'undefined') {
+        htmx.process(categoryTableBody);
+        console.log('Forced HTMX reprocessing on category-table-body');
+    }
 
     document.body.addEventListener('htmx:afterRequest', (event) => {
         console.log('HTMX request completed for target:', event.detail.target.id);
@@ -446,6 +517,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.body.addEventListener('htmx:load', (event) => {
         console.log('HTMX load event:', event.detail.elt);
+    });
+
+    // Additional HTMX debugging events
+    document.body.addEventListener('htmx:beforeSend', (event) => {
+        console.log('HTMX beforeSend event:', event.detail);
+    });
+
+    document.body.addEventListener('htmx:afterProcessNode', (event) => {
+        console.log('HTMX afterProcessNode event:', event.detail.elt);
     });
 });
 
