@@ -158,6 +158,12 @@ def full_refresh():
 def incremental_refresh():
     try:
         current_app.logger.info("Starting incremental refresh")
+        # Ensure any existing transaction is committed or rolled back
+        if db.session.is_active:
+            db.session.commit()
+        else:
+            db.session.rollback()
+
         state = RefreshState.query.first()
         since_date = state.last_refresh if state else None
         

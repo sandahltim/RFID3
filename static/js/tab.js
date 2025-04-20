@@ -122,11 +122,21 @@ function hideOtherSubcats(currentCategory) {
 function escapeHtmlAttribute(value) {
     // Escape special characters for safe HTML attribute inclusion
     return value
-        .replace(/&/g, '&')
-        .replace(/'/g, ''')
-        .replace(/"/g, '"')
-        .replace(/</g, '<')
-        .replace(/>/g, '>');
+        .replace(/&/g, '&amp;')
+        .replace(/'/g, '&#39;')
+        .replace(/"/g, '&quot;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+}
+
+function escapeJsString(value) {
+    // Escape special characters for safe inclusion in JavaScript strings
+    return value
+        .replace(/\\/g, '\\\\')
+        .replace(/'/g, '\\\'')
+        .replace(/"/g, '\\"')
+        .replace(/\n/g, '\\n')
+        .replace(/\r/g, '\\r');
 }
 
 function loadSubcatData(category, subcatData) {
@@ -150,6 +160,8 @@ function loadSubcatData(category, subcatData) {
         
         // Escape the URL for safe HTML attribute inclusion
         const escapedHxGetUrl = escapeHtmlAttribute(hxGetUrl);
+        // Escape subId for safe inclusion in JavaScript string
+        const escapedSubId = escapeJsString(subId);
         html += `
             <table class="table table-bordered mt-2" id="subcat-table-${subId}">
                 <thead>
@@ -170,7 +182,7 @@ function loadSubcatData(category, subcatData) {
                         <td>${sub.in_service !== undefined ? sub.in_service : 'N/A'}</td>
                         <td>${sub.available !== undefined ? sub.available : 'N/A'}</td>
                         <td>
-                            <button class="btn btn-sm btn-secondary" hx-get="${escapedHxGetUrl}" hx-target="#common-${subId}" hx-swap="innerHTML" onclick="showLoading('${subId}')">Load Items</button>
+                            <button class="btn btn-sm btn-secondary" hx-get="${escapedHxGetUrl}" hx-target="#common-${subId}" hx-swap="innerHTML" onclick="showLoading('${escapedSubId}')">Load Items</button>
                             <button class="btn btn-sm btn-info" onclick="printTable('Subcategory', 'subcat-table-${subId}')">Print</button>
                         </td>
                     </tr>
@@ -213,6 +225,8 @@ function loadCommonNames(category, subcategory, commonNamesData) {
             
             // Escape the URL for safe HTML attribute inclusion
             const escapedHxGetUrl = escapeHtmlAttribute(hxGetUrl);
+            // Escape cnId for safe inclusion in JavaScript string
+            const escapedCnId = escapeJsString(cnId);
             html += `
                 <table class="table table-bordered ms-3 mt-2" id="common-table-${cnId}">
                     <thead>
@@ -233,7 +247,7 @@ function loadCommonNames(category, subcategory, commonNamesData) {
                             <td>${cn.in_service !== undefined ? cn.in_service : 'N/A'}</td>
                             <td>${cn.available !== undefined ? cn.available : 'N/A'}</td>
                             <td>
-                                <button class="btn btn-sm btn-secondary" hx-get="${escapedHxGetUrl}" hx-target="#items-${cnId}" hx-swap="innerHTML" onclick="showLoading('${cnId}')">Load Items</button>
+                                <button class="btn btn-sm btn-secondary" hx-get="${escapedHxGetUrl}" hx-target="#items-${cnId}" hx-swap="innerHTML" onclick="showLoading('${escapedCnId}')">Load Items</button>
                                 <button class="btn btn-sm btn-info" onclick="printTable('Common Name', 'common-table-${cnId}')">Print</button>
                             </td>
                         </tr>
