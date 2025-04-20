@@ -11,9 +11,9 @@ cache = Cache()
 def create_app():
     app = Flask(__name__)
 
-    # Database configuration
+    # Database configuration (use mysql+mysqlconnector for mysql-connector-python)
     app.config['SQLALCHEMY_DATABASE_URI'] = (
-        f"mariadb+mariadbconnector://{DB_CONFIG['user']}:{DB_CONFIG['password']}@"
+        f"mysql+mysqlconnector://{DB_CONFIG['user']}:{DB_CONFIG['password']}@"
         f"{DB_CONFIG['host']}/{DB_CONFIG['database']}?charset={DB_CONFIG['charset']}"
     )
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
