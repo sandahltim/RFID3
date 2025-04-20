@@ -158,7 +158,7 @@ function loadSubcatData(category, subcatData) {
                         <td>${sub.available !== undefined ? sub.available : 'N/A'}</td>
                         <td>
                             <button class="btn btn-sm btn-secondary"
-                                    hx-get="${hxGetUrl}"
+                                    hx-get='${hxGetUrl}'
                                     hx-target="#common-${subId}"
                                     hx-swap="innerHTML"
                                     onclick="showLoading('${subId}')">
@@ -225,7 +225,7 @@ function loadCommonNames(category, subcategory, commonNamesData) {
                             <td>${cn.available !== undefined ? cn.available : 'N/A'}</td>
                             <td>
                                 <button class="btn btn-sm btn-secondary"
-                                        hx-get="${hxGetUrl}"
+                                        hx-get='${hxGetUrl}'
                                         hx-target="#items-${cnId}"
                                         hx-swap="innerHTML"
                                         onclick="showLoading('${cnId}')">
