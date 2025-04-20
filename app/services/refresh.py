@@ -4,6 +4,7 @@ from app.models.db_models import ItemMaster, Transaction, SeedRentalClass, Refre
 from app.services.api_client import APIClient
 from app import db, cache
 from datetime import datetime
+from sqlalchemy.orm import Session
 
 refresh_bp = Blueprint('refresh', __name__)
 
@@ -17,7 +18,7 @@ def parse_date(date_str):
             return None
     return None
 
-def update_item_master(items):
+def update_item_master(session, items):
     current_app.logger.info(f"Updating {len(items)} items in id_item_master")
     for item in items:
         try:
@@ -28,7 +29,7 @@ def update_item_master(items):
             date_last_scanned = parse_date(item.get('date_last_scanned'))
             date_created = parse_date(item.get('date_created'))
             date_updated = parse_date(item.get('date_updated'))
-            db.session.merge(ItemMaster(
+            session.merge(ItemMaster(
                 tag_id=item.get('tag_id'),
                 uuid_accounts_fk=item.get('uuid_accounts_fk'),
                 serial_number=item.get('serial_number'),
@@ -52,7 +53,7 @@ def update_item_master(items):
             current_app.logger.error(f"Failed to update item {item.get('tag_id')}: {str(e)}")
             raise
 
-def update_transactions(transactions):
+def update_transactions(session, transactions):
     current_app.logger.info(f"Updating {len(transactions)} transactions in id_transactions")
     for trans in transactions:
         try:
@@ -70,7 +71,7 @@ def update_transactions(transactions):
             if not scan_date:  # Skip if scan_date cannot be parsed
                 current_app.logger.warning(f"Skipping transaction with tag_id {trans.get('tag_id')} due to invalid scan_date")
                 continue
-            db.session.merge(Transaction(
+            session.merge(Transaction(
                 contract_number=trans.get('contract_number'),
                 tag_id=trans.get('tag_id'),
                 scan_type=trans.get('scan_type'),
@@ -109,12 +110,12 @@ def update_transactions(transactions):
             current_app.logger.error(f"Failed to update transaction {trans.get('tag_id')}: {str(e)}")
             raise
 
-def update_seed_data(seeds):
+def update_seed_data(session, seeds):
     current_app.logger.info(f"Updating {len(seeds)} seeds in seed_rental_classes")
     for seed in seeds:
         try:
             rental_class_id = seed.get('rental_class_id')
-            db.session.merge(SeedRentalClass(
+            session.merge(SeedRentalClass(
                 rental_class_id=rental_class_id,
                 common_name=seed.get('common_name')
             ))
@@ -136,9 +137,9 @@ def full_refresh():
         
         current_app.logger.info("Updating database")
         with db.session.begin():
-            update_item_master(items)
-            update_transactions(transactions)
-            update_seed_data(seeds)
+            update_item_master(db.session, items)
+            update_transactions(db.session, transactions)
+            update_seed_data(db.session, seeds)
             
             state = RefreshState.query.first()
             if not state:
@@ -156,15 +157,12 @@ def full_refresh():
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 def incremental_refresh():
+    # Create a new session for this background task
+    session = Session(bind=db.engine)
     try:
         current_app.logger.info("Starting incremental refresh")
-        # Ensure any existing transaction is committed or rolled back
-        if db.session.is_active:
-            db.session.commit()
-        else:
-            db.session.rollback()
 
-        state = RefreshState.query.first()
+        state = session.query(RefreshState).first()
         since_date = state.last_refresh if state else None
         
         client = APIClient()
@@ -172,19 +170,22 @@ def incremental_refresh():
         transactions = client.get_transactions(since_date)
         seeds = client.get_seed_data(since_date)
         
-        with db.session.begin():
-            update_item_master(items)
-            update_transactions(transactions)
-            update_seed_data(seeds)
-            
-            if state:
-                state.last_refresh = datetime.utcnow().isoformat()
-            else:
-                state = RefreshState(last_refresh=datetime.utcnow().isoformat())
-                db.session.add(state)
+        session.begin()
+        update_item_master(session, items)
+        update_transactions(session, transactions)
+        update_seed_data(session, seeds)
         
+        if state:
+            state.last_refresh = datetime.utcnow().isoformat()
+        else:
+            state = RefreshState(last_refresh=datetime.utcnow().isoformat())
+            session.add(state)
+        
+        session.commit()
         cache.clear()
         current_app.logger.info("Incremental refresh completed successfully")
     except Exception as e:
         current_app.logger.error(f"Incremental refresh failed: {str(e)}")
-        db.session.rollback()
+        session.rollback()
+    finally:
+        session.close()
