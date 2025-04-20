@@ -3,8 +3,7 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_caching import Cache
 import logging
 from logging.handlers import RotatingFileHandler
-# Removed Flask-WTF import
-from config import DB_CONFIG, REDIS_CONFIG
+from config import DB_CONFIG, REDIS_URL
 
 db = SQLAlchemy()
 cache = Cache()
@@ -15,15 +14,13 @@ def create_app():
     # Database configuration
     app.config['SQLALCHEMY_DATABASE_URI'] = (
         f"mariadb+mariadbconnector://{DB_CONFIG['user']}:{DB_CONFIG['password']}@"
-        f"{DB_CONFIG['host']}:{DB_CONFIG['port']}/{DB_CONFIG['database']}"
+        f"{DB_CONFIG['host']}/{DB_CONFIG['database']}?charset={DB_CONFIG['charset']}"
     )
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
     # Caching configuration
     app.config['CACHE_TYPE'] = 'redis'
-    app.config['CACHE_REDIS_HOST'] = REDIS_CONFIG['host']
-    app.config['CACHE_REDIS_PORT'] = REDIS_CONFIG['port']
-    app.config['CACHE_REDIS_DB'] = REDIS_CONFIG['db']
+    app.config['CACHE_REDIS_URL'] = REDIS_URL
 
     # Initialize extensions
     db.init_app(app)
