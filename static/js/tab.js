@@ -212,6 +212,15 @@ function loadSubcatData(category, subcatData) {
     
     container.appendChild(div);
     console.log('Subcategory DOM rendered:', container.innerHTML);
+    
+    // Ensure HTMX processes the new elements
+    if (typeof htmx !== 'undefined') {
+        htmx.process(container);
+        console.log('HTMX processed new elements in loadSubcatData');
+    } else {
+        console.error('HTMX not available when processing new elements in loadSubcatData');
+    }
+    
     applyFilters();
 }
 
@@ -308,6 +317,15 @@ function loadCommonNames(category, subcategory, commonNamesData) {
     }
     
     console.log('Common names DOM rendered:', container.innerHTML);
+    
+    // Ensure HTMX processes the new elements
+    if (typeof htmx !== 'undefined') {
+        htmx.process(container);
+        console.log('HTMX processed new elements in loadCommonNames');
+    } else {
+        console.error('HTMX not available when processing new elements in loadCommonNames');
+    }
+    
     applyFilters();
 }
 
