@@ -412,34 +412,6 @@ function loadItems(category, subcategory, commonName, targetId) {
 function expandCategory(category, targetId) {
     console.log(`Expanding category: ${category}, target: ${targetId}`);
     
-    // Test fetch to /health to verify network functionality
-    console.log('Testing network with fetch to /health');
-    try {
-        fetch('/health')
-            .then(response => {
-                console.log('Health fetch status:', response.status, response.statusText);
-                return response.json();
-            })
-            .then(data => console.log('Health fetch response:', data))
-            .catch(error => console.error('Health fetch error:', error));
-    } catch (error) {
-        console.error('Error in health fetch:', error);
-    }
-
-    // Test fetch to /tab/1/categories to verify if the issue is specific to /tab/1/subcat_data
-    console.log('Testing fetch to /tab/1/categories');
-    try {
-        fetch(`/tab/${cachedTabNum}/categories`)
-            .then(response => {
-                console.log('Categories fetch status:', response.status, response.statusText);
-                return response.text();
-            })
-            .then(data => console.log('Categories fetch response:', data.slice(0, 100) + '...'))
-            .catch(error => console.error('Categories fetch error:', error));
-    } catch (error) {
-        console.error('Error in categories fetch:', error);
-    }
-
     // Fetch subcategory data manually
     const url = `/tab/${cachedTabNum}/subcat_data?category=${category}`;
     console.log(`Fetching subcategory data from: ${url}`);
