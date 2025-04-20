@@ -109,7 +109,7 @@ function loadSubcatData(category, subcatData) {
 // Load common names data into the specified container
 function loadCommonNames(category, subcategory, targetId) {
     console.log(`Fetching common names for category: ${category}, subcategory: ${subcategory}`);
-    const url = `/tab/1/common_names?category=${category}&subcategory=${subcategory}`;
+    const url = `/tab/${window.cachedTabNum}/common_names?category=${category}&subcategory=${subcategory}`;
     const container = document.getElementById(targetId);
     if (!container) {
         console.warn(`Container with ID '${targetId}' not found.`);
@@ -192,7 +192,7 @@ function loadCommonNames(category, subcategory, targetId) {
 // Load items data into the specified container
 function loadItems(category, subcategory, commonName, targetId) {
     console.log(`Fetching items for category: ${category}, subcategory: ${subcategory}, common_name: ${commonName}`);
-    const url = `/tab/1/data?category=${category}&subcategory=${subcategory}&common_name=${commonName}`;
+    const url = `/tab/${window.cachedTabNum}/data?category=${category}&subcategory=${subcategory}&common_name=${commonName}`;
     const container = document.getElementById(targetId);
     if (!container) {
         console.warn(`Container with ID '${targetId}' not found.`);
@@ -277,7 +277,7 @@ function expandCategory(category, targetId) {
     console.log(`Expanding category: ${category}, target: ${targetId}`);
     
     // Fetch subcategory data manually
-    const url = `/tab/1/subcat_data?category=${category}`;
+    const url = `/tab/${window.cachedTabNum}/subcat_data?category=${category}`;
     console.log(`Fetching subcategory data from: ${url}`);
     showLoading(targetId.replace('subcat-', '')); // Show loading indicator
 

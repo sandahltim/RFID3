@@ -3,6 +3,7 @@ import time
 from datetime import datetime, timedelta
 from config import API_USERNAME, API_PASSWORD, LOGIN_URL, ITEM_MASTER_URL, TRANSACTION_URL, SEED_URL
 import logging
+from urllib.parse import quote
 
 logging.basicConfig(level=logging.DEBUG, filename='/home/tim/test_rfidpi/sync.log', filemode='a')
 logger = logging.getLogger(__name__)
@@ -53,7 +54,10 @@ class APIClient:
         url = f"{self.base_url}{endpoint_id}"
         all_data = []
         while True:
-            logger.debug(f"Making request to {url} with params: {params}")
+            # Construct and log the full URL
+            query_string = '&'.join([f"{k}={quote(str(v))}" for k, v in params.items()])
+            full_url = f"{url}?{query_string}"
+            logger.debug(f"Making request to full URL: {full_url}")
             response = requests.get(url, headers=headers, params=params, timeout=20)
             data = response.json()
             logger.debug(f"API response: {response.status_code} {response.reason}, response: {data}")
@@ -76,10 +80,7 @@ class APIClient:
         if since_date:
             since_date = datetime.fromisoformat(since_date).strftime('%Y-%m-%d %H:%M:%S')
             logger.debug(f"Item master filter since_date: {since_date}")
-            # Alternative filter syntax: date_last_scanned>2024-12-18 14:35:34
-            filter_param = f"date_last_scanned>{since_date}"
-            logger.debug(f"Constructed filter parameter: {filter_param}")
-            params['filter'] = filter_param
+            params['filter[date_last_scanned][gt]'] = since_date
         return self._make_request("14223767938169344381", params)
 
     def get_transactions(self, since_date=None):
@@ -87,9 +88,7 @@ class APIClient:
         if since_date:
             since_date = datetime.fromisoformat(since_date).strftime('%Y-%m-%d %H:%M:%S')
             logger.debug(f"Transactions filter since_date: {since_date}")
-            filter_param = f"date_updated>{since_date}"
-            logger.debug(f"Constructed filter parameter: {filter_param}")
-            params['filter'] = filter_param
+            params['filter[date_updated][gt]'] = since_date
         return self._make_request("14223767938169346196", params)
 
     def get_seed_data(self, since_date=None):
@@ -97,7 +96,5 @@ class APIClient:
         if since_date:
             since_date = datetime.fromisoformat(since_date).strftime('%Y-%m-%d %H:%M:%S')
             logger.debug(f"Seed data filter since_date: {since_date}")
-            filter_param = f"date_updated>{since_date}"
-            logger.debug(f"Constructed filter parameter: {filter_param}")
-            params['filter'] = filter_param
+            params['filter[date_updated][gt]'] = since_date
         return self._make_request("14223767938169215907", params)

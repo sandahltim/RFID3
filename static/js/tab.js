@@ -1,19 +1,10 @@
 // Global variable to cache the tab number, extracted from the h1 element
-let cachedTabNum = '1'; // Default to '1' if h1 is not found or no number is present
-
-// Show a loading indicator for a given key (e.g., category ID)
-function showLoading(key) {
-    console.log(`Showing loading for key: ${key}`);
-    const loading = document.getElementById(`loading-${key}`);
-    if (loading) loading.style.display = 'block';
+if (typeof cachedTabNum === 'undefined') {
+    var cachedTabNum = '1'; // Default to '1' if h1 is not found or no number is present
 }
 
-// Hide the loading indicator for a given key
-function hideLoading(key) {
-    console.log(`Hiding loading for key: ${key}`);
-    const loading = document.getElementById(`loading-${key}`);
-    if (loading) loading.style.display = 'none';
-}
+// Log script loading
+console.log('tab.js loaded, cachedTabNum:', cachedTabNum);
 
 // Sort a table by a specified column
 function sortTable(column, tableId) {
@@ -70,7 +61,7 @@ function printTable(level, id) {
     }
 
     // Inform the user that printing will occur in the current window due to popup blockers
-    alert('Printing will occur in the current window.\n\nNote: If you prefer a new window, please allow popups for this site:\n1. Click the lock icon in the address bar (left of "pi5:3609")\n2. Click "Site settings"\n3. Find "Pop-ups and redirects" and set to "Allow"\n4. Reload the page and try again');
+    alert('Printing will occur in the current window.\n\nNote: If you prefer a new window, please allow popups for this site:\n1. Click the lock icon in the address bar (left of "pi5:3607")\n2. Click "Site settings"\n3. Find "Pop-ups and redirects" and set to "Allow"\n4. Reload the page and try again');
 
     // Create a temporary container for the print content
     const printContainer = document.createElement('div');
