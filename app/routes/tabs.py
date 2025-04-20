@@ -51,6 +51,7 @@ def subcat_data(tab_num):
         current_app.logger.debug(f"Raw subcategory counts for category {category}: {subcategory_counts}")
         subcategories = [sub[0] for sub, _ in subcategory_counts if sub[0]]
         current_app.logger.info(f"Fetched {len(subcategories)} subcategories for category {category}")
+        current_app.logger.debug(f"Subcategories list before loop: {subcategories}")  # Added debug log
 
         data = []
         for subcategory in subcategories:
