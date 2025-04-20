@@ -197,6 +197,8 @@ function loadSubcatData(category, subcatData) {
     html += '</div>';
     container.innerHTML = html;
     console.log('Subcategory HTML rendered:', container.innerHTML);
+    // Process HTMX attributes on the newly added content
+    htmx.process(container);
     applyFilters();
 }
 
@@ -260,6 +262,8 @@ function loadCommonNames(category, subcategory, commonNamesData) {
 
     container.innerHTML = html;
     console.log('Common names HTML rendered:', container.innerHTML);
+    // Process HTMX attributes on the newly added content
+    htmx.process(container);
     applyFilters();
 }
 
@@ -319,6 +323,13 @@ document.addEventListener('DOMContentLoaded', () => {
 document.body.addEventListener('htmx:afterSwap', (event) => {
     console.log('HTMX afterSwap event for target:', event.detail.target.id, 'Response:', event.detail.xhr.responseText);
     const targetId = event.detail.target.id;
+    if (targetId === 'category-table-body') {
+        // Process HTMX attributes on the newly loaded category table content
+        const container = document.getElementById('category-table-body');
+        if (container) {
+            htmx.process(container);
+        }
+    }
     if (targetId.startsWith('subcat-')) {
         const category = targetId.replace('subcat-', '');
         const data = JSON.parse(event.detail.xhr.responseText);
@@ -390,6 +401,8 @@ document.body.addEventListener('htmx:afterSwap', (event) => {
             `;
             container.innerHTML = html;
             console.log(`Items table rendered for target ${targetId}:`, container.innerHTML);
+            // Process HTMX attributes on the newly added content
+            htmx.process(container);
             applyFilters();
         } else {
             console.warn(`Container with ID '${targetId}' not found.`);
