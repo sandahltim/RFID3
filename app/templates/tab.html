@@ -1,53 +1,75 @@
-{% extends "base.html" %}
+{% extends 'base.html' %}
 
 {% block title %}Tab {{ tab_num }}{% endblock %}
 
+{% block extra_head %}
+<style>
+    .loading { color: #888; font-style: italic; }
+    .table-bordered th, .table-bordered td { border: 1px solid #dee2e6; }
+</style>
+<script src="/static/js/tab.js?t={{ timestamp() }}"></script>
+{% endblock %}
+
 {% block content %}
 <h1>Tab {{ tab_num }}</h1>
+
 <div class="row mb-3">
-    <div class="col-md-3">
-        <input type="text" id="filter-input" class="form-control" placeholder="Search common name, tag ID, etc." onkeyup="applyFilters()">
+    <div class="col-md-4">
+        <input type="text" id="filter-input" class="form-control" placeholder="Search common name, tag id, etc." onkeyup="applyFilters()">
     </div>
-    <div class="col-md-3">
-        <select id="category-filter" class="form-select" onchange="applyFilters()">
-            <option value="">ALL CLASSES</option>
+    <div class="col-md-2">
+        <select id="category-filter" class="form-control" onchange="applyFilters()">
+            <option value="">All Classes</option>
             {% for category in categories %}
-            <option value="{{ category.name | lower }}">{{ category.name }}</option>
+            <option value="{{ category.name }}">{{ category.name }}</option>
             {% endfor %}
         </select>
     </div>
-    <div class="col-md-3">
-        <select id="status-filter" class="form-select" onchange="applyFilters()">
-            <option value="">ALL STATUSES</option>
+    <div class="col-md-2">
+        <select id="status-filter" class="form-control" onchange="applyFilters()">
+            <option value="">All Statuses</option>
             {% for status in statuses %}
-            <option value="{{ status | lower }}">{{ status }}</option>
+            <option value="{{ status }}">{{ status }}</option>
             {% endfor %}
         </select>
     </div>
-    <div class="col-md-3">
-        <select id="bin-location-filter" class="form-select" onchange="applyFilters()">
-            <option value="">ALL BIN LOCATIONS</option>
-            {% for bin in bin_locations %}
-            <option value="{{ bin | lower }}">{{ bin }}</option>
+    <div class="col-md-2">
+        <select id="bin-location-filter" class="form-control" onchange="applyFilters()">
+            <option value="">All Bin Locations</option>
+            {% for location in bin_locations %}
+            <option value="{{ location }}">{{ location }}</option>
             {% endfor %}
         </select>
+    </div>
+    <div class="col-md-2">
+        <button class="btn btn-primary" onclick="refreshTable({{ tab_num }})">Refresh</button>
     </div>
 </div>
 
-<div id="category-table">
-    {% for category in categories %}
-    <div class="row mb-2">
-        <div class="col-md-10">
-            <strong>Category</strong><br>
-            (name: '{{ category.name }}', total_items: {{ category.total_items }}, on_contracts: {{ category.on_contracts }}, in_service: {{ category.in_service }}, available: {{ category.available }})
-        </div>
-        <div class="col-md-2">
-            <button class="btn btn-primary" hx-get="/tab/{{ tab_num }}/subcat_data?category={{ category.name }}" hx-target="#subcat-{{ category.name | lower | replace(' ', '_') }}" hx-swap="innerHTML" onclick="showLoading('{{ category.name | lower | replace(' ', '_') }}')">Expand</button>
-        </div>
-    </div>
-    <div id="subcat-{{ category.name | lower | replace(' ', '_') }}" style="display:none;"></div>
-    <div id="loading-{{ category.name | lower | replace(' ', '_') }}" style="display:none;" class="loading">Loading...</div>
-    <hr>
-    {% endfor %}
-</div>
+<table class="table table-bordered" id="category-table">
+    <thead>
+        <tr>
+            <th>Category</th>
+            <th>Total Items</th>
+            <th>Items on Contracts</th>
+            <th>Items in Service</th>
+            <th>Items Available</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody id="category-table-body"
+        hx-get="/tab/{{ tab_num }}/categories"
+        hx-trigger="load, htmx:load from:body every 30s"
+        hx-target="#category-table-body"
+        hx-swap="innerHTML">
+        <tr>
+            <td colspan="6" class="loading">Loading...</td>
+        </tr>
+    </tbody>
+</table>
+
+{% for category in categories %}
+<div id="subcat-{{ category.name | lower | replace('[^a-z0-9-]', '_') }}" style="display:none;"></div>
+{% endfor %}
+
 {% endblock %}
