@@ -4,8 +4,8 @@ from flask_caching import Cache
 import logging
 from logging.handlers import RotatingFileHandler
 from flask_wtf.csrf import CSRFProtect
-# Adjust import path to point to the root directory
-from ..config import DB_CONFIG, REDIS_CONFIG
+# Use absolute import
+from config import DB_CONFIG, REDIS_CONFIG
 
 db = SQLAlchemy()
 cache = Cache()
