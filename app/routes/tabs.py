@@ -2,6 +2,7 @@ from flask import Blueprint, jsonify, request, current_app, render_template
 from .. import db, cache
 from ..models.db_models import ItemMaster, RentalClassMapping
 from sqlalchemy import func
+from time import time  # Add this import
 
 tabs_bp = Blueprint('tabs', __name__)
 
@@ -46,7 +47,10 @@ def tab_view(tab_num):
         statuses = db.session.query(ItemMaster.status).distinct().order_by(ItemMaster.status).all()
         statuses = [status[0] for status in statuses if status[0]]
 
-        return render_template('tab.html', tab_num=tab_num, categories=categories, statuses=statuses, bin_locations=bin_locations)
+        # Add cache_bust parameter
+        cache_bust = int(time())
+
+        return render_template('tab.html', tab_num=tab_num, categories=categories, statuses=statuses, bin_locations=bin_locations, cache_bust=cache_bust)
     except Exception as e:
         current_app.logger.error(f"Error loading tab {tab_num}: {str(e)}")
         return jsonify({'error': 'Failed to load tab'}), 500
