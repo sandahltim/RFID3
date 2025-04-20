@@ -3,6 +3,7 @@ from .. import db, cache
 from ..models.db_models import ItemMaster, RentalClassMapping
 from sqlalchemy import func, distinct
 from time import time
+from urllib.parse import quote
 
 tabs_bp = Blueprint('tabs', __name__)
 
@@ -100,6 +101,7 @@ def tab_categories(tab_num):
         html = ''
         for category in categories:
             cat_id = category['name'].lower().replace('[^a-z0-9-]', '_')
+            encoded_category = quote(category['name'])
             html += f'''
                 <tr>
                     <td>{category['name']}</td>
@@ -108,7 +110,7 @@ def tab_categories(tab_num):
                     <td>{category['in_service']}</td>
                     <td>{category['available']}</td>
                     <td>
-                        <button class="btn btn-sm btn-secondary" hx-get="/tab/{tab_num}/subcat_data?category={category['name']}" hx-target="#subcat-{cat_id}" hx-swap="innerHTML">Expand</button>
+                        <button class="btn btn-sm btn-secondary" hx-get="/tab/{tab_num}/subcat_data?category={encoded_category}" hx-target="#subcat-{cat_id}" hx-swap="innerHTML">Expand</button>
                         <button class="btn btn-sm btn-info" onclick="printTable('Category', 'category-table')">Print</button>
                         <div id="loading-{cat_id}" style="display:none;" class="loading">Loading...</div>
                     </td>
