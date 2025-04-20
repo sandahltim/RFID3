@@ -135,8 +135,8 @@ function loadSubcatData(category, subcatData) {
         console.log(`Rendering subcategory for ${category}: ${sub.subcategory}`);
         const subId = `${category}_${sub.subcategory}`.toLowerCase().replace(/[^a-z0-9-]/g, '_');
         const escapedSubcategory = sub.subcategory.replace(/&/g, '&').replace(/</g, '<').replace(/>/g, '>').replace(/"/g, '"').replace(/'/g, '');
-        const encodedCategory = encodeURIComponent(category);
-        const encodedSubcategory = encodeURIComponent(sub.subcategory);
+        const hxGetUrl = `/tab/${cachedTabNum}/common_names?category=${encodeURIComponent(category)}&subcategory=${encodeURIComponent(sub.subcategory)}`;
+        console.log(`Generated hx-get URL for subcategory ${sub.subcategory}: ${hxGetUrl}`);
         html += `
             <table class="table table-bordered mt-2" id="subcat-table-${subId}">
                 <thead>
@@ -158,7 +158,7 @@ function loadSubcatData(category, subcatData) {
                         <td>${sub.available !== undefined ? sub.available : 'N/A'}</td>
                         <td>
                             <button class="btn btn-sm btn-secondary"
-                                    hx-get="/tab/${cachedTabNum}/common_names?category=${encodedCategory}&subcategory=${encodedSubcategory}"
+                                    hx-get="${hxGetUrl}"
                                     hx-target="#common-${subId}"
                                     hx-swap="innerHTML"
                                     onclick="showLoading('${subId}')">
@@ -202,9 +202,8 @@ function loadCommonNames(category, subcategory, commonNamesData) {
         commonNamesData.common_names.forEach(cn => {
             const cnId = `${subId}_${cn.name}`.toLowerCase().replace(/[^a-z0-9-]/g, '_');
             const escapedCommonName = cn.name.replace(/&/g, '&').replace(/</g, '<').replace(/>/g, '>').replace(/"/g, '"').replace(/'/g, '');
-            const encodedCategory = encodeURIComponent(category);
-            const encodedSubcategory = encodeURIComponent(subcategory);
-            const encodedCommonName = encodeURIComponent(cn.name);
+            const hxGetUrl = `/tab/${cachedTabNum}/data?category=${encodeURIComponent(category)}&subcategory=${encodeURIComponent(subcategory)}&common_name=${encodeURIComponent(cn.name)}`;
+            console.log(`Generated hx-get URL for common name ${cn.name}: ${hxGetUrl}`);
             html += `
                 <table class="table table-bordered ms-3 mt-2" id="common-table-${cnId}">
                     <thead>
@@ -226,7 +225,7 @@ function loadCommonNames(category, subcategory, commonNamesData) {
                             <td>${cn.available !== undefined ? cn.available : 'N/A'}</td>
                             <td>
                                 <button class="btn btn-sm btn-secondary"
-                                        hx-get="/tab/${cachedTabNum}/data?category=${encodedCategory}&subcategory=${encodedSubcategory}&common_name=${encodedCommonName}"
+                                        hx-get="${hxGetUrl}"
                                         hx-target="#items-${cnId}"
                                         hx-swap="innerHTML"
                                         onclick="showLoading('${cnId}')">
