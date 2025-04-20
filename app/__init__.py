@@ -11,7 +11,7 @@ cache = Cache()
 def create_app():
     app = Flask(__name__)
 
-    # Database configuration (use mysql+mysqlconnector for mysql-connector-python)
+    # Database configuration
     app.config['SQLALCHEMY_DATABASE_URI'] = (
         f"mysql+mysqlconnector://{DB_CONFIG['user']}:{DB_CONFIG['password']}@"
         f"{DB_CONFIG['host']}/{DB_CONFIG['database']}?charset={DB_CONFIG['charset']}"
