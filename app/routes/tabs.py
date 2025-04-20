@@ -48,7 +48,7 @@ def tab_view(tab_num):
         statuses = [status[0] for status in statuses if status[0]]
 
         cache_bust = int(time())
-        return render_template('tab.html', tab_num=tab_num, categories=categories, statuses=statuses, bin_locations=bin_locations, cache_bust=cache_bust)
+        return render_template('tab.html', tab_num=tab_num, categories=categories, statuses=statuses, bin_locations=bin_locations, cache_bust=cache_bust, timestamp=lambda: int(time()))
     except Exception as e:
         current_app.logger.error(f"Error loading tab {tab_num}: {str(e)}")
         return jsonify({'error': 'Failed to load tab'}), 500
