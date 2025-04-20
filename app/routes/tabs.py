@@ -27,7 +27,6 @@ def tab_view(tab_num):
         return jsonify({'error': 'Failed to load tab'}), 500
 
 @tabs_bp.route('/tab/<int:tab_num>/subcat_data', methods=['GET'])
-# @cache.cached(timeout=30)  # Temporarily disabled caching
 def subcat_data(tab_num):
     try:
         category = request.args.get('category')
@@ -49,9 +48,9 @@ def subcat_data(tab_num):
         ).all()
 
         current_app.logger.debug(f"Raw subcategory counts for category {category}: {subcategory_counts}")
-        subcategories = [sub[0] for sub, _ in subcategory_counts if sub[0]]
+        subcategories = [sub for sub, _ in subcategory_counts if sub]  # Fixed line
         current_app.logger.info(f"Fetched {len(subcategories)} subcategories for category {category}")
-        current_app.logger.debug(f"Subcategories list before loop: {subcategories}")  # Added debug log
+        current_app.logger.debug(f"Subcategories list before loop: {subcategories}")
 
         data = []
         for subcategory in subcategories:
