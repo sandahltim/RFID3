@@ -10,8 +10,33 @@ tabs_bp = Blueprint('tabs', __name__)
 def tab_view(tab_num):
     try:
         current_app.logger.info(f"Loading tab {tab_num}")
-        categories = db.session.query(RentalClassMapping.category).distinct().order_by(RentalClassMapping.category).all()
-        categories = [cat[0] for cat in categories if cat[0]]
+        categories_data = db.session.query(
+            RentalClassMapping.category,
+            func.count(ItemMaster.tag_id).label('total_items'),
+            func.coalesce(func.sum(func.cast(ItemMaster.status.in_(['On Rent', 'Delivered']), db.Integer)), 0).label('on_contracts'),
+            func.coalesce(func.sum(func.cast(ItemMaster.status.in_(['Repair']), db.Integer)), 0).label('in_service')
+        ).outerjoin(
+            ItemMaster, RentalClassMapping.rental_class_id == ItemMaster.rental_class_num
+        ).group_by(
+            RentalClassMapping.category
+        ).order_by(
+            RentalClassMapping.category
+        ).all()
+        current_app.logger.debug(f"Raw category data: {categories_data}")
+        categories = []
+        for cat in categories_data:
+            if cat[0]:
+                total_items = cat[1] or 0
+                on_contracts = cat[2] or 0
+                in_service = cat[3] or 0
+                available = total_items - on_contracts - in_service
+                categories.append({
+                    'name': cat[0],
+                    'total_items': total_items,
+                    'on_contracts': on_contracts,
+                    'in_service': in_service,
+                    'available': available
+                })
         current_app.logger.info(f"Fetched {len(categories)} categories")
 
         bin_locations = db.session.query(ItemMaster.bin_location).distinct().order_by(ItemMaster.bin_location).all()
@@ -35,9 +60,11 @@ def subcat_data(tab_num):
 
         subcategory_counts = db.session.query(
             RentalClassMapping.subcategory,
-            func.count(ItemMaster.tag_id).label('item_count')
-        ).join(
-            ItemMaster, RentalClassMapping.rental_class_id == ItemMaster.rental_class_num, isouter=True
+            func.count(ItemMaster.tag_id).label('total_items'),
+            func.coalesce(func.sum(func.cast(ItemMaster.status.in_(['On Rent', 'Delivered']), db.Integer)), 0).label('on_contracts'),
+            func.coalesce(func.sum(func.cast(ItemMaster.status.in_(['Repair']), db.Integer)), 0).label('in_service')
+        ).outerjoin(
+            ItemMaster, RentalClassMapping.rental_class_id == ItemMaster.rental_class_num
         ).filter(
             RentalClassMapping.category.ilike(category)
         ).group_by(
@@ -48,11 +75,24 @@ def subcat_data(tab_num):
         ).all()
 
         current_app.logger.debug(f"Raw subcategory counts for category {category}: {subcategory_counts}")
-        subcategories = [sub for sub, _ in subcategory_counts if sub]
+        subcategories = [sub for sub, _, _, _ in subcategory_counts if sub]
         current_app.logger.info(f"Fetched {len(subcategories)} subcategories for category {category}")
         current_app.logger.debug(f"Subcategories list before loop: {subcategories}")
 
-        data = [{'subcategory': subcategory} for subcategory in subcategories]  # Only include subcategories
+        data = []
+        for sub, total_items, on_contracts, in_service in subcategory_counts:
+            if sub:
+                total_items = total_items or 0
+                on_contracts = on_contracts or 0
+                in_service = in_service or 0
+                available = total_items - on_contracts - in_service
+                data.append({
+                    'subcategory': sub,
+                    'total_items': total_items,
+                    'on_contracts': on_contracts,
+                    'in_service': in_service,
+                    'available': available
+                })
 
         current_app.logger.debug(f"Subcategory data for category {category}: {data}")
         return jsonify(data)
@@ -68,8 +108,11 @@ def common_names(tab_num):
         if not category or not subcategory:
             return jsonify({'error': 'Category and subcategory are required'}), 400
 
-        common_names = db.session.query(
-            ItemMaster.common_name
+        common_names_data = db.session.query(
+            ItemMaster.common_name,
+            func.count(ItemMaster.tag_id).label('total_items'),
+            func.coalesce(func.sum(func.cast(ItemMaster.status.in_(['On Rent', 'Delivered']), db.Integer)), 0).label('on_contracts'),
+            func.coalesce(func.sum(func.cast(ItemMaster.status.in_(['Repair']), db.Integer)), 0).label('in_service')
         ).join(
             RentalClassMapping, ItemMaster.rental_class_num == RentalClassMapping.rental_class_id
         ).filter(
@@ -80,7 +123,22 @@ def common_names(tab_num):
         ).order_by(
             ItemMaster.common_name
         ).all()
-        common_names = [cn[0] for cn in common_names if cn[0]]
+
+        current_app.logger.debug(f"Raw common names data for category {category}, subcategory {subcategory}: {common_names_data}")
+        common_names = []
+        for cn, total_items, on_contracts, in_service in common_names_data:
+            if cn:
+                total_items = total_items or 0
+                on_contracts = on_contracts or 0
+                in_service = in_service or 0
+                available = total_items - on_contracts - in_service
+                common_names.append({
+                    'name': cn,
+                    'total_items': total_items,
+                    'on_contracts': on_contracts,
+                    'in_service': in_service,
+                    'available': available
+                })
 
         current_app.logger.debug(f"Common names for category {category}, subcategory {subcategory}: {common_names}")
         return jsonify({'common_names': common_names})
@@ -115,7 +173,10 @@ def tab_data(tab_num):
             'common_name': item.common_name,
             'bin_location': item.bin_location,
             'status': item.status,
-            'last_contract_num': item.last_contract_num
+            'last_contract_num': item.last_contract_num,
+            'last_scanned_date': item.date_last_scanned.isoformat() if item.date_last_scanned else None,
+            'quality': item.quality,
+            'notes': item.notes
         } for item in items]
         current_app.logger.debug(f"Returning item data: {data}")
         return jsonify(data)
