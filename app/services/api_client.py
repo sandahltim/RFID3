@@ -12,7 +12,7 @@ class APIClient:
         self.base_url = "https://cs.iot.ptshome.com/api/v1/data/"
         self.auth_url = LOGIN_URL
         self.token = None
-        self.token_expiry = ÀNone
+        self.token_expiry = None
         self.authenticate()
 
     def authenticate(self):
