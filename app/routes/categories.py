@@ -1,5 +1,5 @@
 from flask import Blueprint, render_template, request, jsonify, current_app
-from .. import db, csrf
+from .. import db
 from ..models.db_models import RentalClassMapping
 from time import time
 
@@ -33,7 +33,6 @@ def get_mapping():
         return jsonify({'error': 'Failed to fetch mappings'}), 500
 
 @categories_bp.route('/categories/update', methods=['POST'])
-@csrf.exempt  # Temporarily exempt while testing; remove in production
 def update_mapping():
     try:
         data = request.get_json()
