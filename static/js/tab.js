@@ -135,8 +135,8 @@ function loadSubcatData(category, subcatData) {
         console.log(`Rendering subcategory for ${category}: ${sub.subcategory}`);
         const subId = `${category}_${sub.subcategory}`.toLowerCase().replace(/[^a-z0-9-]/g, '_');
         const escapedSubcategory = sub.subcategory.replace(/&/g, '&').replace(/</g, '<').replace(/>/g, '>').replace(/"/g, '"').replace(/'/g, '');
-        const encodedCategory = encodeURIComponent(category);
-        const encodedSubcategory = encodeURIComponent(sub.subcategory);
+        const encodedCategory = encodeURIComponent(category).replace(/'/g, "\\'").replace(/"/g, '&quot;');
+        const encodedSubcategory = encodeURIComponent(sub.subcategory).replace(/'/g, "\\'").replace(/"/g, '&quot;');
         const hxGetUrl = `/tab/${cachedTabNum}/common_names?category=${encodedCategory}&subcategory=${encodedSubcategory}`;
         console.log(`Generated hx-get URL for subcategory ${sub.subcategory}: ${hxGetUrl}`);
         html += `
@@ -159,7 +159,7 @@ function loadSubcatData(category, subcatData) {
                         <td>${sub.in_service !== undefined ? sub.in_service : 'N/A'}</td>
                         <td>${sub.available !== undefined ? sub.available : 'N/A'}</td>
                         <td>
-                            <button class="btn btn-sm btn-secondary" data-hx-get="${hxGetUrl}" hx-target="#common-${subId}" hx-swap="innerHTML" onclick="showLoading('${subId}')">Load Items</button>
+                            <button class="btn btn-sm btn-secondary" hx-get="${hxGetUrl}" hx-target="#common-${subId}" hx-swap="innerHTML" onclick="showLoading('${subId}')">Load Items</button>
                             <button class="btn btn-sm btn-info" onclick="printTable('Subcategory', 'subcat-table-${subId}')">Print</button>
                         </td>
                     </tr>
@@ -177,25 +177,7 @@ function loadSubcatData(category, subcatData) {
     
     html += '</div>';
     container.innerHTML = html;
-    
-    // Manually attach HTMX attributes
-    const buttons = container.querySelectorAll('button[data-hx-get]');
-    console.log(`Found ${buttons.length} buttons with data-hx-get in loadSubcatData`);
-    buttons.forEach(button => {
-        const hxGetValue = button.getAttribute('data-hx-get');
-        console.log(`Setting hx-get for button: ${hxGetValue}`);
-        button.setAttribute('hx-get', hxGetValue);
-        button.removeAttribute('data-hx-get');
-    });
-    
-    // Ensure HTMX processes the new elements
-    if (typeof htmx !== 'undefined') {
-        htmx.process(container);
-        console.log('HTMX processed new elements in loadSubcatData');
-    } else {
-        console.error('HTMX not available when processing new elements in loadSubcatData');
-    }
-    
+    console.log('Subcategory HTML rendered:', container.innerHTML);
     applyFilters();
 }
 
@@ -215,9 +197,9 @@ function loadCommonNames(category, subcategory, commonNamesData) {
         commonNamesData.common_names.forEach(cn => {
             const cnId = `${subId}_${cn.name}`.toLowerCase().replace(/[^a-z0-9-]/g, '_');
             const escapedCommonName = cn.name.replace(/&/g, '&').replace(/</g, '<').replace(/>/g, '>').replace(/"/g, '"').replace(/'/g, '');
-            const encodedCategory = encodeURIComponent(category);
-            const encodedSubcategory = encodeURIComponent(subcategory);
-            const encodedCommonName = encodeURIComponent(cn.name);
+            const encodedCategory = encodeURIComponent(category).replace(/'/g, "\\'").replace(/"/g, '&quot;');
+            const encodedSubcategory = encodeURIComponent(subcategory).replace(/'/g, "\\'").replace(/"/g, '&quot;');
+            const encodedCommonName = encodeURIComponent(cn.name).replace(/'/g, "\\'").replace(/"/g, '&quot;');
             const hxGetUrl = `/tab/${cachedTabNum}/data?category=${encodedCategory}&subcategory=${encodedSubcategory}&common_name=${encodedCommonName}`;
             console.log(`Generated hx-get URL for common name ${cn.name}: ${hxGetUrl}`);
             html += `
@@ -240,7 +222,7 @@ function loadCommonNames(category, subcategory, commonNamesData) {
                             <td>${cn.in_service !== undefined ? cn.in_service : 'N/A'}</td>
                             <td>${cn.available !== undefined ? cn.available : 'N/A'}</td>
                             <td>
-                                <button class="btn btn-sm btn-secondary" data-hx-get="${hxGetUrl}" hx-target="#items-${cnId}" hx-swap="innerHTML" onclick="showLoading('${cnId}')">Load Items</button>
+                                <button class="btn btn-sm btn-secondary" hx-get="${hxGetUrl}" hx-target="#items-${cnId}" hx-swap="innerHTML" onclick="showLoading('${cnId}')">Load Items</button>
                                 <button class="btn btn-sm btn-info" onclick="printTable('Common Name', 'common-table-${cnId}')">Print</button>
                             </td>
                         </tr>
@@ -259,25 +241,7 @@ function loadCommonNames(category, subcategory, commonNamesData) {
     }
 
     container.innerHTML = html;
-    
-    // Manually attach HTMX attributes
-    const buttons = container.querySelectorAll('button[data-hx-get]');
-    console.log(`Found ${buttons.length} buttons with data-hx-get in loadCommonNames`);
-    buttons.forEach(button => {
-        const hxGetValue = button.getAttribute('data-hx-get');
-        console.log(`Setting hx-get for button: ${hxGetValue}`);
-        button.setAttribute('hx-get', hxGetValue);
-        button.removeAttribute('data-hx-get');
-    });
-    
-    // Ensure HTMX processes the new elements
-    if (typeof htmx !== 'undefined') {
-        htmx.process(container);
-        console.log('HTMX processed new elements in loadCommonNames');
-    } else {
-        console.error('HTMX not available when processing new elements in loadCommonNames');
-    }
-    
+    console.log('Common names HTML rendered:', container.innerHTML);
     applyFilters();
 }
 
@@ -398,9 +362,4 @@ document.body.addEventListener('htmx:afterSwap', (event) => {
                 </table>
             `;
             container.innerHTML = html;
-            applyFilters();
-        } else {
-            console.warn(`Container with ID '${targetId}' not found.`);
-        }
-    }
-});
+            applyFilter
