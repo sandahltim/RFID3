@@ -3,12 +3,13 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_caching import Cache
 import logging
 from logging.handlers import RotatingFileHandler
-from .config import DB_CONFIG, REDIS_CONFIG
-from flask_wtf.csrf import CSRFProtect  # Add CSRF protection
+from flask_wtf.csrf import CSRFProtect
+# Adjust import path to point to the root directory
+from ..config import DB_CONFIG, REDIS_CONFIG
 
 db = SQLAlchemy()
 cache = Cache()
-csrf = CSRFProtect()  # Initialize CSRF protection
+csrf = CSRFProtect()
 
 def create_app():
     app = Flask(__name__)
@@ -32,7 +33,7 @@ def create_app():
     # Initialize extensions
     db.init_app(app)
     cache.init_app(app)
-    csrf.init_app(app)  # Initialize CSRF protection
+    csrf.init_app(app)
 
     # Set up logging
     handler = RotatingFileHandler('/home/tim/test_rfidpi/logs/app.log', maxBytes=10000, backupCount=1)
