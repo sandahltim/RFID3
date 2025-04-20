@@ -38,10 +38,11 @@ def create_app():
         db.create_all()
 
     # Register blueprints
-    from .routes import home, tabs, refresh, categories, health
+    from .routes import home, tabs, categories, health
+    from .services.refresh import refresh_bp as refresh
     app.register_blueprint(home.home_bp)
     app.register_blueprint(tabs.tabs_bp)
-    app.register_blueprint(refresh.refresh_bp)
+    app.register_blueprint(refresh)
     app.register_blueprint(categories.categories_bp)
     app.register_blueprint(health.health_bp)
 
