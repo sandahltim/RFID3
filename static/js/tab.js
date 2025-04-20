@@ -262,7 +262,7 @@ function loadCommonNames(category, subcategory, commonNamesData) {
             `;
         });
     } else {
-        html = '<p>No common names found.</p>';
+        html = '<p>.No common names found.</p>';
     }
 
     container.innerHTML = html;
@@ -300,6 +300,8 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
     } else {
         console.log('HTMX library loaded successfully');
+        // Log HTMX version for debugging
+        console.log('HTMX version:', htmx.version);
     }
 
     // Debug button clicks and HTMX attributes
@@ -311,6 +313,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 hxTarget: button.getAttribute('hx-target'),
                 hxSwap: button.getAttribute('hx-swap')
             });
+            // Force HTMX reprocessing on click
+            if (typeof htmx !== 'undefined') {
+                htmx.process(button);
+                console.log('Reprocessed HTMX attributes on button click');
+                // Manually trigger the HTMX request as a fallback
+                htmx.trigger(button, 'click');
+            } else {
+                console.error('HTMX not available during button click');
+            }
             const keyMatch = button.getAttribute('hx-target')?.match(/#subcat-(.+)$/);
             if (keyMatch) {
                 showLoading(keyMatch[1]);
@@ -347,6 +358,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.body.addEventListener('htmx:configRequest', (event) => {
         console.log('HTMX configRequest event:', event.detail);
+    });
+
+    // Debug HTMX initialization
+    document.body.addEventListener('htmx:load', (event) => {
+        console.log('HTMX load event:', event.detail.elt);
     });
 });
 
