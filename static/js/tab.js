@@ -300,6 +300,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
     } else {
         console.log('HTMX library loaded successfully');
+        // Log HTMX version for debugging
         console.log('HTMX version:', htmx.version);
     }
 
@@ -312,10 +313,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 hxTarget: button.getAttribute('hx-target'),
                 hxSwap: button.getAttribute('hx-swap')
             });
+            // Force HTMX reprocessing on click
             if (typeof htmx !== 'undefined') {
                 htmx.process(button);
                 console.log('Reprocessed HTMX attributes on button click');
+                // Manually trigger the HTMX request as a fallback
                 htmx.trigger(button, 'click');
+                // Fallback to manual fetch if HTMX fails
                 setTimeout(() => {
                     if (!button.classList.contains('htmx-request')) {
                         console.warn('HTMX did not initiate request, falling back to manual fetch');
@@ -323,7 +327,13 @@ document.addEventListener('DOMContentLoaded', () => {
                         const targetId = button.getAttribute('hx-target').replace('#', '');
                         const swap = button.getAttribute('hx-swap');
                         fetch(url)
-                            .then(response => response.json())
+                            .then(response => {
+                                console.log('Fetch response status:', response.status, response.statusText);
+                                if (!response.ok) {
+                                    throw new Error(`Fetch failed with status ${response.status}`);
+                                }
+                                return response.json();
+                            })
                             .then(data => {
                                 console.log('Manual fetch response:', data);
                                 if (swap === 'innerHTML') {
@@ -369,25 +379,31 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // Event delegation for print buttons
-    document.body.addEventListener('click', (event) => {
-        console.log('Click event on body:', event.target);
-        const button = event.target.closest('.print-btn');
-        if (button) {
-            const level = button.getAttribute('data-print-level');
-            const id = button.getAttribute('data-print-id');
-            console.log(`Print button clicked: level=${level}, id=${id}`);
-            printTable(level, id);
-        } else {
-            console.log('No print-btn found for click event on body');
-            const closestTd = event.target.closest('td');
-            if (closestTd) {
-                console.log('Closest td content:', closestTd.innerHTML);
-                const printBtn = closestTd.querySelector('.print-btn');
-                console.log('Print button in td:', printBtn ? printBtn.outerHTML : 'None');
+    // Event delegation for print buttons on the category table
+    const categoryTable = document.getElementById('category-table');
+    if (categoryTable) {
+        categoryTable.addEventListener('click', (event) => {
+            console.log('Click event on category-table:', event.target);
+            console.log('Event propagation stopped:', event.cancelBubble);
+            const button = event.target.closest('.print-btn');
+            if (button) {
+                const level = button.getAttribute('data-print-level');
+                const id = button.getAttribute('data-print-id');
+                console.log(`Print button clicked: level=${level}, id=${id}`);
+                printTable(level, id);
+            } else {
+                console.log('No print-btn found for click event on category-table');
+                const closestTd = event.target.closest('td');
+                if (closestTd) {
+                    console.log('Closest td content:', closestTd.innerHTML);
+                    const printBtn = closestTd.querySelector('.print-btn');
+                    console.log('Print button in td:', printBtn ? printBtn.outerHTML : 'None');
+                }
             }
-        }
-    });
+        });
+    } else {
+        console.warn('Category table not found for print button event delegation');
+    }
 
     document.body.addEventListener('htmx:afterRequest', (event) => {
         console.log('HTMX request completed for target:', event.detail.target.id);
@@ -409,6 +425,7 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log('HTMX configRequest event:', event.detail);
     });
 
+    // Debug HTMX initialization
     document.body.addEventListener('htmx:load', (event) => {
         console.log('HTMX load event:', event.detail.elt);
     });
