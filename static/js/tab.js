@@ -129,55 +129,89 @@ function loadSubcatData(category, subcatData) {
     }
     container.innerHTML = '';
     container.style.display = 'block';
-    let html = '<div class="ms-3">';
+    
+    const div = document.createElement('div');
+    div.className = 'ms-3';
     
     subcatData.forEach(sub => {
         console.log(`Rendering subcategory for ${category}: ${sub.subcategory}`);
         const subId = `${category}_${sub.subcategory}`.toLowerCase().replace(/[^a-z0-9-]/g, '_');
         const escapedSubcategory = sub.subcategory.replace(/&/g, '&').replace(/</g, '<').replace(/>/g, '>').replace(/"/g, '"').replace(/'/g, '');
-        const encodedCategory = btoa(category);
-        const encodedSubcategory = btoa(sub.subcategory);
-        const hxGetUrl = `/tab/${cachedTabNum}/common_names?category=${encodedCategory}&subcategory=${encodedSubcategory}`;
+        const hxGetUrl = `/tab/${cachedTabNum}/common_names?category=${encodeURIComponent(category)}&subcategory=${encodeURIComponent(sub.subcategory)}`;
         console.log(`Generated hx-get URL for subcategory ${sub.subcategory}: ${hxGetUrl}`);
-        html += `
-            <table class="table table-bordered mt-2" id="subcat-table-${subId}">
-                <thead>
-                    <tr>
-                        <th>Subcategory</th>
-                        <th>Total Items</th>
-                        <th>Items on Contracts</th>
-                        <th>Items in Service</th>
-                        <th>Items Available</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td>${escapedSubcategory}</td>
-                        <td>${sub.total_items !== undefined ? sub.total_items : 'N/A'}</td>
-                        <td>${sub.on_contracts !== undefined ? sub.on_contracts : 'N/A'}</td>
-                        <td>${sub.in_service !== undefined ? sub.in_service : 'N/A'}</td>
-                        <td>${sub.available !== undefined ? sub.available : 'N/A'}</td>
-                        <td>
-                            <button class="btn btn-sm btn-secondary" hx-get="${hxGetUrl}" hx-target="#common-${subId}" hx-swap="innerHTML" onclick="showLoading('${subId}')">Load Items</button>
-                            <button class="btn btn-sm btn-info" onclick="printTable('Subcategory', 'subcat-table-${subId}')">Print</button>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td colspan="6">
-                            <div id="common-${subId}" style="display:none;"></div>
-                            <div id="items-${subId}" style="display:none;"></div>
-                            <div id="loading-${subId}" style="display:none;" class="loading">Loading...</div>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
+        
+        const table = document.createElement('table');
+        table.className = 'table table-bordered mt-2';
+        table.id = `subcat-table-${subId}`;
+        
+        const thead = document.createElement('thead');
+        thead.innerHTML = `
+            <tr>
+                <th>Subcategory</th>
+                <th>Total Items</th>
+                <th>Items on Contracts</th>
+                <th>Items in Service</th>
+                <th>Items Available</th>
+                <th>Actions</th>
+            </tr>
         `;
+        table.appendChild(thead);
+        
+        const tbody = document.createElement('tbody');
+        const row1 = document.createElement('tr');
+        
+        const td1 = document.createElement('td');
+        td1.textContent = escapedSubcategory;
+        const td2 = document.createElement('td');
+        td2.textContent = sub.total_items !== undefined ? sub.total_items : 'N/A';
+        const td3 = document.createElement('td');
+        td3.textContent = sub.on_contracts !== undefined ? sub.on_contracts : 'N/A';
+        const td4 = document.createElement('td');
+        td4.textContent = sub.in_service !== undefined ? sub.in_service : 'N/A';
+        const td5 = document.createElement('td');
+        td5.textContent = sub.available !== undefined ? sub.available : 'N/A';
+        
+        const td6 = document.createElement('td');
+        const loadButton = document.createElement('button');
+        loadButton.className = 'btn btn-sm btn-secondary';
+        loadButton.setAttribute('hx-get', hxGetUrl);
+        loadButton.setAttribute('hx-target', `#common-${subId}`);
+        loadButton.setAttribute('hx-swap', 'innerHTML');
+        loadButton.textContent = 'Load Items';
+        loadButton.onclick = () => showLoading(subId);
+        td6.appendChild(loadButton);
+
+        const printButton = document.createElement('button');
+        printButton.className = 'btn btn-sm btn-info';
+        printButton.textContent = 'Print';
+        printButton.onclick = () => printTable('Subcategory', `subcat-table-${subId}`);
+        td6.appendChild(printButton);
+        
+        row1.appendChild(td1);
+        row1.appendChild(td2);
+        row1.appendChild(td3);
+        row1.appendChild(td4);
+        row1.appendChild(td5);
+        row1.appendChild(td6);
+        
+        const row2 = document.createElement('tr');
+        const tdRow2 = document.createElement('td');
+        tdRow2.setAttribute('colspan', '6');
+        tdRow2.innerHTML = `
+            <div id="common-${subId}" style="display:none;"></div>
+            <div id="items-${subId}" style="display:none;"></div>
+            <div id="loading-${subId}" style="display:none;" class="loading">Loading...</div>
+        `;
+        row2.appendChild(tdRow2);
+        
+        tbody.appendChild(row1);
+        tbody.appendChild(row2);
+        table.appendChild(tbody);
+        div.appendChild(table);
     });
     
-    html += '</div>';
-    container.innerHTML = html;
-    console.log('Subcategory HTML rendered:', container.innerHTML);
+    container.appendChild(div);
+    console.log('Subcategory DOM rendered:', container.innerHTML);
     applyFilters();
 }
 
@@ -192,56 +226,88 @@ function loadCommonNames(category, subcategory, commonNamesData) {
     container.style.display = 'block';
     hideLoading(subId);
 
-    let html = '';
     if (commonNamesData.common_names && Array.isArray(commonNamesData.common_names)) {
         commonNamesData.common_names.forEach(cn => {
             const cnId = `${subId}_${cn.name}`.toLowerCase().replace(/[^a-z0-9-]/g, '_');
             const escapedCommonName = cn.name.replace(/&/g, '&').replace(/</g, '<').replace(/>/g, '>').replace(/"/g, '"').replace(/'/g, '');
-            const encodedCategory = btoa(category);
-            const encodedSubcategory = btoa(subcategory);
-            const encodedCommonName = btoa(cn.name);
-            const hxGetUrl = `/tab/${cachedTabNum}/data?category=${encodedCategory}&subcategory=${encodedSubcategory}&common_name=${encodedCommonName}`;
+            const hxGetUrl = `/tab/${cachedTabNum}/data?category=${encodeURIComponent(category)}&subcategory=${encodeURIComponent(subcategory)}&common_name=${encodeURIComponent(cn.name)}`;
             console.log(`Generated hx-get URL for common name ${cn.name}: ${hxGetUrl}`);
-            html += `
-                <table class="table table-bordered ms-3 mt-2" id="common-table-${cnId}">
-                    <thead>
-                        <tr>
-                            <th>Common Name</th>
-                            <th>Total Items</th>
-                            <th>Items on Contracts</th>
-                            <th>Items in Service</th>
-                            <th>Items Available</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td>${escapedCommonName}</td>
-                            <td>${cn.total_items !== undefined ? cn.total_items : 'N/A'}</td>
-                            <td>${cn.on_contracts !== undefined ? cn.on_contracts : 'N/A'}</td>
-                            <td>${cn.in_service !== undefined ? cn.in_service : 'N/A'}</td>
-                            <td>${cn.available !== undefined ? cn.available : 'N/A'}</td>
-                            <td>
-                                <button class="btn btn-sm btn-secondary" hx-get="${hxGetUrl}" hx-target="#items-${cnId}" hx-swap="innerHTML" onclick="showLoading('${cnId}')">Load Items</button>
-                                <button class="btn btn-sm btn-info" onclick="printTable('Common Name', 'common-table-${cnId}')">Print</button>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td colspan="6">
-                                <div id="items-${cnId}" style="display:none;"></div>
-                                <div id="loading-${cnId}" style="display:none;" class="loading">Loading...</div>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
+            
+            const table = document.createElement('table');
+            table.className = 'table table-bordered ms-3 mt-2';
+            table.id = `common-table-${cnId}`;
+            
+            const thead = document.createElement('thead');
+            thead.innerHTML = `
+                <tr>
+                    <th>Common Name</th>
+                    <th>Total Items</th>
+                    <th>Items on Contracts</th>
+                    <th>Items in Service</th>
+                    <th>Items Available</th>
+                    <th>Actions</th>
+                </tr>
             `;
+            table.appendChild(thead);
+            
+            const tbody = document.createElement('tbody');
+            const row1 = document.createElement('tr');
+            
+            const td1 = document.createElement('td');
+            td1.textContent = escapedCommonName;
+            const td2 = document.createElement('td');
+            td2.textContent = cn.total_items !== undefined ? cn.total_items : 'N/A';
+            const td3 = document.createElement('td');
+            td3.textContent = cn.on_contracts !== undefined ? cn.on_contracts : 'N/A';
+            const td4 = document.createElement('td');
+            td4.textContent = cn.in_service !== undefined ? cn.in_service : 'N/A';
+            const td5 = document.createElement('td');
+            td5.textContent = cn.available !== undefined ? cn.available : 'N/A';
+            
+            const td6 = document.createElement('td');
+            const loadButton = document.createElement('button');
+            loadButton.className = 'btn btn-sm btn-secondary';
+            loadButton.setAttribute('hx-get', hxGetUrl);
+            loadButton.setAttribute('hx-target', `#items-${cnId}`);
+            loadButton.setAttribute('hx-swap', 'innerHTML');
+            loadButton.textContent = 'Load Items';
+            loadButton.onclick = () => showLoading(cnId);
+            td6.appendChild(loadButton);
+
+            const printButton = document.createElement('button');
+            printButton.className = 'btn btn-sm btn-info';
+            printButton.textContent = 'Print';
+            printButton.onclick = () => printTable('Common Name', `common-table-${cnId}`);
+            td6.appendChild(printButton);
+            
+            row1.appendChild(td1);
+            row1.appendChild(td2);
+            row1.appendChild(td3);
+            row1.appendChild(td4);
+            row1.appendChild(td5);
+            row1.appendChild(td6);
+            
+            const row2 = document.createElement('tr');
+            const tdRow2 = document.createElement('td');
+            tdRow2.setAttribute('colspan', '6');
+            tdRow2.innerHTML = `
+                <div id="items-${cnId}" style="display:none;"></div>
+                <div id="loading-${cnId}" style="display:none;" class="loading">Loading...</div>
+            `;
+            row2.appendChild(tdRow2);
+            
+            tbody.appendChild(row1);
+            tbody.appendChild(row2);
+            table.appendChild(tbody);
+            container.appendChild(table);
         });
     } else {
-        html = '<p>No common names found.</p>';
+        const p = document.createElement('p');
+        p.textContent = 'No common names found.';
+        container.appendChild(p);
     }
-
-    container.innerHTML = html;
-    console.log('Common names HTML rendered:', container.innerHTML);
+    
+    console.log('Common names DOM rendered:', container.innerHTML);
     applyFilters();
 }
 
@@ -304,8 +370,8 @@ document.body.addEventListener('htmx:afterSwap', (event) => {
             console.error('Failed to parse category or subcategory from hx-get:', event.detail.requestConfig.elt.getAttribute('hx-get'));
             return;
         }
-        const category = atob(categoryMatch[1]);
-        const subcategory = atob(subcategoryMatch[1]);
+        const category = decodeURIComponent(categoryMatch[1]);
+        const subcategory = decodeURIComponent(subcategoryMatch[1]);
         const data = JSON.parse(event.detail.xhr.responseText);
         loadCommonNames(category, subcategory, data);
     } else if (targetId.startsWith('items-')) {

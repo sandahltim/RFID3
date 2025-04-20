@@ -3,7 +3,6 @@ from .. import db, cache
 from ..models.db_models import ItemMaster, RentalClassMapping
 from sqlalchemy import func
 from time import time
-import base64  # Add this import
 
 tabs_bp = Blueprint('tabs', __name__)
 
@@ -103,14 +102,10 @@ def subcat_data(tab_num):
 @tabs_bp.route('/tab/<int:tab_num>/common_names', methods=['GET'])
 def common_names(tab_num):
     try:
-        encoded_category = request.args.get('category')
-        encoded_subcategory = request.args.get('subcategory')
-        if not encoded_category or not encoded_subcategory:
+        category = request.args.get('category')
+        subcategory = request.args.get('subcategory')
+        if not category or not subcategory:
             return jsonify({'error': 'Category and subcategory are required'}), 400
-
-        # Decode Base64 parameters
-        category = base64.b64decode(encoded_category).decode('utf-8')
-        subcategory = base64.b64decode(encoded_subcategory).decode('utf-8')
 
         common_names_data = db.session.query(
             ItemMaster.common_name,
@@ -153,14 +148,9 @@ def common_names(tab_num):
 @tabs_bp.route('/tab/<int:tab_num>/data', methods=['GET'])
 def tab_data(tab_num):
     try:
-        encoded_category = request.args.get('category')
-        encoded_subcategory = request.args.get('subcategory')
-        encoded_common_name = request.args.get('common_name')
-
-        # Decode Base64 parameters
-        category = base64.b64decode(encoded_category).decode('utf-8') if encoded_category else None
-        subcategory = base64.b64decode(encoded_subcategory).decode('utf-8') if encoded_subcategory else None
-        common_name = base64.b64decode(encoded_common_name).decode('utf-8') if encoded_common_name else None
+        category = request.args.get('category')
+        subcategory = request.args.get('subcategory')
+        common_name = request.args.get('common_name')
 
         current_app.logger.debug(f"Received request for tab {tab_num} data: category={category}, subcategory={subcategory}, common_name={common_name}")
 
