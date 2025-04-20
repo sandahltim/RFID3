@@ -24,7 +24,7 @@
                     </li>
                     {% for i in range(1, 7) %}
                     <li class="nav-item">
-                        <a class="nav-link {% if request.endpoint == 'tabs.tab_view' and tab_num == i %}active{% endif %}" href="{{ url_for('tabs.tab_view', tab_num=i) }}">Tab {{ i }}</a>
+                        <a class="nav-link {% if tab_num is defined and tab_num == i %}active{% endif %}" href="{{ url_for('tabs.tab_view', tab_num=i) }}">Tab {{ i }}</a>
                     </li>
                     {% endfor %}
                     <li class="nav-item">
@@ -38,6 +38,6 @@
         {% block content %}
         {% endblock %}
     </div>
-    <script src="{{ url_for('static', filename='js/tab.js') }}?v={{ cache_bust if cache_bust else timestamp() }}"></script>
-<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'93320d39ff71b0be',t:'MTc0NTEyNDk1MC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+    <script src="{{ url_for('static', filename='js/tab.js') }}?v={{ cache_bust if cache_bust is defined else timestamp() }}"></script>
+</body>
 </html>
