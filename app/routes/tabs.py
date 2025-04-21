@@ -173,6 +173,8 @@ def common_names(tab_num):
         if not category or not subcategory:
             return jsonify({'error': 'Category and subcategory parameters are required'}), 400
 
+        current_app.logger.debug(f"Fetching common names for category: {category}, subcategory: {subcategory}")
+
         # Normalize common_name by trimming whitespace and converting to uppercase
         common_names = db.session.query(
             func.trim(func.upper(ItemMaster.common_name)).label('common_name'),
@@ -206,8 +208,8 @@ def common_names(tab_num):
 
         return jsonify({'common_names': common_names_data})
     except Exception as e:
-        current_app.logger.error(f"Error fetching common names for category {category}, subcategory {subcategory}: {str(e)}")
-        return jsonify({'error': 'Failed to fetch common names'}), 500
+        current_app.logger.error(f"Error fetching common names for category {category}, subcategory {subcategory}: {str(e)}", exc_info=True)
+        return jsonify({'error': f'Failed to fetch common names: {str(e)}'}), 500
 
 @tabs_bp.route('/tab/<int:tab_num>/data')
 def tab_data(tab_num):
@@ -218,13 +220,15 @@ def tab_data(tab_num):
         if not category or not subcategory or not common_name:
             return jsonify({'error': 'Category, subcategory, and common_name parameters are required'}), 400
 
+        current_app.logger.debug(f"Fetching items for category {category}, subcategory {subcategory}, common_name {common_name}")
+
         items = db.session.query(
             ItemMaster
         ).join(
             RentalClassMapping, RentalClassMapping.rental_class_id == ItemMaster.rental_class_num
         ).filter(
-            RentalClassMapping.category == category,
-            RentalClassMapping.subcategory == subcategory,
+            func.lower(RentalClassMapping.category) == func.lower(category),
+            func.lower(RentalClassMapping.subcategory) == func.lower(subcategory),
             func.trim(func.upper(ItemMaster.common_name)) == func.trim(func.upper(common_name))
         ).all()
 
@@ -246,5 +250,5 @@ def tab_data(tab_num):
 
         return jsonify(items_data)
     except Exception as e:
-        current_app.logger.error(f"Error fetching data for category {category}, subcategory {subcategory}, common_name {common_name}: {str(e)}")
-        return jsonify({'error': 'Failed to fetch data'}), 500
+        current_app.logger.error(f"Error fetching data for category {category}, subcategory {subcategory}, common_name {common_name}: {str(e)}", exc_info=True)
+        return jsonify({'error': f'Failed to fetch data: {str(e)}'}), 500
