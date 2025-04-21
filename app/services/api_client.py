@@ -80,7 +80,7 @@ class APIClient:
         if since_date:
             since_date = datetime.fromisoformat(since_date).strftime('%Y-%m-%d %H:%M:%S')
             logger.debug(f"Item master filter since_date: {since_date}")
-            params['filter[]'] = f"date_last_scanned,gt,'{since_date}'"
+            params['filter[]'] = f"date_last_scanned,gt,'{since_date}'"  # Reverted to correct field name
         return self._make_request("14223767938169344381", params)
 
     def get_transactions(self, since_date=None):

@@ -1,4 +1,4 @@
-from flask import Flask
+from flask import Flask, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
 from flask_caching import Cache
 import logging
@@ -9,7 +9,7 @@ db = SQLAlchemy()
 cache = Cache()
 
 def create_app():
-    app = Flask(__name__)
+    app = Flask(__name__, static_folder='static', static_url_path='/static')
 
     # Database configuration
     app.config['SQLALCHEMY_DATABASE_URI'] = (
@@ -36,6 +36,12 @@ def create_app():
     # Create database tables
     with app.app_context():
         db.create_all()
+
+    # Debug route to test static file serving
+    @app.route('/debug/static/<path:filename>')
+    def debug_static(filename):
+        app.logger.info(f"Debug static file request: {filename}")
+        return send_from_directory(app.static_folder, filename)
 
     # Register blueprints
     from app.routes.home import home_bp

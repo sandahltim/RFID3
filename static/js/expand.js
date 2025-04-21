@@ -69,6 +69,7 @@ function applyFilters() {
 
 // Load subcategory data into the specified container
 function loadSubcatData(category, subcatData) {
+    console.log('Loading subcategories for category: ' + category);
     hideOtherSubcats(category);
     const container = document.getElementById('subcat-' + category.toLowerCase().replace(/[^a-z0-9-]/g, '_'));
     if (!container) return;
@@ -123,10 +124,9 @@ function loadSubcatData(category, subcatData) {
     applyFilters();
 }
 
-//部分
-
 // Load common names data into the specified container
 function loadCommonNames(category, subcategory, targetId) {
+    console.log('Fetching common names for category: ' + category + ', subcategory: ' + subcategory);
     const url = '/tab/' + window.cachedTabNum + '/common_names?category=' + category + '&subcategory=' + subcategory;
     const container = document.getElementById(targetId);
     if (!container) return;
@@ -209,6 +209,7 @@ function loadCommonNames(category, subcategory, targetId) {
 
 // Load items data into the specified container
 function loadItems(category, subcategory, commonName, targetId) {
+    console.log('Fetching items for category: ' + category + ', subcategory: ' + subcategory + ', common_name: ' + commonName);
     const url = '/tab/' + window.cachedTabNum + '/data?category=' + category + '&subcategory=' + subcategory + '&common_name=' + commonName;
     const container = document.getElementById(targetId);
     if (!container) return;
