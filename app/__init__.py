@@ -6,6 +6,14 @@ import logging
 from logging.handlers import RotatingFileHandler
 from config import DB_CONFIG, REDIS_URL
 
+# Set up sync.log logging early
+sync_handler = RotatingFileHandler('/home/tim/test_rfidpi/logs/sync.log', maxBytes=10000, backupCount=1)
+sync_handler.setLevel(logging.DEBUG)
+sync_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+sync_handler.setFormatter(sync_formatter)
+logging.getLogger('').addHandler(sync_handler)
+logging.getLogger('').setLevel(logging.DEBUG)
+
 db = SQLAlchemy()
 cache = Cache()
 
@@ -34,7 +42,7 @@ def create_app():
     db.init_app(app)
     cache.init_app(app)
 
-    # Set up logging
+    # Set up app.log logging
     handler = RotatingFileHandler('/home/tim/test_rfidpi/logs/app.log', maxBytes=10000, backupCount=1)
     handler.setLevel(logging.INFO)
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
