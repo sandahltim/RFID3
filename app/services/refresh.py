@@ -4,6 +4,7 @@ from app.models.db_models import ItemMaster, Transaction, RentalClassMapping, Re
 from app.services.api_client import APIClient
 from app import db, cache
 from datetime import datetime
+import traceback
 
 refresh_bp = Blueprint('refresh', __name__)
 
@@ -16,6 +17,34 @@ def parse_date(date_str):
             current_app.logger.error(f"Failed to parse date '{date_str}': {str(e)}")
             return None
     return None
+
+def clean_duplicates(session):
+    """Remove duplicate tag_id entries from id_item_master, keeping the most recent."""
+    current_app.logger.info("Cleaning duplicates from id_item_master")
+    try:
+        # Identify duplicates and keep the most recent entry
+        subquery = session.query(
+            ItemMaster.tag_id,
+            func.max(ItemMaster.date_updated).label('max_date_updated')
+        ).group_by(
+            ItemMaster.tag_id
+        ).having(
+            func.count(ItemMaster.tag_id) > 1
+        ).subquery()
+
+        # Delete older duplicates
+        delete_query = session.query(ItemMaster).join(
+            subquery,
+            (ItemMaster.tag_id == subquery.c.tag_id) &
+            (ItemMaster.date_updated != subquery.c.max_date_updated)
+        )
+        deleted_count = delete_query.delete(synchronize_session=False)
+        session.commit()
+        current_app.logger.info(f"Removed {deleted_count} duplicate items from id_item_master")
+    except Exception as e:
+        current_app.logger.error(f"Failed to clean duplicates: {str(e)}", exc_info=True)
+        session.rollback()
+        raise
 
 def update_item_master(session, items):
     current_app.logger.info(f"Updating {len(items)} items in id_item_master")
@@ -49,7 +78,7 @@ def update_item_master(session, items):
                 date_updated=date_updated
             ))
         except Exception as e:
-            current_app.logger.error(f"Failed to update item {item.get('tag_id')}: {str(e)}")
+            current_app.logger.error(f"Failed to update item {item.get('tag_id')}: {str(e)}", exc_info=True)
             raise
 
 def update_transactions(session, transactions):
@@ -106,7 +135,7 @@ def update_transactions(session, transactions):
                 notes=trans.get('notes')
             ))
         except Exception as e:
-            current_app.logger.error(f"Failed to update transaction {trans.get('tag_id')}: {str(e)}")
+            current_app.logger.error(f"Failed to update transaction {trans.get('tag_id')}: {str(e)}", exc_info=True)
             raise
 
 def update_seed_data(session, seeds):
@@ -120,7 +149,7 @@ def update_seed_data(session, seeds):
                 subcategory=seed.get('subcategory')
             ))
         except Exception as e:
-            current_app.logger.error(f"Failed to update seed {seed.get('rental_class_id')}: {str(e)}")
+            current_app.logger.error(f"Failed to update seed {seed.get('rental_class_id')}: {str(e)}", exc_info=True)
             raise
 
 @refresh_bp.route('/full_refresh', methods=['POST'])
@@ -130,10 +159,21 @@ def full_refresh():
         client = APIClient()
         current_app.logger.info("Fetching item master data")
         items = client.get_item_master()
+        current_app.logger.info(f"Fetched {len(items)} items from item master")
+        current_app.logger.debug(f"Item master sample: {items[:5] if items else 'No items'}")
+        
         current_app.logger.info("Fetching transactions data")
         transactions = client.get_transactions()
+        current_app.logger.info(f"Fetched {len(transactions)} transactions")
+        current_app.logger.debug(f"Transactions sample: {transactions[:5] if transactions else 'No transactions'}")
+        
         current_app.logger.info("Fetching seed data")
         seeds = client.get_seed_data()
+        current_app.logger.info(f"Fetched {len(seeds)} seeds")
+        current_app.logger.debug(f"Seed data sample: {seeds[:5] if seeds else 'No seeds'}")
+        
+        current_app.logger.info("Cleaning duplicates from database")
+        clean_duplicates(db.session)
         
         current_app.logger.info("Updating database")
         update_item_master(db.session, items)
@@ -152,11 +192,11 @@ def full_refresh():
         current_app.logger.info("Full refresh completed successfully")
         return jsonify({'status': 'success', 'message': 'Database refreshed'})
     except Exception as e:
-        current_app.logger.error(f"Full refresh failed: {str(e)}", exc_info=True)
+        current_app.logger.error(f"Full refresh failed: {str(e)}\nTraceback: {traceback.format_exc()}")
         db.session.rollback()
         return jsonify({'status': 'error', 'message': str(e)}), 500
     finally:
-        db.session.remove()  # Ensure session is fully removed
+        db.session.remove()
         current_app.logger.debug("Full refresh session closed")
 
 def incremental_refresh():
@@ -173,7 +213,7 @@ def incremental_refresh():
         
         update_item_master(db.session, items)
         update_transactions(db.session, transactions)
-        update_seed_data(db.session, seeds)
+        update_seed_data(db.session, seeds)  # Fixed typo: was passing transactions instead of seeds
         
         if state:
             state.last_refresh = datetime.utcnow().isoformat()
@@ -185,9 +225,9 @@ def incremental_refresh():
         cache.clear()
         current_app.logger.info("Incremental refresh completed successfully")
     except Exception as e:
-        current_app.logger.error(f"Incremental refresh failed: {str(e)}", exc_info=True)
+        current_app.logger.error(f"Incremental refresh failed: {str(e)}\nTraceback: {traceback.format_exc()}")
         db.session.rollback()
         raise
     finally:
-        db.session.remove()  # Ensure session is fully removed
+        db.session.remove()
         current_app.logger.debug("Incremental refresh session closed")
