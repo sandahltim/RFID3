@@ -69,7 +69,6 @@ function applyFilters() {
 
 // Load subcategory data into the specified container
 function loadSubcatData(category, subcatData) {
-    console.log('Loading subcategories for category: ' + category);
     hideOtherSubcats(category);
     const container = document.getElementById('subcat-' + category.toLowerCase().replace(/[^a-z0-9-]/g, '_'));
     if (!container) return;
@@ -126,7 +125,6 @@ function loadSubcatData(category, subcatData) {
 
 // Load common names data into the specified container
 function loadCommonNames(category, subcategory, targetId) {
-    console.log('Fetching common names for category: ' + category + ', subcategory: ' + subcategory);
     const url = '/tab/' + window.cachedTabNum + '/common_names?category=' + category + '&subcategory=' + subcategory;
     const container = document.getElementById(targetId);
     if (!container) return;
@@ -209,7 +207,6 @@ function loadCommonNames(category, subcategory, targetId) {
 
 // Load items data into the specified container
 function loadItems(category, subcategory, commonName, targetId) {
-    console.log('Fetching items for category: ' + category + ', subcategory: ' + subcategory + ', common_name: ' + commonName);
     const url = '/tab/' + window.cachedTabNum + '/data?category=' + category + '&subcategory=' + subcategory + '&common_name=' + commonName;
     const container = document.getElementById(targetId);
     if (!container) return;
@@ -290,10 +287,34 @@ function loadItems(category, subcategory, commonName, targetId) {
         });
 }
 
-// Attach expandCategory to the window object to ensure global accessibility
-window.expandCategory = expandCategory;
-
-// Confirm expandCategory is defined
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('expand.js loaded, expandCategory defined:', typeof window.expandCategory === 'function');
+    // Attach expandCategory to the window object to ensure global accessibility
+    window.expandCategory = function(category, targetId) {
+        const url = '/tab/' + window.cachedTabNum + '/subcat_data?category=' + category;
+        showLoading(targetId.replace('subcat-', '')); // Show loading indicator
+
+        fetch(url, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            }
+        })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Subcat fetch failed with status ' + response.status);
+                }
+                return response.json();
+            })
+            .then(data => {
+                const categoryName = targetId.replace('subcat-', '');
+                loadSubcatData(categoryName, data);
+            })
+            .catch(error => {
+                console.error('Subcat fetch error:', error);
+            })
+            .finally(() => {
+                hideLoading(targetId.replace('subcat-', ''));
+            });
+    };
 });

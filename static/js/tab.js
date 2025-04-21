@@ -146,16 +146,20 @@ document.addEventListener('DOMContentLoaded', () => {
         console.debug('Not a tab page, skipping tab-specific logic.');
     }
 
-    // Direct click listener for print-btn buttons
-    document.querySelectorAll('.print-btn').forEach(button => {
-        console.log('Setting up print button listener for:', button);
-        button.addEventListener('click', (event) => {
-            console.log('Direct click on print-btn:', button);
-            console.log('Event details:', event);
-            const level = button.getAttribute('data-print-level');
-            const id = button.getAttribute('data-print-id');
-            console.log('Print button clicked: level=' + level + ', id=' + id);
-            printTable(level, id);
+    // Delay event listener setup to ensure DOM is fully loaded
+    setTimeout(() => {
+        const printButtons = document.querySelectorAll('.print-btn');
+        console.log('Found ' + printButtons.length + ' print buttons');
+        printButtons.forEach(button => {
+            console.log('Setting up print button listener for:', button);
+            button.addEventListener('click', (event) => {
+                console.log('Direct click on print-btn:', button);
+                console.log('Event details:', event);
+                const level = button.getAttribute('data-print-level');
+                const id = button.getAttribute('data-print-id');
+                console.log('Print button clicked: level=' + level + ', id=' + id);
+                printTable(level, id);
+            });
         });
-    });
+    }, 1000);
 });
