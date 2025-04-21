@@ -85,7 +85,7 @@ class APIClient:
         logger.debug(f"Item master filter since_date: {since_date}")
         filter_str = f"date_last_scanned,gt,'{since_date}'"
         logger.debug(f"Constructed filter string: {filter_str}")
-        params['filter[gt]'] = filter_str  // Use filter[gt] instead of filter[]
+        params['filter[gt]'] = filter_str  # Use filter[gt] instead of filter[]
         
         try:
             data = self._make_request("14223767938169344381", params)
@@ -105,9 +105,9 @@ class APIClient:
         if since_date:
             since_date = datetime.fromisoformat(since_date).strftime('%Y-%m-%d %H:%M:%S') if isinstance(since_date, str) else since_date.strftime('%Y-%m-%d %H:%M:%S')
             logger.debug(f"Transactions filter since_date: {since_date}")
-            filter_str = f"date_last_scanned,gt,'{since_date}'"  // Use date_last_scanned as per item master
+            filter_str = f"date_last_scanned,gt,'{since_date}'"  # Use date_last_scanned as per item master
             logger.debug(f"Constructed filter string: {filter_str}")
-            params['filter[gt]'] = filter_str  // Use filter[gt] instead of filter[]
+            params['filter[gt]'] = filter_str  # Use filter[gt] instead of filter[]
             try:
                 data = self._make_request("14223767938169346196", params)
             except Exception as e:
@@ -126,7 +126,7 @@ class APIClient:
 
     def get_seed_data(self, since_date=None):
         params = {}
-        // Remove filter for seed data to avoid errors
+        # Remove filter for seed data to avoid errors
         data = self._make_request("14223767938169215907", params)
         if since_date:
             since_date = datetime.fromisoformat(since_date).strftime('%Y-%m-%d %H:%M:%S') if isinstance(since_date, str) else since_date.strftime('%Y-%m-%d %H:%M:%S')
