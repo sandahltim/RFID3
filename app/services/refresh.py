@@ -125,8 +125,6 @@ def update_seed_data(session, seeds):
 
 @refresh_bp.route('/full_refresh', methods=['POST'])
 def full_refresh():
-    # Create a new session for this request
-    session = db.Session()
     try:
         current_app.logger.info("Starting full refresh")
         client = APIClient()
@@ -138,38 +136,34 @@ def full_refresh():
         seeds = client.get_seed_data()
         
         current_app.logger.info("Updating database")
-        session.begin()
-        update_item_master(session, items)
-        update_transactions(session, transactions)
-        update_seed_data(session, seeds)
+        update_item_master(db.session, items)
+        update_transactions(db.session, transactions)
+        update_seed_data(db.session, seeds)
         
-        state = session.query(RefreshState).first()
+        state = db.session.query(RefreshState).first()
         if not state:
             state = RefreshState(last_refresh=datetime.utcnow().isoformat())
-            session.add(state)
+            db.session.add(state)
         else:
             state.last_refresh = datetime.utcnow().isoformat()
         
-        session.commit()
+        db.session.commit()
         cache.clear()
         current_app.logger.info("Full refresh completed successfully")
         return jsonify({'status': 'success', 'message': 'Database refreshed'})
     except Exception as e:
         current_app.logger.error(f"Full refresh failed: {str(e)}", exc_info=True)
-        session.rollback()
+        db.session.rollback()
         return jsonify({'status': 'error', 'message': str(e)}), 500
     finally:
-        session.close()
         db.session.remove()  # Ensure session is fully removed
         current_app.logger.debug("Full refresh session closed")
 
 def incremental_refresh():
-    # Create a new session for this background task
-    session = db.Session()
     try:
         current_app.logger.info("Starting incremental refresh")
 
-        state = session.query(RefreshState).first()
+        state = db.session.query(RefreshState).first()
         since_date = state.last_refresh if state else None
         
         client = APIClient()
@@ -177,25 +171,23 @@ def incremental_refresh():
         transactions = client.get_transactions(since_date)
         seeds = client.get_seed_data(since_date)
         
-        session.begin()
-        update_item_master(session, items)
-        update_transactions(session, transactions)
-        update_seed_data(session, seeds)
+        update_item_master(db.session, items)
+        update_transactions(db.session, transactions)
+        update_seed_data(db.session, seeds)
         
         if state:
             state.last_refresh = datetime.utcnow().isoformat()
         else:
             state = RefreshState(last_refresh=datetime.utcnow().isoformat())
-            session.add(state)
+            db.session.add(state)
         
-        session.commit()
+        db.session.commit()
         cache.clear()
         current_app.logger.info("Incremental refresh completed successfully")
     except Exception as e:
         current_app.logger.error(f"Incremental refresh failed: {str(e)}", exc_info=True)
-        session.rollback()
+        db.session.rollback()
         raise
     finally:
-        session.close()
         db.session.remove()  # Ensure session is fully removed
         current_app.logger.debug("Incremental refresh session closed")
