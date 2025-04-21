@@ -27,7 +27,7 @@ class APIClient:
                 if response.status_code == 200 and data.get('result'):
                     self.token = data.get('access_token')
                     self.token_expiry = datetime.now() + timedelta(minutes=30)
-                    logger.debug(f"Access token received: {self.token[:20]}... (expires {self.token_expiry})")
+                    logger.debug(f"Access token received: {self.token} (expires {self.token_expiry})")
                     return
                 else:
                     logger.error(f"Token attempt {attempt + 1} failed: {response.status_code} {response.reason}, response: {data}")
@@ -57,6 +57,7 @@ class APIClient:
             query_string = '&'.join([f"{k}={quote(str(v))}" for k, v in params.items()])
             full_url = f"{url}?{query_string}"
             logger.debug(f"Making request to full URL: {full_url}")
+            logger.debug(f"Request headers: {headers}")
             response = requests.get(url, headers=headers, params=params, timeout=20)
             data = response.json()
             logger.debug(f"API response: {response.status_code} {response.reason}, response: {data}")
@@ -81,8 +82,8 @@ class APIClient:
         else:
             since_date = (datetime.now() - timedelta(seconds=30)).strftime('%Y-%m-%d %H:%M:%S')
         logger.debug(f"Item master filter since_date: {since_date}")
-        # Try alternative field name: dateLastScanned
-        filter_str = f"dateLastScanned,gt,'{since_date}'"
+        # Revert to date_last_scanned as per user's successful test
+        filter_str = f"date_last_scanned,gt,'{since_date}'"
         logger.debug(f"Constructed filter string: {filter_str}")
         params['filter[]'] = filter_str
         
