@@ -68,6 +68,7 @@
         <tr>
             {% if tab_num == 2 %}
             <th>Contract Number</th>
+            <th>Customer Name</th>
             {% else %}
             <th>Category</th>
             {% endif %}
@@ -84,7 +85,11 @@
         hx-target="#category-table-body"
         hx-swap="innerHTML">
         <tr>
+            {% if tab_num == 2 %}
+            <td colspan="7" class="loading">Loading...</td>
+            {% else %}
             <td colspan="6" class="loading">Loading...</td>
+            {% endif %}
         </tr>
     </tbody>
 </table>

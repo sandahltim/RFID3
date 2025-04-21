@@ -1,10 +1,10 @@
-from flask import Blueprint, render_template, jsonify, current_app
+from flask import Blueprint, render_template, jsonify, current_app, request  # Add request import
 from .. import db, cache
 from ..models.db_models import ItemMaster, RentalClassMapping
 from sqlalchemy import func
 from urllib.parse import quote
 import re
-import time  # Add this import
+import time
 
 tab1_bp = Blueprint('tab1', __name__)
 

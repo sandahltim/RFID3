@@ -1,10 +1,10 @@
-from flask import Blueprint, render_template, jsonify, current_app
+from flask import Blueprint, render_template, jsonify, current_app, request
 from .. import db, cache
-from ..models.db_models import ItemMaster, RentalClassMapping
+from ..models.db_models import ItemMaster, RentalClassMapping, Transaction
 from sqlalchemy import func
 from urllib.parse import quote
 import re
-import time  # Add this import
+import time
 
 tab2_bp = Blueprint('tab2', __name__)
 
@@ -17,7 +17,10 @@ def tab2_view():
         # Fetch items with status 'On Rent' or 'Delivered', excluding Laundry contracts (starting with 'L')
         contract_data = db.session.query(
             ItemMaster.last_contract_num,
-            func.count(ItemMaster.tag_id).label('total_items')
+            func.count(ItemMaster.tag_id).label('total_items'),
+            func.max(Transaction.client_name).label('customer_name')  # Get customer name from transactions
+        ).outerjoin(
+            Transaction, Transaction.contract_number == ItemMaster.last_contract_num
         ).filter(
             func.lower(ItemMaster.status).in_(['on rent', 'delivered']),
             func.lower(ItemMaster.last_contract_num).notlike('l%')
@@ -33,9 +36,10 @@ def tab2_view():
                 'total_items': total_items,
                 'on_contracts': total_items,  # All items are on contracts
                 'in_service': 0,
-                'available': 0
+                'available': 0,
+                'customer_name': customer_name or 'N/A'  # Include customer name
             }
-            for contract_num, total_items in contract_data
+            for contract_num, total_items, customer_name in contract_data
             if contract_num is not None
         ]
         current_app.logger.info(f"Fetched {len(categories)} rental contracts")
@@ -78,7 +82,10 @@ def tab2_categories():
     try:
         contract_data = db.session.query(
             ItemMaster.last_contract_num,
-            func.count(ItemMaster.tag_id).label('total_items')
+            func.count(ItemMaster.tag_id).label('total_items'),
+            func.max(Transaction.client_name).label('customer_name')
+        ).outerjoin(
+            Transaction, Transaction.contract_number == ItemMaster.last_contract_num
         ).filter(
             func.lower(ItemMaster.status).in_(['on rent', 'delivered']),
             func.lower(ItemMaster.last_contract_num).notlike('l%')
@@ -94,9 +101,10 @@ def tab2_categories():
                 'total_items': total_items,
                 'on_contracts': total_items,
                 'in_service': 0,
-                'available': 0
+                'available': 0,
+                'customer_name': customer_name or 'N/A'
             }
-            for contract_num, total_items in contract_data
+            for contract_num, total_items, customer_name in contract_data
             if contract_num is not None
         ]
 
@@ -108,6 +116,7 @@ def tab2_categories():
             html += f'''
                 <tr>
                     <td>{category['name']}</td>
+                    <td>{category['customer_name']}</td>
                     <td>{category['total_items']}</td>
                     <td>{category['on_contracts']}</td>
                     <td>{category['in_service']}</td>
@@ -122,7 +131,7 @@ def tab2_categories():
         return html
     except Exception as e:
         current_app.logger.error(f"Error fetching contracts for tab 2: {str(e)}", exc_info=True)
-        return '<tr><td colspan="6">Error loading contracts</td></tr>'
+        return '<tr><td colspan="7">Error loading contracts</td></tr>'
 
 @tab2_bp.route('/tab/2/subcat_data')
 def tab2_subcat_data():
