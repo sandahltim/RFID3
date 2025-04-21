@@ -68,7 +68,7 @@
 </table>
 
 {% for category in categories %}
-<div id="subcat-{{ category.name | lower | replace('[^a-z0-9-]', '_') }}" style="display:none;"></div>
+<div id="subcat-{{ category.name | lower | replace(' ', '_') }}" style="display:none;"></div>
 {% endfor %}
 
 {% endblock %}

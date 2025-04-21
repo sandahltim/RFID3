@@ -4,6 +4,7 @@ from ..models.db_models import ItemMaster, RentalClassMapping
 from sqlalchemy import func, distinct
 from time import time
 from urllib.parse import quote
+import re
 
 tabs_bp = Blueprint('tabs', __name__)
 
@@ -100,8 +101,7 @@ def tab_categories(tab_num):
 
         html = ''
         for category in categories:
-            cat_id = category['name'].lower().replace('[^a-z0-9-]', '_')
-            # Enhanced escaping for JavaScript: encode and escape quotes
+            cat_id = re.sub(r'[^a-z0-9-]', '_', category['name'].lower())
             encoded_category = quote(category['name']).replace("'", "\\'").replace('"', '\\"')
             current_app.logger.debug(f"Encoded category for onclick: {encoded_category}")
             html += f'''

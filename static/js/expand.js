@@ -33,6 +33,7 @@ function hideOtherSubcats(currentCategory) {
     const allSubcatDivs = document.querySelectorAll('div[id^="subcat-"]');
     console.log('Found subcat divs:', allSubcatDivs.length);
     allSubcatDivs.forEach(div => {
+        console.log('Subcat div ID:', div.id);
         if (div.id !== 'subcat-' + currentCategory.toLowerCase().replace(/[^a-z0-9-]/g, '_')) {
             console.log('Hiding subcat div:', div.id);
             div.style.display = 'none';
