@@ -1,3 +1,4 @@
+import os
 from flask import Flask, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
 from flask_caching import Cache
@@ -9,7 +10,14 @@ db = SQLAlchemy()
 cache = Cache()
 
 def create_app():
-    app = Flask(__name__, static_folder='static', static_url_path='/static')
+    # Define the project root directory (where static/ is located)
+    project_root = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
+    static_folder = os.path.join(project_root, 'static')
+
+    app = Flask(__name__, static_folder=static_folder, static_url_path='/static')
+
+    # Log the static folder path for debugging
+    app.logger.info(f"Static folder path: {app.static_folder}")
 
     # Database configuration
     app.config['SQLALCHEMY_DATABASE_URI'] = (
