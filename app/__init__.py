@@ -43,7 +43,9 @@ def create_app():
 
     # Create database tables
     with app.app_context():
+        app.logger.info("Creating database tables")
         db.create_all()
+        app.logger.info("Database tables created")
 
     # Debug route to test static file serving
     @app.route('/debug/static/<path:filename>')
@@ -64,7 +66,10 @@ def create_app():
     app.register_blueprint(health_bp)
 
     # Initialize scheduler
-    from app.services.scheduler import init_scheduler
-    init_scheduler(app)
+    from app.services.refresh import init_scheduler
+    with app.app_context():
+        app.logger.info("Initializing scheduler")
+        init_scheduler(app)
+        app.logger.info("Scheduler initialized")
 
     return app

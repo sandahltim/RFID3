@@ -54,7 +54,6 @@ class APIClient:
         url = f"{self.base_url}{endpoint_id}"
         all_data = []
         while True:
-            # Construct and log the full URL
             query_string = '&'.join([f"{k}={quote(str(v))}" for k, v in params.items()])
             full_url = f"{url}?{query_string}"
             logger.debug(f"Making request to full URL: {full_url}")
@@ -77,20 +76,23 @@ class APIClient:
 
     def get_item_master(self, since_date=None):
         params = {}
-        # Temporarily remove filter due to 'Invalid filter parameters' error
-        # Revisit after testing alternative syntaxes
-        # if since_date:
-        #     since_date = datetime.fromisoformat(since_date).strftime('%Y-%m-%d %H:%M:%S')
-        #     logger.debug(f"Item master filter since_date: {since_date}")
-        #     filter_str = f"date_last_scanned,gt,{since_date}"
-        #     logger.debug(f"Constructed filter string: {filter_str}")
-        #     params['filter[]'] = filter_str
+        if since_date:
+            # If since_date is provided, use it directly
+            since_date = datetime.fromisoformat(since_date).strftime('%Y-%m-%d %H:%M:%S') if isinstance(since_date, str) else since_date.strftime('%Y-%m-%d %H:%M:%S')
+        else:
+            # Use current time minus 30 seconds for incremental refresh (matches scheduler interval)
+            since_date = (datetime.now() - timedelta(seconds=30)).strftime('%Y-%m-%d %H:%M:%S')
+        logger.debug(f"Item master filter since_date: {since_date}")
+        # Use quoted date format as confirmed by user test
+        filter_str = f"date_last_scanned,gt,'{since_date}'"
+        logger.debug(f"Constructed filter string: {filter_str}")
+        params['filter[]'] = filter_str
         return self._make_request("14223767938169344381", params)
 
     def get_transactions(self, since_date=None):
         params = {}
         if since_date:
-            since_date = datetime.fromisoformat(since_date).strftime('%Y-%m-%d %H:%M:%S')
+            since_date = datetime.fromisoformat(since_date).strftime('%Y-%m-%d %H:%M:%S') if isinstance(since_date, str) else since_date.strftime('%Y-%m-%d %H:%M:%S')
             logger.debug(f"Transactions filter since_date: {since_date}")
             params['filter[]'] = f"date_updated,gt,'{since_date}'"
         return self._make_request("14223767938169346196", params)
@@ -98,7 +100,7 @@ class APIClient:
     def get_seed_data(self, since_date=None):
         params = {}
         if since_date:
-            since_date = datetime.fromisoformat(since_date).strftime('%Y-%m-%d %H:%M:%S')
+            since_date = datetime.fromisoformat(since_date).strftime('%Y-%m-%d %H:%M:%S') if isinstance(since_date, str) else since_date.strftime('%Y-%m-%d %H:%M:%S')
             logger.debug(f"Seed data filter since_date: {since_date}")
             params['filter[]'] = f"date_updated,gt,'{since_date}'"
         return self._make_request("14223767938169215907", params)
