@@ -4,6 +4,7 @@ from app.models.db_models import ItemMaster, Transaction, RentalClassMapping, Re
 from app.services.api_client import APIClient
 from app import db, cache
 from datetime import datetime
+from sqlalchemy import func  # Import func
 import traceback
 
 refresh_bp = Blueprint('refresh', __name__)
