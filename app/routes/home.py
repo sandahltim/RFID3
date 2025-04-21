@@ -10,13 +10,21 @@ home_bp = Blueprint('home', __name__)
 @cache.cached(timeout=30)
 def index():
     try:
-        # Use DISTINCT to avoid counting duplicate tag_ids
-        total_items = db.session.query(func.count(func.distinct(ItemMaster.tag_id))).scalar() or 0
+        # Clear cache to ensure fresh data
+        cache.clear()
+        current_app.logger.info("Cleared cache for homepage")
+
+        # Use DISTINCT to avoid counting duplicate tag_ids, exclude suspicious tag_ids
+        total_items = db.session.query(func.count(func.distinct(ItemMaster.tag_id))).filter(
+            ItemMaster.tag_id.notlike('7070%')  # Exclude suspicious tag_ids
+        ).scalar() or 0
         current_app.logger.debug(f"Total distinct items: {total_items}")
 
         status_counts = db.session.query(
             func.coalesce(ItemMaster.status, 'Unknown').label('status'),
             func.count(func.distinct(ItemMaster.tag_id)).label('count')
+        ).filter(
+            ItemMaster.tag_id.notlike('7070%')  # Exclude suspicious tag_ids
         ).group_by(
             func.coalesce(ItemMaster.status, 'Unknown')
         ).all()
