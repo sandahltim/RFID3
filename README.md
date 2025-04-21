@@ -4,6 +4,8 @@ test_rfidpi/ RFID2
 │   ├── routes/
 │   │   ├── home.py
 │   │   ├── tabs.py
+│   │   ├── tab1.py
+│   │   ├── tab2.py
 │   │   ├── categories.py
 │   │   └── health.py
 │   ├── services/
@@ -35,3 +37,4 @@ test_rfidpi/ RFID2
 ├── run.py
 ├── config.py
 └── logs/
+
