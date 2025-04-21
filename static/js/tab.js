@@ -1,5 +1,5 @@
 // tab.js - Handles tab functionality for RFID Dashboard
-// Version: 2025-04-20 v2 - Added print button listeners and refresh functionality
+// Version: 2025-04-20 v3 - Added event delegation for print buttons
 
 console.log('tab.js loaded, cachedTabNum:', window.cachedTabNum);
 
@@ -110,19 +110,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     window.cachedTabNum = tabNum;
 
-    // Set up print button listeners
-    const printButtons = document.querySelectorAll('.print-btn');
-    console.log('Found', printButtons.length, 'print buttons');
-    printButtons.forEach(button => {
-        console.log('Setting up print button listener for:', button);
-        button.addEventListener('click', (event) => {
-            console.log('Direct click on print-btn:', button);
-            console.log('Event details:', event);
+    // Set up print button listeners using event delegation
+    document.addEventListener('click', (event) => {
+        const button = event.target.closest('.print-btn');
+        if (button) {
+            console.log('Print button clicked:', button);
             const level = button.getAttribute('data-print-level');
             const id = button.getAttribute('data-print-id');
             console.log(`Print button clicked: level=${level}, id=${id}`);
             printTable(level, id);
-        });
+        }
     });
 
     // Apply filters to all tables based on user input

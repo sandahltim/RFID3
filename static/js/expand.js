@@ -1,8 +1,8 @@
 // expand.js - Handles category expansion for RFID Dashboard
 // Module Purpose: Expands categories to show subcategories, common names, and individual items on the tab page
-// Version: 2025-04-20 v7 - Added individual items expansion layer and print buttons
+// Version: 2025-04-21 v8 - Fixed targetBaseId error in loadCommonNames
 
-console.log('expand.js version: 2025-04-20 v7 loaded');
+console.log('expand.js version: 2025-04-21 v8 loaded');
 
 // --- Loading Indicator Functions ---
 function showLoading(key) {
@@ -154,7 +154,7 @@ function loadItems(category, subcategory, commonName, targetId) {
         })
         .catch(error => {
             console.error('Items fetch error:', error);
-            container.innerHTML = '<p class="ms-4 text-danger">Error loading items.</p>';
+            container.innerHTML = '<p class="ms-4 text-danger">Error loading items: ' + error.message + '</p>';
         })
         .finally(() => {
             hideLoading(targetId.replace('items-', ''));
@@ -196,9 +196,9 @@ function loadCommonNames(category, subcategory, targetId) {
 
             let html = '';
             if (data.common_names && Array.isArray(data.common_names)) {
+                const targetBaseId = targetId.replace('common-', '');
                 hideOtherCommonNames(targetBaseId);
                 data.common_names.forEach(cn => {
-                    const targetBaseId = targetId.replace('common-', '');
                     const cnId = targetBaseId + '_' + cn.name.toLowerCase().replace(/[^a-z0-9-]/g, '_');
                     html += [
                         '<table class="table table-bordered ms-3 mt-2" id="common-table-' + cnId + '">',
@@ -243,7 +243,7 @@ function loadCommonNames(category, subcategory, targetId) {
         })
         .catch(error => {
             console.error('Common names fetch error:', error);
-            container.innerHTML = '<p class="ms-3 text-danger">Error loading common names.</p>';
+            container.innerHTML = '<p class="ms-3 text-danger">Error loading common names: ' + error.message + '</p>';
         })
         .finally(() => {
             hideLoading(targetId.replace('common-', ''));
