@@ -1,8 +1,8 @@
 // expand.js - Handles category expansion for RFID Dashboard
 // Module Purpose: Expands categories to show subcategories, common names, and individual items on the tab page
-// Version: 2025-04-21 v9 - Added smooth transitions for expansions
+// Version: 2025-04-21 v10 - Dynamic subcategory headers based on tab number
 
-console.log('expand.js version: 2025-04-21 v9 loaded');
+console.log('expand.js version: 2025-04-21 v10 loaded');
 
 // --- Loading Indicator Functions ---
 function showLoading(key) {
@@ -274,11 +274,12 @@ function loadSubcatData(originalCategory, normalizedCategory, subcatData) {
     subcatData.forEach(sub => {
         console.log('Processing subcategory:', sub);
         const subId = normalizedCategory + '_' + sub.subcategory.toLowerCase().replace(/[^a-z0-9-]/g, '_');
+        const isTab2 = window.cachedTabNum == 2;
         html += [
             '<table class="table table-bordered mt-2" id="subcat-table-' + subId + '">',
                 '<thead>',
                     '<tr>',
-                        '<th>Subcategory</th>',
+                        '<th>' + (isTab2 ? 'Category' : 'Subcategory') + '</th>',
                         '<th>Total Items</th>',
                         '<th>Items on Contracts</th>',
                         '<th>Items in Service</th>',
@@ -295,7 +296,7 @@ function loadSubcatData(originalCategory, normalizedCategory, subcatData) {
                         '<td>' + (sub.available !== undefined ? sub.available : 'N/A') + '</td>',
                         '<td>',
                             '<button class="btn btn-sm btn-secondary" onclick="loadCommonNames(\'' + encodeURIComponent(originalCategory) + '\', \'' + encodeURIComponent(sub.subcategory) + '\', \'common-' + subId + '\')">Load Items</button>',
-                            '<button class="btn btn-sm btn-info print-btn" data-print-level="Subcategory" data-print-id="subcat-table-' + subId + '">Print</button>',
+                            '<button class="btn btn-sm btn-info print-btn" data-print-level="' + (isTab2 ? 'Category' : 'Subcategory') + '" data-print-id="subcat-table-' + subId + '">Print</button>',
                             '<div id="loading-' + subId + '" style="display:none;" class="loading">Loading...</div>',
                         '</td>',
                     '</tr>',
