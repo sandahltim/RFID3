@@ -1,6 +1,6 @@
 import time
 from flask import Blueprint, jsonify, current_app
-from app.models.db_models import ItemMaster, Transaction, SeedRentalClass, RefreshState
+from app.models.db_models import ItemMaster, Transaction, RentalClassMapping, RefreshState
 from app.services.api_client import APIClient
 from app import db, cache
 from datetime import datetime
@@ -34,7 +34,7 @@ def update_item_master(session, items):
                 uuid_accounts_fk=item.get('uuid_accounts_fk'),
                 serial_number=item.get('serial_number'),
                 client_name=item.get('client_name'),
-                rental_class_num=item.get('rental_class_num'),
+                rental_class_num=item.get('rental_class_id'),
                 common_name=item.get('common_name'),
                 quality=item.get('quality'),
                 bin_location=item.get('bin_location'),
@@ -111,13 +111,16 @@ def update_transactions(session, transactions):
             raise
 
 def update_seed_data(session, seeds):
-    current_app.logger.info(f"Updating {len(seeds)} seeds in seed_rental_classes")
+    current_app.logger.info(f"Updating {len(seeds)} seeds in rental_class_mapping")
     for seed in seeds:
         try:
             rental_class_id = seed.get('rental_class_id')
-            session.merge(SeedRentalClass(
+            date_updated = parse_date(seed.get('date_updated'))
+            session.merge(RentalClassMapping(
                 rental_class_id=rental_class_id,
-                common_name=seed.get('common_name')
+                category=seed.get('category'),
+                subcategory=seed.get('subcategory'),
+                date_updated=date_updated
             ))
         except Exception as e:
             current_app.logger.error(f"Failed to update seed {seed.get('rental_class_id')}: {str(e)}")
@@ -155,11 +158,12 @@ def full_refresh():
         current_app.logger.info("Full refresh completed successfully")
         return jsonify({'status': 'success', 'message': 'Database refreshed'})
     except Exception as e:
-        current_app.logger.error(f"Full refresh failed: {str(e)}")
+        current_app.logger.error(f"Full refresh failed: {str(e)}", exc_info=True)
         session.rollback()
         return jsonify({'status': 'error', 'message': str(e)}), 500
     finally:
         session.close()
+        current_app.logger.debug("Full refresh session closed")
 
 def incremental_refresh():
     # Create a new session for this background task
@@ -190,7 +194,9 @@ def incremental_refresh():
         cache.clear()
         current_app.logger.info("Incremental refresh completed successfully")
     except Exception as e:
-        current_app.logger.error(f"Incremental refresh failed: {str(e)}")
+        current_app.logger.error(f"Incremental refresh failed: {str(e)}", exc_info=True)
         session.rollback()
+        raise
     finally:
         session.close()
+        current_app.logger.debug("Incremental refresh session closed")
