@@ -152,6 +152,64 @@ def update_seed_data(session, seeds):
             current_app.logger.error(f"Failed to update seed {seed.get('rental_class_id')}: {str(e)}", exc_info=True)
             raise
 
+@refresh_bp.route('/clear_api_data', methods=['POST'])
+def clear_api_data():
+    try:
+        current_app.logger.info("Clearing API-sourced data from database")
+        
+        # Clear API-sourced tables: id_item_master and id_transactions
+        deleted_items = db.session.query(ItemMaster).delete()
+        deleted_transactions = db.session.query(Transaction).delete()
+        
+        # Do NOT clear rental_class_mappings or refresh_state
+        current_app.logger.info(f"Deleted {deleted_items} items from id_item_master")
+        current_app.logger.info(f"Deleted {deleted_transactions} transactions from id_transactions")
+        
+        # Trigger a full refresh to repopulate with fresh data
+        current_app.logger.info("Starting full refresh after clearing API data")
+        client = APIClient()
+        current_app.logger.info("Fetching item master data")
+        items = client.get_item_master()
+        current_app.logger.info(f"Fetched {len(items)} items from item master")
+        current_app.logger.debug(f"Item master sample: {items[:5] if items else 'No items'}")
+        
+        current_app.logger.info("Fetching transactions data")
+        transactions = client.get_transactions()
+        current_app.logger.info(f"Fetched {len(transactions)} transactions")
+        current_app.logger.debug(f"Transactions sample: {transactions[:5] if transactions else 'No transactions'}")
+        
+        current_app.logger.info("Fetching seed data")
+        seeds = client.get_seed_data()
+        current_app.logger.info(f"Fetched {len(seeds)} seeds")
+        current_app.logger.debug(f"Seed data sample: {seeds[:5] if seeds else 'No seeds'}")
+        
+        current_app.logger.info("Cleaning duplicates from database")
+        clean_duplicates(db.session)
+        
+        current_app.logger.info("Updating database with fresh API data")
+        update_item_master(db.session, items)
+        update_transactions(db.session, transactions)
+        update_seed_data(db.session, seeds)
+        
+        state = db.session.query(RefreshState).first()
+        if not state:
+            state = RefreshState(last_refresh=datetime.utcnow().isoformat())
+            db.session.add(state)
+        else:
+            state.last_refresh = datetime.utcnow().isoformat()
+        
+        db.session.commit()
+        cache.clear()
+        current_app.logger.info("Clear API data and full refresh completed successfully")
+        return jsonify({'status': 'success', 'message': 'API data cleared and refreshed successfully'})
+    except Exception as e:
+        current_app.logger.error(f"Clear API data and refresh failed: {str(e)}\nTraceback: {traceback.format_exc()}")
+        db.session.rollback()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+    finally:
+        db.session.remove()
+        current_app.logger.debug("Clear API data session closed")
+
 @refresh_bp.route('/full_refresh', methods=['POST'])
 def full_refresh():
     try:
@@ -213,7 +271,7 @@ def incremental_refresh():
         
         update_item_master(db.session, items)
         update_transactions(db.session, transactions)
-        update_seed_data(db.session, seeds)  # Fixed typo: was passing transactions instead of seeds
+        update_seed_data(db.session, seeds)
         
         if state:
             state.last_refresh = datetime.utcnow().isoformat()
