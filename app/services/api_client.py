@@ -77,17 +77,28 @@ class APIClient:
     def get_item_master(self, since_date=None):
         params = {}
         if since_date:
-            # If since_date is provided, use it directly
             since_date = datetime.fromisoformat(since_date).strftime('%Y-%m-%d %H:%M:%S') if isinstance(since_date, str) else since_date.strftime('%Y-%m-%d %H:%M:%S')
         else:
-            # Use current time minus 30 seconds for incremental refresh (matches scheduler interval)
             since_date = (datetime.now() - timedelta(seconds=30)).strftime('%Y-%m-%d %H:%M:%S')
         logger.debug(f"Item master filter since_date: {since_date}")
-        # Use quoted date format as confirmed by user test
-        filter_str = f"date_last_scanned,gt,'{since_date}'"
+        # Try alternative field name: dateLastScanned
+        filter_str = f"dateLastScanned,gt,'{since_date}'"
         logger.debug(f"Constructed filter string: {filter_str}")
         params['filter[]'] = filter_str
-        return self._make_request("14223767938169344381", params)
+        
+        try:
+            data = self._make_request("14223767938169344381", params)
+        except Exception as e:
+            logger.warning(f"Filter failed: {str(e)}. Fetching all data and filtering locally.")
+            # Fallback: Fetch all data and filter locally
+            data = self._make_request("14223767938169344381")
+            if since_date:
+                since_dt = datetime.strptime(since_date, '%Y-%m-%d %H:%M:%S')
+                data = [
+                    item for item in data
+                    if item.get('date_last_scanned') and datetime.strptime(item['date_last_scanned'], '%Y-%m-%d %H:%M:%S') > since_dt
+                ]
+        return data
 
     def get_transactions(self, since_date=None):
         params = {}
