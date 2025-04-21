@@ -181,8 +181,8 @@ def common_names(tab_num):
         ).join(
             RentalClassMapping, RentalClassMapping.rental_class_id == ItemMaster.rental_class_num
         ).filter(
-            RentalClassMapping.category == category,
-            RentalClassMapping.subcategory == subcategory
+            func.lower(RentalClassMapping.category) == func.lower(category),
+            func.lower(RentalClassMapping.subcategory) == func.lower(subcategory)
         ).group_by(
             ItemMaster.common_name
         ).all()

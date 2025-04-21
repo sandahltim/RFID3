@@ -1,8 +1,8 @@
 // expand.js - Handles category expansion for RFID Dashboard
 // Module Purpose: Expands categories to show subcategories and common names on the tab page
-// Version: 2025-04-20 v4 - Added common name aggregation layer
+// Version: 2025-04-20 v5 - Fixed category case for common names fetch
 
-console.log('expand.js version: 2025-04-20 v4 loaded');
+console.log('expand.js version: 2025-04-20 v5 loaded');
 
 // --- Loading Indicator Functions ---
 function showLoading(key) {
@@ -59,8 +59,12 @@ function hideOtherCommonNames(currentSubcategoryId) {
 
 // --- Render Common Names Data ---
 function loadCommonNames(category, subcategory, targetId) {
-    console.log('loadCommonNames called with category:', category, 'subcategory:', subcategory, 'targetId:', targetId);
-    const url = '/tab/' + window.cachedTabNum + '/common_names?category=' + encodeURIComponent(category) + '&subcategory=' + encodeURIComponent(subcategory);
+    // Decode and reformat category to match database (title case with spaces)
+    const decodedCategory = decodeURIComponent(category).replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+    const decodedSubcategory = decodeURIComponent(subcategory);
+    console.log('loadCommonNames called with category:', decodedCategory, 'subcategory:', decodedSubcategory, 'targetId:', targetId);
+    
+    const url = '/tab/' + window.cachedTabNum + '/common_names?category=' + encodeURIComponent(decodedCategory) + '&subcategory=' + encodeURIComponent(decodedSubcategory);
     const container = document.getElementById(targetId);
     if (!container) {
         console.error('Common names container not found for ID:', targetId);
