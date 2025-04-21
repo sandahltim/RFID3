@@ -18,7 +18,7 @@ def tab2_view():
         contract_data = db.session.query(
             ItemMaster.last_contract_num,
             func.count(ItemMaster.tag_id).label('total_items'),
-            func.max(Transaction.client_name).label('customer_name')  # Get customer name from transactions
+            func.max(Transaction.client_name).label('customer_name')
         ).outerjoin(
             Transaction, Transaction.contract_number == ItemMaster.last_contract_num
         ).filter(
@@ -37,7 +37,7 @@ def tab2_view():
                 'on_contracts': total_items,  # All items are on contracts
                 'in_service': 0,
                 'available': 0,
-                'customer_name': customer_name or 'N/A'  # Include customer name
+                'customer_name': customer_name or 'N/A'
             }
             for contract_num, total_items, customer_name in contract_data
             if contract_num is not None
@@ -142,20 +142,20 @@ def tab2_subcat_data():
             current_app.logger.error("Contract parameter is missing")
             return jsonify({'error': 'Contract parameter is required'}), 400
 
-        # Group by Category under the Contract
+        # Group by Category under the Contract, with a default "Unclassified" category
         subcategories = db.session.query(
-            RentalClassMapping.category,
+            func.coalesce(RentalClassMapping.category, 'Unclassified').label('category'),
             func.count(ItemMaster.tag_id).label('total_items'),
             func.coalesce(func.sum(func.cast(func.lower(ItemMaster.status).in_(['on rent', 'delivered']), db.Integer)), 0).label('on_contracts'),
             func.coalesce(func.sum(func.cast(func.lower(ItemMaster.status).in_(['repair']), db.Integer)), 0).label('in_service')
         ).outerjoin(
-            ItemMaster, RentalClassMapping.rental_class_id == ItemMaster.rental_class_num
+            RentalClassMapping, RentalClassMapping.rental_class_id == ItemMaster.rental_class_num
         ).filter(
             func.lower(ItemMaster.status).in_(['on rent', 'delivered']),
             ItemMaster.last_contract_num == contract_num,
             func.lower(ItemMaster.last_contract_num).notlike('l%')
         ).group_by(
-            RentalClassMapping.category
+            func.coalesce(RentalClassMapping.category, 'Unclassified')
         ).all()
 
         current_app.logger.debug(f"Raw category counts for contract {contract_num}: {subcategories}")
@@ -189,21 +189,39 @@ def tab2_common_names():
 
         current_app.logger.debug(f"Fetching common names for contract: {contract_num}, category: {category}")
 
-        common_names = db.session.query(
-            func.trim(func.upper(ItemMaster.common_name)).label('common_name'),
-            func.count(ItemMaster.tag_id).label('total_items'),
-            func.coalesce(func.sum(func.cast(func.lower(ItemMaster.status).in_(['on rent', 'delivered']), db.Integer)), 0).label('on_contracts'),
-            func.coalesce(func.sum(func.cast(func.lower(ItemMaster.status).in_(['repair']), db.Integer)), 0).label('in_service')
-        ).join(
-            RentalClassMapping, RentalClassMapping.rental_class_id == ItemMaster.rental_class_num
-        ).filter(
-            func.lower(ItemMaster.status).in_(['on rent', 'delivered']),
-            ItemMaster.last_contract_num == contract_num,
-            func.lower(RentalClassMapping.category) == func.lower(category),
-            func.lower(ItemMaster.last_contract_num).notlike('l%')
-        ).group_by(
-            func.trim(func.upper(ItemMaster.common_name))
-        ).all()
+        # Handle the default "Unclassified" category
+        if category == 'Unclassified':
+            common_names = db.session.query(
+                func.trim(func.upper(ItemMaster.common_name)).label('common_name'),
+                func.count(ItemMaster.tag_id).label('total_items'),
+                func.coalesce(func.sum(func.cast(func.lower(ItemMaster.status).in_(['on rent', 'delivered']), db.Integer)), 0).label('on_contracts'),
+                func.coalesce(func.sum(func.cast(func.lower(ItemMaster.status).in_(['repair']), db.Integer)), 0).label('in_service')
+            ).outerjoin(
+                RentalClassMapping, RentalClassMapping.rental_class_id == ItemMaster.rental_class_num
+            ).filter(
+                func.lower(ItemMaster.status).in_(['on rent', 'delivered']),
+                ItemMaster.last_contract_num == contract_num,
+                RentalClassMapping.category.is_(None),
+                func.lower(ItemMaster.last_contract_num).notlike('l%')
+            ).group_by(
+                func.trim(func.upper(ItemMaster.common_name))
+            ).all()
+        else:
+            common_names = db.session.query(
+                func.trim(func.upper(ItemMaster.common_name)).label('common_name'),
+                func.count(ItemMaster.tag_id).label('total_items'),
+                func.coalesce(func.sum(func.cast(func.lower(ItemMaster.status).in_(['on rent', 'delivered']), db.Integer)), 0).label('on_contracts'),
+                func.coalesce(func.sum(func.cast(func.lower(ItemMaster.status).in_(['repair']), db.Integer)), 0).label('in_service')
+            ).join(
+                RentalClassMapping, RentalClassMapping.rental_class_id == ItemMaster.rental_class_num
+            ).filter(
+                func.lower(ItemMaster.status).in_(['on rent', 'delivered']),
+                ItemMaster.last_contract_num == contract_num,
+                func.lower(RentalClassMapping.category) == func.lower(category),
+                func.lower(ItemMaster.last_contract_num).notlike('l%')
+            ).group_by(
+                func.trim(func.upper(ItemMaster.common_name))
+            ).all()
 
         current_app.logger.debug(f"Common names for contract {contract_num}, category {category}: {common_names}")
 
@@ -237,17 +255,31 @@ def tab2_data():
 
         current_app.logger.debug(f"Fetching items for contract {contract_num}, category {category}, common_name {common_name}")
 
-        items = db.session.query(
-            ItemMaster
-        ).join(
-            RentalClassMapping, RentalClassMapping.rental_class_id == ItemMaster.rental_class_num
-        ).filter(
-            func.lower(ItemMaster.status).in_(['on rent', 'delivered']),
-            ItemMaster.last_contract_num == contract_num,
-            func.lower(RentalClassMapping.category) == func.lower(category),
-            func.trim(func.upper(ItemMaster.common_name)) == func.trim(func.upper(common_name)),
-            func.lower(ItemMaster.last_contract_num).notlike('l%')
-        ).all()
+        # Handle the default "Unclassified" category
+        if category == 'Unclassified':
+            items = db.session.query(
+                ItemMaster
+            ).outerjoin(
+                RentalClassMapping, RentalClassMapping.rental_class_id == ItemMaster.rental_class_num
+            ).filter(
+                func.lower(ItemMaster.status).in_(['on rent', 'delivered']),
+                ItemMaster.last_contract_num == contract_num,
+                RentalClassMapping.category.is_(None),
+                func.trim(func.upper(ItemMaster.common_name)) == func.trim(func.upper(common_name)),
+                func.lower(ItemMaster.last_contract_num).notlike('l%')
+            ).all()
+        else:
+            items = db.session.query(
+                ItemMaster
+            ).join(
+                RentalClassMapping, RentalClassMapping.rental_class_id == ItemMaster.rental_class_num
+            ).filter(
+                func.lower(ItemMaster.status).in_(['on rent', 'delivered']),
+                ItemMaster.last_contract_num == contract_num,
+                func.lower(RentalClassMapping.category) == func.lower(category),
+                func.trim(func.upper(ItemMaster.common_name)) == func.trim(func.upper(common_name)),
+                func.lower(ItemMaster.last_contract_num).notlike('l%')
+            ).all()
 
         current_app.logger.debug(f"Items for contract {contract_num}, category {category}, common_name {common_name}: {len(items)} items found")
 
