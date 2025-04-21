@@ -1,17 +1,39 @@
+/* style.css - Custom styles for RFID Dashboard */
 body {
     font-family: Arial, sans-serif;
 }
 
-.table-responsive {
-    overflow-x: auto;
+/* Ensure consistent table styling */
+.table {
+    width: 100%;
+    margin-bottom: 1rem;
 }
+
+/* Adjust margins for nested tables */
+.ms-3 {
+    margin-left: 1rem; /* Subcategory tables */
+}
+
+.ms-4 {
+    margin-left: 2rem; /* Common name and item tables */
+}
+
+/* Ensure buttons are aligned */
+.btn-group {
+    display: flex;
+    gap: 0.5rem;
+}
+
+/* Loading indicator styling */
 .loading {
     color: #888;
     font-style: italic;
+    margin-left: 0.5rem;
 }
-/* Ensure table cells have enough width to display content */
+
+/* Ensure nested tables don't overflow */
 .table-bordered th,
 .table-bordered td {
-    min-width: 150px; /* Adjust as needed */
-    white-space: nowrap; /* Prevent text wrapping */
+    border: 1px solid #dee2e6;
+    padding: 0.5rem;
 }

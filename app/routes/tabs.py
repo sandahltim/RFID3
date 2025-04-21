@@ -113,7 +113,7 @@ def tab_categories(tab_num):
                     <td>{category['available']}</td>
                     <td>
                         <button class="btn btn-sm btn-secondary" onclick="expandCategory('{encoded_category}', 'subcat-{cat_id}')">Expand</button>
-                        <button id="print-btn-{cat_id}" class="btn btn-sm btn-info print-btn" data-print-level="Category" data-print-id="category-table">Print</button>
+                        <button class="btn btn-sm btn-info print-btn" data-print-level="Category" data-print-id="category-table">Print</button>
                         <div id="loading-{cat_id}" style="display:none;" class="loading">Loading...</div>
                     </td>
                 </tr>
@@ -173,8 +173,9 @@ def common_names(tab_num):
         if not category or not subcategory:
             return jsonify({'error': 'Category and subcategory parameters are required'}), 400
 
+        # Normalize common_name by trimming whitespace and converting to uppercase
         common_names = db.session.query(
-            ItemMaster.common_name,
+            func.trim(func.upper(ItemMaster.common_name)).label('common_name'),
             func.count(ItemMaster.tag_id).label('total_items'),
             func.coalesce(func.sum(func.cast(func.lower(ItemMaster.status).in_(['on rent', 'delivered']), db.Integer)), 0).label('on_contracts'),
             func.coalesce(func.sum(func.cast(func.lower(ItemMaster.status).in_(['repair']), db.Integer)), 0).label('in_service')
@@ -184,7 +185,7 @@ def common_names(tab_num):
             func.lower(RentalClassMapping.category) == func.lower(category),
             func.lower(RentalClassMapping.subcategory) == func.lower(subcategory)
         ).group_by(
-            ItemMaster.common_name
+            func.trim(func.upper(ItemMaster.common_name))
         ).all()
 
         current_app.logger.debug(f"Common names for category {category}, subcategory {subcategory}: {common_names}")
@@ -224,7 +225,7 @@ def tab_data(tab_num):
         ).filter(
             RentalClassMapping.category == category,
             RentalClassMapping.subcategory == subcategory,
-            ItemMaster.common_name == common_name
+            func.trim(func.upper(ItemMaster.common_name)) == func.trim(func.upper(common_name))
         ).all()
 
         current_app.logger.debug(f"Items for category {category}, subcategory {subcategory}, common_name {common_name}: {len(items)} items found")

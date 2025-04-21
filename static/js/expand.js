@@ -1,8 +1,8 @@
 // expand.js - Handles category expansion for RFID Dashboard
-// Module Purpose: Expands categories to show subcategories and common names on the tab page
-// Version: 2025-04-20 v6 - Fixed category passing for common names fetch
+// Module Purpose: Expands categories to show subcategories, common names, and individual items on the tab page
+// Version: 2025-04-20 v7 - Added individual items expansion layer and print buttons
 
-console.log('expand.js version: 2025-04-20 v6 loaded');
+console.log('expand.js version: 2025-04-20 v7 loaded');
 
 // --- Loading Indicator Functions ---
 function showLoading(key) {
@@ -57,6 +57,110 @@ function hideOtherCommonNames(currentSubcategoryId) {
     });
 }
 
+// --- Individual Items Display Management ---
+function hideOtherItems(currentCommonId) {
+    console.log('hideOtherItems called with currentCommonId:', currentCommonId);
+    const allItemDivs = document.querySelectorAll('div[id^="items-"]');
+    console.log('Found item divs:', allItemDivs.length);
+    allItemDivs.forEach(div => {
+        console.log('Item div ID:', div.id);
+        if (div.id !== 'items-' + currentCommonId) {
+            console.log('Hiding item div:', div.id);
+            div.style.display = 'none';
+            div.innerHTML = '';  // Clear content to prevent bleed-over
+        }
+    });
+}
+
+// --- Render Individual Items Data ---
+function loadItems(category, subcategory, commonName, targetId) {
+    const decodedCategory = decodeURIComponent(category);
+    const decodedSubcategory = decodeURIComponent(subcategory);
+    const decodedCommonName = decodeURIComponent(commonName);
+    console.log('loadItems called with category:', decodedCategory, 'subcategory:', decodedSubcategory, 'commonName:', decodedCommonName, 'targetId:', targetId);
+    
+    const url = '/tab/' + window.cachedTabNum + '/data?category=' + encodeURIComponent(decodedCategory) + '&subcategory=' + encodeURIComponent(decodedSubcategory) + '&common_name=' + encodeURIComponent(decodedCommonName);
+    const container = document.getElementById(targetId);
+    if (!container) {
+        console.error('Items container not found for ID:', targetId);
+        return;
+    }
+
+    showLoading(targetId.replace('items-', '')); // Show loading indicator
+
+    fetch(url, {
+        method: 'GET',
+        headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+        }
+    })
+        .then(response => {
+            console.log('Fetch finished loading: GET "' + url + '"');
+            if (!response.ok) {
+                throw new Error('Items fetch failed with status ' + response.status);
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log('Items data received:', data);
+            container.style.display = 'block';
+
+            let html = '';
+            if (data && Array.isArray(data)) {
+                hideOtherItems(targetId.replace('items-', ''));
+                html += [
+                    '<table class="table table-bordered ms-4 mt-2" id="items-table-' + targetId.replace('items-', '') + '">',
+                        '<thead>',
+                            '<tr>',
+                                '<th>Tag ID</th>',
+                                '<th>Common Name</th>',
+                                '<th>Bin Location</th>',
+                                '<th>Status</th>',
+                                '<th>Last Contract</th>',
+                                '<th>Last Scanned</th>',
+                                '<th>Quality</th>',
+                                '<th>Notes</th>',
+                            '</tr>',
+                        '</thead>',
+                        '<tbody>'
+                ].join('');
+                
+                data.forEach(item => {
+                    html += [
+                        '<tr>',
+                            '<td>' + (item.tag_id || 'N/A') + '</td>',
+                            '<td>' + (item.common_name || 'N/A') + '</td>',
+                            '<td>' + (item.bin_location || 'N/A') + '</td>',
+                            '<td>' + (item.status || 'N/A') + '</td>',
+                            '<td>' + (item.last_contract_num || 'N/A') + '</td>',
+                            '<td>' + (item.last_scanned_date || 'N/A') + '</td>',
+                            '<td>' + (item.quality || 'N/A') + '</td>',
+                            '<td>' + (item.notes || 'N/A') + '</td>',
+                        '</tr>'
+                    ].join('');
+                });
+
+                html += [
+                    '</tbody>',
+                    '</table>'
+                ].join('');
+            } else {
+                html = '<p class="ms-4">No items found.</p>';
+            }
+
+            container.innerHTML = html;
+            console.log('Items table rendered into container');
+        })
+        .catch(error => {
+            console.error('Items fetch error:', error);
+            container.innerHTML = '<p class="ms-4 text-danger">Error loading items.</p>';
+        })
+        .finally(() => {
+            hideLoading(targetId.replace('items-', ''));
+        });
+}
+
 // --- Render Common Names Data ---
 function loadCommonNames(category, subcategory, targetId) {
     const decodedCategory = decodeURIComponent(category);
@@ -92,9 +196,10 @@ function loadCommonNames(category, subcategory, targetId) {
 
             let html = '';
             if (data.common_names && Array.isArray(data.common_names)) {
-                hideOtherCommonNames(targetId.replace('common-', ''));
+                hideOtherCommonNames(targetBaseId);
                 data.common_names.forEach(cn => {
-                    const cnId = targetId.replace('common-', '') + '_' + cn.name.toLowerCase().replace(/[^a-z0-9-]/g, '_');
+                    const targetBaseId = targetId.replace('common-', '');
+                    const cnId = targetBaseId + '_' + cn.name.toLowerCase().replace(/[^a-z0-9-]/g, '_');
                     html += [
                         '<table class="table table-bordered ms-3 mt-2" id="common-table-' + cnId + '">',
                             '<thead>',
@@ -104,6 +209,7 @@ function loadCommonNames(category, subcategory, targetId) {
                                     '<th>Items on Contracts</th>',
                                     '<th>Items in Service</th>',
                                     '<th>Items Available</th>',
+                                    '<th>Actions</th>',
                                 '</tr>',
                             '</thead>',
                             '<tbody>',
@@ -113,6 +219,16 @@ function loadCommonNames(category, subcategory, targetId) {
                                     '<td>' + (cn.on_contracts !== undefined ? cn.on_contracts : 'N/A') + '</td>',
                                     '<td>' + (cn.in_service !== undefined ? cn.in_service : 'N/A') + '</td>',
                                     '<td>' + (cn.available !== undefined ? cn.available : 'N/A') + '</td>',
+                                    '<td>',
+                                        '<button class="btn btn-sm btn-secondary" onclick="loadItems(\'' + encodeURIComponent(decodedCategory) + '\', \'' + encodeURIComponent(decodedSubcategory) + '\', \'' + encodeURIComponent(cn.name) + '\', \'items-' + cnId + '\')">Expand</button>',
+                                        '<button class="btn btn-sm btn-info print-btn" data-print-level="Common Name" data-print-id="common-table-' + cnId + '">Print</button>',
+                                        '<div id="loading-' + cnId + '" style="display:none;" class="loading">Loading...</div>',
+                                    '</td>',
+                                '</tr>',
+                                '<tr>',
+                                    '<td colspan="6">',
+                                        '<div id="items-' + cnId + '" style="display:none;"></div>',
+                                    '</td>',
                                 '</tr>',
                             '</tbody>',
                         '</table>'
@@ -174,6 +290,7 @@ function loadSubcatData(originalCategory, normalizedCategory, subcatData) {
                         '<td>' + (sub.available !== undefined ? sub.available : 'N/A') + '</td>',
                         '<td>',
                             '<button class="btn btn-sm btn-secondary" onclick="loadCommonNames(\'' + encodeURIComponent(originalCategory) + '\', \'' + encodeURIComponent(sub.subcategory) + '\', \'common-' + subId + '\')">Load Items</button>',
+                            '<button class="btn btn-sm btn-info print-btn" data-print-level="Subcategory" data-print-id="subcat-table-' + subId + '">Print</button>',
                             '<div id="loading-' + subId + '" style="display:none;" class="loading">Loading...</div>',
                         '</td>',
                     '</tr>',
