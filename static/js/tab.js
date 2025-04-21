@@ -1,5 +1,5 @@
 // tab.js - Handles tab functionality for RFID Dashboard
-// Version: 2025-04-20 v3 - Added event delegation for print buttons
+// Version: 2025-04-21 v4 - Fixed tab number detection using URL path
 
 console.log('tab.js loaded, cachedTabNum:', window.cachedTabNum);
 
@@ -88,24 +88,18 @@ function printTable(level, id) {
 document.addEventListener('DOMContentLoaded', () => {
     console.log('Document loaded, initializing script');
 
-    // Extract tab number from h1 element
+    // Extract tab number from URL path
     let tabNum;
-    const h1 = document.querySelector('h1');
-    if (h1) {
-        const match = h1.textContent.match(/Tab (\d+)/);
-        if (match) {
-            tabNum = parseInt(match[1], 10);
-            console.log('Extracted tab number:', tabNum);
-        } else if (window.location.pathname === '/') {
-            console.log('Homepage detected, defaulting tab number to 1');
-            tabNum = 1; // Default for homepage
-        } else {
-            console.warn('No tab number found in h1 element, using default tab number 1.');
-            tabNum = 1; // Default if not found
-        }
+    const pathMatch = window.location.pathname.match(/\/tab\/(\d+)/);
+    if (pathMatch) {
+        tabNum = parseInt(pathMatch[1], 10);
+        console.log('Extracted tab number from URL:', tabNum);
+    } else if (window.location.pathname === '/') {
+        console.log('Homepage detected, defaulting tab number to 1');
+        tabNum = 1; // Default for homepage
     } else {
-        console.warn('No h1 element found, using default tab number 1.');
-        tabNum = 1;
+        console.warn('No tab number found in URL, using default tab number 1.');
+        tabNum = 1; // Default if not found
     }
 
     window.cachedTabNum = tabNum;
@@ -137,7 +131,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 const text = Array.from(row.children).map(cell => cell.textContent.toLowerCase()).join(' ');
                 const categoryCell = row.querySelector('td:first-child') ? row.querySelector('td:first-child').textContent.toLowerCase() : '';
                 const statusCell = row.querySelector('td:nth-child(4)') ? row.querySelector('td:nth-child(4)').textContent.toLowerCase() : '';
-                const binLocationCell = row.querySelector('td:nth-child(3)') ? row.querySelector('td:nth-child(3)').textContent.toLowerCase() : '';
+                const binLocationCell = row.querySelector('td:nth-child(3)')
+                    ? row.querySelector('td:nth-child(3)').textContent.toLowerCase()
+                    : row.querySelector('td:nth-child(2)')  // Adjust for Tab 2 with Customer Name
+                      ? row.querySelector('td:nth-child(2)').textContent.toLowerCase()
+                      : '';
 
                 const matchesText = text.includes(textQuery);
                 const matchesCategory = !categoryFilter || categoryCell.includes(categoryFilter);

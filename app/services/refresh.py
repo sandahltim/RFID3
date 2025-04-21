@@ -4,7 +4,6 @@ from app.models.db_models import ItemMaster, Transaction, RentalClassMapping, Re
 from app.services.api_client import APIClient
 from app import db, cache
 from datetime import datetime
-from sqlalchemy.orm import Session
 
 refresh_bp = Blueprint('refresh', __name__)
 
@@ -115,12 +114,10 @@ def update_seed_data(session, seeds):
     for seed in seeds:
         try:
             rental_class_id = seed.get('rental_class_id')
-            date_updated = parse_date(seed.get('date_updated'))
             session.merge(RentalClassMapping(
                 rental_class_id=rental_class_id,
                 category=seed.get('category'),
-                subcategory=seed.get('subcategory'),
-                date_updated=date_updated
+                subcategory=seed.get('subcategory')
             ))
         except Exception as e:
             current_app.logger.error(f"Failed to update seed {seed.get('rental_class_id')}: {str(e)}")
@@ -129,7 +126,7 @@ def update_seed_data(session, seeds):
 @refresh_bp.route('/full_refresh', methods=['POST'])
 def full_refresh():
     # Create a new session for this request
-    session = Session(bind=db.engine)
+    session = db.Session()
     try:
         current_app.logger.info("Starting full refresh")
         client = APIClient()
@@ -163,11 +160,12 @@ def full_refresh():
         return jsonify({'status': 'error', 'message': str(e)}), 500
     finally:
         session.close()
+        db.session.remove()  # Ensure session is fully removed
         current_app.logger.debug("Full refresh session closed")
 
 def incremental_refresh():
     # Create a new session for this background task
-    session = Session(bind=db.engine)
+    session = db.Session()
     try:
         current_app.logger.info("Starting incremental refresh")
 
@@ -199,4 +197,5 @@ def incremental_refresh():
         raise
     finally:
         session.close()
+        db.session.remove()  # Ensure session is fully removed
         current_app.logger.debug("Incremental refresh session closed")
