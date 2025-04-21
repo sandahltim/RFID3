@@ -4,9 +4,13 @@ from datetime import datetime, timedelta
 from config import API_USERNAME, API_PASSWORD, LOGIN_URL, ITEM_MASTER_URL, TRANSACTION_URL, SEED_URL
 import logging
 from urllib.parse import quote
+import os
+import getpass
 
 logging.basicConfig(level=logging.DEBUG, filename='/home/tim/test_rfidpi/sync.log', filemode='a')
 logger = logging.getLogger(__name__)
+logger.debug("Logger initialized at startup")
+logger.debug(f"Running as user: {getpass.getuser()}, group: {os.getegid()}")
 
 class APIClient:
     def __init__(self):
