@@ -4,7 +4,7 @@ from app.models.db_models import ItemMaster, Transaction, RentalClassMapping, Re
 from app.services.api_client import APIClient
 from app import db, cache
 from datetime import datetime
-from sqlalchemy import func  # Import func
+from sqlalchemy import func
 import traceback
 
 refresh_bp = Blueprint('refresh', __name__)
@@ -23,7 +23,7 @@ def clean_duplicates(session):
     """Remove duplicate tag_id entries from id_item_master, keeping the most recent."""
     current_app.logger.info("Cleaning duplicates from id_item_master")
     try:
-        # Identify duplicates and keep the most recent entry
+        # Subquery to find tag_ids with duplicates and their most recent date_updated
         subquery = session.query(
             ItemMaster.tag_id,
             func.max(ItemMaster.date_updated).label('max_date_updated')
@@ -33,13 +33,12 @@ def clean_duplicates(session):
             func.count(ItemMaster.tag_id) > 1
         ).subquery()
 
-        # Delete older duplicates
-        delete_query = session.query(ItemMaster).join(
-            subquery,
-            (ItemMaster.tag_id == subquery.c.tag_id) &
-            (ItemMaster.date_updated != subquery.c.max_date_updated)
-        )
-        deleted_count = delete_query.delete(synchronize_session=False)
+        # Delete duplicates, keeping the row with the most recent date_updated
+        deleted_count = session.query(ItemMaster).filter(
+            ItemMaster.tag_id.in_(session.query(subquery.c.tag_id)),
+            ItemMaster.date_updated != subquery.c.max_date_updated
+        ).delete(synchronize_session=False)
+
         session.commit()
         current_app.logger.info(f"Removed {deleted_count} duplicate items from id_item_master")
     except Exception as e:
@@ -51,6 +50,11 @@ def update_item_master(session, items):
     current_app.logger.info(f"Updating {len(items)} items in id_item_master")
     for item in items:
         try:
+            # Skip items with suspicious tag_ids
+            tag_id = item.get('tag_id')
+            if tag_id and tag_id.startswith('7070'):
+                current_app.logger.warning(f"Skipping item with suspicious tag_id: {tag_id}")
+                continue
             # Convert empty strings to None for DECIMAL fields
             longitude = item.get('long') if item.get('long') else None
             latitude = item.get('lat') if item.get('lat') else None
@@ -59,7 +63,7 @@ def update_item_master(session, items):
             date_created = parse_date(item.get('date_created'))
             date_updated = parse_date(item.get('date_updated'))
             session.merge(ItemMaster(
-                tag_id=item.get('tag_id'),
+                tag_id=tag_id,
                 uuid_accounts_fk=item.get('uuid_accounts_fk'),
                 serial_number=item.get('serial_number'),
                 client_name=item.get('client_name'),
@@ -90,6 +94,11 @@ def update_transactions(session, transactions):
             if not all([trans.get('tag_id'), trans.get('common_name'), trans.get('scan_date')]):
                 current_app.logger.warning(f"Skipping transaction with tag_id {trans.get('tag_id')} due to missing required fields")
                 continue
+            # Skip transactions with suspicious tag_ids
+            tag_id = trans.get('tag_id')
+            if tag_id and tag_id.startswith('7070'):
+                current_app.logger.warning(f"Skipping transaction with suspicious tag_id: {tag_id}")
+                continue
             # Convert empty strings to None for DECIMAL fields
             longitude = trans.get('long') if trans.get('long') else None
             latitude = trans.get('lat') if trans.get('lat') else None
@@ -102,7 +111,7 @@ def update_transactions(session, transactions):
                 continue
             session.merge(Transaction(
                 contract_number=trans.get('contract_number'),
-                tag_id=trans.get('tag_id'),
+                tag_id=tag_id,
                 scan_type=trans.get('scan_type'),
                 scan_date=scan_date,
                 client_name=trans.get('client_name'),
@@ -173,16 +182,22 @@ def clear_api_data():
         items = client.get_item_master()
         current_app.logger.info(f"Fetched {len(items)} items from item master")
         current_app.logger.debug(f"Item master sample: {items[:5] if items else 'No items'}")
+        if not items:
+            current_app.logger.warning("No items fetched from item master API. Check API endpoint or authentication.")
         
         current_app.logger.info("Fetching transactions data")
         transactions = client.get_transactions()
         current_app.logger.info(f"Fetched {len(transactions)} transactions")
         current_app.logger.debug(f"Transactions sample: {transactions[:5] if transactions else 'No transactions'}")
+        if not transactions:
+            current_app.logger.warning("No transactions fetched from transactions API. Check API endpoint or authentication.")
         
         current_app.logger.info("Fetching seed data")
         seeds = client.get_seed_data()
         current_app.logger.info(f"Fetched {len(seeds)} seeds")
         current_app.logger.debug(f"Seed data sample: {seeds[:5] if seeds else 'No seeds'}")
+        if not seeds:
+            current_app.logger.warning("No seeds fetched from seed API. Check API endpoint or authentication.")
         
         current_app.logger.info("Cleaning duplicates from database")
         clean_duplicates(db.session)
@@ -220,16 +235,22 @@ def full_refresh():
         items = client.get_item_master()
         current_app.logger.info(f"Fetched {len(items)} items from item master")
         current_app.logger.debug(f"Item master sample: {items[:5] if items else 'No items'}")
+        if not items:
+            current_app.logger.warning("No items fetched from item master API. Check API endpoint or authentication.")
         
         current_app.logger.info("Fetching transactions data")
         transactions = client.get_transactions()
         current_app.logger.info(f"Fetched {len(transactions)} transactions")
         current_app.logger.debug(f"Transactions sample: {transactions[:5] if transactions else 'No transactions'}")
+        if not transactions:
+            current_app.logger.warning("No transactions fetched from transactions API. Check API endpoint or authentication.")
         
         current_app.logger.info("Fetching seed data")
         seeds = client.get_seed_data()
         current_app.logger.info(f"Fetched {len(seeds)} seeds")
         current_app.logger.debug(f"Seed data sample: {seeds[:5] if seeds else 'No seeds'}")
+        if not seeds:
+            current_app.logger.warning("No seeds fetched from seed API. Check API endpoint or authentication.")
         
         current_app.logger.info("Cleaning duplicates from database")
         clean_duplicates(db.session)
@@ -266,9 +287,26 @@ def incremental_refresh():
         since_date = state.last_refresh if state else None
         
         client = APIClient()
+        current_app.logger.info(f"Fetching item master data with since_date: {since_date}")
         items = client.get_item_master(since_date)
+        current_app.logger.info(f"Fetched {len(items)} items from item master")
+        current_app.logger.debug(f"Item master sample: {items[:5] if items else 'No items'}")
+        if not items:
+            current_app.logger.warning("No items fetched from item master API. Check API endpoint or authentication.")
+        
+        current_app.logger.info(f"Fetching transactions data with since_date: {since_date}")
         transactions = client.get_transactions(since_date)
+        current_app.logger.info(f"Fetched {len(transactions)} transactions")
+        current_app.logger.debug(f"Transactions sample: {transactions[:5] if transactions else 'No transactions'}")
+        if not transactions:
+            current_app.logger.warning("No transactions fetched from transactions API. Check API endpoint or authentication.")
+        
+        current_app.logger.info(f"Fetching seed data with since_date: {since_date}")
         seeds = client.get_seed_data(since_date)
+        current_app.logger.info(f"Fetched {len(seeds)} seeds")
+        current_app.logger.debug(f"Seed data sample: {seeds[:5] if seeds else 'No seeds'}")
+        if not seeds:
+            current_app.logger.warning("No seeds fetched from seed API. Check API endpoint or authentication.")
         
         update_item_master(db.session, items)
         update_transactions(db.session, transactions)
