@@ -1,8 +1,8 @@
 // expand.js - Handles category expansion for RFID Dashboard
 // Module Purpose: Expands categories to show subcategories and common names on the tab page
-// Version: 2025-04-20 v5 - Fixed category case for common names fetch
+// Version: 2025-04-20 v6 - Fixed category passing for common names fetch
 
-console.log('expand.js version: 2025-04-20 v5 loaded');
+console.log('expand.js version: 2025-04-20 v6 loaded');
 
 // --- Loading Indicator Functions ---
 function showLoading(key) {
@@ -59,8 +59,7 @@ function hideOtherCommonNames(currentSubcategoryId) {
 
 // --- Render Common Names Data ---
 function loadCommonNames(category, subcategory, targetId) {
-    // Decode and reformat category to match database (title case with spaces)
-    const decodedCategory = decodeURIComponent(category).replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+    const decodedCategory = decodeURIComponent(category);
     const decodedSubcategory = decodeURIComponent(subcategory);
     console.log('loadCommonNames called with category:', decodedCategory, 'subcategory:', decodedSubcategory, 'targetId:', targetId);
     
@@ -136,10 +135,10 @@ function loadCommonNames(category, subcategory, targetId) {
 }
 
 // --- Render Subcategory Data ---
-function loadSubcatData(category, subcatData) {
-    console.log('loadSubcatData called with category:', category, 'subcatData:', subcatData);
-    hideOtherSubcats(category);
-    const containerId = 'subcat-' + category.toLowerCase().replace(/[^a-z0-9-]/g, '_');
+function loadSubcatData(originalCategory, normalizedCategory, subcatData) {
+    console.log('loadSubcatData called with originalCategory:', originalCategory, 'normalizedCategory:', normalizedCategory, 'subcatData:', subcatData);
+    hideOtherSubcats(normalizedCategory);
+    const containerId = 'subcat-' + normalizedCategory.toLowerCase().replace(/[^a-z0-9-]/g, '_');
     console.log('Looking for container with ID:', containerId);
     const container = document.getElementById(containerId);
     if (!container) {
@@ -153,7 +152,7 @@ function loadSubcatData(category, subcatData) {
     
     subcatData.forEach(sub => {
         console.log('Processing subcategory:', sub);
-        const subId = category + '_' + sub.subcategory.toLowerCase().replace(/[^a-z0-9-]/g, '_');
+        const subId = normalizedCategory + '_' + sub.subcategory.toLowerCase().replace(/[^a-z0-9-]/g, '_');
         html += [
             '<table class="table table-bordered mt-2" id="subcat-table-' + subId + '">',
                 '<thead>',
@@ -174,7 +173,7 @@ function loadSubcatData(category, subcatData) {
                         '<td>' + (sub.in_service !== undefined ? sub.in_service : 'N/A') + '</td>',
                         '<td>' + (sub.available !== undefined ? sub.available : 'N/A') + '</td>',
                         '<td>',
-                            '<button class="btn btn-sm btn-secondary" onclick="loadCommonNames(\'' + encodeURIComponent(category) + '\', \'' + encodeURIComponent(sub.subcategory) + '\', \'common-' + subId + '\')">Load Items</button>',
+                            '<button class="btn btn-sm btn-secondary" onclick="loadCommonNames(\'' + encodeURIComponent(originalCategory) + '\', \'' + encodeURIComponent(sub.subcategory) + '\', \'common-' + subId + '\')">Load Items</button>',
                             '<div id="loading-' + subId + '" style="display:none;" class="loading">Loading...</div>',
                         '</td>',
                     '</tr>',
@@ -219,8 +218,9 @@ document.addEventListener('DOMContentLoaded', () => {
             })
             .then(data => {
                 console.log('Subcat data received:', data);
-                const categoryName = targetId.replace('subcat-', '').replace(/\s+/g, '_'); // Normalize spaces to underscores
-                loadSubcatData(categoryName, data);
+                const normalizedCategory = targetId.replace('subcat-', '').replace(/\s+/g, '_'); // Normalize spaces to underscores
+                const originalCategory = decodeURIComponent(category); // Keep the original category name
+                loadSubcatData(originalCategory, normalizedCategory, data);
             })
             .catch(error => {
                 console.error('Subcat fetch error:', error);
