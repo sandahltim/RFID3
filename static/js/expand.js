@@ -1,8 +1,8 @@
 // expand.js - Handles category expansion for RFID Dashboard
 // Module Purpose: Expands categories to show subcategories, common names, and individual items on the tab page
-// Version: 2025-04-21 v8 - Fixed targetBaseId error in loadCommonNames
+// Version: 2025-04-21 v9 - Added smooth transitions for expansions
 
-console.log('expand.js version: 2025-04-21 v8 loaded');
+console.log('expand.js version: 2025-04-21 v9 loaded');
 
 // --- Loading Indicator Functions ---
 function showLoading(key) {
@@ -35,9 +35,9 @@ function hideOtherSubcats(currentCategory) {
     allSubcatDivs.forEach(div => {
         console.log('Subcat div ID:', div.id);
         if (div.id !== 'subcat-' + currentCategory.toLowerCase().replace(/[^a-z0-9-]/g, '_')) {
-            console.log('Hiding subcat div:', div.id);
-            div.style.display = 'none';
-            div.innerHTML = '';  // Clear content to prevent bleed-over
+            console.log('Collapsing subcat div:', div.id);
+            div.classList.remove('expanded');
+            div.classList.add('collapsed');
         }
     });
 }
@@ -50,9 +50,9 @@ function hideOtherCommonNames(currentSubcategoryId) {
     allCommonDivs.forEach(div => {
         console.log('Common name div ID:', div.id);
         if (div.id !== 'common-' + currentSubcategoryId) {
-            console.log('Hiding common name div:', div.id);
-            div.style.display = 'none';
-            div.innerHTML = '';  // Clear content to prevent bleed-over
+            console.log('Collapsing common name div:', div.id);
+            div.classList.remove('expanded');
+            div.classList.add('collapsed');
         }
     });
 }
@@ -65,9 +65,9 @@ function hideOtherItems(currentCommonId) {
     allItemDivs.forEach(div => {
         console.log('Item div ID:', div.id);
         if (div.id !== 'items-' + currentCommonId) {
-            console.log('Hiding item div:', div.id);
-            div.style.display = 'none';
-            div.innerHTML = '';  // Clear content to prevent bleed-over
+            console.log('Collapsing item div:', div.id);
+            div.classList.remove('expanded');
+            div.classList.add('collapsed');
         }
     });
 }
@@ -104,7 +104,9 @@ function loadItems(category, subcategory, commonName, targetId) {
         })
         .then(data => {
             console.log('Items data received:', data);
-            container.style.display = 'block';
+            container.classList.add('expandable');
+            container.classList.remove('collapsed');
+            container.classList.add('expanded');
 
             let html = '';
             if (data && Array.isArray(data)) {
@@ -192,7 +194,9 @@ function loadCommonNames(category, subcategory, targetId) {
         })
         .then(data => {
             console.log('Common names data received:', data);
-            container.style.display = 'block';
+            container.classList.add('expandable');
+            container.classList.remove('collapsed');
+            container.classList.add('expanded');
 
             let html = '';
             if (data.common_names && Array.isArray(data.common_names)) {
@@ -227,7 +231,7 @@ function loadCommonNames(category, subcategory, targetId) {
                                 '</tr>',
                                 '<tr>',
                                     '<td colspan="6">',
-                                        '<div id="items-' + cnId + '" style="display:none;"></div>',
+                                        '<div id="items-' + cnId + '" class="expandable collapsed"></div>',
                                     '</td>',
                                 '</tr>',
                             '</tbody>',
@@ -262,8 +266,9 @@ function loadSubcatData(originalCategory, normalizedCategory, subcatData) {
         return;
     }
     console.log('Container found:', container);
-    container.innerHTML = '';
-    container.style.display = 'block';
+    container.classList.add('expandable');
+    container.classList.remove('collapsed');
+    container.classList.add('expanded');
     let html = '<div class="ms-3">';
     
     subcatData.forEach(sub => {
@@ -296,7 +301,7 @@ function loadSubcatData(originalCategory, normalizedCategory, subcatData) {
                     '</tr>',
                     '<tr>',
                         '<td colspan="6">',
-                            '<div id="common-' + subId + '" style="display:none;"></div>',
+                            '<div id="common-' + subId + '" class="expandable collapsed"></div>',
                         '</td>',
                     '</tr>',
                 '</tbody>',

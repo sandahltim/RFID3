@@ -6,7 +6,9 @@ body {
 /* Ensure consistent table styling */
 .table {
     width: 100%;
+    max-width: 100%;
     margin-bottom: 1rem;
+    border-collapse: collapse;
 }
 
 /* Adjust margins for nested tables */
@@ -36,4 +38,22 @@ body {
 .table-bordered td {
     border: 1px solid #dee2e6;
     padding: 0.5rem;
+    text-align: left;
+    white-space: nowrap; /* Prevent text wrapping */
+}
+
+/* Smooth transition for expanding/collapsing */
+.expandable {
+    transition: max-height 0.3s ease, opacity 0.3s ease;
+    overflow: hidden;
+}
+
+.expandable.collapsed {
+    max-height: 0;
+    opacity: 0;
+}
+
+.expandable.expanded {
+    max-height: 1000px; /* Adjust based on content */
+    opacity: 1;
 }
