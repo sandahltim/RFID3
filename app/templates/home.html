@@ -36,6 +36,35 @@
             button.innerText = 'Full Refresh';
         });
     }
+
+    function triggerClearAndRefresh() {
+        const button = document.getElementById('clear-refresh-btn');
+        button.disabled = true;
+        button.innerText = 'Clearing and Refreshing...';
+        
+        fetch('/clear_api_data', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                alert(data.message);
+            } else {
+                alert('Error: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error during clear and refresh:', error);
+            alert('Failed to clear API data and refresh');
+        })
+        .finally(() => {
+            button.disabled = false;
+            button.innerText = 'Clear API Data and Refresh';
+        });
+    }
 </script>
 {% endblock %}
 
@@ -47,6 +76,7 @@
     <div class="row mb-3">
         <div class="col-md-12">
             <button id="full-refresh-btn" class="btn btn-primary" onclick="triggerFullRefresh()">Full Refresh</button>
+            <button id="clear-refresh-btn" class="btn btn-warning ml-2" onclick="triggerClearAndRefresh()">Clear API Data and Refresh</button>
         </div>
     </div>
     <div class="row">
