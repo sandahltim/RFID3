@@ -66,7 +66,7 @@ def create_app():
     app.register_blueprint(health_bp)
 
     # Initialize scheduler
-    from app.services.refresh import init_scheduler
+    from app.services.scheduler import init_scheduler
     with app.app_context():
         app.logger.info("Initializing scheduler")
         init_scheduler(app)

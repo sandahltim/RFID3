@@ -1,5 +1,8 @@
 // expand.js - Handles category expansion for RFID Dashboard
 // Module Purpose: Expands categories to show subcategories on the tab page
+// Version: 2025-04-20 v3 - Added detailed logging and space normalization
+
+console.log('expand.js version: 2025-04-20 v3 loaded');
 
 // --- Loading Indicator Functions ---
 function showLoading(key) {
