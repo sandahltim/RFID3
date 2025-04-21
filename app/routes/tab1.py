@@ -4,6 +4,7 @@ from ..models.db_models import ItemMaster, RentalClassMapping
 from sqlalchemy import func
 from urllib.parse import quote
 import re
+import time  # Add this import
 
 tab1_bp = Blueprint('tab1', __name__)
 
@@ -64,8 +65,8 @@ def tab1_view():
             categories=categories,
             bin_locations=bin_locations,
             statuses=statuses,
-            cache_bust=int(time()),
-            timestamp=lambda: int(time())
+            cache_bust=int(time.time()),
+            timestamp=lambda: int(time.time())
         )
     except Exception as e:
         current_app.logger.error(f"Error loading tab 1: {str(e)}", exc_info=True)
