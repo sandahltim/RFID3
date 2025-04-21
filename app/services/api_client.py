@@ -77,13 +77,14 @@ class APIClient:
 
     def get_item_master(self, since_date=None):
         params = {}
-        if since_date:
-            since_date = datetime.fromisoformat(since_date).strftime('%Y-%m-%d %H:%M:%S')
-            logger.debug(f"Item master filter since_date: {since_date}")
-            # Try alternative filter syntax without quotes
-            filter_str = f"date_last_scanned,gt,{since_date}"
-            logger.debug(f"Constructed filter string: {filter_str}")
-            params['filter[]'] = filter_str
+        # Temporarily remove filter due to 'Invalid filter parameters' error
+        # Revisit after testing alternative syntaxes
+        # if since_date:
+        #     since_date = datetime.fromisoformat(since_date).strftime('%Y-%m-%d %H:%M:%S')
+        #     logger.debug(f"Item master filter since_date: {since_date}")
+        #     filter_str = f"date_last_scanned,gt,{since_date}"
+        #     logger.debug(f"Constructed filter string: {filter_str}")
+        #     params['filter[]'] = filter_str
         return self._make_request("14223767938169344381", params)
 
     def get_transactions(self, since_date=None):
