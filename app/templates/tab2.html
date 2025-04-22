@@ -54,35 +54,12 @@
         <tbody id="category-rows" hx-get="/tab/2/categories?cache_bust={{ cache_bust }}" hx-trigger="load, refreshTab">
         </tbody>
     </table>
-
-    <!-- Hand-Counted Items Section -->
-    <!-- Added on 2025-04-21 to display hand-counted items -->
-    <div class="mt-4">
-        <h3>Hand-Counted Items (e.g., Napkins)</h3>
-        <p>Hand-counted items can be added or removed in the Laundry Contracts tab (Tab 4).</p>
-        <!-- Table to display hand-counted items -->
-        <table class="table table-bordered" id="hand-counted-items-table">
-            <thead>
-                <tr>
-                    <th>Contract Number</th>
-                    <th>Item Name</th>
-                    <th>Quantity</th>
-                    <th>Action</th>
-                    <th>Timestamp</th>
-                    <th>User</th>
-                </tr>
-            </thead>
-            <tbody id="hand-counted-items-rows" hx-get="/tab/4/hand_counted_items?cache_bust={{ cache_bust }}" hx-trigger="load, refreshTab">
-            </tbody>
-        </table>
-    </div>
 </div>
 
 <!-- JavaScript for refreshing the table -->
 <script>
 function refreshTab() {
     htmx.trigger('#category-rows', 'refreshTab');
-    htmx.trigger('#hand-counted-items-rows', 'refreshTab');
 }
 </script>
 {% endblock %}
