@@ -16,10 +16,14 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Database connection
-db_url = f"mysql+mysqlconnector://{DB_CONFIG['user']}:{DB_CONFIG['password']}@{DB_CONFIG['host']}/{DB_CONFIG['database']}?charset={DB_CONFIG['charset']}"
-engine = create_engine(db_url)
-Session = sessionmaker(bind=engine)
-session = Session()
+try:
+    db_url = f"mysql+mysqlconnector://{DB_CONFIG['user']}:{DB_CONFIG['password']}@{DB_CONFIG['host']}/{DB_CONFIG['database']}?charset={DB_CONFIG['charset']}"
+    engine = create_engine(db_url)
+    Session = sessionmaker(bind=engine)
+    session = Session()
+except Exception as e:
+    logger.error(f"Failed to connect to the database: {str(e)}")
+    sys.exit(1)
 
 # Data to upsert
 data = [
@@ -337,6 +341,7 @@ try:
 except Exception as e:
     logger.error(f"Error updating rental class mappings: {str(e)}")
     session.rollback()
+    raise
 finally:
     session.close()
     logger.info("Database session closed")
