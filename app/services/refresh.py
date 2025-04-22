@@ -168,12 +168,11 @@ def full_refresh():
         logger.debug("Full refresh session closed")
 
 def incremental_refresh():
-
     logger.info("Starting incremental refresh")
     session = db.session()
     try:
         # Use a since_date for incremental updates (last 30 days for testing)
-        since_date = datetime.utcnow() - timedelta(days=30)
+        since_date = datetime.utcnow() - timedelta(days=30)  # Adjusted to 30 days for testing
         logger.info(f"Fetching item master data with since_date: {since_date}")
         items = api_client.get_item_master(since_date=since_date)
         logger.info(f"Fetched {len(items)} items from item master")
