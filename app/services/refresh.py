@@ -62,8 +62,10 @@ def update_item_master(session, items):
             raise
 
 def update_transactions(session, transactions):
+    # Fixed boolean handling on 2025-04-21 to convert string 'True'/'False' to Python booleans
+    # Fixed loop variable on 2025-04-21: changed 'items' to 'transactions' to resolve NameError
     logger.info(f"Updating {len(transactions)} transactions in id_transactions")
-    for transaction in items:
+    for transaction in transactions:  # Fixed: was incorrectly 'items'
         try:
             tag_id = transaction.get('tag_id')
             scan_date = transaction.get('scan_date')
@@ -117,7 +119,7 @@ def update_transactions(session, transactions):
             db_transaction.longitude = float(longitude) if longitude and longitude.strip() else None
             db_transaction.latitude = float(latitude) if latitude and latitude.strip() else None
             db_transaction.wet = to_bool(transaction.get('wet'))
-            db_transaction.service_required = to_bool(transaction.get('service_required'))
+            db_transaction.service_required = to_bool(transaction.get('service_response'))
             db_transaction.date_created = transaction.get('date_created')
             db_transaction.date_updated = transaction.get('date_updated')
 
