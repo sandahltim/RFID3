@@ -113,16 +113,20 @@ def tab4_view():
 @tab4_bp.route('/tab/4/subcat_data')
 def tab4_subcat_data():
     # Route to fetch subcategory data for a specific laundry contract
-    # Updated to include total items in inventory for each subcategory
+    # Updated to fix Total Items in Inventory and Items on This Contract counts
     try:
         current_app.logger.info("Received request for /tab/4/subcat_data")
         contract_num = request.args.get('category')  # 'category' is the contract number
+        page = int(request.args.get('page', 1))
+        per_page = 20
+        offset = (page - 1) * per_page
+
         if not contract_num:
             current_app.logger.error("Contract parameter is missing")
             return jsonify({'error': 'Contract parameter is required'}), 400
 
-        # Fetch subcategories from ItemMaster (tagged items)
-        subcategories = db.session.query(
+        # Fetch subcategories from ItemMaster (Items on This Contract)
+        base_query = db.session.query(
             func.coalesce(RentalClassMapping.category, 'Unclassified').label('category'),
             func.count(ItemMaster.tag_id).label('items_on_contract')
         ).outerjoin(
@@ -133,9 +137,14 @@ def tab4_subcat_data():
             func.lower(ItemMaster.last_contract_num).like('l%')
         ).group_by(
             func.coalesce(RentalClassMapping.category, 'Unclassified')
-        ).all()
+        )
 
-        # Fetch total items in inventory for each subcategory (across all contracts)
+        total_subcats = base_query.count()
+        subcategories = base_query.order_by(
+            func.coalesce(RentalClassMapping.category, 'Unclassified')
+        ).offset(offset).limit(per_page).all()
+
+        # Fetch total items in inventory for each subcategory (across all contracts, regardless of status)
         total_items_inventory = db.session.query(
             func.coalesce(RentalClassMapping.category, 'Unclassified').label('category'),
             func.count(ItemMaster.tag_id).label('total_items_inventory')
@@ -190,7 +199,12 @@ def tab4_subcat_data():
         current_app.logger.info(f"Fetched {len(subcat_data)} categories for contract {contract_num}")
         current_app.logger.debug(f"Subcategory data for contract {contract_num}: {subcat_data}")
 
-        return jsonify(subcat_data)
+        return jsonify({
+            'subcategories': subcat_data,
+            'total_subcats': total_subcats,
+            'page': page,
+            'per_page': per_page
+        })
     except Exception as e:
         current_app.logger.error(f"Error fetching categories for contract {contract_num}: {str(e)}", exc_info=True)
         return jsonify({'error': 'Failed to fetch subcategory data'}), 500
@@ -200,14 +214,18 @@ def tab4_common_names():
     try:
         contract_num = request.args.get('category')  # Contract number
         subcategory = request.args.get('subcategory')  # Subcategory under the contract
+        page = int(request.args.get('page', 1))
+        per_page = 20
+        offset = (page - 1) * per_page
+
         if not contract_num or not subcategory:
             return jsonify({'error': 'Contract and subcategory parameters are required'}), 400
 
         current_app.logger.debug(f"Fetching common names for contract: {contract_num}, subcategory: {subcategory}")
 
-        # Fetch common names for this contract and subcategory
+        # Fetch common names for this contract and subcategory (Items on This Contract)
         if subcategory == 'Unclassified':
-            common_names = db.session.query(
+            base_query = db.session.query(
                 func.trim(func.upper(ItemMaster.common_name)).label('common_name'),
                 func.count(ItemMaster.tag_id).label('items_on_contract')
             ).outerjoin(
@@ -219,9 +237,9 @@ def tab4_common_names():
                 RentalClassMapping.category.is_(None)
             ).group_by(
                 func.trim(func.upper(ItemMaster.common_name))
-            ).all()
+            )
         else:
-            common_names = db.session.query(
+            base_query = db.session.query(
                 func.trim(func.upper(ItemMaster.common_name)).label('common_name'),
                 func.count(ItemMaster.tag_id).label('items_on_contract')
             ).join(
@@ -233,9 +251,14 @@ def tab4_common_names():
                 func.lower(RentalClassMapping.category) == func.lower(subcategory)
             ).group_by(
                 func.trim(func.upper(ItemMaster.common_name))
-            ).all()
+            )
 
-        # Fetch total items in inventory for each common name (across all contracts)
+        total_common_names = base_query.count()
+        common_names = base_query.order_by(
+            func.trim(func.upper(ItemMaster.common_name))
+        ).offset(offset).limit(per_page).all()
+
+        # Fetch total items in inventory for each common name (across all contracts, regardless of status)
         total_items_inventory = db.session.query(
             func.trim(func.upper(ItemMaster.common_name)).label('common_name'),
             func.count(ItemMaster.tag_id).label('total_items_inventory')
@@ -287,7 +310,12 @@ def tab4_common_names():
 
         current_app.logger.debug(f"Common names for contract {contract_num}, subcategory: {subcategory}: {common_names_data}")
 
-        return jsonify({'common_names': common_names_data})
+        return jsonify({
+            'common_names': common_names_data,
+            'total_common_names': total_common_names,
+            'page': page,
+            'per_page': per_page
+        })
     except Exception as e:
         current_app.logger.error(f"Error fetching common names for contract {contract_num}, subcategory: {subcategory}: {str(e)}", exc_info=True)
         return jsonify({'error': f'Failed to fetch common names: {str(e)}'}), 500

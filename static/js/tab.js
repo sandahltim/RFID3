@@ -26,10 +26,29 @@ function printTable(level, id) {
     const tabName = tabNum == 2 ? 'Open Contracts' : tabNum == 4 ? 'Laundry Contracts' : `Tab ${tabNum}`;
 
     // Clone the element and include all expanded sections
-    const printElement = element.cloneNode(true);
+    let printElement = element.cloneNode(true);
+    let tableWrapper;
+
+    // If printing a top-level row, include the table header
+    if (level === 'Contract') {
+        const header = document.getElementById('category-table-header');
+        if (header) {
+            tableWrapper = document.createElement('table');
+            tableWrapper.className = 'table table-bordered';
+            tableWrapper.appendChild(header.cloneNode(true));
+            const tbody = document.createElement('tbody');
+            tbody.appendChild(printElement);
+            tableWrapper.appendChild(tbody);
+        } else {
+            tableWrapper = printElement;
+        }
+    } else {
+        tableWrapper = printElement;
+    }
+
+    // Find expanded content if any
     const row = element.closest('tr');
     if (row) {
-        // Find the corresponding expanded content (e.g., subcat-, common-, items- divs)
         const nextRow = row.nextElementSibling;
         if (nextRow) {
             const expandedContent = nextRow.querySelector('.expandable.expanded');
@@ -39,13 +58,13 @@ function printTable(level, id) {
                 expandedClone.querySelectorAll('.btn, .loading, .expandable.collapsed, .pagination-controls').forEach(el => el.remove());
                 const expandedWrapper = document.createElement('div');
                 expandedWrapper.appendChild(expandedClone);
-                printElement.appendChild(expandedWrapper);
+                tableWrapper.appendChild(expandedWrapper);
             }
         }
     }
 
     // Remove non-printable elements from the main element
-    printElement.querySelectorAll('.btn, .loading, .expandable.collapsed, .pagination-controls').forEach(el => el.remove());
+    tableWrapper.querySelectorAll('.btn, .loading, .expandable.collapsed, .pagination-controls').forEach(el => el.remove());
 
     // Prepare the print content with custom header and styles
     const printContent = `
@@ -133,7 +152,7 @@ function printTable(level, id) {
                     <p>Printed on: ${new Date().toLocaleString()}</p>
                 </div>
                 <div style="margin-top: 60px;">
-                    ${printElement.outerHTML}
+                    ${tableWrapper.outerHTML}
                 </div>
                 <script>
                     window.onload = function() {
