@@ -1,6 +1,6 @@
-from flask import Blueprint, render_template, current_app
+from flask import Blueprint, render_template, current_app, jsonify, request
 from .. import db, cache
-from ..models.db_models import ItemMaster
+from ..models.db_models import ItemMaster, Transaction
 from sqlalchemy import func
 from time import time
 
@@ -59,3 +59,22 @@ def index():
     except Exception as e:
         current_app.logger.error(f"Error loading home page: {str(e)}", exc_info=True)
         return render_template('home.html', error="Failed to load dashboard data")
+
+@home_bp.route('/get_contract_date')
+def get_contract_date():
+    try:
+        contract_number = request.args.get('contract_number')
+        if not contract_number:
+            return jsonify({'error': 'Contract number is required'}), 400
+
+        # Fetch the earliest transaction date for this contract
+        transaction = db.session.query(
+            func.min(Transaction.date).label('date')
+        ).filter(
+            Transaction.contract_number == contract_number
+        ).first()
+
+        return jsonify({'date': transaction.date.isoformat() if transaction.date else None})
+    except Exception as e:
+        current_app.logger.error(f"Error fetching contract date: {str(e)}", exc_info=True)
+        return jsonify({'error': 'Failed to fetch contract date'}), 500

@@ -3,7 +3,7 @@
 {% block content %}
 <div class="container mt-4">
     <!-- Page title for Tab 3 -->
-    <h2>Service Contracts</h2>
+    <h2>Service</h2>
     <!-- Filter and search row -->
     <div class="row mb-3">
         <div class="col">
@@ -37,21 +37,40 @@
             <button class="btn btn-primary" onclick="refreshTab()">Refresh</button>
         </div>
     </div>
-    <!-- Table for displaying contracts -->
+    <!-- Table for displaying categories -->
     <table class="table table-bordered" id="category-table">
         <thead>
             <tr>
-                <th>Contract Number</th>
-                <th>Customer Name</th>
-                <th class="hidden">Total Items</th>
+                <th>Category</th>
+                <th>Total Items</th>
                 <th>Items on Contracts</th>
-                <th class="hidden">Items in Service</th>
-                <th class="hidden">Items Available</th>
-                <th>Last Scanned Date</th>
+                <th>Items in Service</th>
+                <th>Items Available</th>
                 <th>Actions</th>
             </tr>
         </thead>
-        <tbody id="category-rows" hx-get="/tab/3/categories?cache_bust={{ cache_bust }}" hx-trigger="load, refreshTab">
+        <tbody id="category-rows">
+            {% for category in categories %}
+            {% set encoded_category = category.name | urlencode | replace("'", "\\'") | replace('"', '\\"') %}
+            <tr>
+                <td>{{ category.name }}</td>
+                <td>{{ category.total_items }}</td>
+                <td>{{ category.on_contracts }}</td>
+                <td>{{ category.in_service }}</td>
+                <td>{{ category.available }}</td>
+                <td>
+                    <button class="btn btn-sm btn-secondary expand-btn" onclick="expandCategory('{{ encoded_category }}', 'subcat-{{ category.cat_id }}')">Expand</button>
+                    <button class="btn btn-sm btn-secondary collapse-btn" style="display:none;" onclick="collapseSection('subcat-{{ category.cat_id }}')">Collapse</button>
+                    <button class="btn btn-sm btn-info print-btn" data-print-level="Category" data-print-id="subcat-table-{{ category.cat_id }}">Print</button>
+                    <div id="loading-{{ category.cat_id }}" style="display:none;" class="loading">Loading...</div>
+                </td>
+            </tr>
+            <tr>
+                <td colspan="6">
+                    <div id="subcat-{{ category.cat_id }}" class="expandable collapsed"></div>
+                </td>
+            </tr>
+            {% endfor %}
         </tbody>
     </table>
 </div>
@@ -59,7 +78,7 @@
 <!-- JavaScript for refreshing the table -->
 <script>
 function refreshTab() {
-    htmx.trigger('#category-rows', 'refreshTab');
+    window.location.reload(); // Simple refresh for now
 }
 </script>
 {% endblock %}
