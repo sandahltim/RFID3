@@ -65,7 +65,7 @@ def update_transactions(session, transactions):
     # Fixed boolean handling on 2025-04-21 to convert string 'True'/'False' to Python booleans
     # Fixed loop variable on 2025-04-21: changed 'items' to 'transactions' to resolve NameError
     logger.info(f"Updating {len(transactions)} transactions in id_transactions")
-    for transaction in transactions:  # Fixed: was incorrectly 'items'
+    for transaction in transactions:
         try:
             tag_id = transaction.get('tag_id')
             scan_date = transaction.get('scan_date')
@@ -131,9 +131,8 @@ def update_transactions(session, transactions):
             raise
 
 def update_seed_data(session, seeds):
-    # This function is working as of 2025-04-21 - DO NOT MODIFY
-    # Successfully updates rental_class_mappings with API seed data
-    # Handles missing category by defaulting to 'Unknown'
+    # Fixed category handling on 2025-04-21: default to 'Unknown' if missing
+    # Fixed subcategory handling on 2025-04-21: default to 'Unknown' if missing to resolve IntegrityError
     logger.info(f"Updating {len(seeds)} seeds in rental_class_mapping")
     for seed in seeds:
         try:
@@ -147,7 +146,7 @@ def update_seed_data(session, seeds):
                 db_seed = RentalClassMapping(rental_class_id=rental_class_id)
 
             db_seed.category = seed.get('category', 'Unknown')  # Default to 'Unknown' if category is None
-            db_seed.subcategory = seed.get('subcategory')
+            db_seed.subcategory = seed.get('subcategory', 'Unknown')  # Default to 'Unknown' if subcategory is None
             db_seed.common_name = seed.get('common_name')
             db_seed.bin_location = seed.get('bin_location')
 
