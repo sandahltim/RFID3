@@ -70,6 +70,9 @@
                 <input type="number" class="form-control" id="handCountedQuantity" placeholder="Quantity">
             </div>
             <div class="col">
+                <input type="text" class="form-control" id="handCountedEmployeeName" placeholder="Employee Name">
+            </div>
+            <div class="col">
                 <button class="btn btn-success" onclick="addHandCountedItem()">Add Item</button>
                 <button class="btn btn-danger" onclick="removeHandCountedItem()">Remove Item</button>
             </div>
@@ -96,6 +99,7 @@
 <script>
 function refreshTab() {
     htmx.trigger('#category-rows', 'refreshTab');
+    htmx.trigger('#hand-counted-items-rows', 'refreshHandCountedItems');
 }
 
 function refreshHandCountedItems() {
@@ -106,8 +110,9 @@ function addHandCountedItem() {
     const contractNumber = document.getElementById('handCountedContractNumber').value;
     const itemName = document.getElementById('handCountedItemName').value;
     const quantity = document.getElementById('handCountedQuantity').value;
+    const employeeName = document.getElementById('handCountedEmployeeName').value;
 
-    if (!contractNumber || !itemName || !quantity || quantity <= 0) {
+    if (!contractNumber || !itemName || !quantity || quantity <= 0 || !employeeName) {
         alert('Please fill in all fields with valid values.');
         return;
     }
@@ -121,7 +126,8 @@ function addHandCountedItem() {
             contract_number: contractNumber,
             item_name: itemName,
             quantity: parseInt(quantity),
-            action: 'Added'
+            action: 'Added',
+            employee_name: employeeName
         })
     })
     .then(response => response.json())
@@ -144,8 +150,9 @@ function removeHandCountedItem() {
     const contractNumber = document.getElementById('handCountedContractNumber').value;
     const itemName = document.getElementById('handCountedItemName').value;
     const quantity = document.getElementById('handCountedQuantity').value;
+    const employeeName = document.getElementById('handCountedEmployeeName').value;
 
-    if (!contractNumber || !itemName || !quantity || quantity <= 0) {
+    if (!contractNumber || !itemName || !quantity || quantity <= 0 || !employeeName) {
         alert('Please fill in all fields with valid values.');
         return;
     }
@@ -159,7 +166,8 @@ function removeHandCountedItem() {
             contract_number: contractNumber,
             item_name: itemName,
             quantity: parseInt(quantity),
-            action: 'Removed'
+            action: 'Removed',
+            employee_name: employeeName
         })
     })
     .then(response => response.json())

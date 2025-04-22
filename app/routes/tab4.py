@@ -443,12 +443,10 @@ def add_hand_counted_item():
         item_name = data.get('item_name')
         quantity = data.get('quantity')
         action = data.get('action')
+        employee_name = data.get('employee_name')
 
-        if not all([contract_number, item_name, quantity, action]):
+        if not all([contract_number, item_name, quantity, action, employee_name]):
             return jsonify({'error': 'Missing required fields'}), 400
-
-        # For now, use a static user; this can be replaced with actual user authentication
-        user = "admin"
 
         hand_counted_item = HandCountedItems(
             contract_number=contract_number,
@@ -456,12 +454,12 @@ def add_hand_counted_item():
             quantity=quantity,
             action=action,
             timestamp=datetime.utcnow(),
-            user=user
+            user=employee_name
         )
         db.session.add(hand_counted_item)
         db.session.commit()
 
-        current_app.logger.info(f"Added hand-counted item: {item_name} (Qty: {quantity}) to contract {contract_number} by {user}")
+        current_app.logger.info(f"Added hand-counted item: {item_name} (Qty: {quantity}) to contract {contract_number} by {employee_name}")
 
         return jsonify({'message': 'Item added successfully'})
     except Exception as e:
@@ -477,12 +475,31 @@ def remove_hand_counted_item():
         item_name = data.get('item_name')
         quantity = data.get('quantity')
         action = data.get('action')
+        employee_name = data.get('employee_name')
 
-        if not all([contract_number, item_name, quantity, action]):
+        if not all([contract_number, item_name, quantity, action, employee_name]):
             return jsonify({'error': 'Missing required fields'}), 400
 
-        # For now, use a static user; this can be replaced with actual user authentication
-        user = "admin"
+        # Calculate the current total quantity for this contract and item
+        current_total = db.session.query(
+            func.sum(HandCountedItems.quantity).label('total')
+        ).filter(
+            HandCountedItems.contract_number == contract_number,
+            HandCountedItems.item_name == item_name,
+            HandCountedItems.action == 'Added'
+        ).scalar() or 0
+
+        removed_total = db.session.query(
+            func.sum(HandCountedItems.quantity).label('total')
+        ).filter(
+            HandCountedItems.contract_number == contract_number,
+            HandCountedItems.item_name == item_name,
+            HandCountedItems.action == 'Removed'
+        ).scalar() or 0
+
+        net_quantity = current_total - removed_total
+        if net_quantity < quantity:
+            return jsonify({'error': f'Cannot remove {quantity} items. Only {net_quantity} items are available.'}), 400
 
         # Log the removal as a new entry
         hand_counted_item = HandCountedItems(
@@ -491,12 +508,12 @@ def remove_hand_counted_item():
             quantity=quantity,
             action=action,
             timestamp=datetime.utcnow(),
-            user=user
+            user=employee_name
         )
         db.session.add(hand_counted_item)
         db.session.commit()
 
-        current_app.logger.info(f"Removed hand-counted item: {item_name} (Qty: {quantity}) from contract {contract_number} by {user}")
+        current_app.logger.info(f"Removed hand-counted item: {item_name} (Qty: {quantity}) from contract {contract_number} by {employee_name}")
 
         return jsonify({'message': 'Item removed successfully'})
     except Exception as e:
