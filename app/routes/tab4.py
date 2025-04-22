@@ -6,32 +6,38 @@ from urllib.parse import quote
 import re
 import time
 
-tab2_bp = Blueprint('tab2', __name__)
+# Blueprint for Tab 4 (Laundry Tab) - DO NOT MODIFY BLUEPRINT NAME
+# Added on 2025-04-21 to display laundry contracts (starting with 'L')
+tab4_bp = Blueprint('tab4', __name__)
 
-@tab2_bp.route('/tab/2')
+@tab4_bp.route('/tab/4')
 @cache.cached(timeout=30)
-def tab2_view():
+def tab4_view():
+    # Route to render the main view for Tab 4
+    # Displays a list of laundry contracts (starting with 'L') with status 'on rent' or 'delivered'
     try:
-        current_app.logger.info("Loading tab 2")
+        current_app.logger.info("Loading tab 4 (Laundry)")
 
-        # Fetch items with status 'On Rent' or 'Delivered', grouped by last_contract_num
-        # Include all contracts, even those starting with 'L'
+        # Query to fetch laundry contracts (starting with 'L') from ItemMaster
+        # Filters by status 'on rent' or 'delivered', groups by last_contract_num
+        # Includes customer name and most recent scanned date
         contract_data = db.session.query(
             ItemMaster.last_contract_num,
             func.count(ItemMaster.tag_id).label('total_items'),
             func.max(Transaction.client_name).label('customer_name'),
-            func.max(ItemMaster.date_last_scanned).label('last_scanned_date')  # Add most recent scanned date
+            func.max(ItemMaster.date_last_scanned).label('last_scanned_date')
         ).outerjoin(
             Transaction, Transaction.contract_number == ItemMaster.last_contract_num
         ).filter(
-            func.lower(ItemMaster.status).in_(['on rent', 'delivered'])
-            # Removed: func.lower(ItemMaster.last_contract_num).notlike('l%')
+            func.lower(ItemMaster.status).in_(['on rent', 'delivered']),
+            func.lower(ItemMaster.last_contract_num).like('l%')  # Only laundry contracts
         ).group_by(
             ItemMaster.last_contract_num
         ).order_by(
             ItemMaster.last_contract_num
         ).all()
 
+        # Format the contract data for the template
         categories = [
             {
                 'name': contract_num,
@@ -45,9 +51,10 @@ def tab2_view():
             for contract_num, total_items, customer_name, last_scanned_date in contract_data
             if contract_num is not None
         ]
-        current_app.logger.info(f"Fetched {len(categories)} rental contracts")
+        current_app.logger.info(f"Fetched {len(categories)} laundry contracts")
         current_app.logger.debug(f"Raw contract data: {contract_data}")
 
+        # Fetch bin locations for filtering (same as Tab 2)
         bin_locations = db.session.query(
             ItemMaster.bin_location
         ).filter(
@@ -58,6 +65,7 @@ def tab2_view():
         bin_locations = [loc[0] for loc in bin_locations]
         current_app.logger.info(f"Fetched {len(bin_locations)} bin locations")
 
+        # Fetch statuses for filtering (same as Tab 2)
         statuses = db.session.query(
             ItemMaster.status
         ).filter(
@@ -67,9 +75,10 @@ def tab2_view():
         ).all()
         statuses = [status[0] for status in statuses]
 
+        # Render the tab.html template with the data
         return render_template(
             'tab.html',
-            tab_num=2,
+            tab_num=4,
             categories=categories,
             bin_locations=bin_locations,
             statuses=statuses,
@@ -77,12 +86,16 @@ def tab2_view():
             timestamp=lambda: int(time.time())
         )
     except Exception as e:
-        current_app.logger.error(f"Error loading tab 2: {str(e)}", exc_info=True)
+        current_app.logger.error(f"Error loading tab 4: {str(e)}", exc_info=True)
         return jsonify({'error': 'Failed to load tab data'}), 500
 
-@tab2_bp.route('/tab/2/categories')
-def tab2_categories():
+@tab4_bp.route('/tab/4/categories')
+def tab4_categories():
+    # Route to render the categories table for Tab 4
+    # Shows laundry contracts with columns: Contract Number, Customer Name, Items on Contracts, Last Scanned Date, Actions
+    # Hides columns: Total Items, Items in Service, Items Available
     try:
+        # Same query as tab4_view to fetch laundry contracts
         contract_data = db.session.query(
             ItemMaster.last_contract_num,
             func.count(ItemMaster.tag_id).label('total_items'),
@@ -91,8 +104,8 @@ def tab2_categories():
         ).outerjoin(
             Transaction, Transaction.contract_number == ItemMaster.last_contract_num
         ).filter(
-            func.lower(ItemMaster.status).in_(['on rent', 'delivered'])
-            # Removed: func.lower(ItemMaster.last_contract_num).notlike('l%')
+            func.lower(ItemMaster.status).in_(['on rent', 'delivered']),
+            func.lower(ItemMaster.last_contract_num).like('l%')
         ).group_by(
             ItemMaster.last_contract_num
         ).order_by(
@@ -113,6 +126,7 @@ def tab2_categories():
             if contract_num is not None
         ]
 
+        # Generate HTML for the table rows
         html = ''
         for category in categories:
             cat_id = re.sub(r'[^a-z0-9-]', '_', category['name'].lower())
@@ -136,14 +150,16 @@ def tab2_categories():
             '''
         return html
     except Exception as e:
-        current_app.logger.error(f"Error fetching contracts for tab 2: {str(e)}", exc_info=True)
+        current_app.logger.error(f"Error fetching contracts for tab 4: {str(e)}", exc_info=True)
         return '<tr><td colspan="8">Error loading contracts</td></tr>'
 
-@tab2_bp.route('/tab/2/subcat_data')
-def tab2_subcat_data():
+@tab4_bp.route('/tab/4/subcat_data')
+def tab4_subcat_data():
+    # Route to fetch subcategory data for a specific laundry contract
+    # Subcategories are grouped by RentalClassMapping.category under the contract
     try:
-        current_app.logger.info("Received request for /tab/2/subcat_data")
-        contract_num = request.args.get('category')  # For Tab 2, 'category' is the contract number
+        current_app.logger.info("Received request for /tab/4/subcat_data")
+        contract_num = request.args.get('category')  # 'category' is the contract number
         if not contract_num:
             current_app.logger.error("Contract parameter is missing")
             return jsonify({'error': 'Contract parameter is required'}), 400
@@ -158,7 +174,8 @@ def tab2_subcat_data():
             RentalClassMapping, RentalClassMapping.rental_class_id == ItemMaster.rental_class_num
         ).filter(
             func.lower(ItemMaster.status).in_(['on rent', 'delivered']),
-            ItemMaster.last_contract_num == contract_num
+            ItemMaster.last_contract_num == contract_num,
+            func.lower(ItemMaster.last_contract_num).like('l%')
         ).group_by(
             func.coalesce(RentalClassMapping.category, 'Unclassified')
         ).all()
@@ -184,8 +201,9 @@ def tab2_subcat_data():
         current_app.logger.error(f"Error fetching categories for contract {contract_num}: {str(e)}", exc_info=True)
         return jsonify({'error': 'Failed to fetch subcategory data'}), 500
 
-@tab2_bp.route('/tab/2/common_names')
-def tab2_common_names():
+@tab4_bp.route('/tab/4/common_names')
+def tab4_common_names():
+    # Route to fetch common names under a specific category for a laundry contract
     try:
         contract_num = request.args.get('category')  # Contract number
         category = request.args.get('subcategory')  # Category under the contract
@@ -206,6 +224,7 @@ def tab2_common_names():
             ).filter(
                 func.lower(ItemMaster.status).in_(['on rent', 'delivered']),
                 ItemMaster.last_contract_num == contract_num,
+                func.lower(ItemMaster.last_contract_num).like('l%'),
                 RentalClassMapping.category.is_(None)
             ).group_by(
                 func.trim(func.upper(ItemMaster.common_name))
@@ -221,6 +240,7 @@ def tab2_common_names():
             ).filter(
                 func.lower(ItemMaster.status).in_(['on rent', 'delivered']),
                 ItemMaster.last_contract_num == contract_num,
+                func.lower(ItemMaster.last_contract_num).like('l%'),
                 func.lower(RentalClassMapping.category) == func.lower(category)
             ).group_by(
                 func.trim(func.upper(ItemMaster.common_name))
@@ -247,8 +267,9 @@ def tab2_common_names():
         current_app.logger.error(f"Error fetching common names for contract {contract_num}, category {category}: {str(e)}", exc_info=True)
         return jsonify({'error': f'Failed to fetch common names: {str(e)}'}), 500
 
-@tab2_bp.route('/tab/2/data')
-def tab2_data():
+@tab4_bp.route('/tab/4/data')
+def tab4_data():
+    # Route to fetch individual item details for a specific common name under a category and contract
     try:
         contract_num = request.args.get('category')
         category = request.args.get('subcategory')
@@ -267,6 +288,7 @@ def tab2_data():
             ).filter(
                 func.lower(ItemMaster.status).in_(['on rent', 'delivered']),
                 ItemMaster.last_contract_num == contract_num,
+                func.lower(ItemMaster.last_contract_num).like('l%'),
                 RentalClassMapping.category.is_(None),
                 func.trim(func.upper(ItemMaster.common_name)) == func.trim(func.upper(common_name))
             ).all()
@@ -278,6 +300,7 @@ def tab2_data():
             ).filter(
                 func.lower(ItemMaster.status).in_(['on rent', 'delivered']),
                 ItemMaster.last_contract_num == contract_num,
+                func.lower(ItemMaster.last_contract_num).like('l%'),
                 func.lower(RentalClassMapping.category) == func.lower(category),
                 func.trim(func.upper(ItemMaster.common_name)) == func.trim(func.upper(common_name))
             ).all()
