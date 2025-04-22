@@ -268,13 +268,13 @@ def tab4_common_names():
 
         total_items_dict = {name: total for name, total in total_items_inventory if name is not None}
 
-        # Include hand-counted items if they match the subcategory
+        # Fetch hand-counted items for this contract and subcategory
         hand_counted_common_names = db.session.query(
             HandCountedItems.item_name.label('common_name'),
             func.sum(HandCountedItems.quantity).label('hand_counted_total')
         ).filter(
             HandCountedItems.contract_number == contract_num,
-            HandCountedItems.item_name == subcategory,
+            func.lower(HandCountedItems.item_name) == func.lower(subcategory),
             HandCountedItems.action == 'Added'
         ).group_by(
             HandCountedItems.item_name
@@ -290,10 +290,15 @@ def tab4_common_names():
         }
 
         # Merge hand-counted items into the common names
+        # If the hand-counted item name matches the subcategory, distribute it to matching common names
         for h_name, h_total in hand_counted_common_names:
-            if h_name in common_dict:
-                common_dict[h_name]['items_on_contract'] += h_total
+            # Find common names that could correspond to this hand-counted item
+            matching_common_names = [name for name in common_dict.keys() if func.lower(name) == func.lower(h_name)]
+            if matching_common_names:
+                for name in matching_common_names:
+                    common_dict[name]['items_on_contract'] += h_total
             else:
+                # If no matching common name, add as a new entry
                 common_dict[h_name] = {
                     'items_on_contract': h_total,
                 }
