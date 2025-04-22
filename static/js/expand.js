@@ -1,8 +1,8 @@
 // expand.js - Handles category expansion for RFID Dashboard
 // Module Purpose: Expands categories to show subcategories, common names, and individual items on the tab page
-// Version: 2025-04-21 v11 - Fixed visibility issue and added fallback message for empty subcategories
+// Version: 2025-04-21 v12 - Added more logging to debug expansion issues
 
-console.log('expand.js version: 2025-04-21 v11 loaded');
+console.log('expand.js version: 2025-04-21 v12 loaded');
 
 // --- Loading Indicator Functions ---
 function showLoading(key) {
@@ -164,6 +164,7 @@ function loadItems(category, subcategory, commonName, targetId) {
         })
         .finally(() => {
             hideLoading(targetId.replace('items-', ''));
+            console.log('loadItems completed for targetId:', targetId);
         });
 }
 
@@ -256,6 +257,7 @@ function loadCommonNames(category, subcategory, targetId) {
         })
         .finally(() => {
             hideLoading(targetId.replace('common-', ''));
+            console.log('loadCommonNames completed for targetId:', targetId);
         });
 }
 
@@ -282,7 +284,7 @@ function loadSubcatData(originalCategory, normalizedCategory, subcatData) {
         subcatData.forEach(sub => {
             console.log('Processing subcategory:', sub);
             const subId = normalizedCategory + '_' + sub.subcategory.toLowerCase().replace(/[^a-z0-9-]/g, '_');
-            const isTab2 = window.cachedTabNum == 2;
+            const isTab2 = window.cachedTabNum == 2 || window.cachedTabNum == 3 || window.cachedTabNum == 4; // Tabs 2, 3, 4 treat subcategories as categories
             html += [
                 '<table class="table table-bordered mt-2" id="subcat-table-' + subId + '">',
                     '<thead>',
@@ -318,7 +320,7 @@ function loadSubcatData(originalCategory, normalizedCategory, subcatData) {
             ].join('');
         });
     } else {
-        html += '<p>No ' + (window.cachedTabNum == 2 ? 'categories' : 'subcategories') + ' found for this ' + (window.cachedTabNum == 2 ? 'contract' : 'category') + '.</p>';
+        html += '<p>No ' + (window.cachedTabNum == 2 || window.cachedTabNum == 3 || window.cachedTabNum == 4 ? 'categories' : 'subcategories') + ' found for this ' + (window.cachedTabNum == 2 || window.cachedTabNum == 3 || window.cachedTabNum == 4 ? 'contract' : 'category') + '.</p>';
     }
     
     html += '</div>';
@@ -361,6 +363,7 @@ document.addEventListener('DOMContentLoaded', () => {
             })
             .finally(() => {
                 hideLoading(targetId.replace('subcat-', ''));
+                console.log('expandCategory completed for targetId:', targetId);
             });
     };
     

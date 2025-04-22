@@ -78,7 +78,6 @@ def tab4_view():
         ).all()
         statuses = [status[0] for status in statuses]
 
-        # Updated on 2025-04-21 to use tab4.html instead of tab.html
         return render_template(
             'tab4.html',
             tab_num=4,
@@ -153,6 +152,11 @@ def tab4_categories():
                         <div id="loading-{cat_id}" style="display:none;" class="loading">Loading...</div>
                     </td>
                 </tr>
+                <tr>
+                    <td colspan="8">
+                        <div id="subcat-{cat_id}" class="expandable collapsed"></div>
+                    </td>
+                </tr>
             '''
         return html
     except Exception as e:
@@ -224,7 +228,7 @@ def tab4_common_names():
             ).outerjoin(
                 RentalClassMapping, RentalClassMapping.rental_class_id == ItemMaster.rental_class_num
             ).filter(
-                func.lower(ItemMaster.status).in_(['on rent', 'delivered']),  # Fixed typo 'decisdelivered' on 2025-04-21
+                func.lower(ItemMaster.status).in_(['on rent', 'delivered']),
                 ItemMaster.last_contract_num == contract_num,
                 func.lower(ItemMaster.last_contract_num).like('l%'),
                 RentalClassMapping.category.is_(None)

@@ -59,7 +59,6 @@ def tab1_view():
         ).all()
         statuses = [status[0] for status in statuses]
 
-        # Updated on 2025-04-21 to use tab1.html instead of tab.html
         return render_template(
             'tab1.html',
             tab_num=1,
@@ -116,6 +115,11 @@ def tab1_categories():
                         <button class="btn btn-sm btn-secondary" onclick="expandCategory('{encoded_category}', 'subcat-{cat_id}')">Expand</button>
                         <button class="btn btn-sm btn-info print-btn" data-print-level="Category" data-print-id="category-table">Print</button>
                         <div id="loading-{cat_id}" style="display:none;" class="loading">Loading...</div>
+                    </td>
+                </tr>
+                <tr>
+                    <td colspan="6">
+                        <div id="subcat-{cat_id}" class="expandable collapsed"></div>
                     </td>
                 </tr>
             '''

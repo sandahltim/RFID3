@@ -75,7 +75,6 @@ def tab3_view():
         ).all()
         statuses = [status[0] for status in statuses]
 
-        # Updated on 2025-04-21 to use tab3.html instead of tab.html
         return render_template(
             'tab3.html',
             tab_num=3,
@@ -144,6 +143,11 @@ def tab3_categories():
                         <button class="btn btn-sm btn-secondary" onclick="expandCategory('{encoded_category}', 'subcat-{cat_id}')">Expand</button>
                         <button class="btn btn-sm btn-info print-btn" data-print-level="Contract" data-print-id="category-table">Print</button>
                         <div id="loading-{cat_id}" style="display:none;" class="loading">Loading...</div>
+                    </td>
+                </tr>
+                <tr>
+                    <td colspan="8">
+                        <div id="subcat-{cat_id}" class="expandable collapsed"></div>
                     </td>
                 </tr>
             '''
@@ -242,7 +246,7 @@ def tab3_common_names():
                 func.trim(func.upper(ItemMaster.common_name))
             ).all()
 
-        current_app.logger.debug(f"Common names for contract {contract_num}, category {category}: {common_names}")
+        current_app.logger.debug(f"Common names for contract {contract_num}, category: {category}: {common_names}")
 
         common_names_data = [
             {
@@ -260,7 +264,7 @@ def tab3_common_names():
 
         return jsonify({'common_names': common_names_data})
     except Exception as e:
-        current_app.logger.error(f"Error fetching common names for contract {contract_num}, category {category}: {str(e)}", exc_info=True)
+        current_app.logger.error(f"Error fetching common names for contract {contract_num}, category: {category}: {str(e)}", exc_info=True)
         return jsonify({'error': f'Failed to fetch common names: {str(e)}'}), 500
 
 @tab3_bp.route('/tab/3/data')
