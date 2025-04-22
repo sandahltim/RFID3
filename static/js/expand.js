@@ -1,4 +1,4 @@
-console.log('expand.js version: 2025-04-22 v21 loaded');
+console.log('expand.js version: 2025-04-22 v22 loaded');
 
 // --- Loading Indicator Functions ---
 function showLoading(key) {
@@ -232,9 +232,11 @@ function loadCommonNames(category, subcategory, targetId, page = 1) {
         ? '/tab/' + window.cachedTabNum + '/common_names?category=' + encodeURIComponent(decodedCategory) + '&page=' + page
         : '/tab/' + window.cachedTabNum + '/common_names?category=' + encodeURIComponent(decodedCategory) + '&subcategory=' + encodeURIComponent(decodedSubcategory) + '&page=' + page;
 
-    const container = document.getElementById(targetId);
+    // For Tabs 2 and 4, targetId is already 'common-{{ category.cat_id }}', so don't prepend 'common-'
+    const containerId = isTab2or4 ? targetId : 'common-' + targetId;
+    const container = document.getElementById(containerId);
     if (!container) {
-        console.error('Common names container not found for ID:', targetId);
+        console.error('Common names container not found for ID:', containerId);
         return;
     }
 
@@ -326,7 +328,9 @@ function loadCommonNames(category, subcategory, targetId, page = 1) {
             // Add event listeners to toggle Expand/Collapse buttons
             const expandButtons = container.querySelectorAll('.expand-btn');
             const collapseButtons = container.querySelectorAll('.collapse-btn');
-            expandButtons.forEach((btn, index) => {
+            expandButtons.forEach((üket
+
+btn, index) => {
                 btn.addEventListener('click', () => {
                     btn.style.display = 'none';
                     collapseButtons[index].style.display = 'inline-block';
@@ -420,7 +424,7 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
                                     isTab1 ? '<td>' + (sub.in_service !== undefined ? sub.in_service : 'N/A') + '</td>' : '',
                                     isTab1 ? '<td>' + (sub.available !== undefined ? sub.available : 'N/A') + '</td>' : '',
                                     '<td>',
-                                        '<button class="btn btn-sm btn-secondary expand-btn" onclick="loadCommonNames(\'' + encodeURIComponent(originalCategory) + '\', \'' + encodeURIComponent(sub.subcategory) + '\', \'common-' + subId + '\')">Expand</button>',
+                                        '<button class="btn btn-sm btn-secondary expand-btn" onclick="loadCommonNames(\'' + encodeURIComponent(originalCategory) + '\', \'' + encodeURIComponent(sub.subcategory) + '\', \'' + subId + '\')">Expand</button>',
                                         '<button class="btn btn-sm btn-secondary collapse-btn" style="display:none;" onclick="collapseSection(\'common-' + subId + '\')">Collapse</button>',
                                         '<button class="btn btn-sm btn-info print-btn" data-print-level="' + (isTab1 ? 'Subcategory' : 'Subcategory') + '" data-print-id="subcat-table-' + subId + '">Print</button>',
                                         '<div id="loading-' + subId + '" style="display:none;" class="loading">Loading...</div>',
@@ -491,14 +495,14 @@ document.addEventListener('DOMContentLoaded', () => {
     
     window.expandCategory = function(category, targetId, page = 1) {
         console.log('expandCategory called with category:', category, 'targetId:', targetId, 'page:', page);
-        const normalizedCategory = targetId.replace('subcat-', '').replace(/\s+/g, '_'); // Normalize spaces to underscores
+        const normalizedCategory = targetId.replace('subcat-', '').replace('common-', '').replace(/\s+/g, '_'); // Normalize spaces to underscores
         const originalCategory = decodeURIComponent(category); // Keep the original category name
 
         // Check if we're in Tabs 2 or 4 (skip subcategory layer)
         const isTab2or4 = window.cachedTabNum == 2 || window.cachedTabNum == 4;
         if (isTab2or4) {
             // For Tabs 2 and 4, go straight to common names
-            loadCommonNames(originalCategory, null, 'common-' + normalizedCategory, page);
+            loadCommonNames(originalCategory, null, targetId, page);
         } else {
             // For other tabs (e.g., Tab 1), load subcategories
             loadSubcatData(originalCategory, normalizedCategory, targetId, page);

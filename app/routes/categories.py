@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, request, jsonify, current_app
 from .. import db
 from ..models.db_models import RentalClassMapping, ItemMaster
-from sqlalchemy import func
+from sqlalchemy import func, desc
 from time import time
 
 categories_bp = Blueprint('categories', __name__)
@@ -12,17 +12,26 @@ def manage_categories():
         # Fetch all rental class mappings
         mappings = RentalClassMapping.query.order_by(RentalClassMapping.category, RentalClassMapping.rental_class_id).all()
         
-        # Fetch the most common 'common_name' for each rental_class_id from ItemMaster
-        common_names = db.session.query(
-            RentalClassMapping.rental_class_id,
-            func.mode().within_group(ItemMaster.common_name).label('common_name')
-        ).outerjoin(
-            ItemMaster, ItemMaster.rental_class_num == RentalClassMapping.rental_class_id
+        # Subquery to find the most common common_name for each rental_class_num in ItemMaster
+        subquery = db.session.query(
+            ItemMaster.rental_class_num,
+            ItemMaster.common_name,
+            func.count(ItemMaster.common_name).label('name_count')
         ).group_by(
-            RentalClassMapping.rental_class_id
+            ItemMaster.rental_class_num, ItemMaster.common_name
+        ).subquery()
+
+        # Main query to get the most common common_name per rental_class_num
+        common_names = db.session.query(
+            subquery.c.rental_class_num,
+            subquery.c.common_name
+        ).order_by(
+            subquery.c.rental_class_num, desc(subquery.c.name_count)
+        ).group_by(
+            subquery.c.rental_class_num
         ).all()
-        
-        common_name_dict = {rental_class_id: common_name for rental_class_id, common_name in common_names}
+
+        common_name_dict = {rental_class_num: common_name for rental_class_num, common_name in common_names}
 
         # Prepare data for the template
         categories_data = []
@@ -45,24 +54,33 @@ def manage_categories():
             timestamp=lambda: int(time())
         )
     except Exception as e:
-        current_app.logger.error(f"Error rendering categories page: {str(e)}")
+        current_app.logger.error(f"Error rendering categories page: {str(e)}", exc_info=True)
         return jsonify({'error': 'Failed to load categories page'}), 500
 
 @categories_bp.route('/categories/mapping', methods=['GET'])
 def get_mapping():
     try:
         mappings = RentalClassMapping.query.all()
-        # Fetch the most common 'common_name' for each rental_class_id from ItemMaster
-        common_names = db.session.query(
-            RentalClassMapping.rental_class_id,
-            func.mode().within_group(ItemMaster.common_name).label('common_name')
-        ).outerjoin(
-            ItemMaster, ItemMaster.rental_class_num == RentalClassMapping.rental_class_id
+        # Subquery to find the most common common_name for each rental_class_num in ItemMaster
+        subquery = db.session.query(
+            ItemMaster.rental_class_num,
+            ItemMaster.common_name,
+            func.count(ItemMaster.common_name).label('name_count')
         ).group_by(
-            RentalClassMapping.rental_class_id
+            ItemMaster.rental_class_num, ItemMaster.common_name
+        ).subquery()
+
+        # Main query to get the most common common_name per rental_class_num
+        common_names = db.session.query(
+            subquery.c.rental_class_num,
+            subquery.c.common_name
+        ).order_by(
+            subquery.c.rental_class_num, desc(subquery.c.name_count)
+        ).group_by(
+            subquery.c.rental_class_num
         ).all()
         
-        common_name_dict = {rental_class_id: common_name for rental_class_id, common_name in common_names}
+        common_name_dict = {rental_class_num: common_name for rental_class_num, common_name in common_names}
 
         data = [{
             'id': m.id,  # Use m.id since we're rendering rows dynamically
