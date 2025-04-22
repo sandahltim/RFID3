@@ -130,70 +130,35 @@ def update_transactions(session, transactions):
             session.rollback()
             raise
 
-def update_seed_data(session, seeds):
-    # Fixed category handling on 2025-04-21: default to 'Unknown' if missing
-    # Fixed subcategory handling on 2025-04-21: default to 'Unknown' if missing to resolve IntegrityError
-    logger.info(f"Updating {len(seeds)} seeds in rental_class_mapping")
-    for seed in seeds:
-        try:
-            rental_class_id = seed.get('rental_class_id')
-            if not rental_class_id:
-                logger.warning(f"Skipping seed with missing rental_class_id: {seed}")
-                continue
-
-            db_seed = session.query(RentalClassMapping).filter_by(rental_class_id=rental_class_id).first()
-            if not db_seed:
-                db_seed = RentalClassMapping(rental_class_id=rental_class_id)
-
-            db_seed.category = seed.get('category', 'Unknown')  # Default to 'Unknown' if category is None
-            db_seed.subcategory = seed.get('subcategory', 'Unknown')  # Default to 'Unknown' if subcategory is None
-            db_seed.common_name = seed.get('common_name')
-            db_seed.bin_location = seed.get('bin_location')
-
-            session.merge(db_seed)
-        except Exception as e:
-            logger.error(f"Error updating seed {rental_class_id}: {str(e)}")
-            session.rollback()
-            raise
-
 def full_refresh():
-    # This function is working as of 2025-04-21 - DO NOT MODIFY CORE LOGIC
-    # Successfully clears existing data and fetches new data from API
-    # Issue with longitude/latitude handled in update_item_master and update_transactions
+    # Modified on 2025-04-21 to prevent overwriting rental_class_mappings
+    # Removed deletion and update of rental_class_mappings to preserve custom data
     logger.info("Starting full refresh")
     session = db.session()
     try:
-        # Clear existing data
+        # Clear existing data (skip rental_class_mappings)
         deleted_items = session.query(ItemMaster).delete()
         deleted_transactions = session.query(Transaction).delete()
-        deleted_mappings = session.query(RentalClassMapping).delete()
         logger.info(f"Deleted {deleted_items} items from id_item_master")
         logger.info(f"Deleted {deleted_transactions} transactions from id_transactions")
-        logger.info(f"Deleted {deleted_mappings} mappings from rental_class_mappings")
 
         # Fetch all data without since_date
         items = api_client.get_item_master()
         transactions = api_client.get_transactions()
-        seeds = api_client.get_seed_data()
 
         logger.info(f"Fetched {len(items)} items from item master")
         logger.info(f"Fetched {len(transactions)} transactions")
-        logger.info(f"Fetched {len(seeds)} seeds")
         logger.debug(f"Item master data sample: {items[:5] if items else 'No items'}")
         logger.debug(f"Transactions data sample: {transactions[:5] if transactions else 'No transactions'}")
-        logger.debug(f"Seed data sample: {seeds[:5] if seeds else 'No seeds'}")
 
         if not items:
             logger.warning("No items fetched from item master API. Check API endpoint or authentication.")
         if not transactions:
             logger.warning("No transactions fetched from transactions API. Check API endpoint or authentication.")
-        if not seeds:
-            logger.warning("No seeds fetched from seed API. Check API endpoint or authentication.")
 
-        # Update database
+        # Update database (skip rental_class_mappings)
         update_item_master(session, items)
         update_transactions(session, transactions)
-        update_seed_data(session, seeds)
 
         session.commit()
         logger.info("Clear API data and full refresh completed successfully")
@@ -206,9 +171,8 @@ def full_refresh():
         logger.debug("Full refresh session closed")
 
 def incremental_refresh():
-    # This function is working as of 2025-04-21 - DO NOT MODIFY CORE LOGIC
-    # Successfully fetches incremental data and updates database
-    # Issue with longitude/latitude handled in update_item_master and update_transactions
+    # Modified on 2025-04-21 to prevent overwriting rental_class_mappings
+    # Removed update of rental_class_mappings to preserve custom data
     logger.info("Starting incremental refresh")
     session = db.session()
     try:
@@ -228,16 +192,8 @@ def incremental_refresh():
         if not transactions:
             logger.warning("No transactions fetched from transactions API. Check API endpoint or authentication.")
 
-        logger.info("Fetching seed data")
-        seeds = api_client.get_seed_data()  # Removed since_date as seed data doesn't support filtering
-        logger.info(f"Fetched {len(seeds)} seeds")
-        logger.debug(f"Seed data sample: {seeds[:5] if seeds else 'No seeds'}")
-        if not seeds:
-            logger.warning("No seeds fetched from seed API. Check API endpoint or authentication.")
-
         update_item_master(session, items)
         update_transactions(session, transactions)
-        update_seed_data(session, seeds)
 
         session.commit()
         logger.info("Incremental refresh completed successfully")
