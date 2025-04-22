@@ -1,4 +1,4 @@
-console.log('expand.js version: 2025-04-22 v18 loaded');
+console.log('expand.js version: 2025-04-22 v19 loaded');
 
 // --- Loading Indicator Functions ---
 function showLoading(key) {
@@ -188,9 +188,7 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
 
             // Find the parent row and toggle buttons
             const parentRow = container.closest('tr');
-            const expand
-
-Button = parentRow.querySelector('.expand-btn');
+            const expandButton = parentRow.querySelector('.expand-btn');
             const collapseButton = parentRow.querySelector('.collapse-btn');
             if (expandButton && collapseButton) {
                 expandButton.style.display = 'none';
