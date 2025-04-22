@@ -11,10 +11,20 @@
                 <th>Category</th>
                 <th>Subcategory</th>
                 <th>Rental Class ID</th>
+                <th>Common Name</th>
                 <th>Actions</th>
             </tr>
         </thead>
         <tbody id="mappings-table">
+            {% for category in categories %}
+            <tr>
+                <td><input type="text" class="form-control category-input" value="{{ category.category }}"></td>
+                <td><input type="text" class="form-control subcategory-input" value="{{ category.subcategory }}"></td>
+                <td><input type="text" class="form-control rental-class-id-input" value="{{ category.rental_class_id }}"></td>
+                <td>{{ category.common_name }}</td>
+                <td><button class="btn btn-danger" onclick="removeMappingRow(this)">Remove</button></td>
+            </tr>
+            {% endfor %}
         </tbody>
     </table>
     <button class="btn btn-primary" onclick="addMappingRow()">Add Mapping</button>
@@ -24,13 +34,14 @@
 <script>
     let mappings = [];
 
-    function addMappingRow(mapping = {category: '', subcategory: '', rental_class_id: ''}) {
+    function addMappingRow(mapping = {category: '', subcategory: '', rental_class_id: '', common_name: 'N/A'}) {
         const tableBody = document.getElementById('mappings-table');
         const row = document.createElement('tr');
         row.innerHTML = `
             <td><input type="text" class="form-control category-input" value="${mapping.category}"></td>
             <td><input type="text" class="form-control subcategory-input" value="${mapping.subcategory}"></td>
             <td><input type="text" class="form-control rental-class-id-input" value="${mapping.rental_class_id}"></td>
+            <td>${mapping.common_name}</td>
             <td><button class="btn btn-danger" onclick="removeMappingRow(this)">Remove</button></td>
         `;
         tableBody.appendChild(row);
@@ -63,6 +74,7 @@
                 alert('Error: ' + data.error);
             } else {
                 alert(data.message);
+                window.location.reload();
             }
         })
         .catch(error => {
