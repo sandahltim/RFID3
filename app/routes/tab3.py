@@ -75,9 +75,9 @@ def tab3_view():
         ).all()
         statuses = [status[0] for status in statuses]
 
-        # Render the tab.html template with the data
+        # Updated on 2025-04-21 to use tab3.html instead of tab.html
         return render_template(
-            'tab.html',
+            'tab3.html',
             tab_num=3,
             categories=categories,
             bin_locations=bin_locations,
