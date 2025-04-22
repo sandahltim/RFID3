@@ -17,8 +17,8 @@ def tab1_view():
         categories_data = db.session.query(
             func.coalesce(RentalClassMapping.category, 'Unclassified').label('category'),
             func.count(ItemMaster.tag_id).label('total_items'),
-            func.coalesce(func.sum(func.cast(func.lower(ItemMaster.status).in_(['on rent', 'delivered']), db.Integer)), 0).label('on_contracts'),
-            func.coalesce(func.sum(func.cast(func.lower(ItemMaster.status).in_(['repair']), db.Integer)), 0).label('in_service')
+            func.sum(case((func.lower(ItemMaster.status).in_(['on rent', 'delivered']), 1), else_=0)).label('on_contracts'),
+            func.sum(case((func.lower(ItemMaster.status) == 'repair', 1), else_=0)).label('in_service')
         ).outerjoin(
             RentalClassMapping, RentalClassMapping.rental_class_id == ItemMaster.rental_class_num
         ).group_by(
@@ -78,8 +78,8 @@ def tab1_categories():
         categories_data = db.session.query(
             func.coalesce(RentalClassMapping.category, 'Unclassified').label('category'),
             func.count(ItemMaster.tag_id).label('total_items'),
-            func.coalesce(func.sum(func.cast(func.lower(ItemMaster.status).in_(['on rent', 'delivered']), db.Integer)), 0).label('on_contracts'),
-            func.coalesce(func.sum(func.cast(func.lower(ItemMaster.status).in_(['repair']), db.Integer)), 0).label('in_service')
+            func.sum(case((func.lower(ItemMaster.status).in_(['on rent', 'delivered']), 1), else_=0)).label('on_contracts'),
+            func.sum(case((func.lower(ItemMaster.status) == 'repair', 1), else_=0)).label('in_service')
         ).outerjoin(
             RentalClassMapping, RentalClassMapping.rental_class_id == ItemMaster.rental_class_num
         ).group_by(
@@ -112,8 +112,9 @@ def tab1_categories():
                     <td>{category['in_service']}</td>
                     <td>{category['available']}</td>
                     <td>
-                        <button class="btn btn-sm btn-secondary" onclick="expandCategory('{encoded_category}', 'subcat-{cat_id}')">Expand</button>
-                        <button class="btn btn-sm btn-info print-btn" data-print-level="Category" data-print-id="category-table">Print</button>
+                        <button class="btn btn-sm btn-secondary expand-btn" onclick="expandCategory('{encoded_category}', 'subcat-{cat_id}')">Expand</button>
+                        <button class="btn btn-sm btn-secondary collapse-btn" style="display:none;" onclick="collapseSection('subcat-{cat_id}')">Collapse</button>
+                        <button class="btn btn-sm btn-info print-btn" data-print-level="Category" data-print-id="category-table-{cat_id}">Print</button>
                         <div id="loading-{cat_id}" style="display:none;" class="loading">Loading...</div>
                     </td>
                 </tr>
@@ -142,8 +143,8 @@ def tab1_subcat_data():
             subcategories = db.session.query(
                 func.coalesce(RentalClassMapping.subcategory, 'Uncategorized').label('subcategory'),
                 func.count(ItemMaster.tag_id).label('total_items'),
-                func.coalesce(func.sum(func.cast(func.lower(ItemMaster.status).in_(['on rent', 'delivered']), db.Integer)), 0).label('on_contracts'),
-                func.coalesce(func.sum(func.cast(func.lower(ItemMaster.status).in_(['repair']), db.Integer)), 0).label('in_service')
+                func.sum(case((func.lower(ItemMaster.status).in_(['on rent', 'delivered']), 1), else_=0)).label('on_contracts'),
+                func.sum(case((func.lower(ItemMaster.status) == 'repair', 1), else_=0)).label('in_service')
             ).outerjoin(
                 RentalClassMapping, RentalClassMapping.rental_class_id == ItemMaster.rental_class_num
             ).filter(
@@ -155,8 +156,8 @@ def tab1_subcat_data():
             subcategories = db.session.query(
                 func.coalesce(RentalClassMapping.subcategory, 'Uncategorized').label('subcategory'),
                 func.count(ItemMaster.tag_id).label('total_items'),
-                func.coalesce(func.sum(func.cast(func.lower(ItemMaster.status).in_(['on rent', 'delivered']), db.Integer)), 0).label('on_contracts'),
-                func.coalesce(func.sum(func.cast(func.lower(ItemMaster.status).in_(['repair']), db.Integer)), 0).label('in_service')
+                func.sum(case((func.lower(ItemMaster.status).in_(['on rent', 'delivered']), 1), else_=0)).label('on_contracts'),
+                func.sum(case((func.lower(ItemMaster.status) == 'repair', 1), else_=0)).label('in_service')
             ).outerjoin(
                 RentalClassMapping, RentalClassMapping.rental_class_id == ItemMaster.rental_class_num
             ).filter(
@@ -201,8 +202,8 @@ def tab1_common_names():
             common_names = db.session.query(
                 func.trim(func.upper(ItemMaster.common_name)).label('common_name'),
                 func.count(ItemMaster.tag_id).label('total_items'),
-                func.coalesce(func.sum(func.cast(func.lower(ItemMaster.status).in_(['on rent', 'delivered']), db.Integer)), 0).label('on_contracts'),
-                func.coalesce(func.sum(func.cast(func.lower(ItemMaster.status).in_(['repair']), db.Integer)), 0).label('in_service')
+                func.sum(case((func.lower(ItemMaster.status).in_(['on rent', 'delivered']), 1), else_=0)).label('on_contracts'),
+                func.sum(case((func.lower(ItemMaster.status) == 'repair', 1), else_=0)).label('in_service')
             ).outerjoin(
                 RentalClassMapping, RentalClassMapping.rental_class_id == ItemMaster.rental_class_num
             ).filter(
@@ -215,8 +216,8 @@ def tab1_common_names():
             common_names = db.session.query(
                 func.trim(func.upper(ItemMaster.common_name)).label('common_name'),
                 func.count(ItemMaster.tag_id).label('total_items'),
-                func.coalesce(func.sum(func.cast(func.lower(ItemMaster.status).in_(['on rent', 'delivered']), db.Integer)), 0).label('on_contracts'),
-                func.coalesce(func.sum(func.cast(func.lower(ItemMaster.status).in_(['repair']), db.Integer)), 0).label('in_service')
+                func.sum(case((func.lower(ItemMaster.status).in_(['on rent', 'delivered']), 1), else_=0)).label('on_contracts'),
+                func.sum(case((func.lower(ItemMaster.status) == 'repair', 1), else_=0)).label('in_service')
             ).join(
                 RentalClassMapping, RentalClassMapping.rental_class_id == ItemMaster.rental_class_num
             ).filter(
@@ -253,34 +254,40 @@ def tab1_data():
         category = request.args.get('category')
         subcategory = request.args.get('subcategory')
         common_name = request.args.get('common_name')
+        page = int(request.args.get('page', 1))
+        per_page = 20
+        offset = (page - 1) * per_page
+
         if not category or not subcategory or not common_name:
             return jsonify({'error': 'Category, subcategory, and common_name parameters are required'}), 400
 
-        current_app.logger.debug(f"Fetching items for category {category}, subcategory {subcategory}, common_name {common_name}")
+        current_app.logger.debug(f"Fetching items for category {category}, subcategory {subcategory}, common_name {common_name}, page {page}")
 
-        # Handle the default "Unclassified" category and "Uncategorized" subcategory
+        # Base query for items
+        base_query = db.session.query(ItemMaster).outerjoin(
+            RentalClassMapping, RentalClassMapping.rental_class_id == ItemMaster.rental_class_num
+        ).filter(
+            func.trim(func.upper(ItemMaster.common_name)) == func.trim(func.upper(common_name))
+        )
+
         if category == 'Unclassified' and subcategory == 'Uncategorized':
-            items = db.session.query(
-                ItemMaster
-            ).outerjoin(
-                RentalClassMapping, RentalClassMapping.rental_class_id == ItemMaster.rental_class_num
-            ).filter(
+            base_query = base_query.filter(
                 RentalClassMapping.category.is_(None),
-                RentalClassMapping.subcategory.is_(None),
-                func.trim(func.upper(ItemMaster.common_name)) == func.trim(func.upper(common_name))
-            ).all()
+                RentalClassMapping.subcategory.is_(None)
+            )
         else:
-            items = db.session.query(
-                ItemMaster
-            ).join(
-                RentalClassMapping, RentalClassMapping.rental_class_id == ItemMaster.rental_class_num
-            ).filter(
+            base_query = base_query.filter(
                 func.lower(RentalClassMapping.category) == func.lower(category),
-                func.lower(RentalClassMapping.subcategory) == func.lower(subcategory),
-                func.trim(func.upper(ItemMaster.common_name)) == func.trim(func.upper(common_name))
-            ).all()
+                func.lower(RentalClassMapping.subcategory) == func.lower(subcategory)
+            )
 
-        current_app.logger.debug(f"Items for category {category}, subcategory {subcategory}, common_name {common_name}: {len(items)} items found")
+        # Get total items for pagination
+        total_items = base_query.count()
+
+        # Apply pagination
+        items = base_query.order_by(ItemMaster.tag_id).offset(offset).limit(per_page).all()
+
+        current_app.logger.debug(f"Items for category {category}, subcategory {subcategory}, common_name {common_name}: {len(items)} items found (total {total_items})")
 
         items_data = [
             {
@@ -296,7 +303,12 @@ def tab1_data():
             for item in items
         ]
 
-        return jsonify(items_data)
+        return jsonify({
+            'items': items_data,
+            'total_items': total_items,
+            'page': page,
+            'per_page': per_page
+        })
     except Exception as e:
         current_app.logger.error(f"Error fetching data for category {category}, subcategory {subcategory}, common_name {common_name}: {str(e)}", exc_info=True)
         return jsonify({'error': f'Failed to fetch data: {str(e)}'}), 500

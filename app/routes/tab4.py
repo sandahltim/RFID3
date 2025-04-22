@@ -24,7 +24,7 @@ def tab4_view():
         # Includes customer name and most recent scanned date
         contract_data = db.session.query(
             ItemMaster.last_contract_num,
-            func.count(ItemMaster.tag_id).label('total_items'),
+            func.count(ItemMaster.tag_id).label('tagged_items'),
             func.max(Transaction.client_name).label('customer_name'),
             func.max(ItemMaster.date_last_scanned).label('last_scanned_date')
         ).outerjoin(
@@ -52,21 +52,22 @@ def tab4_view():
         hand_counted_dict = {row.contract_number: row.hand_counted_total for row in hand_counted_data}
 
         # Format the contract data for the template
-        # Include hand-counted items in the total under the same contract
         categories = []
-        for contract_num, total_items, customer_name, last_scanned_date in contract_data:
+        for contract_num, tagged_items, customer_name, last_scanned_date in contract_data:
             if contract_num is None:
                 continue
+            # Get hand-counted items for this contract
             hand_counted_items = hand_counted_dict.get(contract_num, 0)
-            total_with_hand_counted = total_items + hand_counted_items
+            # Sum tagged items and hand-counted items
+            total_items = tagged_items + hand_counted_items
             # Sanitize cat_id in Python
             cat_id = re.sub(r'[^a-z0-9-]', '_', contract_num.lower())
             # Format last_scanned_date to MM/DD/YYYY, h:mm:ss AM/PM
             formatted_date = last_scanned_date.strftime('%m/%d/%Y, %I:%M:%S %p') if last_scanned_date else 'N/A'
             categories.append({
                 'name': contract_num,
-                'cat_id': cat_id,  # Add sanitized cat_id
-                'total_items': total_with_hand_counted,  # Total Items on Contract
+                'cat_id': cat_id,
+                'total_items': total_items,  # Total Items on Contract (tagged + hand-counted)
                 'customer_name': customer_name or 'N/A',
                 'last_scanned_date': formatted_date
             })

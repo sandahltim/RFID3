@@ -39,6 +39,8 @@ test_rfidpi/ RFID2
 │            └── bootstrap.bundle.min.js
 ├── scripts/
 │   ├── migrate_db.sql
+│   ├── update_rental_class_mappings.py
+│   ├── migrate_hand_counted_items.sql
 │   └── setup_mariadb.sh
 ├── run.py
 ├── config.py

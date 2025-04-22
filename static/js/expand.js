@@ -1,4 +1,4 @@
-console.log('expand.js version: 2025-04-22 v15 loaded');
+console.log('expand.js version: 2025-04-22 v17 loaded');
 
 // --- Loading Indicator Functions ---
 function showLoading(key) {
@@ -123,7 +123,10 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
             container.style.display = 'block'; // Ensure visibility
 
             let html = '';
-            if (data.items && Array.isArray(data.items) && data.items.length > 0) {
+            const isTab1 = window.cachedTabNum == 1;
+            if ((data.items && Array.isArray(data.items) && data.items.length > 0) || (data && Array.isArray(data) && data.length > 0)) {
+                // Handle both data.items (Tabs 2, 4) and direct data array (Tab 1)
+                const items = data.items || data;
                 hideOtherItems(targetId.replace('items-', ''));
                 html += [
                     '<div class="item-level-wrapper">',
@@ -136,12 +139,14 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                                 '<th>Status</th>',
                                 '<th>Last Contract</th>',
                                 '<th>Last Scanned</th>',
+                                isTab1 ? '<th>Quality</th>' : '',
+                                isTab1 ? '<th>Notes</th>' : '',
                             '</tr>',
                         '</thead>',
                         '<tbody>'
                 ].join('');
                 
-                data.items.forEach(item => {
+                items.forEach(item => {
                     html += [
                         '<tr>',
                             '<td>' + (item.tag_id || 'N/A') + '</td>',
@@ -150,6 +155,8 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                             '<td>' + (item.status || 'N/A') + '</td>',
                             '<td>' + (item.last_contract_num || 'N/A') + '</td>',
                             '<td>' + (item.last_scanned_date || 'N/A') + '</td>',
+                            isTab1 ? '<td>' + (item.quality || 'N/A') + '</td>' : '',
+                            isTab1 ? '<td>' + (item.notes || 'N/A') + '</td>' : '',
                         '</tr>'
                     ].join('');
                 });
@@ -159,18 +166,20 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                     '</table>'
                 ].join('');
 
-                // Add pagination controls
-                const totalPages = Math.ceil(data.total_items / data.per_page);
-                if (totalPages > 1) {
-                    html += '<div class="pagination-controls mt-2">';
-                    if (data.page > 1) {
-                        html += `<button class="btn btn-sm btn-secondary" onclick="loadItems('${encodeURIComponent(decodedCategory)}', '${encodeURIComponent(decodedSubcategory)}', '${encodeURIComponent(decodedCommonName)}', '${targetId}', ${data.page - 1})">Previous</button>`;
+                // Add pagination controls (only for Tabs 2 and 4)
+                if (!isTab1) {
+                    const totalPages = Math.ceil(data.total_items / data.per_page);
+                    if (totalPages > 1) {
+                        html += '<div class="pagination-controls mt-2">';
+                        if (data.page > 1) {
+                            html += `<button class="btn btn-sm btn-secondary" onclick="loadItems('${encodeURIComponent(decodedCategory)}', '${encodeURIComponent(decodedSubcategory)}', '${encodeURIComponent(decodedCommonName)}', '${targetId}', ${data.page - 1})">Previous</button>`;
+                        }
+                        html += `<span>Page ${data.page} of ${totalPages}</span>`;
+                        if (data.page < totalPages) {
+                            html += `<button class="btn btn-sm btn-secondary" onclick="loadItems('${encodeURIComponent(decodedCategory)}', '${encodeURIComponent(decodedSubcategory)}', '${encodeURIComponent(decodedCommonName)}', '${targetId}', ${data.page + 1})">Next</button>`;
+                        }
+                        html += '</div>';
                     }
-                    html += `<span>Page ${data.page} of ${totalPages}</span>`;
-                    if (data.page < totalPages) {
-                        html += `<button class="btn btn-sm btn-secondary" onclick="loadItems('${encodeURIComponent(decodedCategory)}', '${encodeURIComponent(decodedSubcategory)}', '${encodeURIComponent(decodedCommonName)}', '${targetId}', ${data.page + 1})">Next</button>`;
-                    }
-                    html += '</div>';
                 }
                 html += '</div>';
             } else {
@@ -178,6 +187,16 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
             }
 
             container.innerHTML = html;
+
+            // Find the parent row and toggle buttons
+            const parentRow = container.closest('tr');
+            const expandButton = parentRow.querySelector('.expand-btn');
+            const collapseButton = parentRow.querySelector('.collapse-btn');
+            if (expandButton && collapseButton) {
+                expandButton.style.display = 'none';
+                collapseButton.style.display = 'inline-block';
+            }
+
             console.log('Items table rendered into container');
         })
         .catch(error => {
@@ -227,6 +246,7 @@ function loadCommonNames(category, subcategory, targetId) {
             container.style.display = 'block'; // Ensure visibility
 
             let html = '';
+            const isTab1 = window.cachedTabNum == 1;
             if (data.common_names && Array.isArray(data.common_names) && data.common_names.length > 0) {
                 const targetBaseId = targetId.replace('common-', '');
                 hideOtherCommonNames(targetBaseId);
@@ -237,16 +257,20 @@ function loadCommonNames(category, subcategory, targetId) {
                             '<thead>',
                                 '<tr>',
                                     '<th>Common Name</th>',
-                                    '<th>Total Items in Inventory</th>',
-                                    '<th>Items on This Contract</th>',
+                                    isTab1 ? '<th>Total Items</th>' : '<th>Total Items in Inventory</th>',
+                                    isTab1 ? '<th>Items on Contracts</th>' : '<th>Items on This Contract</th>',
+                                    isTab1 ? '<th>Items in Service</th>' : '',
+                                    isTab1 ? '<th>Items Available</th>' : '',
                                     '<th>Actions</th>',
                                 '</tr>',
                             '</thead>',
                             '<tbody>',
                                 '<tr>',
                                     '<td>' + cn.name + '</td>',
-                                    '<td>' + (cn.total_items_inventory !== undefined ? cn.total_items_inventory : 'N/A') + '</td>',
-                                    '<td>' + (cn.items_on_contract !== undefined ? cn.items_on_contract : 'N/A') + '</td>',
+                                    isTab1 ? '<td>' + (cn.total_items !== undefined ? cn.total_items : 'N/A') + '</td>' : '<td>' + (cn.total_items_inventory !== undefined ? cn.total_items_inventory : 'N/A') + '</td>',
+                                    '<td>' + (cn.items_on_contract !== undefined ? cn.items_on_contract : cn.on_contracts !== undefined ? cn.on_contracts : 'N/A') + '</td>',
+                                    isTab1 ? '<td>' + (cn.in_service !== undefined ? cn.in_service : 'N/A') + '</td>' : '',
+                                    isTab1 ? '<td>' + (cn.available !== undefined ? cn.available : 'N/A') + '</td>' : '',
                                     '<td>',
                                         '<button class="btn btn-sm btn-secondary expand-btn" onclick="loadItems(\'' + encodeURIComponent(decodedCategory) + '\', \'' + encodeURIComponent(decodedSubcategory) + '\', \'' + encodeURIComponent(cn.name) + '\', \'items-' + cnId + '\')">Expand</button>',
                                         '<button class="btn btn-sm btn-secondary collapse-btn" style="display:none;" onclick="collapseSection(\'items-' + cnId + '\')">Collapse</button>',
@@ -255,7 +279,7 @@ function loadCommonNames(category, subcategory, targetId) {
                                     '</td>',
                                 '</tr>',
                                 '<tr>',
-                                    '<td colspan="4">',
+                                    isTab1 ? '<td colspan="6">' : '<td colspan="4">',
                                         '<div id="items-' + cnId + '" class="expandable collapsed"></div>',
                                     '</td>',
                                 '</tr>',
@@ -284,6 +308,15 @@ function loadCommonNames(category, subcategory, targetId) {
                     expandButtons[index].style.display = 'inline-block';
                 });
             });
+
+            // Find the parent row and toggle buttons
+            const parentRow = container.closest('tr');
+            const expandButton = parentRow.querySelector('.expand-btn');
+            const collapseButton = parentRow.querySelector('.collapse-btn');
+            if (expandButton && collapseButton) {
+                expandButton.style.display = 'none';
+                collapseButton.style.display = 'inline-block';
+            }
 
             console.log('Common names table rendered into container');
         })
@@ -317,6 +350,7 @@ function loadSubcatData(originalCategory, normalizedCategory, subcatData) {
     let html = '<div class="subcat-level">';
     
     if (subcatData && subcatData.length > 0) {
+        const isTab1 = window.cachedTabNum == 1;
         subcatData.forEach(sub => {
             console.log('Processing subcategory:', sub);
             const subId = normalizedCategory + '_' + sub.subcategory.toLowerCase().replace(/[^a-z0-9-]/g, '_');
@@ -325,25 +359,29 @@ function loadSubcatData(originalCategory, normalizedCategory, subcatData) {
                     '<thead>',
                         '<tr>',
                             '<th>Subcategory</th>',
-                            '<th>Total Items in Inventory</th>',
-                            '<th>Items on This Contract</th>',
+                            isTab1 ? '<th>Total Items</th>' : '<th>Total Items in Inventory</th>',
+                            isTab1 ? '<th>Items on Contracts</th>' : '<th>Items on This Contract</th>',
+                            isTab1 ? '<th>Items in Service</th>' : '',
+                            isTab1 ? '<th>Items Available</th>' : '',
                             '<th>Actions</th>',
                         '</tr>',
                     '</thead>',
                     '<tbody>',
                         '<tr>',
                             '<td>' + sub.subcategory + '</td>',
-                            '<td>' + (sub.total_items_inventory !== undefined ? sub.total_items_inventory : 'N/A') + '</td>',
-                            '<td>' + (sub.items_on_contract !== undefined ? sub.items_on_contract : 'N/A') + '</td>',
+                            isTab1 ? '<td>' + (sub.total_items !== undefined ? sub.total_items : 'N/A') + '</td>' : '<td>' + (sub.total_items_inventory !== undefined ? sub.total_items_inventory : 'N/A') + '</td>',
+                            isTab1 ? '<td>' + (sub.on_contracts !== undefined ? sub.on_contracts : 'N/A') + '</td>' : '<td>' + (sub.items_on_contract !== undefined ? sub.items_on_contract : 'N/A') + '</td>',
+                            isTab1 ? '<td>' + (sub.in_service !== undefined ? sub.in_service : 'N/A') + '</td>' : '',
+                            isTab1 ? '<td>' + (sub.available !== undefined ? sub.available : 'N/A') + '</td>' : '',
                             '<td>',
                                 '<button class="btn btn-sm btn-secondary expand-btn" onclick="loadCommonNames(\'' + encodeURIComponent(originalCategory) + '\', \'' + encodeURIComponent(sub.subcategory) + '\', \'common-' + subId + '\')">Expand</button>',
                                 '<button class="btn btn-sm btn-secondary collapse-btn" style="display:none;" onclick="collapseSection(\'common-' + subId + '\')">Collapse</button>',
-                                '<button class="btn btn-sm btn-info print-btn" data-print-level="Subcategory" data-print-id="subcat-table-' + subId + '">Print</button>',
+                                '<button class="btn btn-sm btn-info print-btn" data-print-level="' + (isTab1 ? 'Subcategory' : 'Subcategory') + '" data-print-id="subcat-table-' + subId + '">Print</button>',
                                 '<div id="loading-' + subId + '" style="display:none;" class="loading">Loading...</div>',
                             '</td>',
                         '</tr>',
                         '<tr>',
-                            '<td colspan="4">',
+                            isTab1 ? '<td colspan="6">' : '<td colspan="4">',
                                 '<div id="common-' + subId + '" class="expandable collapsed"></div>',
                             '</td>',
                         '</tr>',
@@ -352,7 +390,7 @@ function loadSubcatData(originalCategory, normalizedCategory, subcatData) {
             ].join('');
         });
     } else {
-        html += '<p>No subcategories found for this contract.</p>';
+        html += '<p>No subcategories found for this ' + (window.cachedTabNum == 2 || window.cachedTabNum == 4 ? 'contract' : 'category') + '.</p>';
     }
     
     html += '</div>';
