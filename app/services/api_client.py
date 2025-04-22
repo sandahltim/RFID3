@@ -4,8 +4,6 @@ from datetime import datetime, timedelta
 from config import API_USERNAME, API_PASSWORD, LOGIN_URL, ITEM_MASTER_URL, TRANSACTION_URL, SEED_URL
 import logging
 from urllib.parse import quote
-import os
-import getpass
 
 logger = logging.getLogger(__name__)
 
@@ -59,20 +57,24 @@ class APIClient:
             full_url = f"{url}?{query_string}"
             logger.debug(f"Making request to full URL: {full_url}")
             logger.debug(f"Request headers: {headers}")
-            response = requests.get(url, headers=headers, params=params, timeout=20)
-            data = response.json()
-            logger.debug(f"API response: {response.status_code} {response.reason}, response: {data}")
-            if response.status_code != 200:
-                logger.error(f"Request failed: {response.status_code} {response.reason}, response: {data}")
-                raise Exception(f"{response.status_code} {response.reason}")
-            records = data.get('data', [])
-            total_count = data.get('totalcount', 0)
-            offset = params['offset']
-            logger.debug(f"Fetched {len(records)} records, Total Count: {total_count}, Offset: {offset}")
-            all_data.extend(records)
-            if len(records) < params['limit'] or offset + len(records) >= total_count:
-                break
-            params['offset'] += len(records)
+            try:
+                response = requests.get(url, headers=headers, params=params, timeout=20)
+                data = response.json()
+                logger.debug(f"API response: {response.status_code} {response.reason}, response: {data}")
+                if response.status_code != 200:
+                    logger.error(f"Request failed: {response.status_code} {response.reason}, response: {data}")
+                    raise Exception(f"{response.status_code} {response.reason}")
+                records = data.get('data', [])
+                total_count = data.get('totalcount', 0)
+                offset = params['offset']
+                logger.debug(f"Fetched {len(records)} records, Total Count: {total_count}, Offset: {offset}")
+                all_data.extend(records)
+                if len(records) < params['limit'] or offset + len(records) >= total_count:
+                    break
+                params['offset'] += len(records)
+            except requests.RequestException as e:
+                logger.error(f"Request failed: {str(e)}")
+                raise
         logger.debug(f"Total records fetched: {len(all_data)}")
         return all_data
 
@@ -85,12 +87,13 @@ class APIClient:
         logger.debug(f"Item master filter since_date: {since_date}")
         filter_str = f"date_last_scanned,gt,'{since_date}'"
         logger.debug(f"Constructed filter string: {filter_str}")
-        params['filter[gt]'] = filter_str  # Use filter[gt] instead of filter[]
+        params['filter[gt]'] = filter_str
         
         try:
             data = self._make_request("14223767938169344381", params)
         except Exception as e:
             logger.warning(f"Filter failed: {str(e)}. Fetching all data and filtering locally.")
+            params.pop('filter[gt]', None)
             data = self._make_request("14223767938169344381")
             if since_date:
                 since_dt = datetime.strptime(since_date, '%Y-%m-%d %H:%M:%S')
@@ -98,6 +101,7 @@ class APIClient:
                     item for item in data
                     if item.get('date_last_scanned') and datetime.strptime(item['date_last_scanned'], '%Y-%m-%d %H:%M:%S') > since_dt
                 ]
+        logger.debug(f"Item master data sample: {data[:5] if data else 'No data'}")
         return data
 
     def get_transactions(self, since_date=None):
@@ -105,13 +109,14 @@ class APIClient:
         if since_date:
             since_date = datetime.fromisoformat(since_date).strftime('%Y-%m-%d %H:%M:%S') if isinstance(since_date, str) else since_date.strftime('%Y-%m-%d %H:%M:%S')
             logger.debug(f"Transactions filter since_date: {since_date}")
-            filter_str = f"date_last_scanned,gt,'{since_date}'"  # Use date_last_scanned as per item master
+            filter_str = f"date_updated,gt,'{since_date}'"
             logger.debug(f"Constructed filter string: {filter_str}")
-            params['filter[gt]'] = filter_str  # Use filter[gt] instead of filter[]
+            params['filter[gt]'] = filter_str
             try:
                 data = self._make_request("14223767938169346196", params)
             except Exception as e:
                 logger.warning(f"Filter failed: {str(e)}. Fetching all data and filtering locally.")
+                params.pop('filter[gt]', None)
                 data = self._make_request("14223767938169346196")
                 if since_date:
                     since_dt = datetime.strptime(since_date, '%Y-%m-%d %H:%M:%S')
@@ -119,21 +124,32 @@ class APIClient:
                         item for item in data
                         if item.get('date_updated') and datetime.strptime(item['date_updated'], '%Y-%m-%d %H:%M:%S') > since_dt
                     ]
-                return data
         else:
             data = self._make_request("14223767938169346196")
+        logger.debug(f"Transactions data sample: {data[:5] if data else 'No data'}")
         return data
 
     def get_seed_data(self, since_date=None):
         params = {}
-        # Remove filter for seed data to avoid errors
-        data = self._make_request("14223767938169215907", params)
         if since_date:
             since_date = datetime.fromisoformat(since_date).strftime('%Y-%m-%d %H:%M:%S') if isinstance(since_date, str) else since_date.strftime('%Y-%m-%d %H:%M:%S')
             logger.debug(f"Seed data filter since_date: {since_date}")
-            since_dt = datetime.strptime(since_date, '%Y-%m-%d %H:%M:%S')
-            data = [
-                item for item in data
-                if item.get('date_updated') and datetime.strptime(item['date_updated'], '%Y-%m-%d %H:%M:%S') > since_dt
-            ]
+            filter_str = f"date_updated,gt,'{since_date}'"
+            logger.debug(f"Constructed filter string: {filter_str}")
+            params['filter[gt]'] = filter_str
+            try:
+                data = self._make_request("14223767938169215907", params)
+            except Exception as e:
+                logger.warning(f"Filter failed: {str(e)}. Fetching all data and filtering locally.")
+                params.pop('filter[gt]', None)
+                data = self._make_request("14223767938169215907")
+                if since_date:
+                    since_dt = datetime.strptime(since_date, '%Y-%m-%d %H:%M:%S')
+                    data = [
+                        item for item in data
+                        if item.get('date_updated') and datetime.strptime(item['date_updated'], '%Y-%m-%d %H:%M:%S') > since_dt
+                    ]
+        else:
+            data = self._make_request("14223767938169215907")
+        logger.debug(f"Seed data sample: {data[:5] if data else 'No data'}")
         return data
