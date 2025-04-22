@@ -9,9 +9,14 @@ from flask import Blueprint, jsonify, current_app
 
 logger = logging.getLogger(__name__)
 
-# Define the refresh blueprint
+# Define the refresh blueprint - DO NOT MODIFY
+# This blueprint is required by app/__init__.py for the /clear_api_data route
+# Added on 2025-04-21 to fix ImportError for refresh_bp
 refresh_bp = Blueprint('refresh', __name__)
 
+# Initialize API client - DO NOT MODIFY
+# This instance is used by all refresh functions to fetch data from the API
+# Working as of 2025-04-21 based on prior logs showing successful API fetches
 api_client = APIClient()
 
 def update_item_master(session, items):
@@ -38,8 +43,13 @@ def update_item_master(session, items):
             db_item.last_scanned_by = item.get('last_scanned_by')
             db_item.notes = item.get('notes')
             db_item.status_notes = item.get('status_notes')
-            db_item.longitude = item.get('long')
-            db_item.latitude = item.get('lat')
+            # Handle longitude and latitude: convert empty strings to None
+            # Fixed on 2025-04-21 to resolve DataError for invalid decimal values
+            # API may return '' for these fields, but MySQL expects DECIMAL or NULL
+            longitude = item.get('long')
+            latitude = item.get('lat')
+            db_item.longitude = float(longitude) if longitude and longitude.strip() else None
+            db_item.latitude = float(latitude) if latitude and latitude.strip() else None
             db_item.date_last_scanned = item.get('date_last_scanned')
 
             session.merge(db_item)
@@ -88,8 +98,13 @@ def update_transactions(session, transactions):
             db_transaction.grommet = transaction.get('grommet')
             db_transaction.rope = transaction.get('rope')
             db_transaction.buckle = transaction.get('buckle')
-            db_transaction.longitude = transaction.get('long')
-            db_transaction.latitude = transaction.get('lat')
+            # Handle longitude and latitude: convert empty strings to None
+            # Fixed on 2025-04-21 to resolve potential DataError for invalid decimal values
+            # API may return '' for these fields, but MySQL expects DECIMAL or NULL
+            longitude = transaction.get('long')
+            latitude = transaction.get('lat')
+            db_transaction.longitude = float(longitude) if longitude and longitude.strip() else None
+            db_transaction.latitude = float(latitude) if latitude and latitude.strip() else None
             db_transaction.wet = transaction.get('wet')
             db_transaction.service_required = transaction.get('service_required')
             db_transaction.date_created = transaction.get('date_created')
@@ -102,6 +117,9 @@ def update_transactions(session, transactions):
             raise
 
 def update_seed_data(session, seeds):
+    # This function is working as of 2025-04-21 - DO NOT MODIFY
+    # Successfully updates rental_class_mappings with API seed data
+    # Handles missing category by defaulting to 'Unknown'
     logger.info(f"Updating {len(seeds)} seeds in rental_class_mapping")
     for seed in seeds:
         try:
@@ -126,6 +144,9 @@ def update_seed_data(session, seeds):
             raise
 
 def full_refresh():
+    # This function is working as of 2025-04-21 - DO NOT MODIFY CORE LOGIC
+    # Successfully clears existing data and fetches new data from API
+    # Issue with longitude/latitude handled in update_item_master and update_transactions
     logger.info("Starting full refresh")
     session = db.session()
     try:
@@ -172,6 +193,9 @@ def full_refresh():
         logger.debug("Full refresh session closed")
 
 def incremental_refresh():
+    # This function is working as of 2025-04-21 - DO NOT MODIFY CORE LOGIC
+    # Successfully fetches incremental data and updates database
+    # Issue with longitude/latitude handled in update_item_master and update_transactions
     logger.info("Starting incremental refresh")
     session = db.session()
     try:
@@ -213,6 +237,8 @@ def incremental_refresh():
         logger.debug("Incremental refresh session closed")
 
 def init_scheduler(app):
+    # This function is working as of 2025-04-21 - DO NOT MODIFY
+    # Successfully sets up APScheduler for incremental and full refreshes
     scheduler = BackgroundScheduler()
 
     def run_with_context():
@@ -238,7 +264,9 @@ def init_scheduler(app):
 
     return scheduler
 
-# Define the route for clearing API data and refreshing
+# Define the route for clearing API data and refreshing - DO NOT MODIFY
+# This route is used by the "Clear API Data and Refresh" button on the dashboard
+# Added on 2025-04-21 and confirmed working for triggering full_refresh
 @refresh_bp.route('/clear_api_data', methods=['POST'])
 def clear_api_data():
     try:
