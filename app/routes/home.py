@@ -42,7 +42,7 @@ def index():
             {
                 'tag_id': item.tag_id,
                 'common_name': item.common_name,
-                'date_last_scanned': item.date_last_scanned.isoformat().replace('T', ' ') if item.date_last_scanned else None
+                'date_last_scanned': item.date_last_scanned.strftime('%m/%d/%Y, %I:%M:%S %p') if item.date_last_scanned else 'N/A'
             }
             for item in recent_scans
         ]
