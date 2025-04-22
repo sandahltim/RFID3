@@ -2,7 +2,7 @@ import logging
 from datetime import datetime, timedelta
 from sqlalchemy.exc import SQLAlchemyError
 from apscheduler.schedulers.background import BackgroundScheduler
-from app.models.db_models import IDItemMaster, IDTransactions, RentalClassMapping, db
+from app.models.db_models import ItemMaster, Transaction, RentalClassMapping, db
 from app.services.api_client import APIClient
 from config import FULL_REFRESH_INTERVAL, INCREMENTAL_REFRESH_INTERVAL
 
@@ -19,9 +19,9 @@ def update_item_master(session, items):
                 logger.warning(f"Skipping item with missing tag_id: {item}")
                 continue
 
-            db_item = session.query(IDItemMaster).filter_by(tag_id=tag_id).first()
+            db_item = session.query(ItemMaster).filter_by(tag_id=tag_id).first()
             if not db_item:
-                db_item = IDItemMaster(tag_id=tag_id)
+                db_item = ItemMaster(tag_id=tag_id)
 
             db_item.serial_number = item.get('serial_number')
             db_item.rental_class_num = item.get('rental_class_num')
@@ -34,8 +34,8 @@ def update_item_master(session, items):
             db_item.last_scanned_by = item.get('last_scanned_by')
             db_item.notes = item.get('notes')
             db_item.status_notes = item.get('status_notes')
-            db_item.long = item.get('long')
-            db_item.lat = item.get('lat')
+            db_item.longitude = item.get('long')  # Updated to match db_models.py
+            db_item.latitude = item.get('lat')   # Updated to match db_models.py
             db_item.date_last_scanned = item.get('date_last_scanned')
 
             session.merge(db_item)
@@ -54,17 +54,17 @@ def update_transactions(session, transactions):
                 logger.warning(f"Skipping transaction with missing tag_id or scan_date: {transaction}")
                 continue
 
-            db_transaction = session.query(IDTransactions).filter_by(
+            db_transaction = session.query(Transaction).filter_by(
                 tag_id=tag_id, scan_date=scan_date
             ).first()
             if not db_transaction:
-                db_transaction = IDTransactions(tag_id=tag_id, scan_date=scan_date)
+                db_transaction = Transaction(tag_id=tag_id, scan_date=scan_date)
 
             db_transaction.scan_type = transaction.get('scan_type')
             db_transaction.contract_number = transaction.get('contract_number')
             db_transaction.client_name = transaction.get('client_name')
             db_transaction.notes = transaction.get('notes')
-            db_transaction.rental_class_id = transaction.get('rental_class_id')
+            db_transaction.rental_class_num = transaction.get('rental_class_id')  # Updated to match db_models.py
             db_transaction.common_name = transaction.get('common_name')
             db_transaction.serial_number = transaction.get('serial_number')
             db_transaction.location_of_repair = transaction.get('location_of_repair')
@@ -84,8 +84,8 @@ def update_transactions(session, transactions):
             db_transaction.grommet = transaction.get('grommet')
             db_transaction.rope = transaction.get('rope')
             db_transaction.buckle = transaction.get('buckle')
-            db_transaction.long = transaction.get('long')
-            db_transaction.lat = transaction.get('lat')
+            db_transaction.longitude = transaction.get('long')  # Updated to match db_models.py
+            db_transaction.latitude = transaction.get('lat')   # Updated to match db_models.py
             db_transaction.wet = transaction.get('wet')
             db_transaction.service_required = transaction.get('service_required')
             db_transaction.date_created = transaction.get('date_created')
@@ -126,8 +126,8 @@ def full_refresh():
     session = db.session()
     try:
         # Clear existing data
-        deleted_items = session.query(IDItemMaster).delete()
-        deleted_transactions = session.query(IDTransactions).delete()
+        deleted_items = session.query(ItemMaster).delete()
+        deleted_transactions = session.query(Transaction).delete()
         deleted_mappings = session.query(RentalClassMapping).delete()
         logger.info(f"Deleted {deleted_items} items from id_item_master")
         logger.info(f"Deleted {deleted_transactions} transactions from id_transactions")
