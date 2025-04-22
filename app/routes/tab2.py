@@ -49,7 +49,7 @@ def tab2_view():
         hand_counted_dict = {row.contract_number: row.hand_counted_total for row in hand_counted_data}
 
         # Format the contract data for the template
-        # Include hand-counted items in the total
+        # Include hand-counted items in the total under the same contract
         categories = []
         for contract_num, total_items, customer_name, last_scanned_date in contract_data:
             if contract_num is None:
@@ -109,7 +109,6 @@ def tab2_categories():
     # Route to render the categories table for Tab 2
     # Shows all open contracts with columns: Contract Number, Customer Name, Items on Contracts, Last Scanned Date, Actions
     # Hides columns: Total Items, Items in Service, Items Available
-    # Fixed on 2025-04-21 to ensure correct column data and visibility
     try:
         contract_data = db.session.query(
             ItemMaster.last_contract_num,
@@ -191,6 +190,7 @@ def tab2_categories():
 @tab2_bp.route('/tab/2/subcat_data')
 def tab2_subcat_data():
     # Route to fetch subcategory data for a specific contract
+    # Updated on 2025-04-21 to combine hand-counted items under the same contract
     try:
         current_app.logger.info("Received request for /tab/2/subcat_data")
         contract_num = request.args.get('category')  # For Tab 2, 'category' is the contract number
@@ -212,7 +212,7 @@ def tab2_subcat_data():
             func.coalesce(RentalClassMapping.category, 'Unclassified')
         ).all()
 
-        # Include hand-counted items in subcategory counts if applicable
+        # Fetch hand-counted items for this contract
         hand_counted_subcat_data = db.session.query(
             HandCountedItems.item_name.label('category'),
             func.sum(HandCountedItems.quantity).label('hand_counted_total')
@@ -223,31 +223,42 @@ def tab2_subcat_data():
             HandCountedItems.item_name
         ).all()
 
-        hand_counted_subcat_dict = {row.category: row.hand_counted_total for row in hand_counted_subcat_data}
-
-        subcat_data = []
-        for cat, total_items, on_contracts, in_service in subcategories:
-            hand_counted_items = hand_counted_subcat_dict.get(cat, 0)
-            total_with_hand_counted = total_items + hand_counted_items
-            on_contracts_with_hand_counted = on_contracts + hand_counted_items
-            subcat_data.append({
-                'subcategory': cat,
-                'total_items': total_with_hand_counted,
-                'on_contracts': on_contracts_with_hand_counted,
+        # Convert subcategories to a dictionary for merging
+        subcat_dict = {
+            cat: {
+                'total_items': total_items,
+                'on_contracts': on_contracts,
                 'in_service': in_service,
                 'available': 0
-            })
+            }
+            for cat, total_items, on_contracts, in_service in subcategories
+        }
 
-        # Add hand-counted items that don't match any subcategory
-        for item_name, hand_counted_total in hand_counted_subcat_dict.items():
-            if not any(subcat['subcategory'] == item_name for subcat in subcat_data):
-                subcat_data.append({
-                    'subcategory': item_name,
-                    'total_items': hand_counted_total,
-                    'on_contracts': hand_counted_total,
+        # Merge hand-counted items into the subcategories
+        for h_cat, h_total in hand_counted_subcat_data:
+            if h_cat in subcat_dict:
+                # Add hand-counted items to existing subcategory
+                subcat_dict[h_cat]['total_items'] += h_total
+                subcat_dict[h_cat]['on_contracts'] += h_total
+            else:
+                # Create new subcategory entry for hand-counted item
+                subcat_dict[h_cat] = {
+                    'total_items': h_total,
+                    'on_contracts': h_total,
                     'in_service': 0,
                     'available': 0
-                })
+                }
+
+        subcat_data = [
+            {
+                'subcategory': cat,
+                'total_items': data['total_items'],
+                'on_contracts': data['on_contracts'],
+                'in_service': data['in_service'],
+                'available': data['available']
+            }
+            for cat, data in subcat_dict.items()
+        ]
 
         current_app.logger.info(f"Fetched {len(subcat_data)} categories for contract {contract_num}")
         current_app.logger.debug(f"Subcategory data for contract {contract_num}: {subcat_data}")
@@ -310,33 +321,41 @@ def tab2_common_names():
             HandCountedItems.item_name
         ).all()
 
-        hand_counted_common_dict = {row.common_name: row.hand_counted_total for row in hand_counted_common_names}
-
-        common_names_data = []
-        for name, total_items, on_contracts, in_service in common_names:
-            if name is None:
-                continue
-            hand_counted_items = hand_counted_common_dict.get(name, 0)
-            total_with_hand_counted = total_items + hand_counted_items
-            on_contracts_with_hand_counted = on_contracts + hand_counted_items
-            common_names_data.append({
-                'name': name,
-                'total_items': total_with_hand_counted,
-                'on_contracts': on_contracts_with_hand_counted,
+        # Convert common names to a dictionary for merging
+        common_dict = {
+            name: {
+                'total_items': total_items,
+                'on_contracts': on_contracts,
                 'in_service': in_service,
                 'available': 0
-            })
+            }
+            for name, total_items, on_contracts, in_service in common_names
+            if name is not None
+        }
 
-        # Add hand-counted items that match the category but don't have a common name
-        for item_name, hand_counted_total in hand_counted_common_dict.items():
-            if not any(cn['name'] == item_name for cn in common_names_data):
-                common_names_data.append({
-                    'name': item_name,
-                    'total_items': hand_counted_total,
-                    'on_contracts': hand_counted_total,
+        # Merge hand-counted items into the common names
+        for h_name, h_total in hand_counted_common_names:
+            if h_name in common_dict:
+                common_dict[h_name]['total_items'] += h_total
+                common_dict[h_name]['on_contracts'] += h_total
+            else:
+                common_dict[h_name] = {
+                    'total_items': h_total,
+                    'on_contracts': h_total,
                     'in_service': 0,
                     'available': 0
-                })
+                }
+
+        common_names_data = [
+            {
+                'name': name,
+                'total_items': data['total_items'],
+                'on_contracts': data['on_contracts'],
+                'in_service': data['in_service'],
+                'available': data['available']
+            }
+            for name, data in common_dict.items()
+        ]
 
         current_app.logger.debug(f"Common names for contract {contract_num}, category: {category}: {common_names_data}")
 
