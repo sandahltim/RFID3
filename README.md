@@ -20,6 +20,10 @@ test_rfidpi/ RFID2
 │   │   ├── base.html
 │   │   ├── categories.html
 │   │   ├── home.html
+│   │   ├── tab1.html
+│   │   ├── tab2.html
+│   │   ├── tab3.html
+│   │   ├── tab4.html
 │   │   └── tab.html
 ├── static/
 │   └── css/

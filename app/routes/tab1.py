@@ -59,8 +59,9 @@ def tab1_view():
         ).all()
         statuses = [status[0] for status in statuses]
 
+        # Updated on 2025-04-21 to use tab1.html instead of tab.html
         return render_template(
-            'tab.html',
+            'tab1.html',
             tab_num=1,
             categories=categories,
             bin_locations=bin_locations,

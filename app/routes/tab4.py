@@ -78,9 +78,9 @@ def tab4_view():
         ).all()
         statuses = [status[0] for status in statuses]
 
-        # Render the tab.html template with the data
+        # Updated on 2025-04-21 to use tab4.html instead of tab.html
         return render_template(
-            'tab.html',
+            'tab4.html',
             tab_num=4,
             categories=categories,
             bin_locations=bin_locations,
@@ -224,7 +224,7 @@ def tab4_common_names():
             ).outerjoin(
                 RentalClassMapping, RentalClassMapping.rental_class_id == ItemMaster.rental_class_num
             ).filter(
-                func.lower(ItemMaster.status).in_(['on rent', ' decisdelivered']),
+                func.lower(ItemMaster.status).in_(['on rent', 'delivered']),  # Fixed typo 'decisdelivered' on 2025-04-21
                 ItemMaster.last_contract_num == contract_num,
                 func.lower(ItemMaster.last_contract_num).like('l%'),
                 RentalClassMapping.category.is_(None)
