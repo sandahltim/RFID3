@@ -1,10 +1,11 @@
 from flask import Blueprint, render_template, jsonify, current_app, request
 from .. import db, cache
-from ..models.db_models import ItemMaster, RentalClassMapping, Transaction
+from ..models.db_models import ItemMaster, RentalClassMapping, Transaction, HandCountedItems
 from sqlalchemy import func
 from urllib.parse import quote
 import re
 import time
+from datetime import datetime
 
 # Blueprint for Tab 4 (Laundry Tab) - DO NOT MODIFY BLUEPRINT NAME
 # Added on 2025-04-21 to display laundry contracts (starting with 'L')
@@ -37,24 +38,39 @@ def tab4_view():
             ItemMaster.last_contract_num
         ).all()
 
+        # Fetch hand-counted items to add to the counts
+        hand_counted_data = db.session.query(
+            HandCountedItems.contract_number,
+            func.sum(HandCountedItems.quantity).label('hand_counted_total')
+        ).filter(
+            func.lower(HandCountedItems.contract_number).like('l%'),
+            HandCountedItems.action == 'Added'
+        ).group_by(
+            HandCountedItems.contract_number
+        ).all()
+
+        hand_counted_dict = {row.contract_number: row.hand_counted_total for row in hand_counted_data}
+
         # Format the contract data for the template
-        # Fixed on 2025-04-21 to ensure 'on_contracts' is a count, not a date
-        categories = [
-            {
+        # Include hand-counted items in the total
+        categories = []
+        for contract_num, total_items, customer_name, last_scanned_date in contract_data:
+            if contract_num is None:
+                continue
+            hand_counted_items = hand_counted_dict.get(contract_num, 0)
+            total_with_hand_counted = total_items + hand_counted_items
+            categories.append({
                 'name': contract_num,
-                'total_items': total_items,
-                'on_contracts': total_items,  # Count of items on contract (status 'on rent' or 'delivered')
+                'total_items': total_with_hand_counted,
+                'on_contracts': total_with_hand_counted,  # Count includes hand-counted items
                 'in_service': 0,  # Placeholder, not used
                 'available': 0,   # Placeholder, not used
                 'customer_name': customer_name or 'N/A',
                 'last_scanned_date': last_scanned_date.isoformat().replace('T', ' ') if last_scanned_date else 'N/A'
-            }
-            for contract_num, total_items, customer_name, last_scanned_date in contract_data
-            if contract_num is not None
-        ]
+            })
         current_app.logger.info(f"Fetched {len(categories)} laundry contracts")
         current_app.logger.debug(f"Raw contract data: {contract_data}")
-        # Added on 2025-04-21 to debug display issues
+        current_app.logger.debug(f"Hand-counted data: {hand_counted_dict}")
         current_app.logger.debug(f"Formatted categories for tab 4: {categories}")
 
         # Fetch bin locations for filtering (same as Tab 2)
@@ -115,20 +131,35 @@ def tab4_categories():
             ItemMaster.last_contract_num
         ).all()
 
-        categories = [
-            {
+        # Fetch hand-counted items to add to the counts
+        hand_counted_data = db.session.query(
+            HandCountedItems.contract_number,
+            func.sum(HandCountedItems.quantity).label('hand_counted_total')
+        ).filter(
+            func.lower(HandCountedItems.contract_number).like('l%'),
+            HandCountedItems.action == 'Added'
+        ).group_by(
+            HandCountedItems.contract_number
+        ).all()
+
+        hand_counted_dict = {row.contract_number: row.hand_counted_total for row in hand_counted_data}
+
+        # Format the contract data for the template
+        categories = []
+        for contract_num, total_items, customer_name, last_scanned_date in contract_data:
+            if contract_num is None:
+                continue
+            hand_counted_items = hand_counted_dict.get(contract_num, 0)
+            total_with_hand_counted = total_items + hand_counted_items
+            categories.append({
                 'name': contract_num,
-                'total_items': total_items,
-                'on_contracts': total_items,
+                'total_items': total_with_hand_counted,
+                'on_contracts': total_with_hand_counted,
                 'in_service': 0,
                 'available': 0,
                 'customer_name': customer_name or 'N/A',
                 'last_scanned_date': last_scanned_date.isoformat().replace('T', ' ') if last_scanned_date else 'N/A'
-            }
-            for contract_num, total_items, customer_name, last_scanned_date in contract_data
-            if contract_num is not None
-        ]
-        # Added on 2025-04-21 to debug display issues
+            })
         current_app.logger.debug(f"Categories for tab 4 rendering: {categories}")
 
         # Generate HTML for the table rows with correct column alignment
@@ -188,18 +219,42 @@ def tab4_subcat_data():
             func.coalesce(RentalClassMapping.category, 'Unclassified')
         ).all()
 
-        current_app.logger.debug(f"Raw category counts for contract {contract_num}: {subcategories}")
+        # Include hand-counted items in subcategory counts if applicable
+        hand_counted_subcat_data = db.session.query(
+            HandCountedItems.item_name.label('category'),
+            func.sum(HandCountedItems.quantity).label('hand_counted_total')
+        ).filter(
+            HandCountedItems.contract_number == contract_num,
+            HandCountedItems.action == 'Added'
+        ).group_by(
+            HandCountedItems.item_name
+        ).all()
 
-        subcat_data = [
-            {
+        hand_counted_subcat_dict = {row.category: row.hand_counted_total for row in hand_counted_subcat_data}
+
+        subcat_data = []
+        for cat, total_items, on_contracts, in_service in subcategories:
+            hand_counted_items = hand_counted_subcat_dict.get(cat, 0)
+            total_with_hand_counted = total_items + hand_counted_items
+            on_contracts_with_hand_counted = on_contracts + hand_counted_items
+            subcat_data.append({
                 'subcategory': cat,
-                'total_items': total_items,
-                'on_contracts': on_contracts,
+                'total_items': total_with_hand_counted,
+                'on_contracts': on_contracts_with_hand_counted,
                 'in_service': in_service,
                 'available': 0
-            }
-            for cat, total_items, on_contracts, in_service in subcategories
-        ]
+            })
+
+        # Add hand-counted items that don't match any subcategory
+        for item_name, hand_counted_total in hand_counted_subcat_dict.items():
+            if not any(subcat['subcategory'] == item_name for subcat in subcat_data):
+                subcat_data.append({
+                    'subcategory': item_name,
+                    'total_items': hand_counted_total,
+                    'on_contracts': hand_counted_total,
+                    'in_service': 0,
+                    'available': 0
+                })
 
         current_app.logger.info(f"Fetched {len(subcat_data)} categories for contract {contract_num}")
         current_app.logger.debug(f"Subcategory data for contract {contract_num}: {subcat_data}")
@@ -252,21 +307,47 @@ def tab4_common_names():
                 func.trim(func.upper(ItemMaster.common_name))
             ).all()
 
-        current_app.logger.debug(f"Common names for contract {contract_num}, category: {category}: {common_names}")
+        # Include hand-counted items if they match the category
+        hand_counted_common_names = db.session.query(
+            HandCountedItems.item_name.label('common_name'),
+            func.sum(HandCountedItems.quantity).label('hand_counted_total')
+        ).filter(
+            HandCountedItems.contract_number == contract_num,
+            HandCountedItems.item_name == category,
+            HandCountedItems.action == 'Added'
+        ).group_by(
+            HandCountedItems.item_name
+        ).all()
 
-        common_names_data = [
-            {
+        hand_counted_common_dict = {row.common_name: row.hand_counted_total for row in hand_counted_common_names}
+
+        common_names_data = []
+        for name, total_items, on_contracts, in_service in common_names:
+            if name is None:
+                continue
+            hand_counted_items = hand_counted_common_dict.get(name, 0)
+            total_with_hand_counted = total_items + hand_counted_items
+            on_contracts_with_hand_counted = on_contracts + hand_counted_items
+            common_names_data.append({
                 'name': name,
-                'total_items': total_items,
-                'on_contracts': on_contracts,
+                'total_items': total_with_hand_counted,
+                'on_contracts': on_contracts_with_hand_counted,
                 'in_service': in_service,
                 'available': 0
-            }
-            for name, total_items, on_contracts, in_service in common_names
-            if name is not None
-        ]
+            })
 
-        current_app.logger.debug(f"Common names data: {common_names_data}")
+        # Add hand-counted items that match the category but don't have a common name
+        for item_name, hand_counted_total in hand_counted_common_dict.items():
+            if not any(cn['name'] == item_name for cn in common_names_data):
+                common_names_data.append({
+                    'name': item_name,
+                    'total_items': hand_counted_total,
+                    'on_contracts': hand_counted_total,
+                    'in_service': 0,
+                    'available': 0
+                })
+
+        current_app.logger.debug(f"Common names for contract {contract_num}, category: {category}: {common_names_data}")
 
         return jsonify({'common_names': common_names_data})
     except Exception as e:
@@ -309,6 +390,9 @@ def tab4_data():
                 func.trim(func.upper(ItemMaster.common_name)) == func.trim(func.upper(common_name))
             ).all()
 
+        # Hand-counted items don't have individual item details, so they won't appear here
+        # They are already included in the counts at the subcategory and common name levels
+
         current_app.logger.debug(f"Items for contract {contract_num}, category {category}, common_name {common_name}: {len(items)} items found")
 
         items_data = [
@@ -329,3 +413,95 @@ def tab4_data():
     except Exception as e:
         current_app.logger.error(f"Error fetching data for contract {contract_num}, category {category}, common_name {common_name}: {str(e)}", exc_info=True)
         return jsonify({'error': f'Failed to fetch data: {str(e)}'}), 500
+
+# Added on 2025-04-21 to handle hand-counted items
+@tab4_bp.route('/tab/4/add_hand_counted_item', methods=['POST'])
+def add_hand_counted_item():
+    try:
+        data = request.get_json()
+        contract_number = data.get('contract_number')
+        item_name = data.get('item_name')
+        quantity = data.get('quantity')
+        action = data.get('action')
+
+        if not all([contract_number, item_name, quantity, action]):
+            return jsonify({'error': 'Missing required fields'}), 400
+
+        # For now, use a static user; this can be replaced with actual user authentication
+        user = "admin"
+
+        hand_counted_item = HandCountedItems(
+            contract_number=contract_number,
+            item_name=item_name,
+            quantity=quantity,
+            action=action,
+            timestamp=datetime.utcnow(),
+            user=user
+        )
+        db.session.add(hand_counted_item)
+        db.session.commit()
+
+        current_app.logger.info(f"Added hand-counted item: {item_name} (Qty: {quantity}) to contract {contract_number} by {user}")
+
+        return jsonify({'message': 'Item added successfully'})
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Error adding hand-counted item: {str(e)}", exc_info=True)
+        return jsonify({'error': 'Failed to add item'}), 500
+
+@tab4_bp.route('/tab/4/remove_hand_counted_item', methods=['POST'])
+def remove_hand_counted_item():
+    try:
+        data = request.get_json()
+        contract_number = data.get('contract_number')
+        item_name = data.get('item_name')
+        quantity = data.get('quantity')
+        action = data.get('action')
+
+        if not all([contract_number, item_name, quantity, action]):
+            return jsonify({'error': 'Missing required fields'}), 400
+
+        # For now, use a static user; this can be replaced with actual user authentication
+        user = "admin"
+
+        # Log the removal as a new entry
+        hand_counted_item = HandCountedItems(
+            contract_number=contract_number,
+            item_name=item_name,
+            quantity=quantity,
+            action=action,
+            timestamp=datetime.utcnow(),
+            user=user
+        )
+        db.session.add(hand_counted_item)
+        db.session.commit()
+
+        current_app.logger.info(f"Removed hand-counted item: {item_name} (Qty: {quantity}) from contract {contract_number} by {user}")
+
+        return jsonify({'message': 'Item removed successfully'})
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Error removing hand-counted item: {str(e)}", exc_info=True)
+        return jsonify({'error': 'Failed to remove item'}), 500
+
+@tab4_bp.route('/tab/4/hand_counted_items')
+def get_hand_counted_items():
+    try:
+        items = db.session.query(HandCountedItems).order_by(HandCountedItems.timestamp.desc()).all()
+
+        html = ''
+        for item in items:
+            html += f'''
+                <tr>
+                    <td>{item.contract_number}</td>
+                    <td>{item.item_name}</td>
+                    <td>{item.quantity}</td>
+                    <td>{item.action}</td>
+                    <td>{item.timestamp.isoformat().replace('T', ' ')}</td>
+                    <td>{item.user}</td>
+                </tr>
+            '''
+        return html
+    except Exception as e:
+        current_app.logger.error(f"Error fetching hand-counted items: {str(e)}", exc_info=True)
+        return '<tr><td colspan="6">Error loading hand-counted items</td></tr>'

@@ -99,3 +99,15 @@ class RentalClassMapping(db.Model):
     rental_class_id = db.Column(db.String(50), primary_key=True)
     category = db.Column(db.String(100), nullable=False)
     subcategory = db.Column(db.String(100), nullable=False)
+
+# Added on 2025-04-21 to track hand-counted items for contracts
+class HandCountedItems(db.Model):
+    __tablename__ = 'id_hand_counted_items'
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    contract_number = db.Column(db.String(50), nullable=False)  # Links to the contract
+    item_name = db.Column(db.String(255), nullable=False)      # e.g., "Napkins"
+    quantity = db.Column(db.Integer, nullable=False)           # Number of items
+    action = db.Column(db.String(50), nullable=False)          # "Added" or "Removed"
+    timestamp = db.Column(db.DateTime, nullable=False)         # When the action occurred
+    user = db.Column(db.String(50), nullable=False)            # Who performed the action

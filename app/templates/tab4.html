@@ -54,12 +54,128 @@
         <tbody id="category-rows" hx-get="/tab/4/categories?cache_bust={{ cache_bust }}" hx-trigger="load, refreshTab">
         </tbody>
     </table>
+
+    <!-- Hand-Counted Items Section -->
+    <!-- Added on 2025-04-21 for entering items not tracked by API -->
+    <div class="mt-4">
+        <h3>Add Hand-Counted Items (e.g., Napkins)</h3>
+        <div class="row mb-3">
+            <div class="col">
+                <input type="text" class="form-control" id="handCountedContractNumber" placeholder="Contract Number (e.g., L3)">
+            </div>
+            <div class="col">
+                <input type="text" class="form-control" id="handCountedItemName" placeholder="Item Name (e.g., Napkins)">
+            </div>
+            <div class="col">
+                <input type="number" class="form-control" id="handCountedQuantity" placeholder="Quantity">
+            </div>
+            <div class="col">
+                <button class="btn btn-success" onclick="addHandCountedItem()">Add Item</button>
+                <button class="btn btn-danger" onclick="removeHandCountedItem()">Remove Item</button>
+            </div>
+        </div>
+        <!-- Table to display hand-counted items -->
+        <table class="table table-bordered" id="hand-counted-items-table">
+            <thead>
+                <tr>
+                    <th>Contract Number</th>
+                    <th>Item Name</th>
+                    <th>Quantity</th>
+                    <th>Action</th>
+                    <th>Timestamp</th>
+                    <th>User</th>
+                </tr>
+            </thead>
+            <tbody id="hand-counted-items-rows" hx-get="/tab/4/hand_counted_items?cache_bust={{ cache_bust }}" hx-trigger="load, refreshHandCountedItems">
+            </tbody>
+        </table>
+    </div>
 </div>
 
-<!-- JavaScript for refreshing the table -->
+<!-- JavaScript for refreshing the table and handling hand-counted items -->
 <script>
 function refreshTab() {
     htmx.trigger('#category-rows', 'refreshTab');
+}
+
+function refreshHandCountedItems() {
+    htmx.trigger('#hand-counted-items-rows', 'refreshHandCountedItems');
+}
+
+function addHandCountedItem() {
+    const contractNumber = document.getElementById('handCountedContractNumber').value;
+    const itemName = document.getElementById('handCountedItemName').value;
+    const quantity = document.getElementById('handCountedQuantity').value;
+
+    if (!contractNumber || !itemName || !quantity || quantity <= 0) {
+        alert('Please fill in all fields with valid values.');
+        return;
+    }
+
+    fetch('/tab/4/add_hand_counted_item', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            contract_number: contractNumber,
+            item_name: itemName,
+            quantity: parseInt(quantity),
+            action: 'Added'
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            alert('Error: ' + data.error);
+        } else {
+            alert(data.message);
+            refreshHandCountedItems();
+            refreshTab(); // Refresh the main table to update counts
+        }
+    })
+    .catch(error => {
+        console.error('Error adding hand-counted item:', error);
+        alert('Failed to add item');
+    });
+}
+
+function removeHandCountedItem() {
+    const contractNumber = document.getElementById('handCountedContractNumber').value;
+    const itemName = document.getElementById('handCountedItemName').value;
+    const quantity = document.getElementById('handCountedQuantity').value;
+
+    if (!contractNumber || !itemName || !quantity || quantity <= 0) {
+        alert('Please fill in all fields with valid values.');
+        return;
+    }
+
+    fetch('/tab/4/remove_hand_counted_item', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            contract_number: contractNumber,
+            item_name: itemName,
+            quantity: parseInt(quantity),
+            action: 'Removed'
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            alert('Error: ' + data.error);
+        } else {
+            alert(data.message);
+            refreshHandCountedItems();
+            refreshTab(); // Refresh the main table to update counts
+        }
+    })
+    .catch(error => {
+        console.error('Error removing hand-counted item:', error);
+        alert('Failed to remove item');
+    });
 }
 </script>
 {% endblock %}
