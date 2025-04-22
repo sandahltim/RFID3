@@ -289,7 +289,7 @@ def tab1_data():
                 'bin_location': item.bin_location,
                 'status': item.status,
                 'last_contract_num': item.last_contract_num,
-                'last_scanned_date': item.date_last_scanned.isoformat().replace('T', ' ') if item.date_last_scanned else None,
+                'last_scanned_date': item.date_last_scanned.strftime('%m/%d/%Y, %I:%M:%S %p') if item.date_last_scanned else 'N/A',
                 'quality': item.quality,
                 'notes': item.notes
             }
