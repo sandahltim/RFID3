@@ -6,39 +6,45 @@ from urllib.parse import quote
 import re
 import time
 
+# Blueprint for Tab 2 (Open Contracts) - DO NOT MODIFY BLUEPRINT NAME
+# Added on 2025-04-21 to display all open contracts
 tab2_bp = Blueprint('tab2', __name__)
 
 @tab2_bp.route('/tab/2')
 @cache.cached(timeout=30)
 def tab2_view():
+    # Route to render the main view for Tab 2
+    # Displays a list of all open contracts with status 'on rent' or 'delivered'
     try:
         current_app.logger.info("Loading tab 2")
 
-        # Fetch items with status 'On Rent' or 'Delivered', grouped by last_contract_num
-        # Include all contracts, even those starting with 'L'
+        # Query to fetch all open contracts from ItemMaster
+        # Filters by status 'on rent' or 'delivered', groups by last_contract_num
+        # Includes customer name and most recent scanned date
         contract_data = db.session.query(
             ItemMaster.last_contract_num,
             func.count(ItemMaster.tag_id).label('total_items'),
             func.max(Transaction.client_name).label('customer_name'),
-            func.max(ItemMaster.date_last_scanned).label('last_scanned_date')  # Add most recent scanned date
+            func.max(ItemMaster.date_last_scanned).label('last_scanned_date')
         ).outerjoin(
             Transaction, Transaction.contract_number == ItemMaster.last_contract_num
         ).filter(
             func.lower(ItemMaster.status).in_(['on rent', 'delivered'])
-            # Removed: func.lower(ItemMaster.last_contract_num).notlike('l%')
         ).group_by(
             ItemMaster.last_contract_num
         ).order_by(
             ItemMaster.last_contract_num
         ).all()
 
+        # Format the contract data for the template
+        # Fixed on 2025-04-21 to ensure 'on_contracts' is a count, not a date
         categories = [
             {
                 'name': contract_num,
                 'total_items': total_items,
-                'on_contracts': total_items,  # All items are on contracts (status 'on rent' or 'delivered')
-                'in_service': 0,
-                'available': 0,
+                'on_contracts': total_items,  # Count of items on contract (status 'on rent' or 'delivered')
+                'in_service': 0,  # Placeholder, not used
+                'available': 0,   # Placeholder, not used
                 'customer_name': customer_name or 'N/A',
                 'last_scanned_date': last_scanned_date.isoformat().replace('T', ' ') if last_scanned_date else 'N/A'
             }
@@ -47,7 +53,10 @@ def tab2_view():
         ]
         current_app.logger.info(f"Fetched {len(categories)} rental contracts")
         current_app.logger.debug(f"Raw contract data: {contract_data}")
+        # Added on 2025-04-21 to debug display issues
+        current_app.logger.debug(f"Formatted categories for tab 2: {categories}")
 
+        # Fetch bin locations for filtering
         bin_locations = db.session.query(
             ItemMaster.bin_location
         ).filter(
@@ -58,6 +67,7 @@ def tab2_view():
         bin_locations = [loc[0] for loc in bin_locations]
         current_app.logger.info(f"Fetched {len(bin_locations)} bin locations")
 
+        # Fetch statuses for filtering
         statuses = db.session.query(
             ItemMaster.status
         ).filter(
@@ -82,6 +92,10 @@ def tab2_view():
 
 @tab2_bp.route('/tab/2/categories')
 def tab2_categories():
+    # Route to render the categories table for Tab 2
+    # Shows all open contracts with columns: Contract Number, Customer Name, Items on Contracts, Last Scanned Date, Actions
+    # Hides columns: Total Items, Items in Service, Items Available
+    # Fixed on 2025-04-21 to ensure correct column data and visibility
     try:
         contract_data = db.session.query(
             ItemMaster.last_contract_num,
@@ -92,7 +106,6 @@ def tab2_categories():
             Transaction, Transaction.contract_number == ItemMaster.last_contract_num
         ).filter(
             func.lower(ItemMaster.status).in_(['on rent', 'delivered'])
-            # Removed: func.lower(ItemMaster.last_contract_num).notlike('l%')
         ).group_by(
             ItemMaster.last_contract_num
         ).order_by(
@@ -112,7 +125,10 @@ def tab2_categories():
             for contract_num, total_items, customer_name, last_scanned_date in contract_data
             if contract_num is not None
         ]
+        # Added on 2025-04-21 to debug display issues
+        current_app.logger.debug(f"Categories for tab 2 rendering: {categories}")
 
+        # Generate HTML for the table rows with correct column alignment
         html = ''
         for category in categories:
             cat_id = re.sub(r'[^a-z0-9-]', '_', category['name'].lower())
@@ -141,6 +157,7 @@ def tab2_categories():
 
 @tab2_bp.route('/tab/2/subcat_data')
 def tab2_subcat_data():
+    # Route to fetch subcategory data for a specific contract
     try:
         current_app.logger.info("Received request for /tab/2/subcat_data")
         contract_num = request.args.get('category')  # For Tab 2, 'category' is the contract number
@@ -148,7 +165,6 @@ def tab2_subcat_data():
             current_app.logger.error("Contract parameter is missing")
             return jsonify({'error': 'Contract parameter is required'}), 400
 
-        # Group by Category under the Contract, with a default "Unclassified" category
         subcategories = db.session.query(
             func.coalesce(RentalClassMapping.category, 'Unclassified').label('category'),
             func.count(ItemMaster.tag_id).label('total_items'),
@@ -194,7 +210,6 @@ def tab2_common_names():
 
         current_app.logger.debug(f"Fetching common names for contract: {contract_num}, category: {category}")
 
-        # Handle the default "Unclassified" category
         if category == 'Unclassified':
             common_names = db.session.query(
                 func.trim(func.upper(ItemMaster.common_name)).label('common_name'),
@@ -226,7 +241,7 @@ def tab2_common_names():
                 func.trim(func.upper(ItemMaster.common_name))
             ).all()
 
-        current_app.logger.debug(f"Common names for contract {contract_num}, category {category}: {common_names}")
+        current_app.logger.debug(f"Common names for contract {contract_num}, category: {category}: {common_names}")
 
         common_names_data = [
             {
@@ -244,7 +259,7 @@ def tab2_common_names():
 
         return jsonify({'common_names': common_names_data})
     except Exception as e:
-        current_app.logger.error(f"Error fetching common names for contract {contract_num}, category {category}: {str(e)}", exc_info=True)
+        current_app.logger.error(f"Error fetching common names for contract {contract_num}, category: {category}: {str(e)}", exc_info=True)
         return jsonify({'error': f'Failed to fetch common names: {str(e)}'}), 500
 
 @tab2_bp.route('/tab/2/data')
@@ -258,7 +273,6 @@ def tab2_data():
 
         current_app.logger.debug(f"Fetching items for contract {contract_num}, category {category}, common_name {common_name}")
 
-        # Handle the default "Unclassified" category
         if category == 'Unclassified':
             items = db.session.query(
                 ItemMaster
