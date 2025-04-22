@@ -15,11 +15,14 @@ logger = logging.getLogger(__name__)
 refresh_bp = Blueprint('refresh', __name__)
 
 # Initialize API client - DO NOT MODIFY
-# This instance is used by all refresh functions to fetch data from the API
+# This instance is used by all refresh functions to fetch data from API
 # Working as of 2025-04-21 based on prior logs showing successful API fetches
 api_client = APIClient()
 
 def update_item_master(session, items):
+    # This function is working as of 2025-04-21 - DO NOT MODIFY CORE LOGIC
+    # Successfully updates id_item_master with API data
+    # Fixed longitude/latitude handling on 2025-04-21
     logger.info(f"Updating {len(items)} items in id_item_master")
     for item in items:
         try:
@@ -60,7 +63,7 @@ def update_item_master(session, items):
 
 def update_transactions(session, transactions):
     logger.info(f"Updating {len(transactions)} transactions in id_transactions")
-    for transaction in transactions:
+    for transaction in items:
         try:
             tag_id = transaction.get('tag_id')
             scan_date = transaction.get('scan_date')
@@ -86,18 +89,26 @@ def update_transactions(session, transactions):
             db_transaction.bin_location = transaction.get('bin_location')
             db_transaction.status = transaction.get('status')
             db_transaction.scan_by = transaction.get('scan_by')
-            db_transaction.dirty_or_mud = transaction.get('dirty_or_mud')
-            db_transaction.leaves = transaction.get('leaves')
-            db_transaction.oil = transaction.get('oil')
-            db_transaction.mold = transaction.get('mold')
-            db_transaction.stain = transaction.get('stain')
-            db_transaction.oxidation = transaction.get('oxidation')
+            # Handle boolean fields: convert string 'True'/'False' to Python booleans
+            # Fixed on 2025-04-21 to resolve TypeError for string booleans
+            # API returns 'True'/'False' as strings, but SQLAlchemy expects True/False
+            def to_bool(value):
+                if isinstance(value, str):
+                    return value.lower() == 'true'
+                return bool(value) if value is not None else None
+
+            db_transaction.dirty_or_mud = to_bool(transaction.get('dirty_or_mud'))
+            db_transaction.leaves = to_bool(transaction.get('leaves'))
+            db_transaction.oil = to_bool(transaction.get('oil'))
+            db_transaction.mold = to_bool(transaction.get('mold'))
+            db_transaction.stain = to_bool(transaction.get('stain'))
+            db_transaction.oxidation = to_bool(transaction.get('oxidation'))
             db_transaction.other = transaction.get('other')
-            db_transaction.rip_or_tear = transaction.get('rip_or_tear')
-            db_transaction.sewing_repair_needed = transaction.get('sewing_repair_needed')
-            db_transaction.grommet = transaction.get('grommet')
-            db_transaction.rope = transaction.get('rope')
-            db_transaction.buckle = transaction.get('buckle')
+            db_transaction.rip_or_tear = to_bool(transaction.get('rip_or_tear'))
+            db_transaction.sewing_repair_needed = to_bool(transaction.get('sewing_repair_needed'))
+            db_transaction.grommet = to_bool(transaction.get('grommet'))
+            db_transaction.rope = to_bool(transaction.get('rope'))
+            db_transaction.buckle = to_bool(transaction.get('buckle'))
             # Handle longitude and latitude: convert empty strings to None
             # Fixed on 2025-04-21 to resolve potential DataError for invalid decimal values
             # API may return '' for these fields, but MySQL expects DECIMAL or NULL
@@ -105,14 +116,15 @@ def update_transactions(session, transactions):
             latitude = transaction.get('lat')
             db_transaction.longitude = float(longitude) if longitude and longitude.strip() else None
             db_transaction.latitude = float(latitude) if latitude and latitude.strip() else None
-            db_transaction.wet = transaction.get('wet')
-            db_transaction.service_required = transaction.get('service_required')
+            db_transaction.wet = to_bool(transaction.get('wet'))
+            db_transaction.service_required = to_bool(transaction.get('service_required'))
             db_transaction.date_created = transaction.get('date_created')
             db_transaction.date_updated = transaction.get('date_updated')
 
             session.merge(db_transaction)
         except Exception as e:
             logger.error(f"Error updating transaction {tag_id} at {scan_date}: {str(e)}")
+            logger.debug(f"Raw transaction data: {transaction}")
             session.rollback()
             raise
 
