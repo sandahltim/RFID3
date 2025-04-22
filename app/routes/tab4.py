@@ -59,14 +59,19 @@ def tab4_view():
                 continue
             hand_counted_items = hand_counted_dict.get(contract_num, 0)
             total_with_hand_counted = total_items + hand_counted_items
+            # Sanitize cat_id in Python
+            cat_id = re.sub(r'[^a-z0-9-]', '_', contract_num.lower())
+            # Format last_scanned_date to MM/DD/YYYY, h:mm:ss AM/PM
+            formatted_date = last_scanned_date.strftime('%m/%d/%Y, %I:%M:%S %p') if last_scanned_date else 'N/A'
             categories.append({
                 'name': contract_num,
+                'cat_id': cat_id,  # Add sanitized cat_id
                 'total_items': total_with_hand_counted,
                 'on_contracts': total_with_hand_counted,  # Count includes hand-counted items
                 'in_service': 0,  # Placeholder, not used
                 'available': 0,   # Placeholder, not used
                 'customer_name': customer_name or 'N/A',
-                'last_scanned_date': last_scanned_date.isoformat().replace('T', ' ') if last_scanned_date else 'N/A'
+                'last_scanned_date': formatted_date
             })
         current_app.logger.info(f"Fetched {len(categories)} laundry contracts")
         current_app.logger.debug(f"Raw contract data: {contract_data}")
@@ -106,92 +111,6 @@ def tab4_view():
     except Exception as e:
         current_app.logger.error(f"Error loading tab 4: {str(e)}", exc_info=True)
         return jsonify({'error': 'Failed to load tab data'}), 500
-
-@tab4_bp.route('/tab/4/categories')
-def tab4_categories():
-    # Route to render the categories table for Tab 4
-    # Shows laundry contracts with columns: Contract Number, Customer Name, Items on Contracts, Last Scanned Date, Actions
-    # Hides columns: Total Items, Items in Service, Items Available
-    try:
-        # Same query as tab4_view to fetch laundry contracts
-        contract_data = db.session.query(
-            ItemMaster.last_contract_num,
-            func.count(ItemMaster.tag_id).label('total_items'),
-            func.max(Transaction.client_name).label('customer_name'),
-            func.max(ItemMaster.date_last_scanned).label('last_scanned_date')
-        ).outerjoin(
-            Transaction, Transaction.contract_number == ItemMaster.last_contract_num
-        ).filter(
-            func.lower(ItemMaster.status).in_(['on rent', 'delivered']),
-            func.lower(ItemMaster.last_contract_num).like('l%')
-        ).group_by(
-            ItemMaster.last_contract_num
-        ).order_by(
-            ItemMaster.last_contract_num
-        ).all()
-
-        # Fetch hand-counted items to add to the counts
-        hand_counted_data = db.session.query(
-            HandCountedItems.contract_number,
-            func.sum(HandCountedItems.quantity).label('hand_counted_total')
-        ).filter(
-            func.lower(HandCountedItems.contract_number).like('l%'),
-            HandCountedItems.action == 'Added'
-        ).group_by(
-            HandCountedItems.contract_number
-        ).all()
-
-        hand_counted_dict = {row.contract_number: row.hand_counted_total for row in hand_counted_data}
-
-        # Format the contract data for the template
-        categories = []
-        for contract_num, total_items, customer_name, last_scanned_date in contract_data:
-            if contract_num is None:
-                continue
-            hand_counted_items = hand_counted_dict.get(contract_num, 0)
-            total_with_hand_counted = total_items + hand_counted_items
-            categories.append({
-                'name': contract_num,
-                'total_items': total_with_hand_counted,
-                'on_contracts': total_with_hand_counted,
-                'in_service': 0,
-                'available': 0,
-                'customer_name': customer_name or 'N/A',
-                'last_scanned_date': last_scanned_date.isoformat().replace('T', ' ') if last_scanned_date else 'N/A'
-            })
-        current_app.logger.debug(f"Categories for tab 4 rendering: {categories}")
-
-        # Generate HTML for the table rows with correct column alignment
-        html = ''
-        for category in categories:
-            cat_id = re.sub(r'[^a-z0-9-]', '_', category['name'].lower())
-            encoded_category = quote(category['name']).replace("'", "\\'").replace('"', '\\"')
-            current_app.logger.debug(f"Encoded category for onclick: {encoded_category}")
-            html += f'''
-                <tr>
-                    <td>{category['name']}</td>
-                    <td>{category['customer_name']}</td>
-                    <td class="hidden">{category['total_items']}</td>
-                    <td>{category['on_contracts']}</td>
-                    <td class="hidden">{category['in_service']}</td>
-                    <td class="hidden">{category['available']}</td>
-                    <td>{category['last_scanned_date']}</td>
-                    <td>
-                        <button class="btn btn-sm btn-secondary" onclick="expandCategory('{encoded_category}', 'subcat-{cat_id}')">Expand</button>
-                        <button class="btn btn-sm btn-info print-btn" data-print-level="Contract" data-print-id="category-table">Print</button>
-                        <div id="loading-{cat_id}" style="display:none;" class="loading">Loading...</div>
-                    </td>
-                </tr>
-                <tr>
-                    <td colspan="8">
-                        <div id="subcat-{cat_id}" class="expandable collapsed"></div>
-                    </td>
-                </tr>
-            '''
-        return html
-    except Exception as e:
-        current_app.logger.error(f"Error fetching contracts for tab 4: {str(e)}", exc_info=True)
-        return '<tr><td colspan="8">Error loading contracts</td></tr>'
 
 @tab4_bp.route('/tab/4/subcat_data')
 def tab4_subcat_data():
@@ -423,7 +342,7 @@ def tab4_data():
                 'bin_location': item.bin_location,
                 'status': item.status,
                 'last_contract_num': item.last_contract_num,
-                'last_scanned_date': item.date_last_scanned.isoformat().replace('T', ' ') if item.date_last_scanned else None,
+                'last_scanned_date': item.date_last_scanned.strftime('%m/%d/%Y, %I:%M:%S %p') if item.date_last_scanned else 'N/A',
                 'quality': item.quality,
                 'notes': item.notes
             }
@@ -528,13 +447,15 @@ def get_hand_counted_items():
 
         html = ''
         for item in items:
+            # Format timestamp to MM/DD/YYYY, h:mm:ss AM/PM
+            formatted_timestamp = item.timestamp.strftime('%m/%d/%Y, %I:%M:%S %p') if item.timestamp else 'N/A'
             html += f'''
                 <tr>
                     <td>{item.contract_number}</td>
                     <td>{item.item_name}</td>
                     <td>{item.quantity}</td>
                     <td>{item.action}</td>
-                    <td>{item.timestamp.isoformat().replace('T', ' ')}</td>
+                    <td>{formatted_timestamp}</td>
                     <td>{item.user}</td>
                 </tr>
             '''

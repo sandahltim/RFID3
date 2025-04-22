@@ -53,7 +53,6 @@
         </thead>
         <tbody id="category-rows">
             {% for category in categories %}
-            {% set cat_id = category.name.lower() | regex_replace('[^a-z0-9-]', '_') %}
             {% set encoded_category = category.name | urlencode | replace("'", "\\'") | replace('"', '\\"') %}
             <tr>
                 <td>{{ category.name }}</td>
@@ -64,15 +63,15 @@
                 <td class="hidden">{{ category.available }}</td>
                 <td>{{ category.last_scanned_date }}</td>
                 <td>
-                    <button class="btn btn-sm btn-secondary expand-btn" onclick="expandCategory('{{ encoded_category }}', 'subcat-{{ cat_id }}')">Expand</button>
-                    <button class="btn btn-sm btn-secondary collapse-btn" style="display:none;" onclick="collapseSection('subcat-{{ cat_id }}')">Collapse</button>
+                    <button class="btn btn-sm btn-secondary expand-btn" onclick="expandCategory('{{ encoded_category }}', 'subcat-{{ category.cat_id }}')">Expand</button>
+                    <button class="btn btn-sm btn-secondary collapse-btn" style="display:none;" onclick="collapseSection('subcat-{{ category.cat_id }}')">Collapse</button>
                     <button class="btn btn-sm btn-info print-btn" data-print-level="Contract" data-print-id="category-table">Print</button>
-                    <div id="loading-{{ cat_id }}" style="display:none;" class="loading">Loading...</div>
+                    <div id="loading-{{ category.cat_id }}" style="display:none;" class="loading">Loading...</div>
                 </td>
             </tr>
             <tr>
                 <td colspan="8">
-                    <div id="subcat-{{ cat_id }}" class="expandable collapsed"></div>
+                    <div id="subcat-{{ category.cat_id }}" class="expandable collapsed"></div>
                 </td>
             </tr>
             {% endfor %}
