@@ -1,8 +1,4 @@
-// expand.js - Handles category expansion for RFID Dashboard
-// Module Purpose: Expands categories to show subcategories, common names, and individual items on the tab page
-// Version: 2025-04-21 v12 - Added more logging to debug expansion issues
-
-console.log('expand.js version: 2025-04-21 v12 loaded');
+console.log('expand.js version: 2025-04-22 v13 loaded');
 
 // --- Loading Indicator Functions ---
 function showLoading(key) {
@@ -73,6 +69,20 @@ function hideOtherItems(currentCommonId) {
             div.style.display = 'none'; // Ensure hidden
         }
     });
+}
+
+// --- Collapse Functionality ---
+function collapseSection(targetId) {
+    console.log('collapseSection called with targetId:', targetId);
+    const container = document.getElementById(targetId);
+    if (container) {
+        console.log('Container found, collapsing:', container);
+        container.classList.remove('expanded');
+        container.classList.add('collapsed');
+        container.style.display = 'none'; // Ensure hidden
+    } else {
+        console.warn('Container not found for collapsing with targetId:', targetId);
+    }
 }
 
 // --- Render Individual Items Data ---
@@ -230,7 +240,8 @@ function loadCommonNames(category, subcategory, targetId) {
                                     '<td>' + (cn.in_service !== undefined ? cn.in_service : 'N/A') + '</td>',
                                     '<td>' + (cn.available !== undefined ? cn.available : 'N/A') + '</td>',
                                     '<td>',
-                                        '<button class="btn btn-sm btn-secondary" onclick="loadItems(\'' + encodeURIComponent(decodedCategory) + '\', \'' + encodeURIComponent(decodedSubcategory) + '\', \'' + encodeURIComponent(cn.name) + '\', \'items-' + cnId + '\')">Expand</button>',
+                                        '<button class="btn btn-sm btn-secondary expand-btn" onclick="loadItems(\'' + encodeURIComponent(decodedCategory) + '\', \'' + encodeURIComponent(decodedSubcategory) + '\', \'' + encodeURIComponent(cn.name) + '\', \'items-' + cnId + '\')">Expand</button>',
+                                        '<button class="btn btn-sm btn-secondary collapse-btn" style="display:none;" onclick="collapseSection(\'items-' + cnId + '\')">Collapse</button>',
                                         '<button class="btn btn-sm btn-info print-btn" data-print-level="Common Name" data-print-id="common-table-' + cnId + '">Print</button>',
                                         '<div id="loading-' + cnId + '" style="display:none;" class="loading">Loading...</div>',
                                     '</td>',
@@ -249,6 +260,23 @@ function loadCommonNames(category, subcategory, targetId) {
             }
 
             container.innerHTML = html;
+
+            // Add event listeners to toggle Expand/Collapse buttons
+            const expandButtons = container.querySelectorAll('.expand-btn');
+            const collapseButtons = container.querySelectorAll('.collapse-btn');
+            expandButtons.forEach((btn, index) => {
+                btn.addEventListener('click', () => {
+                    btn.style.display = 'none';
+                    collapseButtons[index].style.display = 'inline-block';
+                });
+            });
+            collapseButtons.forEach((btn, index) => {
+                btn.addEventListener('click', () => {
+                    btn.style.display = 'none';
+                    expandButtons[index].style.display = 'inline-block';
+                });
+            });
+
             console.log('Common names table rendered into container');
         })
         .catch(error => {
@@ -305,7 +333,8 @@ function loadSubcatData(originalCategory, normalizedCategory, subcatData) {
                             '<td>' + (sub.in_service !== undefined ? sub.in_service : 'N/A') + '</td>',
                             '<td>' + (sub.available !== undefined ? sub.available : 'N/A') + '</td>',
                             '<td>',
-                                '<button class="btn btn-sm btn-secondary" onclick="loadCommonNames(\'' + encodeURIComponent(originalCategory) + '\', \'' + encodeURIComponent(sub.subcategory) + '\', \'common-' + subId + '\')">Load Items</button>',
+                                '<button class="btn btn-sm btn-secondary expand-btn" onclick="loadCommonNames(\'' + encodeURIComponent(originalCategory) + '\', \'' + encodeURIComponent(sub.subcategory) + '\', \'common-' + subId + '\')">Load Items</button>',
+                                '<button class="btn btn-sm btn-secondary collapse-btn" style="display:none;" onclick="collapseSection(\'common-' + subId + '\')">Collapse</button>',
                                 '<button class="btn btn-sm btn-info print-btn" data-print-level="' + (isTab2 ? 'Category' : 'Subcategory') + '" data-print-id="subcat-table-' + subId + '">Print</button>',
                                 '<div id="loading-' + subId + '" style="display:none;" class="loading">Loading...</div>',
                             '</td>',
@@ -326,6 +355,23 @@ function loadSubcatData(originalCategory, normalizedCategory, subcatData) {
     html += '</div>';
     console.log('Generated HTML for subcategories:', html);
     container.innerHTML = html;
+
+    // Add event listeners to toggle Expand/Collapse buttons for subcategories
+    const expandButtons = container.querySelectorAll('.expand-btn');
+    const collapseButtons = container.querySelectorAll('.collapse-btn');
+    expandButtons.forEach((btn, index) => {
+        btn.addEventListener('click', () => {
+            btn.style.display = 'none';
+            collapseButtons[index].style.display = 'inline-block';
+        });
+    });
+    collapseButtons.forEach((btn, index) => {
+        btn.addEventListener('click', () => {
+            btn.style.display = 'none';
+            expandButtons[index].style.display = 'inline-block';
+        });
+    });
+
     console.log('Subcategory table rendered into container');
 }
 
@@ -357,6 +403,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 const normalizedCategory = targetId.replace('subcat-', '').replace(/\s+/g, '_'); // Normalize spaces to underscores
                 const originalCategory = decodeURIComponent(category); // Keep the original category name
                 loadSubcatData(originalCategory, normalizedCategory, data);
+
+                // Add event listener for top-level collapse after rendering
+                const container = document.getElementById(targetId);
+                const expandButton = container.parentElement.parentElement.querySelector('.expand-btn');
+                const collapseButton = container.parentElement.parentElement.querySelector('.collapse-btn');
+                expandButton.style.display = 'none';
+                collapseButton.style.display = 'inline-block';
+                collapseButton.addEventListener('click', () => {
+                    collapseSection(targetId);
+                    collapseButton.style.display = 'none';
+                    expandButton.style.display = 'inline-block';
+                });
             })
             .catch(error => {
                 console.error('Subcat fetch error:', error);
