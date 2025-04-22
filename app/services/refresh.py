@@ -5,8 +5,12 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from app.models.db_models import ItemMaster, Transaction, RentalClassMapping, db
 from app.services.api_client import APIClient
 from config import FULL_REFRESH_INTERVAL, INCREMENTAL_REFRESH_INTERVAL
+from flask import Blueprint, jsonify, current_app
 
 logger = logging.getLogger(__name__)
+
+# Define the refresh blueprint
+refresh_bp = Blueprint('refresh', __name__)
 
 api_client = APIClient()
 
@@ -34,8 +38,8 @@ def update_item_master(session, items):
             db_item.last_scanned_by = item.get('last_scanned_by')
             db_item.notes = item.get('notes')
             db_item.status_notes = item.get('status_notes')
-            db_item.longitude = item.get('long')  # Updated to match db_models.py
-            db_item.latitude = item.get('lat')   # Updated to match db_models.py
+            db_item.longitude = item.get('long')
+            db_item.latitude = item.get('lat')
             db_item.date_last_scanned = item.get('date_last_scanned')
 
             session.merge(db_item)
@@ -64,7 +68,7 @@ def update_transactions(session, transactions):
             db_transaction.contract_number = transaction.get('contract_number')
             db_transaction.client_name = transaction.get('client_name')
             db_transaction.notes = transaction.get('notes')
-            db_transaction.rental_class_num = transaction.get('rental_class_id')  # Updated to match db_models.py
+            db_transaction.rental_class_num = transaction.get('rental_class_id')
             db_transaction.common_name = transaction.get('common_name')
             db_transaction.serial_number = transaction.get('serial_number')
             db_transaction.location_of_repair = transaction.get('location_of_repair')
@@ -84,8 +88,8 @@ def update_transactions(session, transactions):
             db_transaction.grommet = transaction.get('grommet')
             db_transaction.rope = transaction.get('rope')
             db_transaction.buckle = transaction.get('buckle')
-            db_transaction.longitude = transaction.get('long')  # Updated to match db_models.py
-            db_transaction.latitude = transaction.get('lat')   # Updated to match db_models.py
+            db_transaction.longitude = transaction.get('long')
+            db_transaction.latitude = transaction.get('lat')
             db_transaction.wet = transaction.get('wet')
             db_transaction.service_required = transaction.get('service_required')
             db_transaction.date_created = transaction.get('date_created')
@@ -233,3 +237,15 @@ def init_scheduler(app):
     logger.info("Scheduler started with incremental and full refresh jobs")
 
     return scheduler
+
+# Define the route for clearing API data and refreshing
+@refresh_bp.route('/clear_api_data', methods=['POST'])
+def clear_api_data():
+    try:
+        current_app.logger.info("Starting clear API data and refresh")
+        full_refresh()
+        current_app.logger.info("Clear API data and refresh completed successfully")
+        return jsonify({'status': 'success', 'message': 'API data cleared and refreshed successfully'})
+    except Exception as e:
+        current_app.logger.error(f"Clear API data and refresh failed: {str(e)}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
