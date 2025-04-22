@@ -168,11 +168,12 @@ def full_refresh():
         logger.debug("Full refresh session closed")
 
 def incremental_refresh():
+
     logger.info("Starting incremental refresh")
     session = db.session()
     try:
-        # Use a since_date for incremental updates (last 30 seconds)
-        since_date = datetime.utcnow() - timedelta(days=30)  # Adjusted to 30 days for testing
+        # Use a since_date for incremental updates (last 30 days for testing)
+        since_date = datetime.utcnow() - timedelta(days=30)
         logger.info(f"Fetching item master data with since_date: {since_date}")
         items = api_client.get_item_master(since_date=since_date)
         logger.info(f"Fetched {len(items)} items from item master")
@@ -187,7 +188,7 @@ def incremental_refresh():
         if not transactions:
             logger.warning("No transactions fetched from transactions API. Check API endpoint or authentication.")
 
-        logger.info(f"Fetching seed data with since_date: {since_date}")
+        logger.info("Fetching seed data")
         seeds = api_client.get_seed_data()  # Removed since_date as seed data doesn't support filtering
         logger.info(f"Fetched {len(seeds)} seeds")
         logger.debug(f"Seed data sample: {seeds[:5] if seeds else 'No seeds'}")
@@ -232,138 +233,4 @@ def init_scheduler(app):
     scheduler.start()
     logger.info("Scheduler started with incremental and full refresh jobs")
 
-    return schedulerget_seed_data()
-        current_app.logger.info(f"Fetched {len(seeds)} seeds")
-        current_app.logger.debug(f"Seed data sample: {seeds[:5] if seeds else 'No seeds'}")
-        if not seeds:
-            current_app.logger.warning("No seeds fetched from seed API. Check API endpoint or authentication.")
-        
-        current_app.logger.info("Cleaning duplicates from database")
-        clean_duplicates(db.session)
-        
-        current_app.logger.info("Updating database with fresh API data")
-        update_item_master(db.session, items)
-        update_transactions(db.session, transactions)
-        update_seed_data(db.session, seeds)
-        
-        state = db.session.query(RefreshState).first()
-        if not state:
-            state = RefreshState(last_refresh=datetime.utcnow().isoformat())
-            db.session.add(state)
-        else:
-            state.last_refresh = datetime.utcnow().isoformat()
-        
-        db.session.commit()
-        cache.clear()
-        current_app.logger.info("Clear API data and full refresh completed successfully")
-        return jsonify({'status': 'success', 'message': 'API data cleared and refreshed successfully'})
-    except Exception as e:
-        current_app.logger.error(f"Clear API data and refresh failed: {str(e)}\nTraceback: {traceback.format_exc()}")
-        db.session.rollback()
-        return jsonify({'status': 'error', 'message': str(e)}), 500
-    finally:
-        db.session.remove()
-        current_app.logger.debug("Clear API data session closed")
-
-@refresh_bp.route('/full_refresh', methods=['POST'])
-def full_refresh():
-    try:
-        current_app.logger.info("Starting full refresh")
-        client = APIClient()
-        current_app.logger.info("Fetching item master data")
-        items = client.get_item_master()
-        current_app.logger.info(f"Fetched {len(items)} items from item master")
-        current_app.logger.debug(f"Item master sample: {items[:5] if items else 'No items'}")
-        if not items:
-            current_app.logger.warning("No items fetched from item master API. Check API endpoint or authentication.")
-        
-        current_app.logger.info("Fetching transactions data")
-        transactions = client.get_transactions()
-        current_app.logger.info(f"Fetched {len(transactions)} transactions")
-        current_app.logger.debug(f"Transactions sample: {transactions[:5] if transactions else 'No transactions'}")
-        if not transactions:
-            current_app.logger.warning("No transactions fetched from transactions API. Check API endpoint or authentication.")
-        
-        current_app.logger.info("Fetching seed data")
-        seeds = client.get_seed_data()
-        current_app.logger.info(f"Fetched {len(seeds)} seeds")
-        current_app.logger.debug(f"Seed data sample: {seeds[:5] if seeds else 'No seeds'}")
-        if not seeds:
-            current_app.logger.warning("No seeds fetched from seed API. Check API endpoint or authentication.")
-        
-        current_app.logger.info("Cleaning duplicates from database")
-        clean_duplicates(db.session)
-        
-        current_app.logger.info("Updating database")
-        update_item_master(db.session, items)
-        update_transactions(db.session, transactions)
-        update_seed_data(db.session, seeds)
-        
-        state = db.session.query(RefreshState).first()
-        if not state:
-            state = RefreshState(last_refresh=datetime.utcnow().isoformat())
-            db.session.add(state)
-        else:
-            state.last_refresh = datetime.utcnow().isoformat()
-        
-        db.session.commit()
-        cache.clear()
-        current_app.logger.info("Full refresh completed successfully")
-        return jsonify({'status': 'success', 'message': 'Database refreshed'})
-    except Exception as e:
-        current_app.logger.error(f"Full refresh failed: {str(e)}\nTraceback: {traceback.format_exc()}")
-        db.session.rollback()
-        return jsonify({'status': 'error', 'message': str(e)}), 500
-    finally:
-        db.session.remove()
-        current_app.logger.debug("Full refresh session closed")
-
-def incremental_refresh():
-    try:
-        current_app.logger.info("Starting incremental refresh")
-
-        state = db.session.query(RefreshState).first()
-        since_date = state.last_refresh if state else None
-        
-        client = APIClient()
-        current_app.logger.info(f"Fetching item master data with since_date: {since_date}")
-        items = client.get_item_master(since_date)
-        current_app.logger.info(f"Fetched {len(items)} items from item master")
-        current_app.logger.debug(f"Item master sample: {items[:5] if items else 'No items'}")
-        if not items:
-            current_app.logger.warning("No items fetched from item master API. Check API endpoint or authentication.")
-        
-        current_app.logger.info(f"Fetching transactions data with since_date: {since_date}")
-        transactions = client.get_transactions(since_date)
-        current_app.logger.info(f"Fetched {len(transactions)} transactions")
-        current_app.logger.debug(f"Transactions sample: {transactions[:5] if transactions else 'No transactions'}")
-        if not transactions:
-            current_app.logger.warning("No transactions fetched from transactions API. Check API endpoint or authentication.")
-        
-        current_app.logger.info(f"Fetching seed data with since_date: {since_date}")
-        seeds = client.get_seed_data(since_date)
-        current_app.logger.info(f"Fetched {len(seeds)} seeds")
-        current_app.logger.debug(f"Seed data sample: {seeds[:5] if seeds else 'No seeds'}")
-        if not seeds:
-            current_app.logger.warning("No seeds fetched from seed API. Check API endpoint or authentication.")
-        
-        update_item_master(db.session, items)
-        update_transactions(db.session, transactions)
-        update_seed_data(db.session, seeds)
-        
-        if state:
-            state.last_refresh = datetime.utcnow().isoformat()
-        else:
-            state = RefreshState(last_refresh=datetime.utcnow().isoformat())
-            db.session.add(state)
-        
-        db.session.commit()
-        cache.clear()
-        current_app.logger.info("Incremental refresh completed successfully")
-    except Exception as e:
-        current_app.logger.error(f"Incremental refresh failed: {str(e)}\nTraceback: {traceback.format_exc()}")
-        db.session.rollback()
-        raise
-    finally:
-        db.session.remove()
-        current_app.logger.debug("Incremental refresh session closed")
+    return scheduler
