@@ -43,10 +43,7 @@
             <tr>
                 <th>Contract Number</th>
                 <th>Customer Name</th>
-                <th class="hidden">Total Items</th>
-                <th>Items on Contracts</th>
-                <th class="hidden">Items in Service</th>
-                <th class="hidden">Items Available</th>
+                <th>Total Items on Contract</th>
                 <th>Last Scanned Date</th>
                 <th>Actions</th>
             </tr>
@@ -57,20 +54,17 @@
             <tr>
                 <td>{{ category.name }}</td>
                 <td>{{ category.customer_name }}</td>
-                <td class="hidden">{{ category.total_items }}</td>
-                <td>{{ category.on_contracts }}</td>
-                <td class="hidden">{{ category.in_service }}</td>
-                <td class="hidden">{{ category.available }}</td>
+                <td>{{ category.total_items }}</td>
                 <td>{{ category.last_scanned_date }}</td>
                 <td>
                     <button class="btn btn-sm btn-secondary expand-btn" onclick="expandCategory('{{ encoded_category }}', 'subcat-{{ category.cat_id }}')">Expand</button>
                     <button class="btn btn-sm btn-secondary collapse-btn" style="display:none;" onclick="collapseSection('subcat-{{ category.cat_id }}')">Collapse</button>
-                    <button class="btn btn-sm btn-info print-btn" data-print-level="Contract" data-print-id="category-table">Print</button>
+                    <button class="btn btn-sm btn-info print-btn" data-print-level="Contract" data-print-id="category-table-{{ category.cat_id }}">Print</button>
                     <div id="loading-{{ category.cat_id }}" style="display:none;" class="loading">Loading...</div>
                 </td>
             </tr>
             <tr>
-                <td colspan="8">
+                <td colspan="5">
                     <div id="subcat-{{ category.cat_id }}" class="expandable collapsed"></div>
                 </td>
             </tr>
