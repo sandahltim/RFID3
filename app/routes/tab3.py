@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, jsonify, current_app, request
 from .. import db, cache
 from ..models.db_models import ItemMaster, RentalClassMapping
-from sqlalchemy import func
+from sqlalchemy import func, case
 from urllib.parse import quote
 import re
 import time
@@ -22,14 +22,14 @@ def tab3_view():
         categories = db.session.query(
             func.coalesce(RentalClassMapping.category, 'Unclassified').label('category'),
             func.count(ItemMaster.tag_id).label('total_items'),
-            func.sum(func.case(
-                (func.lower(ItemMaster.status).in_(['on rent', 'delivered']), 1), else_=0
+            func.count(case(
+                [(func.lower(ItemMaster.status).in_(['on rent', 'delivered']), ItemMaster.tag_id)], else_=None
             )).label('on_contracts'),
-            func.sum(func.case(
-                (func.lower(ItemMaster.status) == 'in service', 1), else_=0
+            func.count(case(
+                [(func.lower(ItemMaster.status) == 'in service', ItemMaster.tag_id)], else_=None
             )).label('in_service'),
-            func.sum(func.case(
-                (func.lower(ItemMaster.status) == 'available', 1), else_=0
+            func.count(case(
+                [(func.lower(ItemMaster.status) == 'available', ItemMaster.tag_id)], else_=None
             )).label('available')
         ).outerjoin(
             RentalClassMapping, RentalClassMapping.rental_class_id == ItemMaster.rental_class_num
@@ -76,7 +76,7 @@ def tab3_view():
         statuses = [status[0] for status in statuses]
 
         return render_template(
-            'tab1.html',  # Reuse tab1.html since the structure is similar
+            'tab3.html',
             tab_num=3,
             categories=formatted_categories,
             bin_locations=bin_locations,
@@ -106,14 +106,14 @@ def tab3_subcat_data():
         base_query = db.session.query(
             func.coalesce(RentalClassMapping.subcategory, 'Unclassified').label('subcategory'),
             func.count(ItemMaster.tag_id).label('total_items'),
-            func.sum(func.case(
-                (func.lower(ItemMaster.status).in_(['on rent', 'delivered']), 1), else_=0
+            func.count(case(
+                [(func.lower(ItemMaster.status).in_(['on rent', 'delivered']), ItemMaster.tag_id)], else_=None
             )).label('on_contracts'),
-            func.sum(func.case(
-                (func.lower(ItemMaster.status) == 'in service', 1), else_=0
+            func.count(case(
+                [(func.lower(ItemMaster.status) == 'in service', ItemMaster.tag_id)], else_=None
             )).label('in_service'),
-            func.sum(func.case(
-                (func.lower(ItemMaster.status) == 'available', 1), else_=0
+            func.count(case(
+                [(func.lower(ItemMaster.status) == 'available', ItemMaster.tag_id)], else_=None
             )).label('available')
         ).outerjoin(
             RentalClassMapping, RentalClassMapping.rental_class_id == ItemMaster.rental_class_num
@@ -138,6 +138,61 @@ def tab3_subcat_data():
         subcategories = base_query.order_by(
             func.coalesce(RentalClassMapping.subcategory, 'Unclassified')
         ).offset(offset).limit(per_page).all()
+
+        # If no subcategories are found, check if there are items for this category
+        if not subcategories:
+            # Check if there are any items in this category
+            item_count = db.session.query(
+                func.count(ItemMaster.tag_id)
+            ).outerjoin(
+                RentalClassMapping, RentalClassMapping.rental_class_id == ItemMaster.rental_class_num
+            ).filter(
+                func.lower(ItemMaster.status) == 'in service'
+            )
+            if category != 'Unclassified':
+                item_count = item_count.filter(
+                    func.lower(RentalClassMapping.category) == func.lower(category)
+                )
+            else:
+                item_count = item_count.filter(
+                    RentalClassMapping.category.is_(None)
+                )
+            item_count = item_count.scalar()
+
+            if item_count > 0:
+                # If there are items but no subcategories, treat it as a single "Unclassified" subcategory
+                subcategories = [(
+                    'Unclassified',
+                    item_count,
+                    db.session.query(
+                        func.count(ItemMaster.tag_id)
+                    ).outerjoin(
+                        RentalClassMapping, RentalClassMapping.rental_class_id == ItemMaster.rental_class_num
+                    ).filter(
+                        func.lower(ItemMaster.status).in_(['on rent', 'delivered'])
+                    ).filter(
+                        func.lower(RentalClassMapping.category) == func.lower(category) if category != 'Unclassified' else RentalClassMapping.category.is_(None)
+                    ).scalar() or 0,
+                    db.session.query(
+                        func.count(ItemMaster.tag_id)
+                    ).outerjoin(
+                        RentalClassMapping, RentalClassMapping.rental_class_id == ItemMaster.rental_class_num
+                    ).filter(
+                        func.lower(ItemMaster.status) == 'in service'
+                    ).filter(
+                        func.lower(RentalClassMapping.category) == func.lower(category) if category != 'Unclassified' else RentalClassMapping.category.is_(None)
+                    ).scalar() or 0,
+                    db.session.query(
+                        func.count(ItemMaster.tag_id)
+                    ).outerjoin(
+                        RentalClassMapping, RentalClassMapping.rental_class_id == ItemMaster.rental_class_num
+                    ).filter(
+                        func.lower(ItemMaster.status) == 'available'
+                    ).filter(
+                        func.lower(RentalClassMapping.category) == func.lower(category) if category != 'Unclassified' else RentalClassMapping.category.is_(None)
+                    ).scalar() or 0
+                )]
+                total_subcats = 1
 
         subcat_data = [
             {
@@ -182,14 +237,14 @@ def tab3_common_names():
             base_query = db.session.query(
                 func.trim(func.upper(ItemMaster.common_name)).label('common_name'),
                 func.count(ItemMaster.tag_id).label('total_items'),
-                func.sum(func.case(
-                    (func.lower(ItemMaster.status).in_(['on rent', 'delivered']), 1), else_=0
+                func.count(case(
+                    [(func.lower(ItemMaster.status).in_(['on rent', 'delivered']), ItemMaster.tag_id)], else_=None
                 )).label('on_contracts'),
-                func.sum(func.case(
-                    (func.lower(ItemMaster.status) == 'in service', 1), else_=0
+                func.count(case(
+                    [(func.lower(ItemMaster.status) == 'in service', ItemMaster.tag_id)], else_=None
                 )).label('in_service'),
-                func.sum(func.case(
-                    (func.lower(ItemMaster.status) == 'available', 1), else_=0
+                func.count(case(
+                    [(func.lower(ItemMaster.status) == 'available', ItemMaster.tag_id)], else_=None
                 )).label('available')
             ).outerjoin(
                 RentalClassMapping, RentalClassMapping.rental_class_id == ItemMaster.rental_class_num
@@ -209,14 +264,14 @@ def tab3_common_names():
             base_query = db.session.query(
                 func.trim(func.upper(ItemMaster.common_name)).label('common_name'),
                 func.count(ItemMaster.tag_id).label('total_items'),
-                func.sum(func.case(
-                    (func.lower(ItemMaster.status).in_(['on rent', 'delivered']), 1), else_=0
+                func.count(case(
+                    [(func.lower(ItemMaster.status).in_(['on rent', 'delivered']), ItemMaster.tag_id)], else_=None
                 )).label('on_contracts'),
-                func.sum(func.case(
-                    (func.lower(ItemMaster.status) == 'in service', 1), else_=0
+                func.count(case(
+                    [(func.lower(ItemMaster.status) == 'in service', ItemMaster.tag_id)], else_=None
                 )).label('in_service'),
-                func.sum(func.case(
-                    (func.lower(ItemMaster.status) == 'available', 1), else_=0
+                func.count(case(
+                    [(func.lower(ItemMaster.status) == 'available', ItemMaster.tag_id)], else_=None
                 )).label('available')
             ).join(
                 RentalClassMapping, RentalClassMapping.rental_class_id == ItemMaster.rental_class_num
