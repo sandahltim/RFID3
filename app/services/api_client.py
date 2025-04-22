@@ -82,12 +82,10 @@ class APIClient:
         params = {}
         if since_date:
             since_date = datetime.fromisoformat(since_date).strftime('%Y-%m-%d %H:%M:%S') if isinstance(since_date, str) else since_date.strftime('%Y-%m-%d %H:%M:%S')
-        else:
-            since_date = (datetime.now() - timedelta(seconds=30)).strftime('%Y-%m-%d %H:%M:%S')
-        logger.debug(f"Item master filter since_date: {since_date}")
-        filter_str = f"date_last_scanned,gt,'{since_date}'"
-        logger.debug(f"Constructed filter string: {filter_str}")
-        params['filter[gt]'] = filter_str
+            logger.debug(f"Item master filter since_date: {since_date}")
+            filter_str = f"date_last_scanned,gt,'{since_date}'"
+            logger.debug(f"Constructed filter string: {filter_str}")
+            params['filter[gt]'] = filter_str
         
         try:
             data = self._make_request("14223767938169344381", params)
@@ -131,25 +129,7 @@ class APIClient:
 
     def get_seed_data(self, since_date=None):
         params = {}
-        if since_date:
-            since_date = datetime.fromisoformat(since_date).strftime('%Y-%m-%d %H:%M:%S') if isinstance(since_date, str) else since_date.strftime('%Y-%m-%d %H:%M:%S')
-            logger.debug(f"Seed data filter since_date: {since_date}")
-            filter_str = f"date_updated,gt,'{since_date}'"
-            logger.debug(f"Constructed filter string: {filter_str}")
-            params['filter[gt]'] = filter_str
-            try:
-                data = self._make_request("14223767938169215907", params)
-            except Exception as e:
-                logger.warning(f"Filter failed: {str(e)}. Fetching all data and filtering locally.")
-                params.pop('filter[gt]', None)
-                data = self._make_request("14223767938169215907")
-                if since_date:
-                    since_dt = datetime.strptime(since_date, '%Y-%m-%d %H:%M:%S')
-                    data = [
-                        item for item in data
-                        if item.get('date_updated') and datetime.strptime(item['date_updated'], '%Y-%m-%d %H:%M:%S') > since_dt
-                    ]
-        else:
-            data = self._make_request("14223767938169215907")
+        # Seed data doesn't support filtering by date_updated, so fetch all data
+        data = self._make_request("14223767938169215907", params)
         logger.debug(f"Seed data sample: {data[:5] if data else 'No data'}")
         return data
