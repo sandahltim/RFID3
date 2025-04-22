@@ -57,15 +57,15 @@
                 <td>{{ category.total_items }}</td>
                 <td>{{ category.last_scanned_date }}</td>
                 <td>
-                    <button class="btn btn-sm btn-secondary expand-btn" onclick="expandCategory('{{ encoded_category }}', 'subcat-{{ category.cat_id }}')">Expand</button>
-                    <button class="btn btn-sm btn-secondary collapse-btn" style="display:none;" onclick="collapseSection('subcat-{{ category.cat_id }}')">Collapse</button>
+                    <button class="btn btn-sm btn-secondary expand-btn" onclick="expandCategory('{{ encoded_category }}', 'common-{{ category.cat_id }}')">Expand</button>
+                    <button class="btn btn-sm btn-secondary collapse-btn" style="display:none;" onclick="collapseSection('common-{{ category.cat_id }}')">Collapse</button>
                     <button class="btn btn-sm btn-info print-btn" data-print-level="Contract" data-print-id="category-row-{{ category.cat_id }}">Print</button>
                     <div id="loading-{{ category.cat_id }}" style="display:none;" class="loading">Loading...</div>
                 </td>
             </tr>
             <tr>
                 <td colspan="5">
-                    <div id="subcat-{{ category.cat_id }}" class="expandable collapsed"></div>
+                    <div id="common-{{ category.cat_id }}" class="expandable collapsed"></div>
                 </td>
             </tr>
             {% endfor %}
