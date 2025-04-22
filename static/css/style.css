@@ -61,3 +61,8 @@ body {
 .hidden {
     display: none;
 }
+
+/* Ensure hidden columns are not displayed, with high specificity to override Bootstrap */
+table.table th.hidden, table.table td.hidden {
+    display: none !important;
+}

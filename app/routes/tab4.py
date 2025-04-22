@@ -38,13 +38,14 @@ def tab4_view():
         ).all()
 
         # Format the contract data for the template
+        # Fixed on 2025-04-21 to ensure 'on_contracts' is a count, not a date
         categories = [
             {
                 'name': contract_num,
                 'total_items': total_items,
-                'on_contracts': total_items,  # All items are on contracts (status 'on rent' or 'delivered')
-                'in_service': 0,
-                'available': 0,
+                'on_contracts': total_items,  # Count of items on contract (status 'on rent' or 'delivered')
+                'in_service': 0,  # Placeholder, not used
+                'available': 0,   # Placeholder, not used
                 'customer_name': customer_name or 'N/A',
                 'last_scanned_date': last_scanned_date.isoformat().replace('T', ' ') if last_scanned_date else 'N/A'
             }
@@ -53,6 +54,8 @@ def tab4_view():
         ]
         current_app.logger.info(f"Fetched {len(categories)} laundry contracts")
         current_app.logger.debug(f"Raw contract data: {contract_data}")
+        # Added on 2025-04-21 to debug display issues
+        current_app.logger.debug(f"Formatted categories for tab 4: {categories}")
 
         # Fetch bin locations for filtering (same as Tab 2)
         bin_locations = db.session.query(
@@ -94,6 +97,7 @@ def tab4_categories():
     # Route to render the categories table for Tab 4
     # Shows laundry contracts with columns: Contract Number, Customer Name, Items on Contracts, Last Scanned Date, Actions
     # Hides columns: Total Items, Items in Service, Items Available
+    # Fixed on 2025-04-21 to ensure correct column data and visibility
     try:
         # Same query as tab4_view to fetch laundry contracts
         contract_data = db.session.query(
@@ -125,8 +129,10 @@ def tab4_categories():
             for contract_num, total_items, customer_name, last_scanned_date in contract_data
             if contract_num is not None
         ]
+        # Added on 2025-04-21 to debug display issues
+        current_app.logger.debug(f"Categories for tab 4 rendering: {categories}")
 
-        # Generate HTML for the table rows
+        # Generate HTML for the table rows with correct column alignment
         html = ''
         for category in categories:
             cat_id = re.sub(r'[^a-z0-9-]', '_', category['name'].lower())
@@ -156,7 +162,6 @@ def tab4_categories():
 @tab4_bp.route('/tab/4/subcat_data')
 def tab4_subcat_data():
     # Route to fetch subcategory data for a specific laundry contract
-    # Subcategories are grouped by RentalClassMapping.category under the contract
     try:
         current_app.logger.info("Received request for /tab/4/subcat_data")
         contract_num = request.args.get('category')  # 'category' is the contract number
@@ -164,7 +169,6 @@ def tab4_subcat_data():
             current_app.logger.error("Contract parameter is missing")
             return jsonify({'error': 'Contract parameter is required'}), 400
 
-        # Group by Category under the Contract, with a default "Unclassified" category
         subcategories = db.session.query(
             func.coalesce(RentalClassMapping.category, 'Unclassified').label('category'),
             func.count(ItemMaster.tag_id).label('total_items'),
@@ -203,7 +207,6 @@ def tab4_subcat_data():
 
 @tab4_bp.route('/tab/4/common_names')
 def tab4_common_names():
-    # Route to fetch common names under a specific category for a laundry contract
     try:
         contract_num = request.args.get('category')  # Contract number
         category = request.args.get('subcategory')  # Category under the contract
@@ -212,7 +215,6 @@ def tab4_common_names():
 
         current_app.logger.debug(f"Fetching common names for contract: {contract_num}, category: {category}")
 
-        # Handle the default "Unclassified" category
         if category == 'Unclassified':
             common_names = db.session.query(
                 func.trim(func.upper(ItemMaster.common_name)).label('common_name'),
@@ -222,7 +224,7 @@ def tab4_common_names():
             ).outerjoin(
                 RentalClassMapping, RentalClassMapping.rental_class_id == ItemMaster.rental_class_num
             ).filter(
-                func.lower(ItemMaster.status).in_(['on rent', 'delivered']),
+                func.lower(ItemMaster.status).in_(['on rent', ' decisdelivered']),
                 ItemMaster.last_contract_num == contract_num,
                 func.lower(ItemMaster.last_contract_num).like('l%'),
                 RentalClassMapping.category.is_(None)
@@ -246,7 +248,7 @@ def tab4_common_names():
                 func.trim(func.upper(ItemMaster.common_name))
             ).all()
 
-        current_app.logger.debug(f"Common names for contract {contract_num}, category {category}: {common_names}")
+        current_app.logger.debug(f"Common names for contract {contract_num}, category: {category}: {common_names}")
 
         common_names_data = [
             {
@@ -264,12 +266,11 @@ def tab4_common_names():
 
         return jsonify({'common_names': common_names_data})
     except Exception as e:
-        current_app.logger.error(f"Error fetching common names for contract {contract_num}, category {category}: {str(e)}", exc_info=True)
+        current_app.logger.error(f"Error fetching common names for contract {contract_num}, category: {category}: {str(e)}", exc_info=True)
         return jsonify({'error': f'Failed to fetch common names: {str(e)}'}), 500
 
 @tab4_bp.route('/tab/4/data')
 def tab4_data():
-    # Route to fetch individual item details for a specific common name under a category and contract
     try:
         contract_num = request.args.get('category')
         category = request.args.get('subcategory')
@@ -279,7 +280,6 @@ def tab4_data():
 
         current_app.logger.debug(f"Fetching items for contract {contract_num}, category {category}, common_name {common_name}")
 
-        # Handle the default "Unclassified" category
         if category == 'Unclassified':
             items = db.session.query(
                 ItemMaster

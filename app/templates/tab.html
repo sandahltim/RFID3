@@ -1,101 +1,65 @@
-{% extends 'base.html' %}
-
-{% block title %}
-{% if tab_num == 1 %}Rental Inventory
-{% elif tab_num == 2 %}Open Contracts
-{% elif tab_num == 3 %}Service
-{% elif tab_num == 4 %}Laundry Contracts
-{% elif tab_num == 5 %}Resale
-{% elif tab_num == 6 %}Manage Categories
-{% else %}Tab {{ tab_num }}
-{% endif %}
-{% endblock %}
-
-{% block extra_head %}
-<style>
-    .loading { color: #888; font-style: italic; }
-    .table-bordered th, .table-bordered td { border: 1px solid #dee2e6; padding: 0.5rem; }
-</style>
-{% endblock %}
+{% extends "base.html" %}
 
 {% block content %}
-<h1>
-    {% if tab_num == 1 %}Rental Inventory
-    {% elif tab_num == 2 %}Open Contracts
-    {% elif tab_num == 3 %}Service
-    {% elif tab_num == 4 %}Laundry Contracts
-    {% elif tab_num == 5 %}Resale
-    {% elif tab_num == 6 %}Manage Categories
-    {% else %}Tab {{ tab_num }}
-    {% endif %}
-</h1>
-
-<div class="row mb-3">
-    <div class="col-md-4">
-        <input type="text" id="filter-input" class="form-control" placeholder="Search common name, tag id, etc." onkeyup="applyFilters()">
+<div class="container mt-4">
+    <!-- Page title based on tab number -->
+    <h2>{% if tab_num == 2 %}Open Contracts{% elif tab_num == 4 %}Laundry Contracts{% else %}Tab {{ tab_num }}{% endif %}</h2>
+    <!-- Filter and search row -->
+    <div class="row mb-3">
+        <div class="col">
+            <input type="text" class="form-control" placeholder="Search common name, tag id, etc." id="searchInput">
+        </div>
+        <div class="col">
+            <select class="form-control" id="categoryFilter">
+                <option value="">All Classes</option>
+                {% for category in categories %}
+                <option value="{{ category.name }}">{{ category.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col">
+            <select class="form-control" id="statusFilter">
+                <option value="">All Statuses</option>
+                {% for status in statuses %}
+                <option value="{{ status }}">{{ status }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col">
+            <select class="form-control" id="binFilter">
+                <option value="">All Bin Locations</option>
+                {% for bin in bin_locations %}
+                <option value="{{ bin }}">{{ bin }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col">
+            <button class="btn btn-primary" onclick="refreshTab()">Refresh</button>
+        </div>
     </div>
-    <div class="col-md-2">
-        <select id="category-filter" class="form-control" onchange="applyFilters()">
-            <option value="">All Classes</option>
-            {% for category in categories %}
-            <option value="{{ category.name }}">{{ category.name }}</option>
-            {% endfor %}
-        </select>
-    </div>
-    <div class="col-md-2">
-        <select id="status-filter" class="form-control" onchange="applyFilters()">
-            <option value="">All Statuses</option>
-            {% for status in statuses %}
-            <option value="{{ status }}">{{ status }}</option>
-            {% endfor %}
-        </select>
-    </div>
-    <div class="col-md-2">
-        <select id="bin-location-filter" class="form-control" onchange="applyFilters()">
-            <option value="">All Bin Locations</option>
-            {% for location in bin_locations %}
-            <option value="{{ location }}">{{ location }}</option>
-            {% endfor %}
-        </select>
-    </div>
-    <div class="col-md-2">
-        <button class="btn btn-primary" onclick="refreshTable({{ tab_num }})">Refresh</button>
-    </div>
+    <!-- Table for displaying contracts -->
+    <table class="table table-bordered" id="category-table">
+        <thead>
+            <tr>
+                <th>Contract Number</th>
+                <th>Customer Name</th>
+                <th class="hidden">Total Items</th>
+                <th>Items on Contracts</th>
+                <th class="hidden">Items in Service</th>
+                <th class="hidden">Items Available</th>
+                <th>Last Scanned Date</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody id="category-rows" hx-get="/tab/{{ tab_num }}/categories?cache_bust={{ cache_bust }}" hx-trigger="load, refreshTab">
+        </tbody>
+    </table>
 </div>
 
-<table class="table table-bordered" id="category-table">
-    <thead>
-        <tr>
-            {% if tab_num == 2 %}
-            <th>Contract Number</th>
-            <th>Customer Name</th>
-            {% else %}
-            <th>Category</th>
-            {% endif %}
-            <th>Total Items</th>
-            <th>Items on Contracts</th>
-            <th>Items in Service</th>
-            <th>Items Available</th>
-            <th>Actions</th>
-        </tr>
-    </thead>
-    <tbody id="category-table-body"
-        hx-get="/tab/{{ tab_num }}/categories"
-        hx-trigger="load, every 30s"
-        hx-target="#category-table-body"
-        hx-swap="innerHTML">
-        <tr>
-            {% if tab_num == 2 %}
-            <td colspan="7" class="loading">Loading...</td>
-            {% else %}
-            <td colspan="6" class="loading">Loading...</td>
-            {% endif %}
-        </tr>
-    </tbody>
-</table>
-
-{% for category in categories %}
-<div id="subcat-{{ category.name | lower | replace(' ', '_') }}" style="display:none;"></div>
-{% endfor %}
-
+<!-- JavaScript for refreshing the table -->
+<script>
+function refreshTab() {
+    htmx.trigger('#category-rows', 'refreshTab');
+}
+</script>
 {% endblock %}
