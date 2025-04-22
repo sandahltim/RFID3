@@ -1,17 +1,8 @@
-// tab.js - Handles tab functionality for RFID Dashboard
-// Version: 2025-04-21 v4 - Fixed tab number detection using URL path
-
 console.log('tab.js loaded, cachedTabNum:', window.cachedTabNum);
 
 // Refresh table function
-function refreshTable(tabNum) {
-    const tableBody = document.getElementById('category-table-body');
-    if (tableBody) {
-        console.log('Refreshing table for tab:', tabNum);
-        htmx.trigger(tableBody, 'refresh');
-    } else {
-        console.warn('Table body not found for refresh');
-    }
+function refreshTab() {
+    window.location.reload(); // Updated to match static rendering in tab2.html and tab4.html
 }
 
 // Print table function
@@ -30,40 +21,120 @@ function printTable(level, id) {
         return;
     }
 
-    // Get the stylesheets
-    const stylesheets = Array.from(document.styleSheets)
-        .map(sheet => {
-            try {
-                return Array.from(sheet.cssRules)
-                    .map(rule => rule.cssText)
-                    .join('\n');
-            } catch (e) {
-                console.warn('Cannot access stylesheet rules:', e);
-                return '';
-            }
-        })
-        .filter(style => style)
-        .join('\n');
+    // Get the tab name based on the current tab number
+    const tabNum = window.cachedTabNum || 1;
+    const tabName = tabNum == 2 ? 'Open Contracts' : tabNum == 4 ? 'Laundry Contracts' : `Tab ${tabNum}`;
 
-    // Prepare the print content
+    // Clone the element and include all expanded sections
+    const printElement = element.cloneNode(true);
+    const row = element.closest('tr');
+    if (row) {
+        // Find the corresponding expanded content (e.g., subcat-, common-, items- divs)
+        const nextRow = row.nextElementSibling;
+        if (nextRow) {
+            const expandedContent = nextRow.querySelector('.expandable.expanded');
+            if (expandedContent) {
+                const expandedClone = expandedContent.cloneNode(true);
+                // Remove buttons and loading indicators from expanded content
+                expandedClone.querySelectorAll('.btn, .loading, .expandable.collapsed').forEach(el => el.remove());
+                const expandedWrapper = document.createElement('div');
+                expandedWrapper.appendChild(expandedClone);
+                printElement.appendChild(expandedWrapper);
+            }
+        }
+    }
+
+    // Remove non-printable elements from the main element
+    printElement.querySelectorAll('.btn, .loading, .expandable.collapsed').forEach(el => el.remove());
+
+    // Prepare the print content with custom header and styles
     const printContent = `
         <html>
             <head>
-                <title>Print ${level}</title>
+                <title>RFID Dashboard - ${tabName} - ${level}</title>
                 <style>
-                    ${stylesheets}
-                    body { font-family: Arial, sans-serif; margin: 20px; }
-                    table { border-collapse: collapse; width: 100%; }
-                    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-                    th { background-color: #f2f2f2; }
+                    body {
+                        font-family: Arial, sans-serif;
+                        margin: 20px;
+                        color: #333;
+                    }
+                    .print-header {
+                        text-align: center;
+                        margin-bottom: 20px;
+                    }
+                    .print-header h1 {
+                        font-size: 24px;
+                        margin: 0;
+                    }
+                    .print-header p {
+                        font-size: 14px;
+                        color: #666;
+                        margin: 5px 0;
+                    }
+                    table {
+                        border-collapse: collapse;
+                        width: 100%;
+                        margin-top: 10px;
+                    }
+                    th, td {
+                        border: 1px solid #ccc;
+                        padding: 8px;
+                        text-align: left;
+                        font-size: 12px;
+                    }
+                    th {
+                        background-color: #f2f2f2;
+                        font-weight: bold;
+                    }
+                    .hidden {
+                        display: none;
+                    }
+                    .subcat-level {
+                        margin-left: 1.5rem;
+                        background-color: #f8f9fa;
+                        padding: 0.5rem;
+                        border-left: 3px solid #007bff;
+                    }
+                    .common-level {
+                        margin-left: 1rem;
+                        background-color: #e9ecef;
+                        padding: 0.5rem;
+                        border-left: 3px solid #28a745;
+                    }
+                    .item-level {
+                        margin-left: 1rem;
+                        background-color: #dee2e6;
+                        padding: 0.5rem;
+                        border-left: 3px solid #dc3545;
+                    }
                     @media print {
-                        .btn, .loading { display: none; }
+                        body {
+                            margin: 0;
+                        }
+                        .print-header {
+                            position: fixed;
+                            top: 0;
+                            width: 100%;
+                        }
+                        table {
+                            page-break-inside: auto;
+                        }
+                        tr {
+                            page-break-inside: avoid;
+                            page-break-after: auto;
+                        }
                     }
                 </style>
             </head>
             <body>
-                <h1>${level}</h1>
-                ${element.outerHTML}
+                <div class="print-header">
+                    <h1>RFID Dashboard - ${tabName}</h1>
+                    <p>${level}</p>
+                    <p>Printed on: ${new Date().toLocaleString()}</p>
+                </div>
+                <div style="margin-top: 60px;">
+                    ${printElement.outerHTML}
+                </div>
                 <script>
                     window.onload = function() {
                         window.print();
@@ -79,9 +150,6 @@ function printTable(level, id) {
     printWindow.document.write(printContent);
     printWindow.document.close();
     console.log('Print triggered successfully');
-
-    // Restore original content (in case of any DOM manipulation)
-    console.log('Original content restored after print');
 }
 
 // Initialize script on document load
@@ -119,10 +187,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // Apply filters to all tables based on user input
     window.applyFilters = function() {
         console.log('Applying filters');
-        const textQuery = document.getElementById('filter-input') ? document.getElementById('filter-input').value.toLowerCase() : '';
-        const categoryFilter = document.getElementById('category-filter') ? document.getElementById('category-filter').value.toLowerCase() : '';
-        const statusFilter = document.getElementById('status-filter') ? document.getElementById('status-filter').value.toLowerCase() : '';
-        const binLocationFilter = document.getElementById('bin-location-filter') ? document.getElementById('bin-location-filter').value.toLowerCase() : '';
+        const textQuery = document.getElementById('searchInput') ? document.getElementById('searchInput').value.toLowerCase() : '';
+        const categoryFilter = document.getElementById('categoryFilter') ? document.getElementById('categoryFilter').value.toLowerCase() : '';
+        const statusFilter = document.getElementById('statusFilter') ? document.getElementById('statusFilter').value.toLowerCase() : '';
+        const binLocationFilter = document.getElementById('binFilter') ? document.getElementById('binFilter').value.toLowerCase() : '';
 
         const tables = document.querySelectorAll('table');
         tables.forEach(table => {
