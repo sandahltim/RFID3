@@ -1,4 +1,4 @@
-console.log('expand.js version: 2025-04-22 v13 loaded');
+console.log('expand.js version: 2025-04-22 v14 loaded');
 
 // --- Loading Indicator Functions ---
 function showLoading(key) {
@@ -126,7 +126,7 @@ function loadItems(category, subcategory, commonName, targetId) {
             if (data && Array.isArray(data) && data.length > 0) {
                 hideOtherItems(targetId.replace('items-', ''));
                 html += [
-                    '<table class="table table-bordered ms-4 mt-2" id="items-table-' + targetId.replace('items-', '') + '">',
+                    '<table class="table table-bordered item-level mt-2">',
                         '<thead>',
                             '<tr>',
                                 '<th>Tag ID</th>',
@@ -135,8 +135,6 @@ function loadItems(category, subcategory, commonName, targetId) {
                                 '<th>Status</th>',
                                 '<th>Last Contract</th>',
                                 '<th>Last Scanned</th>',
-                                '<th>Quality</th>',
-                                '<th>Notes</th>',
                             '</tr>',
                         '</thead>',
                         '<tbody>'
@@ -151,8 +149,6 @@ function loadItems(category, subcategory, commonName, targetId) {
                             '<td>' + (item.status || 'N/A') + '</td>',
                             '<td>' + (item.last_contract_num || 'N/A') + '</td>',
                             '<td>' + (item.last_scanned_date || 'N/A') + '</td>',
-                            '<td>' + (item.quality || 'N/A') + '</td>',
-                            '<td>' + (item.notes || 'N/A') + '</td>',
                         '</tr>'
                     ].join('');
                 });
@@ -162,7 +158,7 @@ function loadItems(category, subcategory, commonName, targetId) {
                     '</table>'
                 ].join('');
             } else {
-                html = '<p class="ms-4">No items found for this common name.</p>';
+                html = '<p class="item-level">No items found for this common name.</p>';
             }
 
             container.innerHTML = html;
@@ -170,7 +166,7 @@ function loadItems(category, subcategory, commonName, targetId) {
         })
         .catch(error => {
             console.error('Items fetch error:', error);
-            container.innerHTML = '<p class="ms-4 text-danger">Error loading items: ' + error.message + '</p>';
+            container.innerHTML = '<p class="item-level text-danger">Error loading items: ' + error.message + '</p>';
         })
         .finally(() => {
             hideLoading(targetId.replace('items-', ''));
@@ -221,14 +217,12 @@ function loadCommonNames(category, subcategory, targetId) {
                 data.common_names.forEach(cn => {
                     const cnId = targetBaseId + '_' + cn.name.toLowerCase().replace(/[^a-z0-9-]/g, '_');
                     html += [
-                        '<table class="table table-bordered ms-3 mt-2" id="common-table-' + cnId + '">',
+                        '<table class="table table-bordered common-level mt-2">',
                             '<thead>',
                                 '<tr>',
                                     '<th>Common Name</th>',
                                     '<th>Total Items</th>',
                                     '<th>Items on Contracts</th>',
-                                    '<th>Items in Service</th>',
-                                    '<th>Items Available</th>',
                                     '<th>Actions</th>',
                                 '</tr>',
                             '</thead>',
@@ -237,8 +231,6 @@ function loadCommonNames(category, subcategory, targetId) {
                                     '<td>' + cn.name + '</td>',
                                     '<td>' + (cn.total_items !== undefined ? cn.total_items : 'N/A') + '</td>',
                                     '<td>' + (cn.on_contracts !== undefined ? cn.on_contracts : 'N/A') + '</td>',
-                                    '<td>' + (cn.in_service !== undefined ? cn.in_service : 'N/A') + '</td>',
-                                    '<td>' + (cn.available !== undefined ? cn.available : 'N/A') + '</td>',
                                     '<td>',
                                         '<button class="btn btn-sm btn-secondary expand-btn" onclick="loadItems(\'' + encodeURIComponent(decodedCategory) + '\', \'' + encodeURIComponent(decodedSubcategory) + '\', \'' + encodeURIComponent(cn.name) + '\', \'items-' + cnId + '\')">Expand</button>',
                                         '<button class="btn btn-sm btn-secondary collapse-btn" style="display:none;" onclick="collapseSection(\'items-' + cnId + '\')">Collapse</button>',
@@ -247,7 +239,7 @@ function loadCommonNames(category, subcategory, targetId) {
                                     '</td>',
                                 '</tr>',
                                 '<tr>',
-                                    '<td colspan="6">',
+                                    '<td colspan="4">',
                                         '<div id="items-' + cnId + '" class="expandable collapsed"></div>',
                                     '</td>',
                                 '</tr>',
@@ -256,7 +248,7 @@ function loadCommonNames(category, subcategory, targetId) {
                     ].join('');
                 });
             } else {
-                html = '<p class="ms-3">No common names found for this category.</p>';
+                html = '<p class="common-level">No common names found for this category.</p>';
             }
 
             container.innerHTML = html;
@@ -281,7 +273,7 @@ function loadCommonNames(category, subcategory, targetId) {
         })
         .catch(error => {
             console.error('Common names fetch error:', error);
-            container.innerHTML = '<p class="ms-3 text-danger">Error loading common names: ' + error.message + '</p>';
+            container.innerHTML = '<p class="common-level text-danger">Error loading common names: ' + error.message + '</p>';
         })
         .finally(() => {
             hideLoading(targetId.replace('common-', ''));
@@ -306,7 +298,7 @@ function loadSubcatData(originalCategory, normalizedCategory, subcatData) {
     container.classList.add('expanded');
     container.style.display = 'block'; // Ensure visibility
 
-    let html = '<div class="ms-3">';
+    let html = '<div class="subcat-level">';
     
     if (subcatData && subcatData.length > 0) {
         subcatData.forEach(sub => {
@@ -314,14 +306,12 @@ function loadSubcatData(originalCategory, normalizedCategory, subcatData) {
             const subId = normalizedCategory + '_' + sub.subcategory.toLowerCase().replace(/[^a-z0-9-]/g, '_');
             const isTab2 = window.cachedTabNum == 2 || window.cachedTabNum == 3 || window.cachedTabNum == 4; // Tabs 2, 3, 4 treat subcategories as categories
             html += [
-                '<table class="table table-bordered mt-2" id="subcat-table-' + subId + '">',
+                '<table class="table table-bordered subcat-table mt-2">',
                     '<thead>',
                         '<tr>',
                             '<th>' + (isTab2 ? 'Category' : 'Subcategory') + '</th>',
                             '<th>Total Items</th>',
                             '<th>Items on Contracts</th>',
-                            '<th>Items in Service</th>',
-                            '<th>Items Available</th>',
                             '<th>Actions</th>',
                         '</tr>',
                     '</thead>',
@@ -330,8 +320,6 @@ function loadSubcatData(originalCategory, normalizedCategory, subcatData) {
                             '<td>' + sub.subcategory + '</td>',
                             '<td>' + (sub.total_items !== undefined ? sub.total_items : 'N/A') + '</td>',
                             '<td>' + (sub.on_contracts !== undefined ? sub.on_contracts : 'N/A') + '</td>',
-                            '<td>' + (sub.in_service !== undefined ? sub.in_service : 'N/A') + '</td>',
-                            '<td>' + (sub.available !== undefined ? sub.available : 'N/A') + '</td>',
                             '<td>',
                                 '<button class="btn btn-sm btn-secondary expand-btn" onclick="loadCommonNames(\'' + encodeURIComponent(originalCategory) + '\', \'' + encodeURIComponent(sub.subcategory) + '\', \'common-' + subId + '\')">Load Items</button>',
                                 '<button class="btn btn-sm btn-secondary collapse-btn" style="display:none;" onclick="collapseSection(\'common-' + subId + '\')">Collapse</button>',
@@ -340,7 +328,7 @@ function loadSubcatData(originalCategory, normalizedCategory, subcatData) {
                             '</td>',
                         '</tr>',
                         '<tr>',
-                            '<td colspan="6">',
+                            '<td colspan="4">',
                                 '<div id="common-' + subId + '" class="expandable collapsed"></div>',
                             '</td>',
                         '</tr>',
