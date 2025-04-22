@@ -36,7 +36,7 @@ function printTable(level, id) {
             if (expandedContent) {
                 const expandedClone = expandedContent.cloneNode(true);
                 // Remove buttons and loading indicators from expanded content
-                expandedClone.querySelectorAll('.btn, .loading, .expandable.collapsed').forEach(el => el.remove());
+                expandedClone.querySelectorAll('.btn, .loading, .expandable.collapsed, .pagination-controls').forEach(el => el.remove());
                 const expandedWrapper = document.createElement('div');
                 expandedWrapper.appendChild(expandedClone);
                 printElement.appendChild(expandedWrapper);
@@ -45,7 +45,7 @@ function printTable(level, id) {
     }
 
     // Remove non-printable elements from the main element
-    printElement.querySelectorAll('.btn, .loading, .expandable.collapsed').forEach(el => el.remove());
+    printElement.querySelectorAll('.btn, .loading, .expandable.collapsed, .pagination-controls').forEach(el => el.remove());
 
     // Prepare the print content with custom header and styles
     const printContent = `
@@ -101,7 +101,7 @@ function printTable(level, id) {
                         padding: 0.5rem;
                         border-left: 3px solid #28a745;
                     }
-                    .item-level {
+                    .item-level-wrapper {
                         margin-left: 1rem;
                         background-color: #dee2e6;
                         padding: 0.5rem;
@@ -198,12 +198,8 @@ document.addEventListener('DOMContentLoaded', () => {
             rows.forEach(row => {
                 const text = Array.from(row.children).map(cell => cell.textContent.toLowerCase()).join(' ');
                 const categoryCell = row.querySelector('td:first-child') ? row.querySelector('td:first-child').textContent.toLowerCase() : '';
-                const statusCell = row.querySelector('td:nth-child(4)') ? row.querySelector('td:nth-child(4)').textContent.toLowerCase() : '';
-                const binLocationCell = row.querySelector('td:nth-child(3)')
-                    ? row.querySelector('td:nth-child(3)').textContent.toLowerCase()
-                    : row.querySelector('td:nth-child(2)')  // Adjust for Tab 2 with Customer Name
-                      ? row.querySelector('td:nth-child(2)').textContent.toLowerCase()
-                      : '';
+                const statusCell = row.cells[3] ? row.cells[3].textContent.toLowerCase() : ''; // Status or Last Scanned Date
+                const binLocationCell = row.cells[2] ? row.cells[2].textContent.toLowerCase() : ''; // Adjust for contract table structure
 
                 const matchesText = text.includes(textQuery);
                 const matchesCategory = !categoryFilter || categoryCell.includes(categoryFilter);
