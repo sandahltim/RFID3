@@ -1,3 +1,10 @@
+import sys
+import os
+
+# Add the project directory to the Python path
+project_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.append(project_dir)
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from app.models.db_models import RentalClassMapping
