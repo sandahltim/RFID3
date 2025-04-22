@@ -6,7 +6,7 @@ function refreshTab() {
 }
 
 // Print table function
-function printTable(level, id) {
+async function printTable(level, id) {
     console.log(`Printing table: ${level}, ID: ${id}`);
     const element = document.getElementById(id);
     if (!element) {
@@ -24,6 +24,25 @@ function printTable(level, id) {
     // Get the tab name based on the current tab number
     const tabNum = window.cachedTabNum || 1;
     const tabName = tabNum == 2 ? 'Open Contracts' : tabNum == 4 ? 'Laundry Contracts' : `Tab ${tabNum}`;
+
+    // Extract contract number if level is Contract
+    let contractNumber = '';
+    if (level === 'Contract') {
+        const contractCell = element.querySelector('td:first-child');
+        contractNumber = contractCell ? contractCell.textContent.trim() : '';
+    }
+
+    // Fetch contract creation date if available
+    let contractDate = 'N/A';
+    if (contractNumber && (tabNum == 2 || tabNum == 4)) {
+        try {
+            const response = await fetch(`/get_contract_date?contract_number=${encodeURIComponent(contractNumber)}`);
+            const data = await response.json();
+            contractDate = data.date ? new Date(data.date).toLocaleString() : 'N/A';
+        } catch (error) {
+            console.error('Error fetching contract date:', error);
+        }
+    }
 
     // Clone the element and include all expanded sections
     let printElement = element.cloneNode(true);
@@ -66,7 +85,7 @@ function printTable(level, id) {
     // Remove non-printable elements from the main element
     tableWrapper.querySelectorAll('.btn, .loading, .expandable.collapsed, .pagination-controls').forEach(el => el.remove());
 
-    // Prepare the print content with custom header and styles
+    // Prepare the print content with custom header, signature line, and styles
     const printContent = `
         <html>
             <head>
@@ -82,8 +101,12 @@ function printTable(level, id) {
                         margin-bottom: 20px;
                     }
                     .print-header h1 {
-                        font-size: 24px;
+                        font-size: 28px;
                         margin: 0;
+                    }
+                    .print-header h2 {
+                        font-size: 20px;
+                        margin: 5px 0;
                     }
                     .print-header p {
                         font-size: 14px;
@@ -108,12 +131,6 @@ function printTable(level, id) {
                     .hidden {
                         display: none;
                     }
-                    .subcat-level {
-                        margin-left: 1.5rem;
-                        background-color: #f8f9fa;
-                        padding: 0.5rem;
-                        border-left: 3px solid #007bff;
-                    }
                     .common-level {
                         margin-left: 1rem;
                         background-color: #e9ecef;
@@ -125,6 +142,14 @@ function printTable(level, id) {
                         background-color: #dee2e6;
                         padding: 0.5rem;
                         border-left: 3px solid #dc3545;
+                    }
+                    .signature-line {
+                        margin-top: 40px;
+                        border-top: 1px solid #000;
+                        width: 300px;
+                        text-align: center;
+                        padding-top: 10px;
+                        font-size: 14px;
                     }
                     @media print {
                         body {
@@ -147,12 +172,17 @@ function printTable(level, id) {
             </head>
             <body>
                 <div class="print-header">
-                    <h1>RFID Dashboard - ${tabName}</h1>
-                    <p>${level}</p>
+                    <h1>Broadway Tent and Event</h1>
+                    <h2>${tabName}</h2>
+                    ${contractNumber ? `<p>Contract Number: ${contractNumber}</p>` : ''}
+                    ${contractDate !== 'N/A' ? `<p>Contract Created: ${contractDate}</p>` : ''}
                     <p>Printed on: ${new Date().toLocaleString()}</p>
                 </div>
-                <div style="margin-top: 60px;">
+                <div style="margin-top: 100px;">
                     ${tableWrapper.outerHTML}
+                </div>
+                <div class="signature-line">
+                    Signature: _______________________________
                 </div>
                 <script>
                     window.onload = function() {

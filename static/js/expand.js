@@ -1,4 +1,4 @@
-console.log('expand.js version: 2025-04-22 v19 loaded');
+console.log('expand.js version: 2025-04-22 v21 loaded');
 
 // --- Loading Indicator Functions ---
 function showLoading(key) {
@@ -23,7 +23,7 @@ function hideLoading(key) {
     }
 }
 
-// --- Subcategory Display Management ---
+// --- Subcategory Display Management (for tabs that use it, e.g., Tab 1) ---
 function hideOtherSubcats(currentCategory) {
     console.log('hideOtherSubcats called with currentCategory:', currentCategory);
     const allSubcatDivs = document.querySelectorAll('div[id^="subcat-"]');
@@ -40,13 +40,13 @@ function hideOtherSubcats(currentCategory) {
 }
 
 // --- Common Names Display Management ---
-function hideOtherCommonNames(currentSubcategoryId) {
-    console.log('hideOtherCommonNames called with currentSubcategoryId:', currentSubcategoryId);
+function hideOtherCommonNames(currentId) {
+    console.log('hideOtherCommonNames called with currentId:', currentId);
     const allCommonDivs = document.querySelectorAll('div[id^="common-"]');
     console.log('Found common name divs:', allCommonDivs.length);
     allCommonDivs.forEach(div => {
         console.log('Common name div ID:', div.id);
-        if (div.id !== 'common-' + currentSubcategoryId) {
+        if (div.id !== 'common-' + currentId) {
             console.log('Collapsing common name div:', div.id);
             div.classList.remove('expanded');
             div.classList.add('collapsed');
@@ -80,6 +80,15 @@ function collapseSection(targetId) {
         container.classList.remove('expanded');
         container.classList.add('collapsed');
         container.style.display = 'none'; // Ensure hidden
+
+        // Find the parent row and toggle buttons
+        const parentRow = container.closest('tr');
+        const expandButton = parentRow.querySelector('.expand-btn');
+        const collapseButton = parentRow.querySelector('.collapse-btn');
+        if (expandButton && collapseButton) {
+            expandButton.style.display = 'inline-block';
+            collapseButton.style.display = 'none';
+        }
     } else {
         console.warn('Container not found for collapsing with targetId:', targetId);
     }
@@ -88,11 +97,16 @@ function collapseSection(targetId) {
 // --- Render Individual Items Data with Pagination ---
 function loadItems(category, subcategory, commonName, targetId, page = 1) {
     const decodedCategory = decodeURIComponent(category);
-    const decodedSubcategory = decodeURIComponent(subcategory);
+    const decodedSubcategory = subcategory ? decodeURIComponent(subcategory) : null;
     const decodedCommonName = decodeURIComponent(commonName);
     console.log('loadItems called with category:', decodedCategory, 'subcategory:', decodedSubcategory, 'commonName:', decodedCommonName, 'targetId:', targetId, 'page:', page);
     
-    const url = '/tab/' + window.cachedTabNum + '/data?category=' + encodeURIComponent(decodedCategory) + '&subcategory=' + encodeURIComponent(decodedSubcategory) + '&common_name=' + encodeURIComponent(decodedCommonName) + '&page=' + page;
+    // Determine if we're in Tabs 2 or 4 (no subcategory) or other tabs (with subcategory)
+    const isTab2or4 = window.cachedTabNum == 2 || window.cachedTabNum == 4;
+    const url = isTab2or4 
+        ? '/tab/' + window.cachedTabNum + '/data?category=' + encodeURIComponent(decodedCategory) + '&common_name=' + encodeURIComponent(decodedCommonName) + '&page=' + page
+        : '/tab/' + window.cachedTabNum + '/data?category=' + encodeURIComponent(decodedCategory) + '&subcategory=' + encodeURIComponent(decodedSubcategory) + '&common_name=' + encodeURIComponent(decodedCommonName) + '&page=' + page;
+
     const container = document.getElementById(targetId);
     if (!container) {
         console.error('Items container not found for ID:', targetId);
@@ -125,7 +139,6 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
             let html = '';
             const isTab1 = window.cachedTabNum == 1;
             if ((data.items && Array.isArray(data.items) && data.items.length > 0) || (data && Array.isArray(data) && data.length > 0)) {
-                // Handle both data.items (Tabs 2, 4) and direct data array (Tab 1)
                 const items = data.items || data;
                 hideOtherItems(targetId.replace('items-', ''));
                 html += [
@@ -166,16 +179,16 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                     '</table>'
                 ].join('');
 
-                // Add pagination controls for all tabs
+                // Add pagination controls
                 const totalPages = Math.ceil(data.total_items / data.per_page);
                 if (totalPages > 1) {
                     html += '<div class="pagination-controls mt-2">';
                     if (data.page > 1) {
-                        html += `<button class="btn btn-sm btn-secondary" onclick="loadItems('${encodeURIComponent(decodedCategory)}', '${encodeURIComponent(decodedSubcategory)}', '${encodeURIComponent(decodedCommonName)}', '${targetId}', ${data.page - 1})">Previous</button>`;
+                        html += `<button class="btn btn-sm btn-secondary" onclick="loadItems('${encodeURIComponent(decodedCategory)}', ${isTab2or4 ? 'null' : '\'' + encodeURIComponent(decodedSubcategory) + '\''}, '${encodeURIComponent(decodedCommonName)}', '${targetId}', ${data.page - 1})">Previous</button>`;
                     }
                     html += `<span>Page ${data.page} of ${totalPages}</span>`;
                     if (data.page < totalPages) {
-                        html += `<button class="btn btn-sm btn-secondary" onclick="loadItems('${encodeURIComponent(decodedCategory)}', '${encodeURIComponent(decodedSubcategory)}', '${encodeURIComponent(decodedCommonName)}', '${targetId}', ${data.page + 1})">Next</button>`;
+                        html += `<button class="btn btn-sm btn-secondary" onclick="loadItems('${encodeURIComponent(decodedCategory)}', ${isTab2or4 ? 'null' : '\'' + encodeURIComponent(decodedSubcategory) + '\''}, '${encodeURIComponent(decodedCommonName)}', '${targetId}', ${data.page + 1})">Next</button>`;
                     }
                     html += '</div>';
                 }
@@ -210,10 +223,15 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
 // --- Render Common Names Data with Pagination ---
 function loadCommonNames(category, subcategory, targetId, page = 1) {
     const decodedCategory = decodeURIComponent(category);
-    const decodedSubcategory = decodeURIComponent(subcategory);
+    const decodedSubcategory = subcategory ? decodeURIComponent(subcategory) : null;
     console.log('loadCommonNames called with category:', decodedCategory, 'subcategory:', decodedSubcategory, 'targetId:', targetId, 'page:', page);
     
-    const url = '/tab/' + window.cachedTabNum + '/common_names?category=' + encodeURIComponent(decodedCategory) + '&subcategory=' + encodeURIComponent(decodedSubcategory) + '&page=' + page;
+    // Determine if we're in Tabs 2 or 4 (no subcategory) or other tabs (with subcategory)
+    const isTab2or4 = window.cachedTabNum == 2 || window.cachedTabNum == 4;
+    const url = isTab2or4
+        ? '/tab/' + window.cachedTabNum + '/common_names?category=' + encodeURIComponent(decodedCategory) + '&page=' + page
+        : '/tab/' + window.cachedTabNum + '/common_names?category=' + encodeURIComponent(decodedCategory) + '&subcategory=' + encodeURIComponent(decodedSubcategory) + '&page=' + page;
+
     const container = document.getElementById(targetId);
     if (!container) {
         console.error('Common names container not found for ID:', targetId);
@@ -270,7 +288,7 @@ function loadCommonNames(category, subcategory, targetId, page = 1) {
                                     isTab1 ? '<td>' + (cn.in_service !== undefined ? cn.in_service : 'N/A') + '</td>' : '',
                                     isTab1 ? '<td>' + (cn.available !== undefined ? cn.available : 'N/A') + '</td>' : '',
                                     '<td>',
-                                        '<button class="btn btn-sm btn-secondary expand-btn" onclick="loadItems(\'' + encodeURIComponent(decodedCategory) + '\', \'' + encodeURIComponent(decodedSubcategory) + '\', \'' + encodeURIComponent(cn.name) + '\', \'items-' + cnId + '\')">Expand</button>',
+                                        '<button class="btn btn-sm btn-secondary expand-btn" onclick="loadItems(\'' + encodeURIComponent(decodedCategory) + '\', ' + (isTab2or4 ? 'null' : '\'' + encodeURIComponent(decodedSubcategory) + '\'') + ', \'' + encodeURIComponent(cn.name) + '\', \'items-' + cnId + '\')">Expand</button>',
                                         '<button class="btn btn-sm btn-secondary collapse-btn" style="display:none;" onclick="collapseSection(\'items-' + cnId + '\')">Collapse</button>',
                                         '<button class="btn btn-sm btn-info print-btn" data-print-level="Common Name" data-print-id="common-table-' + cnId + '">Print</button>',
                                         '<div id="loading-' + cnId + '" style="display:none;" class="loading">Loading...</div>',
@@ -291,16 +309,16 @@ function loadCommonNames(category, subcategory, targetId, page = 1) {
                 if (totalPages > 1) {
                     html += '<div class="pagination-controls mt-2">';
                     if (data.page > 1) {
-                        html += `<button class="btn btn-sm btn-secondary" onclick="loadCommonNames('${encodeURIComponent(decodedCategory)}', '${encodeURIComponent(decodedSubcategory)}', '${targetId}', ${data.page - 1})">Previous</button>`;
+                        html += `<button class="btn btn-sm btn-secondary" onclick="loadCommonNames('${encodeURIComponent(decodedCategory)}', ${isTab2or4 ? 'null' : '\'' + encodeURIComponent(decodedSubcategory) + '\''}, '${targetId}', ${data.page - 1})">Previous</button>`;
                     }
                     html += `<span>Page ${data.page} of ${totalPages}</span>`;
                     if (data.page < totalPages) {
-                        html += `<button class="btn btn-sm btn-secondary" onclick="loadCommonNames('${encodeURIComponent(decodedCategory)}', '${encodeURIComponent(decodedSubcategory)}', '${targetId}', ${data.page + 1})">Next</button>`;
+                        html += `<button class="btn btn-sm btn-secondary" onclick="loadCommonNames('${encodeURIComponent(decodedCategory)}', ${isTab2or4 ? 'null' : '\'' + encodeURIComponent(decodedSubcategory) + '\''}, '${targetId}', ${data.page + 1})">Next</button>`;
                     }
                     html += '</div>';
                 }
             } else {
-                html = '<p class="common-level">No common names found for this subcategory.</p>';
+                html = '<p class="common-level">No common names found for this ' + (isTab2or4 ? 'contract' : 'subcategory') + '.</p>';
             }
 
             container.innerHTML = html;
@@ -342,7 +360,7 @@ function loadCommonNames(category, subcategory, targetId, page = 1) {
         });
 }
 
-// --- Render Subcategory Data with Pagination ---
+// --- Render Subcategory Data with Pagination (for tabs that use it, e.g., Tab 1) ---
 function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1) {
     console.log('loadSubcatData called with originalCategory:', originalCategory, 'normalizedCategory:', normalizedCategory, 'targetId:', targetId, 'page:', page);
     hideOtherSubcats(normalizedCategory);
@@ -432,7 +450,7 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
                     html += '</div>';
                 }
             } else {
-                html += '<p>No subcategories found for this ' + (window.cachedTabNum == 2 || window.cachedTabNum == 4 ? 'contract' : 'category') + '.</p>';
+                html += '<p>No subcategories found for this category.</p>';
             }
             
             html += '</div>';
@@ -475,7 +493,16 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log('expandCategory called with category:', category, 'targetId:', targetId, 'page:', page);
         const normalizedCategory = targetId.replace('subcat-', '').replace(/\s+/g, '_'); // Normalize spaces to underscores
         const originalCategory = decodeURIComponent(category); // Keep the original category name
-        loadSubcatData(originalCategory, normalizedCategory, targetId, page);
+
+        // Check if we're in Tabs 2 or 4 (skip subcategory layer)
+        const isTab2or4 = window.cachedTabNum == 2 || window.cachedTabNum == 4;
+        if (isTab2or4) {
+            // For Tabs 2 and 4, go straight to common names
+            loadCommonNames(originalCategory, null, 'common-' + normalizedCategory, page);
+        } else {
+            // For other tabs (e.g., Tab 1), load subcategories
+            loadSubcatData(originalCategory, normalizedCategory, targetId, page);
+        }
     };
     
     console.log('expand.js: expandCategory defined');
