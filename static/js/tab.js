@@ -100,6 +100,9 @@ async function printTable(level, id) {
     // Remove non-printable elements from the main element
     tableWrapper.querySelectorAll('.btn, .loading, .expandable.collapsed, .pagination-controls').forEach(el => el.remove());
 
+    // Clean up any <br> tags that might cause overlapping
+    tableWrapper.querySelectorAll('br').forEach(br => br.remove());
+
     // Prepare the print content with custom header, signature line, and styles
     const printContent = `
         <html>
@@ -113,7 +116,7 @@ async function printTable(level, id) {
                     }
                     .print-header {
                         text-align: center;
-                        margin-bottom: 20px;
+                        margin-bottom: 40px; /* Increased margin for better spacing */
                     }
                     .print-header h1 {
                         font-size: 28px;
@@ -131,23 +134,23 @@ async function printTable(level, id) {
                     table {
                         border-collapse: collapse;
                         width: 100%;
-                        margin-top: 10px;
+                        margin-top: 20px;
                     }
                     th, td {
                         border: 1px solid #ccc;
-                        padding: 12px; /* Increased padding for better spacing */
+                        padding: 12px;
                         text-align: left;
-                        font-size: 14px; /* Slightly larger font for readability */
-                        white-space: normal; /* Allow text wrapping */
-                        word-wrap: break-word; /* Break long words */
+                        font-size: 14px;
+                        white-space: normal;
+                        word-wrap: break-word;
+                        min-width: 150px; /* Increased min-width for better spacing */
                     }
                     th {
                         background-color: #f2f2f2;
                         font-weight: bold;
-                        min-width: 120px; /* Ensure columns have enough width */
                     }
                     td {
-                        min-width: 120px; /* Ensure columns have enough width */
+                        vertical-align: top; /* Align content to the top */
                     }
                     .hidden {
                         display: none;
@@ -157,12 +160,14 @@ async function printTable(level, id) {
                         background-color: #e9ecef;
                         padding: 0.5rem;
                         border-left: 3px solid #28a745;
+                        margin-top: 10px;
                     }
                     .item-level-wrapper {
                         margin-left: 1rem;
                         background-color: #dee2e6;
                         padding: 0.5rem;
                         border-left: 3px solid #dc3545;
+                        margin-top: 10px;
                     }
                     .signature-line {
                         margin-top: 40px;
@@ -177,9 +182,9 @@ async function printTable(level, id) {
                             margin: 0;
                         }
                         .print-header {
-                            position: fixed;
-                            top: 0;
+                            position: static; /* Changed to static to prevent overlap */
                             width: 100%;
+                            margin-bottom: 20px;
                         }
                         table {
                             page-break-inside: auto;
@@ -199,7 +204,7 @@ async function printTable(level, id) {
                     ${contractDate !== 'N/A' ? `<p>Contract Created: ${contractDate}</p>` : ''}
                     <p>Printed on: ${new Date().toLocaleString()}</p>
                 </div>
-                <div style="margin-top: 100px;">
+                <div>
                     ${tableWrapper.outerHTML}
                 </div>
                 <div class="signature-line">

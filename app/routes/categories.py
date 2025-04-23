@@ -14,11 +14,11 @@ def manage_categories():
         
         # Subquery to find the most common common_name for each rental_class_num in ItemMaster
         subquery = db.session.query(
-            func.trim(func.upper(ItemMaster.rental_class_num)).label('rental_class_num'),
+            func.trim(func.upper(func.cast(ItemMaster.rental_class_num, db.String))).label('rental_class_num'),
             ItemMaster.common_name,
             func.count(ItemMaster.common_name).label('name_count')
         ).group_by(
-            func.trim(func.upper(ItemMaster.rental_class_num)), ItemMaster.common_name
+            func.trim(func.upper(func.cast(ItemMaster.rental_class_num, db.String))), ItemMaster.common_name
         ).subquery()
 
         # Main query to get the most common common_name per rental_class_num
@@ -32,17 +32,31 @@ def manage_categories():
         ).all()
 
         common_name_dict = {rental_class_num: common_name for rental_class_num, common_name in common_names}
+        current_app.logger.debug(f"Common names dictionary: {common_name_dict}")
 
         # Prepare data for the template
         categories_data = []
         for mapping in mappings:
             # Normalize rental_class_id for matching
-            normalized_rental_class_id = mapping.rental_class_id.strip().upper() if mapping.rental_class_id else ''
+            normalized_rental_class_id = str(mapping.rental_class_id).strip().upper() if mapping.rental_class_id else ''
+            common_name = common_name_dict.get(normalized_rental_class_id, 'N/A')
+            
+            # If common_name is 'N/A', try to fetch directly from ItemMaster for debugging
+            if common_name == 'N/A':
+                item = db.session.query(ItemMaster.common_name).filter(
+                    func.trim(func.upper(func.cast(ItemMaster.rental_class_num, db.String))) == normalized_rental_class_id
+                ).first()
+                if item and item.common_name:
+                    common_name = item.common_name
+                    current_app.logger.info(f"Found common name {common_name} for rental_class_id {normalized_rental_class_id} via direct query")
+                else:
+                    current_app.logger.warning(f"No common name found for rental_class_id {normalized_rental_class_id}")
+
             categories_data.append({
                 'rental_class_id': mapping.rental_class_id,
                 'category': mapping.category,
                 'subcategory': mapping.subcategory,
-                'common_name': common_name_dict.get(normalized_rental_class_id, 'N/A')
+                'common_name': common_name
             })
 
         current_app.logger.info(f"Fetched {len(categories_data)} category mappings")
@@ -64,11 +78,11 @@ def get_mapping():
         mappings = RentalClassMapping.query.all()
         # Subquery to find the most common common_name for each rental_class_num in ItemMaster
         subquery = db.session.query(
-            func.trim(func.upper(ItemMaster.rental_class_num)).label('rental_class_num'),
+            func.trim(func.upper(func.cast(ItemMaster.rental_class_num, db.String))).label('rental_class_num'),
             ItemMaster.common_name,
             func.count(ItemMaster.common_name).label('name_count')
         ).group_by(
-            func.trim(func.upper(ItemMaster.rental_class_num)), ItemMaster.common_name
+            func.trim(func.upper(func.cast(ItemMaster.rental_class_num, db.String))), ItemMaster.common_name
         ).subquery()
 
         # Main query to get the most common common_name per rental_class_num
@@ -82,14 +96,30 @@ def get_mapping():
         ).all()
         
         common_name_dict = {rental_class_num: common_name for rental_class_num, common_name in common_names}
+        current_app.logger.debug(f"Common names dictionary (mapping): {common_name_dict}")
 
-        data = [{
-            'rental_class_id': m.rental_class_id,
-            'category': m.category,
-            'subcategory': m.subcategory,
-            'rental_class_id': m.rental_class_id,
-            'common_name': common_name_dict.get(m.rental_class_id.strip().upper() if m.rental_class_id else '', 'N/A')
-        } for m in mappings]
+        data = []
+        for m in mappings:
+            normalized_rental_class_id = str(m.rental_class_id).strip().upper() if m.rental_class_id else ''
+            common_name = common_name_dict.get(normalized_rental_class_id, 'N/A')
+            
+            # If common_name is 'N/A', try to fetch directly from ItemMaster for debugging
+            if common_name == 'N/A':
+                item = db.session.query(ItemMaster.common_name).filter(
+                    func.trim(func.upper(func.cast(ItemMaster.rental_class_num, db.String))) == normalized_rental_class_id
+                ).first()
+                if item and item.common_name:
+                    common_name = item.common_name
+                    current_app.logger.info(f"Found common name {common_name} for rental_class_id {normalized_rental_class_id} via direct query (mapping)")
+                else:
+                    current_app.logger.warning(f"No common name found for rental_class_id {normalized_rental_class_id} (mapping)")
+
+            data.append({
+                'rental_class_id': m.rental_class_id,
+                'category': m.category,
+                'subcategory': m.subcategory,
+                'common_name': common_name
+            })
         return jsonify(data)
     except Exception as e:
         current_app.logger.error(f"Error fetching category mappings: {str(e)}")
