@@ -1,4 +1,4 @@
-console.log('expand.js version: 2025-04-22 v22 loaded');
+console.log('expand.js version: 2025-04-22 v23 loaded');
 
 // --- Loading Indicator Functions ---
 function showLoading(key) {
@@ -328,16 +328,14 @@ function loadCommonNames(category, subcategory, targetId, page = 1) {
             // Add event listeners to toggle Expand/Collapse buttons
             const expandButtons = container.querySelectorAll('.expand-btn');
             const collapseButtons = container.querySelectorAll('.collapse-btn');
-            expandButtons.forEach((üket
-
-btn, index) => {
-                btn.addEventListener('click', () => {
+            expandButtons.forEach(function(btn, index) {
+                btn.addEventListener('click', function() {
                     btn.style.display = 'none';
                     collapseButtons[index].style.display = 'inline-block';
                 });
             });
-            collapseButtons.forEach((btn, index) => {
-                btn.addEventListener('click', () => {
+            collapseButtons.forEach(function(btn, index) {
+                btn.addEventListener('click', function() {
                     btn.style.display = 'none';
                     expandButtons[index].style.display = 'inline-block';
                 });
@@ -464,14 +462,14 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
             // Add event listeners to toggle Expand/Collapse buttons for subcategories
             const expandButtons = container.querySelectorAll('.expand-btn');
             const collapseButtons = container.querySelectorAll('.collapse-btn');
-            expandButtons.forEach((btn, index) => {
-                btn.addEventListener('click', () => {
+            expandButtons.forEach(function(btn, index) {
+                btn.addEventListener('click', function() {
                     btn.style.display = 'none';
                     collapseButtons[index].style.display = 'inline-block';
                 });
             });
-            collapseButtons.forEach((btn, index) => {
-                btn.addEventListener('click', () => {
+            collapseButtons.forEach(function(btn, index) {
+                btn.addEventListener('click', function() {
                     btn.style.display = 'none';
                     expandButtons[index].style.display = 'inline-block';
                 });

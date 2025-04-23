@@ -57,8 +57,8 @@
                 <td>{{ category.total_items }}</td>
                 <td>{{ category.last_scanned_date }}</td>
                 <td>
-                    <button class="btn btn-sm btn-secondary expand-btn" onclick="expandCategory(&quot;{{ encoded_category }}&quot;, &quot;common-{{ category.cat_id }}&quot;)">Expand</button>
-                    <button class="btn btn-sm btn-secondary collapse-btn" style="display:none;" onclick="collapseSection(&quot;common-{{ category.cat_id }}&quot;)">Collapse</button>
+                    <button class="btn btn-sm btn-secondary expand-btn" data-category="{{ encoded_category }}" data-target="common-{{ category.cat_id }}">Expand</button>
+                    <button class="btn btn-sm btn-secondary collapse-btn" style="display:none;" onclick="collapseSection('common-{{ category.cat_id }}')">Collapse</button>
                     <button class="btn btn-sm btn-info print-btn" data-print-level="Contract" data-print-id="category-row-{{ category.cat_id }}">Print</button>
                     <div id="loading-{{ category.cat_id }}" style="display:none;" class="loading">Loading...</div>
                 </td>
@@ -211,6 +211,20 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    // Set up expand button event listeners
+    const expandButtons = document.querySelectorAll('.expand-btn');
+    expandButtons.forEach(function(button) {
+        button.addEventListener('click', function() {
+            const category = button.getAttribute('data-category');
+            const targetId = button.getAttribute('data-target');
+            if (typeof window.expandCategory === 'function') {
+                window.expandCategory(category, targetId);
+            } else {
+                console.error('expandCategory function is not defined');
+            }
+        });
+    });
+
     // Attach event listeners to buttons
     if (addBtn) {
         addBtn.addEventListener('click', addHandCountedItem);
@@ -222,6 +236,8 @@ document.addEventListener('DOMContentLoaded', function() {
     // Apply filters (already defined in tab.js)
     if (typeof applyFilters === 'function') {
         applyFilters();
+    } else {
+        console.error('applyFilters function is not defined');
     }
 });
 </script>
