@@ -61,16 +61,19 @@
             };
         });
 
-        // Check for duplicate rental_class_id entries
-        const rentalClassIds = mappings.map(mapping => mapping.rental_class_id);
-        const duplicates = rentalClassIds.filter((id, index) => id && rentalClassIds.indexOf(id) !== index);
-        if (duplicates.length > 0) {
-            alert('Error: Duplicate Rental Class IDs found: ' + duplicates.join(', ') + '. Each Rental Class ID must be unique.');
-            return;
+        // Deduplicate rental_class_id entries, keeping the last occurrence
+        const deduplicatedMappings = [];
+        const seenIds = new Set();
+        for (let i = mappings.length - 1; i >= 0; i--) {
+            const mapping = mappings[i];
+            if (mapping.rental_class_id && !seenIds.has(mapping.rental_class_id)) {
+                seenIds.add(mapping.rental_class_id);
+                deduplicatedMappings.unshift(mapping);
+            }
         }
 
         // Remove entries with empty rental_class_id
-        const validMappings = mappings.filter(mapping => mapping.rental_class_id !== '');
+        const validMappings = deduplicatedMappings.filter(mapping => mapping.rental_class_id !== '');
 
         if (validMappings.length === 0) {
             alert('Error: No valid mappings to save. Please ensure all rows have a Rental Class ID.');

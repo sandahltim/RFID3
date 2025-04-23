@@ -132,15 +132,22 @@ def update_mapping():
         if not isinstance(data, list):
             return jsonify({'error': 'Invalid data format'}), 400
 
+        # Deduplicate entries on the server side, keeping the last occurrence
+        deduplicated_data = {}
+        for item in data:
+            rental_class_id = item.get('rental_class_id')
+            if rental_class_id:
+                deduplicated_data[rental_class_id] = item
+
         # Clear existing mappings
         RentalClassMapping.query.delete()
 
-        # Add new mappings
-        for item in data:
+        # Add deduplicated mappings
+        for rental_class_id, item in deduplicated_data.items():
             mapping = RentalClassMapping(
                 category=item.get('category'),
                 subcategory=item.get('subcategory'),
-                rental_class_id=item.get('rental_class_id')
+                rental_class_id=rental_class_id
             )
             db.session.add(mapping)
 
