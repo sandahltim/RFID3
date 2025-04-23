@@ -2,6 +2,7 @@ from flask import Blueprint, render_template, current_app
 from .. import db
 from ..models.db_models import ItemMaster, Transaction
 from sqlalchemy import func
+from time import time
 
 home_bp = Blueprint('home', __name__)
 
@@ -21,12 +22,6 @@ def home():
         # Items in service logic:
         # 1. Status is not 'Ready to Rent', 'On Rent', or 'Delivered', OR
         # 2. Most recent transaction has service_required = true
-        # First, get items with non-ready status
-        items_in_service_status = session.query(func.count(ItemMaster.tag_id)).filter(
-            ~ItemMaster.status.in_(['Ready to Rent', 'On Rent', 'Delivered'])
-        ).scalar()
-
-        # Then, get items with service_required = true in their most recent transaction
         subquery = session.query(
             Transaction.tag_id,
             Transaction.scan_date,
@@ -37,15 +32,6 @@ def home():
             Transaction.scan_date.desc()
         ).subquery()
 
-        items_service_required = session.query(func.count(ItemMaster.tag_id)).join(
-            subquery,
-            ItemMaster.tag_id == subquery.c.tag_id
-        ).filter(
-            subquery.c.scan_date == session.query(func.max(Transaction.scan_date)).filter(Transaction.tag_id == ItemMaster.tag_id).correlate(ItemMaster).scalar_subquery(),
-            subquery.c.service_required == True
-        ).scalar()
-
-        # Combine both counts, avoiding double-counting
         items_in_service = session.query(func.count(ItemMaster.tag_id)).filter(
             (ItemMaster.status.notin_(['Ready to Rent', 'On Rent', 'Delivered'])) |
             (ItemMaster.tag_id.in_(
@@ -66,11 +52,13 @@ def home():
                               total_items=total_items or 0,
                               items_on_rent=items_on_rent or 0,
                               items_in_service=items_in_service or 0,
-                              items_available=items_available or 0)
+                              items_available=items_available or 0,
+                              cache_bust=int(time()))
     except Exception as e:
         current_app.logger.error(f"Error rendering home page: {str(e)}", exc_info=True)
         return render_template('home.html', 
                               total_items=0,
                               items_on_rent=0,
                               items_in_service=0,
-                              items_available=0)
+                              items_available=0,
+                              cache_bust=int(time()))

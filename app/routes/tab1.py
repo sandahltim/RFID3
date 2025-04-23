@@ -2,12 +2,12 @@ from flask import Blueprint, render_template, request, jsonify, current_app
 from .. import db, cache
 from ..models.db_models import ItemMaster, Transaction, RentalClassMapping, UserRentalClassMapping
 from sqlalchemy import func, desc, or_
+from time import time
 
 tab1_bp = Blueprint('tab1', __name__)
 
 @tab1_bp.route('/tab/1')
-@cache.cached(timeout=60)
-def tab1():
+def tab1_view():
     try:
         session = db.session()
         current_app.logger.info("Starting new session for tab1")
@@ -49,9 +49,7 @@ def tab1():
                 ItemMaster.status.in_(['On Rent', 'Delivered'])
             ).scalar()
 
-            # Items in service logic:
-            # 1. Status is not 'Ready to Rent', 'On Rent', or 'Delivered', OR
-            # 2. Most recent transaction has service_required = true
+            # Items in service logic
             subquery = session.query(
                 Transaction.tag_id,
                 Transaction.scan_date,
@@ -94,13 +92,13 @@ def tab1():
         current_app.logger.info(f"Fetched {len(category_data)} categories for tab1")
 
         session.close()
-        return render_template('tab1.html', categories=category_data)
+        return render_template('tab1.html', categories=category_data, cache_bust=int(time()))
     except Exception as e:
         current_app.logger.error(f"Error rendering Tab 1: {str(e)}", exc_info=True)
-        return render_template('tab1.html', categories=[])
+        return render_template('tab1.html', categories=[], cache_bust=int(time()))
 
 @tab1_bp.route('/tab/1/subcat_data')
-def get_subcat_data():
+def tab1_subcat_data():
     category = request.args.get('category')
     page = int(request.args.get('page', 1))
     per_page = 10
@@ -199,7 +197,7 @@ def get_subcat_data():
         return jsonify({'error': 'Failed to fetch subcategory data'}), 500
 
 @tab1_bp.route('/tab/1/common_names')
-def get_common_names():
+def tab1_common_names():
     category = request.args.get('category')
     subcategory = request.args.get('subcategory')
     page = int(request.args.get('page', 1))
@@ -301,7 +299,7 @@ def get_common_names():
         return jsonify({'error': 'Failed to fetch common names'}), 500
 
 @tab1_bp.route('/tab/1/data')
-def get_data():
+def tab1_data():
     category = request.args.get('category')
     subcategory = request.args.get('subcategory')
     common_name = request.args.get('common_name')
