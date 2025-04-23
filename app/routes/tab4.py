@@ -287,16 +287,26 @@ def tab4_hand_counted_items():
         ).all()
         session.close()
         current_app.logger.info(f"Found {len(items)} hand-counted items for contract {contract_number}")
-        return jsonify([{
-            'id': item.id,
-            'contract_number': item.contract_number,
-            'item_name': item.item_name,
-            'quantity': item.quantity,
-            'action': item.action,
-            'timestamp': item.timestamp.isoformat() if item.timestamp else None,
-            'user': item.user
-        } for item in items])
+
+        # Render HTML rows for HTMX to insert into the table
+        html = ""
+        if not items:
+            html = '<tr><td colspan="6">No hand-counted items found.</td></tr>'
+        else:
+            for item in items:
+                timestamp = item.timestamp.isoformat() if item.timestamp else 'N/A'
+                html += f"""
+                    <tr>
+                        <td>{item.contract_number}</td>
+                        <td>{item.item_name}</td>
+                        <td>{item.quantity}</td>
+                        <td>{item.action}</td>
+                        <td>{timestamp}</td>
+                        <td>{item.user}</td>
+                    </tr>
+                """
+        return html
     except Exception as e:
         current_app.logger.error(f"Error fetching hand-counted items for contract {contract_number}: {str(e)}")
         session.close()
-        return jsonify({'error': 'Failed to fetch hand-counted items'}), 500
+        return '<tr><td colspan="6">Error loading hand-counted items.</td></tr>'
