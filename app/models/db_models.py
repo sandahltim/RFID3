@@ -1,4 +1,5 @@
 from app import db  # Import db from app/__init__.py
+from datetime import datetime
 
 class ItemMaster(db.Model):
     __tablename__ = 'id_item_master'
@@ -111,3 +112,13 @@ class HandCountedItems(db.Model):
     action = db.Column(db.String(50), nullable=False)          # "Added" or "Removed"
     timestamp = db.Column(db.DateTime, nullable=False)         # When the action occurred
     user = db.Column(db.String(50), nullable=False)            # Who performed the action
+
+# Added on 2025-04-23 to store user-defined rental class mappings
+class UserRentalClassMapping(db.Model):
+    __tablename__ = 'user_rental_class_mappings'
+
+    rental_class_id = db.Column(db.String(50), primary_key=True)
+    category = db.Column(db.String(100), nullable=False)
+    subcategory = db.Column(db.String(100), nullable=False)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
