@@ -32,14 +32,11 @@ def update_item_master(session, items):
             db_item.common_name = item.get('common_name')
             db_item.quality = item.get('quality')
             db_item.bin_location = item.get('bin_location')
-            # Normalize status values
-            status = item.get('status')
-            if status:
-                status = status.title()  # Convert to title case (e.g., 'delivered' -> 'Delivered')
-                if status not in ['On Rent', 'Delivered', 'Ready to Rent', 'In Service']:
-                    status = 'Unknown'
-            else:
-                status = 'Unknown'
+            # Log raw status value
+            raw_status = item.get('status')
+            logger.debug(f"Raw status for tag_id {tag_id}: {raw_status}")
+            # Use the status as-is from the API, only set 'Unknown' if missing
+            status = raw_status if raw_status else 'Unknown'
             db_item.status = status
             logger.debug(f"Set status for tag_id {tag_id} to {status}")
             db_item.last_contract_num = item.get('last_contract_num')
