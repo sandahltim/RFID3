@@ -135,13 +135,19 @@ async function printTable(level, id) {
                     }
                     th, td {
                         border: 1px solid #ccc;
-                        padding: 8px;
+                        padding: 12px; /* Increased padding for better spacing */
                         text-align: left;
-                        font-size: 12px;
+                        font-size: 14px; /* Slightly larger font for readability */
+                        white-space: normal; /* Allow text wrapping */
+                        word-wrap: break-word; /* Break long words */
                     }
                     th {
                         background-color: #f2f2f2;
                         font-weight: bold;
+                        min-width: 120px; /* Ensure columns have enough width */
+                    }
+                    td {
+                        min-width: 120px; /* Ensure columns have enough width */
                     }
                     .hidden {
                         display: none;

@@ -1,4 +1,4 @@
-console.log('expand.js version: 2025-04-22 v24 loaded');
+console.log('expand.js version: 2025-04-22 v25 loaded');
 
 // --- Loading Indicator Functions ---
 function showLoading(key) {
@@ -176,6 +176,24 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                 hideOtherItems(targetId.replace('items-', ''));
                 html += [
                     '<div class="item-level-wrapper">',
+                    // Pagination controls at the top
+                    '<div class="pagination-controls mt-2">'
+                ].join('');
+
+                // Add pagination controls at the top
+                const totalPages = Math.ceil(data.total_items / data.per_page);
+                if (totalPages > 1) {
+                    if (data.page > 1) {
+                        html += `<button class="btn btn-sm btn-secondary" onclick="loadItems('${encodeURIComponent(decodedCategory)}', ${isTab2or4 ? 'null' : '\'' + encodeURIComponent(decodedSubcategory) + '\''}, '${encodeURIComponent(decodedCommonName)}', '${targetId}', ${data.page - 1})">Previous</button>`;
+                    }
+                    html += `<span>Page ${data.page} of ${totalPages}</span>`;
+                    if (data.page < totalPages) {
+                        html += `<button class="btn btn-sm btn-secondary" onclick="loadItems('${encodeURIComponent(decodedCategory)}', ${isTab2or4 ? 'null' : '\'' + encodeURIComponent(decodedSubcategory) + '\''}, '${encodeURIComponent(decodedCommonName)}', '${targetId}', ${data.page + 1})">Next</button>`;
+                    }
+                }
+                html += '</div>';
+
+                html += [
                     '<table class="table table-bordered item-level mt-2">',
                         '<thead>',
                             '<tr>',
@@ -212,8 +230,7 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                     '</table>'
                 ].join('');
 
-                // Add pagination controls
-                const totalPages = Math.ceil(data.total_items / data.per_page);
+                // Add pagination controls at the bottom
                 if (totalPages > 1) {
                     html += '<div class="pagination-controls mt-2">';
                     if (data.page > 1) {
@@ -301,6 +318,21 @@ function loadCommonNames(category, subcategory, targetId, page = 1) {
             if (data.common_names && Array.isArray(data.common_names) && data.common_names.length > 0) {
                 const targetBaseId = targetId.replace('common-', '');
                 hideOtherCommonNames(targetBaseId);
+
+                // Pagination controls at the top
+                html += '<div class="pagination-controls mt-2">';
+                const totalPages = Math.ceil(data.total_common_names / data.per_page);
+                if (totalPages > 1) {
+                    if (data.page > 1) {
+                        html += `<button class="btn btn-sm btn-secondary" onclick="loadCommonNames('${encodeURIComponent(decodedCategory)}', ${isTab2or4 ? 'null' : '\'' + encodeURIComponent(decodedSubcategory) + '\''}, '${targetId}', ${data.page - 1})">Previous</button>`;
+                    }
+                    html += `<span>Page ${data.page} of ${totalPages}</span>`;
+                    if (data.page < totalPages) {
+                        html += `<button class="btn btn-sm btn-secondary" onclick="loadCommonNames('${encodeURIComponent(decodedCategory)}', ${isTab2or4 ? 'null' : '\'' + encodeURIComponent(decodedSubcategory) + '\''}, '${targetId}', ${data.page + 1})">Next</button>`;
+                    }
+                }
+                html += '</div>';
+
                 data.common_names.forEach(cn => {
                     const cnId = targetBaseId + '_' + cn.name.toLowerCase().replace(/[^a-z0-9-]/g, '_');
                     html += [
@@ -339,8 +371,7 @@ function loadCommonNames(category, subcategory, targetId, page = 1) {
                     ].join('');
                 });
 
-                // Add pagination controls
-                const totalPages = Math.ceil(data.total_common_names / data.per_page);
+                // Add pagination controls at the bottom
                 if (totalPages > 1) {
                     html += '<div class="pagination-controls mt-2">';
                     if (data.page > 1) {
@@ -415,6 +446,21 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
         .then(data => {
             let html = '<div class="subcat-level">';
             const isTab1 = window.cachedTabNum == 1;
+
+            // Pagination controls at the top
+            const totalPages = Math.ceil(data.total_subcats / data.per_page);
+            if (totalPages > 1) {
+                html += '<div class="pagination-controls mt-2">';
+                if (data.page > 1) {
+                    html += `<button class="btn btn-sm btn-secondary" onclick="loadSubcatData('${encodeURIComponent(originalCategory)}', '${normalizedCategory}', '${targetId}', ${data.page - 1})">Previous</button>`;
+                }
+                html += `<span>Page ${data.page} of ${totalPages}</span>`;
+                if (data.page < totalPages) {
+                    html += `<button class="btn btn-sm btn-secondary" onclick="loadSubcatData('${encodeURIComponent(originalCategory)}', '${normalizedCategory}', '${targetId}', ${data.page + 1})">Next</button>`;
+                }
+                html += '</div>';
+            }
+
             if (data.subcategories && Array.isArray(data.subcategories) && data.subcategories.length > 0) {
                 data.subcategories.forEach(sub => {
                     console.log('Processing subcategory:', sub);
@@ -455,8 +501,7 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
                     ].join('');
                 });
 
-                // Add pagination controls
-                const totalPages = Math.ceil(data.total_subcats / data.per_page);
+                // Add pagination controls at the bottom
                 if (totalPages > 1) {
                     html += '<div class="pagination-controls mt-2">';
                     if (data.page > 1) {
