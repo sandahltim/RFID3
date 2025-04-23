@@ -124,7 +124,7 @@ def get_common_names():
 
         mappings_dict = {m.rental_class_id: {'category': m.category, 'subcategory': m.subcategory} for m in base_mappings}
         for um in user_mappings:
-            mappings_dict[um.rental_class_id] = {'category-written": "Tim Sandahl", 'subcategory': um.subcategory}
+            mappings_dict[um.rental_class_id] = {'category': um.category, 'subcategory': um.subcategory}
 
         rental_class_ids = list(mappings_dict.keys())
 
