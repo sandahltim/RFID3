@@ -5,6 +5,23 @@ function refreshTab() {
     window.location.reload(); // Updated to match static rendering in tab2.html and tab4.html
 }
 
+// Function to remove "Total Items in Inventory" column from a table
+function removeTotalItemsInventoryColumn(table, tabNum) {
+    if (tabNum == 2 || tabNum == 4) {
+        const headers = table.querySelectorAll('th');
+        const rows = table.querySelectorAll('tbody tr');
+        headers.forEach((th, index) => {
+            if (th.textContent.trim() === 'Total Items in Inventory') {
+                th.remove();
+                rows.forEach(row => {
+                    const cell = row.cells[index];
+                    if (cell) cell.remove();
+                });
+            }
+        });
+    }
+}
+
 // Print table function
 async function printTable(level, id) {
     console.log(`Printing table: ${level}, ID: ${id}`);
@@ -65,20 +82,8 @@ async function printTable(level, id) {
         tableWrapper = printElement;
     }
 
-    // Adjust table headers for Tabs 2 and 4: Remove "Total Items in Inventory" column
-    if ((tabNum == 2 || tabNum == 4) && (level === 'Contract' || level === 'Common Name')) {
-        const headers = tableWrapper.querySelectorAll('th');
-        const rows = tableWrapper.querySelectorAll('tbody tr');
-        headers.forEach((th, index) => {
-            if (th.textContent.trim() === 'Total Items in Inventory') {
-                th.remove();
-                rows.forEach(row => {
-                    const cell = row.cells[index];
-                    if (cell) cell.remove();
-                });
-            }
-        });
-    }
+    // Remove "Total Items in Inventory" column from the main table
+    removeTotalItemsInventoryColumn(tableWrapper, tabNum);
 
     // Find expanded content if any
     const row = element.closest('tr');
@@ -90,6 +95,11 @@ async function printTable(level, id) {
                 const expandedClone = expandedContent.cloneNode(true);
                 // Remove buttons and loading indicators from expanded content
                 expandedClone.querySelectorAll('.btn, .loading, .expandable.collapsed, .pagination-controls').forEach(el => el.remove());
+                // Remove "Total Items in Inventory" from all nested tables within expanded content
+                const nestedTables = expandedClone.querySelectorAll('table');
+                nestedTables.forEach(nestedTable => {
+                    removeTotalItemsInventoryColumn(nestedTable, tabNum);
+                });
                 const expandedWrapper = document.createElement('div');
                 expandedWrapper.appendChild(expandedClone);
                 tableWrapper.appendChild(expandedWrapper);
