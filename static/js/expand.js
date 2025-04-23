@@ -84,15 +84,18 @@ function collapseSection(targetId) {
 function loadCommonNames(category, subcategory, targetId, page = 1, contractNumber = null) {
     console.log('loadCommonNames called with', { category, subcategory, targetId, page, contractNumber });
 
-    const container = document.getElementById(targetId);
+    // For Tabs 2 and 4, targetId is already the correct container ID (e.g., 'common-212761')
+    // For Tabs 1, 3, and 5, targetId is a base ID (e.g., 'resale_resale'), so we need to prepend 'common-'
+    const containerId = (window.cachedTabNum == 2 || window.cachedTabNum == 4) ? targetId : `common-${targetId}`;
+    const container = document.getElementById(containerId);
     if (!container) {
-        console.error(`Container with ID ${targetId} not found`);
+        console.error(`Container with ID ${containerId} not found`);
         return;
     }
 
     const key = subcategory ? `${category}_${subcategory}` : category;
     showLoading(key);
-    hideOtherCommonNames(targetId);
+    hideOtherCommonNames(containerId);
 
     let url = `/tab/${window.cachedTabNum}/common_names?category=${encodeURIComponent(category)}&page=${page}`;
     if (contractNumber) {

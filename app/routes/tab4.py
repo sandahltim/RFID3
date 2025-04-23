@@ -8,14 +8,18 @@ tab4_bp = Blueprint('tab4', __name__)
 
 @tab4_bp.route('/tab/4')
 def tab4_view():
+    current_app.logger.info("Entering tab4_view route")
     try:
+        current_app.logger.info("Attempting to create database session")
         session = db.session()
-        current_app.logger.info("Starting new session for tab4")
+        current_app.logger.info("Database session created successfully")
 
         # Define laundry-related categories
         laundry_categories = ['Rectangle Linen', 'Round Linen', 'Runners and Drapes']
+        current_app.logger.info(f"Laundry categories defined: {laundry_categories}")
 
         # Fetch laundry contracts from id_item_master (contract numbers starting with 'L' or 'l')
+        current_app.logger.info("Executing contracts query")
         contracts_query = session.query(
             ItemMaster.last_contract_num,
             func.count(ItemMaster.tag_id).label('total_items')
@@ -125,7 +129,8 @@ def tab4_view():
         return render_template('tab4.html', contracts=contracts, cache_bust=int(time()))
     except Exception as e:
         current_app.logger.error(f"Error rendering Tab 4: {str(e)}", exc_info=True)
-        session.close()
+        if 'session' in locals():
+            session.close()
         return render_template('tab4.html', contracts=[], cache_bust=int(time()))
 
 @tab4_bp.route('/tab/4/common_names')
