@@ -23,12 +23,14 @@ def tab4_view():
             ItemMaster.status.in_(['On Rent', 'Delivered']),
             ItemMaster.last_contract_num != None,
             ItemMaster.last_contract_num != '00000',
-            func.lower(ItemMaster.last_contract_num).like('[lL]%')  # Laundry contracts start with 'L' or 'l'
+            func.lower(ItemMaster.last_contract_num).like('[lL]%')
         ).group_by(
             ItemMaster.last_contract_num
         ).having(
             func.count(ItemMaster.tag_id) > 0
         ).all()
+
+        current_app.logger.info(f"Raw laundry contracts query result: {[(c.last_contract_num, c.total_items) for c in contracts_query]}")
 
         contracts = []
         for contract_number, total_items in contracts_query:
@@ -54,6 +56,8 @@ def tab4_view():
                 ItemMaster.status.in_(['On Rent', 'Delivered'])
             ).distinct().all()
             rental_class_nums = [r[0] for r in rental_class_nums if r[0]]
+
+            current_app.logger.debug(f"Laundry contract {contract_number}: rental_class_nums = {rental_class_nums}")
 
             # Map rental class IDs to categories, filtering for laundry categories
             base_mappings = session.query(RentalClassMapping).filter(
@@ -107,7 +111,7 @@ def tab4_view():
             })
 
         contracts.sort(key=lambda x: x['contract_number'])
-        current_app.logger.info(f"Fetched {len(contracts)} laundry contracts for tab4")
+        current_app.logger.info(f"Fetched {len(contracts)} laundry contracts for tab4: {[c['contract_number'] for c in contracts]}")
         session.close()
         return render_template('tab4.html', contracts=contracts, cache_bust=int(time()))
     except Exception as e:
@@ -149,6 +153,8 @@ def tab4_common_names():
         ).group_by(
             ItemMaster.common_name
         ).all()
+
+        current_app.logger.debug(f"Common names for laundry contract {contract_number}, category {category}: {[(name, count) for name, count in common_names_query]}")
 
         common_names = []
         for name, on_contracts in common_names_query:
@@ -232,6 +238,8 @@ def tab4_data():
                 'last_contract_num': item.last_contract_num,
                 'last_scanned_date': last_scanned_date
             })
+
+        current_app.logger.debug(f"Items for laundry contract {contract_number}, category {category}, common_name {common_name}: {len(items_data)} items")
 
         session.close()
         return jsonify({
