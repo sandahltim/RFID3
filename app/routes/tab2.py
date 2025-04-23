@@ -12,33 +12,42 @@ def tab2_view():
         session = db.session()
         current_app.logger.info("Starting new session for tab2")
 
-        # Fetch all contracts (group by contract_number where scan_type = 'Rental')
+        # Fetch all contracts from id_item_master where items are on rent
         contracts_query = session.query(
-            Transaction.contract_number,
-            Transaction.client_name,
-            func.min(Transaction.scan_date).label('scan_date')
+            ItemMaster.last_contract_num,
+            func.count(ItemMaster.tag_id).label('total_items')
         ).filter(
-            Transaction.scan_type == 'Rental',
-            Transaction.contract_number != None
+            ItemMaster.status.in_(['On Rent', 'Delivered']),
+            ItemMaster.last_contract_num != None,
+            ItemMaster.last_contract_num != '00000'  # Exclude placeholder contract numbers
         ).group_by(
-            Transaction.contract_number,
-            Transaction.client_name
-        ).order_by(
-            desc(func.min(Transaction.scan_date))
+            ItemMaster.last_contract_num
+        ).having(
+            func.count(ItemMaster.tag_id) > 0
         ).all()
 
         contracts = []
-        for contract in contracts_query:
-            contract_number = contract.contract_number
-            client_name = contract.client_name
-            scan_date = contract.scan_date.isoformat() if contract.scan_date else 'N/A'
-
-            # Fetch rental class IDs for items in this contract
-            rental_class_nums = session.query(
-                func.trim(func.upper(func.cast(Transaction.rental_class_num, db.String)))
+        for contract_number, total_items in contracts_query:
+            # Fetch additional details from id_transactions for this contract
+            latest_transaction = session.query(
+                Transaction.client_name,
+                Transaction.scan_date
             ).filter(
                 Transaction.contract_number == contract_number,
                 Transaction.scan_type == 'Rental'
+            ).order_by(
+                desc(Transaction.scan_date)
+            ).first()
+
+            client_name = latest_transaction.client_name if latest_transaction else 'N/A'
+            scan_date = latest_transaction.scan_date.isoformat() if latest_transaction and latest_transaction.scan_date else 'N/A'
+
+            # Fetch rental class IDs for items in this contract
+            rental_class_nums = session.query(
+                func.trim(func.upper(func.cast(ItemMaster.rental_class_num, db.String)))
+            ).filter(
+                ItemMaster.last_contract_num == contract_number,
+                ItemMaster.status.in_(['On Rent', 'Delivered'])
             ).distinct().all()
             rental_class_nums = [r[0] for r in rental_class_nums if r[0]]
 
@@ -64,12 +73,10 @@ def tab2_view():
 
             contract_categories = []
             for cat, rental_ids in categories.items():
-                # Count items on this contract (status = 'On Rent' or 'Delivered')
-                items_on_contract = session.query(func.count(Transaction.tag_id)).filter(
-                    Transaction.contract_number == contract_number,
-                    Transaction.scan_type == 'Rental',
-                    func.trim(func.upper(func.cast(Transaction.rental_class_num, db.String))).in_(rental_ids),
-                    Transaction.tag_id == ItemMaster.tag_id,
+                # Count items on this contract (already filtered by status)
+                items_on_contract = session.query(func.count(ItemMaster.tag_id)).filter(
+                    ItemMaster.last_contract_num == contract_number,
+                    func.trim(func.upper(func.cast(ItemMaster.rental_class_num, db.String))).in_(rental_ids),
                     ItemMaster.status.in_(['On Rent', 'Delivered'])
                 ).scalar()
 
@@ -93,11 +100,13 @@ def tab2_view():
                 'categories': contract_categories
             })
 
+        contracts.sort(key=lambda x: x['contract_number'])
         current_app.logger.info(f"Fetched {len(contracts)} contracts for tab2")
         session.close()
         return render_template('tab2.html', contracts=contracts, cache_bust=int(time()))
     except Exception as e:
         current_app.logger.error(f"Error rendering Tab 2: {str(e)}", exc_info=True)
+        session.close()
         return render_template('tab2.html', contracts=[], cache_bust=int(time()))
 
 @tab2_bp.route('/tab/2/common_names')
@@ -125,16 +134,14 @@ def tab2_common_names():
 
         # Fetch common names for items on this contract
         common_names_query = session.query(
-            Transaction.common_name,
-            func.count(Transaction.tag_id).label('on_contracts')
+            ItemMaster.common_name,
+            func.count(ItemMaster.tag_id).label('on_contracts')
         ).filter(
-            Transaction.contract_number == contract_number,
-            Transaction.scan_type == 'Rental',
-            func.trim(func.upper(func.cast(Transaction.rental_class_num, db.String))).in_(rental_class_ids),
-            Transaction.tag_id == ItemMaster.tag_id,
+            ItemMaster.last_contract_num == contract_number,
+            func.trim(func.upper(func.cast(ItemMaster.rental_class_num, db.String))).in_(rental_class_ids),
             ItemMaster.status.in_(['On Rent', 'Delivered'])
         ).group_by(
-            Transaction.common_name
+            ItemMaster.common_name
         ).all()
 
         common_names = []
@@ -169,6 +176,7 @@ def tab2_common_names():
         })
     except Exception as e:
         current_app.logger.error(f"Error fetching common names for contract {contract_number}, category {category}: {str(e)}")
+        session.close()
         return jsonify({'error': 'Failed to fetch common names'}), 500
 
 @tab2_bp.route('/tab/2/data')
@@ -196,23 +204,19 @@ def tab2_data():
         rental_class_ids = list(mappings_dict.keys())
 
         # Fetch items on this contract
-        query = session.query(Transaction, ItemMaster).join(
-            ItemMaster,
-            Transaction.tag_id == ItemMaster.tag_id
-        ).filter(
-            Transaction.contract_number == contract_number,
-            Transaction.scan_type == 'Rental',
-            func.trim(func.upper(func.cast(Transaction.rental_class_num, db.String))).in_(rental_class_ids),
-            Transaction.common_name == common_name,
+        query = session.query(ItemMaster).filter(
+            ItemMaster.last_contract_num == contract_number,
+            func.trim(func.upper(func.cast(ItemMaster.rental_class_num, db.String))).in_(rental_class_ids),
+            ItemMaster.common_name == common_name,
             ItemMaster.status.in_(['On Rent', 'Delivered'])
         )
 
         # Paginate items
         total_items = query.count()
-        items = query.order_by(Transaction.tag_id).offset((page - 1) * per_page).limit(per_page).all()
+        items = query.order_by(ItemMaster.tag_id).offset((page - 1) * per_page).limit(per_page).all()
 
         items_data = []
-        for transaction, item in items:
+        for item in items:
             last_scanned_date = item.date_last_scanned.isoformat() if item.date_last_scanned else 'N/A'
             items_data.append({
                 'tag_id': item.tag_id,
@@ -232,4 +236,5 @@ def tab2_data():
         })
     except Exception as e:
         current_app.logger.error(f"Error fetching items for contract {contract_number}, category {category}, common_name {common_name}: {str(e)}")
+        session.close()
         return jsonify({'error': 'Failed to fetch items'}), 500
