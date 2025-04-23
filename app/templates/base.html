@@ -6,8 +6,8 @@
     <title>RFID Dashboard - {% block title %}{% endblock %}</title>
     <link href="{{ url_for('static', filename='lib/bootstrap/bootstrap.min.css') }}?v={{ cache_bust if cache_bust is defined else timestamp() }}" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/style.css') }}?v={{ cache_bust if cache_bust is defined else timestamp() }}" rel="stylesheet">
-    <script src="{{ url_for('static', filename='lib/bootstrap/bootstrap.bundle.min.js') }}?v={{ cache_bust if cache_bust is defined else timestamp() }}" defer></script>
-    <script src="{{ url_for('static', filename='lib/htmx/htmx.min.js') }}?v={{ cache_bust if cache_bust is defined else timestamp() }}" defer></script>
+    <script src="{{ url_for('static', filename='lib/bootstrap/bootstrap.bundle.min.js') }}?v={{ cache_bust if cache_bust is defined else timestamp() }}"></script>
+    <script src="{{ url_for('static', filename='lib/htmx/htmx.min.js') }}?v={{ cache_bust if cache_bust is defined else timestamp() }}"></script>
     {% block extra_head %}{% endblock %}
 </head>
 <body>
@@ -48,7 +48,7 @@
         {% block content %}
         {% endblock %}
     </div>
-    <script src="{{ url_for('static', filename='js/tab.js') }}?v={{ cache_bust if cache_bust is defined else timestamp() }}" defer></script>
-    <script src="{{ url_for('static', filename='js/expand.js') }}?v={{ (cache_bust if cache_bust is defined else timestamp()) + 2 }}" defer></script>
+    <script src="{{ url_for('static', filename='js/tab.js') }}?v={{ cache_bust if cache_bust is defined else timestamp() }}"></script>
+    <script src="{{ url_for('static', filename='js/expand.js') }}?v={{ (cache_bust if cache_bust is defined else timestamp()) + 2 }}"></script>
 </body>
 </html>

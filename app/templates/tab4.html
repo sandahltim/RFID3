@@ -57,8 +57,8 @@
                 <td>{{ category.total_items }}</td>
                 <td>{{ category.last_scanned_date }}</td>
                 <td>
-                    <button class="btn btn-sm btn-secondary expand-btn" onclick="expandCategory('{{ encoded_category }}', 'common-{{ category.cat_id }}')">Expand</button>
-                    <button class="btn btn-sm btn-secondary collapse-btn" style="display:none;" onclick="collapseSection('common-{{ category.cat_id }}')">Collapse</button>
+                    <button class="btn btn-sm btn-secondary expand-btn" onclick="expandCategory(&quot;{{ encoded_category }}&quot;, &quot;common-{{ category.cat_id }}&quot;)">Expand</button>
+                    <button class="btn btn-sm btn-secondary collapse-btn" style="display:none;" onclick="collapseSection(&quot;common-{{ category.cat_id }}&quot;)">Collapse</button>
                     <button class="btn btn-sm btn-info print-btn" data-print-level="Contract" data-print-id="category-row-{{ category.cat_id }}">Print</button>
                     <div id="loading-{{ category.cat_id }}" style="display:none;" class="loading">Loading...</div>
                 </td>
@@ -90,8 +90,8 @@
                 <input type="text" class="form-control" id="handCountedEmployeeName" placeholder="Employee Name">
             </div>
             <div class="col">
-                <button class="btn btn-success" onclick="addHandCountedItem()">Add Item</button>
-                <button class="btn btn-danger" onclick="removeHandCountedItem()">Remove Item</button>
+                <button class="btn btn-success" id="addHandCountedBtn">Add Item</button>
+                <button class="btn btn-danger" id="removeHandCountedBtn">Remove Item</button>
             </div>
         </div>
         <!-- Table to display hand-counted items -->
@@ -114,93 +114,115 @@
 
 <!-- JavaScript for refreshing the table and handling hand-counted items -->
 <script>
-function refreshTab() {
-    window.location.reload(); // Simple refresh for now
-    htmx.trigger('#hand-counted-items-rows', 'refreshHandCountedItems');
-}
+document.addEventListener('DOMContentLoaded', function() {
+    const addBtn = document.getElementById('addHandCountedBtn');
+    const removeBtn = document.getElementById('removeHandCountedBtn');
 
-function refreshHandCountedItems() {
-    htmx.trigger('#hand-counted-items-rows', 'refreshHandCountedItems');
-}
-
-function addHandCountedItem() {
-    const contractNumber = document.getElementById('handCountedContractNumber').value;
-    const itemName = document.getElementById('handCountedItemName').value;
-    const quantity = document.getElementById('handCountedQuantity').value;
-    const employeeName = document.getElementById('handCountedEmployeeName').value;
-
-    if (!contractNumber || !itemName || !quantity || quantity <= 0 || !employeeName) {
-        alert('Please fill in all fields with valid values.');
-        return;
+    function refreshTab() {
+        window.location.reload();
+        if (typeof htmx !== 'undefined') {
+            htmx.trigger('#hand-counted-items-rows', 'refreshHandCountedItems');
+        }
     }
 
-    fetch('/tab/4/add_hand_counted_item', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            contract_number: contractNumber,
-            item_name: itemName,
-            quantity: parseInt(quantity),
-            action: 'Added',
-            employee_name: employeeName
-        })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.error) {
-            alert('Error: ' + data.error);
-        } else {
-            alert(data.message);
-            refreshHandCountedItems();
-            refreshTab(); // Refresh the main table to update counts
+    function refreshHandCountedItems() {
+        if (typeof htmx !== 'undefined') {
+            htmx.trigger('#hand-counted-items-rows', 'refreshHandCountedItems');
         }
-    })
-    .catch(error => {
-        console.error('Error adding hand-counted item:', error);
-        alert('Failed to add item');
-    });
-}
-
-function removeHandCountedItem() {
-    const contractNumber = document.getElementById('handCountedContractNumber').value;
-    const itemName = document.getElementById('handCountedItemName').value;
-    const quantity = document.getElementById('handCountedQuantity').value;
-    const employeeName = document.getElementById('handCountedEmployeeName').value;
-
-    if (!contractNumber || !itemName || !quantity || quantity <= 0 || !employeeName) {
-        alert('Please fill in all fields with valid values.');
-        return;
     }
 
-    fetch('/tab/4/remove_hand_counted_item', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            contract_number: contractNumber,
-            item_name: itemName,
-            quantity: parseInt(quantity),
-            action: 'Removed',
-            employee_name: employeeName
-        })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.error) {
-            alert('Error: ' + data.error);
-        } else {
-            alert(data.message);
-            refreshHandCountedItems();
-            refreshTab(); // Refresh the main table to update counts
+    function addHandCountedItem() {
+        const contractNumber = document.getElementById('handCountedContractNumber').value;
+        const itemName = document.getElementById('handCountedItemName').value;
+        const quantity = document.getElementById('handCountedQuantity').value;
+        const employeeName = document.getElementById('handCountedEmployeeName').value;
+
+        if (!contractNumber || !itemName || !quantity || quantity <= 0 || !employeeName) {
+            alert('Please fill in all fields with valid values.');
+            return;
         }
-    })
-    .catch(error => {
-        console.error('Error removing hand-counted item:', error);
-        alert('Failed to remove item');
-    });
-}
+
+        fetch('/tab/4/add_hand_counted_item', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                contract_number: contractNumber,
+                item_name: itemName,
+                quantity: parseInt(quantity),
+                action: 'Added',
+                employee_name: employeeName
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                alert('Error: ' + data.error);
+            } else {
+                alert(data.message);
+                refreshHandCountedItems();
+                refreshTab(); // Refresh the main table to update counts
+            }
+        })
+        .catch(error => {
+            console.error('Error adding hand-counted item:', error);
+            alert('Failed to add item');
+        });
+    }
+
+    function removeHandCountedItem() {
+        const contractNumber = document.getElementById('handCountedContractNumber').value;
+        const itemName = document.getElementById('handCountedItemName').value;
+        const quantity = document.getElementById('handCountedQuantity').value;
+        const employeeName = document.getElementById('handCountedEmployeeName').value;
+
+        if (!contractNumber || !itemName || !quantity || quantity <= 0 || !employeeName) {
+            alert('Please fill in all fields with valid values.');
+            return;
+        }
+
+        fetch('/tab/4/remove_hand_counted_item', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                contract_number: contractNumber,
+                item_name: itemName,
+                quantity: parseInt(quantity),
+                action: 'Removed',
+                employee_name: employeeName
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                alert('Error: ' + data.error);
+            } else {
+                alert(data.message);
+                refreshHandCountedItems();
+                refreshTab(); // Refresh the main table to update counts
+            }
+        })
+        .catch(error => {
+            console.error('Error removing hand-counted item:', error);
+            alert('Failed to remove item');
+        });
+    }
+
+    // Attach event listeners to buttons
+    if (addBtn) {
+        addBtn.addEventListener('click', addHandCountedItem);
+    }
+    if (removeBtn) {
+        removeBtn.addEventListener('click', removeHandCountedItem);
+    }
+
+    // Apply filters (already defined in tab.js)
+    if (typeof applyFilters === 'function') {
+        applyFilters();
+    }
+});
 </script>
 {% endblock %}
