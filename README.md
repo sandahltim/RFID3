@@ -62,3 +62,5 @@ cat /home/tim/test_rfidpi/logs/sync.log
 
 source venv/bin/activate
 
+So Resale tab.... It will actually be Resale/Rental Packs. It is part resale items, part packs of rental items that are too small to individually label and already come in packs of a certain quantity. The way we tell is the bin data on each item, if it is "resale" or "sold" it is a resale item. If bin is "pack" or "burst" then it is a rental pack. The kicker is we need a way to change the bin in the API for item master with a post request I believe?
+
