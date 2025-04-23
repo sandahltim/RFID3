@@ -9,20 +9,11 @@ from flask import Blueprint, jsonify, current_app
 
 logger = logging.getLogger(__name__)
 
-# Define the refresh blueprint - DO NOT MODIFY
-# This blueprint is required by app/__init__.py for the /clear_api_data route
-# Added on 2025-04-21 to fix ImportError for refresh_bp
 refresh_bp = Blueprint('refresh', __name__)
 
-# Initialize API client - DO NOT MODIFY
-# This instance is used by all refresh functions to fetch data from API
-# Working as of 2025-04-21 based on prior logs showing successful API fetches
 api_client = APIClient()
 
 def update_item_master(session, items):
-    # This function is working as of 2025-04-21 - DO NOT MODIFY CORE LOGIC
-    # Successfully updates id_item_master with API data
-    # Fixed longitude/latitude handling on 2025-04-21
     logger.info(f"Updating {len(items)} items in id_item_master")
     for item in items:
         try:
@@ -41,14 +32,20 @@ def update_item_master(session, items):
             db_item.common_name = item.get('common_name')
             db_item.quality = item.get('quality')
             db_item.bin_location = item.get('bin_location')
-            db_item.status = item.get('status')
+            # Normalize status values
+            status = item.get('status')
+            if status:
+                status = status.title()  # Convert to title case (e.g., 'delivered' -> 'Delivered')
+                if status not in ['On Rent', 'Delivered', 'Ready to Rent', 'In Service']:
+                    status = 'Unknown'
+            else:
+                status = 'Unknown'
+            db_item.status = status
+            logger.debug(f"Set status for tag_id {tag_id} to {status}")
             db_item.last_contract_num = item.get('last_contract_num')
             db_item.last_scanned_by = item.get('last_scanned_by')
             db_item.notes = item.get('notes')
             db_item.status_notes = item.get('status_notes')
-            # Handle longitude and latitude: convert empty strings to None
-            # Fixed on 2025-04-21 to resolve DataError for invalid decimal values
-            # API may return '' for these fields, but MySQL expects DECIMAL or NULL
             longitude = item.get('long')
             latitude = item.get('lat')
             db_item.longitude = float(longitude) if longitude and longitude.strip() else None
@@ -62,8 +59,6 @@ def update_item_master(session, items):
             raise
 
 def update_transactions(session, transactions):
-    # Fixed boolean handling on 2025-04-21 to convert string 'True'/'False' to Python booleans
-    # Fixed loop variable on 2025-04-21: changed 'items' to 'transactions' to resolve NameError
     logger.info(f"Updating {len(transactions)} transactions in id_transactions")
     for transaction in transactions:
         try:
@@ -91,9 +86,6 @@ def update_transactions(session, transactions):
             db_transaction.bin_location = transaction.get('bin_location')
             db_transaction.status = transaction.get('status')
             db_transaction.scan_by = transaction.get('scan_by')
-            # Handle boolean fields: convert string 'True'/'False' to Python booleans
-            # Fixed on 2025-04-21 to resolve TypeError for string booleans
-            # API returns 'True'/'False' as strings, but SQLAlchemy expects True/False
             def to_bool(value):
                 if isinstance(value, str):
                     return value.lower() == 'true'
@@ -111,9 +103,6 @@ def update_transactions(session, transactions):
             db_transaction.grommet = to_bool(transaction.get('grommet'))
             db_transaction.rope = to_bool(transaction.get('rope'))
             db_transaction.buckle = to_bool(transaction.get('buckle'))
-            # Handle longitude and latitude: convert empty strings to None
-            # Fixed on 2025-04-21 to resolve potential DataError for invalid decimal values
-            # API may return '' for these fields, but MySQL expects DECIMAL or NULL
             longitude = transaction.get('long')
             latitude = transaction.get('lat')
             db_transaction.longitude = float(longitude) if longitude and longitude.strip() else None
@@ -131,18 +120,14 @@ def update_transactions(session, transactions):
             raise
 
 def full_refresh():
-    # Modified on 2025-04-21 to prevent overwriting rental_class_mappings
-    # Removed deletion and update of rental_class_mappings to preserve custom data
     logger.info("Starting full refresh")
     session = db.session()
     try:
-        # Clear existing data (skip rental_class_mappings)
         deleted_items = session.query(ItemMaster).delete()
         deleted_transactions = session.query(Transaction).delete()
         logger.info(f"Deleted {deleted_items} items from id_item_master")
         logger.info(f"Deleted {deleted_transactions} transactions from id_transactions")
 
-        # Fetch all data without since_date
         items = api_client.get_item_master()
         transactions = api_client.get_transactions()
 
@@ -156,7 +141,6 @@ def full_refresh():
         if not transactions:
             logger.warning("No transactions fetched from transactions API. Check API endpoint or authentication.")
 
-        # Update database (skip rental_class_mappings)
         update_item_master(session, items)
         update_transactions(session, transactions)
 
@@ -171,13 +155,10 @@ def full_refresh():
         logger.debug("Full refresh session closed")
 
 def incremental_refresh():
-    # Modified on 2025-04-21 to prevent overwriting rental_class_mappings
-    # Removed update of rental_class_mappings to preserve custom data
     logger.info("Starting incremental refresh")
     session = db.session()
     try:
-        # Use a since_date for incremental updates (last 30 days for testing)
-        since_date = datetime.utcnow() - timedelta(days=30)  # Adjusted to 30 days for testing
+        since_date = datetime.utcnow() - timedelta(days=30)
         logger.info(f"Fetching item master data with since_date: {since_date}")
         items = api_client.get_item_master(since_date=since_date)
         logger.info(f"Fetched {len(items)} items from item master")
@@ -206,8 +187,6 @@ def incremental_refresh():
         logger.debug("Incremental refresh session closed")
 
 def init_scheduler(app):
-    # This function is working as of 2025-04-21 - DO NOT MODIFY
-    # Successfully sets up APScheduler for incremental and full refreshes
     scheduler = BackgroundScheduler()
 
     def run_with_context():
@@ -233,9 +212,6 @@ def init_scheduler(app):
 
     return scheduler
 
-# Define the route for clearing API data and refreshing - DO NOT MODIFY
-# This route is used by the "Clear API Data and Refresh" button on the dashboard
-# Added on 2025-04-21 and confirmed working for triggering full_refresh
 @refresh_bp.route('/clear_api_data', methods=['POST'])
 def clear_api_data():
     try:

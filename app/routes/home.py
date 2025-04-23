@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, current_app
 from .. import db
 from ..models.db_models import ItemMaster, Transaction
-from sqlalchemy import func
+from sqlalchemy import func, text
 from time import time
 
 home_bp = Blueprint('home', __name__)
@@ -13,15 +13,22 @@ def home():
 
         # Total items (all items in id_item_master)
         total_items = session.query(func.count(ItemMaster.tag_id)).scalar()
+        current_app.logger.info(f"Total items: {total_items}")
+
+        # Log distinct status values to debug
+        status_counts = session.query(
+            ItemMaster.status,
+            func.count(ItemMaster.tag_id).label('count')
+        ).group_by(ItemMaster.status).all()
+        current_app.logger.info(f"Status counts in id_item_master: {[(status, count) for status, count in status_counts]}")
 
         # Items on rent (status = 'On Rent' or 'Delivered')
         items_on_rent = session.query(func.count(ItemMaster.tag_id)).filter(
             ItemMaster.status.in_(['On Rent', 'Delivered'])
         ).scalar()
+        current_app.logger.info(f"Items on rent: {items_on_rent}")
 
-        # Items in service logic:
-        # 1. Status is not 'Ready to Rent', 'On Rent', or 'Delivered', OR
-        # 2. Most recent transaction has service_required = true
+        # Items in service logic
         subquery = session.query(
             Transaction.tag_id,
             Transaction.scan_date,
@@ -32,6 +39,13 @@ def home():
             Transaction.scan_date.desc()
         ).subquery()
 
+        # Log service_required counts to debug
+        service_required_counts = session.query(
+            subquery.c.service_required,
+            func.count(subquery.c.tag_id).label('count')
+        ).group_by(subquery.c.service_required).all()
+        current_app.logger.info(f"Service required counts in id_transactions: {[(sr, count) for sr, count in service_required_counts]}")
+
         items_in_service = session.query(func.count(ItemMaster.tag_id)).filter(
             (ItemMaster.status.notin_(['Ready to Rent', 'On Rent', 'Delivered'])) |
             (ItemMaster.tag_id.in_(
@@ -41,11 +55,26 @@ def home():
                 )
             ))
         ).scalar()
+        current_app.logger.info(f"Items in service: {items_in_service}")
 
         # Items available (status = 'Ready to Rent')
         items_available = session.query(func.count(ItemMaster.tag_id)).filter(
             ItemMaster.status == 'Ready to Rent'
         ).scalar()
+        current_app.logger.info(f"Items available: {items_available}")
+
+        # Fetch status breakdown for template
+        status_breakdown = session.query(
+            ItemMaster.status,
+            func.count(ItemMaster.tag_id).label('count')
+        ).group_by(ItemMaster.status).all()
+        status_counts = [(status or 'Unknown', count) for status, count in status_breakdown]
+
+        # Fetch recent scans for template
+        recent_scans = session.query(ItemMaster).order_by(
+            ItemMaster.date_last_scanned.desc()
+        ).limit(10).all()
+        current_app.logger.info(f"Recent scans sample: {[(item.tag_id, item.common_name, item.date_last_scanned) for item in recent_scans[:5]]}")
 
         session.close()
         return render_template('home.html', 
@@ -53,12 +82,17 @@ def home():
                               items_on_rent=items_on_rent or 0,
                               items_in_service=items_in_service or 0,
                               items_available=items_available or 0,
+                              status_counts=status_counts,
+                              recent_scans=recent_scans,
                               cache_bust=int(time()))
     except Exception as e:
         current_app.logger.error(f"Error rendering home page: {str(e)}", exc_info=True)
+        session.close()
         return render_template('home.html', 
                               total_items=0,
                               items_on_rent=0,
                               items_in_service=0,
                               items_available=0,
+                              status_counts=[],
+                              recent_scans=[],
                               cache_bust=int(time()))
