@@ -57,8 +57,8 @@
                 <td>{{ category.total_items }}</td>
                 <td>{{ category.last_scanned_date }}</td>
                 <td>
-                    <button class="btn btn-sm btn-secondary expand-btn" onclick="expandCategory('{{ encoded_category }}', 'common-{{ category.cat_id }}')">Expand</button>
-                    <button class="btn btn-sm btn-secondary collapse-btn" style="display:none;" onclick="collapseSection('common-{{ category.cat_id }}')">Collapse</button>
+                    <button class="btn btn-sm btn-secondary expand-btn" onclick="expandCategory(&quot;{{ encoded_category }}&quot;, &quot;common-{{ category.cat_id }}&quot;)">Expand</button>
+                    <button class="btn btn-sm btn-secondary collapse-btn" style="display:none;" onclick="collapseSection(&quot;common-{{ category.cat_id }}&quot;)">Collapse</button>
                     <button class="btn btn-sm btn-info print-btn" data-print-level="Contract" data-print-id="category-row-{{ category.cat_id }}">Print</button>
                     <div id="loading-{{ category.cat_id }}" style="display:none;" class="loading">Loading...</div>
                 </td>
@@ -78,5 +78,13 @@
 function refreshTab() {
     window.location.reload(); // Simple refresh for now
 }
+
+// Ensure scripts are loaded before using expandCategory
+document.addEventListener('DOMContentLoaded', function() {
+    // Apply filters (already defined in tab.js)
+    if (typeof applyFilters === 'function') {
+        applyFilters();
+    }
+});
 </script>
 {% endblock %}
