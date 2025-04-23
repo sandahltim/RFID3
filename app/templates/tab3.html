@@ -1,84 +1,108 @@
 {% extends "base.html" %}
 
+{% block title %}Service Dashboard - RFID Dashboard{% endblock %}
+
 {% block content %}
 <div class="container mt-4">
-    <!-- Page title for Tab 3 -->
-    <h2>Service</h2>
-    <!-- Filter and search row -->
-    <div class="row mb-3">
-        <div class="col">
-            <input type="text" class="form-control" placeholder="Search common name, tag id, etc." id="searchInput">
-        </div>
-        <div class="col">
-            <select class="form-control" id="categoryFilter">
-                <option value="">All Classes</option>
-                {% for category in categories %}
-                <option value="{{ category.name }}">{{ category.name }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div class="col">
-            <select class="form-control" id="statusFilter">
-                <option value="">All Statuses</option>
-                {% for status in statuses %}
-                <option value="{{ status }}">{{ status }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div class="col">
-            <select class="form-control" id="binFilter">
-                <option value="">All Bin Locations</option>
-                {% for bin in bin_locations %}
-                <option value="{{ bin }}">{{ bin }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div class="col">
-            <button class="btn btn-primary" onclick="refreshTab()">Refresh</button>
-        </div>
-    </div>
-    <!-- Table for displaying categories -->
-    <table class="table table-bordered" id="category-table">
-        <thead>
-            <tr>
-                <th>Category</th>
-                <th>Total Items</th>
-                <th>Items on Contracts</th>
-                <th>Items in Service</th>
-                <th>Items Available</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody id="category-rows">
-            {% for category in categories %}
-            {% set encoded_category = category.name | urlencode | replace("'", "\\'") | replace('"', '\\"') %}
-            <tr>
-                <td>{{ category.name }}</td>
-                <td>{{ category.total_items }}</td>
-                <td>{{ category.on_contracts }}</td>
-                <td>{{ category.in_service }}</td>
-                <td>{{ category.available }}</td>
-                <td>
-                    <button class="btn btn-sm btn-secondary expand-btn" onclick="expandCategory('{{ encoded_category }}', 'subcat-{{ category.cat_id }}')">Expand</button>
-                    <button class="btn btn-sm btn-secondary collapse-btn" style="display:none;" onclick="collapseSection('subcat-{{ category.cat_id }}')">Collapse</button>
-                    <button class="btn btn-sm btn-info print-btn" data-print-level="Category" data-print-id="subcat-table-{{ category.cat_id }}">Print</button>
-                    <div id="loading-{{ category.cat_id }}" style="display:none;" class="loading">Loading...</div>
-                </td>
-            </tr>
-            <tr>
-                <td colspan="6">
-                    <div id="subcat-{{ category.cat_id }}" class="expandable collapsed"></div>
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-</div>
+    <h2>Service Dashboard (Tab 3)</h2>
 
-<!-- JavaScript for refreshing the table -->
-<script>
-function refreshTab() {
-    window.location.reload(); // Simple refresh for now
-}
-</script>
+    <!-- Tent Crew Section -->
+    <h3>Tent Crew Items</h3>
+    {% if tent_crew_items %}
+        <table class="table table-bordered">
+            <thead>
+                <tr>
+                    <th>Tag ID</th>
+                    <th>Common Name</th>
+                    <th>Status</th>
+                    <th>Bin Location</th>
+                    <th>Last Contract</th>
+                    <th>Location of Repair</th>
+                    <th>Repair Types</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in tent_crew_items %}
+                    <tr>
+                        <td>{{ item.tag_id }}</td>
+                        <td>{{ item.common_name }}</td>
+                        <td>{{ item.status }}</td>
+                        <td>{{ item.bin_location }}</td>
+                        <td>{{ item.last_contract_num }}</td>
+                        <td>{{ item.location_of_repair }}</td>
+                        <td>{{ item.repair_types | join(', ') }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>No items currently in service for the Tent Crew.</p>
+    {% endif %}
+
+    <!-- Laundry Crew Section -->
+    <h3>Laundry Crew Items</h3>
+    {% if laundry_crew_items %}
+        <table class="table table-bordered">
+            <thead>
+                <tr>
+                    <th>Tag ID</th>
+                    <th>Common Name</th>
+                    <th>Status</th>
+                    <th>Bin Location</th>
+                    <th>Last Contract</th>
+                    <th>Location of Repair</th>
+                    <th>Repair Types</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in laundry_crew_items %}
+                    <tr>
+                        <td>{{ item.tag_id }}</td>
+                        <td>{{ item.common_name }}</td>
+                        <td>{{ item.status }}</td>
+                        <td>{{ item.bin_location }}</td>
+                        <td>{{ item.last_contract_num }}</td>
+                        <td>{{ item.location_of_repair }}</td>
+                        <td>{{ item.repair_types | join(', ') }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>No items currently in service for the Laundry Crew.</p>
+    {% endif %}
+
+    <!-- Maintenance Crew Section -->
+    <h3>Maintenance Crew Items</h3>
+    {% if maintenance_crew_items %}
+        <table class="table table-bordered">
+            <thead>
+                <tr>
+                    <th>Tag ID</th>
+                    <th>Common Name</th>
+                    <th>Status</th>
+                    <th>Bin Location</th>
+                    <th>Last Contract</th>
+                    <th>Location of Repair</th>
+                    <th>Repair Types</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in maintenance_crew_items %}
+                    <tr>
+                        <td>{{ item.tag_id }}</td>
+                        <td>{{ item.common_name }}</td>
+                        <td>{{ item.status }}</td>
+                        <td>{{ item.bin_location }}</td>
+                        <td>{{ item.last_contract_num }}</td>
+                        <td>{{ item.location_of_repair }}</td>
+                        <td>{{ item.repair_types | join(', ') }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>No items currently in service for the Maintenance Crew.</p>
+    {% endif %}
+</div>
 {% endblock %}

@@ -1,4 +1,4 @@
-console.log('expand.js version: 2025-04-22 v25 loaded');
+console.log('expand.js version: 2025-04-23 v26 loaded');
 
 // --- Loading Indicator Functions ---
 function showLoading(key) {
@@ -219,8 +219,8 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                             '<td>' + (item.status || 'N/A') + '</td>',
                             '<td>' + (item.last_contract_num || 'N/A') + '</td>',
                             '<td>' + (item.last_scanned_date || 'N/A') + '</td>',
-                            isTab1 ? '<td>' + (item.quality || 'N/A') + '</td>' : '',
-                            isTab1 ? '<td>' + (item.notes || 'N/A') + '</td>' : '',
+                            isTab1 ? '<th>' + (item.quality || 'N/A') + '</th>' : '',
+                            isTab1 ? '<th>' + (item.notes || 'N/A') + '</th>' : '',
                         '</tr>'
                     ].join('');
                 });
