@@ -34,6 +34,8 @@ def tab4_view():
 
         contracts = []
         for contract_number, total_items in contracts_query:
+            current_app.logger.debug(f"Processing contract: {contract_number} with {total_items} items")
+
             # Fetch additional details from id_transactions for this contract
             latest_transaction = session.query(
                 Transaction.client_name,
@@ -47,6 +49,7 @@ def tab4_view():
 
             client_name = latest_transaction.client_name if latest_transaction else 'N/A'
             scan_date = latest_transaction.scan_date.isoformat() if latest_transaction and latest_transaction.scan_date else 'N/A'
+            current_app.logger.debug(f"Contract {contract_number}: client_name={client_name}, scan_date={scan_date}")
 
             # Fetch rental class IDs for items in this contract
             rental_class_nums = session.query(
@@ -73,6 +76,8 @@ def tab4_view():
             for um in user_mappings:
                 mappings_dict[um.rental_class_id] = {'category': um.category, 'subcategory': um.subcategory}
 
+            current_app.logger.debug(f"Laundry contract {contract_number}: mappings_dict = {mappings_dict}")
+
             categories = {}
             for rental_class_id in rental_class_nums:
                 if rental_class_id in mappings_dict:
@@ -80,6 +85,8 @@ def tab4_view():
                     if category not in categories:
                         categories[category] = []
                     categories[category].append(rental_class_id)
+
+            current_app.logger.debug(f"Laundry contract {contract_number}: categories = {categories}")
 
             contract_categories = []
             for cat, rental_ids in categories.items():
@@ -101,6 +108,7 @@ def tab4_view():
                     'items_on_contract': items_on_contract or 0,
                     'total_items_inventory': total_items_inventory or 0
                 })
+                current_app.logger.debug(f"Laundry contract {contract_number}: category {cat} - items_on_contract={items_on_contract}, total_items_inventory={total_items_inventory}")
 
             contract_categories.sort(key=lambda x: x['category'])
             contracts.append({
@@ -113,6 +121,7 @@ def tab4_view():
         contracts.sort(key=lambda x: x['contract_number'])
         current_app.logger.info(f"Fetched {len(contracts)} laundry contracts for tab4: {[c['contract_number'] for c in contracts]}")
         session.close()
+        current_app.logger.info(f"Rendering tab4.html with contracts: {[c['contract_number'] for c in contracts]}")
         return render_template('tab4.html', contracts=contracts, cache_bust=int(time()))
     except Exception as e:
         current_app.logger.error(f"Error rendering Tab 4: {str(e)}", exc_info=True)
@@ -126,7 +135,10 @@ def tab4_common_names():
     page = int(request.args.get('page', 1))
     per_page = 10
 
+    current_app.logger.info(f"Fetching common names for category={category}, contract_number={contract_number}, page={page}")
+
     if not category or not contract_number:
+        current_app.logger.error("Missing required parameters: category and contract_number are required")
         return jsonify({'error': 'Category and contract number are required'}), 400
 
     try:
@@ -141,6 +153,7 @@ def tab4_common_names():
             mappings_dict[um.rental_class_id] = {'category': um.category, 'subcategory': um.subcategory}
 
         rental_class_ids = list(mappings_dict.keys())
+        current_app.logger.debug(f"Common names for contract {contract_number}, category {category}: rental_class_ids = {rental_class_ids}")
 
         # Fetch common names for items on this contract
         common_names_query = session.query(
@@ -180,6 +193,7 @@ def tab4_common_names():
         paginated_common_names = common_names[start:end]
 
         session.close()
+        current_app.logger.info(f"Returning {len(paginated_common_names)} common names for contract {contract_number}, category {category}")
         return jsonify({
             'common_names': paginated_common_names,
             'total_common_names': total_common_names,
@@ -199,7 +213,10 @@ def tab4_data():
     page = int(request.args.get('page', 1))
     per_page = 10
 
+    current_app.logger.info(f"Fetching items for category={category}, contract_number={contract_number}, common_name={common_name}, page={page}")
+
     if not category or not contract_number or not common_name:
+        current_app.logger.error("Missing required parameters: category, contract number, and common name are required")
         return jsonify({'error': 'Category, contract number, and common name are required'}), 400
 
     try:
@@ -214,6 +231,7 @@ def tab4_data():
             mappings_dict[um.rental_class_id] = {'category': um.category, 'subcategory': um.subcategory}
 
         rental_class_ids = list(mappings_dict.keys())
+        current_app.logger.debug(f"Items for contract {contract_number}, category {category}: rental_class_ids = {rental_class_ids}")
 
         # Fetch items on this contract
         query = session.query(ItemMaster).filter(
@@ -256,12 +274,14 @@ def tab4_data():
 @tab4_bp.route('/tab/4/hand_counted_items')
 def tab4_hand_counted_items():
     contract_number = request.args.get('contract_number')
+    current_app.logger.info(f"Fetching hand-counted items for contract_number={contract_number}")
     try:
         session = db.session()
         items = session.query(HandCountedItems).filter(
             HandCountedItems.contract_number == contract_number
         ).all()
         session.close()
+        current_app.logger.info(f"Found {len(items)} hand-counted items for contract {contract_number}")
         return jsonify([{
             'id': item.id,
             'contract_number': item.contract_number,
