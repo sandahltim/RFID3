@@ -17,7 +17,7 @@
         </thead>
         <tbody id="mappings-table">
             {% for category in categories %}
-            <tr>
+            <tr data-rental-class-id="{{ category.rental_class_id }}">
                 <td><input type="text" class="form-control category-input" value="{{ category.category }}"></td>
                 <td><input type="text" class="form-control subcategory-input" value="{{ category.subcategory }}"></td>
                 <td><input type="text" class="form-control rental-class-id-input" value="{{ category.rental_class_id }}"></td>
@@ -37,6 +37,7 @@
     function addMappingRow(mapping = {category: '', subcategory: '', rental_class_id: '', common_name: 'N/A'}) {
         const tableBody = document.getElementById('mappings-table');
         const row = document.createElement('tr');
+        row.setAttribute('data-rental-class-id', mapping.rental_class_id);
         row.innerHTML = `
             <td><input type="text" class="form-control category-input" value="${mapping.category}"></td>
             <td><input type="text" class="form-control subcategory-input" value="${mapping.subcategory}"></td>
@@ -48,7 +49,34 @@
     }
 
     function removeMappingRow(button) {
-        button.parentElement.parentElement.remove();
+        const row = button.parentElement.parentElement;
+        const rentalClassId = row.getAttribute('data-rental-class-id');
+        if (!rentalClassId) {
+            // If the row was newly added and not yet saved, just remove it from the UI
+            row.remove();
+            return;
+        }
+
+        fetch('/categories/delete', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ rental_class_id: rentalClassId })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                alert('Error: ' + data.error);
+            } else {
+                alert(data.message);
+                row.remove();
+            }
+        })
+        .catch(error => {
+            console.error('Error deleting mapping:', error);
+            alert('Failed to delete mapping');
+        });
     }
 
     function saveMappings() {
