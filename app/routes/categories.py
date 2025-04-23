@@ -1,26 +1,42 @@
 from flask import Blueprint, render_template, request, jsonify, current_app
 from .. import db, cache
-from ..models.db_models import RentalClassMapping, ItemMaster
+from ..models.db_models import RentalClassMapping, UserRentalClassMapping, ItemMaster
 from sqlalchemy import func, desc, text
 from time import time
+from datetime import datetime
 
 categories_bp = Blueprint('categories', __name__)
-
-# Confirmation log to ensure this file is loaded
-current_app.logger.info("Loaded categories.py with transaction isolation fixes")
 
 @categories_bp.route('/categories', methods=['GET'])
 @cache.cached(timeout=0)  # Disable caching for this endpoint
 def manage_categories():
+    # Log here instead of at module level to ensure app context
+    current_app.logger.info("Loaded categories.py with user_rental_class_mappings support")
     try:
         # Start a new session for this request
         session = db.session()
         current_app.logger.info("Starting new session for manage_categories")
 
-        # Fetch all rental class mappings
-        mappings = session.query(RentalClassMapping).order_by(RentalClassMapping.category, RentalClassMapping.rental_class_id).all()
-        current_app.logger.info(f"Fetched {len(mappings)} mappings from database")
-        
+        # Fetch all rental class mappings from both tables
+        base_mappings = session.query(RentalClassMapping).all()
+        user_mappings = session.query(UserRentalClassMapping).all()
+
+        # Create a dictionary of mappings, prioritizing user mappings
+        mappings_dict = {m.rental_class_id: {'category': m.category, 'subcategory': m.subcategory} for m in base_mappings}
+        for um in user_mappings:
+            mappings_dict[um.rental_class_id] = {'category': um.category, 'subcategory': um.subcategory}
+
+        # Convert to list for template
+        mappings = [
+            RentalClassMapping(
+                rental_class_id=rental_class_id,
+                category=data['category'],
+                subcategory=data['subcategory']
+            ) for rental_class_id, data in mappings_dict.items()
+        ]
+        mappings.sort(key=lambda x: (x.category, x.rental_class_id))
+        current_app.logger.info(f"Fetched {len(mappings)} combined mappings from database")
+
         # Subquery to find the most common common_name for each rental_class_num in ItemMaster
         subquery = session.query(
             func.trim(func.upper(func.cast(ItemMaster.rental_class_num, db.String))).label('rental_class_num'),
@@ -72,8 +88,10 @@ def manage_categories():
         current_app.logger.debug(f"Categories data: {categories_data}")
 
         # Direct query to verify database state
-        raw_mappings = session.execute(text("SELECT rental_class_id, category, subcategory FROM rental_class_mappings")).fetchall()
-        current_app.logger.info(f"Raw database mappings: {[(row[0], row[1], row[2]) for row in raw_mappings]}")
+        raw_base_mappings = session.execute(text("SELECT rental_class_id, category, subcategory FROM rental_class_mappings")).fetchall()
+        raw_user_mappings = session.execute(text("SELECT rental_class_id, category, subcategory FROM user_rental_class_mappings")).fetchall()
+        current_app.logger.info(f"Raw base mappings: {[(row[0], row[1], row[2]) for row in raw_base_mappings]}")
+        current_app.logger.info(f"Raw user mappings: {[(row[0], row[1], row[2]) for row in raw_user_mappings]}")
 
         session.close()
         return render_template(
@@ -90,7 +108,22 @@ def manage_categories():
 def get_mapping():
     try:
         session = db.session()
-        mappings = session.query(RentalClassMapping).all()
+        # Fetch from both tables and merge, prioritizing user mappings
+        base_mappings = session.query(RentalClassMapping).all()
+        user_mappings = session.query(UserRentalClassMapping).all()
+
+        mappings_dict = {m.rental_class_id: {'category': m.category, 'subcategory': m.subcategory} for m in base_mappings}
+        for um in user_mappings:
+            mappings_dict[um.rental_class_id] = {'category': um.category, 'subcategory': um.subcategory}
+
+        mappings = [
+            RentalClassMapping(
+                rental_class_id=rental_class_id,
+                category=data['category'],
+                subcategory=data['subcategory']
+            ) for rental_class_id, data in mappings_dict.items()
+        ]
+
         # Subquery to find the most common common_name for each rental_class_num in ItemMaster
         subquery = session.query(
             func.trim(func.upper(func.cast(ItemMaster.rental_class_num, db.String))).label('rental_class_num'),
@@ -156,21 +189,21 @@ def update_mapping():
 
         current_app.logger.info(f"Received update request with {len(data)} mappings: {data}")
 
-        # Deduplicate entries on the server side, keeping the last occurrence
+        # Deduplicate entries, keeping the last occurrence
         deduplicated_data = {}
         for item in data:
             rental_class_id = item.get('rental_class_id')
             if rental_class_id:
                 deduplicated_data[rental_class_id] = item
 
-        # Clear existing mappings
-        deleted_count = session.query(RentalClassMapping).delete()
-        current_app.logger.info(f"Deleted {deleted_count} existing mappings")
+        # Clear existing user mappings (don't touch rental_class_mappings)
+        deleted_count = session.query(UserRentalClassMapping).delete()
+        current_app.logger.info(f"Deleted {deleted_count} existing user mappings")
 
-        # Add deduplicated mappings
+        # Add deduplicated mappings to user_rental_class_mappings
         added_mappings = []
         for rental_class_id, item in deduplicated_data.items():
-            mapping = RentalClassMapping(
+            mapping = UserRentalClassMapping(
                 category=item.get('category'),
                 subcategory=item.get('subcategory'),
                 rental_class_id=rental_class_id
@@ -183,16 +216,16 @@ def update_mapping():
             })
 
         session.commit()
-        current_app.logger.info(f"Added {len(added_mappings)} mappings: {added_mappings}")
+        current_app.logger.info(f"Added {len(added_mappings)} user mappings: {added_mappings}")
 
         # Verify the data in the database after commit
-        mappings_after_commit = session.query(RentalClassMapping).all()
-        current_app.logger.info(f"Mappings in database after commit: {len(mappings_after_commit)} entries")
-        current_app.logger.debug(f"Database mappings: {[{ 'rental_class_id': m.rental_class_id, 'category': m.category, 'subcategory': m.subcategory } for m in mappings_after_commit]}")
+        user_mappings_after_commit = session.query(UserRentalClassMapping).all()
+        current_app.logger.info(f"User mappings in database after commit: {len(user_mappings_after_commit)} entries")
+        current_app.logger.debug(f"User database mappings: {[{ 'rental_class_id': m.rental_class_id, 'category': m.category, 'subcategory': m.subcategory } for m in user_mappings_after_commit]}")
 
         # Direct query to verify database state
-        raw_mappings = session.execute(text("SELECT rental_class_id, category, subcategory FROM rental_class_mappings")).fetchall()
-        current_app.logger.info(f"Raw database mappings after commit: {[(row[0], row[1], row[2]) for row in raw_mappings]}")
+        raw_user_mappings = session.execute(text("SELECT rental_class_id, category, subcategory FROM user_rental_class_mappings")).fetchall()
+        current_app.logger.info(f"Raw user mappings after commit: {[(row[0], row[1], row[2]) for row in raw_user_mappings]}")
 
         session.close()
         return jsonify({'message': 'Mappings updated successfully'})
@@ -216,18 +249,19 @@ def delete_mapping():
             session.close()
             return jsonify({'error': 'Rental Class ID is required'}), 400
 
-        deleted = session.query(RentalClassMapping).filter_by(rental_class_id=rental_class_id).delete()
+        # Delete only from user_rental_class_mappings
+        deleted = session.query(UserRentalClassMapping).filter_by(rental_class_id=rental_class_id).delete()
         session.commit()
-        current_app.logger.info(f"Deleted mapping with rental_class_id {rental_class_id}, {deleted} rows affected")
+        current_app.logger.info(f"Deleted user mapping with rental_class_id {rental_class_id}, {deleted} rows affected")
 
         # Verify the data in the database after commit
-        mappings_after_commit = session.query(RentalClassMapping).all()
-        current_app.logger.info(f"Mappings in database after deletion: {len(mappings_after_commit)} entries")
-        current_app.logger.debug(f"Database mappings: {[{ 'rental_class_id': m.rental_class_id, 'category': m.category, 'subcategory': m.subcategory } for m in mappings_after_commit]}")
+        user_mappings_after_commit = session.query(UserRentalClassMapping).all()
+        current_app.logger.info(f"User mappings in database after deletion: {len(user_mappings_after_commit)} entries")
+        current_app.logger.debug(f"User database mappings: {[{ 'rental_class_id': m.rental_class_id, 'category': m.category, 'subcategory': m.subcategory } for m in user_mappings_after_commit]}")
 
         # Direct query to verify database state
-        raw_mappings = session.execute(text("SELECT rental_class_id, category, subcategory FROM rental_class_mappings")).fetchall()
-        current_app.logger.info(f"Raw database mappings after deletion: {[(row[0], row[1], row[2]) for row in raw_mappings]}")
+        raw_user_mappings = session.execute(text("SELECT rental_class_id, category, subcategory FROM user_rental_class_mappings")).fetchall()
+        current_app.logger.info(f"Raw user mappings after deletion: {[(row[0], row[1], row[2]) for row in raw_user_mappings]}")
 
         session.close()
         return jsonify({'message': 'Mapping deleted successfully'})
