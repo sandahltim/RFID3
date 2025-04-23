@@ -55,18 +55,34 @@
         const rows = document.querySelectorAll('#mappings-table tr');
         const mappings = Array.from(rows).map(row => {
             return {
-                category: row.querySelector('.category-input').value,
-                subcategory: row.querySelector('.subcategory-input').value,
-                rental_class_id: row.querySelector('.rental-class-id-input').value
+                category: row.querySelector('.category-input').value.trim(),
+                subcategory: row.querySelector('.subcategory-input').value.trim(),
+                rental_class_id: row.querySelector('.rental-class-id-input').value.trim()
             };
         });
+
+        // Check for duplicate rental_class_id entries
+        const rentalClassIds = mappings.map(mapping => mapping.rental_class_id);
+        const duplicates = rentalClassIds.filter((id, index) => id && rentalClassIds.indexOf(id) !== index);
+        if (duplicates.length > 0) {
+            alert('Error: Duplicate Rental Class IDs found: ' + duplicates.join(', ') + '. Each Rental Class ID must be unique.');
+            return;
+        }
+
+        // Remove entries with empty rental_class_id
+        const validMappings = mappings.filter(mapping => mapping.rental_class_id !== '');
+
+        if (validMappings.length === 0) {
+            alert('Error: No valid mappings to save. Please ensure all rows have a Rental Class ID.');
+            return;
+        }
 
         fetch('/categories/update', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify(mappings)
+            body: JSON.stringify(validMappings)
         })
         .then(response => response.json())
         .then(data => {
