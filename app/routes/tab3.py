@@ -2,12 +2,12 @@ from flask import Blueprint, render_template, current_app
 from .. import db, cache
 from ..models.db_models import ItemMaster, Transaction, RentalClassMapping, UserRentalClassMapping
 from sqlalchemy import func, desc, or_
+from time import time
 
 tab3_bp = Blueprint('tab3', __name__)
 
 @tab3_bp.route('/tab/3')
-@cache.cached(timeout=60)
-def tab3():
+def tab3_view():
     try:
         session = db.session()
         current_app.logger.info("Starting new session for tab3")
@@ -128,10 +128,12 @@ def tab3():
         return render_template('tab3.html', 
                               tent_crew_items=tent_crew_items,
                               laundry_crew_items=laundry_crew_items,
-                              maintenance_crew_items=maintenance_crew_items)
+                              maintenance_crew_items=maintenance_crew_items,
+                              cache_bust=int(time()))
     except Exception as e:
         current_app.logger.error(f"Error rendering Tab 3: {str(e)}", exc_info=True)
         return render_template('tab3.html', 
                               tent_crew_items=[],
                               laundry_crew_items=[],
-                              maintenance_crew_items=[])
+                              maintenance_crew_items=[],
+                              cache_bust=int(time()))

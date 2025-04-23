@@ -2,12 +2,12 @@ from flask import Blueprint, render_template, request, jsonify, current_app
 from .. import db, cache
 from ..models.db_models import Transaction, ItemMaster, RentalClassMapping, UserRentalClassMapping
 from sqlalchemy import func, desc, or_
+from time import time
 
 tab4_bp = Blueprint('tab4', __name__)
 
 @tab4_bp.route('/tab/4')
-@cache.cached(timeout=60)
-def tab4():
+def tab4_view():
     try:
         session = db.session()
         current_app.logger.info("Starting new session for tab4")
@@ -100,13 +100,13 @@ def tab4():
 
         current_app.logger.info(f"Fetched {len(contracts)} laundry contracts for tab4")
         session.close()
-        return render_template('tab4.html', contracts=contracts)
+        return render_template('tab4.html', contracts=contracts, cache_bust=int(time()))
     except Exception as e:
         current_app.logger.error(f"Error rendering Tab 4: {str(e)}", exc_info=True)
-        return render_template('tab4.html', contracts=[])
+        return render_template('tab4.html', contracts=[], cache_bust=int(time()))
 
 @tab4_bp.route('/tab/4/common_names')
-def get_common_names():
+def tab4_common_names():
     category = request.args.get('category')
     contract_number = request.args.get('contract_number')
     page = int(request.args.get('page', 1))
@@ -177,7 +177,7 @@ def get_common_names():
         return jsonify({'error': 'Failed to fetch common names'}), 500
 
 @tab4_bp.route('/tab/4/data')
-def get_data():
+def tab4_data():
     category = request.args.get('category')
     contract_number = request.args.get('contract_number')
     common_name = request.args.get('common_name')
