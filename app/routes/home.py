@@ -6,7 +6,7 @@ from time import time
 
 home_bp = Blueprint('home', __name__)
 
-@home_bp.route('/')
+@home_bp.route('/', endpoint='home')
 def home():
     try:
         session = db.session()

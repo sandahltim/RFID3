@@ -1,4 +1,4 @@
-console.log('expand.js version: 2025-04-23 v26 loaded');
+console.log('expand.js version: 2025-04-23 v27 loaded');
 
 // --- Loading Indicator Functions ---
 function showLoading(key) {
@@ -23,7 +23,7 @@ function hideLoading(key) {
     }
 }
 
-// --- Subcategory Display Management (for tabs that use it, e.g., Tab 1) ---
+// --- Subcategory Display Management ---
 function hideOtherSubcats(currentCategory) {
     console.log('hideOtherSubcats called with currentCategory:', currentCategory);
     const allSubcatDivs = document.querySelectorAll('div[id^="subcat-"]');
@@ -34,7 +34,7 @@ function hideOtherSubcats(currentCategory) {
             console.log('Collapsing subcat div:', div.id);
             div.classList.remove('expanded');
             div.classList.add('collapsed');
-            div.style.display = 'none'; // Ensure hidden
+            div.style.display = 'none';
 
             // Reset buttons for collapsed sections
             const parentRow = div.closest('tr');
@@ -61,7 +61,7 @@ function hideOtherCommonNames(currentId) {
             console.log('Collapsing common name div:', div.id);
             div.classList.remove('expanded');
             div.classList.add('collapsed');
-            div.style.display = 'none'; // Ensure hidden
+            div.style.display = 'none';
 
             // Reset buttons for collapsed sections
             const parentRow = div.closest('tr');
@@ -88,7 +88,7 @@ function hideOtherItems(currentCommonId) {
             console.log('Collapsing item div:', div.id);
             div.classList.remove('expanded');
             div.classList.add('collapsed');
-            div.style.display = 'none'; // Ensure hidden
+            div.style.display = 'none';
 
             // Reset buttons for collapsed sections
             const parentRow = div.closest('tr');
@@ -112,7 +112,7 @@ function collapseSection(targetId) {
         console.log('Container found, collapsing:', container);
         container.classList.remove('expanded');
         container.classList.add('collapsed');
-        container.style.display = 'none'; // Ensure hidden
+        container.style.display = 'none';
 
         // Find the parent row and toggle buttons
         const parentRow = container.closest('tr');
@@ -127,6 +127,39 @@ function collapseSection(targetId) {
     }
 }
 
+// --- Update Bin Location (for Tab 5) ---
+function updateBinLocation(tagId, selectElement) {
+    const newBinLocation = selectElement.value;
+    console.log('updateBinLocation called with tagId:', tagId, 'newBinLocation:', newBinLocation);
+
+    fetch('/tab/5/update_bin_location', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            tag_id: tagId,
+            bin_location: newBinLocation
+        })
+    })
+    .then(response => {
+        console.log('Update bin location response status:', response.status);
+        return response.json();
+    })
+    .then(data => {
+        console.log('Update bin location response data:', data);
+        if (data.error) {
+            alert('Error: ' + data.error);
+        } else {
+            alert(data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error updating bin location:', error);
+        alert('Failed to update bin location');
+    });
+}
+
 // --- Render Individual Items Data with Pagination ---
 function loadItems(category, subcategory, commonName, targetId, page = 1) {
     const decodedCategory = decodeURIComponent(category);
@@ -134,7 +167,6 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
     const decodedCommonName = decodeURIComponent(commonName);
     console.log('loadItems called with category:', decodedCategory, 'subcategory:', decodedSubcategory, 'commonName:', decodedCommonName, 'targetId:', targetId, 'page:', page);
     
-    // Determine if we're in Tabs 2 or 4 (no subcategory) or other tabs (with subcategory)
     const isTab2or4 = window.cachedTabNum == 2 || window.cachedTabNum == 4;
     const url = isTab2or4 
         ? '/tab/' + window.cachedTabNum + '/data?category=' + encodeURIComponent(decodedCategory) + '&common_name=' + encodeURIComponent(decodedCommonName) + '&page=' + page
@@ -146,7 +178,7 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
         return;
     }
 
-    showLoading(targetId.replace('items-', '')); // Show loading indicator
+    showLoading(targetId.replace('items-', ''));
 
     fetch(url, {
         method: 'GET',
@@ -167,20 +199,18 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
             container.classList.add('expandable');
             container.classList.remove('collapsed');
             container.classList.add('expanded');
-            container.style.display = 'block'; // Ensure visibility
+            container.style.display = 'block';
 
             let html = '';
-            const isTab1 = window.cachedTabNum == 1;
+            const isTab1or5 = window.cachedTabNum == 1 || window.cachedTabNum == 5;
             if ((data.items && Array.isArray(data.items) && data.items.length > 0) || (data && Array.isArray(data) && data.length > 0)) {
                 const items = data.items || data;
                 hideOtherItems(targetId.replace('items-', ''));
                 html += [
                     '<div class="item-level-wrapper">',
-                    // Pagination controls at the top
                     '<div class="pagination-controls mt-2">'
                 ].join('');
 
-                // Add pagination controls at the top
                 const totalPages = Math.ceil(data.total_items / data.per_page);
                 if (totalPages > 1) {
                     if (data.page > 1) {
@@ -203,8 +233,9 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                                 '<th>Status</th>',
                                 '<th>Last Contract</th>',
                                 '<th>Last Scanned</th>',
-                                isTab1 ? '<th>Quality</th>' : '',
-                                isTab1 ? '<th>Notes</th>' : '',
+                                isTab1or5 ? '<th>Quality</th>' : '',
+                                isTab1or5 ? '<th>Notes</th>' : '',
+                                window.cachedTabNum == 5 ? '<th>Actions</th>' : '',
                             '</tr>',
                         '</thead>',
                         '<tbody>'
@@ -215,12 +246,22 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                         '<tr>',
                             '<td>' + (item.tag_id || 'N/A') + '</td>',
                             '<td>' + (item.common_name || 'N/A') + '</td>',
-                            '<td>' + (item.bin_location || 'N/A') + '</td>',
+                            '<td>',
+                                window.cachedTabNum == 5 ? [
+                                    '<select class="form-control bin-location-select" onchange="updateBinLocation(\'' + item.tag_id + '\', this)">',
+                                        '<option value="resale"' + (item.bin_location === 'resale' ? ' selected' : '') + '>Resale</option>',
+                                        '<option value="sold"' + (item.bin_location === 'sold' ? ' selected' : '') + '>Sold</option>',
+                                        '<option value="pack"' + (item.bin_location === 'pack' ? ' selected' : '') + '>Pack</option>',
+                                        '<option value="burst"' + (item.bin_location === 'burst' ? ' selected' : '') + '>Burst</option>',
+                                    '</select>'
+                                ].join('') : (item.bin_location || 'N/A'),
+                            '</td>',
                             '<td>' + (item.status || 'N/A') + '</td>',
                             '<td>' + (item.last_contract_num || 'N/A') + '</td>',
                             '<td>' + (item.last_scanned_date || 'N/A') + '</td>',
-                            isTab1 ? '<th>' + (item.quality || 'N/A') + '</th>' : '',
-                            isTab1 ? '<th>' + (item.notes || 'N/A') + '</th>' : '',
+                            isTab1or5 ? '<td>' + (item.quality || 'N/A') + '</td>' : '',
+                            isTab1or5 ? '<td>' + (item.notes || 'N/A') + '</td>' : '',
+                            window.cachedTabNum == 5 ? '<td><button class="btn btn-sm btn-primary" onclick="updateBinLocation(\'' + item.tag_id + '\', this.previousElementSibling)">Update</button></td>' : '',
                         '</tr>'
                     ].join('');
                 });
@@ -230,7 +271,6 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                     '</table>'
                 ].join('');
 
-                // Add pagination controls at the bottom
                 if (totalPages > 1) {
                     html += '<div class="pagination-controls mt-2">';
                     if (data.page > 1) {
@@ -249,7 +289,6 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
 
             container.innerHTML = html;
 
-            // Find the parent row and toggle buttons
             const parentRow = container.closest('tr');
             const expandButton = parentRow.previousElementSibling.querySelector('.expand-btn');
             const collapseButton = parentRow.previousElementSibling.querySelector('.collapse-btn');
@@ -276,13 +315,11 @@ function loadCommonNames(category, subcategory, targetId, page = 1) {
     const decodedSubcategory = subcategory ? decodeURIComponent(subcategory) : null;
     console.log('loadCommonNames called with category:', decodedCategory, 'subcategory:', decodedSubcategory, 'targetId:', targetId, 'page:', page);
     
-    // Determine if we're in Tabs 2 or 4 (no subcategory) or other tabs (with subcategory)
     const isTab2or4 = window.cachedTabNum == 2 || window.cachedTabNum == 4;
     const url = isTab2or4
         ? '/tab/' + window.cachedTabNum + '/common_names?category=' + encodeURIComponent(decodedCategory) + '&page=' + page
         : '/tab/' + window.cachedTabNum + '/common_names?category=' + encodeURIComponent(decodedCategory) + '&subcategory=' + encodeURIComponent(decodedSubcategory) + '&page=' + page;
 
-    // For Tabs 2 and 4, targetId is already 'common-{{ category.cat_id }}', so don't prepend 'common-'
     const containerId = isTab2or4 ? targetId : 'common-' + targetId;
     const container = document.getElementById(containerId);
     if (!container) {
@@ -290,7 +327,7 @@ function loadCommonNames(category, subcategory, targetId, page = 1) {
         return;
     }
 
-    showLoading(targetId.replace('common-', '')); // Show loading indicator
+    showLoading(targetId.replace('common-', ''));
 
     fetch(url, {
         method: 'GET',
@@ -311,15 +348,14 @@ function loadCommonNames(category, subcategory, targetId, page = 1) {
             container.classList.add('expandable');
             container.classList.remove('collapsed');
             container.classList.add('expanded');
-            container.style.display = 'block'; // Ensure visibility
+            container.style.display = 'block';
 
             let html = '';
-            const isTab1 = window.cachedTabNum == 1;
+            const isTab1or5 = window.cachedTabNum == 1 || window.cachedTabNum == 5;
             if (data.common_names && Array.isArray(data.common_names) && data.common_names.length > 0) {
                 const targetBaseId = targetId.replace('common-', '');
                 hideOtherCommonNames(targetBaseId);
 
-                // Pagination controls at the top
                 html += '<div class="pagination-controls mt-2">';
                 const totalPages = Math.ceil(data.total_common_names / data.per_page);
                 if (totalPages > 1) {
@@ -340,20 +376,20 @@ function loadCommonNames(category, subcategory, targetId, page = 1) {
                             '<thead>',
                                 '<tr>',
                                     '<th>Common Name</th>',
-                                    isTab1 ? '<th>Total Items</th>' : '<th>Total Items in Inventory</th>',
-                                    isTab1 ? '<th>Items on Contracts</th>' : '<th>Items on This Contract</th>',
-                                    isTab1 ? '<th>Items in Service</th>' : '',
-                                    isTab1 ? '<th>Items Available</th>' : '',
+                                    isTab1or5 ? '<th>Total Items</th>' : '<th>Total Items in Inventory</th>',
+                                    isTab1or5 ? '<th>Items on Contracts</th>' : '<th>Items on This Contract</th>',
+                                    isTab1or5 ? '<th>Items in Service</th>' : '',
+                                    isTab1or5 ? '<th>Items Available</th>' : '',
                                     '<th>Actions</th>',
                                 '</tr>',
                             '</thead>',
                             '<tbody>',
                                 '<tr>',
                                     '<td>' + cn.name + '</td>',
-                                    isTab1 ? '<td>' + (cn.total_items !== undefined ? cn.total_items : 'N/A') + '</td>' : '<td>' + (cn.total_items_inventory !== undefined ? cn.total_items_inventory : 'N/A') + '</td>',
+                                    isTab1or5 ? '<td>' + (cn.total_items !== undefined ? cn.total_items : 'N/A') + '</td>' : '<td>' + (cn.total_items_inventory !== undefined ? cn.total_items_inventory : 'N/A') + '</td>',
                                     '<td>' + (cn.items_on_contract !== undefined ? cn.items_on_contract : cn.on_contracts !== undefined ? cn.on_contracts : 'N/A') + '</td>',
-                                    isTab1 ? '<td>' + (cn.in_service !== undefined ? cn.in_service : 'N/A') + '</td>' : '',
-                                    isTab1 ? '<td>' + (cn.available !== undefined ? cn.available : 'N/A') + '</td>' : '',
+                                    isTab1or5 ? '<td>' + (cn.in_service !== undefined ? cn.in_service : 'N/A') + '</td>' : '',
+                                    isTab1or5 ? '<td>' + (cn.available !== undefined ? cn.available : 'N/A') + '</td>' : '',
                                     '<td>',
                                         '<button class="btn btn-sm btn-secondary expand-btn" onclick="loadItems(\'' + encodeURIComponent(decodedCategory) + '\', ' + (isTab2or4 ? 'null' : '\'' + encodeURIComponent(decodedSubcategory) + '\'') + ', \'' + encodeURIComponent(cn.name) + '\', \'items-' + cnId + '\')">Expand</button>',
                                         '<button class="btn btn-sm btn-secondary collapse-btn" style="display:none;" onclick="collapseSection(\'items-' + cnId + '\')">Collapse</button>',
@@ -362,7 +398,7 @@ function loadCommonNames(category, subcategory, targetId, page = 1) {
                                     '</td>',
                                 '</tr>',
                                 '<tr>',
-                                    isTab1 ? '<td colspan="6">' : '<td colspan="4">',
+                                    isTab1or5 ? '<td colspan="6">' : '<td colspan="4">',
                                         '<div id="items-' + cnId + '" class="expandable collapsed"></div>',
                                     '</td>',
                                 '</tr>',
@@ -371,7 +407,6 @@ function loadCommonNames(category, subcategory, targetId, page = 1) {
                     ].join('');
                 });
 
-                // Add pagination controls at the bottom
                 if (totalPages > 1) {
                     html += '<div class="pagination-controls mt-2">';
                     if (data.page > 1) {
@@ -389,7 +424,6 @@ function loadCommonNames(category, subcategory, targetId, page = 1) {
 
             container.innerHTML = html;
 
-            // Find the parent row and toggle buttons
             const parentRow = container.closest('tr');
             const expandButton = parentRow.previousElementSibling.querySelector('.expand-btn');
             const collapseButton = parentRow.previousElementSibling.querySelector('.collapse-btn');
@@ -410,7 +444,7 @@ function loadCommonNames(category, subcategory, targetId, page = 1) {
         });
 }
 
-// --- Render Subcategory Data with Pagination (for tabs that use it, e.g., Tab 1) ---
+// --- Render Subcategory Data with Pagination ---
 function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1) {
     console.log('loadSubcatData called with originalCategory:', originalCategory, 'normalizedCategory:', normalizedCategory, 'targetId:', targetId, 'page:', page);
     hideOtherSubcats(normalizedCategory);
@@ -425,7 +459,7 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
     container.classList.add('expandable');
     container.classList.remove('collapsed');
     container.classList.add('expanded');
-    container.style.display = 'block'; // Ensure visibility
+    container.style.display = 'block';
 
     const url = '/tab/' + window.cachedTabNum + '/subcat_data?category=' + encodeURIComponent(originalCategory) + '&page=' + page;
     showLoading(containerId.replace('subcat-', ''));
@@ -445,9 +479,8 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
         })
         .then(data => {
             let html = '<div class="subcat-level">';
-            const isTab1 = window.cachedTabNum == 1;
+            const isTab1or5 = window.cachedTabNum == 1 || window.cachedTabNum == 5;
 
-            // Pagination controls at the top
             const totalPages = Math.ceil(data.total_subcats / data.per_page);
             if (totalPages > 1) {
                 html += '<div class="pagination-controls mt-2">';
@@ -470,29 +503,29 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
                             '<thead>',
                                 '<tr>',
                                     '<th>Subcategory</th>',
-                                    isTab1 ? '<th>Total Items</th>' : '<th>Total Items in Inventory</th>',
-                                    isTab1 ? '<th>Items on Contracts</th>' : '<th>Items on This Contract</th>',
-                                    isTab1 ? '<th>Items in Service</th>' : '',
-                                    isTab1 ? '<th>Items Available</th>' : '',
+                                    isTab1or5 ? '<th>Total Items</th>' : '<th>Total Items in Inventory</th>',
+                                    isTab1or5 ? '<th>Items on Contracts</th>' : '<th>Items on This Contract</th>',
+                                    isTab1or5 ? '<th>Items in Service</th>' : '',
+                                    isTab1or5 ? '<th>Items Available</th>' : '',
                                     '<th>Actions</th>',
                                 '</tr>',
                             '</thead>',
                             '<tbody>',
                                 '<tr>',
                                     '<td>' + sub.subcategory + '</td>',
-                                    isTab1 ? '<td>' + (sub.total_items !== undefined ? sub.total_items : 'N/A') + '</td>' : '<td>' + (sub.total_items_inventory !== undefined ? sub.total_items_inventory : 'N/A') + '</td>',
-                                    isTab1 ? '<td>' + (sub.on_contracts !== undefined ? sub.on_contracts : 'N/A') + '</td>' : '<td>' + (sub.items_on_contract !== undefined ? sub.items_on_contract : 'N/A') + '</td>',
-                                    isTab1 ? '<td>' + (sub.in_service !== undefined ? sub.in_service : 'N/A') + '</td>' : '',
-                                    isTab1 ? '<td>' + (sub.available !== undefined ? sub.available : 'N/A') + '</td>' : '',
+                                    isTab1or5 ? '<td>' + (sub.total_items !== undefined ? sub.total_items : 'N/A') + '</td>' : '<td>' + (sub.total_items_inventory !== undefined ? sub.total_items_inventory : 'N/A') + '</td>',
+                                    isTab1or5 ? '<td>' + (sub.on_contracts !== undefined ? sub.on_contracts : 'N/A') + '</td>' : '<td>' + (sub.items_on_contract !== undefined ? sub.items_on_contract : 'N/A') + '</td>',
+                                    isTab1or5 ? '<td>' + (sub.in_service !== undefined ? sub.in_service : 'N/A') + '</td>' : '',
+                                    isTab1or5 ? '<td>' + (sub.available !== undefined ? sub.available : 'N/A') + '</td>' : '',
                                     '<td>',
                                         '<button class="btn btn-sm btn-secondary expand-btn" onclick="loadCommonNames(\'' + encodeURIComponent(originalCategory) + '\', \'' + encodeURIComponent(sub.subcategory) + '\', \'' + subId + '\')">Expand</button>',
                                         '<button class="btn btn-sm btn-secondary collapse-btn" style="display:none;" onclick="collapseSection(\'common-' + subId + '\')">Collapse</button>',
-                                        '<button class="btn btn-sm btn-info print-btn" data-print-level="' + (isTab1 ? 'Subcategory' : 'Subcategory') + '" data-print-id="subcat-table-' + subId + '">Print</button>',
+                                        '<button class="btn btn-sm btn-info print-btn" data-print-level="' + (isTab1or5 ? 'Subcategory' : 'Subcategory') + '" data-print-id="subcat-table-' + subId + '">Print</button>',
                                         '<div id="loading-' + subId + '" style="display:none;" class="loading">Loading...</div>',
                                     '</td>',
                                 '</tr>',
                                 '<tr>',
-                                    isTab1 ? '<td colspan="6">' : '<td colspan="4">',
+                                    isTab1or5 ? '<td colspan="6">' : '<td colspan="4">',
                                         '<div id="common-' + subId + '" class="expandable collapsed"></div>',
                                     '</td>',
                                 '</tr>',
@@ -501,7 +534,6 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
                     ].join('');
                 });
 
-                // Add pagination controls at the bottom
                 if (totalPages > 1) {
                     html += '<div class="pagination-controls mt-2">';
                     if (data.page > 1) {
@@ -521,7 +553,6 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
             console.log('Generated HTML for subcategories:', html);
             container.innerHTML = html;
 
-            // Find the parent row and toggle buttons
             const parentRow = container.closest('tr');
             const expandButton = parentRow.previousElementSibling.querySelector('.expand-btn');
             const collapseButton = parentRow.previousElementSibling.querySelector('.collapse-btn');
@@ -548,16 +579,13 @@ document.addEventListener('DOMContentLoaded', () => {
     
     window.expandCategory = function(category, targetId, page = 1) {
         console.log('expandCategory called with category:', category, 'targetId:', targetId, 'page:', page);
-        const normalizedCategory = targetId.replace('subcat-', '').replace('common-', '').replace(/\s+/g, '_'); // Normalize spaces to underscores
-        const originalCategory = decodeURIComponent(category); // Keep the original category name
+        const normalizedCategory = targetId.replace('subcat-', '').replace('common-', '').replace(/\s+/g, '_');
+        const originalCategory = decodeURIComponent(category);
 
-        // Check if we're in Tabs 2 or 4 (skip subcategory layer)
         const isTab2or4 = window.cachedTabNum == 2 || window.cachedTabNum == 4;
         if (isTab2or4) {
-            // For Tabs 2 and 4, go straight to common names
             loadCommonNames(originalCategory, null, targetId, page);
         } else {
-            // For other tabs (e.g., Tab 1), load subcategories
             loadSubcatData(originalCategory, normalizedCategory, targetId, page);
         }
     };

@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block title %}Resale/Rental Packs{% endblock %}
+
+{% block extra_head %}
+<script>
+    window.cachedTabNum = 5; // Set tab number for expand.js
+</script>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Resale/Rental Packs (Tab 5)</h2>
+    <table class="table table-bordered" id="category-table">
+        <thead>
+            <tr>
+                <th>Category</th>
+                <th>Total Items</th>
+                <th>Items on Contracts</th>
+                <th>Items in Service</th>
+                <th>Items Available</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody id="category-rows">
+            {% for category in categories %}
+            {% set cat_id = category.cat_id %}
+            {% set encoded_category = category.category | urlencode | replace("'", "\\'") | replace('"', '\\"') %}
+            <tr>
+                <td>{{ category.category }}</td>
+                <td>{{ category.total_items }}</td>
+                <td>{{ category.items_on_contracts }}</td>
+                <td>{{ category.items_in_service }}</td>
+                <td>{{ category.items_available }}</td>
+                <td>
+                    <button class="btn btn-sm btn-secondary expand-btn" onclick="expandCategory('{{ encoded_category }}', 'subcat-{{ cat_id }}')">Expand</button>
+                    <button class="btn btn-sm btn-secondary collapse-btn" style="display:none;" onclick="collapseSection('subcat-{{ cat_id }}')">Collapse</button>
+                    <button class="btn btn-sm btn-info print-btn" data-print-level="Category" data-print-id="category-table">Print</button>
+                    <div id="loading-{{ cat_id }}" style="display:none;" class="loading">Loading...</div>
+                </td>
+            </tr>
+            <tr>
+                <td colspan="6">
+                    <div id="subcat-{{ cat_id }}" class="expandable collapsed"></div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}
