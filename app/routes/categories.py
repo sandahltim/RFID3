@@ -37,7 +37,6 @@ def manage_categories():
         categories_data = []
         for mapping in mappings:
             categories_data.append({
-                'id': mapping.id,
                 'rental_class_id': mapping.rental_class_id,
                 'category': mapping.category,
                 'subcategory': mapping.subcategory,
@@ -83,7 +82,7 @@ def get_mapping():
         common_name_dict = {rental_class_num: common_name for rental_class_num, common_name in common_names}
 
         data = [{
-            'id': m.id,  # Use m.id since we're rendering rows dynamically
+            'rental_class_id': m.rental_class_id,
             'category': m.category,
             'subcategory': m.subcategory,
             'rental_class_id': m.rental_class_id,

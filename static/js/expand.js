@@ -1,4 +1,4 @@
-console.log('expand.js version: 2025-04-22 v23 loaded');
+console.log('expand.js version: 2025-04-22 v24 loaded');
 
 // --- Loading Indicator Functions ---
 function showLoading(key) {
@@ -35,6 +35,17 @@ function hideOtherSubcats(currentCategory) {
             div.classList.remove('expanded');
             div.classList.add('collapsed');
             div.style.display = 'none'; // Ensure hidden
+
+            // Reset buttons for collapsed sections
+            const parentRow = div.closest('tr');
+            if (parentRow) {
+                const expandButton = parentRow.previousElementSibling.querySelector('.expand-btn');
+                const collapseButton = parentRow.previousElementSibling.querySelector('.collapse-btn');
+                if (expandButton && collapseButton) {
+                    expandButton.style.display = 'inline-block';
+                    collapseButton.style.display = 'none';
+                }
+            }
         }
     });
 }
@@ -51,6 +62,17 @@ function hideOtherCommonNames(currentId) {
             div.classList.remove('expanded');
             div.classList.add('collapsed');
             div.style.display = 'none'; // Ensure hidden
+
+            // Reset buttons for collapsed sections
+            const parentRow = div.closest('tr');
+            if (parentRow) {
+                const expandButton = parentRow.previousElementSibling.querySelector('.expand-btn');
+                const collapseButton = parentRow.previousElementSibling.querySelector('.collapse-btn');
+                if (expandButton && collapseButton) {
+                    expandButton.style.display = 'inline-block';
+                    collapseButton.style.display = 'none';
+                }
+            }
         }
     });
 }
@@ -67,6 +89,17 @@ function hideOtherItems(currentCommonId) {
             div.classList.remove('expanded');
             div.classList.add('collapsed');
             div.style.display = 'none'; // Ensure hidden
+
+            // Reset buttons for collapsed sections
+            const parentRow = div.closest('tr');
+            if (parentRow) {
+                const expandButton = parentRow.previousElementSibling.querySelector('.expand-btn');
+                const collapseButton = parentRow.previousElementSibling.querySelector('.collapse-btn');
+                if (expandButton && collapseButton) {
+                    expandButton.style.display = 'inline-block';
+                    collapseButton.style.display = 'none';
+                }
+            }
         }
     });
 }
@@ -83,8 +116,8 @@ function collapseSection(targetId) {
 
         // Find the parent row and toggle buttons
         const parentRow = container.closest('tr');
-        const expandButton = parentRow.querySelector('.expand-btn');
-        const collapseButton = parentRow.querySelector('.collapse-btn');
+        const expandButton = parentRow.previousElementSibling.querySelector('.expand-btn');
+        const collapseButton = parentRow.previousElementSibling.querySelector('.collapse-btn');
         if (expandButton && collapseButton) {
             expandButton.style.display = 'inline-block';
             collapseButton.style.display = 'none';
@@ -201,8 +234,8 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
 
             // Find the parent row and toggle buttons
             const parentRow = container.closest('tr');
-            const expandButton = parentRow.querySelector('.expand-btn');
-            const collapseButton = parentRow.querySelector('.collapse-btn');
+            const expandButton = parentRow.previousElementSibling.querySelector('.expand-btn');
+            const collapseButton = parentRow.previousElementSibling.querySelector('.collapse-btn');
             if (expandButton && collapseButton) {
                 expandButton.style.display = 'none';
                 collapseButton.style.display = 'inline-block';
@@ -325,26 +358,10 @@ function loadCommonNames(category, subcategory, targetId, page = 1) {
 
             container.innerHTML = html;
 
-            // Add event listeners to toggle Expand/Collapse buttons
-            const expandButtons = container.querySelectorAll('.expand-btn');
-            const collapseButtons = container.querySelectorAll('.collapse-btn');
-            expandButtons.forEach(function(btn, index) {
-                btn.addEventListener('click', function() {
-                    btn.style.display = 'none';
-                    collapseButtons[index].style.display = 'inline-block';
-                });
-            });
-            collapseButtons.forEach(function(btn, index) {
-                btn.addEventListener('click', function() {
-                    btn.style.display = 'none';
-                    expandButtons[index].style.display = 'inline-block';
-                });
-            });
-
             // Find the parent row and toggle buttons
             const parentRow = container.closest('tr');
-            const expandButton = parentRow.querySelector('.expand-btn');
-            const collapseButton = parentRow.querySelector('.collapse-btn');
+            const expandButton = parentRow.previousElementSibling.querySelector('.expand-btn');
+            const collapseButton = parentRow.previousElementSibling.querySelector('.collapse-btn');
             if (expandButton && collapseButton) {
                 expandButton.style.display = 'none';
                 collapseButton.style.display = 'inline-block';
@@ -459,21 +476,14 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
             console.log('Generated HTML for subcategories:', html);
             container.innerHTML = html;
 
-            // Add event listeners to toggle Expand/Collapse buttons for subcategories
-            const expandButtons = container.querySelectorAll('.expand-btn');
-            const collapseButtons = container.querySelectorAll('.collapse-btn');
-            expandButtons.forEach(function(btn, index) {
-                btn.addEventListener('click', function() {
-                    btn.style.display = 'none';
-                    collapseButtons[index].style.display = 'inline-block';
-                });
-            });
-            collapseButtons.forEach(function(btn, index) {
-                btn.addEventListener('click', function() {
-                    btn.style.display = 'none';
-                    expandButtons[index].style.display = 'inline-block';
-                });
-            });
+            // Find the parent row and toggle buttons
+            const parentRow = container.closest('tr');
+            const expandButton = parentRow.previousElementSibling.querySelector('.expand-btn');
+            const collapseButton = parentRow.previousElementSibling.querySelector('.collapse-btn');
+            if (expandButton && collapseButton) {
+                expandButton.style.display = 'none';
+                collapseButton.style.display = 'inline-block';
+            }
 
             console.log('Subcategory table rendered into container');
         })

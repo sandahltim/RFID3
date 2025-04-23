@@ -69,7 +69,7 @@ def get_contract_date():
 
         # Fetch the earliest transaction date for this contract
         transaction = db.session.query(
-            func.min(Transaction.date).label('date')
+            func.min(Transaction.date_created).label('date')
         ).filter(
             Transaction.contract_number == contract_number
         ).first()

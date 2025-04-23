@@ -65,6 +65,21 @@ async function printTable(level, id) {
         tableWrapper = printElement;
     }
 
+    // Adjust table headers for Tabs 2 and 4: Remove "Total Items in Inventory" column
+    if ((tabNum == 2 || tabNum == 4) && (level === 'Contract' || level === 'Common Name')) {
+        const headers = tableWrapper.querySelectorAll('th');
+        const rows = tableWrapper.querySelectorAll('tbody tr');
+        headers.forEach((th, index) => {
+            if (th.textContent.trim() === 'Total Items in Inventory') {
+                th.remove();
+                rows.forEach(row => {
+                    const cell = row.cells[index];
+                    if (cell) cell.remove();
+                });
+            }
+        });
+    }
+
     // Find expanded content if any
     const row = element.closest('tr');
     if (row) {
