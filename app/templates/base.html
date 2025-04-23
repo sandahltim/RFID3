@@ -13,29 +13,29 @@
 <body>
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
         <div class="container-fluid">
-            <a class="navbar-brand" href="{{ url_for('home.index') }}">RFID Dashboard</a>
+            <a class="navbar-brand" href="{{ url_for('home.home') }}">RFID Dashboard</a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                 <span class="navbar-toggler-icon"></span>
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav">
                     <li class="nav-item">
-                        <a class="nav-link {% if request.endpoint == 'home.index' %}active{% endif %}" href="{{ url_for('home.index') }}">Home</a>
+                        <a class="nav-link {% if request.endpoint == 'home.home' %}active{% endif %}" href="{{ url_for('home.home') }}">Home</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {% if tab_num is defined and tab_num == 1 %}active{% endif %}" href="{{ url_for('tabs.tab_view', tab_num=1) }}">Rental Inventory</a>
+                        <a class="nav-link {% if request.endpoint == 'tab1.tab1_view' %}active{% endif %}" href="{{ url_for('tabs.tab_view', tab_num=1) }}">Rental Inventory</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {% if tab_num is defined and tab_num == 2 %}active{% endif %}" href="{{ url_for('tabs.tab_view', tab_num=2) }}">Open Contracts</a>
+                        <a class="nav-link {% if request.endpoint == 'tab2.tab2_view' %}active{% endif %}" href="{{ url_for('tabs.tab_view', tab_num=2) }}">Open Contracts</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {% if tab_num is defined and tab_num == 3 %}active{% endif %}" href="{{ url_for('tabs.tab_view', tab_num=3) }}">Service</a>
+                        <a class="nav-link {% if request.endpoint == 'tab3.tab3_view' %}active{% endif %}" href="{{ url_for('tabs.tab_view', tab_num=3) }}">Service</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {% if tab_num is defined and tab_num == 4 %}active{% endif %}" href="{{ url_for('tabs.tab_view', tab_num=4) }}">Laundry Contracts</a>
+                        <a class="nav-link {% if request.endpoint == 'tab4.tab4_view' %}active{% endif %}" href="{{ url_for('tabs.tab_view', tab_num=4) }}">Laundry Contracts</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {% if tab_num is defined and tab_num == 5 %}active{% endif %}" href="{{ url_for('tabs.tab_view', tab_num=5) }}">Resale</a>
+                        <a class="nav-link {% if request.endpoint == 'tab5.tab5_view' %}active{% endif %}" href="{{ url_for('tabs.tab_view', tab_num=5) }}">Resale</a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link {% if request.endpoint == 'categories.manage_categories' %}active{% endif %}" href="{{ url_for('categories.manage_categories') }}">Manage Categories</a>
@@ -50,5 +50,6 @@
     </div>
     <script src="{{ url_for('static', filename='js/tab.js') }}?v={{ cache_bust if cache_bust is defined else timestamp() }}"></script>
     <script src="{{ url_for('static', filename='js/expand.js') }}?v={{ (cache_bust if cache_bust is defined else timestamp()) + 2 }}"></script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'934f72f6edc7bfaa',t:'MTc0NTQzMzIwNC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script>
 </body>
 </html>
