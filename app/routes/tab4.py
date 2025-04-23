@@ -1,267 +1,234 @@
-from flask import Blueprint, render_template, jsonify, current_app, request
+from flask import Blueprint, render_template, request, jsonify, current_app
 from .. import db, cache
-from ..models.db_models import ItemMaster, RentalClassMapping, Transaction, HandCountedItems
-from sqlalchemy import func
-from urllib.parse import quote
-import re
-import time
-from datetime import datetime
+from ..models.db_models import Transaction, ItemMaster, RentalClassMapping, UserRentalClassMapping
+from sqlalchemy import func, desc, or_
 
-# Blueprint for Tab 4 (Laundry Tab) - DO NOT MODIFY BLUEPRINT NAME
-# Added on 2025-04-21 to display laundry contracts (starting with 'L')
 tab4_bp = Blueprint('tab4', __name__)
 
 @tab4_bp.route('/tab/4')
-@cache.cached(timeout=30)
-def tab4_view():
-    # Route to render the main view for Tab 4
-    # Displays a list of laundry contracts (starting with 'L') with status 'on rent' or 'delivered'
+@cache.cached(timeout=60)
+def tab4():
     try:
-        current_app.logger.info("Loading tab 4 (Laundry)")
+        session = db.session()
+        current_app.logger.info("Starting new session for tab4")
 
-        # Query to fetch laundry contracts (starting with 'L') from ItemMaster
-        # Filters by status 'on rent' or 'delivered', groups by last_contract_num
-        # Includes customer name and most recent scanned date
-        contract_data = db.session.query(
-            ItemMaster.last_contract_num,
-            func.max(Transaction.client_name).label('customer_name'),
-            func.max(ItemMaster.date_last_scanned).label('last_scanned_date')
-        ).outerjoin(
-            Transaction, Transaction.contract_number == ItemMaster.last_contract_num
+        # Define laundry-related categories
+        laundry_categories = ['Rectangle Linen', 'Round Linen', 'Runners and Drapes']
+
+        # Fetch all contracts (group by contract_number where scan_type = 'Rental')
+        contracts_query = session.query(
+            Transaction.contract_number,
+            Transaction.client_name,
+            func.min(Transaction.scan_date).label('scan_date')
         ).filter(
-            func.lower(ItemMaster.status).in_(['on rent', 'delivered']),
-            func.lower(ItemMaster.last_contract_num).like('l%')  # Only laundry contracts
+            Transaction.scan_type == 'Rental',
+            Transaction.contract_number != None
         ).group_by(
-            ItemMaster.last_contract_num
+            Transaction.contract_number,
+            Transaction.client_name
         ).order_by(
-            ItemMaster.last_contract_num
+            desc(func.min(Transaction.scan_date))
         ).all()
 
-        # Fetch hand-counted items to add to the counts
-        hand_counted_data = db.session.query(
-            HandCountedItems.contract_number,
-            func.sum(HandCountedItems.quantity).label('hand_counted_total')
-        ).filter(
-            func.lower(HandCountedItems.contract_number).like('l%'),
-            HandCountedItems.action == 'Added'
-        ).group_by(
-            HandCountedItems.contract_number
-        ).all()
-        hand_counted_dict = {row.contract_number: row.hand_counted_total for row in hand_counted_data}
+        contracts = []
+        for contract in contracts_query:
+            contract_number = contract.contract_number
+            client_name = contract.client_name
+            scan_date = contract.scan_date.isoformat() if contract.scan_date else 'N/A'
 
-        # Calculate total items per contract by aggregating common names
-        categories = []
-        for contract_num, customer_name, last_scanned_date in contract_data:
-            if contract_num is None:
-                continue
-
-            # Fetch tagged items by common name for this contract
-            tagged_items_query = db.session.query(
-                func.count(ItemMaster.tag_id).label('items_on_contract')
+            # Fetch rental class IDs for items in this contract
+            rental_class_nums = session.query(
+                func.trim(func.upper(func.cast(Transaction.rental_class_num, db.String)))
             ).filter(
-                func.lower(ItemMaster.status).in_(['on rent', 'delivered']),
-                ItemMaster.last_contract_num == contract_num,
-                func.lower(ItemMaster.last_contract_num).like('l%')
-            ).scalar() or 0
+                Transaction.contract_number == contract_number,
+                Transaction.scan_type == 'Rental'
+            ).distinct().all()
+            rental_class_nums = [r[0] for r in rental_class_nums if r[0]]
 
-            # Get hand-counted items for this contract
-            hand_counted_items = hand_counted_dict.get(contract_num, 0)
+            # Map rental class IDs to categories
+            base_mappings = session.query(RentalClassMapping).filter(
+                RentalClassMapping.rental_class_id.in_(rental_class_nums),
+                RentalClassMapping.category.in_(laundry_categories)
+            ).all()
+            user_mappings = session.query(UserRentalClassMapping).filter(
+                UserRentalClassMapping.rental_class_id.in_(rental_class_nums),
+                UserRentalClassMapping.category.in_(laundry_categories)
+            ).all()
 
-            # Total items on this contract
-            total_items = tagged_items_query + hand_counted_items
+            mappings_dict = {m.rental_class_id: {'category': m.category, 'subcategory': m.subcategory} for m in base_mappings}
+            for um in user_mappings:
+                mappings_dict[um.rental_class_id] = {'category': um.category, 'subcategory': um.subcategory}
 
-            # Sanitize cat_id in Python
-            cat_id = re.sub(r'[^a-z0-9-]', '_', contract_num.lower())
-            # Format last_scanned_date to MM/DD/YYYY, h:mm:ss AM/PM
-            formatted_date = last_scanned_date.strftime('%m/%d/%Y, %I:%M:%S %p') if last_scanned_date else 'N/A'
-            categories.append({
-                'name': contract_num,
-                'cat_id': cat_id,
-                'total_items': total_items,  # Total Items on Contract (tagged + hand-counted)
-                'customer_name': customer_name or 'N/A',
-                'last_scanned_date': formatted_date
+            categories = {}
+            for rental_class_id in rental_class_nums:
+                if rental_class_id in mappings_dict:
+                    category = mappings_dict[rental_class_id]['category']
+                    if category not in categories:
+                        categories[category] = []
+                    categories[category].append(rental_class_id)
+
+            contract_categories = []
+            for cat, rental_ids in categories.items():
+                # Count items on this contract (status = 'On Rent' or 'Delivered')
+                items_on_contract = session.query(func.count(Transaction.tag_id)).filter(
+                    Transaction.contract_number == contract_number,
+                    Transaction.scan_type == 'Rental',
+                    func.trim(func.upper(func.cast(Transaction.rental_class_num, db.String))).in_(rental_ids),
+                    Transaction.tag_id == ItemMaster.tag_id,
+                    ItemMaster.status.in_(['On Rent', 'Delivered'])
+                ).scalar()
+
+                # Total items in inventory for this category
+                total_items_inventory = session.query(func.count(ItemMaster.tag_id)).filter(
+                    func.trim(func.upper(func.cast(ItemMaster.rental_class_num, db.String))).in_(rental_ids)
+                ).scalar()
+
+                contract_categories.append({
+                    'category': cat,
+                    'cat_id': contract_number + '_' + cat.lower().replace(' ', '_').replace('/', '_'),
+                    'items_on_contract': items_on_contract or 0,
+                    'total_items_inventory': total_items_inventory or 0
+                })
+
+            contract_categories.sort(key=lambda x: x['category'])
+            contracts.append({
+                'contract_number': contract_number,
+                'client_name': client_name,
+                'scan_date': scan_date,
+                'categories': contract_categories
             })
-        current_app.logger.info(f"Fetched {len(categories)} laundry contracts")
-        current_app.logger.debug(f"Raw contract data: {contract_data}")
-        current_app.logger.debug(f"Hand-counted data: {hand_counted_dict}")
-        current_app.logger.debug(f"Formatted categories for tab 4: {categories}")
 
-        # Fetch bin locations for filtering (same as Tab 2)
-        bin_locations = db.session.query(
-            ItemMaster.bin_location
-        ).filter(
-            ItemMaster.bin_location.isnot(None)
-        ).distinct().order_by(
-            ItemMaster.bin_location
-        ).all()
-        bin_locations = [loc[0] for loc in bin_locations]
-        current_app.logger.info(f"Fetched {len(bin_locations)} bin locations")
-
-        # Fetch statuses for filtering (same as Tab 2)
-        statuses = db.session.query(
-            ItemMaster.status
-        ).filter(
-            ItemMaster.status.isnot(None)
-        ).distinct().order_by(
-            ItemMaster.status
-        ).all()
-        statuses = [status[0] for status in statuses]
-
-        return render_template(
-            'tab4.html',
-            tab_num=4,
-            categories=categories,
-            bin_locations=bin_locations,
-            statuses=statuses,
-            cache_bust=int(time.time()),
-            timestamp=lambda: int(time.time())
-        )
+        current_app.logger.info(f"Fetched {len(contracts)} laundry contracts for tab4")
+        session.close()
+        return render_template('tab4.html', contracts=contracts)
     except Exception as e:
-        current_app.logger.error(f"Error loading tab 4: {str(e)}", exc_info=True)
-        return jsonify({'error': 'Failed to load tab data'}), 500
-
-@tab4_bp.route('/tab/4/subcat_data')
-def tab4_subcat_data():
-    # Route removed as subcategory layer is being eliminated
-    return jsonify({'error': 'Subcategory layer removed'}), 410
+        current_app.logger.error(f"Error rendering Tab 4: {str(e)}", exc_info=True)
+        return render_template('tab4.html', contracts=[])
 
 @tab4_bp.route('/tab/4/common_names')
-def tab4_common_names():
+def get_common_names():
+    category = request.args.get('category')
+    contract_number = request.args.get('contract_number')
+    page = int(request.args.get('page', 1))
+    per_page = 10
+
+    if not category or not contract_number:
+        return jsonify({'error': 'Category and contract number are required'}), 400
+
     try:
-        contract_num = request.args.get('category')  # Contract number
-        page = int(request.args.get('page', 1))
-        per_page = 20
-        offset = (page - 1) * per_page
+        session = db.session()
 
-        if not contract_num:
-            return jsonify({'error': 'Contract parameter is required'}), 400
+        # Fetch rental class IDs for this category
+        base_mappings = session.query(RentalClassMapping).filter_by(category=category).all()
+        user_mappings = session.query(UserRentalClassMapping).filter_by(category=category).all()
 
-        current_app.logger.debug(f"Fetching common names for contract: {contract_num}")
+        mappings_dict = {m.rental_class_id: {'category': m.category, 'subcategory': m.subcategory} for m in base_mappings}
+        for um in user_mappings:
+            mappings_dict[um.rental_class_id] = {'category-written": "Tim Sandahl", 'subcategory': um.subcategory}
 
-        # Fetch common names for this contract (Items on This Contract)
-        base_query = db.session.query(
-            func.trim(func.upper(ItemMaster.common_name)).label('common_name'),
-            func.count(ItemMaster.tag_id).label('items_on_contract')
+        rental_class_ids = list(mappings_dict.keys())
+
+        # Fetch common names for items on this contract
+        common_names_query = session.query(
+            Transaction.common_name,
+            func.count(Transaction.tag_id).label('on_contracts')
         ).filter(
-            func.lower(ItemMaster.status).in_(['on rent', 'delivered']),
-            ItemMaster.last_contract_num == contract_num,
-            func.lower(ItemMaster.last_contract_num).like('l%')
+            Transaction.contract_number == contract_number,
+            Transaction.scan_type == 'Rental',
+            func.trim(func.upper(func.cast(Transaction.rental_class_num, db.String))).in_(rental_class_ids),
+            Transaction.tag_id == ItemMaster.tag_id,
+            ItemMaster.status.in_(['On Rent', 'Delivered'])
         ).group_by(
-            func.trim(func.upper(ItemMaster.common_name))
-        )
-
-        total_common_names = base_query.count()
-        common_names = base_query.order_by(
-            func.trim(func.upper(ItemMaster.common_name))
-        ).offset(offset).limit(per_page).all()
-
-        # Fetch total items in inventory for each common name (across all contracts, regardless of status)
-        total_items_inventory = db.session.query(
-            func.trim(func.upper(ItemMaster.common_name)).label('common_name'),
-            func.count(ItemMaster.tag_id).label('total_items_inventory')
-        ).group_by(
-            func.trim(func.upper(ItemMaster.common_name))
+            Transaction.common_name
         ).all()
 
-        total_items_dict = {name: total for name, total in total_items_inventory if name is not None}
+        common_names = []
+        for name, on_contracts in common_names_query:
+            if not name:
+                continue
 
-        # Fetch hand-counted items for this contract
-        hand_counted_common_names = db.session.query(
-            HandCountedItems.item_name.label('common_name'),
-            func.sum(HandCountedItems.quantity).label('hand_counted_total')
-        ).filter(
-            HandCountedItems.contract_number == contract_num,
-            HandCountedItems.action == 'Added'
-        ).group_by(
-            HandCountedItems.item_name
-        ).all()
+            # Total items in inventory for this common name
+            total_items_inventory = session.query(func.count(ItemMaster.tag_id)).filter(
+                func.trim(func.upper(func.cast(ItemMaster.rental_class_num, db.String))).in_(rental_class_ids),
+                ItemMaster.common_name == name
+            ).scalar()
 
-        # Convert common names to a dictionary for merging
-        common_dict = {
-            name: {
-                'items_on_contract': items_on_contract,
-            }
-            for name, items_on_contract in common_names
-            if name is not None
-        }
-
-        # Merge hand-counted items into the common names
-        for h_name, h_total in hand_counted_common_names:
-            # Find common names that could correspond to this hand-counted item
-            matching_common_names = [name for name in common_dict.keys() if func.lower(name) == func.lower(h_name)]
-            if matching_common_names:
-                for name in matching_common_names:
-                    common_dict[name]['items_on_contract'] += h_total
-            else:
-                # If no matching common name, add as a new entry
-                common_dict[h_name] = {
-                    'items_on_contract': h_total,
-                }
-
-        # Add total items in inventory to each common name
-        common_names_data = [
-            {
+            common_names.append({
                 'name': name,
-                'total_items_inventory': total_items_dict.get(name, 0),
-                'items_on_contract': data['items_on_contract'],
-            }
-            for name, data in common_dict.items()
-        ]
+                'on_contracts': on_contracts or 0,
+                'total_items_inventory': total_items_inventory or 0
+            })
 
-        current_app.logger.debug(f"Common names for contract {contract_num}: {common_names_data}")
+        # Paginate common names
+        total_common_names = len(common_names)
+        start = (page - 1) * per_page
+        end = start + per_page
+        paginated_common_names = common_names[start:end]
 
+        session.close()
         return jsonify({
-            'common_names': common_names_data,
+            'common_names': paginated_common_names,
             'total_common_names': total_common_names,
             'page': page,
             'per_page': per_page
         })
     except Exception as e:
-        current_app.logger.error(f"Error fetching common names for contract {contract_num}: {str(e)}", exc_info=True)
-        return jsonify({'error': f'Failed to fetch common names: {str(e)}'}), 500
+        current_app.logger.error(f"Error fetching common names for contract {contract_number}, category {category}: {str(e)}")
+        return jsonify({'error': 'Failed to fetch common names'}), 500
 
 @tab4_bp.route('/tab/4/data')
-def tab4_data():
+def get_data():
+    category = request.args.get('category')
+    contract_number = request.args.get('contract_number')
+    common_name = request.args.get('common_name')
+    page = int(request.args.get('page', 1))
+    per_page = 10
+
+    if not category or not contract_number or not common_name:
+        return jsonify({'error': 'Category, contract number, and common name are required'}), 400
+
     try:
-        contract_num = request.args.get('category')
-        common_name = request.args.get('common_name')
-        page = int(request.args.get('page', 1))
-        per_page = 20
-        offset = (page - 1) * per_page
+        session = db.session()
 
-        if not contract_num or not common_name:
-            return jsonify({'error': 'Contract and common_name parameters are required'}), 400
+        # Fetch rental class IDs for this category
+        base_mappings = session.query(RentalClassMapping).filter_by(category=category).all()
+        user_mappings = session.query(UserRentalClassMapping).filter_by(category=category).all()
 
-        current_app.logger.debug(f"Fetching items for contract {contract_num}, common_name {common_name}, page {page}")
+        mappings_dict = {m.rental_class_id: {'category': m.category, 'subcategory': m.subcategory} for m in base_mappings}
+        for um in user_mappings:
+            mappings_dict[um.rental_class_id] = {'category': um.category, 'subcategory': um.subcategory}
 
-        # Base query for items
-        base_query = db.session.query(ItemMaster).filter(
-            func.lower(ItemMaster.status).in_(['on rent', 'delivered']),
-            ItemMaster.last_contract_num == contract_num,
-            func.lower(ItemMaster.last_contract_num).like('l%'),
-            func.trim(func.upper(ItemMaster.common_name)) == func.trim(func.upper(common_name))
+        rental_class_ids = list(mappings_dict.keys())
+
+        # Fetch items on this contract
+        query = session.query(Transaction, ItemMaster).join(
+            ItemMaster,
+            Transaction.tag_id == ItemMaster.tag_id
+        ).filter(
+            Transaction.contract_number == contract_number,
+            Transaction.scan_type == 'Rental',
+            func.trim(func.upper(func.cast(Transaction.rental_class_num, db.String))).in_(rental_class_ids),
+            Transaction.common_name == common_name,
+            ItemMaster.status.in_(['On Rent', 'Delivered'])
         )
 
-        # Get total items for pagination
-        total_items = base_query.count()
+        # Paginate items
+        total_items = query.count()
+        items = query.order_by(Transaction.tag_id).offset((page - 1) * per_page).limit(per_page).all()
 
-        # Apply pagination
-        items = base_query.order_by(ItemMaster.tag_id).offset(offset).limit(per_page).all()
-
-        current_app.logger.debug(f"Items for contract {contract_num}, common_name {common_name}: {len(items)} items found (total {total_items})")
-
-        items_data = [
-            {
+        items_data = []
+        for transaction, item in items:
+            last_scanned_date = item.date_last_scanned.isoformat() if item.date_last_scanned else 'N/A'
+            items_data.append({
                 'tag_id': item.tag_id,
                 'common_name': item.common_name,
                 'bin_location': item.bin_location,
                 'status': item.status,
                 'last_contract_num': item.last_contract_num,
-                'last_scanned_date': item.date_last_scanned.strftime('%m/%d/%Y, %I:%M:%S %p') if item.date_last_scanned else 'N/A',
-            }
-            for item in items
-        ]
+                'last_scanned_date': last_scanned_date
+            })
 
+        session.close()
         return jsonify({
             'items': items_data,
             'total_items': total_items,
@@ -269,115 +236,5 @@ def tab4_data():
             'per_page': per_page
         })
     except Exception as e:
-        current_app.logger.error(f"Error fetching data for contract {contract_num}, common_name {common_name}: {str(e)}", exc_info=True)
-        return jsonify({'error': f'Failed to fetch data: {str(e)}'}), 500
-
-@tab4_bp.route('/tab/4/add_hand_counted_item', methods=['POST'])
-def add_hand_counted_item():
-    try:
-        data = request.get_json()
-        contract_number = data.get('contract_number')
-        item_name = data.get('item_name')
-        quantity = data.get('quantity')
-        action = data.get('action')
-        employee_name = data.get('employee_name')
-
-        if not all([contract_number, item_name, quantity, action, employee_name]):
-            return jsonify({'error': 'Missing required fields'}), 400
-
-        hand_counted_item = HandCountedItems(
-            contract_number=contract_number,
-            item_name=item_name,
-            quantity=quantity,
-            action=action,
-            timestamp=datetime.utcnow(),
-            user=employee_name
-        )
-        db.session.add(hand_counted_item)
-        db.session.commit()
-
-        current_app.logger.info(f"Added hand-counted item: {item_name} (Qty: {quantity}) to contract {contract_number} by {employee_name}")
-
-        return jsonify({'message': 'Item added successfully'})
-    except Exception as e:
-        db.session.rollback()
-        current_app.logger.error(f"Error adding hand-counted item: {str(e)}", exc_info=True)
-        return jsonify({'error': 'Failed to add item'}), 500
-
-@tab4_bp.route('/tab/4/remove_hand_counted_item', methods=['POST'])
-def remove_hand_counted_item():
-    try:
-        data = request.get_json()
-        contract_number = data.get('contract_number')
-        item_name = data.get('item_name')
-        quantity = data.get('quantity')
-        action = data.get('action')
-        employee_name = data.get('employee_name')
-
-        if not all([contract_number, item_name, quantity, action, employee_name]):
-            return jsonify({'error': 'Missing required fields'}), 400
-
-        # Calculate the current total quantity for this contract and item
-        current_total = db.session.query(
-            func.sum(HandCountedItems.quantity).label('total')
-        ).filter(
-            HandCountedItems.contract_number == contract_number,
-            HandCountedItems.item_name == item_name,
-            HandCountedItems.action == 'Added'
-        ).scalar() or 0
-
-        removed_total = db.session.query(
-            func.sum(HandCountedItems.quantity).label('total')
-        ).filter(
-            HandCountedItems.contract_number == contract_number,
-            HandCountedItems.item_name == item_name,
-            HandCountedItems.action == 'Removed'
-        ).scalar() or 0
-
-        net_quantity = current_total - removed_total
-        if net_quantity < quantity:
-            return jsonify({'error': f'Cannot remove {quantity} items. Only {net_quantity} items are available.'}), 400
-
-        # Log the removal as a new entry
-        hand_counted_item = HandCountedItems(
-            contract_number=contract_number,
-            item_name=item_name,
-            quantity=quantity,
-            action=action,
-            timestamp=datetime.utcnow(),
-            user=employee_name
-        )
-        db.session.add(hand_counted_item)
-        db.session.commit()
-
-        current_app.logger.info(f"Removed hand-counted item: {item_name} (Qty: {quantity}) from contract {contract_number} by {employee_name}")
-
-        return jsonify({'message': 'Item removed successfully'})
-    except Exception as e:
-        db.session.rollback()
-        current_app.logger.error(f"Error removing hand-counted item: {str(e)}", exc_info=True)
-        return jsonify({'error': 'Failed to remove item'}), 500
-
-@tab4_bp.route('/tab/4/hand_counted_items')
-def get_hand_counted_items():
-    try:
-        items = db.session.query(HandCountedItems).order_by(HandCountedItems.timestamp.desc()).all()
-
-        html = ''
-        for item in items:
-            # Format timestamp to MM/DD/YYYY, h:mm:ss AM/PM
-            formatted_timestamp = item.timestamp.strftime('%m/%d/%Y, %I:%M:%S %p') if item.timestamp else 'N/A'
-            html += f'''
-                <tr>
-                    <td>{item.contract_number}</td>
-                    <td>{item.item_name}</td>
-                    <td>{item.quantity}</td>
-                    <td>{item.action}</td>
-                    <td>{formatted_timestamp}</td>
-                    <td>{item.user}</td>
-                </tr>
-            '''
-        return html
-    except Exception as e:
-        current_app.logger.error(f"Error fetching hand-counted items: {str(e)}", exc_info=True)
-        return '<tr><td colspan="6">Error loading hand-counted items</td></tr>'
+        current_app.logger.error(f"Error fetching items for contract {contract_number}, category {category}, common_name {common_name}: {str(e)}")
+        return jsonify({'error': 'Failed to fetch items'}), 500

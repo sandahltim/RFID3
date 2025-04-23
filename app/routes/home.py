@@ -1,80 +1,76 @@
-from flask import Blueprint, render_template, current_app, jsonify, request
-from .. import db, cache
+from flask import Blueprint, render_template, current_app
+from .. import db
 from ..models.db_models import ItemMaster, Transaction
 from sqlalchemy import func
-from time import time
 
 home_bp = Blueprint('home', __name__)
 
 @home_bp.route('/')
-@cache.cached(timeout=30)
-def index():
+def home():
     try:
-        # Clear cache to ensure fresh data
-        cache.clear()
-        current_app.logger.info("Cleared cache for homepage")
+        session = db.session()
 
-        # Use DISTINCT to avoid counting duplicate tag_ids, exclude suspicious tag_ids
-        total_items = db.session.query(func.count(func.distinct(ItemMaster.tag_id))).filter(
-            ItemMaster.tag_id.notlike('7070%')  # Exclude suspicious tag_ids
-        ).scalar() or 0
-        current_app.logger.debug(f"Total distinct items: {total_items}")
+        # Total items (all items in id_item_master)
+        total_items = session.query(func.count(ItemMaster.tag_id)).scalar()
 
-        status_counts = db.session.query(
-            func.coalesce(ItemMaster.status, 'Unknown').label('status'),
-            func.count(func.distinct(ItemMaster.tag_id)).label('count')
+        # Items on rent (status = 'On Rent' or 'Delivered')
+        items_on_rent = session.query(func.count(ItemMaster.tag_id)).filter(
+            ItemMaster.status.in_(['On Rent', 'Delivered'])
+        ).scalar()
+
+        # Items in service logic:
+        # 1. Status is not 'Ready to Rent', 'On Rent', or 'Delivered', OR
+        # 2. Most recent transaction has service_required = true
+        # First, get items with non-ready status
+        items_in_service_status = session.query(func.count(ItemMaster.tag_id)).filter(
+            ~ItemMaster.status.in_(['Ready to Rent', 'On Rent', 'Delivered'])
+        ).scalar()
+
+        # Then, get items with service_required = true in their most recent transaction
+        subquery = session.query(
+            Transaction.tag_id,
+            Transaction.scan_date,
+            Transaction.service_required
         ).filter(
-            ItemMaster.tag_id.notlike('7070%')  # Exclude suspicious tag_ids
-        ).group_by(
-            func.coalesce(ItemMaster.status, 'Unknown')
-        ).all()
-        current_app.logger.debug(f"Status counts: {status_counts}")
-
-        status_breakdown = {status: count for status, count in status_counts}
-
-        # Fetch recent scans, ensuring distinct tag_ids and excluding suspicious patterns
-        recent_scans = db.session.query(ItemMaster).filter(
-            ItemMaster.tag_id.notlike('7070%')  # Exclude suspicious tag_ids
+            Transaction.tag_id == ItemMaster.tag_id
         ).order_by(
-            ItemMaster.date_last_scanned.desc()
-        ).limit(5).all()
-        recent_scans = [
-            {
-                'tag_id': item.tag_id,
-                'common_name': item.common_name,
-                'date_last_scanned': item.date_last_scanned.strftime('%m/%d/%Y, %I:%M:%S %p') if item.date_last_scanned else 'N/A'
-            }
-            for item in recent_scans
-        ]
-        current_app.logger.debug(f"Recent scans: {recent_scans}")
+            Transaction.scan_date.desc()
+        ).subquery()
 
-        return render_template(
-            'home.html',
-            total_items=total_items,
-            status_counts=status_counts,
-            recent_scans=recent_scans,
-            cache_bust=int(time()),
-            timestamp=lambda: int(time())
-        )
-    except Exception as e:
-        current_app.logger.error(f"Error loading home page: {str(e)}", exc_info=True)
-        return render_template('home.html', error="Failed to load dashboard data")
-
-@home_bp.route('/get_contract_date')
-def get_contract_date():
-    try:
-        contract_number = request.args.get('contract_number')
-        if not contract_number:
-            return jsonify({'error': 'Contract number is required'}), 400
-
-        # Fetch the earliest transaction date for this contract
-        transaction = db.session.query(
-            func.min(Transaction.date_created).label('date')
+        items_service_required = session.query(func.count(ItemMaster.tag_id)).join(
+            subquery,
+            ItemMaster.tag_id == subquery.c.tag_id
         ).filter(
-            Transaction.contract_number == contract_number
-        ).first()
+            subquery.c.scan_date == session.query(func.max(Transaction.scan_date)).filter(Transaction.tag_id == ItemMaster.tag_id).correlate(ItemMaster).scalar_subquery(),
+            subquery.c.service_required == True
+        ).scalar()
 
-        return jsonify({'date': transaction.date.isoformat() if transaction.date else None})
+        # Combine both counts, avoiding double-counting
+        items_in_service = session.query(func.count(ItemMaster.tag_id)).filter(
+            (ItemMaster.status.notin_(['Ready to Rent', 'On Rent', 'Delivered'])) |
+            (ItemMaster.tag_id.in_(
+                session.query(subquery.c.tag_id).filter(
+                    subquery.c.scan_date == session.query(func.max(Transaction.scan_date)).filter(Transaction.tag_id == subquery.c.tag_id).correlate(subquery).scalar_subquery(),
+                    subquery.c.service_required == True
+                )
+            ))
+        ).scalar()
+
+        # Items available (status = 'Ready to Rent')
+        items_available = session.query(func.count(ItemMaster.tag_id)).filter(
+            ItemMaster.status == 'Ready to Rent'
+        ).scalar()
+
+        session.close()
+        return render_template('home.html', 
+                              total_items=total_items or 0,
+                              items_on_rent=items_on_rent or 0,
+                              items_in_service=items_in_service or 0,
+                              items_available=items_available or 0)
     except Exception as e:
-        current_app.logger.error(f"Error fetching contract date: {str(e)}", exc_info=True)
-        return jsonify({'error': 'Failed to fetch contract date'}), 500
+        current_app.logger.error(f"Error rendering home page: {str(e)}", exc_info=True)
+        return render_template('home.html', 
+                              total_items=0,
+                              items_on_rent=0,
+                              items_in_service=0,
+                              items_available=0)
