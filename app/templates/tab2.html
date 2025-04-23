@@ -55,9 +55,11 @@
             <tr id="category-row-{{ contract.contract_number }}">
                 <td>{{ contract.contract_number }}</td>
                 <td>{{ contract.client_name }}</td>
-                <td>
+                <td class="category-cell">
                     {% for category in contract.categories %}
-                    {{ category.category }} ({{ category.items_on_contract }} on contract, {{ category.total_items_inventory }} in inventory)<br>
+                    <div class="category-item">
+                        {{ category.category }} ({{ category.items_on_contract }} on contract, {{ category.total_items_inventory }} in inventory)
+                    </div>
                     {% endfor %}
                 </td>
                 <td>{{ contract.scan_date }}</td>
