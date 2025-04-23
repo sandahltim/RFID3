@@ -23,13 +23,16 @@ def tab3_view():
             func.coalesce(RentalClassMapping.category, 'Unclassified').label('category'),
             func.count(ItemMaster.tag_id).label('total_items'),
             func.count(case(
-                [(func.lower(ItemMaster.status).in_(['on rent', 'delivered']), ItemMaster.tag_id)], else_=None
+                (func.lower(ItemMaster.status).in_(['on rent', 'delivered']), ItemMaster.tag_id),
+                else_=None
             )).label('on_contracts'),
             func.count(case(
-                [(func.lower(ItemMaster.status) == 'in service', ItemMaster.tag_id)], else_=None
+                (func.lower(ItemMaster.status) == 'in service', ItemMaster.tag_id),
+                else_=None
             )).label('in_service'),
             func.count(case(
-                [(func.lower(ItemMaster.status) == 'available', ItemMaster.tag_id)], else_=None
+                (func.lower(ItemMaster.status) == 'available', ItemMaster.tag_id),
+                else_=None
             )).label('available')
         ).outerjoin(
             RentalClassMapping, RentalClassMapping.rental_class_id == ItemMaster.rental_class_num
@@ -107,13 +110,16 @@ def tab3_subcat_data():
             func.coalesce(RentalClassMapping.subcategory, 'Unclassified').label('subcategory'),
             func.count(ItemMaster.tag_id).label('total_items'),
             func.count(case(
-                [(func.lower(ItemMaster.status).in_(['on rent', 'delivered']), ItemMaster.tag_id)], else_=None
+                (func.lower(ItemMaster.status).in_(['on rent', 'delivered']), ItemMaster.tag_id),
+                else_=None
             )).label('on_contracts'),
             func.count(case(
-                [(func.lower(ItemMaster.status) == 'in service', ItemMaster.tag_id)], else_=None
+                (func.lower(ItemMaster.status) == 'in service', ItemMaster.tag_id),
+                else_=None
             )).label('in_service'),
             func.count(case(
-                [(func.lower(ItemMaster.status) == 'available', ItemMaster.tag_id)], else_=None
+                (func.lower(ItemMaster.status) == 'available', ItemMaster.tag_id),
+                else_=None
             )).label('available')
         ).outerjoin(
             RentalClassMapping, RentalClassMapping.rental_class_id == ItemMaster.rental_class_num
@@ -238,13 +244,16 @@ def tab3_common_names():
                 func.trim(func.upper(ItemMaster.common_name)).label('common_name'),
                 func.count(ItemMaster.tag_id).label('total_items'),
                 func.count(case(
-                    [(func.lower(ItemMaster.status).in_(['on rent', 'delivered']), ItemMaster.tag_id)], else_=None
+                    (func.lower(ItemMaster.status).in_(['on rent', 'delivered']), ItemMaster.tag_id),
+                    else_=None
                 )).label('on_contracts'),
                 func.count(case(
-                    [(func.lower(ItemMaster.status) == 'in service', ItemMaster.tag_id)], else_=None
+                    (func.lower(ItemMaster.status) == 'in service', ItemMaster.tag_id),
+                    else_=None
                 )).label('in_service'),
                 func.count(case(
-                    [(func.lower(ItemMaster.status) == 'available', ItemMaster.tag_id)], else_=None
+                    (func.lower(ItemMaster.status) == 'available', ItemMaster.tag_id),
+                    else_=None
                 )).label('available')
             ).outerjoin(
                 RentalClassMapping, RentalClassMapping.rental_class_id == ItemMaster.rental_class_num
@@ -265,13 +274,16 @@ def tab3_common_names():
                 func.trim(func.upper(ItemMaster.common_name)).label('common_name'),
                 func.count(ItemMaster.tag_id).label('total_items'),
                 func.count(case(
-                    [(func.lower(ItemMaster.status).in_(['on rent', 'delivered']), ItemMaster.tag_id)], else_=None
+                    (func.lower(ItemMaster.status).in_(['on rent', 'delivered']), ItemMaster.tag_id),
+                    else_=None
                 )).label('on_contracts'),
                 func.count(case(
-                    [(func.lower(ItemMaster.status) == 'in service', ItemMaster.tag_id)], else_=None
+                    (func.lower(ItemMaster.status) == 'in service', ItemMaster.tag_id),
+                    else_=None
                 )).label('in_service'),
                 func.count(case(
-                    [(func.lower(ItemMaster.status) == 'available', ItemMaster.tag_id)], else_=None
+                    (func.lower(ItemMaster.status) == 'available', ItemMaster.tag_id),
+                    else_=None
                 )).label('available')
             ).join(
                 RentalClassMapping, RentalClassMapping.rental_class_id == ItemMaster.rental_class_num
