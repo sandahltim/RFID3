@@ -1,5 +1,5 @@
 from flask import Blueprint, render_template, request, jsonify, current_app
-from .. import db
+from .. import db, cache
 from ..models.db_models import RentalClassMapping, ItemMaster
 from sqlalchemy import func, desc
 from time import time
@@ -7,10 +7,12 @@ from time import time
 categories_bp = Blueprint('categories', __name__)
 
 @categories_bp.route('/categories', methods=['GET'])
+@cache.cached(timeout=0)  # Disable caching for this endpoint
 def manage_categories():
     try:
         # Fetch all rental class mappings
         mappings = RentalClassMapping.query.order_by(RentalClassMapping.category, RentalClassMapping.rental_class_id).all()
+        current_app.logger.info(f"Fetched {len(mappings)} mappings from database")
         
         # Subquery to find the most common common_name for each rental_class_num in ItemMaster
         subquery = db.session.query(
@@ -140,9 +142,11 @@ def update_mapping():
                 deduplicated_data[rental_class_id] = item
 
         # Clear existing mappings
-        RentalClassMapping.query.delete()
+        deleted_count = RentalClassMapping.query.delete()
+        current_app.logger.info(f"Deleted {deleted_count} existing mappings")
 
         # Add deduplicated mappings
+        added_mappings = []
         for rental_class_id, item in deduplicated_data.items():
             mapping = RentalClassMapping(
                 category=item.get('category'),
@@ -150,10 +154,39 @@ def update_mapping():
                 rental_class_id=rental_class_id
             )
             db.session.add(mapping)
+            added_mappings.append({
+                'rental_class_id': rental_class_id,
+                'category': item.get('category'),
+                'subcategory': item.get('subcategory')
+            })
 
         db.session.commit()
+        current_app.logger.info(f"Added {len(added_mappings)} mappings: {added_mappings}")
+
+        # Verify the data in the database after commit
+        mappings_after_commit = RentalClassMapping.query.all()
+        current_app.logger.info(f"Mappings in database after commit: {len(mappings_after_commit)} entries")
+        current_app.logger.debug(f"Database mappings: {[{ 'rental_class_id': m.rental_class_id, 'category': m.category, 'subcategory': m.subcategory } for m in mappings_after_commit]}")
+
         return jsonify({'message': 'Mappings updated successfully'})
     except Exception as e:
         db.session.rollback()
-        current_app.logger.error(f"Error updating category mappings: {str(e)}")
+        current_app.logger.error(f"Error updating category mappings: {str(e)}", exc_info=True)
         return jsonify({'error': 'Failed to update mappings'}), 500
+
+@categories_bp.route('/categories/delete', methods=['POST'])
+def delete_mapping():
+    try:
+        data = request.get_json()
+        rental_class_id = data.get('rental_class_id')
+        if not rental_class_id:
+            return jsonify({'error': 'Rental Class ID is required'}), 400
+
+        deleted = RentalClassMapping.query.filter_by(rental_class_id=rental_class_id).delete()
+        db.session.commit()
+        current_app.logger.info(f"Deleted mapping with rental_class_id {rental_class_id}, {deleted} rows affected")
+        return jsonify({'message': 'Mapping deleted successfully'})
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Error deleting category mapping with rental_class_id {rental_class_id}: {str(e)}", exc_info=True)
+        return jsonify({'error': 'Failed to delete mapping'}), 500
