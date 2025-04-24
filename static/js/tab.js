@@ -1,9 +1,9 @@
 console.log('tab.js loaded, cachedTabNum:', window.cachedTabNum);
 
-// Define applyFilters early to ensure it's available
+// Define applyFilters immediately to ensure availability
 window.applyFilters = function() {
     console.log('Applying filters');
-    const textQuery = document.getElementById('category-filter') ? document.getElementById('category-filter').value.toLowerCase() : '';
+    const textQuery = document.getElementById('category-filter') ? document.getElementById('category-filter').value.toLowerCase() : document.getElementById('searchInput') ? document.getElementById('searchInput').value.toLowerCase() : '';
     const categoryFilter = document.getElementById('categoryFilter') ? document.getElementById('categoryFilter').value.toLowerCase() : '';
     const statusFilter = document.getElementById('statusFilter') ? document.getElementById('statusFilter').value.toLowerCase() : '';
     const binLocationFilter = document.getElementById('binFilter') ? document.getElementById('binFilter').value.toLowerCase() : '';
@@ -86,7 +86,7 @@ async function printTable(level, id, commonName = null, category = null, subcate
     let tableWrapper;
 
     if (level === 'Common Name' && commonName && category) {
-        const url = `/tab/${tabNum}/data?common_name=${encodeURIComponent(commonName)}&category=${encodeURIComponent(category)}` + (subcategory ? `&subcategory=${encodeURIComponent(subcategory)}` : '');
+        const url = `/tab/${tabNum}/data?common_name=${encodeURIComponent(commonName)}&contract_number=${encodeURIComponent(category)}` + (subcategory ? `&subcategory=${encodeURIComponent(subcategory)}` : '');
         const response = await fetch(url);
         const data = await response.json();
         const items = data.items || [];
