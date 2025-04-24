@@ -48,4 +48,5 @@ def health_check():
         status["overall"] = "unhealthy"
 
     status_code = 200 if status["overall"] == "healthy" else 503
+    current_app.logger.info(f"Health check status: {status}")
     return jsonify(status), status_code
