@@ -136,13 +136,13 @@ def update_mappings():
             subcategory = mapping.get('subcategory', '')
 
             if not rental_class_id or not category:
-                current_app.logger.warning(f"Skipping invalid mapping: {mapping}")
+                current_app.logger.warning(f"Skipping invalid mapping due to missing rental_class_id or category: {mapping}")
                 continue
 
             user_mapping = UserRentalClassMapping(
                 rental_class_id=rental_class_id,
                 category=category,
-                subcategory=subcategory
+                subcategory=subcategory or ''
             )
             session.add(user_mapping)
             current_app.logger.debug(f"Added mapping: rental_class_id={rental_class_id}, category={category}, subcategory={subcategory}")
