@@ -2,22 +2,12 @@
 
 {% block content %}
 <div class="container mt-4">
-    <!-- Page title for Tab 2 -->
+    <!-- Page title -->
     <h2>Open Contracts</h2>
     <!-- Filter and search row -->
     <div class="row mb-3">
         <div class="col">
-            <input type="text" class="form-control" placeholder="Search common name, tag id, etc." id="searchInput">
-        </div>
-        <div class="col">
-            <select class="form-control" id="categoryFilter">
-                <option value="">All Classes</option>
-                {% for contract in contracts %}
-                {% for category in contract.categories %}
-                <option value="{{ category.category }}">{{ category.category }}</option>
-                {% endfor %}
-                {% endfor %}
-            </select>
+            <input type="text" class="form-control" placeholder="Search contract number, customer name, etc." id="searchInput">
         </div>
         <div class="col">
             <select class="form-control" id="statusFilter">
@@ -29,10 +19,9 @@
         <div class="col">
             <select class="form-control" id="binFilter">
                 <option value="">All Bin Locations</option>
-                <option value="resale">resale</option>
-                <option value="sold">sold</option>
-                <option value="pack">pack</option>
-                <option value="burst">burst</option>
+                {% for bin in ['resale', 'sold', 'pack', 'burst'] %}
+                <option value="{{ bin }}">{{ bin }}</option>
+                {% endfor %}
             </select>
         </div>
         <div class="col">
@@ -41,37 +30,33 @@
     </div>
     <!-- Table for displaying contracts -->
     <table class="table table-bordered" id="category-table">
-        <thead>
-            <tr id="category-table-header">
+        <thead id="category-table-header">
+            <tr>
                 <th>Contract Number</th>
                 <th>Customer Name</th>
-                <th>Categories</th>
+                <th>Items on Contract</th>
+                <th>Total Items in Inventory</th>
                 <th>Last Scanned Date</th>
                 <th>Actions</th>
             </tr>
         </thead>
         <tbody id="category-rows">
             {% for contract in contracts %}
-            <tr id="category-row-{{ contract.contract_number }}">
+            <tr>
                 <td>{{ contract.contract_number }}</td>
                 <td>{{ contract.client_name }}</td>
-                <td class="category-cell">
-                    {% for category in contract.categories %}
-                    <div class="category-item">
-                        {{ category.category }} ({{ category.items_on_contract }} on contract, {{ category.total_items_inventory }} in inventory)
-                    </div>
-                    {% endfor %}
-                </td>
+                <td>{{ contract.items_on_contract }}</td>
+                <td>{{ contract.total_items_inventory }}</td>
                 <td>{{ contract.scan_date }}</td>
                 <td>
-                    <button class="btn btn-sm btn-secondary expand-btn" onclick="window.expandCategory('{{ contract.contract_number | urlencode | replace('\'', '\\\'') | replace('\"', '\\\"') }}', 'common-{{ contract.contract_number }}', '{{ contract.contract_number | urlencode | replace('\'', '\\\'') | replace('\"', '\\\"') }}')">Expand</button>
+                    <button class="btn btn-sm btn-secondary expand-btn" onclick="window.expandCategory('{{ contract.contract_number | urlencode | replace('\'', '\\\'') | replace('"', '\\"') }}', 'common-{{ contract.contract_number }}', '{{ contract.contract_number | urlencode | replace('\'', '\\\'') | replace('"', '\\"') }}')">Expand</button>
                     <button class="btn btn-sm btn-secondary collapse-btn" style="display:none;" onclick="collapseSection('common-{{ contract.contract_number }}')">Collapse</button>
-                    <button class="btn btn-sm btn-info print-btn" data-print-level="Contract" data-print-id="category-row-{{ contract.contract_number }}">Print</button>
+                    <button class="btn btn-sm btn-info print-btn" data-print-level="Contract" data-print-id="category-table">Print</button>
                     <div id="loading-{{ contract.contract_number }}" style="display:none;" class="loading">Loading...</div>
                 </td>
             </tr>
             <tr>
-                <td colspan="5">
+                <td colspan="6">
                     <div id="common-{{ contract.contract_number }}" class="expandable collapsed"></div>
                 </td>
             </tr>
@@ -83,12 +68,12 @@
 <!-- JavaScript for refreshing the table -->
 <script>
 function refreshTab() {
-    window.location.reload(); // Simple refresh for now
+    window.location.reload();
 }
 
-// Apply filters (already defined in tab.js)
-if (typeof applyFilters === 'function') {
-    applyFilters();
+// Apply filters to all tables based on user input
+if (typeof window.applyFilters === 'function') {
+    window.applyFilters();
 } else {
     console.error('applyFilters function is not defined');
 }
