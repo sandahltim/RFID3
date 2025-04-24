@@ -184,7 +184,7 @@ function removeHandCountedItem(contractNumber) {
 if (typeof window.applyFilters === 'function') {
     window.applyFilters();
 } else {
-    console.error('applyFilters function is not defined');
+    console.warn('applyFilters function is not available, skipping filter application');
 }
 </script>
 {% endblock %}
