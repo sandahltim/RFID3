@@ -34,48 +34,73 @@ def create_app():
     app.logger.debug(f"Static folder path: {app.static_folder}")
 
     # Database configuration
-    app.config['SQLALCHEMY_DATABASE_URI'] = (
-        f"mysql+mysqlconnector://{DB_CONFIG['user']}:{DB_CONFIG['password']}@"
-        f"{DB_CONFIG['host']}/{DB_CONFIG['database']}?charset={DB_CONFIG['charset']}"
-    )
-    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-    app.config['REDIS_URL'] = REDIS_URL
+    try:
+        app.config['SQLALCHEMY_DATABASE_URI'] = (
+            f"mysql+mysqlconnector://{DB_CONFIG['user']}:{DB_CONFIG['password']}@"
+            f"{DB_CONFIG['host']}/{DB_CONFIG['database']}?charset={DB_CONFIG['charset']}"
+        )
+        app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+        app.config['REDIS_URL'] = REDIS_URL
+        app.logger.info("Database and Redis configuration set successfully")
+    except Exception as e:
+        app.logger.error(f"Failed to set database/Redis configuration: {str(e)}", exc_info=True)
+        raise
 
     # Initialize extensions
-    db.init_app(app)
-    cache.init_app(app)
+    try:
+        db.init_app(app)
+        cache.init_app(app)
+        app.logger.info("Extensions initialized successfully")
+    except Exception as e:
+        app.logger.error(f"Failed to initialize extensions: {str(e)}", exc_info=True)
+        raise
 
     # Create database tables
-    with app.app_context():
-        app.logger.info("Creating database tables")
-        db.create_all()
-        app.logger.info("Database tables created")
+    try:
+        with app.app_context():
+            app.logger.info("Creating database tables")
+            db.create_all()
+            app.logger.info("Database tables created")
+    except Exception as e:
+        app.logger.error(f"Failed to create database tables: {str(e)}", exc_info=True)
+        raise
 
     # Import and register blueprints
-    from app.routes.home import home_bp
-    from app.routes.tab1 import tab1_bp
-    from app.routes.tab2 import tab2_bp
-    from app.routes.tab3 import tab3_bp
-    from app.routes.tab4 import tab4_bp
-    from app.routes.tab5 import tab5_bp
-    from app.routes.categories import categories_bp
-    from app.routes.health import health_bp
-    from app.services.refresh import refresh_bp
-    from app.routes.tabs import tabs_bp
+    try:
+        from app.routes.home import home_bp
+        from app.routes.tab1 import tab1_bp
+        from app.routes.tab2 import tab2_bp
+        from app.routes.tab3 import tab3_bp
+        from app.routes.tab4 import tab4_bp
+        from app.routes.tab5 import tab5_bp
+        from app.routes.categories import categories_bp
+        from app.routes.health import health_bp
+        from app.services.refresh import refresh_bp
+        from app.routes.tabs import tabs_bp
 
-    app.register_blueprint(home_bp)
-    app.register_blueprint(tab1_bp)
-    app.register_blueprint(tab2_bp)
-    app.register_blueprint(tab3_bp)
-    app.register_blueprint(tab4_bp)
-    app.register_blueprint(tab5_bp)
-    app.register_blueprint(categories_bp)
-    app.register_blueprint(health_bp)
-    app.register_blueprint(refresh_bp)
-    app.register_blueprint(tabs_bp)
+        app.register_blueprint(home_bp)
+        app.register_blueprint(tab1_bp)
+        app.register_blueprint(tab2_bp)
+        app.register_blueprint(tab3_bp)
+        app.register_blueprint(tab4_bp)
+        app.register_blueprint(tab5_bp)
+        app.register_blueprint(categories_bp)
+        app.register_blueprint(health_bp)
+        app.register_blueprint(refresh_bp)
+        app.register_blueprint(tabs_bp)
+        app.logger.info("Blueprints registered successfully")
+    except Exception as e:
+        app.logger.error(f"Failed to register blueprints: {str(e)}", exc_info=True)
+        raise
 
     # Initialize scheduler
-    from app.services.scheduler import init_scheduler
-    init_scheduler(app)
+    try:
+        from app.services.scheduler import init_scheduler
+        init_scheduler(app)
+        app.logger.info("Scheduler initialized successfully")
+    except Exception as e:
+        app.logger.error(f"Failed to initialize scheduler: {str(e)}", exc_info=True)
+        raise
 
+    app.logger.info("Application startup completed successfully")
     return app
