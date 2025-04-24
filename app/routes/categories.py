@@ -2,6 +2,7 @@ from flask import Blueprint, render_template, request, jsonify, current_app
 from .. import db
 from ..models.db_models import ItemMaster, RentalClassMapping, UserRentalClassMapping
 from sqlalchemy import func, text
+from sqlalchemy.exc import SQLAlchemyError
 from time import time
 
 categories_bp = Blueprint('categories', __name__)
@@ -112,6 +113,7 @@ def get_mappings():
 
 @categories_bp.route('/categories/update', methods=['POST'])
 def update_mappings():
+    session = None
     try:
         # Start a new session for this request
         session = db.session()
@@ -119,10 +121,10 @@ def update_mappings():
 
         # Get the new mappings from the request
         new_mappings = request.get_json()
-        current_app.logger.debug(f"Received new mappings: {new_mappings}")
+        current_app.logger.info(f"Received {len(new_mappings)} new mappings: {new_mappings}")
 
         if not isinstance(new_mappings, list):
-            session.close()
+            current_app.logger.error("Invalid data format received, expected a list")
             return jsonify({'error': 'Invalid data format, expected a list'}), 400
 
         # Clear existing user mappings
@@ -159,17 +161,25 @@ def update_mappings():
         raw_user_mappings = session.execute(text("SELECT rental_class_id, category, subcategory FROM user_rental_class_mappings")).fetchall()
         current_app.logger.info(f"Raw user mappings after commit: {[(row[0], row[1], row[2]) for row in raw_user_mappings]}")
 
-        session.close()
         return jsonify({'message': 'Mappings updated successfully'})
-    except Exception as e:
-        current_app.logger.error(f"Error updating mappings: {str(e)}", exc_info=True)
-        if 'session' in locals():
+    except SQLAlchemyError as e:
+        current_app.logger.error(f"Database error during update_mappings: {str(e)}", exc_info=True)
+        if session:
             session.rollback()
+        return jsonify({'error': f'Database error: {str(e)}'}), 500
+    except Exception as e:
+        current_app.logger.error(f"Unexpected error during update_mappings: {str(e)}", exc_info=True)
+        if session:
+            session.rollback()
+        return jsonify({'error': f'Unexpected error: {str(e)}'}), 500
+    finally:
+        if session:
             session.close()
-        return jsonify({'error': 'Failed to update mappings'}), 500
+            current_app.logger.info("Database session closed for update_mappings")
 
 @categories_bp.route('/categories/delete', methods=['POST'])
 def delete_mapping():
+    session = None
     try:
         session = db.session()
         data = request.get_json()
@@ -177,7 +187,6 @@ def delete_mapping():
 
         if not rental_class_id:
             current_app.logger.error("Missing rental_class_id in delete request")
-            session.close()
             return jsonify({'error': 'Rental class ID is required'}), 400
 
         current_app.logger.info(f"Deleting mapping for rental_class_id: {rental_class_id}")
@@ -189,11 +198,18 @@ def delete_mapping():
         remaining_mappings = session.query(UserRentalClassMapping).all()
         current_app.logger.info(f"Remaining user mappings after deletion: {[(m.rental_class_id, m.category, m.subcategory) for m in remaining_mappings]}")
 
-        session.close()
         return jsonify({'message': 'Mapping deleted successfully'})
-    except Exception as e:
-        current_app.logger.error(f"Error deleting mapping: {str(e)}")
-        if 'session' in locals():
+    except SQLAlchemyError as e:
+        current_app.logger.error(f"Database error during delete_mapping: {str(e)}", exc_info=True)
+        if session:
             session.rollback()
+        return jsonify({'error': f'Database error: {str(e)}'}), 500
+    except Exception as e:
+        current_app.logger.error(f"Unexpected error during delete_mapping: {str(e)}", exc_info=True)
+        if session:
+            session.rollback()
+        return jsonify({'error': f'Unexpected error: {str(e)}'}), 500
+    finally:
+        if session:
             session.close()
-        return jsonify({'error': 'Failed to delete mapping'}), 500
+            current_app.logger.info("Database session closed for delete_mapping")
