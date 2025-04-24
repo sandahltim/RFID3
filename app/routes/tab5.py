@@ -8,9 +8,15 @@ from time import time
 tab5_bp = Blueprint('tab5', __name__)
 
 @tab5_bp.route('/tab/5')
-@cache.cached(timeout=60)
 def tab5_view():
     try:
+        # Check if data is in cache
+        cache_key = 'tab5_view_data'
+        cached_data = cache.get(cache_key)
+        if cached_data is not None:
+            current_app.logger.info("Serving Tab 5 data from cache")
+            return render_template('tab5.html', categories=cached_data, cache_bust=int(time()))
+
         session = db.session()
         current_app.logger.info("Starting new session for tab5")
 
@@ -100,6 +106,10 @@ def tab5_view():
 
         category_data.sort(key=lambda x: x['category'])
         current_app.logger.info(f"Fetched {len(category_data)} categories for tab5")
+
+        # Cache the data
+        cache.set(cache_key, category_data, timeout=60)
+        current_app.logger.info("Cached Tab 5 data")
 
         session.close()
         return render_template('tab5.html', categories=category_data, cache_bust=int(time()))
