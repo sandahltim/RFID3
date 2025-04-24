@@ -2,9 +2,7 @@
 
 {% block content %}
 <div class="container mt-4">
-    <!-- Page title -->
     <h2>Laundry Contracts</h2>
-    <!-- Filter and search row -->
     <div class="row mb-3">
         <div class="col">
             <input type="text" class="form-control" placeholder="Search contract number, customer name, etc." id="searchInput">
@@ -28,7 +26,6 @@
             <button class="btn btn-primary" onclick="refreshTab()">Refresh</button>
         </div>
     </div>
-    <!-- Table for displaying contracts -->
     <table class="table table-bordered" id="category-table">
         <thead id="category-table-header">
             <tr>
@@ -178,13 +175,6 @@ function removeHandCountedItem(contractNumber) {
         console.error('Error removing hand-counted item:', error);
         alert('Failed to remove item');
     });
-}
-
-// Apply filters to all tables based on user input
-if (typeof window.applyFilters === 'function') {
-    window.applyFilters();
-} else {
-    console.warn('applyFilters function is not available, skipping filter application');
 }
 </script>
 {% endblock %}
