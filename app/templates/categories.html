@@ -17,7 +17,7 @@
         </thead>
         <tbody id="mappings-table">
             {% for category in categories %}
-            <tr data-rental-class-id="{{ category.rental_class_id }}">
+            <tr data-rental-class-id="{{ category.rental_class_id }}" data-original-category="{{ category.category }}" data-original-subcategory="{{ category.subcategory }}">
                 <td><input type="text" class="form-control category-input" value="{{ category.category }}"></td>
                 <td><input type="text" class="form-control subcategory-input" value="{{ category.subcategory }}"></td>
                 <td><input type="text" class="form-control rental-class-id-input" value="{{ category.rental_class_id }}"></td>
@@ -38,6 +38,8 @@
         const tableBody = document.getElementById('mappings-table');
         const row = document.createElement('tr');
         row.setAttribute('data-rental-class-id', mapping.rental_class_id);
+        row.setAttribute('data-original-category', mapping.category);
+        row.setAttribute('data-original-subcategory', mapping.subcategory);
         row.innerHTML = `
             <td><input type="text" class="form-control category-input" value="${mapping.category}"></td>
             <td><input type="text" class="form-control subcategory-input" value="${mapping.subcategory}"></td>
@@ -115,7 +117,9 @@
             if (!row) return true;
             const originalCategory = row.getAttribute('data-original-category') || '';
             const originalSubcategory = row.getAttribute('data-original-subcategory') || '';
-            return mapping.category !== originalCategory || mapping.subcategory !== originalSubcategory;
+            const currentCategory = mapping.category || '';
+            const currentSubcategory = mapping.subcategory || '';
+            return currentCategory !== originalCategory || currentSubcategory !== originalSubcategory;
         });
 
         console.log('Changed mappings:', changedMappings);
@@ -161,14 +165,7 @@
         .then(response => response.json())
         .then(data => {
             console.log('Loaded mappings:', data);
-            data.forEach(mapping => {
-                addMappingRow(mapping);
-                const row = document.querySelector(`tr[data-rental-class-id="${mapping.rental_class_id}"]`);
-                if (row) {
-                    row.setAttribute('data-original-category', mapping.category);
-                    row.setAttribute('data-original-subcategory', mapping.subcategory);
-                }
-            });
+            data.forEach(mapping => addMappingRow(mapping));
         })
         .catch(error => {
             console.error('Error loading mappings:', error);
