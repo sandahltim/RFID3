@@ -112,14 +112,25 @@
             return;
         }
 
-        const changedMappings = validMappings.filter(mapping => {
+        const changedMappings = [];
+        validMappings.forEach(mapping => {
             const row = document.querySelector(`tr[data-rental-class-id="${mapping.rental_class_id}"]`);
-            if (!row) return true;
-            const originalCategory = row.getAttribute('data-original-category') || '';
-            const originalSubcategory = row.getAttribute('data-original-subcategory') || '';
-            const currentCategory = mapping.category || '';
-            const currentSubcategory = mapping.subcategory || '';
-            return currentCategory !== originalCategory || currentSubcategory !== originalSubcategory;
+            if (!row) {
+                changedMappings.push(mapping);
+                console.log(`New mapping added:`, mapping);
+                return;
+            }
+            const originalCategory = (row.getAttribute('data-original-category') || '').trim();
+            const originalSubcategory = (row.getAttribute('data-original-subcategory') || '').trim();
+            const currentCategory = (mapping.category || '').trim();
+            const currentSubcategory = (mapping.subcategory || '').trim();
+
+            console.log(`Comparing rental_class_id=${mapping.rental_class_id}: originalCategory='${originalCategory}', currentCategory='${currentCategory}', originalSubcategory='${originalSubcategory}', currentSubcategory='${currentSubcategory}'`);
+
+            if (currentCategory !== originalCategory || currentSubcategory !== originalSubcategory) {
+                changedMappings.push(mapping);
+                console.log(`Change detected for rental_class_id=${mapping.rental_class_id}:`, { originalCategory, currentCategory, originalSubcategory, currentSubcategory });
+            }
         });
 
         console.log('Changed mappings:', changedMappings);
@@ -171,11 +182,5 @@
             console.error('Error loading mappings:', error);
             alert('Failed to load mappings');
         });
-
-    if (typeof window.applyFilters === 'function') {
-        window.applyFilters();
-    } else {
-        console.warn('applyFilters function is not available, skipping filter application');
-    }
 </script>
 {% endblock %}
