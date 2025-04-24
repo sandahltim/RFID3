@@ -1,5 +1,36 @@
 console.log('tab.js loaded, cachedTabNum:', window.cachedTabNum);
 
+// Define applyFilters early to ensure it's available
+window.applyFilters = function() {
+    console.log('Applying filters');
+    const textQuery = document.getElementById('category-filter') ? document.getElementById('category-filter').value.toLowerCase() : '';
+    const categoryFilter = document.getElementById('categoryFilter') ? document.getElementById('categoryFilter').value.toLowerCase() : '';
+    const statusFilter = document.getElementById('statusFilter') ? document.getElementById('statusFilter').value.toLowerCase() : '';
+    const binLocationFilter = document.getElementById('binFilter') ? document.getElementById('binFilter').value.toLowerCase() : '';
+
+    const tables = document.querySelectorAll('table');
+    tables.forEach(table => {
+        const rows = table.querySelectorAll('tbody tr');
+        rows.forEach(row => {
+            if (row.querySelector('.expandable')) {
+                return;
+            }
+
+            const text = Array.from(row.children).map(cell => cell.textContent.toLowerCase()).join(' ');
+            const categoryCell = row.querySelector('td:first-child') ? row.querySelector('td:first-child').textContent.toLowerCase() : '';
+            const statusCell = row.cells[3] ? row.cells[3].textContent.toLowerCase() : '';
+            const binLocationCell = row.cells[2] ? row.cells[2].textContent.toLowerCase() : '';
+
+            const matchesText = text.includes(textQuery);
+            const matchesCategory = !categoryFilter || categoryCell.includes(categoryFilter);
+            const matchesStatus = !statusFilter || statusCell.includes(statusFilter);
+            const matchesBinLocation = !binLocationFilter || binLocationCell.includes(binLocationFilter);
+
+            row.style.display = (matchesText && matchesCategory && matchesStatus && matchesBinLocation) ? '' : 'none';
+        });
+    });
+};
+
 // Refresh table function
 function refreshTab() {
     window.location.reload();
@@ -31,18 +62,15 @@ async function printTable(level, id, commonName = null, category = null, subcate
         return;
     }
 
-    // Get the tab name based on the current tab number
     const tabNum = window.cachedTabNum || 1;
     const tabName = tabNum == 2 ? 'Open Contracts' : tabNum == 4 ? 'Laundry Contracts' : `Tab ${tabNum}`;
 
-    // Extract contract number if level is Contract
     let contractNumber = '';
     if (level === 'Contract') {
         const contractCell = element.querySelector('td:first-child');
         contractNumber = contractCell ? contractCell.textContent.trim() : '';
     }
 
-    // Fetch contract creation date if available
     let contractDate = 'N/A';
     if (contractNumber && (tabNum == 2 || tabNum == 4)) {
         try {
@@ -58,20 +86,17 @@ async function printTable(level, id, commonName = null, category = null, subcate
     let tableWrapper;
 
     if (level === 'Common Name' && commonName && category) {
-        // Fetch all items for the common name to aggregate
         const url = `/tab/${tabNum}/data?common_name=${encodeURIComponent(commonName)}&category=${encodeURIComponent(category)}` + (subcategory ? `&subcategory=${encodeURIComponent(subcategory)}` : '');
         const response = await fetch(url);
         const data = await response.json();
         const items = data.items || [];
 
-        // Aggregate by status
         const statusCounts = {};
         items.forEach(item => {
             const status = item.status || 'Unknown';
             statusCounts[status] = (statusCounts[status] || 0) + 1;
         });
 
-        // Create a new table for the aggregate
         tableWrapper = document.createElement('table');
         tableWrapper.className = 'table table-bordered';
         tableWrapper.innerHTML = `
@@ -93,10 +118,8 @@ async function printTable(level, id, commonName = null, category = null, subcate
             </tbody>
         `;
     } else {
-        // Clone the element and include all expanded sections
         printElement = element.cloneNode(true);
 
-        // If printing a top-level row, include the table header
         if (level === 'Contract') {
             const header = document.getElementById('category-table-header');
             if (header) {
@@ -113,10 +136,8 @@ async function printTable(level, id, commonName = null, category = null, subcate
             tableWrapper = printElement;
         }
 
-        // Remove "Total Items in Inventory" column from the main table
         removeTotalItemsInventoryColumn(tableWrapper, tabNum);
 
-        // Find expanded content if any
         const row = element.closest('tr');
         if (row) {
             const nextRow = row.nextElementSibling;
@@ -124,9 +145,7 @@ async function printTable(level, id, commonName = null, category = null, subcate
                 const expandedContent = nextRow.querySelector('.expandable.expanded');
                 if (expandedContent) {
                     const expandedClone = expandedContent.cloneNode(true);
-                    // Remove buttons and loading indicators from expanded content
                     expandedClone.querySelectorAll('.btn, .loading, .expandable.collapsed, .pagination-controls, .filter-sort-controls').forEach(el => el.remove());
-                    // Remove "Total Items in Inventory" from all nested tables within expanded content
                     const nestedTables = expandedClone.querySelectorAll('table');
                     nestedTables.forEach(nestedTable => {
                         removeTotalItemsInventoryColumn(nestedTable, tabNum);
@@ -138,14 +157,11 @@ async function printTable(level, id, commonName = null, category = null, subcate
             }
         }
 
-        // Remove non-printable elements from the main element
         tableWrapper.querySelectorAll('.btn, .loading, .expandable.collapsed, .pagination-controls, .filter-sort-controls').forEach(el => el.remove());
     }
 
-    // Clean up any <br> tags that might cause overlapping
     tableWrapper.querySelectorAll('br').forEach(br => br.remove());
 
-    // Prepare the print content with custom header, signature line, and styles
     const printContent = `
         <html>
             <head>
@@ -275,19 +291,16 @@ async function printTable(level, id, commonName = null, category = null, subcate
     console.log('Print triggered successfully');
 }
 
-// Print full item list by rental_class_num
 async function printFullItemList(category, subcategory, commonName) {
     console.log(`Printing full item list for Category: ${category}, Subcategory: ${subcategory}, Common Name: ${commonName}`);
     const tabNum = window.cachedTabNum || 1;
     const tabName = tabNum == 2 ? 'Open Contracts' : tabNum == 4 ? 'Laundry Contracts' : `Tab ${tabNum}`;
 
-    // Fetch all items with the same rental_class_num and common_name
     const url = `/tab/${tabNum}/full_items_by_rental_class?category=${encodeURIComponent(category)}&subcategory=${encodeURIComponent(subcategory)}&common_name=${encodeURIComponent(commonName)}`;
     const response = await fetch(url);
     const data = await response.json();
     const items = data.items || [];
 
-    // Create a table for the full item list
     const tableWrapper = document.createElement('table');
     tableWrapper.className = 'table table-bordered';
     const headers = ['Tag ID', 'Common Name', 'Rental Class Num', 'Bin Location', 'Status', 'Last Contract', 'Last Scanned Date', 'Quality', 'Notes'];
@@ -314,7 +327,6 @@ async function printFullItemList(category, subcategory, commonName) {
         </tbody>
     `;
 
-    // Prepare the print content
     const printContent = `
         <html>
             <head>
@@ -425,11 +437,9 @@ async function printFullItemList(category, subcategory, commonName) {
     console.log('Full item list print triggered successfully');
 }
 
-// Initialize script on document load
 document.addEventListener('DOMContentLoaded', () => {
     console.log('Document loaded, initializing script');
 
-    // Extract tab number from URL path
     let tabNum;
     const pathMatch = window.location.pathname.match(/\/tab\/(\d+)/);
     if (pathMatch) {
@@ -437,15 +447,14 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log('Extracted tab number from URL:', tabNum);
     } else if (window.location.pathname === '/') {
         console.log('Homepage detected, defaulting tab number to 1');
-        tabNum = 1; // Default for homepage
+        tabNum = 1;
     } else {
         console.warn('No tab number found in URL, using default tab number 1.');
-        tabNum = 1; // Default if not found
+        tabNum = 1;
     }
 
     window.cachedTabNum = tabNum;
 
-    // Set up print button listeners using event delegation
     document.addEventListener('click', (event) => {
         const printBtn = event.target.closest('.print-btn');
         const printFullBtn = event.target.closest('.print-full-btn');
@@ -471,38 +480,16 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Apply filters to all tables based on user input
-    window.applyFilters = function() {
-        console.log('Applying filters');
-        const textQuery = document.getElementById('category-filter') ? document.getElementById('category-filter').value.toLowerCase() : '';
-        const categoryFilter = document.getElementById('categoryFilter') ? document.getElementById('categoryFilter').value.toLowerCase() : '';
-        const statusFilter = document.getElementById('statusFilter') ? document.getElementById('statusFilter').value.toLowerCase() : '';
-        const binLocationFilter = document.getElementById('binFilter') ? document.getElementById('binFilter').value.toLowerCase() : '';
+    // Attach event listeners for filters
+    const searchInput = document.getElementById('category-filter') || document.getElementById('searchInput');
+    const categoryFilter = document.getElementById('categoryFilter');
+    const statusFilter = document.getElementById('statusFilter');
+    const binFilter = document.getElementById('binFilter');
 
-        const tables = document.querySelectorAll('table');
-        tables.forEach(table => {
-            const rows = table.querySelectorAll('tbody tr');
-            rows.forEach(row => {
-                // Skip rows that are expandable containers
-                if (row.querySelector('.expandable')) {
-                    return;
-                }
+    if (searchInput) searchInput.addEventListener('input', window.applyFilters);
+    if (categoryFilter) categoryFilter.addEventListener('change', window.applyFilters);
+    if (statusFilter) statusFilter.addEventListener('change', window.applyFilters);
+    if (binFilter) binFilter.addEventListener('change', window.applyFilters);
 
-                const text = Array.from(row.children).map(cell => cell.textContent.toLowerCase()).join(' ');
-                const categoryCell = row.querySelector('td:first-child') ? row.querySelector('td:first-child').textContent.toLowerCase() : '';
-                const statusCell = row.cells[3] ? row.cells[3].textContent.toLowerCase() : ''; // Status or Last Scanned Date
-                const binLocationCell = row.cells[2] ? row.cells[2].textContent.toLowerCase() : ''; // Adjust for contract table structure
-
-                const matchesText = text.includes(textQuery);
-                const matchesCategory = !categoryFilter || categoryCell.includes(categoryFilter);
-                const matchesStatus = !statusFilter || statusCell.includes(statusFilter);
-                const matchesBinLocation = !binLocationFilter || binLocationCell.includes(binLocationFilter);
-
-                row.style.display = (matchesText && matchesCategory && matchesStatus && matchesBinLocation) ? '' : 'none';
-            });
-        });
-    };
-
-    // Initial filter application
     window.applyFilters();
 });
