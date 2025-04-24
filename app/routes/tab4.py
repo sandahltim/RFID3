@@ -14,6 +14,11 @@ def tab4_view():
         session = db.session()
         current_app.logger.info("Database session created successfully")
 
+        # Verify database connection
+        current_app.logger.info("Testing database connection")
+        session.execute("SELECT 1")
+        current_app.logger.info("Database connection test successful")
+
         # Define laundry-related categories
         laundry_categories = ['Rectangle Linen', 'Round Linen', 'Runners and Drapes']
         current_app.logger.info(f"Laundry categories defined: {laundry_categories}")
@@ -310,3 +315,73 @@ def tab4_hand_counted_items():
         current_app.logger.error(f"Error fetching hand-counted items for contract {contract_number}: {str(e)}")
         session.close()
         return '<tr><td colspan="6">Error loading hand-counted items.</td></tr>'
+
+@tab4_bp.route('/tab/4/add_hand_counted_item', methods=['POST'])
+def add_hand_counted_item():
+    data = request.get_json()
+    contract_number = data.get('contract_number')
+    item_name = data.get('item_name')
+    quantity = data.get('quantity')
+    action = data.get('action')
+    employee_name = data.get('employee_name')
+
+    current_app.logger.info(f"Adding hand-counted item: contract_number={contract_number}, item_name={item_name}, quantity={quantity}, action={action}, employee_name={employee_name}")
+
+    if not all([contract_number, item_name, quantity, action, employee_name]):
+        current_app.logger.error("Missing required fields for adding hand-counted item")
+        return jsonify({'error': 'All fields are required'}), 400
+
+    try:
+        session = db.session()
+        hand_counted_item = HandCountedItems(
+            contract_number=contract_number,
+            item_name=item_name,
+            quantity=quantity,
+            action=action,
+            user=employee_name
+        )
+        session.add(hand_counted_item)
+        session.commit()
+        session.close()
+        current_app.logger.info(f"Successfully added hand-counted item for contract {contract_number}")
+        return jsonify({'message': 'Item added successfully'})
+    except Exception as e:
+        current_app.logger.error(f"Error adding hand-counted item: {str(e)}")
+        session.rollback()
+        session.close()
+        return jsonify({'error': 'Failed to add item'}), 500
+
+@tab4_bp.route('/tab/4/remove_hand_counted_item', methods=['POST'])
+def remove_hand_counted_item():
+    data = request.get_json()
+    contract_number = data.get('contract_number')
+    item_name = data.get('item_name')
+    quantity = data.get('quantity')
+    action = data.get('action')
+    employee_name = data.get('employee_name')
+
+    current_app.logger.info(f"Removing hand-counted item: contract_number={contract_number}, item_name={item_name}, quantity={quantity}, action={action}, employee_name={employee_name}")
+
+    if not all([contract_number, item_name, quantity, action, employee_name]):
+        current_app.logger.error("Missing required fields for removing hand-counted item")
+        return jsonify({'error': 'All fields are required'}), 400
+
+    try:
+        session = db.session()
+        hand_counted_item = HandCountedItems(
+            contract_number=contract_number,
+            item_name=item_name,
+            quantity=quantity,
+            action=action,
+            user=employee_name
+        )
+        session.add(hand_counted_item)
+        session.commit()
+        session.close()
+        current_app.logger.info(f"Successfully removed hand-counted item for contract {contract_number}")
+        return jsonify({'message': 'Item removed successfully'})
+    except Exception as e:
+        current_app.logger.error(f"Error removing hand-counted item: {str(e)}")
+        session.rollback()
+        session.close()
+        return jsonify({'error': 'Failed to remove item'}), 500

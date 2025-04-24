@@ -269,30 +269,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Apply filters to all tables based on user input
+    // Temporarily disable filters for debugging
     window.applyFilters = function() {
-        console.log('Applying filters');
-        const textQuery = document.getElementById('searchInput') ? document.getElementById('searchInput').value.toLowerCase() : '';
-        const categoryFilter = document.getElementById('categoryFilter') ? document.getElementById('categoryFilter').value.toLowerCase() : '';
-        const statusFilter = document.getElementById('statusFilter') ? document.getElementById('statusFilter').value.toLowerCase() : '';
-        const binLocationFilter = document.getElementById('binFilter') ? document.getElementById('binFilter').value.toLowerCase() : '';
-
-        const tables = document.querySelectorAll('table');
-        tables.forEach(table => {
-            const rows = table.querySelectorAll('tbody tr');
-            rows.forEach(row => {
-                const text = Array.from(row.children).map(cell => cell.textContent.toLowerCase()).join(' ');
-                const categoryCell = row.querySelector('td:first-child') ? row.querySelector('td:first-child').textContent.toLowerCase() : '';
-                const statusCell = row.cells[3] ? row.cells[3].textContent.toLowerCase() : ''; // Status or Last Scanned Date
-                const binLocationCell = row.cells[2] ? row.cells[2].textContent.toLowerCase() : ''; // Adjust for contract table structure
-
-                const matchesText = text.includes(textQuery);
-                const matchesCategory = !categoryFilter || categoryCell.includes(categoryFilter);
-                const matchesStatus = !statusFilter || statusCell.includes(statusFilter);
-                const matchesBinLocation = !binLocationFilter || binLocationCell.includes(binLocationFilter);
-
-                row.style.display = (matchesText && matchesCategory && matchesStatus && matchesBinLocation) ? '' : 'none';
-            });
-        });
+        console.log('applyFilters disabled for debugging');
+        // Do nothing to show all rows
     };
 });
