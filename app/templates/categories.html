@@ -28,7 +28,7 @@
         </tbody>
     </table>
     <button class="btn btn-primary" onclick="addMappingRow()">Add Mapping</button>
-    <button class="btn btn-success" onclick="saveMappings()">Save Mappings</button>
+    <button class="btn btn-success" onclick="confirmSaveMappings()">Save Mappings</button>
 </div>
 
 <script>
@@ -52,7 +52,6 @@
         const row = button.parentElement.parentElement;
         const rentalClassId = row.getAttribute('data-rental-class-id');
         if (!rentalClassId) {
-            // If the row was newly added and not yet saved, just remove it from the UI
             row.remove();
             return;
         }
@@ -79,7 +78,7 @@
         });
     }
 
-    function saveMappings() {
+    function collectMappings() {
         const rows = document.querySelectorAll('#mappings-table tr');
         const mappings = Array.from(rows).map(row => {
             return {
@@ -89,7 +88,6 @@
             };
         });
 
-        // Deduplicate rental_class_id entries, keeping the last occurrence
         const deduplicatedMappings = [];
         const seenIds = new Set();
         for (let i = mappings.length - 1; i >= 0; i--) {
@@ -100,16 +98,39 @@
             }
         }
 
-        // Remove entries with empty rental_class_id
-        const validMappings = deduplicatedMappings.filter(mapping => mapping.rental_class_id !== '');
+        return deduplicatedMappings.filter(mapping => mapping.rental_class_id !== '');
+    }
 
-        console.log('Valid mappings to save:', validMappings);
+    function confirmSaveMappings() {
+        const validMappings = collectMappings();
+        console.log('Mappings to be saved:', validMappings);
 
         if (validMappings.length === 0) {
             alert('Error: No valid mappings to save. Please ensure all rows have a Rental Class ID.');
             return;
         }
 
+        const changedMappings = validMappings.filter(mapping => {
+            const row = document.querySelector(`tr[data-rental-class-id="${mapping.rental_class_id}"]`);
+            if (!row) return true;
+            const originalCategory = row.getAttribute('data-original-category') || '';
+            const originalSubcategory = row.getAttribute('data-original-subcategory') || '';
+            return mapping.category !== originalCategory || mapping.subcategory !== originalSubcategory;
+        });
+
+        console.log('Changed mappings:', changedMappings);
+
+        if (changedMappings.length === 0) {
+            alert('No changes detected to save.');
+            return;
+        }
+
+        if (confirm(`You are about to save ${changedMappings.length} changes. Continue?`)) {
+            saveMappings(validMappings);
+        }
+    }
+
+    function saveMappings(validMappings) {
         fetch('/categories/update', {
             method: 'POST',
             headers: {
@@ -136,19 +157,25 @@
         });
     }
 
-    // Load existing mappings
+    // Load existing mappings and store original values
     fetch('/categories/mapping')
         .then(response => response.json())
         .then(data => {
             console.log('Loaded mappings:', data);
-            data.forEach(mapping => addMappingRow(mapping));
+            data.forEach(mapping => {
+                addMappingRow(mapping);
+                const row = document.querySelector(`tr[data-rental-class-id="${mapping.rental_class_id}"]`);
+                if (row) {
+                    row.setAttribute('data-original-category', mapping.category);
+                    row.setAttribute('data-original-subcategory', mapping.subcategory);
+                }
+            });
         })
         .catch(error => {
             console.error('Error loading mappings:', error);
             alert('Failed to load mappings');
         });
 
-    // Apply filters to all tables based on user input
     if (typeof window.applyFilters === 'function') {
         window.applyFilters();
     } else {
