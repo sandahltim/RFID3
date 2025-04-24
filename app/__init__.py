@@ -21,6 +21,7 @@ def create_app():
     handler.setLevel(logging.DEBUG)
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     handler.setFormatter(formatter)
+    logging.getLogger('').addHandler(handler)  # Add to root logger
     app.logger.addHandler(handler)
     app.logger.setLevel(logging.DEBUG)
     app.logger.info(f"Static folder path: {app.static_folder}")
@@ -72,4 +73,3 @@ def create_app():
     init_scheduler(app)
 
     return app
-    

@@ -15,7 +15,7 @@ def health_check():
         "overall": "healthy"
     }
 
-    # Check database
+    #  Check database
     try:
         db.session.execute(text("SELECT 1"))
         status["database"] = "healthy"
