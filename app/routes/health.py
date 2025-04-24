@@ -27,7 +27,7 @@ def health_check():
     # Check Redis
     try:
         cache.set("health_check", "ok", timeout=1)
-        if cache.get("health_check") == "ok":
+        if cache.get("health_check") == b"ok":
             status["redis"] = "healthy"
         else:
             status["redis"] = "unhealthy: failed to retrieve test value"
@@ -47,4 +47,5 @@ def health_check():
         status["api"] = f"unhealthy: {str(e)}"
         status["overall"] = "unhealthy"
 
-    return jsonify(status), 200 if status["overall"] == "healthy" else 500
+    status_code = 200 if status["overall"] == "healthy" else 503
+    return jsonify(status), status_code
