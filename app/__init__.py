@@ -5,7 +5,7 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_redis import FlaskRedis
 from config import DB_CONFIG, REDIS_URL, LOG_FILE
 
-#  Initialize extensions
+# Initialize extensions
 db = SQLAlchemy()
 cache = FlaskRedis()
 
@@ -21,11 +21,14 @@ def create_app():
     handler.setLevel(logging.DEBUG)
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     handler.setFormatter(formatter)
-    logging.getLogger('').addHandler(handler)  # Add to root logger
+    # Add handler to root logger and app logger
+    logging.getLogger('').addHandler(handler)
+    app.logger.handlers = []  # Clear existing handlers
     app.logger.addHandler(handler)
     app.logger.setLevel(logging.DEBUG)
-    app.logger.info(f"Static folder path: {app.static_folder}")
-    app.logger.debug("Test log entry to verify logging")
+    app.logger.propagate = False  # Prevent double logging
+    app.logger.info("Application starting up")
+    app.logger.debug(f"Static folder path: {app.static_folder}")
 
     # Database configuration
     app.config['SQLALCHEMY_DATABASE_URI'] = (
