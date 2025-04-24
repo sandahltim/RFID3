@@ -8,7 +8,7 @@ tab4_bp = Blueprint('tab4', __name__)
 
 @tab4_bp.route('/tab/4')
 def tab4_view():
-    current_app.logger.info("Entering tab4_view route")
+    current_app.logger.info("Route /tab/4 accessed")
     try:
         current_app.logger.info("Attempting to create database session")
         session = db.session()
@@ -140,30 +140,30 @@ def tab4_view():
 
 @tab4_bp.route('/tab/4/common_names')
 def tab4_common_names():
-    category = request.args.get('category')
+    category = request.args.get('contract_number')  # Use contract_number instead of category
     contract_number = request.args.get('contract_number')
     page = int(request.args.get('page', 1))
     per_page = 10
 
-    current_app.logger.info(f"Fetching common names for category={category}, contract_number={contract_number}, page={page}")
+    current_app.logger.info(f"Fetching common names for contract_number={contract_number}, page={page}")
 
-    if not category or not contract_number:
-        current_app.logger.error("Missing required parameters: category and contract_number are required")
-        return jsonify({'error': 'Category and contract number are required'}), 400
+    if not contract_number:
+        current_app.logger.error("Missing required parameter: contract_number is required")
+        return jsonify({'error': 'Contract number is required'}), 400
 
     try:
         session = db.session()
 
-        # Fetch rental class IDs for this category
-        base_mappings = session.query(RentalClassMapping).filter_by(category=category).all()
-        user_mappings = session.query(UserRentalClassMapping).filter_by(category=category).all()
+        # Fetch rental class IDs for items in this contract
+        rental_class_nums = session.query(
+            func.trim(func.upper(func.cast(ItemMaster.rental_class_num, db.String)))
+        ).filter(
+            ItemMaster.last_contract_num == contract_number,
+            ItemMaster.status.in_(['On Rent', 'Delivered'])
+        ).distinct().all()
+        rental_class_nums = [r[0] for r in rental_class_nums if r[0]]
 
-        mappings_dict = {m.rental_class_id: {'category': m.category, 'subcategory': m.subcategory} for m in base_mappings}
-        for um in user_mappings:
-            mappings_dict[um.rental_class_id] = {'category': um.category, 'subcategory': um.subcategory}
-
-        rental_class_ids = list(mappings_dict.keys())
-        current_app.logger.debug(f"Common names for contract {contract_number}, category {category}: rental_class_ids = {rental_class_ids}")
+        current_app.logger.debug(f"Contract {contract_number}: rental_class_nums = {rental_class_nums}")
 
         # Fetch common names for items on this contract
         common_names_query = session.query(
@@ -171,13 +171,13 @@ def tab4_common_names():
             func.count(ItemMaster.tag_id).label('on_contracts')
         ).filter(
             ItemMaster.last_contract_num == contract_number,
-            func.trim(func.upper(func.cast(ItemMaster.rental_class_num, db.String))).in_(rental_class_ids),
+            func.trim(func.upper(func.cast(ItemMaster.rental_class_num, db.String))).in_(rental_class_nums),
             ItemMaster.status.in_(['On Rent', 'Delivered'])
         ).group_by(
             ItemMaster.common_name
         ).all()
 
-        current_app.logger.debug(f"Common names for laundry contract {contract_number}, category {category}: {[(name, count) for name, count in common_names_query]}")
+        current_app.logger.debug(f"Common names for laundry contract {contract_number}: {[(name, count) for name, count in common_names_query]}")
 
         common_names = []
         for name, on_contracts in common_names_query:
@@ -186,7 +186,7 @@ def tab4_common_names():
 
             # Total items in inventory for this common name
             total_items_inventory = session.query(func.count(ItemMaster.tag_id)).filter(
-                func.trim(func.upper(func.cast(ItemMaster.rental_class_num, db.String))).in_(rental_class_ids),
+                func.trim(func.upper(func.cast(ItemMaster.rental_class_num, db.String))).in_(rental_class_nums),
                 ItemMaster.common_name == name
             ).scalar()
 
@@ -203,7 +203,7 @@ def tab4_common_names():
         paginated_common_names = common_names[start:end]
 
         session.close()
-        current_app.logger.info(f"Returning {len(paginated_common_names)} common names for contract {contract_number}, category {category}")
+        current_app.logger.info(f"Returning {len(paginated_common_names)} common names for contract {contract_number}")
         return jsonify({
             'common_names': paginated_common_names,
             'total_common_names': total_common_names,
@@ -211,42 +211,42 @@ def tab4_common_names():
             'per_page': per_page
         })
     except Exception as e:
-        current_app.logger.error(f"Error fetching common names for contract {contract_number}, category {category}: {str(e)}")
-        session.close()
+        current_app.logger.error(f"Error fetching common names for contract {contract_number}: {str(e)}")
+        if 'session' in locals():
+            session.close()
         return jsonify({'error': 'Failed to fetch common names'}), 500
 
 @tab4_bp.route('/tab/4/data')
 def tab4_data():
-    category = request.args.get('category')
     contract_number = request.args.get('contract_number')
     common_name = request.args.get('common_name')
     page = int(request.args.get('page', 1))
     per_page = 10
 
-    current_app.logger.info(f"Fetching items for category={category}, contract_number={contract_number}, common_name={common_name}, page={page}")
+    current_app.logger.info(f"Fetching items for contract_number={contract_number}, common_name={common_name}, page={page}")
 
-    if not category or not contract_number or not common_name:
-        current_app.logger.error("Missing required parameters: category, contract number, and common name are required")
-        return jsonify({'error': 'Category, contract number, and common name are required'}), 400
+    if not contract_number or not common_name:
+        current_app.logger.error("Missing required parameters: contract number and common name are required")
+        return jsonify({'error': 'Contract number and common name are required'}), 400
 
     try:
         session = db.session()
 
-        # Fetch rental class IDs for this category
-        base_mappings = session.query(RentalClassMapping).filter_by(category=category).all()
-        user_mappings = session.query(UserRentalClassMapping).filter_by(category=category).all()
+        # Fetch rental class IDs for items in this contract
+        rental_class_nums = session.query(
+            func.trim(func.upper(func.cast(ItemMaster.rental_class_num, db.String)))
+        ).filter(
+            ItemMaster.last_contract_num == contract_number,
+            ItemMaster.status.in_(['On Rent', 'Delivered'])
+        ).distinct().all()
+        rental_class_nums = [r[0] for r in rental_class_nums if r[0]]
 
-        mappings_dict = {m.rental_class_id: {'category': m.category, 'subcategory': m.subcategory} for m in base_mappings}
-        for um in user_mappings:
-            mappings_dict[um.rental_class_id] = {'category': um.category, 'subcategory': um.subcategory}
-
-        rental_class_ids = list(mappings_dict.keys())
-        current_app.logger.debug(f"Items for contract {contract_number}, category {category}: rental_class_ids = {rental_class_ids}")
+        current_app.logger.debug(f"Items for contract {contract_number}: rental_class_nums = {rental_class_nums}")
 
         # Fetch items on this contract
         query = session.query(ItemMaster).filter(
             ItemMaster.last_contract_num == contract_number,
-            func.trim(func.upper(func.cast(ItemMaster.rental_class_num, db.String))).in_(rental_class_ids),
+            func.trim(func.upper(func.cast(ItemMaster.rental_class_num, db.String))).in_(rental_class_nums),
             ItemMaster.common_name == common_name,
             ItemMaster.status.in_(['On Rent', 'Delivered'])
         )
@@ -267,7 +267,7 @@ def tab4_data():
                 'last_scanned_date': last_scanned_date
             })
 
-        current_app.logger.debug(f"Items for laundry contract {contract_number}, category {category}, common_name {common_name}: {len(items_data)} items")
+        current_app.logger.debug(f"Items for laundry contract {contract_number}, common_name {common_name}: {len(items_data)} items")
 
         session.close()
         return jsonify({
@@ -277,8 +277,9 @@ def tab4_data():
             'per_page': per_page
         })
     except Exception as e:
-        current_app.logger.error(f"Error fetching items for contract {contract_number}, category {category}, common_name {common_name}: {str(e)}")
-        session.close()
+        current_app.logger.error(f"Error fetching items for contract {contract_number}, common_name {common_name}: {str(e)}")
+        if 'session' in locals():
+            session.close()
         return jsonify({'error': 'Failed to fetch items'}), 500
 
 @tab4_bp.route('/tab/4/hand_counted_items')
@@ -313,7 +314,8 @@ def tab4_hand_counted_items():
         return html
     except Exception as e:
         current_app.logger.error(f"Error fetching hand-counted items for contract {contract_number}: {str(e)}")
-        session.close()
+        if 'session' in locals():
+            session.close()
         return '<tr><td colspan="6">Error loading hand-counted items.</td></tr>'
 
 @tab4_bp.route('/tab/4/add_hand_counted_item', methods=['POST'])
@@ -347,8 +349,9 @@ def add_hand_counted_item():
         return jsonify({'message': 'Item added successfully'})
     except Exception as e:
         current_app.logger.error(f"Error adding hand-counted item: {str(e)}")
-        session.rollback()
-        session.close()
+        if 'session' in locals():
+            session.rollback()
+            session.close()
         return jsonify({'error': 'Failed to add item'}), 500
 
 @tab4_bp.route('/tab/4/remove_hand_counted_item', methods=['POST'])
@@ -382,6 +385,7 @@ def remove_hand_counted_item():
         return jsonify({'message': 'Item removed successfully'})
     except Exception as e:
         current_app.logger.error(f"Error removing hand-counted item: {str(e)}")
-        session.rollback()
-        session.close()
+        if 'session' in locals():
+            session.rollback()
+            session.close()
         return jsonify({'error': 'Failed to remove item'}), 500
