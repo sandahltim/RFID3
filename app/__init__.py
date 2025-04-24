@@ -5,7 +5,7 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_redis import FlaskRedis
 from config import DB_CONFIG, REDIS_URL, LOG_FILE
 
-# Initialize extensions
+#  Initialize extensions
 db = SQLAlchemy()
 cache = FlaskRedis()
 
