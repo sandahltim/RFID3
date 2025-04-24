@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, request, jsonify, current_app
 from .. import db, cache
-from ..models.db_models import Transaction, ItemMaster, RentalClassMapping, UserRentalClassMapping, HandCountedItems
-from sqlalchemy import func, desc, or_
+from ..models.db_models import Transaction, ItemMaster, HandCountedItems
+from sqlalchemy import func, desc
 from time import time
 
 tab4_bp = Blueprint('tab4', __name__)
@@ -18,10 +18,6 @@ def tab4_view():
         current_app.logger.info("Testing database connection")
         session.execute("SELECT 1")
         current_app.logger.info("Database connection test successful")
-
-        # Define laundry-related categories
-        laundry_categories = ['Rectangle Linen', 'Round Linen', 'Runners and Drapes']
-        current_app.logger.info(f"Laundry categories defined: {laundry_categories}")
 
         # Fetch laundry contracts from id_item_master (contract numbers starting with 'L' or 'l')
         current_app.logger.info("Executing contracts query")
@@ -60,71 +56,23 @@ def tab4_view():
             scan_date = latest_transaction.scan_date.isoformat() if latest_transaction and latest_transaction.scan_date else 'N/A'
             current_app.logger.debug(f"Contract {contract_number}: client_name={client_name}, scan_date={scan_date}")
 
-            # Fetch rental class IDs for items in this contract
-            rental_class_nums = session.query(
-                func.trim(func.upper(func.cast(ItemMaster.rental_class_num, db.String)))
-            ).filter(
+            # Count items on this contract
+            items_on_contract = session.query(func.count(ItemMaster.tag_id)).filter(
                 ItemMaster.last_contract_num == contract_number,
                 ItemMaster.status.in_(['On Rent', 'Delivered'])
-            ).distinct().all()
-            rental_class_nums = [r[0] for r in rental_class_nums if r[0]]
+            ).scalar()
 
-            current_app.logger.debug(f"Laundry contract {contract_number}: rental_class_nums = {rental_class_nums}")
+            # Total items in inventory for this contract
+            total_items_inventory = session.query(func.count(ItemMaster.tag_id)).filter(
+                ItemMaster.last_contract_num == contract_number
+            ).scalar()
 
-            # Map rental class IDs to categories, filtering for laundry categories
-            base_mappings = session.query(RentalClassMapping).filter(
-                RentalClassMapping.rental_class_id.in_(rental_class_nums),
-                RentalClassMapping.category.in_(laundry_categories)
-            ).all()
-            user_mappings = session.query(UserRentalClassMapping).filter(
-                UserRentalClassMapping.rental_class_id.in_(rental_class_nums),
-                UserRentalClassMapping.category.in_(laundry_categories)
-            ).all()
-
-            mappings_dict = {m.rental_class_id: {'category': m.category, 'subcategory': m.subcategory} for m in base_mappings}
-            for um in user_mappings:
-                mappings_dict[um.rental_class_id] = {'category': um.category, 'subcategory': um.subcategory}
-
-            current_app.logger.debug(f"Laundry contract {contract_number}: mappings_dict = {mappings_dict}")
-
-            categories = {}
-            for rental_class_id in rental_class_nums:
-                if rental_class_id in mappings_dict:
-                    category = mappings_dict[rental_class_id]['category']
-                    if category not in categories:
-                        categories[category] = []
-                    categories[category].append(rental_class_id)
-
-            current_app.logger.debug(f"Laundry contract {contract_number}: categories = {categories}")
-
-            contract_categories = []
-            for cat, rental_ids in categories.items():
-                # Count items on this contract (already filtered by status)
-                items_on_contract = session.query(func.count(ItemMaster.tag_id)).filter(
-                    ItemMaster.last_contract_num == contract_number,
-                    func.trim(func.upper(func.cast(ItemMaster.rental_class_num, db.String))).in_(rental_ids),
-                    ItemMaster.status.in_(['On Rent', 'Delivered'])
-                ).scalar()
-
-                # Total items in inventory for this category
-                total_items_inventory = session.query(func.count(ItemMaster.tag_id)).filter(
-                    func.trim(func.upper(func.cast(ItemMaster.rental_class_num, db.String))).in_(rental_ids)
-                ).scalar()
-
-                contract_categories.append({
-                    'category': cat,
-                    'cat_id': contract_number + '_' + cat.lower().replace(' ', '_').replace('/', '_'),
-                    'items_on_contract': items_on_contract or 0,
-                    'total_items_inventory': total_items_inventory or 0
-                })
-                current_app.logger.debug(f"Laundry contract {contract_number}: category {cat} - items_on_contract={items_on_contract}, total_items_inventory={total_items_inventory}")
-
-            contract_categories.sort(key=lambda x: x['category'])
             contracts.append({
                 'contract_number': contract_number,
                 'client_name': client_name,
                 'scan_date': scan_date,
-                'categories': contract_categories
+                'items_on_contract': items_on_contract or 0,
+                'total_items_inventory': total_items_inventory or 0
             })
 
         contracts.sort(key=lambda x: x['contract_number'])
@@ -140,7 +88,6 @@ def tab4_view():
 
 @tab4_bp.route('/tab/4/common_names')
 def tab4_common_names():
-    category = request.args.get('contract_number')  # Use contract_number instead of category
     contract_number = request.args.get('contract_number')
     page = int(request.args.get('page', 1))
     per_page = 10
@@ -154,24 +101,12 @@ def tab4_common_names():
     try:
         session = db.session()
 
-        # Fetch rental class IDs for items in this contract
-        rental_class_nums = session.query(
-            func.trim(func.upper(func.cast(ItemMaster.rental_class_num, db.String)))
-        ).filter(
-            ItemMaster.last_contract_num == contract_number,
-            ItemMaster.status.in_(['On Rent', 'Delivered'])
-        ).distinct().all()
-        rental_class_nums = [r[0] for r in rental_class_nums if r[0]]
-
-        current_app.logger.debug(f"Contract {contract_number}: rental_class_nums = {rental_class_nums}")
-
         # Fetch common names for items on this contract
         common_names_query = session.query(
             ItemMaster.common_name,
             func.count(ItemMaster.tag_id).label('on_contracts')
         ).filter(
             ItemMaster.last_contract_num == contract_number,
-            func.trim(func.upper(func.cast(ItemMaster.rental_class_num, db.String))).in_(rental_class_nums),
             ItemMaster.status.in_(['On Rent', 'Delivered'])
         ).group_by(
             ItemMaster.common_name
@@ -186,7 +121,6 @@ def tab4_common_names():
 
             # Total items in inventory for this common name
             total_items_inventory = session.query(func.count(ItemMaster.tag_id)).filter(
-                func.trim(func.upper(func.cast(ItemMaster.rental_class_num, db.String))).in_(rental_class_nums),
                 ItemMaster.common_name == name
             ).scalar()
 
@@ -232,21 +166,9 @@ def tab4_data():
     try:
         session = db.session()
 
-        # Fetch rental class IDs for items in this contract
-        rental_class_nums = session.query(
-            func.trim(func.upper(func.cast(ItemMaster.rental_class_num, db.String)))
-        ).filter(
-            ItemMaster.last_contract_num == contract_number,
-            ItemMaster.status.in_(['On Rent', 'Delivered'])
-        ).distinct().all()
-        rental_class_nums = [r[0] for r in rental_class_nums if r[0]]
-
-        current_app.logger.debug(f"Items for contract {contract_number}: rental_class_nums = {rental_class_nums}")
-
         # Fetch items on this contract
         query = session.query(ItemMaster).filter(
             ItemMaster.last_contract_num == contract_number,
-            func.trim(func.upper(func.cast(ItemMaster.rental_class_num, db.String))).in_(rental_class_nums),
             ItemMaster.common_name == common_name,
             ItemMaster.status.in_(['On Rent', 'Delivered'])
         )
@@ -389,3 +311,45 @@ def remove_hand_counted_item():
             session.rollback()
             session.close()
         return jsonify({'error': 'Failed to remove item'}), 500
+
+@tab4_bp.route('/tab/4/full_items_by_rental_class')
+def full_items_by_rental_class():
+    contract_number = request.args.get('category')  # Using 'category' as contract_number for consistency with JS
+    common_name = request.args.get('common_name')
+
+    if not contract_number or not common_name:
+        return jsonify({'error': 'Category (contract_number) and common name are required'}), 400
+
+    try:
+        session = db.session()
+
+        # Fetch all items with the same contract_number and common_name
+        items_query = session.query(ItemMaster).filter(
+            ItemMaster.last_contract_num == contract_number,
+            ItemMaster.common_name == common_name
+        ).order_by(ItemMaster.tag_id)
+
+        items = items_query.all()
+        items_data = []
+        for item in items:
+            last_scanned_date = item.date_last_scanned.isoformat() if item.date_last_scanned else 'N/A'
+            items_data.append({
+                'tag_id': item.tag_id,
+                'common_name': item.common_name,
+                'rental_class_num': item.rental_class_num,
+                'bin_location': item.bin_location,
+                'status': item.status,
+                'last_contract_num': item.last_contract_num,
+                'last_scanned_date': last_scanned_date,
+                'quality': item.quality,
+                'notes': item.notes
+            })
+
+        session.close()
+        return jsonify({
+            'items': items_data,
+            'total_items': len(items_data)
+        })
+    except Exception as e:
+        current_app.logger.error(f"Error fetching full items for contract {contract_number}, common_name {common_name}: {str(e)}")
+        return jsonify({'error': 'Failed to fetch full items'}), 500
