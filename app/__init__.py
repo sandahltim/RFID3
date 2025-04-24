@@ -14,12 +14,17 @@ def create_app():
     app = Flask(__name__, static_folder='static')
 
     # Configure logging
-    logging.basicConfig(
-        filename=LOG_FILE,
-        level=logging.DEBUG,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-    )
+    log_dir = os.path.dirname(LOG_FILE)
+    if not os.path.exists(log_dir):
+        os.makedirs(log_dir)
+    handler = logging.FileHandler(LOG_FILE)
+    handler.setLevel(logging.DEBUG)
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    handler.setFormatter(formatter)
+    app.logger.addHandler(handler)
+    app.logger.setLevel(logging.DEBUG)
     app.logger.info(f"Static folder path: {app.static_folder}")
+    app.logger.debug("Test log entry to verify logging")
 
     # Database configuration
     app.config['SQLALCHEMY_DATABASE_URI'] = (
