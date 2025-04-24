@@ -12,7 +12,6 @@ def tab2_view():
         session = db.session()
         current_app.logger.info("Starting new session for tab2")
 
-        # Fetch all contracts from id_item_master where items are on rent
         contracts_query = session.query(
             ItemMaster.last_contract_num,
             func.count(ItemMaster.tag_id).label('total_items')
@@ -30,7 +29,6 @@ def tab2_view():
 
         contracts = []
         for contract_number, total_items in contracts_query:
-            # Fetch additional details from id_transactions for this contract
             latest_transaction = session.query(
                 Transaction.client_name,
                 Transaction.scan_date
@@ -44,13 +42,11 @@ def tab2_view():
             client_name = latest_transaction.client_name if latest_transaction else 'N/A'
             scan_date = latest_transaction.scan_date.isoformat() if latest_transaction and latest_transaction.scan_date else 'N/A'
 
-            # Count items on this contract
             items_on_contract = session.query(func.count(ItemMaster.tag_id)).filter(
                 ItemMaster.last_contract_num == contract_number,
                 ItemMaster.status.in_(['On Rent', 'Delivered'])
             ).scalar()
 
-            # Total items in inventory for this contract (all items with this contract number)
             total_items_inventory = session.query(func.count(ItemMaster.tag_id)).filter(
                 ItemMaster.last_contract_num == contract_number
             ).scalar()
@@ -87,7 +83,6 @@ def tab2_common_names():
     try:
         session = db.session()
 
-        # Fetch common names for items on this contract
         common_names_query = session.query(
             ItemMaster.common_name,
             func.count(ItemMaster.tag_id).label('on_contracts')
@@ -105,7 +100,6 @@ def tab2_common_names():
             if not name:
                 continue
 
-            # Total items in inventory for this common name
             total_items_inventory = session.query(func.count(ItemMaster.tag_id)).filter(
                 ItemMaster.common_name == name
             ).scalar()
@@ -116,7 +110,6 @@ def tab2_common_names():
                 'total_items_inventory': total_items_inventory or 0
             })
 
-        # Paginate common names
         total_common_names = len(common_names)
         start = (page - 1) * per_page
         end = start + per_page
@@ -151,14 +144,12 @@ def tab2_data():
     try:
         session = db.session()
 
-        # Fetch items on this contract
         query = session.query(ItemMaster).filter(
             ItemMaster.last_contract_num == contract_number,
             ItemMaster.common_name == common_name,
             ItemMaster.status.in_(['On Rent', 'Delivered'])
         )
 
-        # Paginate items
         total_items = query.count()
         items = query.order_by(ItemMaster.tag_id).offset((page - 1) * per_page).limit(per_page).all()
 
@@ -190,7 +181,7 @@ def tab2_data():
 
 @tab2_bp.route('/tab/2/full_items_by_rental_class')
 def full_items_by_rental_class():
-    contract_number = request.args.get('category')  # Using 'category' as contract_number for consistency with JS
+    contract_number = request.args.get('category')
     common_name = request.args.get('common_name')
 
     if not contract_number or not common_name:
@@ -199,7 +190,6 @@ def full_items_by_rental_class():
     try:
         session = db.session()
 
-        # Fetch all items with the same contract_number and common_name
         items_query = session.query(ItemMaster).filter(
             ItemMaster.last_contract_num == contract_number,
             ItemMaster.common_name == common_name
@@ -229,3 +219,26 @@ def full_items_by_rental_class():
     except Exception as e:
         current_app.logger.error(f"Error fetching full items for contract {contract_number}, common_name {common_name}: {str(e)}")
         return jsonify({'error': 'Failed to fetch full items'}), 500
+
+@tab2_bp.route('/get_contract_date')
+def get_contract_date():
+    contract_number = request.args.get('contract_number')
+    if not contract_number:
+        current_app.logger.error("Missing required parameter: contract_number is required")
+        return jsonify({'error': 'Contract number is required'}), 400
+
+    try:
+        session = db.session()
+        latest_transaction = session.query(Transaction.scan_date).filter(
+            Transaction.contract_number == contract_number,
+            Transaction.scan_type == 'Rental'
+        ).order_by(desc(Transaction.scan_date)).first()
+
+        session.close()
+        if latest_transaction and latest_transaction.scan_date:
+            return jsonify({'date': latest_transaction.scan_date.isoformat()})
+        return jsonify({'date': 'N/A'})
+    except Exception as e:
+        current_app.logger.error(f"Error fetching contract date for {contract_number}: {str(e)}")
+        session.close()
+        return jsonify({'error': 'Failed to fetch contract date'}), 500
