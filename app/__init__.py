@@ -48,7 +48,7 @@ def create_app():
     from app.routes.tab5 import tab5_bp
     from app.routes.categories import categories_bp
     from app.routes.health import health_bp
-    from app.routes.refresh import refresh_bp
+    from app.services.refresh import refresh_bp
     from app.routes.tabs import tabs_bp
 
     app.register_blueprint(home_bp)
