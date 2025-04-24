@@ -5,38 +5,29 @@
     <!-- Page title for Tab 1 -->
     <h2>Rental Inventory</h2>
     <!-- Filter and search row -->
-    <div class="row mb-3">
-        <div class="col">
-            <input type="text" class="form-control" placeholder="Search common name, tag id, etc." id="searchInput">
-        </div>
-        <div class="col">
-            <select class="form-control" id="categoryFilter">
-                <option value="">All Classes</option>
-                {% for category in categories %}
-                <option value="{{ category.category }}">{{ category.category }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div class="col">
-            <select class="form-control" id="statusFilter">
-                <option value="">All Statuses</option>
-                <option value="On Rent">On Rent</option>
-                <option value="Delivered">Delivered</option>
-                <option value="Ready to Rent">Ready to Rent</option>
-            </select>
-        </div>
-        <div class="col">
-            <select class="form-control" id="binFilter">
-                <option value="">All Bin Locations</option>
-                <option value="resale">resale</option>
-                <option value="sold">sold</option>
-                <option value="pack">pack</option>
-                <option value="burst">burst</option>
-            </select>
-        </div>
-        <div class="col">
-            <button class="btn btn-primary" onclick="refreshTab()">Refresh</button>
-        </div>
+    <div class="filter-sort-controls">
+        <input type="text" id="category-filter" placeholder="Filter categories..." oninput="applyCategoryFilters()">
+        <select id="category-sort" onchange="applyCategoryFilters()">
+            <option value="">Sort By...</option>
+            <option value="category_asc">Category (A-Z)</option>
+            <option value="category_desc">Category (Z-A)</option>
+            <option value="total_items_asc">Total Items (Low to High)</option>
+            <option value="total_items_desc">Total Items (High to Low)</option>
+        </select>
+        <select id="statusFilter" onchange="applyCategoryFilters()">
+            <option value="">All Statuses</option>
+            <option value="On Rent">On Rent</option>
+            <option value="Delivered">Delivered</option>
+            <option value="Ready to Rent">Ready to Rent</option>
+        </select>
+        <select id="binFilter" onchange="applyCategoryFilters()">
+            <option value="">All Bin Locations</option>
+            <option value="resale">resale</option>
+            <option value="sold">sold</option>
+            <option value="pack">pack</option>
+            <option value="burst">burst</option>
+        </select>
+        <button class="btn btn-primary" onclick="refreshTab()">Refresh</button>
     </div>
     <!-- Table for displaying categories -->
     <table class="table table-bordered" id="category-table">
@@ -77,6 +68,15 @@
 
 <!-- JavaScript for refreshing the table -->
 <script>
+function applyCategoryFilters() {
+    const filter = document.getElementById('category-filter').value;
+    const sort = document.getElementById('category-sort').value;
+    let url = '/tab/1?';
+    if (filter) url += `filter=${encodeURIComponent(filter)}&`;
+    if (sort) url += `sort=${encodeURIComponent(sort)}`;
+    window.location.href = url;
+}
+
 function refreshTab() {
     window.location.reload();
 }

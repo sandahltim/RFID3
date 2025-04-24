@@ -1,14 +1,64 @@
 /* style.css - Custom styles for RFID Dashboard */
 body {
     font-family: Arial, sans-serif;
+    background-color: #f8f9fa;
 }
 
-/* Ensure consistent table styling */
+.container {
+    max-width: 1400px;
+    margin-top: 20px;
+}
+
+/* Navbar styling */
+.navbar {
+    background-color: #343a40 !important;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+}
+
+.navbar-brand, .nav-link {
+    color: #ffffff !important;
+}
+
+.nav-link:hover, .nav-link.active {
+    background-color: #495057;
+    border-radius: 5px;
+}
+
+/* Table styling */
 .table {
     width: 100%;
     max-width: 100%;
     margin-bottom: 1rem;
     border-collapse: collapse;
+    background-color: #ffffff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.table-bordered th, .table-bordered td {
+    border: 1px solid #dee2e6 !important;
+    padding: 10px;
+    text-align: left;
+    white-space: nowrap;
+}
+
+.table thead th {
+    background-color: #e9ecef;
+    color: #495057;
+    font-weight: bold;
+    position: sticky;
+    top: 56px; /* Adjust based on navbar height */
+    z-index: 10;
+}
+
+.table tbody tr:nth-child(odd) {
+    background-color: #f8f9fa;
+}
+
+.table tbody tr:hover {
+    background-color: #e9ecef;
 }
 
 /* Styling for categories column in Tab 2 */
@@ -31,61 +81,119 @@ body {
 /* Hierarchy level styling */
 .subcat-level {
     margin-left: 1.5rem;
-    background-color: #f8f9fa; /* Light gray background for subcategories */
+    background-color: #f8f9fa;
     padding: 0.5rem;
-    border-left: 3px solid #007bff; /* Blue border to indicate level */
-    max-height: 800px; /* Increased for more vertical space (was 500px) */
-    overflow-y: auto; /* Enable vertical scrolling */
+    border-left: 3px solid #007bff;
+    max-height: 800px;
+    overflow-y: auto;
 }
 
 .common-level {
     margin-left: 1rem;
-    background-color: #e9ecef; /* Slightly darker gray for common names */
+    background-color: #e9ecef;
     padding: 0.5rem;
-    border-left: 3px solid #28a745; /* Green border to indicate level */
-    max-height: 800px; /* Increased for more vertical space (was 500px) */
-    overflow-y: auto; /* Enable vertical scrolling */
+    border-left: 3px solid #28a745;
+    max-height: 800px;
+    overflow-y: auto;
 }
 
 .item-level-wrapper {
     margin-left: 1rem;
-    background-color: #dee2e6; /* Even darker gray for items */
+    background-color: #dee2e6;
     padding: 0.5rem;
-    border-left: 3px solid #dc3545; /* Red border to indicate level */
-    overflow-x: auto; /* Enable horizontal scrolling */
-    max-width: 100%; /* Prevent overflow */
-    max-height: 600px; /* Increased for more vertical space (was 400px) */
-    overflow-y: auto; /* Enable vertical scrolling */
+    border-left: 3px solid #dc3545;
+    overflow-x: auto;
+    max-width: 100%;
+    max-height: 600px;
+    overflow-y: auto;
 }
 
-/* Ensure individual items table is scrollable and responsive */
 .item-level {
-    min-width: 800px; /* Ensure all columns are visible without wrapping */
+    min-width: 800px;
 }
 
-/* Adjust table styling for nested levels */
-.subcat-table th,
-.subcat-table td,
-.common-level th,
-.common-level td,
-.item-level th,
-.item-level td {
-    padding: 0.5rem;
-    text-align: left;
-}
-
-/* Allow wrapping for common name column specifically */
 .common-level th:nth-child(1),
 .common-level td:nth-child(1) {
-    white-space: normal; /* Allow text wrapping for common name */
-    word-wrap: break-word; /* Break long words */
-    max-width: 200px; /* Set a reasonable max width */
+    white-space: normal;
+    word-wrap: break-word;
+    max-width: 200px;
 }
 
-/* Ensure buttons are aligned and touch-friendly */
+/* Filter and sort controls */
+.filter-sort-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 15px;
+    background-color: #f1f3f5;
+    padding: 10px;
+    border-radius: 5px;
+}
+
+.filter-sort-controls input,
+.filter-sort-controls select {
+    flex: 1;
+    min-width: 150px;
+    border-radius: 4px;
+    border: 1px solid #ced4da;
+    padding: 5px;
+}
+
+.filter-sort-controls input:focus,
+.filter-sort-controls select:focus {
+    border-color: #007bff;
+    box-shadow: 0 0 5px rgba(0, 123, 255, 0.3);
+}
+
+/* Button styling */
 .btn-group {
     display: flex;
     gap: 0.5rem;
+}
+
+.btn {
+    margin: 2px;
+    transition: background-color 0.2s;
+}
+
+.btn-primary {
+    background-color: #007bff;
+    border-color: #007bff;
+}
+
+.btn-primary:hover {
+    background-color: #0056b3;
+    border-color: #0056b3;
+}
+
+.btn-secondary {
+    background-color: #6c757d;
+    border-color: #6c757d;
+}
+
+.btn-secondary:hover {
+    background-color: #5a6268;
+    border-color: #5a6268;
+}
+
+.btn-danger {
+    background-color: #dc3545;
+    border-color: #dc3545;
+}
+
+.btn-danger:hover {
+    background-color: #c82333;
+    border-color: #c82333;
+}
+
+.btn-success {
+    background-color: #28a745;
+    border-color: #28a745;
+}
+
+.btn-success:hover {
+    background-color: #218838;
+    border-color: #218838;
 }
 
 .btn-sm {
@@ -98,15 +206,6 @@ body {
     color: #888;
     font-style: italic;
     margin-left: 0.5rem;
-}
-
-/* Ensure nested tables don't overflow */
-.table-bordered th,
-.table-bordered td {
-    border: 1px solid #dee2e6;
-    padding: 0.5rem;
-    text-align: left;
-    white-space: nowrap; /* Prevent text wrapping by default */
 }
 
 /* Pagination controls */
@@ -139,16 +238,11 @@ body {
 }
 
 .expandable.expanded {
-    max-height: 1500px; /* Increased to accommodate larger content (was 1000px) */
+    max-height: 1500px;
     opacity: 1;
 }
 
 .hidden {
-    display: none;
-}
-
-/* Ensure hidden columns are not displayed, with high specificity to override Bootstrap */
-table.table th.hidden, table.table td.hidden {
     display: none !important;
 }
 
@@ -188,7 +282,7 @@ table.table th.hidden, table.table td.hidden {
 
     .common-level th:nth-child(1),
     .common-level td:nth-child(1) {
-        max-width: 150px; /* Adjust for smaller screens */
+        max-width: 150px;
     }
 
     .category-cell {
@@ -198,5 +292,14 @@ table.table th.hidden, table.table td.hidden {
     .category-item {
         margin-bottom: 0.3rem;
         font-size: 0.85rem;
+    }
+
+    .filter-sort-controls {
+        flex-direction: column;
+    }
+
+    .filter-sort-controls input,
+    .filter-sort-controls select {
+        width: 100%;
     }
 }

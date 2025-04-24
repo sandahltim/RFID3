@@ -1,4 +1,4 @@
-console.log('expand.js version: 2025-04-23 v27 loaded');
+console.log('expand.js version: 2025-04-24 v28 loaded');
 
 function showLoading(key) {
     const loadingDiv = document.getElementById(`loading-${key}`);
@@ -84,8 +84,6 @@ function collapseSection(targetId) {
 function loadCommonNames(category, subcategory, targetId, page = 1, contractNumber = null) {
     console.log('loadCommonNames called with', { category, subcategory, targetId, page, contractNumber });
 
-    // For Tabs 2 and 4, targetId is already the correct container ID (e.g., 'common-212761')
-    // For Tabs 1, 3, and 5, targetId is a base ID (e.g., 'resale_resale'), so we need to prepend 'common-'
     const containerId = (window.cachedTabNum == 2 || window.cachedTabNum == 4) ? targetId : `common-${targetId}`;
     const container = document.getElementById(containerId);
     if (!container) {
@@ -107,6 +105,16 @@ function loadCommonNames(category, subcategory, targetId, page = 1, contractNumb
         url += `&subcategory=${encodeURIComponent(subcategory)}`;
     }
 
+    // Add filter and sort parameters
+    const commonFilter = document.getElementById(`common-filter-${key}`)?.value || '';
+    const commonSort = document.getElementById(`common-sort-${key}`)?.value || '';
+    if (commonFilter) {
+        url += `&filter=${encodeURIComponent(commonFilter)}`;
+    }
+    if (commonSort) {
+        url += `&sort=${encodeURIComponent(commonSort)}`;
+    }
+
     fetch(url)
         .then(response => {
             console.log('Fetch finished loading:', `GET "${url}"`);
@@ -124,6 +132,16 @@ function loadCommonNames(category, subcategory, targetId, page = 1, contractNumb
 
                 html += `
                     <div class="common-level">
+                        <div class="filter-sort-controls">
+                            <input type="text" id="common-filter-${key}" placeholder="Filter common names..." value="${commonFilter}" oninput="loadCommonNames('${category}', '${subcategory || ''}', '${targetId}', 1, '${contractNumber || ''}')">
+                            <select id="common-sort-${key}" onchange="loadCommonNames('${category}', '${subcategory || ''}', '${targetId}', 1, '${contractNumber || ''}')">
+                                <option value="">Sort By...</option>
+                                <option value="name_asc" ${commonSort === 'name_asc' ? 'selected' : ''}>Name (A-Z)</option>
+                                <option value="name_desc" ${commonSort === 'name_desc' ? 'selected' : ''}>Name (Z-A)</option>
+                                <option value="total_items_asc" ${commonSort === 'total_items_asc' ? 'selected' : ''}>Total Items (Low to High)</option>
+                                <option value="total_items_desc" ${commonSort === 'total_items_desc' ? 'selected' : ''}>Total Items (High to Low)</option>
+                            </select>
+                        </div>
                         <table class="table table-bordered mt-2" id="common-table-${key}">
                             <thead>
                                 <tr>
@@ -144,7 +162,8 @@ function loadCommonNames(category, subcategory, targetId, page = 1, contractNumb
                                 <td>
                                     <button class="btn btn-sm btn-secondary expand-btn" onclick="loadItems('${category}', '${subcategory || ''}', '${item.name}', 'items-${rowId}')">Expand</button>
                                     <button class="btn btn-sm btn-secondary collapse-btn" style="display:none;" onclick="collapseSection('items-${rowId}')">Collapse</button>
-                                    <button class="btn btn-sm btn-info print-btn" data-print-level="Common Name" data-print-id="common-table-${key}">Print</button>
+                                    <button class="btn btn-sm btn-info print-btn" data-print-level="Common Name" data-print-id="common-table-${key}" data-common-name="${item.name}" data-category="${category}" data-subcategory="${subcategory || ''}">Print Aggregate</button>
+                                    <button class="btn btn-sm btn-info print-full-btn" data-common-name="${item.name}" data-category="${category}" data-subcategory="${subcategory || ''}">Print Full List</button>
                                     <div id="loading-${rowId}" style="display:none;" class="loading">Loading...</div>
                                 </td>
                             </tr>
@@ -165,7 +184,8 @@ function loadCommonNames(category, subcategory, targetId, page = 1, contractNumb
                                 <td>
                                     <button class="btn btn-sm btn-secondary expand-btn" onclick="loadItems('${category}', '${subcategory || ''}', '${item.name}', 'items-${rowId}')">Expand</button>
                                     <button class="btn btn-sm btn-secondary collapse-btn" style="display:none;" onclick="collapseSection('items-${rowId}')">Collapse</button>
-                                    <button class="btn btn-sm btn-info print-btn" data-print-level="Common Name" data-print-id="common-table-${key}">Print</button>
+                                    <button class="btn btn-sm btn-info print-btn" data-print-level="Common Name" data-print-id="common-table-${key}" data-common-name="${item.name}" data-category="${category}" data-subcategory="${subcategory || ''}">Print Aggregate</button>
+                                    <button class="btn btn-sm btn-info print-full-btn" data-common-name="${item.name}" data-category="${category}" data-subcategory="${subcategory || ''}">Print Full List</button>
                                     <div id="loading-${rowId}" style="display:none;" class="loading">Loading...</div>
                                 </td>
                             </tr>
@@ -183,9 +203,9 @@ function loadCommonNames(category, subcategory, targetId, page = 1, contractNumb
                     html += `
                         <tr>
                             <td colspan="${headers.length}" class="pagination-controls">
-                                <button class="btn btn-sm btn-secondary" onclick="loadCommonNames('${category}', '${subcategory || ''}', '${targetId}', ${page - 1})" ${page === 1 ? 'disabled' : ''}>Previous</button>
+                                <button class="btn btn-sm btn-secondary" onclick="loadCommonNames('${category}', '${subcategory || ''}', '${targetId}', ${page - 1}, '${contractNumber || ''}')" ${page === 1 ? 'disabled' : ''}>Previous</button>
                                 <span>Page ${page} of ${totalPages}</span>
-                                <button class="btn btn-sm btn-secondary" onclick="loadCommonNames('${category}', '${subcategory || ''}', '${targetId}', ${page + 1})" ${page === totalPages ? 'disabled' : ''}>Next</button>
+                                <button class="btn btn-sm btn-secondary" onclick="loadCommonNames('${category}', '${subcategory || ''}', '${targetId}', ${page + 1}, '${contractNumber || ''}')" ${page === totalPages ? 'disabled' : ''}>Next</button>
                             </td>
                         </tr>
                     `;
@@ -242,11 +262,20 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
     if (subcategory) {
         url += `&subcategory=${encodeURIComponent(subcategory)}`;
     }
-    // For Tabs 2 and 4, include contract_number instead of category
     if (window.cachedTabNum == 2 || window.cachedTabNum == 4) {
         url += `&contract_number=${encodeURIComponent(category)}`;
     } else {
         url += `&category=${encodeURIComponent(category)}`;
+    }
+
+    // Add filter and sort parameters
+    const itemFilter = document.getElementById(`item-filter-${key}`)?.value || '';
+    const itemSort = document.getElementById(`item-sort-${key}`)?.value || '';
+    if (itemFilter) {
+        url += `&filter=${encodeURIComponent(itemFilter)}`;
+    }
+    if (itemSort) {
+        url += `&sort=${encodeURIComponent(itemSort)}`;
     }
 
     fetch(url)
@@ -267,6 +296,16 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
 
                 html += `
                     <div class="item-level-wrapper">
+                        <div class="filter-sort-controls">
+                            <input type="text" id="item-filter-${key}" placeholder="Filter items..." value="${itemFilter}" oninput="loadItems('${category}', '${subcategory || ''}', '${commonName}', '${targetId}', 1)">
+                            <select id="item-sort-${key}" onchange="loadItems('${category}', '${subcategory || ''}', '${commonName}', '${targetId}', 1)">
+                                <option value="">Sort By...</option>
+                                <option value="tag_id_asc" ${itemSort === 'tag_id_asc' ? 'selected' : ''}>Tag ID (A-Z)</option>
+                                <option value="tag_id_desc" ${itemSort === 'tag_id_desc' ? 'selected' : ''}>Tag ID (Z-A)</option>
+                                <option value="last_scanned_date_desc" ${itemSort === 'last_scanned_date_desc' ? 'selected' : ''}>Last Scanned (Newest)</option>
+                                <option value="last_scanned_date_asc" ${itemSort === 'last_scanned_date_asc' ? 'selected' : ''}>Last Scanned (Oldest)</option>
+                            </select>
+                        </div>
                         <table class="table table-bordered item-level mt-2" id="item-table-${key}">
                             <thead>
                                 <tr>
@@ -366,9 +405,19 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
     hideOtherSubcats(normalizedCategory);
     showLoading(normalizedCategory);
 
-    fetch(`/tab/${window.cachedTabNum}/subcat_data?category=${encodeURIComponent(originalCategory)}&page=${page}`)
+    let url = `/tab/${window.cachedTabNum}/subcat_data?category=${encodeURIComponent(originalCategory)}&page=${page}`;
+    const subcatFilter = document.getElementById(`subcat-filter-${normalizedCategory}`)?.value || '';
+    const subcatSort = document.getElementById(`subcat-sort-${normalizedCategory}`)?.value || '';
+    if (subcatFilter) {
+        url += `&filter=${encodeURIComponent(subcatFilter)}`;
+    }
+    if (subcatSort) {
+        url += `&sort=${encodeURIComponent(subcatSort)}`;
+    }
+
+    fetch(url)
         .then(response => {
-            console.log('Fetch finished loading:', `GET "/tab/${window.cachedTabNum}/subcat_data?category=${encodeURIComponent(originalCategory)}&page=${page}"`);
+            console.log('Fetch finished loading:', `GET "${url}"`);
             if (!response.ok) {
                 throw new Error(`Subcategory fetch failed with status ${response.status}`);
             }
@@ -377,6 +426,18 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
         .then(data => {
             let html = '';
             if (data.subcategories && data.subcategories.length > 0) {
+                html += `
+                    <div class="filter-sort-controls">
+                        <input type="text" id="subcat-filter-${normalizedCategory}" placeholder="Filter subcategories..." value="${subcatFilter}" oninput="loadSubcatData('${originalCategory}', '${normalizedCategory}', '${targetId}', 1)">
+                        <select id="subcat-sort-${normalizedCategory}" onchange="loadSubcatData('${originalCategory}', '${normalizedCategory}', '${targetId}', 1)">
+                            <option value="">Sort By...</option>
+                            <option value="subcategory_asc" ${subcatSort === 'subcategory_asc' ? 'selected' : ''}>Subcategory (A-Z)</option>
+                            <option value="subcategory_desc" ${subcatSort === 'subcategory_desc' ? 'selected' : ''}>Subcategory (Z-A)</option>
+                            <option value="total_items_asc" ${subcatSort === 'total_items_asc' ? 'selected' : ''}>Total Items (Low to High)</option>
+                            <option value="total_items_desc" ${subcatSort === 'total_items_desc' ? 'selected' : ''}>Total Items (High to Low)</option>
+                        </select>
+                    </div>
+                `;
                 data.subcategories.forEach(subcat => {
                     console.log('Processing subcategory:', subcat);
                     const subcatKey = `${normalizedCategory}_${subcat.subcategory.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
