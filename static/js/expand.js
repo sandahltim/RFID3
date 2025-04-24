@@ -97,9 +97,11 @@ function loadCommonNames(category, subcategory, targetId, page = 1, contractNumb
     showLoading(key);
     hideOtherCommonNames(containerId);
 
-    let url = `/tab/${window.cachedTabNum}/common_names?category=${encodeURIComponent(category)}&page=${page}`;
-    if (contractNumber) {
+    let url = `/tab/${window.cachedTabNum}/common_names?page=${page}`;
+    if (window.cachedTabNum == 2 || window.cachedTabNum == 4) {
         url += `&contract_number=${encodeURIComponent(contractNumber)}`;
+    } else {
+        url += `&category=${encodeURIComponent(category)}`;
     }
     if (subcategory) {
         url += `&subcategory=${encodeURIComponent(subcategory)}`;
@@ -236,9 +238,15 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
     showLoading(key);
     hideOtherItems(targetId);
 
-    let url = `/tab/${window.cachedTabNum}/data?category=${encodeURIComponent(category)}&common_name=${encodeURIComponent(commonName)}&page=${page}`;
+    let url = `/tab/${window.cachedTabNum}/data?common_name=${encodeURIComponent(commonName)}&page=${page}`;
     if (subcategory) {
         url += `&subcategory=${encodeURIComponent(subcategory)}`;
+    }
+    // For Tabs 2 and 4, include contract_number instead of category
+    if (window.cachedTabNum == 2 || window.cachedTabNum == 4) {
+        url += `&contract_number=${encodeURIComponent(category)}`;
+    } else {
+        url += `&category=${encodeURIComponent(category)}`;
     }
 
     fetch(url)
