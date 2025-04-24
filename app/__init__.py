@@ -1,5 +1,6 @@
 import os
 import logging
+from logging.handlers import RotatingFileHandler
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_redis import FlaskRedis
@@ -17,17 +18,19 @@ def create_app():
     log_dir = os.path.dirname(LOG_FILE)
     if not os.path.exists(log_dir):
         os.makedirs(log_dir)
-    handler = logging.FileHandler(LOG_FILE)
+    handler = RotatingFileHandler(LOG_FILE, maxBytes=1000000, backupCount=5)
     handler.setLevel(logging.DEBUG)
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     handler.setFormatter(formatter)
+    # Clear existing handlers to prevent duplicates
+    logging.getLogger('').handlers = []
+    app.logger.handlers = []
     # Add handler to root logger and app logger
     logging.getLogger('').addHandler(handler)
-    app.logger.handlers = []  # Clear existing handlers
     app.logger.addHandler(handler)
     app.logger.setLevel(logging.DEBUG)
     app.logger.propagate = False  # Prevent double logging
-    app.logger.info("Application starting up")
+    app.logger.info("Application starting up - logging initialized")
     app.logger.debug(f"Static folder path: {app.static_folder}")
 
     # Database configuration
