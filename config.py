@@ -29,3 +29,4 @@ INCREMENTAL_REFRESH_INTERVAL = 30  # 30 seconds
 
 # Logging
 LOG_FILE = os.path.join(BASE_DIR, 'logs', 'rfid_dashboard.log')
+#mariadbhash   *8226E019AE8D0D41243D07D91ABCD8E2F20358BC  root password    MySecureRootPass123
