@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, request, jsonify, current_app
-from .. import db, cache
+from .. import db
 from ..models.db_models import ItemMaster, Transaction, RentalClassMapping, UserRentalClassMapping
-from sqlalchemy import func, desc, or_
+from sqlalchemy import func, desc, or_, asc
 from time import time
 
 tab1_bp = Blueprint('tab1', __name__)
@@ -35,19 +35,33 @@ def tab1_view():
 
         # Calculate counts for each category
         category_data = []
+        # Apply filter and sort if provided
+        filter_query = request.args.get('filter', '').lower()
+        sort = request.args.get('sort', '')
+
         for cat, mappings in categories.items():
             rental_class_ids = [m['rental_class_id'] for m in mappings]
 
             # Total items in this category
-            total_items = session.query(func.count(ItemMaster.tag_id)).filter(
+            total_items_query = session.query(func.count(ItemMaster.tag_id)).filter(
                 func.trim(func.upper(func.cast(ItemMaster.rental_class_num, db.String))).in_(rental_class_ids)
-            ).scalar()
+            )
+            if filter_query:
+                total_items_query = total_items_query.filter(
+                    func.lower(ItemMaster.common_name).like(f'%{filter_query}%')
+                )
+            total_items = total_items_query.scalar()
 
             # Items on contracts (status = 'On Rent' or 'Delivered')
-            items_on_contracts = session.query(func.count(ItemMaster.tag_id)).filter(
+            items_on_contracts_query = session.query(func.count(ItemMaster.tag_id)).filter(
                 func.trim(func.upper(func.cast(ItemMaster.rental_class_num, db.String))).in_(rental_class_ids),
                 ItemMaster.status.in_(['On Rent', 'Delivered'])
-            ).scalar()
+            )
+            if filter_query:
+                items_on_contracts_query = items_on_contracts_query.filter(
+                    func.lower(ItemMaster.common_name).like(f'%{filter_query}%')
+                )
+            items_on_contracts = items_on_contracts_query.scalar()
 
             # Items in service logic
             subquery = session.query(
@@ -60,7 +74,7 @@ def tab1_view():
                 Transaction.scan_date.desc()
             ).subquery()
 
-            items_in_service = session.query(func.count(ItemMaster.tag_id)).filter(
+            items_in_service_query = session.query(func.count(ItemMaster.tag_id)).filter(
                 func.trim(func.upper(func.cast(ItemMaster.rental_class_num, db.String))).in_(rental_class_ids),
                 or_(
                     ItemMaster.status.notin_(['Ready to Rent', 'On Rent', 'Delivered']),
@@ -71,13 +85,23 @@ def tab1_view():
                         )
                     )
                 )
-            ).scalar()
+            )
+            if filter_query:
+                items_in_service_query = items_in_service_query.filter(
+                    func.lower(ItemMaster.common_name).like(f'%{filter_query}%')
+                )
+            items_in_service = items_in_service_query.scalar()
 
             # Items available (status = 'Ready to Rent')
-            items_available = session.query(func.count(ItemMaster.tag_id)).filter(
+            items_available_query = session.query(func.count(ItemMaster.tag_id)).filter(
                 func.trim(func.upper(func.cast(ItemMaster.rental_class_num, db.String))).in_(rental_class_ids),
                 ItemMaster.status == 'Ready to Rent'
-            ).scalar()
+            )
+            if filter_query:
+                items_available_query = items_available_query.filter(
+                    func.lower(ItemMaster.common_name).like(f'%{filter_query}%')
+                )
+            items_available = items_available_query.scalar()
 
             category_data.append({
                 'category': cat,
@@ -88,7 +112,16 @@ def tab1_view():
                 'items_available': items_available or 0
             })
 
-        category_data.sort(key=lambda x: x['category'])
+        # Sort category data
+        if sort == 'category_asc':
+            category_data.sort(key=lambda x: x['category'].lower())
+        elif sort == 'category_desc':
+            category_data.sort(key=lambda x: x['category'].lower(), reverse=True)
+        elif sort == 'total_items_asc':
+            category_data.sort(key=lambda x: x['total_items'])
+        elif sort == 'total_items_desc':
+            category_data.sort(key=lambda x: x['total_items'], reverse=True)
+
         current_app.logger.info(f"Fetched {len(category_data)} categories for tab1")
 
         session.close()
@@ -102,6 +135,8 @@ def tab1_subcat_data():
     category = request.args.get('category')
     page = int(request.args.get('page', 1))
     per_page = 10
+    filter_query = request.args.get('filter', '').lower()
+    sort = request.args.get('sort', '')
 
     if not category:
         return jsonify({'error': 'Category is required'}), 400
@@ -125,8 +160,16 @@ def tab1_subcat_data():
                 subcategories[subcategory] = []
             subcategories[subcategory].append(rental_class_id)
 
-        # Paginate subcategories
+        # Apply filter and sort
         subcat_list = sorted(subcategories.keys())
+        if filter_query:
+            subcat_list = [s for s in subcat_list if filter_query in s.lower()]
+        if sort == 'subcategory_asc':
+            subcat_list.sort()
+        elif sort == 'subcategory_desc':
+            subcat_list.sort(reverse=True)
+
+        # Paginate subcategories
         total_subcats = len(subcat_list)
         start = (page - 1) * per_page
         end = start + per_page
@@ -137,15 +180,25 @@ def tab1_subcat_data():
             rental_class_ids = subcategories[subcat]
 
             # Total items in this subcategory
-            total_items = session.query(func.count(ItemMaster.tag_id)).filter(
+            total_items_query = session.query(func.count(ItemMaster.tag_id)).filter(
                 func.trim(func.upper(func.cast(ItemMaster.rental_class_num, db.String))).in_(rental_class_ids)
-            ).scalar()
+            )
+            if filter_query:
+                total_items_query = total_items_query.filter(
+                    func.lower(ItemMaster.common_name).like(f'%{filter_query}%')
+                )
+            total_items = total_items_query.scalar()
 
             # Items on contracts (status = 'On Rent' or 'Delivered')
-            items_on_contracts = session.query(func.count(ItemMaster.tag_id)).filter(
+            items_on_contracts_query = session.query(func.count(ItemMaster.tag_id)).filter(
                 func.trim(func.upper(func.cast(ItemMaster.rental_class_num, db.String))).in_(rental_class_ids),
                 ItemMaster.status.in_(['On Rent', 'Delivered'])
-            ).scalar()
+            )
+            if filter_query:
+                items_on_contracts_query = items_on_contracts_query.filter(
+                    func.lower(ItemMaster.common_name).like(f'%{filter_query}%')
+                )
+            items_on_contracts = items_on_contracts_query.scalar()
 
             # Items in service
             subquery = session.query(
@@ -158,7 +211,7 @@ def tab1_subcat_data():
                 Transaction.scan_date.desc()
             ).subquery()
 
-            items_in_service = session.query(func.count(ItemMaster.tag_id)).filter(
+            items_in_service_query = session.query(func.count(ItemMaster.tag_id)).filter(
                 func.trim(func.upper(func.cast(ItemMaster.rental_class_num, db.String))).in_(rental_class_ids),
                 or_(
                     ItemMaster.status.notin_(['Ready to Rent', 'On Rent', 'Delivered']),
@@ -169,13 +222,23 @@ def tab1_subcat_data():
                         )
                     )
                 )
-            ).scalar()
+            )
+            if filter_query:
+                items_in_service_query = items_in_service_query.filter(
+                    func.lower(ItemMaster.common_name).like(f'%{filter_query}%')
+                )
+            items_in_service = items_in_service_query.scalar()
 
             # Items available (status = 'Ready to Rent')
-            items_available = session.query(func.count(ItemMaster.tag_id)).filter(
+            items_available_query = session.query(func.count(ItemMaster.tag_id)).filter(
                 func.trim(func.upper(func.cast(ItemMaster.rental_class_num, db.String))).in_(rental_class_ids),
                 ItemMaster.status == 'Ready to Rent'
-            ).scalar()
+            )
+            if filter_query:
+                items_available_query = items_available_query.filter(
+                    func.lower(ItemMaster.common_name).like(f'%{filter_query}%')
+                )
+            items_available = items_available_query.scalar()
 
             subcategory_data.append({
                 'subcategory': subcat,
@@ -184,6 +247,12 @@ def tab1_subcat_data():
                 'in_service': items_in_service or 0,
                 'available': items_available or 0
             })
+
+            # Sort subcategory data if needed
+            if sort == 'total_items_asc':
+                subcategory_data.sort(key=lambda x: x['total_items'])
+            elif sort == 'total_items_desc':
+                subcategory_data.sort(key=lambda x: x['total_items'], reverse=True)
 
         session.close()
         return jsonify({
@@ -202,6 +271,8 @@ def tab1_common_names():
     subcategory = request.args.get('subcategory')
     page = int(request.args.get('page', 1))
     per_page = 10
+    filter_query = request.args.get('filter', '').lower()
+    sort = request.args.get('sort', '')
 
     if not category or not subcategory:
         return jsonify({'error': 'Category and subcategory are required'}), 400
@@ -225,21 +296,41 @@ def tab1_common_names():
             func.count(ItemMaster.tag_id).label('total_items')
         ).filter(
             func.trim(func.upper(func.cast(ItemMaster.rental_class_num, db.String))).in_(rental_class_ids)
-        ).group_by(
-            ItemMaster.common_name
-        ).all()
+        )
+        if filter_query:
+            common_names_query = common_names_query.filter(
+                func.lower(ItemMaster.common_name).like(f'%{filter_query}%')
+            )
+        common_names_query = common_names_query.group_by(ItemMaster.common_name)
 
+        # Apply sorting
+        if sort == 'name_asc':
+            common_names_query = common_names_query.order_by(asc(func.lower(ItemMaster.common_name)))
+        elif sort == 'name_desc':
+            common_names_query = common_names_query.order_by(desc(func.lower(ItemMaster.common_name)))
+        elif sort == 'total_items_asc':
+            common_names_query = common_names_query.order_by(asc('total_items'))
+        elif sort == 'total_items_desc':
+            common_names_query = common_names_query.order_by(desc('total_items'))
+
+        # Fetch all common names to calculate total before pagination
+        common_names_all = common_names_query.all()
         common_names = []
-        for name, total in common_names_query:
+        for name, total in common_names_all:
             if not name:  # Skip items with no common name
                 continue
 
             # Items on contracts (status = 'On Rent' or 'Delivered')
-            items_on_contracts = session.query(func.count(ItemMaster.tag_id)).filter(
+            items_on_contracts_query = session.query(func.count(ItemMaster.tag_id)).filter(
                 func.trim(func.upper(func.cast(ItemMaster.rental_class_num, db.String))).in_(rental_class_ids),
                 ItemMaster.common_name == name,
                 ItemMaster.status.in_(['On Rent', 'Delivered'])
-            ).scalar()
+            )
+            if filter_query:
+                items_on_contracts_query = items_on_contracts_query.filter(
+                    func.lower(ItemMaster.common_name).like(f'%{filter_query}%')
+                )
+            items_on_contracts = items_on_contracts_query.scalar()
 
             # Items in service
             subquery = session.query(
@@ -252,7 +343,7 @@ def tab1_common_names():
                 Transaction.scan_date.desc()
             ).subquery()
 
-            items_in_service = session.query(func.count(ItemMaster.tag_id)).filter(
+            items_in_service_query = session.query(func.count(ItemMaster.tag_id)).filter(
                 func.trim(func.upper(func.cast(ItemMaster.rental_class_num, db.String))).in_(rental_class_ids),
                 ItemMaster.common_name == name,
                 or_(
@@ -264,14 +355,24 @@ def tab1_common_names():
                         )
                     )
                 )
-            ).scalar()
+            )
+            if filter_query:
+                items_in_service_query = items_in_service_query.filter(
+                    func.lower(ItemMaster.common_name).like(f'%{filter_query}%')
+                )
+            items_in_service = items_in_service_query.scalar()
 
             # Items available (status = 'Ready to Rent')
-            items_available = session.query(func.count(ItemMaster.tag_id)).filter(
+            items_available_query = session.query(func.count(ItemMaster.tag_id)).filter(
                 func.trim(func.upper(func.cast(ItemMaster.rental_class_num, db.String))).in_(rental_class_ids),
                 ItemMaster.common_name == name,
                 ItemMaster.status == 'Ready to Rent'
-            ).scalar()
+            )
+            if filter_query:
+                items_available_query = items_available_query.filter(
+                    func.lower(ItemMaster.common_name).like(f'%{filter_query}%')
+                )
+            items_available = items_available_query.scalar()
 
             common_names.append({
                 'name': name,
@@ -305,6 +406,8 @@ def tab1_data():
     common_name = request.args.get('common_name')
     page = int(request.args.get('page', 1))
     per_page = 10
+    filter_query = request.args.get('filter', '').lower()
+    sort = request.args.get('sort', '')
 
     if not category or not subcategory or not common_name:
         return jsonify({'error': 'Category, subcategory, and common name are required'}), 400
@@ -327,10 +430,29 @@ def tab1_data():
             func.trim(func.upper(func.cast(ItemMaster.rental_class_num, db.String))).in_(rental_class_ids),
             ItemMaster.common_name == common_name
         )
+        if filter_query:
+            query = query.filter(
+                or_(
+                    func.lower(ItemMaster.tag_id).like(f'%{filter_query}%'),
+                    func.lower(ItemMaster.bin_location).like(f'%{filter_query}%'),
+                    func.lower(ItemMaster.status).like(f'%{filter_query}%'),
+                    func.lower(ItemMaster.last_contract_num).like(f'%{filter_query}%')
+                )
+            )
+
+        # Apply sorting
+        if sort == 'tag_id_asc':
+            query = query.order_by(asc(ItemMaster.tag_id))
+        elif sort == 'tag_id_desc':
+            query = query.order_by(desc(ItemMaster.tag_id))
+        elif sort == 'last_scanned_date_asc':
+            query = query.order_by(asc(ItemMaster.date_last_scanned))
+        elif sort == 'last_scanned_date_desc':
+            query = query.order_by(desc(ItemMaster.date_last_scanned))
 
         # Paginate items
         total_items = query.count()
-        items = query.order_by(ItemMaster.tag_id).offset((page - 1) * per_page).limit(per_page).all()
+        items = query.offset((page - 1) * per_page).limit(per_page).all()
 
         items_data = []
         for item in items:
@@ -356,3 +478,56 @@ def tab1_data():
     except Exception as e:
         current_app.logger.error(f"Error fetching items for category {category}, subcategory {subcategory}, common_name {common_name}: {str(e)}")
         return jsonify({'error': 'Failed to fetch items'}), 500
+
+@tab1_bp.route('/tab/1/full_items_by_rental_class')
+def full_items_by_rental_class():
+    category = request.args.get('category')
+    subcategory = request.args.get('subcategory')
+    common_name = request.args.get('common_name')
+
+    if not category or not subcategory or not common_name:
+        return jsonify({'error': 'Category, subcategory, and common name are required'}), 400
+
+    try:
+        session = db.session()
+
+        # Fetch rental class IDs for this category and subcategory
+        base_mappings = session.query(RentalClassMapping).filter_by(category=category, subcategory=subcategory).all()
+        user_mappings = session.query(UserRentalClassMapping).filter_by(category=category, subcategory=subcategory).all()
+
+        mappings_dict = {m.rental_class_id: {'category': m.category, 'subcategory': m.subcategory} for m in base_mappings}
+        for um in user_mappings:
+            mappings_dict[um.rental_class_id] = {'category': um.category, 'subcategory': um.subcategory}
+
+        rental_class_ids = list(mappings_dict.keys())
+
+        # Fetch all items with the same rental_class_num and common_name
+        items_query = session.query(ItemMaster).filter(
+            func.trim(func.upper(func.cast(ItemMaster.rental_class_num, db.String))).in_(rental_class_ids),
+            ItemMaster.common_name == common_name
+        ).order_by(ItemMaster.tag_id)
+
+        items = items_query.all()
+        items_data = []
+        for item in items:
+            last_scanned_date = item.date_last_scanned.isoformat() if item.date_last_scanned else 'N/A'
+            items_data.append({
+                'tag_id': item.tag_id,
+                'common_name': item.common_name,
+                'rental_class_num': item.rental_class_num,
+                'bin_location': item.bin_location,
+                'status': item.status,
+                'last_contract_num': item.last_contract_num,
+                'last_scanned_date': last_scanned_date,
+                'quality': item.quality,
+                'notes': item.notes
+            })
+
+        session.close()
+        return jsonify({
+            'items': items_data,
+            'total_items': len(items_data)
+        })
+    except Exception as e:
+        current_app.logger.error(f"Error fetching full items for category {category}, subcategory {subcategory}, common_name {common_name}: {str(e)}")
+        return jsonify({'error': 'Failed to fetch full items'}), 500
