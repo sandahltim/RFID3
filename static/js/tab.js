@@ -10,7 +10,6 @@ window.applyFilters = function() {
 
     const tables = document.querySelectorAll('table');
     tables.forEach(table => {
-        // Only apply filters to the main category table
         if (table.id !== 'category-table') {
             console.log(`Skipping filter application for table: ${table.id}`);
             return;
@@ -277,6 +276,7 @@ async function printTable(level, id, commonName = null, category = null, subcate
                 </div>
                 <script>
                     window.onload = function() {
+                        console.log('Print window loaded, content:', document.body.innerHTML);
                         window.print();
                         window.onafterprint = function() {
                             window.close();
@@ -423,6 +423,7 @@ async function printFullItemList(category, subcategory, commonName) {
                 </div>
                 <script>
                     window.onload = function() {
+                        console.log('Full item list print window loaded, content:', document.body.innerHTML);
                         window.print();
                         window.onafterprint = function() {
                             window.close();

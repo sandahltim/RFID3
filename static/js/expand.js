@@ -1,4 +1,4 @@
-console.log('expand.js version: 2025-04-25 v38 loaded');
+console.log('expand.js version: 2025-04-25 v39 loaded');
 
 function showLoading(key) {
     const loadingDiv = document.getElementById(`loading-${key}`);
@@ -30,9 +30,9 @@ function hideOtherSubcats(currentCategory) {
             console.log('Collapsing subcat div:', divId);
             div.classList.remove('expanded');
             div.classList.add('collapsed');
-            div.classList.remove('fade'); // Remove Bootstrap fade class
+            div.classList.remove('fade');
             div.style.display = 'none';
-            div.style.opacity = '0'; // Ensure collapsed state
+            div.style.opacity = '0';
         } else {
             console.log(`Keeping subcat div visible: ${divId}`);
         }
@@ -78,7 +78,7 @@ function collapseSection(targetId) {
         section.classList.add('collapsed');
         section.classList.remove('fade');
         section.style.display = 'none';
-        section.style.opacity = '0'; // Ensure collapsed state
+        section.style.opacity = '0';
 
         const expandBtn = document.querySelector(`button[onclick*="${targetId}"]`);
         const collapseBtn = expandBtn ? expandBtn.nextElementSibling : null;
@@ -98,6 +98,8 @@ function loadCommonNames(category, subcategory, targetId, page = 1, contractNumb
         console.error(`Container with ID ${containerId} not found`);
         return;
     }
+    console.log('Common names container found:', container);
+    console.log('Common names container classes before update:', container.className);
 
     const key = subcategory ? `${category}_${subcategory}` : category;
     showLoading(key);
@@ -228,13 +230,40 @@ function loadCommonNames(category, subcategory, targetId, page = 1, contractNumb
                 html = `<div class="common-level"><p>No common names found for this ${subcategory ? 'subcategory' : 'category'}.</p></div>`;
             }
 
+            console.log('Setting common names container HTML for targetId:', targetId);
             container.innerHTML = html;
             container.classList.remove('collapsed');
             container.classList.add('expanded');
-            container.classList.remove('fade'); // Remove Bootstrap fade class
-            container.classList.add('show'); // Ensure Bootstrap show class if needed
+            container.classList.remove('fade');
+            container.classList.add('show');
             container.style.display = 'block';
-            container.style.opacity = '1'; // Force visibility
+            container.style.opacity = '1';
+            console.log('Common names container classes after update:', container.className);
+            console.log('Common names container updated with HTML:', container.innerHTML);
+
+            // Debug the container's computed style
+            const computedContainerStyle = window.getComputedStyle(container);
+            console.log('Common names container computed style:', {
+                display: computedContainerStyle.display,
+                visibility: computedContainerStyle.visibility,
+                opacity: computedContainerStyle.opacity,
+                height: computedContainerStyle.height,
+                transition: computedContainerStyle.transition
+            });
+
+            // Debug the common-level div
+            const commonLevel = container.querySelector('.common-level');
+            if (commonLevel) {
+                const computedCommonLevelStyle = window.getComputedStyle(commonLevel);
+                console.log('Common-level computed style:', {
+                    display: computedCommonLevelStyle.display,
+                    visibility: computedCommonLevelStyle.visibility,
+                    opacity: computedCommonLevelStyle.opacity,
+                    height: computedCommonLevelStyle.height
+                });
+            } else {
+                console.log('Common-level div not found');
+            }
 
             const expandBtn = document.querySelector(`button[onclick*="loadCommonNames('${category}', '${subcategory || ''}', '${targetId}')"]`);
             const collapseBtn = expandBtn ? expandBtn.nextElementSibling : null;
@@ -334,6 +363,11 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
                                             <div id="loading-${subcatKey}" style="display:none;" class="loading">Loading...</div>
                                         </td>
                                     </tr>
+                                    <tr>
+                                        <td colspan="${headers.length}">
+                                            <div id="common-${subcatKey}" class="expandable collapsed"></div>
+                                        </td>
+                                    </tr>
                                 </tbody>
                             </table>
                         </div>
@@ -359,10 +393,10 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
             container.innerHTML = html;
             container.classList.remove('collapsed');
             container.classList.add('expanded');
-            container.classList.remove('fade'); // Remove Bootstrap fade class
-            container.classList.add('show'); // Ensure Bootstrap show class if needed
+            container.classList.remove('fade');
+            container.classList.add('show');
             container.style.display = 'block';
-            container.style.opacity = '1'; // Force visibility
+            container.style.opacity = '1';
             console.log('Container classes after update:', container.className);
             console.log('Container updated with HTML:', container.innerHTML);
 
