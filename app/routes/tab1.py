@@ -5,6 +5,7 @@ from sqlalchemy import func, desc, or_, asc
 from time import time
 import logging
 import sys
+from urllib.parse import unquote  # Add this import for URL decoding
 
 # Configure logging
 logger = logging.getLogger('tab1')
@@ -29,7 +30,7 @@ logger.addHandler(console_handler)
 tab1_bp = Blueprint('tab1', __name__)
 
 # Version marker
-logger.info("Deployed tab1.py version: 2025-04-25-v8")
+logger.info("Deployed tab1.py version: 2025-04-25-v9")
 
 @tab1_bp.route('/tab/1')
 def tab1_view():
@@ -159,11 +160,12 @@ def tab1_view():
         return render_template('tab1.html', categories=category_data, cache_bust=int(time()))
     except Exception as e:
         logger.error(f"Error rendering Tab 1: {str(e)}", exc_info=True)
-        return render_template('tab1.1.html', categories=[], cache_bust=int(time()))
+        return render_template('tab1.html', categories=[], cache_bust=int(time()))
 
 @tab1_bp.route('/tab/1/subcat_data')
 def tab1_subcat_data():
-    category = request.args.get('category')
+    # Decode the category parameter to handle URL-encoded values
+    category = unquote(request.args.get('category'))
     page = int(request.args.get('page', 1))
     per_page = 10
     filter_query = request.args.get('filter', '').lower()
@@ -185,6 +187,12 @@ def tab1_subcat_data():
             func.lower(UserRentalClassMapping.category) == category.lower()
         ).all()
         logger.debug(f"Fetched {len(base_mappings)} base mappings and {len(user_mappings)} user mappings for category {category}")
+
+        # Log the mappings for debugging
+        if base_mappings:
+            logger.debug("Base mappings: " + ", ".join([f"{ms.rental_class_id}: {m.category} - {m.subcategory}" for m in base_mappings]))
+        if user_mappings:
+            logger.debug("User mappings: " + ", ".join([f"{m.rental_class_id}: {m.category} - {m.subcategory}" for m in user_mappings]))
 
         # If no mappings exist, return an empty response with a warning
         if not base_mappings and not user_mappings:
@@ -228,6 +236,7 @@ def tab1_subcat_data():
         subcategory_data = []
         for subcat in paginated_subcats:
             rental_class_ids = subcategories[subcat]
+            logger.debug(f"Processing subcategory {subcat} with rental_class_ids: {rental_class_ids}")
 
             # Total items in this subcategory
             total_items_query = session.query(func.count(ItemMaster.tag_id)).filter(
@@ -303,6 +312,8 @@ def tab1_subcat_data():
                     'items_in_service': items_in_service or 0,
                     'items_available': items_available or 0
                 })
+            else:
+                logger.debug(f"Skipping subcategory {subcat} due to zero total items")
 
         # Sort subcategory data if needed
         if sort == 'total_items_asc':
@@ -324,8 +335,8 @@ def tab1_subcat_data():
 
 @tab1_bp.route('/tab/1/common_names')
 def tab1_common_names():
-    category = request.args.get('category')
-    subcategory = request.args.get('subcategory')
+    category = unquote(request.args.get('category'))
+    subcategory = unquote(request.args.get('subcategory'))
     page = int(request.args.get('page', 1))
     per_page = 10
     filter_query = request.args.get('filter', '').lower()
@@ -464,9 +475,9 @@ def tab1_common_names():
 
 @tab1_bp.route('/tab/1/data')
 def tab1_data():
-    category = request.args.get('category')
-    subcategory = request.args.get('subcategory')
-    common_name = request.args.get('common_name')
+    category = unquote(request.args.get('category'))
+    subcategory = unquote(request.args.get('subcategory'))
+    common_name = unquote(request.args.get('common_name'))
     page = int(request.args.get('page', 1))
     per_page = 10
     filter_query = request.args.get('filter', '').lower()
@@ -550,9 +561,9 @@ def tab1_data():
 
 @tab1_bp.route('/tab/1/full_items_by_rental_class')
 def full_items_by_rental_class():
-    category = request.args.get('category')
-    subcategory = request.args.get('subcategory')
-    common_name = request.args.get('common_name')
+    category = unquote(request.args.get('category'))
+    subcategory = unquote(request.args.get('subcategory'))
+    common_name = unquote(request.args.get('common_name'))
 
     if not category or not subcategory or not common_name:
         return jsonify({'error': 'Category, subcategory, and common name are required'}), 400
