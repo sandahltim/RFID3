@@ -308,4 +308,19 @@ body {
         display: table-row !important;
         visibility: visible !important;
     }
+
+    .subcat-table tbody tr.subcat-row {
+        min-height: 40px !important;
+        display: table-row !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+    }
+    
+    .subcat-table tbody tr.subcat-row td {
+        min-height: 40px !important;
+        padding: 10px !important;
+        display: table-cell !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+    }
 }
