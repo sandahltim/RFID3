@@ -1,4 +1,4 @@
-console.log('expand.js version: 2025-04-25 v37 loaded');
+console.log('expand.js version: 2025-04-25 v38 loaded');
 
 function showLoading(key) {
     const loadingDiv = document.getElementById(`loading-${key}`);
@@ -235,7 +235,6 @@ function loadCommonNames(category, subcategory, targetId, page = 1, contractNumb
             container.classList.add('show'); // Ensure Bootstrap show class if needed
             container.style.display = 'block';
             container.style.opacity = '1'; // Force visibility
-            container.style.transition = 'none'; // Disable transition to avoid delays
 
             const expandBtn = document.querySelector(`button[onclick*="loadCommonNames('${category}', '${subcategory || ''}', '${targetId}')"]`);
             const collapseBtn = expandBtn ? expandBtn.nextElementSibling : null;
@@ -253,7 +252,6 @@ function loadCommonNames(category, subcategory, targetId, page = 1, contractNumb
             container.classList.add('show');
             container.style.display = 'block';
             container.style.opacity = '1';
-            container.style.transition = 'none';
         })
         .finally(() => {
             hideLoading(key);
@@ -365,7 +363,6 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
             container.classList.add('show'); // Ensure Bootstrap show class if needed
             container.style.display = 'block';
             container.style.opacity = '1'; // Force visibility
-            container.style.transition = 'none'; // Disable transition to avoid delays
             console.log('Container classes after update:', container.className);
             console.log('Container updated with HTML:', container.innerHTML);
 
@@ -437,7 +434,6 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
                 void container.offsetHeight; // Trigger reflow
                 container.style.display = 'block';
                 container.style.opacity = '1';
-                container.style.transition = 'none';
                 console.log('After container reflow, container display:', container.style.display, 'opacity:', container.style.opacity);
 
                 // Force a reflow on the row
@@ -458,7 +454,6 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
             container.classList.add('show');
             container.style.display = 'block';
             container.style.opacity = '1';
-            container.style.transition = 'none';
         })
         .finally(() => {
             hideLoading(normalizedCategory);
@@ -593,7 +588,6 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
             container.classList.add('show');
             container.style.display = 'block';
             container.style.opacity = '1';
-            container.style.transition = 'none';
 
             const expandBtn = document.querySelector(`button[onclick*="loadItems('${category}', '${subcategory || ''}', '${commonName}', '${targetId}')"]`);
             const collapseBtn = expandBtn ? expandBtn.nextElementSibling : null;
@@ -611,7 +605,6 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
             container.classList.add('show');
             container.style.display = 'block';
             container.style.opacity = '1';
-            container.style.transition = 'none';
         })
         .finally(() => {
             hideLoading(key);
