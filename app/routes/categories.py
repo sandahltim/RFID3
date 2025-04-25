@@ -31,12 +31,15 @@ def manage_categories():
             try:
                 api_client = APIClient()
                 seed_data = api_client.get_seed_data()
-                current_app.logger.debug(f"Seed data fetched from API: {seed_data[:5] if seed_data else 'Empty'}")
+                current_app.logger.debug(f"Seed data fetched from API (first 5 items): {seed_data[:5] if seed_data else 'Empty'}")
                 cache.set(cache_key, seed_data, timeout=3600)  # Cache for 1 hour
                 current_app.logger.info("Fetched seed data from API and cached")
             except Exception as api_error:
                 current_app.logger.error(f"Failed to fetch seed data from API: {str(api_error)}", exc_info=True)
                 seed_data = []  # Fallback to empty list
+        else:
+            current_app.logger.info("Using cached seed data")
+            current_app.logger.debug(f"Cached seed data (first 5 items): {seed_data[:5] if seed_data else 'Empty'}")
 
         # Create a mapping of rental_class_id to common_name
         try:
@@ -45,12 +48,19 @@ def manage_categories():
                 for item in seed_data
                 if 'rental_class_id' in item and 'common_name' in item
             }
+            current_app.logger.debug(f"Created common_name_dict with {len(common_name_dict)} entries")
+            # Log a sample of common_name_dict to verify contents
+            sample_common_names = dict(list(common_name_dict.items())[:5])
+            current_app.logger.debug(f"Sample of common_name_dict: {sample_common_names}")
         except Exception as dict_error:
             current_app.logger.error(f"Error creating common_name_dict from seed_data: {str(dict_error)}", exc_info=True)
             common_name_dict = {}
 
         # Build categories list
         categories = []
+        # Log a sample of rental_class_ids from mappings_dict for comparison
+        sample_rental_class_ids = list(mappings_dict.keys())[:5]
+        current_app.logger.debug(f"Sample rental_class_ids from mappings: {sample_rental_class_ids}")
         for rental_class_id, mapping in mappings_dict.items():
             normalized_rental_class_id = str(rental_class_id).strip().upper()
             common_name = common_name_dict.get(normalized_rental_class_id, 'N/A')
@@ -97,18 +107,24 @@ def get_mappings():
 
         # Fetch seed data from cache or API
         cache_key = 'seed_rental_classes'
+        # Temporarily clear cache to force a fresh API call for debugging
+        cache.delete(cache_key)
+        current_app.logger.info("Cleared seed_rental_classes cache to force fresh API call")
         seed_data = cache.get(cache_key)
         common_name_dict = {}
         if seed_data is None:
             try:
                 api_client = APIClient()
                 seed_data = api_client.get_seed_data()
-                current_app.logger.debug(f"Seed data fetched from API: {seed_data[:5] if seed_data else 'Empty'}")
+                current_app.logger.debug(f"Seed data fetched from API (first 5 items): {seed_data[:5] if seed_data else 'Empty'}")
                 cache.set(cache_key, seed_data, timeout=3600)  # Cache for 1 hour
                 current_app.logger.info("Fetched seed data from API and cached")
             except Exception as api_error:
                 current_app.logger.error(f"Failed to fetch seed data from API: {str(api_error)}", exc_info=True)
                 seed_data = []  # Fallback to empty list
+        else:
+            current_app.logger.info("Using cached seed data")
+            current_app.logger.debug(f"Cached seed data (first 5 items): {seed_data[:5] if seed_data else 'Empty'}")
 
         # Create a mapping of rental_class_id to common_name
         try:
@@ -117,12 +133,19 @@ def get_mappings():
                 for item in seed_data
                 if 'rental_class_id' in item and 'common_name' in item
             }
+            current_app.logger.debug(f"Created common_name_dict with {len(common_name_dict)} entries")
+            # Log a sample of common_name_dict to verify contents
+            sample_common_names = dict(list(common_name_dict.items())[:5])
+            current_app.logger.debug(f"Sample of common_name_dict: {sample_common_names}")
         except Exception as dict_error:
             current_app.logger.error(f"Error creating common_name_dict from seed_data: {str(dict_error)}", exc_info=True)
             common_name_dict = {}
 
         # Build categories list
         categories = []
+        # Log a sample of rental_class_ids from mappings_dict for comparison
+        sample_rental_class_ids = list(mappings_dict.keys())[:5]
+        current_app.logger.debug(f"Sample rental_class_ids from mappings: {sample_rental_class_ids}")
         for rental_class_id, mapping in mappings_dict.items():
             normalized_rental_class_id = str(rental_class_id).strip().upper()
             common_name = common_name_dict.get(normalized_rental_class_id, 'N/A')
