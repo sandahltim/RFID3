@@ -36,6 +36,12 @@
 
     function addMappingRow(mapping = {category: '', subcategory: '', rental_class_id: '', common_name: 'N/A'}) {
         const tableBody = document.getElementById('mappings-table');
+        const existingRow = tableBody.querySelector(`tr[data-rental-class-id="${mapping.rental_class_id}"]`);
+        if (existingRow) {
+            console.log(`Skipping duplicate rental_class_id: ${mapping.rental_class_id}`);
+            return;
+        }
+
         const row = document.createElement('tr');
         row.setAttribute('data-rental-class-id', mapping.rental_class_id);
         row.setAttribute('data-original-category', mapping.category);
@@ -197,6 +203,9 @@
             alert('Failed to save mappings');
         });
     }
+
+    // Clear the table before loading mappings to prevent duplicates
+    document.getElementById('mappings-table').innerHTML = '';
 
     fetch('/categories/mapping')
         .then(response => response.json())
