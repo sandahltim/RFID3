@@ -82,12 +82,32 @@
 
     function collectMappings() {
         const rows = document.querySelectorAll('#mappings-table tr');
-        const mappings = Array.from(rows).map(row => {
-            return {
-                category: row.querySelector('.category-input').value.trim(),
-                subcategory: row.querySelector('.subcategory-input').value.trim(),
-                rental_class_id: row.querySelector('.rental-class-id-input').value.trim()
-            };
+        console.log(`Found ${rows.length} rows in mappings table`);
+
+        const rentalClassIds = new Set();
+        const mappings = [];
+        rows.forEach((row, index) => {
+            const rentalClassId = row.querySelector('.rental-class-id-input')?.value.trim();
+            if (!rentalClassId) return;
+
+            if (rentalClassIds.has(rentalClassId)) {
+                console.warn(`Duplicate rental_class_id found: ${rentalClassId} at row ${index}`);
+            }
+            rentalClassIds.add(rentalClassId);
+
+            const categoryInput = row.querySelector('.category-input');
+            const subcategoryInput = row.querySelector('.subcategory-input');
+
+            const categoryValue = categoryInput ? categoryInput.value : '';
+            const subcategoryValue = subcategoryInput ? subcategoryInput.value : '';
+
+            console.log(`Row ${index} (rental_class_id=${rentalClassId}): raw category='${categoryValue}', raw subcategory='${subcategoryValue}'`);
+
+            mappings.push({
+                category: categoryValue.trim(),
+                subcategory: subcategoryValue.trim(),
+                rental_class_id: rentalClassId
+            });
         });
 
         const deduplicatedMappings = [];
@@ -114,12 +134,18 @@
 
         const changedMappings = [];
         validMappings.forEach(mapping => {
-            const row = document.querySelector(`tr[data-rental-class-id="${mapping.rental_class_id}"]`);
+            const rows = document.querySelectorAll(`tr[data-rental-class-id="${mapping.rental_class_id}"]`);
+            if (rows.length > 1) {
+                console.error(`Multiple rows found for rental_class_id=${mapping.rental_class_id}: ${rows.length} rows`);
+            }
+
+            const row = rows[0];
             if (!row) {
                 changedMappings.push(mapping);
                 console.log(`New mapping added:`, mapping);
                 return;
             }
+
             const originalCategory = (row.getAttribute('data-original-category') || '').trim();
             const originalSubcategory = (row.getAttribute('data-original-subcategory') || '').trim();
             const currentCategory = (mapping.category || '').trim();
@@ -182,5 +208,13 @@
             console.error('Error loading mappings:', error);
             alert('Failed to load mappings');
         });
+
+    document.addEventListener('DOMContentLoaded', () => {
+        if (typeof window.applyFilters === 'function') {
+            window.applyFilters();
+        } else {
+            console.warn('applyFilters function is not available after DOM load');
+        }
+    });
 </script>
 {% endblock %}
