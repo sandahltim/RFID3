@@ -36,7 +36,7 @@ if not any(isinstance(h, logging.StreamHandler) for h in root_logger.handlers):
 categories_bp = Blueprint('categories', __name__)
 
 # Version check to ensure correct deployment
-logger.info("Deployed categories.py version: 2025-04-24-v4")
+logger.info("Deployed categories.py version: 2025-04-24-v5")
 
 @categories_bp.route('/categories')
 def manage_categories():
@@ -89,35 +89,47 @@ def manage_categories():
             valid_items = []
             logger.debug("Starting debug loop for seed data items")
             for idx, item in enumerate(seed_data[:10]):  # Limit to first 10 for brevity
-                logger.debug(f"Processing item {idx}: {item}")
-                has_rental_class_id = 'rental_class_id' in item
-                has_common_name = 'common_name' in item
-                logger.debug(f"Item {idx} - Keys: {list(item.keys())}, has_rental_class_id: {has_rental_class_id}, has_common_name: {has_common_name}")
-                if has_rental_class_id and has_common_name:
-                    valid_items.append(item)
+                try:
+                    logger.debug(f"Processing item {idx}: {item}")
+                    # Log raw keys as strings to check for encoding issues
+                    raw_keys = [str(key) for key in item.keys()]
+                    logger.debug(f"Item {idx} - Raw keys: {raw_keys}")
+                    has_rental_class_id = 'rental_class_id' in item
+                    has_common_name = 'common_name' in item
+                    logger.debug(f"Item {idx} - Keys: {list(item.keys())}, has_rental_class_id: {has_rental_class_id}, has_common_name: {has_common_name}")
+                    if has_rental_class_id and has_common_name:
+                        valid_items.append(item)
+                except Exception as item_error:
+                    logger.error(f"Error processing item {idx}: {str(item_error)}", exc_info=True)
             if not valid_items:
                 logger.warning("No valid items found in debug loop")
-            logger.debug(f"Number of valid items: {len(valid_items)}")
-            if valid_items:
+            else:
+                logger.debug(f"Number of valid items: {len(valid_items)}")
                 logger.debug(f"Sample valid item: {valid_items[0]}")
             
             # Try dictionary comprehension
-            common_name_dict = {
-                str(item['rental_class_id']).strip(): item['common_name']
-                for item in seed_data
-                if 'rental_class_id' in item and 'common_name' in item
-            }
+            logger.debug("Attempting dictionary comprehension")
+            common_name_dict = {}
+            for idx, item in enumerate(seed_data):
+                try:
+                    if 'rental_class_id' in item and 'common_name' in item:
+                        common_name_dict[str(item['rental_class_id']).strip()] = item['common_name']
+                except Exception as comp_error:
+                    logger.error(f"Error in dict comprehension for item {idx}: {str(comp_error)}", exc_info=True)
             logger.debug(f"After dict comprehension, common_name_dict has {len(common_name_dict)} entries")
             
             # Fallback: If dict is empty, populate manually
             if not common_name_dict:
                 logger.warning("Dictionary comprehension failed, attempting manual population")
                 for idx, item in enumerate(seed_data):
-                    rental_class_id = item.get('rental_class_id')
-                    common_name = item.get('common_name')
-                    logger.debug(f"Fallback - Item {idx}: rental_class_id={rental_class_id}, common_name={common_name}")
-                    if rental_class_id and common_name:
-                        common_name_dict[str(rental_class_id).strip()] = common_name
+                    try:
+                        rental_class_id = item.get('rental_class_id')
+                        common_name = item.get('common_name')
+                        logger.debug(f"Fallback - Item {idx}: rental_class_id={rental_class_id}, common_name={common_name}")
+                        if rental_class_id and common_name:
+                            common_name_dict[str(rental_class_id).strip()] = common_name
+                    except Exception as fallback_error:
+                        logger.error(f"Error in fallback for item {idx}: {str(fallback_error)}", exc_info=True)
                 logger.debug(f"Manually populated common_name_dict with {len(common_name_dict)} entries")
 
             logger.debug(f"Created common_name_dict with {len(common_name_dict)} entries")
@@ -216,35 +228,47 @@ def get_mappings():
             valid_items = []
             logger.debug("Starting debug loop for seed data items")
             for idx, item in enumerate(seed_data[:10]):  # Limit to first 10 for brevity
-                logger.debug(f"Processing item {idx}: {item}")
-                has_rental_class_id = 'rental_class_id' in item
-                has_common_name = 'common_name' in item
-                logger.debug(f"Item {idx} - Keys: {list(item.keys())}, has_rental_class_id: {has_rental_class_id}, has_common_name: {has_common_name}")
-                if has_rental_class_id and has_common_name:
-                    valid_items.append(item)
+                try:
+                    logger.debug(f"Processing item {idx}: {item}")
+                    # Log raw keys as strings to check for encoding issues
+                    raw_keys = [str(key) for key in item.keys()]
+                    logger.debug(f"Item {idx} - Raw keys: {raw_keys}")
+                    has_rental_class_id = 'rental_class_id' in item
+                    has_common_name = 'common_name' in item
+                    logger.debug(f"Item {idx} - Keys: {list(item.keys())}, has_rental_class_id: {has_rental_class_id}, has_common_name: {has_common_name}")
+                    if has_rental_class_id and has_common_name:
+                        valid_items.append(item)
+                except Exception as item_error:
+                    logger.error(f"Error processing item {idx}: {str(item_error)}", exc_info=True)
             if not valid_items:
                 logger.warning("No valid items found in debug loop")
-            logger.debug(f"Number of valid items: {len(valid_items)}")
-            if valid_items:
+            else:
+                logger.debug(f"Number of valid items: {len(valid_items)}")
                 logger.debug(f"Sample valid item: {valid_items[0]}")
             
             # Try dictionary comprehension
-            common_name_dict = {
-                str(item['rental_class_id']).strip(): item['common_name']
-                for item in seed_data
-                if 'rental_class_id' in item and 'common_name' in item
-            }
+            logger.debug("Attempting dictionary comprehension")
+            common_name_dict = {}
+            for idx, item in enumerate(seed_data):
+                try:
+                    if 'rental_class_id' in item and 'common_name' in item:
+                        common_name_dict[str(item['rental_class_id']).strip()] = item['common_name']
+                except Exception as comp_error:
+                    logger.error(f"Error in dict comprehension for item {idx}: {str(comp_error)}", exc_info=True)
             logger.debug(f"After dict comprehension, common_name_dict has {len(common_name_dict)} entries")
             
             # Fallback: If dict is empty, populate manually
             if not common_name_dict:
                 logger.warning("Dictionary comprehension failed, attempting manual population")
                 for idx, item in enumerate(seed_data):
-                    rental_class_id = item.get('rental_class_id')
-                    common_name = item.get('common_name')
-                    logger.debug(f"Fallback - Item {idx}: rental_class_id={rental_class_id}, common_name={common_name}")
-                    if rental_class_id and common_name:
-                        common_name_dict[str(rental_class_id).strip()] = common_name
+                    try:
+                        rental_class_id = item.get('rental_class_id')
+                        common_name = item.get('common_name')
+                        logger.debug(f"Fallback - Item {idx}: rental_class_id={rental_class_id}, common_name={common_name}")
+                        if rental_class_id and common_name:
+                            common_name_dict[str(rental_class_id).strip()] = common_name
+                    except Exception as fallback_error:
+                        logger.error(f"Error in fallback for item {idx}: {str(fallback_error)}", exc_info=True)
                 logger.debug(f"Manually populated common_name_dict with {len(common_name_dict)} entries")
 
             logger.debug(f"Created common_name_dict with {len(common_name_dict)} entries")
