@@ -6,6 +6,7 @@ from sqlalchemy import func, text
 from sqlalchemy.exc import SQLAlchemyError
 from time import time
 import logging
+import sys
 
 # Configure logging to ensure logs are captured
 logger = logging.getLogger('categories')
@@ -22,7 +23,7 @@ file_handler.setFormatter(formatter)
 logger.addHandler(file_handler)
 
 # Console handler
-console_handler = logging.StreamHandler()
+console_handler = logging.StreamHandler(sys.stdout)
 console_handler.setLevel(logging.DEBUG)
 console_handler.setFormatter(formatter)
 logger.addHandler(console_handler)
@@ -36,12 +37,12 @@ if not any(isinstance(h, logging.StreamHandler) for h in root_logger.handlers):
 categories_bp = Blueprint('categories', __name__)
 
 # Version check to ensure correct deployment
-logger.info("Deployed categories.py version: 2025-04-24-v7")
+logger.info("Deployed categories.py version: 2025-04-24-v8")
 
 # Test logging levels
-logger.debug("DEBUG level test message")
-logger.info("INFO level test message")
-logger.warning("WARNING level test message")
+logger.debug("DEBUG level test message at startup")
+logger.info("INFO level test message at startup")
+logger.warning("WARNING level test message at startup")
 
 @categories_bp.route('/categories')
 def manage_categories():
@@ -92,8 +93,9 @@ def manage_categories():
             
             # Debug the dictionary comprehension
             valid_items = []
-            logger.debug("Starting debug loop for seed data items")
+            logger.info("Starting debug loop for seed data items (INFO level)")
             for idx, item in enumerate(seed_data[:10]):  # Limit to first 10 for brevity
+                logger.info(f"Debug loop iteration {idx} (INFO level)")
                 try:
                     logger.debug(f"Processing item {idx}: {item}")
                     # Log raw keys as strings to check for encoding issues
@@ -223,8 +225,9 @@ def get_mappings():
             
             # Debug the dictionary comprehension
             valid_items = []
-            logger.debug("Starting debug loop for seed data items")
+            logger.info("Starting debug loop for seed data items (INFO level)")
             for idx, item in enumerate(seed_data[:10]):  # Limit to first 10 for brevity
+                logger.info(f"Debug loop iteration {idx} (INFO level)")
                 try:
                     logger.debug(f"Processing item {idx}: {item}")
                     # Log raw keys as strings to check for encoding issues
