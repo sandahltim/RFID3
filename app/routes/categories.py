@@ -1,6 +1,7 @@
 from flask import Blueprint, render_template, request, jsonify, current_app
-from .. import db
-from ..models.db_models import ItemMaster, RentalClassMapping, UserRentalClassMapping
+from .. import db, cache
+from ..models.db_models import RentalClassMapping, UserRentalClassMapping
+from ..services.api_client import APIClient
 from sqlalchemy import func, text
 from sqlalchemy.exc import SQLAlchemyError
 from time import time
@@ -22,18 +23,20 @@ def manage_categories():
         for um in user_mappings:
             mappings_dict[um.rental_class_id] = {'category': um.category, 'subcategory': um.subcategory}
 
-        # Fetch common names for each rental class ID
+        # Fetch seed data from cache or API
+        cache_key = 'seed_rental_classes'
+        seed_data = cache.get(cache_key)
+        if seed_data is None:
+            api_client = APIClient()
+            seed_data = api_client.get_seed_data()
+            cache.set(cache_key, seed_data, timeout=3600)  # Cache for 1 hour
+            current_app.logger.info("Fetched seed data from API and cached")
+
+        # Create a mapping of rental_class_id to common_name
+        common_name_dict = {str(item['rental_class_id']).strip().upper(): item['common_name'] for item in seed_data}
+
+        # Build categories list
         categories = []
-        rental_class_ids = list(mappings_dict.keys())
-        common_names_query = session.query(
-            func.trim(func.upper(func.cast(ItemMaster.rental_class_num, db.String))).label('rental_class_num'),
-            ItemMaster.common_name
-        ).filter(
-            func.trim(func.upper(func.cast(ItemMaster.rental_class_num, db.String))).in_(rental_class_ids)
-        ).distinct().all()
-
-        common_name_dict = {str(rental_class_num).strip().upper(): common_name for rental_class_num, common_name in common_names_query}
-
         for rental_class_id, mapping in mappings_dict.items():
             normalized_rental_class_id = str(rental_class_id).strip().upper()
             common_name = common_name_dict.get(normalized_rental_class_id, 'N/A')
@@ -78,18 +81,20 @@ def get_mappings():
         for um in user_mappings:
             mappings_dict[um.rental_class_id] = {'category': um.category, 'subcategory': um.subcategory}
 
-        # Fetch common names
+        # Fetch seed data from cache or API
+        cache_key = 'seed_rental_classes'
+        seed_data = cache.get(cache_key)
+        if seed_data is None:
+            api_client = APIClient()
+            seed_data = api_client.get_seed_data()
+            cache.set(cache_key, seed_data, timeout=3600)  # Cache for 1 hour
+            current_app.logger.info("Fetched seed data from API and cached")
+
+        # Create a mapping of rental_class_id to common_name
+        common_name_dict = {str(item['rental_class_id']).strip().upper(): item['common_name'] for item in seed_data}
+
+        # Build categories list
         categories = []
-        rental_class_ids = list(mappings_dict.keys())
-        common_names_query = session.query(
-            func.trim(func.upper(func.cast(ItemMaster.rental_class_num, db.String))).label('rental_class_num'),
-            ItemMaster.common_name
-        ).filter(
-            func.trim(func.upper(func.cast(ItemMaster.rental_class_num, db.String))).in_(rental_class_ids)
-        ).distinct().all()
-
-        common_name_dict = {str(rental_class_num).strip().upper(): common_name for rental_class_num, common_name in common_names_query}
-
         for rental_class_id, mapping in mappings_dict.items():
             normalized_rental_class_id = str(rental_class_id).strip().upper()
             common_name = common_name_dict.get(normalized_rental_class_id, 'N/A')
