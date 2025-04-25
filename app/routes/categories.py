@@ -10,6 +10,7 @@ categories_bp = Blueprint('categories', __name__)
 
 @categories_bp.route('/categories')
 def manage_categories():
+    current_app.logger.info("TEST: Entering manage_categories endpoint")
     try:
         session = db.session()
         current_app.logger.info("Starting new session for manage_categories")
@@ -31,6 +32,10 @@ def manage_categories():
             try:
                 api_client = APIClient()
                 seed_data = api_client.get_seed_data()
+                # Check if response is nested under 'data' key
+                if isinstance(seed_data, dict) and 'data' in seed_data:
+                    current_app.logger.debug("API response contains 'data' key, extracting nested data")
+                    seed_data = seed_data['data']
                 current_app.logger.debug(f"Seed data fetched from API (first 5 items): {seed_data[:5] if seed_data else 'Empty'}")
                 cache.set(cache_key, seed_data, timeout=3600)  # Cache for 1 hour
                 current_app.logger.info("Fetched seed data from API and cached")
@@ -43,24 +48,12 @@ def manage_categories():
 
         # Create a mapping of rental_class_id to common_name
         try:
-            # Try using 'class_id' and 'name' keys
             common_name_dict = {
-                str(item['class_id']).strip().upper(): item['name']
+                str(item['rental_class_id']).strip().upper(): item['common_name']
                 for item in seed_data
-                if 'class_id' in item and 'name' in item
+                if 'rental_class_id' in item and 'common_name' in item
             }
-            if common_name_dict:
-                current_app.logger.debug(f"Created common_name_dict using 'class_id' and 'name' with {len(common_name_dict)} entries")
-            else:
-                # If no entries with 'class_id' and 'name', try 'rental_class_id' and 'common_name'
-                current_app.logger.debug("No entries found with 'class_id' and 'name', trying 'rental_class_id' and 'common_name'")
-                common_name_dict = {
-                    str(item['rental_class_id']).strip().upper(): item['common_name']
-                    for item in seed_data
-                    if 'rental_class_id' in item and 'common_name' in item
-                }
-                current_app.logger.debug(f"Created common_name_dict using 'rental_class_id' and 'common_name' with {len(common_name_dict)} entries")
-            
+            current_app.logger.debug(f"Created common_name_dict with {len(common_name_dict)} entries")
             # Log a sample of common_name_dict to verify contents
             sample_common_names = dict(list(common_name_dict.items())[:5])
             current_app.logger.debug(f"Sample of common_name_dict: {sample_common_names}")
@@ -104,6 +97,7 @@ def manage_categories():
 
 @categories_bp.route('/categories/mapping', methods=['GET'])
 def get_mappings():
+    current_app.logger.info("TEST: Entering get_mappings endpoint")
     try:
         session = db.session()
         current_app.logger.info("Fetching rental class mappings for API")
@@ -128,6 +122,10 @@ def get_mappings():
             try:
                 api_client = APIClient()
                 seed_data = api_client.get_seed_data()
+                # Check if response is nested under 'data' key
+                if isinstance(seed_data, dict) and 'data' in seed_data:
+                    current_app.logger.debug("API response contains 'data' key, extracting nested data")
+                    seed_data = seed_data['data']
                 current_app.logger.debug(f"Seed data fetched from API (first 5 items): {seed_data[:5] if seed_data else 'Empty'}")
                 cache.set(cache_key, seed_data, timeout=3600)  # Cache for 1 hour
                 current_app.logger.info("Fetched seed data from API and cached")
@@ -140,24 +138,12 @@ def get_mappings():
 
         # Create a mapping of rental_class_id to common_name
         try:
-            # Try using 'class_id' and 'name' keys
             common_name_dict = {
-                str(item['class_id']).strip().upper(): item['name']
+                str(item['rental_class_id']).strip().upper(): item['common_name']
                 for item in seed_data
-                if 'class_id' in item and 'name' in item
+                if 'rental_class_id' in item and 'common_name' in item
             }
-            if common_name_dict:
-                current_app.logger.debug(f"Created common_name_dict using 'class_id' and 'name' with {len(common_name_dict)} entries")
-            else:
-                # If no entries with 'class_id' and 'name', try 'rental_class_id' and 'common_name'
-                current_app.logger.debug("No entries found with 'class_id' and 'name', trying 'rental_class_id' and 'common_name'")
-                common_name_dict = {
-                    str(item['rental_class_id']).strip().upper(): item['common_name']
-                    for item in seed_data
-                    if 'rental_class_id' in item and 'common_name' in item
-                }
-                current_app.logger.debug(f"Created common_name_dict using 'rental_class_id' and 'common_name' with {len(common_name_dict)} entries")
-            
+            current_app.logger.debug(f"Created common_name_dict with {len(common_name_dict)} entries")
             # Log a sample of common_name_dict to verify contents
             sample_common_names = dict(list(common_name_dict.items())[:5])
             current_app.logger.debug(f"Sample of common_name_dict: {sample_common_names}")
