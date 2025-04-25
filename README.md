@@ -55,26 +55,46 @@ git pull origin RFID2
 sudo systemctl stop rfid_dash_dev.service
 sudo systemctl start rfid_dash_dev.service
 sudo systemctl status rfid_dash_dev.service
-
 cat /home/tim/test_rfidpi/logs/gunicorn_error.log
 cat /home/tim/test_rfidpi/logs/app.log
 cat /home/tim/test_rfidpi/logs/sync.log
 
 source venv/bin/activate
 
-## Database and API Mapping
 
-### Overview
+config.py
+import os
 
-The application integrates with three API databases and maintains two local tables:
+# Base directory
+BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
-- **API Databases**:
-  - **Item Master**: Primary dataset of all items.
-  - **Transactions**: Transaction history for items.
-  - **Seed Rental Classes**: Mapping of rental class IDs to common names and bin locations.
-- **Local Tables**:
-  - **Hand Counted Items**: Manually counted items for contracts.
-  - **Categories/Mappings**: Custom mappings for organizing items by category and subcategory.
+# MariaDB configuration
+DB_CONFIG = {
+    'host': 'localhost',
+    'user': 'rfid_user',
+    'password': 'rfid_user_password',  # Change this to a secure password
+    'database': 'rfid_inventory',
+    'charset': 'utf8mb4'
+}
+
+# Redis configuration
+REDIS_URL = 'redis://localhost:6379/0'
+
+# API configuration
+API_USERNAME = os.environ.get('API_USERNAME', 'api')
+API_PASSWORD = os.environ.get('API_PASSWORD', 'Broadway8101')
+LOGIN_URL = 'https://login.cloud.ptshome.com/api/v1/login'
+ITEM_MASTER_URL = 'https://cs.iot.ptshome.com/api/v1/data/14223767938169344381'
+TRANSACTION_URL = 'https://cs.iot.ptshome.com/api/v1/data/14223767938169346196'
+SEED_URL = 'https://cs.iot.ptshome.com/api/v1/data/14223767938169215907'
+
+# Refresh intervals (seconds)
+FULL_REFRESH_INTERVAL = 300  # 5 minutes
+INCREMENTAL_REFRESH_INTERVAL = 30  # 30 seconds
+
+# Logging
+LOG_FILE = os.path.join(BASE_DIR, 'logs', 'rfid_dashboard.log')
+#mariadbhash   *8226E019AE8D0D41243D07D91ABCD8E2F20358BC  root password    MySecureRootPass123
 
 ### Database Schemas
 
@@ -166,102 +186,3 @@ The application integrates with three API databases and maintains two local tabl
 - `id_item_master.rental_class_num` ↔ `rental_class_mappings.rental_class_id` (many-to-one).
 - `id_transactions.rental_class_num` ↔ `seed_rental_classes.rental_class_id` (many-to-one).
 - `id_hand_counted_items.contract_number` ↔ `id_item_master.last_contract_num` (one-to-many).
-
-### API Details
-
-- **Authentication**:
-  - Endpoint: `login.cloud.ptshome.com/api/v1/login` (POST)
-  - Parameters: `username`, `password`
-  - Response: Includes `access_token` (valid for 60 minutes).
-- **Item Master**:
-  - Endpoint: `cs.iot.ptshome.com/api/v1/data/14223767938169344381`
-  - Supports: GET/POST/PUT/PATCH
-  - GET Parameters: `filter[]`, `offset`, `limit`, `sort[]`, `returncount`
-  - POST/PUT/PATCH: Updates fields like `tag_id`, `bin_location`, `status`.
-- **Transactions**:
-  - Endpoint: `cs.iot.ptshome.com/api/v1/data/14223767938169346196`
-  - Supports: GET
-  - GET Parameters: `filter[]`, `offset`, `limit`, `sort[]`, `returncount`
-- **Seed Rental Classes**:
-  - Endpoint: `cs.iot.ptshome.com/api/v1/data/14223767938169215907`
-  - Supports: GET/POST/PUT/PATCH
-  - GET Parameters: `filter[]`, `offset`, `limit`, `sort[]`, `returncount`
-
-### Logic
-
-- **Data Sync**:
-  - Full refresh: Deletes and re-fetches all data.
-  - Incremental refresh: Updates based on `since_date`.
-- **Tab 1 (Rental Inventory)**: Groups items by category/subcategory, counts items by status.
-- **Tab 2 (Open Contracts)**: Lists items on rent by contract, expandable to common name aggregate and item list.
-- **Tab 4 (Laundry Contracts)**: Filters for contracts starting with "L" or "l", same structure as Tab 2.
-- **Tab 5 (Resale/Packs)**: Manages items in specific `bin_location` values, updates via API.
-- **Categories**: Allows manual mapping of rental classes to categories/subcategories.
-
-### Categories and Subcategories Logic (for use in other tabs)
-
-#### Overview
-The Categories tab (`categories.py`) provides functionality to map `rental_class_id` values to categories and subcategories, which is used across tabs to organize inventory data. It also integrates `common_name` data from the `seed_rental_classes` API table.
-
-#### Key Functions and Logic
-
-- **Merging Mappings**:
-  - Both `RentalClassMapping` (base) and `UserRentalClassMapping` (user-defined) tables are queried to create a mapping of `rental_class_id` to category and subcategory.
-  - User mappings take precedence over base mappings.
-  - Example in `categories.py`:
-    ```python
-    base_mappings = session.query(RentalClassMapping).all()
-    user_mappings = session.query(UserRentalClassMapping).all()
-    mappings_dict = {m.rental_class_id: {'category': m.category, 'subcategory': m.subcategory} for m in base_mappings}
-    for um in user_mappings:
-        mappings_dict[um.rental_class_id] = {'category': um.category, 'subcategory': um.subcategory}
-    ```
-
-- **Building `common_name_dict`**:
-  - The `build_common_name_dict` function creates a mapping of `rental_class_id` to `common_name` using data from the `seed_rental_classes` API table.
-  - It normalizes `rental_class_id` by converting to string and stripping whitespace.
-  - Example in `categories.py`:
-    ```python
-    def build_common_name_dict(seed_data):
-        common_name_dict = {}
-        for item in seed_data:
-            try:
-                rental_class_id = item.get('rental_class_id')
-                common_name = item.get('common_name')
-                if rental_class_id and common_name:
-                    normalized_key = str(rental_class_id).strip()
-                    common_name_dict[normalized_key] = common_name
-            except Exception as comp_error:
-                logger.error(f"Error processing item for common_name_dict: {str(comp_error)}", exc_info=True)
-        return common_name_dict
-    ```
-
-- **`/categories/mapping` Endpoint Response**:
-  - The `/categories/mapping` endpoint returns a list of dictionaries with the following structure:
-    ```json
-    [
-        {
-            "category": "Round Linen",
-            "subcategory": "100 m",
-            "rental_class_id": "61885",
-            "common_name": "108 ROUND WHITE LINEN"
-        },
-        ...
-    ]
-    ```
-  - This endpoint can be used by other tabs to fetch categorized data with associated common names.
-
-#### Usage in Other Tabs
-- **Fetching Categories and Subcategories**:
-  - Use the `/categories/mapping` endpoint to get the full list of mappings, which includes `rental_class_id`, `category`, `subcategory`, and `common_name`.
-  - Example: `GET /categories/mapping`
-- **Integrating with `id_item_master`**:
-  - Join the `rental_class_id` from the endpoint response with `id_item_master.rental_class_num` to categorize inventory items.
-  - Ensure to normalize `rental_class_num` using `str().strip()` to match the normalized keys in `common_name_dict`.
-- **Caching**:
-  - The `seed_rental_classes` data is cached with the key `seed_rental_classes` for 1 hour. Ensure to fetch from cache if available to reduce API calls.
-  - The `cache.set` operation should be performed **after** using `common_name_dict` to avoid potential interference.
-
-#### Notes
-- The `common_name_dict` must be constructed before performing lookups to ensure `common_name` values are available.
-- If subcategories are not displaying, verify that `RentalClassMapping` and `UserRentalClassMapping` tables contain data for the given category, and check for case sensitivity in category names.
