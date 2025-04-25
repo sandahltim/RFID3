@@ -1,4 +1,4 @@
-console.log('expand.js version: 2025-04-25 v33 loaded');
+console.log('expand.js version: 2025-04-25 v34 loaded');
 
 function showLoading(key) {
     const loadingDiv = document.getElementById(`loading-${key}`);
@@ -349,6 +349,29 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
             container.style.display = 'block';
             console.log('Container updated with HTML:', container.innerHTML);
 
+            // Debug the container's computed style
+            const computedContainerStyle = window.getComputedStyle(container);
+            console.log('Container computed style:', {
+                display: computedContainerStyle.display,
+                visibility: computedContainerStyle.visibility,
+                opacity: computedContainerStyle.opacity,
+                height: computedContainerStyle.height
+            });
+
+            // Debug the subcat-level div
+            const subcatLevel = container.querySelector('.subcat-level');
+            if (subcatLevel) {
+                const computedSubcatLevelStyle = window.getComputedStyle(subcatLevel);
+                console.log('Subcat-level computed style:', {
+                    display: computedSubcatLevelStyle.display,
+                    visibility: computedSubcatLevelStyle.visibility,
+                    opacity: computedSubcatLevelStyle.opacity,
+                    height: computedSubcatLevelStyle.height
+                });
+            } else {
+                console.log('Subcat-level div not found');
+            }
+
             // Debug the subcategory row
             const subcatRow = container.querySelector('tbody tr.subcat-row');
             if (subcatRow) {
@@ -365,10 +388,16 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
                     opacity: computedStyle.opacity
                 });
 
-                // Force a reflow to ensure rendering
+                // Force a reflow on the container to ensure rendering
+                container.style.display = 'none';
+                void container.offsetHeight; // Trigger reflow
+                container.style.display = 'block';
+                console.log('After container reflow, container display:', container.style.display);
+
+                // Force a reflow on the row
                 subcatRow.style.display = 'table-row';
                 void subcatRow.offsetHeight; // Trigger reflow
-                console.log('After reflow, subcategory row height:', subcatRow.offsetHeight);
+                console.log('After row reflow, subcategory row height:', subcatRow.offsetHeight);
             } else {
                 console.log('Subcategory row not found in DOM');
             }
