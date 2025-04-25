@@ -117,13 +117,14 @@ function loadCommonNames(category, subcategory, targetId, page = 1, contractNumb
 
     fetch(url)
         .then(response => {
-            console.log('Fetch finished loading:', `GET "${url}"`);
+            console.log('Fetch finished loading:', `GET "${url}"`, response.status);
             if (!response.ok) {
-                throw new Error(`Common names fetch failed with status ${response.status}`);
+                throw new Error(`Common names fetch failed with status ${response.status}: ${response.statusText}`);
             }
             return response.json();
         })
         .then(data => {
+            console.log('Common names data:', data);
             let html = '';
             if (data.common_names && data.common_names.length > 0) {
                 const headers = window.cachedTabNum == 2 || window.cachedTabNum == 4
@@ -242,6 +243,141 @@ function loadCommonNames(category, subcategory, targetId, page = 1, contractNumb
         .finally(() => {
             hideLoading(key);
             console.log('loadCommonNames completed for targetId:', targetId);
+        });
+}
+
+// ... (rest of the file unchanged)
+
+console.log('expand.js version: 2025-04-24 v29 loaded');
+
+// ... (other functions unchanged)
+
+function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1) {
+    console.log('loadSubcatData called with', { originalCategory, normalizedCategory, targetId, page });
+
+    const container = document.getElementById(targetId);
+    console.log('Looking for container with ID:', targetId);
+    if (!container) {
+        console.error(`Container with ID ${targetId} not found`);
+        return;
+    }
+    console.log('Container found:', container);
+
+    hideOtherSubcats(normalizedCategory);
+    showLoading(normalizedCategory);
+
+    let url = `/tab/${window.cachedTabNum}/subcat_data?category=${encodeURIComponent(originalCategory)}&page=${page}`;
+    const subcatFilter = document.getElementById(`subcat-filter-${normalizedCategory}`)?.value || '';
+    const subcatSort = document.getElementById(`subcat-sort-${normalizedCategory}`)?.value || '';
+    if (subcatFilter) {
+        url += `&filter=${encodeURIComponent(subcatFilter)}`;
+    }
+    if (subcatSort) {
+        url += `&sort=${encodeURIComponent(subcatSort)}`;
+    }
+
+    fetch(url)
+        .then(response => {
+            console.log('Fetch finished loading:', `GET "${url}"`);
+            if (!response.ok) {
+                throw new Error(`Subcategory fetch failed with status ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            let html = '';
+            if (data.subcategories && data.subcategories.length > 0) {
+                html += `
+                    <div class="filter-sort-controls">
+                        <input type="text" id="subcat-filter-${normalizedCategory}" placeholder="Filter subcategories..." value="${subcatFilter}" oninput="loadSubcatData('${originalCategory}', '${normalizedCategory}', '${targetId}', 1)">
+                        <select id="subcat-sort-${normalizedCategory}" onchange="loadSubcatData('${originalCategory}', '${normalizedCategory}', '${targetId}', 1)">
+                            <option value="">Sort By...</option>
+                            <option value="subcategory_asc" ${subcatSort === 'subcategory_asc' ? 'selected' : ''}>Subcategory (A-Z)</option>
+                            <option value="subcategory_desc" ${subcatSort === 'subcategory_desc' ? 'selected' : ''}>Subcategory (Z-A)</option>
+                            <option value="total_items_asc" ${subcatSort === 'total_items_asc' ? 'selected' : ''}>Total Items (Low to High)</option>
+                            <option value="total_items_desc" ${subcatSort === 'total_items_desc' ? 'selected' : ''}>Total Items (High to Low)</option>
+                        </select>
+                    </div>
+                `;
+                data.subcategories.forEach(subcat => {
+                    console.log('Processing subcategory:', subcat);
+                    const subcatKey = `${normalizedCategory}_${subcat.subcategory.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
+                    const headers = ['Subcategory', 'Total Items', 'Items on Contracts', 'Items in Service', 'Items Available', 'Actions'];
+                    html += `
+                        <div class="subcat-level">
+                            <table class="table table-bordered subcat-table mt-2" id="subcat-table-${subcatKey}">
+                                <thead>
+                                    <tr>
+                                        ${headers.map(header => `<th>${header}</th>`).join('')}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>${subcat.subcategory}</td>
+                                        <td>${subcat.total_items}</td>
+                                        <td>${subcat.on_contracts}</td>
+                                        <td>${subcat.in_service}</td>
+                                        <td>${subcat.available}</td>
+                                        <td>
+                                            <button class="btn btn-sm btn-secondary expand-btn" onclick="loadCommonNames('${originalCategory}', '${subcat.subcategory}', '${subcatKey}')">Expand</button>
+                                            <button class="btn btn-sm btn-secondary collapse-btn" style="display:none;" onclick="collapseSection('common-${subcatKey}')">Collapse</button>
+                                            <button class="btn btn-sm btn-info print-btn" data-print-level="Subcategory" data-print-id="subcat-table-${subcatKey}">Print</button>
+                                            <div id="loading-${subcatKey}" style="display:none;" class="loading">Loading...</div>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td colspan="6">
+                                            <div id="common-${subcatKey}" class="expandable collapsed"></div>
+                                        </td>
+                                    </tr>
+                    `;
+
+                    if (data.total_subcats > data.per_page) {
+                        const totalPages = Math.ceil(data.total_subcats / data.per_page);
+                        html += `
+                            <tr>
+                                <td colspan="6" class="pagination-controls">
+                                    <button class="btn btn-sm btn-secondary" onclick="loadSubcatData('${originalCategory}', '${normalizedCategory}', '${targetId}', ${page - 1})" ${page === 1 ? 'disabled' : ''}>Previous</button>
+                                    <span>Page ${page} of ${totalPages}</span>
+                                    <button class="btn btn-sm btn-secondary" onclick="loadSubcatData('${originalCategory}', '${normalizedCategory}', '${targetId}', ${page + 1})" ${page === totalPages ? 'disabled' : ''}>Next</button>
+                                </td>
+                            </tr>
+                        `;
+                    }
+
+                    html += `
+                                </tbody>
+                            </table>
+                        </div>
+                    `;
+                });
+                console.log('Generated HTML for subcategories:', html); // Debug log to confirm HTML
+            } else {
+                html = `<div class="subcat-level"><p>No subcategories found for this category.</p></div>`;
+            }
+
+            container.innerHTML = html;
+            container.classList.remove('collapsed');
+            container.classList.add('expanded');
+            container.style.display = 'block';
+
+            const expandBtn = document.querySelector(`button[onclick*="loadSubcatData('${originalCategory}', '${normalizedCategory}', '${targetId}')"]`);
+            const collapseBtn = expandBtn ? expandBtn.nextElementSibling : null;
+            if (expandBtn && collapseBtn) {
+                expandBtn.style.display = 'none';
+                collapseBtn.style.display = 'inline-block';
+            }
+        })
+        .catch(error => {
+            console.error('Subcategory fetch error:', error);
+            container.innerHTML = `<div class="subcat-level"><p>Error loading subcategories: ${error.message}</p></div>`;
+            container.classList.remove('collapsed');
+            container.classList.add('expanded');
+            container.style.display = 'block';
+        })
+        .finally(() => {
+            hideLoading(normalizedCategory);
+            console.log('loadSubcatData completed for targetId:', targetId);
         });
 }
 
@@ -390,141 +526,6 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
             console.log('loadItems completed for targetId:', targetId);
         });
 }
-
-console.log('expand.js version: 2025-04-24 v29 loaded');
-
-// ... (other functions unchanged)
-
-function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1) {
-    console.log('loadSubcatData called with', { originalCategory, normalizedCategory, targetId, page });
-
-    const container = document.getElementById(targetId);
-    console.log('Looking for container with ID:', targetId);
-    if (!container) {
-        console.error(`Container with ID ${targetId} not found`);
-        return;
-    }
-    console.log('Container found:', container);
-
-    hideOtherSubcats(normalizedCategory);
-    showLoading(normalizedCategory);
-
-    let url = `/tab/${window.cachedTabNum}/subcat_data?category=${encodeURIComponent(originalCategory)}&page=${page}`;
-    const subcatFilter = document.getElementById(`subcat-filter-${normalizedCategory}`)?.value || '';
-    const subcatSort = document.getElementById(`subcat-sort-${normalizedCategory}`)?.value || '';
-    if (subcatFilter) {
-        url += `&filter=${encodeURIComponent(subcatFilter)}`;
-    }
-    if (subcatSort) {
-        url += `&sort=${encodeURIComponent(subcatSort)}`;
-    }
-
-    fetch(url)
-        .then(response => {
-            console.log('Fetch finished loading:', `GET "${url}"`);
-            if (!response.ok) {
-                throw new Error(`Subcategory fetch failed with status ${response.status}`);
-            }
-            return response.json();
-        })
-        .then(data => {
-            let html = '';
-            if (data.subcategories && data.subcategories.length > 0) {
-                html += `
-                    <div class="filter-sort-controls">
-                        <input type="text" id="subcat-filter-${normalizedCategory}" placeholder="Filter subcategories..." value="${subcatFilter}" oninput="loadSubcatData('${originalCategory}', '${normalizedCategory}', '${targetId}', 1)">
-                        <select id="subcat-sort-${normalizedCategory}" onchange="loadSubcatData('${originalCategory}', '${normalizedCategory}', '${targetId}', 1)">
-                            <option value="">Sort By...</option>
-                            <option value="subcategory_asc" ${subcatSort === 'subcategory_asc' ? 'selected' : ''}>Subcategory (A-Z)</option>
-                            <option value="subcategory_desc" ${subcatSort === 'subcategory_desc' ? 'selected' : ''}>Subcategory (Z-A)</option>
-                            <option value="total_items_asc" ${subcatSort === 'total_items_asc' ? 'selected' : ''}>Total Items (Low to High)</option>
-                            <option value="total_items_desc" ${subcatSort === 'total_items_desc' ? 'selected' : ''}>Total Items (High to Low)</option>
-                        </select>
-                    </div>
-                `;
-                data.subcategories.forEach(subcat => {
-                    console.log('Processing subcategory:', subcat);
-                    const subcatKey = `${normalizedCategory}_${subcat.subcategory.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
-                    const headers = ['Subcategory', 'Total Items', 'Items on Contracts', 'Items in Service', 'Items Available', 'Actions'];
-                    html += `
-                        <div class="subcat-level">
-                            <table class="table table-bordered subcat-table mt-2" id="subcat-table-${subcatKey}">
-                                <thead>
-                                    <tr>
-                                        ${headers.map(header => `<th>${header}</th>`).join('')}
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr>
-                                        <td>${subcat.subcategory}</td>
-                                        <td>${subcat.total_items}</td>
-                                        <td>${subcat.on_contracts}</td>
-                                        <td>${subcat.in_service}</td>
-                                        <td>${subcat.available}</td>
-                                        <td>
-                                            <button class="btn btn-sm btn-secondary expand-btn" onclick="loadCommonNames('${originalCategory}', '${subcat.subcategory}', '${subcatKey}')">Expand</button>
-                                            <button class="btn btn-sm btn-secondary collapse-btn" style="display:none;" onclick="collapseSection('common-${subcatKey}')">Collapse</button>
-                                            <button class="btn btn-sm btn-info print-btn" data-print-level="Subcategory" data-print-id="subcat-table-${subcatKey}">Print</button>
-                                            <div id="loading-${subcatKey}" style="display:none;" class="loading">Loading...</div>
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <td colspan="6">
-                                            <div id="common-${subcatKey}" class="expandable collapsed"></div>
-                                        </td>
-                                    </tr>
-                    `;
-
-                    if (data.total_subcats > data.per_page) {
-                        const totalPages = Math.ceil(data.total_subcats / data.per_page);
-                        html += `
-                            <tr>
-                                <td colspan="6" class="pagination-controls">
-                                    <button class="btn btn-sm btn-secondary" onclick="loadSubcatData('${originalCategory}', '${normalizedCategory}', '${targetId}', ${page - 1})" ${page === 1 ? 'disabled' : ''}>Previous</button>
-                                    <span>Page ${page} of ${totalPages}</span>
-                                    <button class="btn btn-sm btn-secondary" onclick="loadSubcatData('${originalCategory}', '${normalizedCategory}', '${targetId}', ${page + 1})" ${page === totalPages ? 'disabled' : ''}>Next</button>
-                                </td>
-                            </tr>
-                        `;
-                    }
-
-                    html += `
-                                </tbody>
-                            </table>
-                        </div>
-                    `;
-                });
-                console.log('Generated HTML for subcategories:', html); // Debug log to confirm HTML
-            } else {
-                html = `<div class="subcat-level"><p>No subcategories found for this category.</p></div>`;
-            }
-
-            container.innerHTML = html;
-            container.classList.remove('collapsed');
-            container.classList.add('expanded');
-            container.style.display = 'block';
-
-            const expandBtn = document.querySelector(`button[onclick*="loadSubcatData('${originalCategory}', '${normalizedCategory}', '${targetId}')"]`);
-            const collapseBtn = expandBtn ? expandBtn.nextElementSibling : null;
-            if (expandBtn && collapseBtn) {
-                expandBtn.style.display = 'none';
-                collapseBtn.style.display = 'inline-block';
-            }
-        })
-        .catch(error => {
-            console.error('Subcategory fetch error:', error);
-            container.innerHTML = `<div class="subcat-level"><p>Error loading subcategories: ${error.message}</p></div>`;
-            container.classList.remove('collapsed');
-            container.classList.add('expanded');
-            container.style.display = 'block';
-        })
-        .finally(() => {
-            hideLoading(normalizedCategory);
-            console.log('loadSubcatData completed for targetId:', targetId);
-        });
-}
-
-// ... (rest of the file unchanged)
 
 document.addEventListener('DOMContentLoaded', function() {
     console.log('expand.js: DOMContentLoaded event fired');

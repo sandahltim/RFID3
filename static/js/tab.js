@@ -10,6 +10,12 @@ window.applyFilters = function() {
 
     const tables = document.querySelectorAll('table');
     tables.forEach(table => {
+        // Only apply filters to the main category table
+        if (table.id !== 'category-table') {
+            console.log(`Skipping filter application for table: ${table.id}`);
+            return;
+        }
+
         const rows = table.querySelectorAll('tbody tr');
         rows.forEach(row => {
             if (row.querySelector('.expandable')) {
