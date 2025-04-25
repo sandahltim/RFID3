@@ -238,8 +238,66 @@ body {
 }
 
 .expandable.expanded {
-    max-height: 1500px;
-    opacity: 1;
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    height: auto !important;
+}
+
+/* style.css */
+
+/* Ensure the container and subcat-level are visible */
+.expandable.expanded {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    height: auto !important;
+}
+
+.subcat-level {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    height: auto !important;
+    overflow: visible !important;
+}
+
+/* Ensure the filter-sort-controls are visible */
+.filter-sort-controls {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    margin-bottom: 10px;
+}
+
+/* Ensure the table and its rows are visible */
+.subcat-table {
+    display: table !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    width: 100%;
+}
+
+.subcat-table thead,
+.subcat-table tbody {
+    display: table-row-group !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+.subcat-table tbody tr.subcat-row {
+    min-height: 40px !important;
+    display: table-row !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+.subcat-table tbody tr.subcat-row td {
+    min-height: 40px !important;
+    padding: 10px !important;
+    display: table-cell !important;
+    visibility: visible !important;
+    opacity: 1 !important;
 }
 
 .hidden {
