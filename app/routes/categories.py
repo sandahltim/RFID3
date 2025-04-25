@@ -52,6 +52,9 @@ def manage_categories():
                     logger.debug("API response contains 'data' key, extracting nested data")
                     seed_data = seed_data['data']
                 logger.debug(f"Seed data fetched from API (first 5 items): {seed_data[:5] if seed_data else 'Empty'}")
+                # Log all rental_class_id values from seed data
+                seed_rental_class_ids = [item['rental_class_id'] for item in seed_data if 'rental_class_id' in item]
+                logger.debug(f"All rental_class_ids from seed data: {seed_rental_class_ids}")
                 cache.set(cache_key, seed_data, timeout=3600)  # Cache for 1 hour
                 logger.info("Fetched seed data from API and cached")
             except Exception as api_error:
@@ -64,7 +67,7 @@ def manage_categories():
         # Create a mapping of rental_class_id to common_name
         try:
             common_name_dict = {
-                str(item['rental_class_id']).strip().upper(): item['common_name']
+                str(item['rental_class_id']).strip(): item['common_name']  # Removed .upper()
                 for item in seed_data
                 if 'rental_class_id' in item and 'common_name' in item
             }
@@ -82,7 +85,7 @@ def manage_categories():
         sample_rental_class_ids = list(mappings_dict.keys())[:5]
         logger.debug(f"Sample rental_class_ids from mappings: {sample_rental_class_ids}")
         for rental_class_id, mapping in mappings_dict.items():
-            normalized_rental_class_id = str(rental_class_id).strip().upper()
+            normalized_rental_class_id = str(rental_class_id).strip()  # Removed .upper()
             common_name = common_name_dict.get(normalized_rental_class_id, 'N/A')
             if common_name == 'N/A':
                 logger.warning(f"No common name found for rental_class_id {normalized_rental_class_id}")
@@ -142,6 +145,9 @@ def get_mappings():
                     logger.debug("API response contains 'data' key, extracting nested data")
                     seed_data = seed_data['data']
                 logger.debug(f"Seed data fetched from API (first 5 items): {seed_data[:5] if seed_data else 'Empty'}")
+                # Log all rental_class_id values from seed data
+                seed_rental_class_ids = [item['rental_class_id'] for item in seed_data if 'rental_class_id' in item]
+                logger.debug(f"All rental_class_ids from seed data: {seed_rental_class_ids}")
                 cache.set(cache_key, seed_data, timeout=3600)  # Cache for 1 hour
                 logger.info("Fetched seed data from API and cached")
             except Exception as api_error:
@@ -154,7 +160,7 @@ def get_mappings():
         # Create a mapping of rental_class_id to common_name
         try:
             common_name_dict = {
-                str(item['rental_class_id']).strip().upper(): item['common_name']
+                str(item['rental_class_id']).strip(): item['common_name']  # Removed .upper()
                 for item in seed_data
                 if 'rental_class_id' in item and 'common_name' in item
             }
@@ -172,7 +178,7 @@ def get_mappings():
         sample_rental_class_ids = list(mappings_dict.keys())[:5]
         logger.debug(f"Sample rental_class_ids from mappings: {sample_rental_class_ids}")
         for rental_class_id, mapping in mappings_dict.items():
-            normalized_rental_class_id = str(rental_class_id).strip().upper()
+            normalized_rental_class_id = str(rental_class_id).strip()  # Removed .upper()
             common_name = common_name_dict.get(normalized_rental_class_id, 'N/A')
             if common_name == 'N/A':
                 logger.warning(f"No common name found for rental_class_id {normalized_rental_class_id} (mapping)")
