@@ -36,7 +36,7 @@ if not any(isinstance(h, logging.StreamHandler) for h in root_logger.handlers):
 categories_bp = Blueprint('categories', __name__)
 
 # Version check to ensure correct deployment
-logger.info("Deployed categories.py version: 2025-04-24-v5")
+logger.info("Deployed categories.py version: 2025-04-24-v6")
 
 @categories_bp.route('/categories')
 def manage_categories():
@@ -94,8 +94,8 @@ def manage_categories():
                     # Log raw keys as strings to check for encoding issues
                     raw_keys = [str(key) for key in item.keys()]
                     logger.debug(f"Item {idx} - Raw keys: {raw_keys}")
-                    has_rental_class_id = 'rental_class_id' in item
-                    has_common_name = 'common_name' in item
+                    has_rental_class_id = 'rental_class_id' in raw_keys
+                    has_common_name = 'common_name' in raw_keys
                     logger.debug(f"Item {idx} - Keys: {list(item.keys())}, has_rental_class_id: {has_rental_class_id}, has_common_name: {has_common_name}")
                     if has_rental_class_id and has_common_name:
                         valid_items.append(item)
@@ -107,35 +107,27 @@ def manage_categories():
                 logger.debug(f"Number of valid items: {len(valid_items)}")
                 logger.debug(f"Sample valid item: {valid_items[0]}")
             
-            # Try dictionary comprehension
-            logger.debug("Attempting dictionary comprehension")
+            # Explicitly build common_name_dict
+            logger.debug("Building common_name_dict explicitly")
             common_name_dict = {}
             for idx, item in enumerate(seed_data):
                 try:
-                    if 'rental_class_id' in item and 'common_name' in item:
-                        common_name_dict[str(item['rental_class_id']).strip()] = item['common_name']
+                    rental_class_id = item.get('rental_class_id')
+                    common_name = item.get('common_name')
+                    logger.debug(f"Item {idx}: rental_class_id={rental_class_id}, common_name={common_name}")
+                    if rental_class_id and common_name:
+                        common_name_dict[str(rental_class_id).strip()] = common_name
                 except Exception as comp_error:
-                    logger.error(f"Error in dict comprehension for item {idx}: {str(comp_error)}", exc_info=True)
-            logger.debug(f"After dict comprehension, common_name_dict has {len(common_name_dict)} entries")
-            
-            # Fallback: If dict is empty, populate manually
-            if not common_name_dict:
-                logger.warning("Dictionary comprehension failed, attempting manual population")
-                for idx, item in enumerate(seed_data):
-                    try:
-                        rental_class_id = item.get('rental_class_id')
-                        common_name = item.get('common_name')
-                        logger.debug(f"Fallback - Item {idx}: rental_class_id={rental_class_id}, common_name={common_name}")
-                        if rental_class_id and common_name:
-                            common_name_dict[str(rental_class_id).strip()] = common_name
-                    except Exception as fallback_error:
-                        logger.error(f"Error in fallback for item {idx}: {str(fallback_error)}", exc_info=True)
-                logger.debug(f"Manually populated common_name_dict with {len(common_name_dict)} entries")
-
+                    logger.error(f"Error processing item {idx} for common_name_dict: {str(comp_error)}", exc_info=True)
             logger.debug(f"Created common_name_dict with {len(common_name_dict)} entries")
+            
             # Log a sample of common_name_dict to verify contents
             sample_common_names = dict(list(common_name_dict.items())[:5])
             logger.debug(f"Sample of common_name_dict: {sample_common_names}")
+            
+            # Flush logs to ensure they are written
+            for handler in logger.handlers:
+                handler.flush()
         except Exception as dict_error:
             logger.error(f"Error creating common_name_dict from seed_data: {str(dict_error)}", exc_info=True)
             common_name_dict = {}
@@ -233,8 +225,8 @@ def get_mappings():
                     # Log raw keys as strings to check for encoding issues
                     raw_keys = [str(key) for key in item.keys()]
                     logger.debug(f"Item {idx} - Raw keys: {raw_keys}")
-                    has_rental_class_id = 'rental_class_id' in item
-                    has_common_name = 'common_name' in item
+                    has_rental_class_id = 'rental_class_id' in raw_keys
+                    has_common_name = 'common_name' in raw_keys
                     logger.debug(f"Item {idx} - Keys: {list(item.keys())}, has_rental_class_id: {has_rental_class_id}, has_common_name: {has_common_name}")
                     if has_rental_class_id and has_common_name:
                         valid_items.append(item)
@@ -246,35 +238,27 @@ def get_mappings():
                 logger.debug(f"Number of valid items: {len(valid_items)}")
                 logger.debug(f"Sample valid item: {valid_items[0]}")
             
-            # Try dictionary comprehension
-            logger.debug("Attempting dictionary comprehension")
+            # Explicitly build common_name_dict
+            logger.debug("Building common_name_dict explicitly")
             common_name_dict = {}
             for idx, item in enumerate(seed_data):
                 try:
-                    if 'rental_class_id' in item and 'common_name' in item:
-                        common_name_dict[str(item['rental_class_id']).strip()] = item['common_name']
+                    rental_class_id = item.get('rental_class_id')
+                    common_name = item.get('common_name')
+                    logger.debug(f"Item {idx}: rental_class_id={rental_class_id}, common_name={common_name}")
+                    if rental_class_id and common_name:
+                        common_name_dict[str(rental_class_id).strip()] = common_name
                 except Exception as comp_error:
-                    logger.error(f"Error in dict comprehension for item {idx}: {str(comp_error)}", exc_info=True)
-            logger.debug(f"After dict comprehension, common_name_dict has {len(common_name_dict)} entries")
-            
-            # Fallback: If dict is empty, populate manually
-            if not common_name_dict:
-                logger.warning("Dictionary comprehension failed, attempting manual population")
-                for idx, item in enumerate(seed_data):
-                    try:
-                        rental_class_id = item.get('rental_class_id')
-                        common_name = item.get('common_name')
-                        logger.debug(f"Fallback - Item {idx}: rental_class_id={rental_class_id}, common_name={common_name}")
-                        if rental_class_id and common_name:
-                            common_name_dict[str(rental_class_id).strip()] = common_name
-                    except Exception as fallback_error:
-                        logger.error(f"Error in fallback for item {idx}: {str(fallback_error)}", exc_info=True)
-                logger.debug(f"Manually populated common_name_dict with {len(common_name_dict)} entries")
-
+                    logger.error(f"Error processing item {idx} for common_name_dict: {str(comp_error)}", exc_info=True)
             logger.debug(f"Created common_name_dict with {len(common_name_dict)} entries")
+            
             # Log a sample of common_name_dict to verify contents
             sample_common_names = dict(list(common_name_dict.items())[:5])
             logger.debug(f"Sample of common_name_dict: {sample_common_names}")
+            
+            # Flush logs to ensure they are written
+            for handler in logger.handlers:
+                handler.flush()
         except Exception as dict_error:
             logger.error(f"Error creating common_name_dict from seed_data: {str(dict_error)}", exc_info=True)
             common_name_dict = {}
