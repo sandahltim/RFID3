@@ -3,6 +3,39 @@ from .. import db
 from ..models.db_models import ItemMaster, Transaction, RentalClassMapping, UserRentalClassMapping
 from sqlalchemy import func, desc, or_, asc
 from time import time
+import logging
+
+# Configure logging
+logger = logging.getLogger('tab1')
+logger.setLevel(logging.DEBUG)
+
+# Remove existing handlers to avoid duplicates
+logger.handlers = []
+
+# File handler for rfid_dashboard.log
+file_handler = logging.FileHandler('/home/tim/test_rfidpi/logs/rfid_dashboard.log')
+file_handler.setLevel(logging.DEBUG)
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+file_handler.setFormatter(formatter)
+logger.addHandler(file_handler)
+
+# Secondary file handler for debug.log
+debug_handler = logging.FileHandler('/home/tim/test_rfidpi/logs/debug.log')
+debug_handler.setLevel(logging.DEBUG)
+debug_handler.setFormatter(formatter)
+logger.addHandler(debug_handler)
+
+# Console handler
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.DEBUG)
+console_handler.setFormatter(formatter)
+logger.addHandler(console_handler)
+
+# Also add logs to the root logger (which Gunicorn might capture)
+root_logger = logging.getLogger()
+root_logger.setLevel(logging.DEBUG)
+if not any(isinstance(h, logging.StreamHandler) for h in root_logger.handlers):
+    root_logger.addHandler(console_handler)
 
 tab1_bp = Blueprint('tab1', __name__)
 
@@ -10,16 +43,19 @@ tab1_bp = Blueprint('tab1', __name__)
 def tab1_view():
     try:
         session = db.session()
-        current_app.logger.info("Starting new session for tab1")
+        logger.info("Starting new session for tab1")
 
         # Fetch all rental class mappings from both tables
         base_mappings = session.query(RentalClassMapping).all()
         user_mappings = session.query(UserRentalClassMapping).all()
+        logger.debug(f"Fetched {len(base_mappings)} base mappings")
+        logger.debug(f"Fetched {len(user_mappings)} user mappings")
 
         # Merge mappings, prioritizing user mappings
         mappings_dict = {m.rental_class_id: {'category': m.category, 'subcategory': m.subcategory} for m in base_mappings}
         for um in user_mappings:
             mappings_dict[um.rental_class_id] = {'category': um.category, 'subcategory': um.subcategory}
+        logger.debug(f"Merged mappings_dict has {len(mappings_dict)} entries")
 
         # Group by category
         categories = {}
@@ -32,15 +68,16 @@ def tab1_view():
                 'category': category,
                 'subcategory': data['subcategory']
             })
+        logger.debug(f"Grouped into {len(categories)} categories: {list(categories.keys())}")
 
         # Calculate counts for each category
         category_data = []
-        # Apply filter and sort if provided
         filter_query = request.args.get('filter', '').lower()
         sort = request.args.get('sort', '')
 
         for cat, mappings in categories.items():
             rental_class_ids = [m['rental_class_id'] for m in mappings]
+            logger.debug(f"Processing category {cat} with rental_class_ids: {rental_class_ids[:5]}...")
 
             # Total items in this category
             total_items_query = session.query(func.count(ItemMaster.tag_id)).filter(
@@ -51,6 +88,7 @@ def tab1_view():
                     func.lower(ItemMaster.common_name).like(f'%{filter_query}%')
                 )
             total_items = total_items_query.scalar()
+            logger.debug(f"Total items for category {cat}: {total_items}")
 
             # Items on contracts (status = 'On Rent' or 'Delivered')
             items_on_contracts_query = session.query(func.count(ItemMaster.tag_id)).filter(
@@ -62,6 +100,7 @@ def tab1_view():
                     func.lower(ItemMaster.common_name).like(f'%{filter_query}%')
                 )
             items_on_contracts = items_on_contracts_query.scalar()
+            logger.debug(f"Items on contracts for category {cat}: {items_on_contracts}")
 
             # Items in service logic
             subquery = session.query(
@@ -91,6 +130,7 @@ def tab1_view():
                     func.lower(ItemMaster.common_name).like(f'%{filter_query}%')
                 )
             items_in_service = items_in_service_query.scalar()
+            logger.debug(f"Items in service for category {cat}: {items_in_service}")
 
             # Items available (status = 'Ready to Rent')
             items_available_query = session.query(func.count(ItemMaster.tag_id)).filter(
@@ -102,6 +142,7 @@ def tab1_view():
                     func.lower(ItemMaster.common_name).like(f'%{filter_query}%')
                 )
             items_available = items_available_query.scalar()
+            logger.debug(f"Items available for category {cat}: {items_available}")
 
             category_data.append({
                 'category': cat,
@@ -122,12 +163,12 @@ def tab1_view():
         elif sort == 'total_items_desc':
             category_data.sort(key=lambda x: x['total_items'], reverse=True)
 
-        current_app.logger.info(f"Fetched {len(category_data)} categories for tab1")
+        logger.info(f"Fetched {len(category_data)} categories for tab1")
 
         session.close()
         return render_template('tab1.html', categories=category_data, cache_bust=int(time()))
     except Exception as e:
-        current_app.logger.error(f"Error rendering Tab 1: {str(e)}", exc_info=True)
+        logger.error(f"Error rendering Tab 1: {str(e)}", exc_info=True)
         return render_template('tab1.html', categories=[], cache_bust=int(time()))
 
 @tab1_bp.route('/tab/1/subcat_data')
@@ -139,18 +180,23 @@ def tab1_subcat_data():
     sort = request.args.get('sort', '')
 
     if not category:
+        logger.error("Category parameter is missing in subcat_data request")
         return jsonify({'error': 'Category is required'}), 400
 
+    logger.info(f"Fetching subcategories for category: {category}")
     try:
         session = db.session()
 
         # Fetch mappings for this category
         base_mappings = session.query(RentalClassMapping).filter_by(category=category).all()
         user_mappings = session.query(UserRentalClassMapping).filter_by(category=category).all()
+        logger.debug(f"Fetched {len(base_mappings)} base mappings for category {category}")
+        logger.debug(f"Fetched {len(user_mappings)} user mappings for category {category}")
 
         mappings_dict = {m.rental_class_id: {'category': m.category, 'subcategory': m.subcategory} for m in base_mappings}
         for um in user_mappings:
             mappings_dict[um.rental_class_id] = {'category': um.category, 'subcategory': um.subcategory}
+        logger.debug(f"Merged mappings_dict has {len(mappings_dict)} entries: {list(mappings_dict.items())[:5]}")
 
         # Group by subcategory
         subcategories = {}
@@ -159,6 +205,7 @@ def tab1_subcat_data():
             if subcategory not in subcategories:
                 subcategories[subcategory] = []
             subcategories[subcategory].append(rental_class_id)
+        logger.debug(f"Found {len(subcategories)} subcategories: {list(subcategories.keys())}")
 
         # Apply filter and sort
         subcat_list = sorted(subcategories.keys())
@@ -174,10 +221,12 @@ def tab1_subcat_data():
         start = (page - 1) * per_page
         end = start + per_page
         paginated_subcats = subcat_list[start:end]
+        logger.debug(f"Paginated subcategories (page {page}): {paginated_subcats}")
 
         subcategory_data = []
         for subcat in paginated_subcats:
             rental_class_ids = subcategories[subcat]
+            logger.debug(f"Processing subcategory {subcat} with rental_class_ids: {rental_class_ids}")
 
             # Total items in this subcategory
             total_items_query = session.query(func.count(ItemMaster.tag_id)).filter(
@@ -188,6 +237,7 @@ def tab1_subcat_data():
                     func.lower(ItemMaster.common_name).like(f'%{filter_query}%')
                 )
             total_items = total_items_query.scalar()
+            logger.debug(f"Total items for subcategory {subcat}: {total_items}")
 
             # Items on contracts (status = 'On Rent' or 'Delivered')
             items_on_contracts_query = session.query(func.count(ItemMaster.tag_id)).filter(
@@ -199,6 +249,7 @@ def tab1_subcat_data():
                     func.lower(ItemMaster.common_name).like(f'%{filter_query}%')
                 )
             items_on_contracts = items_on_contracts_query.scalar()
+            logger.debug(f"Items on contracts for subcategory {subcat}: {items_on_contracts}")
 
             # Items in service
             subquery = session.query(
@@ -228,6 +279,7 @@ def tab1_subcat_data():
                     func.lower(ItemMaster.common_name).like(f'%{filter_query}%')
                 )
             items_in_service = items_in_service_query.scalar()
+            logger.debug(f"Items in service for subcategory {subcat}: {items_in_service}")
 
             # Items available (status = 'Ready to Rent')
             items_available_query = session.query(func.count(ItemMaster.tag_id)).filter(
@@ -239,6 +291,7 @@ def tab1_subcat_data():
                     func.lower(ItemMaster.common_name).like(f'%{filter_query}%')
                 )
             items_available = items_available_query.scalar()
+            logger.debug(f"Items available for subcategory {subcat}: {items_available}")
 
             subcategory_data.append({
                 'subcategory': subcat,
@@ -255,6 +308,7 @@ def tab1_subcat_data():
                 subcategory_data.sort(key=lambda x: x['total_items'], reverse=True)
 
         session.close()
+        logger.info(f"Returning {len(subcategory_data)} subcategories for category {category}")
         return jsonify({
             'subcategories': subcategory_data,
             'total_subcats': total_subcats,
@@ -262,7 +316,7 @@ def tab1_subcat_data():
             'per_page': per_page
         })
     except Exception as e:
-        current_app.logger.error(f"Error fetching subcategory data for category {category}: {str(e)}")
+        logger.error(f"Error fetching subcategory data for category {category}: {str(e)}")
         return jsonify({'error': 'Failed to fetch subcategory data'}), 500
 
 @tab1_bp.route('/tab/1/common_names')
