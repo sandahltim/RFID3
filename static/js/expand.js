@@ -1,4 +1,4 @@
-console.log('expand.js version: 2025-04-24 v28 loaded');
+console.log('expand.js version: 2025-04-25 v30 loaded');
 
 function showLoading(key) {
     const loadingDiv = document.getElementById(`loading-${key}`);
@@ -31,6 +31,8 @@ function hideOtherSubcats(currentCategory) {
             div.classList.remove('expanded');
             div.classList.add('collapsed');
             div.style.display = 'none';
+        } else {
+            console.log(`Keeping subcat div visible: ${divId}`);
         }
     });
 }
@@ -158,8 +160,8 @@ function loadCommonNames(category, subcategory, targetId, page = 1, contractNumb
                         html += `
                             <tr>
                                 <td>${item.name}</td>
-                                <td>${item.on_contracts}</td>
-                                <td>${item.total_items_inventory}</td>
+                                <td>${item.items_on_contracts}</td>
+                                <td>${item.total_items}</td>
                                 <td>
                                     <button class="btn btn-sm btn-secondary expand-btn" onclick="loadItems('${category}', '${subcategory || ''}', '${item.name}', 'items-${rowId}')">Expand</button>
                                     <button class="btn btn-sm btn-secondary collapse-btn" style="display:none;" onclick="collapseSection('items-${rowId}')">Collapse</button>
@@ -180,8 +182,8 @@ function loadCommonNames(category, subcategory, targetId, page = 1, contractNumb
                                 <td>${item.name}</td>
                                 <td>${item.total_items}</td>
                                 <td>${item.items_on_contracts}</td>
-                                <td>${item.in_service}</td>
-                                <td>${item.available}</td>
+                                <td>${item.items_in_service}</td>
+                                <td>${item.items_available}</td>
                                 <td>
                                     <button class="btn btn-sm btn-secondary expand-btn" onclick="loadItems('${category}', '${subcategory || ''}', '${item.name}', 'items-${rowId}')">Expand</button>
                                     <button class="btn btn-sm btn-secondary collapse-btn" style="display:none;" onclick="collapseSection('items-${rowId}')">Collapse</button>
@@ -246,12 +248,6 @@ function loadCommonNames(category, subcategory, targetId, page = 1, contractNumb
         });
 }
 
-// ... (rest of the file unchanged)
-
-console.log('expand.js version: 2025-04-24 v29 loaded');
-
-// ... (other functions unchanged)
-
 function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1) {
     console.log('loadSubcatData called with', { originalCategory, normalizedCategory, targetId, page });
 
@@ -285,6 +281,7 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
             return response.json();
         })
         .then(data => {
+            console.log('Subcategory data received:', data);
             let html = '';
             if (data.subcategories && data.subcategories.length > 0) {
                 html += `
@@ -315,9 +312,9 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
                                     <tr>
                                         <td>${subcat.subcategory}</td>
                                         <td>${subcat.total_items}</td>
-                                        <td>${subcat.on_contracts}</td>
-                                        <td>${subcat.in_service}</td>
-                                        <td>${subcat.available}</td>
+                                        <td>${subcat.items_on_contracts}</td>
+                                        <td>${subcat.items_in_service}</td>
+                                        <td>${subcat.items_available}</td>
                                         <td>
                                             <button class="btn btn-sm btn-secondary expand-btn" onclick="loadCommonNames('${originalCategory}', '${subcat.subcategory}', '${subcatKey}')">Expand</button>
                                             <button class="btn btn-sm btn-secondary collapse-btn" style="display:none;" onclick="collapseSection('common-${subcatKey}')">Collapse</button>
@@ -351,15 +348,17 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
                         </div>
                     `;
                 });
-                console.log('Generated HTML for subcategories:', html); // Debug log to confirm HTML
+                console.log('Generated HTML for subcategories:', html);
             } else {
                 html = `<div class="subcat-level"><p>No subcategories found for this category.</p></div>`;
             }
 
+            console.log('Setting container HTML for targetId:', targetId);
             container.innerHTML = html;
             container.classList.remove('collapsed');
             container.classList.add('expanded');
             container.style.display = 'block';
+            console.log('Container updated:', container);
 
             const expandBtn = document.querySelector(`button[onclick*="loadSubcatData('${originalCategory}', '${normalizedCategory}', '${targetId}')"]`);
             const collapseBtn = expandBtn ? expandBtn.nextElementSibling : null;
