@@ -1,4 +1,4 @@
-console.log('expand.js version: 2025-04-25 v39 loaded');
+console.log('expand.js version: 2025-04-25 v40 loaded');
 
 function showLoading(key) {
     const loadingDiv = document.getElementById(`loading-${key}`);
@@ -323,6 +323,18 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
         })
         .then(data => {
             console.log('Subcategory data received:', data);
+            // Detailed logging of the response
+            if (data.subcategories && data.subcategories.length > 0) {
+                console.log('Subcategories found:', data.subcategories);
+                data.subcategories.forEach(subcat => {
+                    console.log(`Subcategory: ${subcat.subcategory}, Total Items: ${subcat.total_items}, Items on Contracts: ${subcat.items_on_contracts}, Items in Service: ${subcat.items_in_service}, Items Available: ${subcat.items_available}`);
+                });
+            } else if (data.message) {
+                console.log('No subcategories message:', data.message);
+            } else {
+                console.log('Unexpected response format:', data);
+            }
+
             let html = '';
             if (data.subcategories && data.subcategories.length > 0) {
                 html += `
@@ -411,7 +423,7 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
             });
 
             // Debug the parent <td> and <tr> styles
-            const parentTd = container.parentElement; // Should be the <td>
+            const parentTd = container.parentElement;
             if (parentTd) {
                 const computedTdStyle = window.getComputedStyle(parentTd);
                 console.log('Parent <td> computed style:', {
@@ -421,7 +433,7 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
                     height: computedTdStyle.height
                 });
 
-                const parentTr = parentTd.parentElement; // Should be the <tr>
+                const parentTr = parentTd.parentElement;
                 if (parentTr) {
                     const computedTrStyle = window.getComputedStyle(parentTr);
                     console.log('Parent <tr> computed style:', {
@@ -465,7 +477,7 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
 
                 // Force a reflow on the container to ensure rendering
                 container.style.display = 'none';
-                void container.offsetHeight; // Trigger reflow
+                void container.offsetHeight;
                 container.style.display = 'block';
                 container.style.opacity = '1';
                 console.log('After container reflow, container display:', container.style.display, 'opacity:', container.style.opacity);
@@ -473,7 +485,7 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
                 // Force a reflow on the row
                 subcatRow.style.display = 'table-row';
                 subcatRow.style.opacity = '1';
-                void subcatRow.offsetHeight; // Trigger reflow
+                void subcatRow.offsetHeight;
                 console.log('After row reflow, subcategory row height:', subcatRow.offsetHeight);
             } else {
                 console.log('Subcategory row not found in DOM');
@@ -536,6 +548,7 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
             return response.json();
         })
         .then(data => {
+            console.log('Items data:', data);
             let html = '';
             if (data.items && data.items.length > 0) {
                 const headers = ['Tag ID', 'Common Name', 'Bin Location', 'Status', 'Last Contract', 'Last Scanned Date'];
