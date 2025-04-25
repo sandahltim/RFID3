@@ -1,4 +1,4 @@
-console.log('expand.js version: 2025-04-25 v34 loaded');
+console.log('expand.js version: 2025-04-25 v35 loaded');
 
 function showLoading(key) {
     const loadingDiv = document.getElementById(`loading-${key}`);
@@ -347,6 +347,7 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
             container.classList.remove('collapsed');
             container.classList.add('expanded');
             container.style.display = 'block';
+            container.style.opacity = '1'; // Explicitly set opacity
             console.log('Container updated with HTML:', container.innerHTML);
 
             // Debug the container's computed style
@@ -357,6 +358,29 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
                 opacity: computedContainerStyle.opacity,
                 height: computedContainerStyle.height
             });
+
+            // Debug the parent <td> and <tr> styles
+            const parentTd = container.parentElement; // Should be the <td>
+            if (parentTd) {
+                const computedTdStyle = window.getComputedStyle(parentTd);
+                console.log('Parent <td> computed style:', {
+                    display: computedTdStyle.display,
+                    visibility: computedTdStyle.visibility,
+                    opacity: computedTdStyle.opacity,
+                    height: computedTdStyle.height
+                });
+
+                const parentTr = parentTd.parentElement; // Should be the <tr>
+                if (parentTr) {
+                    const computedTrStyle = window.getComputedStyle(parentTr);
+                    console.log('Parent <tr> computed style:', {
+                        display: computedTrStyle.display,
+                        visibility: computedTrStyle.visibility,
+                        opacity: computedTrStyle.opacity,
+                        height: computedTrStyle.height
+                    });
+                }
+            }
 
             // Debug the subcat-level div
             const subcatLevel = container.querySelector('.subcat-level');
@@ -392,7 +416,8 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
                 container.style.display = 'none';
                 void container.offsetHeight; // Trigger reflow
                 container.style.display = 'block';
-                console.log('After container reflow, container display:', container.style.display);
+                container.style.opacity = '1';
+                console.log('After container reflow, container display:', container.style.display, 'opacity:', container.style.opacity);
 
                 // Force a reflow on the row
                 subcatRow.style.display = 'table-row';
@@ -408,6 +433,7 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
             container.classList.remove('collapsed');
             container.classList.add('expanded');
             container.style.display = 'block';
+            container.style.opacity = '1';
         })
         .finally(() => {
             hideLoading(normalizedCategory);
