@@ -22,6 +22,12 @@ formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(messag
 file_handler.setFormatter(formatter)
 logger.addHandler(file_handler)
 
+# Secondary file handler for debug.log
+debug_handler = logging.FileHandler('/home/tim/test_rfidpi/logs/debug.log')
+debug_handler.setLevel(logging.DEBUG)
+debug_handler.setFormatter(formatter)
+logger.addHandler(debug_handler)
+
 # Console handler
 console_handler = logging.StreamHandler(sys.stdout)
 console_handler.setLevel(logging.DEBUG)
@@ -37,7 +43,7 @@ if not any(isinstance(h, logging.StreamHandler) for h in root_logger.handlers):
 categories_bp = Blueprint('categories', __name__)
 
 # Version check to ensure correct deployment
-logger.info("Deployed categories.py version: 2025-04-24-v8")
+logger.info("Deployed categories.py version: 2025-04-24-v9")
 
 # Test logging levels
 logger.debug("DEBUG level test message at startup")
@@ -94,8 +100,10 @@ def manage_categories():
             # Debug the dictionary comprehension
             valid_items = []
             logger.info("Starting debug loop for seed data items (INFO level)")
+            print("Starting debug loop for seed data items (PRINT statement)")  # Temporary print for debugging
             for idx, item in enumerate(seed_data[:10]):  # Limit to first 10 for brevity
                 logger.info(f"Debug loop iteration {idx} (INFO level)")
+                print(f"Debug loop iteration {idx} (PRINT statement)")  # Temporary print for debugging
                 try:
                     logger.debug(f"Processing item {idx}: {item}")
                     # Log raw keys as strings to check for encoding issues
@@ -226,8 +234,10 @@ def get_mappings():
             # Debug the dictionary comprehension
             valid_items = []
             logger.info("Starting debug loop for seed data items (INFO level)")
+            print("Starting debug loop for seed data items (PRINT statement)")  # Temporary print for debugging
             for idx, item in enumerate(seed_data[:10]):  # Limit to first 10 for brevity
                 logger.info(f"Debug loop iteration {idx} (INFO level)")
+                print(f"Debug loop iteration {idx} (PRINT statement)")  # Temporary print for debugging
                 try:
                     logger.debug(f"Processing item {idx}: {item}")
                     # Log raw keys as strings to check for encoding issues
