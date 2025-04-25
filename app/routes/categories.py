@@ -79,6 +79,17 @@ def manage_categories():
 
         # Create a mapping of rental_class_id to common_name
         try:
+            # Debug the dictionary comprehension
+            valid_items = []
+            for item in seed_data:
+                has_keys = 'rental_class_id' in item and 'common_name' in item
+                logger.debug(f"Item keys: {list(item.keys())}, has_keys: {has_keys}")
+                if has_keys:
+                    valid_items.append(item)
+            logger.debug(f"Number of valid items: {len(valid_items)}")
+            if valid_items:
+                logger.debug(f"Sample valid item: {valid_items[0]}")
+            
             common_name_dict = {
                 str(item['rental_class_id']).strip(): item['common_name']
                 for item in seed_data
@@ -173,6 +184,17 @@ def get_mappings():
 
         # Create a mapping of rental_class_id to common_name
         try:
+            # Debug the dictionary comprehension
+            valid_items = []
+            for item in seed_data:
+                has_keys = 'rental_class_id' in item and 'common_name' in item
+                logger.debug(f"Item keys: {list(item.keys())}, has_keys: {has_keys}")
+                if has_keys:
+                    valid_items.append(item)
+            logger.debug(f"Number of valid items: {len(valid_items)}")
+            if valid_items:
+                logger.debug(f"Sample valid item: {valid_items[0]}")
+            
             common_name_dict = {
                 str(item['rental_class_id']).strip(): item['common_name']
                 for item in seed_data
