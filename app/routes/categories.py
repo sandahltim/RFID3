@@ -36,7 +36,7 @@ if not any(isinstance(h, logging.StreamHandler) for h in root_logger.handlers):
 categories_bp = Blueprint('categories', __name__)
 
 # Version check to ensure correct deployment
-logger.info("Deployed categories.py version: 2025-04-24-v3")
+logger.info("Deployed categories.py version: 2025-04-24-v4")
 
 @categories_bp.route('/categories')
 def manage_categories():
@@ -82,8 +82,12 @@ def manage_categories():
 
         # Create a mapping of rental_class_id to common_name
         try:
+            # Log seed data details
+            logger.debug(f"Seed data length: {len(seed_data)}, type: {type(seed_data)}")
+            
             # Debug the dictionary comprehension
             valid_items = []
+            logger.debug("Starting debug loop for seed data items")
             for idx, item in enumerate(seed_data[:10]):  # Limit to first 10 for brevity
                 logger.debug(f"Processing item {idx}: {item}")
                 has_rental_class_id = 'rental_class_id' in item
@@ -91,6 +95,8 @@ def manage_categories():
                 logger.debug(f"Item {idx} - Keys: {list(item.keys())}, has_rental_class_id: {has_rental_class_id}, has_common_name: {has_common_name}")
                 if has_rental_class_id and has_common_name:
                     valid_items.append(item)
+            if not valid_items:
+                logger.warning("No valid items found in debug loop")
             logger.debug(f"Number of valid items: {len(valid_items)}")
             if valid_items:
                 logger.debug(f"Sample valid item: {valid_items[0]}")
@@ -101,13 +107,15 @@ def manage_categories():
                 for item in seed_data
                 if 'rental_class_id' in item and 'common_name' in item
             }
+            logger.debug(f"After dict comprehension, common_name_dict has {len(common_name_dict)} entries")
             
             # Fallback: If dict is empty, populate manually
             if not common_name_dict:
                 logger.warning("Dictionary comprehension failed, attempting manual population")
-                for item in seed_data:
+                for idx, item in enumerate(seed_data):
                     rental_class_id = item.get('rental_class_id')
                     common_name = item.get('common_name')
+                    logger.debug(f"Fallback - Item {idx}: rental_class_id={rental_class_id}, common_name={common_name}")
                     if rental_class_id and common_name:
                         common_name_dict[str(rental_class_id).strip()] = common_name
                 logger.debug(f"Manually populated common_name_dict with {len(common_name_dict)} entries")
@@ -201,8 +209,12 @@ def get_mappings():
 
         # Create a mapping of rental_class_id to common_name
         try:
+            # Log seed data details
+            logger.debug(f"Seed data length: {len(seed_data)}, type: {type(seed_data)}")
+            
             # Debug the dictionary comprehension
             valid_items = []
+            logger.debug("Starting debug loop for seed data items")
             for idx, item in enumerate(seed_data[:10]):  # Limit to first 10 for brevity
                 logger.debug(f"Processing item {idx}: {item}")
                 has_rental_class_id = 'rental_class_id' in item
@@ -210,6 +222,8 @@ def get_mappings():
                 logger.debug(f"Item {idx} - Keys: {list(item.keys())}, has_rental_class_id: {has_rental_class_id}, has_common_name: {has_common_name}")
                 if has_rental_class_id and has_common_name:
                     valid_items.append(item)
+            if not valid_items:
+                logger.warning("No valid items found in debug loop")
             logger.debug(f"Number of valid items: {len(valid_items)}")
             if valid_items:
                 logger.debug(f"Sample valid item: {valid_items[0]}")
@@ -220,13 +234,15 @@ def get_mappings():
                 for item in seed_data
                 if 'rental_class_id' in item and 'common_name' in item
             }
+            logger.debug(f"After dict comprehension, common_name_dict has {len(common_name_dict)} entries")
             
             # Fallback: If dict is empty, populate manually
             if not common_name_dict:
                 logger.warning("Dictionary comprehension failed, attempting manual population")
-                for item in seed_data:
+                for idx, item in enumerate(seed_data):
                     rental_class_id = item.get('rental_class_id')
                     common_name = item.get('common_name')
+                    logger.debug(f"Fallback - Item {idx}: rental_class_id={rental_class_id}, common_name={common_name}")
                     if rental_class_id and common_name:
                         common_name_dict[str(rental_class_id).strip()] = common_name
                 logger.debug(f"Manually populated common_name_dict with {len(common_name_dict)} entries")
