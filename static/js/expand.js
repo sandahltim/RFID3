@@ -1,4 +1,4 @@
-console.log('expand.js version: 2025-04-25 v30 loaded');
+console.log('expand.js version: 2025-04-25 v32 loaded');
 
 function showLoading(key) {
     const loadingDiv = document.getElementById(`loading-${key}`);
@@ -107,7 +107,6 @@ function loadCommonNames(category, subcategory, targetId, page = 1, contractNumb
         url += `&subcategory=${encodeURIComponent(subcategory)}`;
     }
 
-    // Add filter and sort parameters
     const commonFilter = document.getElementById(`common-filter-${key}`)?.value || '';
     const commonSort = document.getElementById(`common-sort-${key}`)?.value || '';
     if (commonFilter) {
@@ -309,7 +308,7 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <tr>
+                                    <tr class="subcat-row">
                                         <td>${subcat.subcategory}</td>
                                         <td>${subcat.total_items}</td>
                                         <td>${subcat.items_on_contracts}</td>
@@ -322,11 +321,9 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
                                             <div id="loading-${subcatKey}" style="display:none;" class="loading">Loading...</div>
                                         </td>
                                     </tr>
-                                    <tr>
-                                        <td colspan="6">
-                                            <div id="common-${subcatKey}" class="expandable collapsed"></div>
-                                        </td>
-                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
                     `;
 
                     if (data.total_subcats > data.per_page) {
@@ -341,12 +338,6 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
                             </tr>
                         `;
                     }
-
-                    html += `
-                                </tbody>
-                            </table>
-                        </div>
-                    `;
                 });
                 console.log('Generated HTML for subcategories:', html);
             } else {
@@ -360,11 +351,26 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
             container.style.display = 'block';
             console.log('Container updated:', container);
 
-            const expandBtn = document.querySelector(`button[onclick*="loadSubcatData('${originalCategory}', '${normalizedCategory}', '${targetId}')"]`);
-            const collapseBtn = expandBtn ? expandBtn.nextElementSibling : null;
-            if (expandBtn && collapseBtn) {
-                expandBtn.style.display = 'none';
-                collapseBtn.style.display = 'inline-block';
+            // Debug the height and computed style of the subcategory row
+            const subcatRow = container.querySelector('tbody tr.subcat-row');
+            if (subcatRow) {
+                console.log('Subcategory row height:', subcatRow.offsetHeight);
+                const computedStyle = window.getComputedStyle(subcatRow);
+                console.log('Subcategory row computed style:', {
+                    display: computedStyle.display,
+                    visibility: computedStyle.visibility,
+                    height: computedStyle.height,
+                    minHeight: computedStyle.minHeight,
+                    padding: computedStyle.padding,
+                    margin: computedStyle.margin,
+                    opacity: computedStyle.opacity
+                });
+
+                // Force a reflow to ensure rendering
+                subcatRow.style.display = 'table-row';
+                void subcatRow.offsetHeight; // Trigger reflow
+            } else {
+                console.log('Subcategory row not found in DOM');
             }
         })
         .catch(error => {
@@ -403,7 +409,6 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
         url += `&category=${encodeURIComponent(category)}`;
     }
 
-    // Add filter and sort parameters
     const itemFilter = document.getElementById(`item-filter-${key}`)?.value || '';
     const itemSort = document.getElementById(`item-sort-${key}`)?.value || '';
     if (itemFilter) {
