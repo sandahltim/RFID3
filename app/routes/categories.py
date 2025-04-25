@@ -43,12 +43,24 @@ def manage_categories():
 
         # Create a mapping of rental_class_id to common_name
         try:
+            # Try using 'class_id' and 'name' keys
             common_name_dict = {
                 str(item['class_id']).strip().upper(): item['name']
                 for item in seed_data
                 if 'class_id' in item and 'name' in item
             }
-            current_app.logger.debug(f"Created common_name_dict with {len(common_name_dict)} entries")
+            if common_name_dict:
+                current_app.logger.debug(f"Created common_name_dict using 'class_id' and 'name' with {len(common_name_dict)} entries")
+            else:
+                # If no entries with 'class_id' and 'name', try 'rental_class_id' and 'common_name'
+                current_app.logger.debug("No entries found with 'class_id' and 'name', trying 'rental_class_id' and 'common_name'")
+                common_name_dict = {
+                    str(item['rental_class_id']).strip().upper(): item['common_name']
+                    for item in seed_data
+                    if 'rental_class_id' in item and 'common_name' in item
+                }
+                current_app.logger.debug(f"Created common_name_dict using 'rental_class_id' and 'common_name' with {len(common_name_dict)} entries")
+            
             # Log a sample of common_name_dict to verify contents
             sample_common_names = dict(list(common_name_dict.items())[:5])
             current_app.logger.debug(f"Sample of common_name_dict: {sample_common_names}")
@@ -128,12 +140,24 @@ def get_mappings():
 
         # Create a mapping of rental_class_id to common_name
         try:
+            # Try using 'class_id' and 'name' keys
             common_name_dict = {
                 str(item['class_id']).strip().upper(): item['name']
                 for item in seed_data
                 if 'class_id' in item and 'name' in item
             }
-            current_app.logger.debug(f"Created common_name_dict with {len(common_name_dict)} entries")
+            if common_name_dict:
+                current_app.logger.debug(f"Created common_name_dict using 'class_id' and 'name' with {len(common_name_dict)} entries")
+            else:
+                # If no entries with 'class_id' and 'name', try 'rental_class_id' and 'common_name'
+                current_app.logger.debug("No entries found with 'class_id' and 'name', trying 'rental_class_id' and 'common_name'")
+                common_name_dict = {
+                    str(item['rental_class_id']).strip().upper(): item['common_name']
+                    for item in seed_data
+                    if 'rental_class_id' in item and 'common_name' in item
+                }
+                current_app.logger.debug(f"Created common_name_dict using 'rental_class_id' and 'common_name' with {len(common_name_dict)} entries")
+            
             # Log a sample of common_name_dict to verify contents
             sample_common_names = dict(list(common_name_dict.items())[:5])
             current_app.logger.debug(f"Sample of common_name_dict: {sample_common_names}")
