@@ -44,7 +44,7 @@ if not any(isinstance(h, logging.StreamHandler) for h in root_logger.handlers):
 categories_bp = Blueprint('categories', __name__)
 
 # Version check to ensure correct deployment
-logger.info("Deployed categories.py version: 2025-04-24-v12")
+logger.info("Deployed categories.py version: 2025-04-24-v13")
 
 # Test logging levels
 logger.debug("DEBUG level test message at startup")
@@ -134,7 +134,9 @@ def manage_categories():
                     common_name = item.get('common_name')
                     logger.debug(f"Item {idx}: rental_class_id={rental_class_id}, common_name={common_name}")
                     if rental_class_id and common_name:
-                        common_name_dict[str(rental_class_id).strip()] = common_name
+                        normalized_key = str(rental_class_id).strip()
+                        common_name_dict[normalized_key] = common_name
+                        logger.debug(f"Added to common_name_dict: key={normalized_key}, value={common_name}")
                 except Exception as comp_error:
                     logger.error(f"Error processing item {idx} for common_name_dict: {str(comp_error)}", exc_info=True)
             logger.debug(f"Created common_name_dict with {len(common_name_dict)} entries")
@@ -163,8 +165,13 @@ def manage_categories():
         # Log a sample of rental_class_ids from mappings_dict for comparison
         sample_rental_class_ids = list(mappings_dict.keys())[:5]
         logger.debug(f"Sample rental_class_ids from mappings: {sample_rental_class_ids}")
+        # Log a sample of common_name_dict keys for comparison
+        common_name_dict_keys = list(common_name_dict.keys())[:5]
+        logger.debug(f"Sample keys from common_name_dict: {common_name_dict_keys}")
         for rental_class_id, mapping in mappings_dict.items():
+            logger.debug(f"Raw rental_class_id from mappings_dict: {rental_class_id}, type: {type(rental_class_id)}")
             normalized_rental_class_id = str(rental_class_id).strip()
+            logger.debug(f"Normalized rental_class_id for lookup: {normalized_rental_class_id}")
             common_name = common_name_dict.get(normalized_rental_class_id, 'N/A')
             if common_name == 'N/A':
                 logger.warning(f"No common name found for rental_class_id {normalized_rental_class_id}")
@@ -278,7 +285,9 @@ def get_mappings():
                     common_name = item.get('common_name')
                     logger.debug(f"Item {idx}: rental_class_id={rental_class_id}, common_name={common_name}")
                     if rental_class_id and common_name:
-                        common_name_dict[str(rental_class_id).strip()] = common_name
+                        normalized_key = str(rental_class_id).strip()
+                        common_name_dict[normalized_key] = common_name
+                        logger.debug(f"Added to common_name_dict: key={normalized_key}, value={common_name}")
                 except Exception as comp_error:
                     logger.error(f"Error processing item {idx} for common_name_dict: {str(comp_error)}", exc_info=True)
             logger.debug(f"Created common_name_dict with {len(common_name_dict)} entries")
@@ -307,8 +316,13 @@ def get_mappings():
         # Log a sample of rental_class_ids from mappings_dict for comparison
         sample_rental_class_ids = list(mappings_dict.keys())[:5]
         logger.debug(f"Sample rental_class_ids from mappings: {sample_rental_class_ids}")
+        # Log a sample of common_name_dict keys for comparison
+        common_name_dict_keys = list(common_name_dict.keys())[:5]
+        logger.debug(f"Sample keys from common_name_dict: {common_name_dict_keys}")
         for rental_class_id, mapping in mappings_dict.items():
+            logger.debug(f"Raw rental_class_id from mappings_dict: {rental_class_id}, type: {type(rental_class_id)}")
             normalized_rental_class_id = str(rental_class_id).strip()
+            logger.debug(f"Normalized rental_class_id for lookup: {normalized_rental_class_id}")
             common_name = common_name_dict.get(normalized_rental_class_id, 'N/A')
             if common_name == 'N/A':
                 logger.warning(f"No common name found for rental_class_id {normalized_rental_class_id} (mapping)")
