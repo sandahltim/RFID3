@@ -7,25 +7,38 @@ from sqlalchemy.exc import SQLAlchemyError
 from time import time
 import logging
 
-# Ensure logs go to both file and console
+# Configure logging to ensure logs are captured
 logger = logging.getLogger('categories')
-if not logger.handlers:
-    logger.setLevel(logging.DEBUG)
-    file_handler = logging.FileHandler('/home/tim/test_rfidpi/logs/rfid_dashboard.log')
-    file_handler.setLevel(logging.DEBUG)
-    console_handler = logging.StreamHandler()
-    console_handler.setLevel(logging.DEBUG)
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    file_handler.setFormatter(formatter)
-    console_handler.setFormatter(formatter)
-    logger.addHandler(file_handler)
-    logger.addHandler(console_handler)
+logger.setLevel(logging.DEBUG)
+
+# Remove existing handlers to avoid duplicates
+logger.handlers = []
+
+# File handler for rfid_dashboard.log
+file_handler = logging.FileHandler('/home/tim/test_rfidpi/logs/rfid_dashboard.log')
+file_handler.setLevel(logging.DEBUG)
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+file_handler.setFormatter(formatter)
+logger.addHandler(file_handler)
+
+# Console handler
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.DEBUG)
+console_handler.setFormatter(formatter)
+logger.addHandler(console_handler)
+
+# Also add logs to the root logger (which Gunicorn might capture)
+root_logger = logging.getLogger()
+root_logger.setLevel(logging.DEBUG)
+if not any(isinstance(h, logging.StreamHandler) for h in root_logger.handlers):
+    root_logger.addHandler(console_handler)
 
 categories_bp = Blueprint('categories', __name__)
 
 @categories_bp.route('/categories')
 def manage_categories():
     logger.info("TEST: Entering manage_categories endpoint")
+    root_logger.info("TEST: Entering manage_categories endpoint (root logger)")
     try:
         session = db.session()
         logger.info("Starting new session for manage_categories")
@@ -67,7 +80,7 @@ def manage_categories():
         # Create a mapping of rental_class_id to common_name
         try:
             common_name_dict = {
-                str(item['rental_class_id']).strip(): item['common_name']  # Removed .upper()
+                str(item['rental_class_id']).strip(): item['common_name']
                 for item in seed_data
                 if 'rental_class_id' in item and 'common_name' in item
             }
@@ -85,7 +98,7 @@ def manage_categories():
         sample_rental_class_ids = list(mappings_dict.keys())[:5]
         logger.debug(f"Sample rental_class_ids from mappings: {sample_rental_class_ids}")
         for rental_class_id, mapping in mappings_dict.items():
-            normalized_rental_class_id = str(rental_class_id).strip()  # Removed .upper()
+            normalized_rental_class_id = str(rental_class_id).strip()
             common_name = common_name_dict.get(normalized_rental_class_id, 'N/A')
             if common_name == 'N/A':
                 logger.warning(f"No common name found for rental_class_id {normalized_rental_class_id}")
@@ -116,6 +129,7 @@ def manage_categories():
 @categories_bp.route('/categories/mapping', methods=['GET'])
 def get_mappings():
     logger.info("TEST: Entering get_mappings endpoint")
+    root_logger.info("TEST: Entering get_mappings endpoint (root logger)")
     try:
         session = db.session()
         logger.info("Fetching rental class mappings for API")
@@ -160,7 +174,7 @@ def get_mappings():
         # Create a mapping of rental_class_id to common_name
         try:
             common_name_dict = {
-                str(item['rental_class_id']).strip(): item['common_name']  # Removed .upper()
+                str(item['rental_class_id']).strip(): item['common_name']
                 for item in seed_data
                 if 'rental_class_id' in item and 'common_name' in item
             }
@@ -178,7 +192,7 @@ def get_mappings():
         sample_rental_class_ids = list(mappings_dict.keys())[:5]
         logger.debug(f"Sample rental_class_ids from mappings: {sample_rental_class_ids}")
         for rental_class_id, mapping in mappings_dict.items():
-            normalized_rental_class_id = str(rental_class_id).strip()  # Removed .upper()
+            normalized_rental_class_id = str(rental_class_id).strip()
             common_name = common_name_dict.get(normalized_rental_class_id, 'N/A')
             if common_name == 'N/A':
                 logger.warning(f"No common name found for rental_class_id {normalized_rental_class_id} (mapping)")
