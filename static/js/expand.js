@@ -1,4 +1,4 @@
-console.log('expand.js version: 2025-04-25 v35 loaded');
+console.log('expand.js version: 2025-04-25 v37 loaded');
 
 function showLoading(key) {
     const loadingDiv = document.getElementById(`loading-${key}`);
@@ -30,7 +30,9 @@ function hideOtherSubcats(currentCategory) {
             console.log('Collapsing subcat div:', divId);
             div.classList.remove('expanded');
             div.classList.add('collapsed');
+            div.classList.remove('fade'); // Remove Bootstrap fade class
             div.style.display = 'none';
+            div.style.opacity = '0'; // Ensure collapsed state
         } else {
             console.log(`Keeping subcat div visible: ${divId}`);
         }
@@ -47,6 +49,7 @@ function hideOtherCommonNames(currentTargetId) {
             console.log('Collapsing common div:', divId);
             div.classList.remove('expanded');
             div.classList.add('collapsed');
+            div.classList.remove('fade');
             div.style.display = 'none';
         }
     });
@@ -62,6 +65,7 @@ function hideOtherItems(currentTargetId) {
             console.log('Collapsing item div:', divId);
             div.classList.remove('expanded');
             div.classList.add('collapsed');
+            div.classList.remove('fade');
             div.style.display = 'none';
         }
     });
@@ -72,7 +76,9 @@ function collapseSection(targetId) {
     if (section) {
         section.classList.remove('expanded');
         section.classList.add('collapsed');
+        section.classList.remove('fade');
         section.style.display = 'none';
+        section.style.opacity = '0'; // Ensure collapsed state
 
         const expandBtn = document.querySelector(`button[onclick*="${targetId}"]`);
         const collapseBtn = expandBtn ? expandBtn.nextElementSibling : null;
@@ -225,7 +231,11 @@ function loadCommonNames(category, subcategory, targetId, page = 1, contractNumb
             container.innerHTML = html;
             container.classList.remove('collapsed');
             container.classList.add('expanded');
+            container.classList.remove('fade'); // Remove Bootstrap fade class
+            container.classList.add('show'); // Ensure Bootstrap show class if needed
             container.style.display = 'block';
+            container.style.opacity = '1'; // Force visibility
+            container.style.transition = 'none'; // Disable transition to avoid delays
 
             const expandBtn = document.querySelector(`button[onclick*="loadCommonNames('${category}', '${subcategory || ''}', '${targetId}')"]`);
             const collapseBtn = expandBtn ? expandBtn.nextElementSibling : null;
@@ -239,7 +249,11 @@ function loadCommonNames(category, subcategory, targetId, page = 1, contractNumb
             container.innerHTML = `<div class="common-level"><p>Error loading common names: ${error.message}</p></div>`;
             container.classList.remove('collapsed');
             container.classList.add('expanded');
+            container.classList.remove('fade');
+            container.classList.add('show');
             container.style.display = 'block';
+            container.style.opacity = '1';
+            container.style.transition = 'none';
         })
         .finally(() => {
             hideLoading(key);
@@ -257,6 +271,7 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
         return;
     }
     console.log('Container found:', container);
+    console.log('Container classes before update:', container.className);
 
     hideOtherSubcats(normalizedCategory);
     showLoading(normalizedCategory);
@@ -346,8 +361,12 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
             container.innerHTML = html;
             container.classList.remove('collapsed');
             container.classList.add('expanded');
+            container.classList.remove('fade'); // Remove Bootstrap fade class
+            container.classList.add('show'); // Ensure Bootstrap show class if needed
             container.style.display = 'block';
-            container.style.opacity = '1'; // Explicitly set opacity
+            container.style.opacity = '1'; // Force visibility
+            container.style.transition = 'none'; // Disable transition to avoid delays
+            console.log('Container classes after update:', container.className);
             console.log('Container updated with HTML:', container.innerHTML);
 
             // Debug the container's computed style
@@ -356,7 +375,8 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
                 display: computedContainerStyle.display,
                 visibility: computedContainerStyle.visibility,
                 opacity: computedContainerStyle.opacity,
-                height: computedContainerStyle.height
+                height: computedContainerStyle.height,
+                transition: computedContainerStyle.transition
             });
 
             // Debug the parent <td> and <tr> styles
@@ -417,10 +437,12 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
                 void container.offsetHeight; // Trigger reflow
                 container.style.display = 'block';
                 container.style.opacity = '1';
+                container.style.transition = 'none';
                 console.log('After container reflow, container display:', container.style.display, 'opacity:', container.style.opacity);
 
                 // Force a reflow on the row
                 subcatRow.style.display = 'table-row';
+                subcatRow.style.opacity = '1';
                 void subcatRow.offsetHeight; // Trigger reflow
                 console.log('After row reflow, subcategory row height:', subcatRow.offsetHeight);
             } else {
@@ -432,8 +454,11 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
             container.innerHTML = `<div class="subcat-level"><p>Error loading subcategories: ${error.message}</p></div>`;
             container.classList.remove('collapsed');
             container.classList.add('expanded');
+            container.classList.remove('fade');
+            container.classList.add('show');
             container.style.display = 'block';
             container.style.opacity = '1';
+            container.style.transition = 'none';
         })
         .finally(() => {
             hideLoading(normalizedCategory);
@@ -564,7 +589,11 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
             container.innerHTML = html;
             container.classList.remove('collapsed');
             container.classList.add('expanded');
+            container.classList.remove('fade');
+            container.classList.add('show');
             container.style.display = 'block';
+            container.style.opacity = '1';
+            container.style.transition = 'none';
 
             const expandBtn = document.querySelector(`button[onclick*="loadItems('${category}', '${subcategory || ''}', '${commonName}', '${targetId}')"]`);
             const collapseBtn = expandBtn ? expandBtn.nextElementSibling : null;
@@ -578,7 +607,11 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
             container.innerHTML = `<div class="item-level-wrapper"><p>Error loading items: ${error.message}</p></div>`;
             container.classList.remove('collapsed');
             container.classList.add('expanded');
+            container.classList.remove('fade');
+            container.classList.add('show');
             container.style.display = 'block';
+            container.style.opacity = '1';
+            container.style.transition = 'none';
         })
         .finally(() => {
             hideLoading(key);
