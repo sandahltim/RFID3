@@ -36,7 +36,12 @@ if not any(isinstance(h, logging.StreamHandler) for h in root_logger.handlers):
 categories_bp = Blueprint('categories', __name__)
 
 # Version check to ensure correct deployment
-logger.info("Deployed categories.py version: 2025-04-24-v6")
+logger.info("Deployed categories.py version: 2025-04-24-v7")
+
+# Test logging levels
+logger.debug("DEBUG level test message")
+logger.info("INFO level test message")
+logger.warning("WARNING level test message")
 
 @categories_bp.route('/categories')
 def manage_categories():
