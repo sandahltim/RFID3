@@ -43,7 +43,7 @@ if not any(isinstance(h, logging.StreamHandler) for h in root_logger.handlers):
 categories_bp = Blueprint('categories', __name__)
 
 # Version check to ensure correct deployment
-logger.info("Deployed categories.py version: 2025-04-24-v9")
+logger.info("Deployed categories.py version: 2025-04-24-v10")
 
 # Test logging levels
 logger.debug("DEBUG level test message at startup")
@@ -95,27 +95,31 @@ def manage_categories():
         # Create a mapping of rental_class_id to common_name
         try:
             # Log seed data details
-            logger.debug(f"Seed data length: {len(seed_data)}, type: {type(seed_data)}")
-            
+            logger.info(f"Seed data length: {len(seed_data)}, type: {type(seed_data)}")
+            print(f"Seed data length: {len(seed_data)}, type: {type(seed_data)}")
+
             # Debug the dictionary comprehension
             valid_items = []
             logger.info("Starting debug loop for seed data items (INFO level)")
-            print("Starting debug loop for seed data items (PRINT statement)")  # Temporary print for debugging
-            for idx, item in enumerate(seed_data[:10]):  # Limit to first 10 for brevity
-                logger.info(f"Debug loop iteration {idx} (INFO level)")
-                print(f"Debug loop iteration {idx} (PRINT statement)")  # Temporary print for debugging
+            print("Starting debug loop for seed data items (PRINT statement)")
+            
+            # Simplify the loop to isolate the issue
+            for i in range(min(10, len(seed_data))):
+                item = seed_data[i]
+                logger.info(f"Debug loop iteration {i} (INFO level)")
+                print(f"Debug loop iteration {i} (PRINT statement)")
                 try:
-                    logger.debug(f"Processing item {idx}: {item}")
+                    logger.debug(f"Processing item {i}: {item}")
                     # Log raw keys as strings to check for encoding issues
                     raw_keys = [str(key) for key in item.keys()]
-                    logger.debug(f"Item {idx} - Raw keys: {raw_keys}")
+                    logger.debug(f"Item {i} - Raw keys: {raw_keys}")
                     has_rental_class_id = 'rental_class_id' in raw_keys
                     has_common_name = 'common_name' in raw_keys
-                    logger.debug(f"Item {idx} - Keys: {list(item.keys())}, has_rental_class_id: {has_rental_class_id}, has_common_name: {has_common_name}")
+                    logger.debug(f"Item {i} - Keys: {list(item.keys())}, has_rental_class_id: {has_rental_class_id}, has_common_name: {has_common_name}")
                     if has_rental_class_id and has_common_name:
                         valid_items.append(item)
                 except Exception as item_error:
-                    logger.error(f"Error processing item {idx}: {str(item_error)}", exc_info=True)
+                    logger.error(f"Error processing item {i}: {str(item_error)}", exc_info=True)
             if not valid_items:
                 logger.warning("No valid items found in debug loop")
             else:
@@ -229,27 +233,31 @@ def get_mappings():
         # Create a mapping of rental_class_id to common_name
         try:
             # Log seed data details
-            logger.debug(f"Seed data length: {len(seed_data)}, type: {type(seed_data)}")
-            
+            logger.info(f"Seed data length: {len(seed_data)}, type: {type(seed_data)}")
+            print(f"Seed data length: {len(seed_data)}, type: {type(seed_data)}")
+
             # Debug the dictionary comprehension
             valid_items = []
             logger.info("Starting debug loop for seed data items (INFO level)")
-            print("Starting debug loop for seed data items (PRINT statement)")  # Temporary print for debugging
-            for idx, item in enumerate(seed_data[:10]):  # Limit to first 10 for brevity
-                logger.info(f"Debug loop iteration {idx} (INFO level)")
-                print(f"Debug loop iteration {idx} (PRINT statement)")  # Temporary print for debugging
+            print("Starting debug loop for seed data items (PRINT statement)")
+            
+            # Simplify the loop to isolate the issue
+            for i in range(min(10, len(seed_data))):
+                item = seed_data[i]
+                logger.info(f"Debug loop iteration {i} (INFO level)")
+                print(f"Debug loop iteration {i} (PRINT statement)")
                 try:
-                    logger.debug(f"Processing item {idx}: {item}")
+                    logger.debug(f"Processing item {i}: {item}")
                     # Log raw keys as strings to check for encoding issues
                     raw_keys = [str(key) for key in item.keys()]
-                    logger.debug(f"Item {idx} - Raw keys: {raw_keys}")
+                    logger.debug(f"Item {i} - Raw keys: {raw_keys}")
                     has_rental_class_id = 'rental_class_id' in raw_keys
                     has_common_name = 'common_name' in raw_keys
-                    logger.debug(f"Item {idx} - Keys: {list(item.keys())}, has_rental_class_id: {has_rental_class_id}, has_common_name: {has_common_name}")
+                    logger.debug(f"Item {i} - Keys: {list(item.keys())}, has_rental_class_id: {has_rental_class_id}, has_common_name: {has_common_name}")
                     if has_rental_class_id and has_common_name:
                         valid_items.append(item)
                 except Exception as item_error:
-                    logger.error(f"Error processing item {idx}: {str(item_error)}", exc_info=True)
+                    logger.error(f"Error processing item {i}: {str(item_error)}", exc_info=True)
             if not valid_items:
                 logger.warning("No valid items found in debug loop")
             else:
