@@ -5,7 +5,7 @@ from sqlalchemy import func, desc, or_, asc
 from time import time
 import logging
 import sys
-from urllib.parse import unquote  # Add this import for URL decoding
+from urllib.parse import unquote
 
 # Configure logging
 logger = logging.getLogger('tab1')
@@ -30,7 +30,7 @@ logger.addHandler(console_handler)
 tab1_bp = Blueprint('tab1', __name__)
 
 # Version marker
-logger.info("Deployed tab1.py version: 2025-04-25-v9")
+logger.info("Deployed tab1.py version: 2025-04-25-v10")
 
 @tab1_bp.route('/tab/1')
 def tab1_view():
@@ -72,7 +72,7 @@ def tab1_view():
         sort = request.args.get('sort', '')
 
         for cat, mappings in categories.items():
-            rental_class_ids = [str(m['rental_class_id']) for m in mappings]  # Ensure IDs are strings
+            rental_class_ids = [str(m['rental_class_id']) for m in mappings]
 
             # Total items in this category
             total_items_query = session.query(func.count(ItemMaster.tag_id)).filter(
@@ -190,7 +190,7 @@ def tab1_subcat_data():
 
         # Log the mappings for debugging
         if base_mappings:
-            logger.debug("Base mappings: " + ", ".join([f"{ms.rental_class_id}: {m.category} - {m.subcategory}" for m in base_mappings]))
+            logger.debug("Base mappings: " + ", ".join([f"{m.rental_class_id}: {m.category} - {m.subcategory}" for m in base_mappings]))
         if user_mappings:
             logger.debug("User mappings: " + ", ".join([f"{m.rental_class_id}: {m.category} - {m.subcategory}" for m in user_mappings]))
 
@@ -238,82 +238,86 @@ def tab1_subcat_data():
             rental_class_ids = subcategories[subcat]
             logger.debug(f"Processing subcategory {subcat} with rental_class_ids: {rental_class_ids}")
 
-            # Total items in this subcategory
-            total_items_query = session.query(func.count(ItemMaster.tag_id)).filter(
-                func.trim(func.cast(ItemMaster.rental_class_num, db.String)).in_(rental_class_ids)
-            )
-            if filter_query:
-                total_items_query = total_items_query.filter(
-                    func.lower(ItemMaster.common_name).like(f'%{filter_query}%')
+            try:
+                # Total items in this subcategory
+                total_items_query = session.query(func.count(ItemMaster.tag_id)).filter(
+                    func.trim(func.cast(ItemMaster.rental_class_num, db.String)).in_(rental_class_ids)
                 )
-            total_items = total_items_query.scalar()
-            logger.debug(f"Total items for subcategory {subcat}: {total_items}")
+                if filter_query:
+                    total_items_query = total_items_query.filter(
+                        func.lower(ItemMaster.common_name).like(f'%{filter_query}%')
+                    )
+                total_items = total_items_query.scalar() or 0
+                logger.debug(f"Total items for subcategory {subcat}: {total_items}")
 
-            # Items on contracts (status = 'On Rent' or 'Delivered')
-            items_on_contracts_query = session.query(func.count(ItemMaster.tag_id)).filter(
-                func.trim(func.cast(ItemMaster.rental_class_num, db.String)).in_(rental_class_ids),
-                ItemMaster.status.in_(['On Rent', 'Delivered'])
-            )
-            if filter_query:
-                items_on_contracts_query = items_on_contracts_query.filter(
-                    func.lower(ItemMaster.common_name).like(f'%{filter_query}%')
+                # Items on contracts (status = 'On Rent' or 'Delivered')
+                items_on_contracts_query = session.query(func.count(ItemMaster.tag_id)).filter(
+                    func.trim(func.cast(ItemMaster.rental_class_num, db.String)).in_(rental_class_ids),
+                    ItemMaster.status.in_(['On Rent', 'Delivered'])
                 )
-            items_on_contracts = items_on_contracts_query.scalar()
-            logger.debug(f"Items on contracts for subcategory {subcat}: {items_on_contracts}")
+                if filter_query:
+                    items_on_contracts_query = items_on_contracts_query.filter(
+                        func.lower(ItemMaster.common_name).like(f'%{filter_query}%')
+                    )
+                items_on_contracts = items_on_contracts_query.scalar() or 0
+                logger.debug(f"Items on contracts for subcategory {subcat}: {items_on_contracts}")
 
-            # Items in service
-            subquery = session.query(
-                Transaction.tag_id,
-                Transaction.scan_date,
-                Transaction.service_required
-            ).filter(
-                Transaction.tag_id == ItemMaster.tag_id
-            ).order_by(
-                Transaction.scan_date.desc()
-            ).subquery()
+                # Items in service
+                subquery = session.query(
+                    Transaction.tag_id,
+                    Transaction.scan_date,
+                    Transaction.service_required
+                ).filter(
+                    Transaction.tag_id == ItemMaster.tag_id
+                ).order_by(
+                    Transaction.scan_date.desc()
+                ).subquery()
 
-            items_in_service_query = session.query(func.count(ItemMaster.tag_id)).filter(
-                func.trim(func.cast(ItemMaster.rental_class_num, db.String)).in_(rental_class_ids),
-                or_(
-                    ItemMaster.status.notin_(['Ready to Rent', 'On Rent', 'Delivered']),
-                    ItemMaster.tag_id.in_(
-                        session.query(subquery.c.tag_id).filter(
-                            subquery.c.scan_date == session.query(func.max(Transaction.scan_date)).filter(Transaction.tag_id == subquery.c.tag_id).correlate(subquery).scalar_subquery(),
-                            subquery.c.service_required == True
+                items_in_service_query = session.query(func.count(ItemMaster.tag_id)).filter(
+                    func.trim(func.cast(ItemMaster.rental_class_num, db.String)).in_(rental_class_ids),
+                    or_(
+                        ItemMaster.status.notin_(['Ready to Rent', 'On Rent', 'Delivered']),
+                        ItemMaster.tag_id.in_(
+                            session.query(subquery.c.tag_id).filter(
+                                subquery.c.scan_date == session.query(func.max(Transaction.scan_date)).filter(Transaction.tag_id == subquery.c.tag_id).correlate(subquery).scalar_subquery(),
+                                subquery.c.service_required == True
+                            )
                         )
                     )
                 )
-            )
-            if filter_query:
-                items_in_service_query = items_in_service_query.filter(
-                    func.lower(ItemMaster.common_name).like(f'%{filter_query}%')
-                )
-            items_in_service = items_in_service_query.scalar()
-            logger.debug(f"Items in service for subcategory {subcat}: {items_in_service}")
+                if filter_query:
+                    items_in_service_query = items_in_service_query.filter(
+                        func.lower(ItemMaster.common_name).like(f'%{filter_query}%')
+                    )
+                items_in_service = items_in_service_query.scalar() or 0
+                logger.debug(f"Items in service for subcategory {subcat}: {items_in_service}")
 
-            # Items available (status = 'Ready to Rent')
-            items_available_query = session.query(func.count(ItemMaster.tag_id)).filter(
-                func.trim(func.cast(ItemMaster.rental_class_num, db.String)).in_(rental_class_ids),
-                ItemMaster.status == 'Ready to Rent'
-            )
-            if filter_query:
-                items_available_query = items_available_query.filter(
-                    func.lower(ItemMaster.common_name).like(f'%{filter_query}%')
+                # Items available (status = 'Ready to Rent')
+                items_available_query = session.query(func.count(ItemMaster.tag_id)).filter(
+                    func.trim(func.cast(ItemMaster.rental_class_num, db.String)).in_(rental_class_ids),
+                    ItemMaster.status == 'Ready to Rent'
                 )
-            items_available = items_available_query.scalar()
-            logger.debug(f"Items available for subcategory {subcat}: {items_available}")
+                if filter_query:
+                    items_available_query = items_available_query.filter(
+                        func.lower(ItemMaster.common_name).like(f'%{filter_query}%')
+                    )
+                items_available = items_available_query.scalar() or 0
+                logger.debug(f"Items available for subcategory {subcat}: {items_available}")
 
-            # Only include subcategories with at least one item
-            if total_items and total_items > 0:
-                subcategory_data.append({
-                    'subcategory': subcat,
-                    'total_items': total_items or 0,
-                    'items_on_contracts': items_on_contracts or 0,
-                    'items_in_service': items_in_service or 0,
-                    'items_available': items_available or 0
-                })
-            else:
-                logger.debug(f"Skipping subcategory {subcat} due to zero total items")
+                # Only include subcategories with at least one item
+                if total_items and total_items > 0:
+                    subcategory_data.append({
+                        'subcategory': subcat,
+                        'total_items': total_items,
+                        'items_on_contracts': items_on_contracts,
+                        'items_in_service': items_in_service,
+                        'items_available': items_available
+                    })
+                else:
+                    logger.debug(f"Skipping subcategory {subcat} due to zero total items")
+            except Exception as e:
+                logger.error(f"Error calculating counts for subcategory {subcat} in category {category}: {str(e)}", exc_info=True)
+                continue  # Skip this subcategory and continue with others
 
         # Sort subcategory data if needed
         if sort == 'total_items_asc':
@@ -330,8 +334,8 @@ def tab1_subcat_data():
             'per_page': per_page
         })
     except Exception as e:
-        logger.error(f"Error fetching subcategory data for category {category}: {str(e)}")
-        return jsonify({'error': 'Failed to fetch subcategory data'}), 500
+        logger.error(f"Error fetching subcategory data for category {category}: {str(e)}", exc_info=True)
+        return jsonify({'error': 'Failed to fetch subcategory data', 'details': str(e)}), 500
 
 @tab1_bp.route('/tab/1/common_names')
 def tab1_common_names():
