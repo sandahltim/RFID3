@@ -36,7 +36,7 @@ if not any(isinstance(h, logging.StreamHandler) for h in root_logger.handlers):
 categories_bp = Blueprint('categories', __name__)
 
 # Version check to ensure correct deployment
-logger.info("Deployed categories.py version: 2025-04-24-v2")
+logger.info("Deployed categories.py version: 2025-04-24-v3")
 
 @categories_bp.route('/categories')
 def manage_categories():
@@ -95,11 +95,23 @@ def manage_categories():
             if valid_items:
                 logger.debug(f"Sample valid item: {valid_items[0]}")
             
+            # Try dictionary comprehension
             common_name_dict = {
                 str(item['rental_class_id']).strip(): item['common_name']
                 for item in seed_data
                 if 'rental_class_id' in item and 'common_name' in item
             }
+            
+            # Fallback: If dict is empty, populate manually
+            if not common_name_dict:
+                logger.warning("Dictionary comprehension failed, attempting manual population")
+                for item in seed_data:
+                    rental_class_id = item.get('rental_class_id')
+                    common_name = item.get('common_name')
+                    if rental_class_id and common_name:
+                        common_name_dict[str(rental_class_id).strip()] = common_name
+                logger.debug(f"Manually populated common_name_dict with {len(common_name_dict)} entries")
+
             logger.debug(f"Created common_name_dict with {len(common_name_dict)} entries")
             # Log a sample of common_name_dict to verify contents
             sample_common_names = dict(list(common_name_dict.items())[:5])
@@ -202,11 +214,23 @@ def get_mappings():
             if valid_items:
                 logger.debug(f"Sample valid item: {valid_items[0]}")
             
+            # Try dictionary comprehension
             common_name_dict = {
                 str(item['rental_class_id']).strip(): item['common_name']
                 for item in seed_data
                 if 'rental_class_id' in item and 'common_name' in item
             }
+            
+            # Fallback: If dict is empty, populate manually
+            if not common_name_dict:
+                logger.warning("Dictionary comprehension failed, attempting manual population")
+                for item in seed_data:
+                    rental_class_id = item.get('rental_class_id')
+                    common_name = item.get('common_name')
+                    if rental_class_id and common_name:
+                        common_name_dict[str(rental_class_id).strip()] = common_name
+                logger.debug(f"Manually populated common_name_dict with {len(common_name_dict)} entries")
+
             logger.debug(f"Created common_name_dict with {len(common_name_dict)} entries")
             # Log a sample of common_name_dict to verify contents
             sample_common_names = dict(list(common_name_dict.items())[:5])
