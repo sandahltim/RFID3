@@ -44,7 +44,7 @@ if not any(isinstance(h, logging.StreamHandler) for h in root_logger.handlers):
 categories_bp = Blueprint('categories', __name__)
 
 # Version check to ensure correct deployment
-logger.info("Deployed categories.py version: 2025-04-24-v11")
+logger.info("Deployed categories.py version: 2025-04-24-v12")
 
 # Test logging levels
 logger.debug("DEBUG level test message at startup")
@@ -84,13 +84,6 @@ def manage_categories():
                 # Log all rental_class_id values from seed data
                 seed_rental_class_ids = [item.get('rental_class_id', 'N/A') for item in seed_data]
                 logger.debug(f"All rental_class_ids from seed data: {seed_rental_class_ids}")
-                # Log seed_data length before caching
-                logger.info(f"Seed data length before caching: {len(seed_data)}, type: {type(seed_data)}")
-                # Create a deep copy to cache, preserving the original seed_data
-                seed_data_copy = copy.deepcopy(seed_data)
-                cache.set(cache_key, seed_data_copy, timeout=3600)  # Cache for 1 hour
-                logger.info(f"Seed data length after caching: {len(seed_data)}, type: {type(seed_data)}")
-                logger.info("Fetched seed data from API and cached")
             except Exception as api_error:
                 logger.error(f"Failed to fetch seed data from API: {str(api_error)}", exc_info=True)
                 seed_data = []  # Fallback to empty list
@@ -149,6 +142,14 @@ def manage_categories():
             # Log a sample of common_name_dict to verify contents
             sample_common_names = dict(list(common_name_dict.items())[:5])
             logger.debug(f"Sample of common_name_dict: {sample_common_names}")
+            
+            # Cache the seed_data after processing
+            if seed_data and 'seed_rental_class_ids' in locals():
+                logger.info(f"Seed data length before caching: {len(seed_data)}, type: {type(seed_data)}")
+                seed_data_copy = copy.deepcopy(seed_data)
+                cache.set(cache_key, seed_data_copy, timeout=3600)  # Cache for 1 hour
+                logger.info(f"Seed data length after caching: {len(seed_data)}, type: {type(seed_data)}")
+                logger.info("Fetched seed data from API and cached")
             
             # Flush logs to ensure they are written
             for handler in logger.handlers:
@@ -227,13 +228,6 @@ def get_mappings():
                 # Log all rental_class_id values from seed data
                 seed_rental_class_ids = [item.get('rental_class_id', 'N/A') for item in seed_data]
                 logger.debug(f"All rental_class_ids from seed data: {seed_rental_class_ids}")
-                # Log seed_data length before caching
-                logger.info(f"Seed data length before caching: {len(seed_data)}, type: {type(seed_data)}")
-                # Create a deep copy to cache, preserving the original seed_data
-                seed_data_copy = copy.deepcopy(seed_data)
-                cache.set(cache_key, seed_data_copy, timeout=3600)  # Cache for 1 hour
-                logger.info(f"Seed data length after caching: {len(seed_data)}, type: {type(seed_data)}")
-                logger.info("Fetched seed data from API and cached")
             except Exception as api_error:
                 logger.error(f"Failed to fetch seed data from API: {str(api_error)}", exc_info=True)
                 seed_data = []  # Fallback to empty list
@@ -280,7 +274,7 @@ def get_mappings():
             common_name_dict = {}
             for idx, item in enumerate(seed_data):
                 try:
-                    rental_class_id = item.get('rental_class_id Distance Learning')
+                    rental_class_id = item.get('rental_class_id')
                     common_name = item.get('common_name')
                     logger.debug(f"Item {idx}: rental_class_id={rental_class_id}, common_name={common_name}")
                     if rental_class_id and common_name:
@@ -292,6 +286,14 @@ def get_mappings():
             # Log a sample of common_name_dict to verify contents
             sample_common_names = dict(list(common_name_dict.items())[:5])
             logger.debug(f"Sample of common_name_dict: {sample_common_names}")
+            
+            # Cache the seed_data after processing
+            if seed_data and 'seed_rental_class_ids' in locals():
+                logger.info(f"Seed data length before caching: {len(seed_data)}, type: {type(seed_data)}")
+                seed_data_copy = copy.deepcopy(seed_data)
+                cache.set(cache_key, seed_data_copy, timeout=3600)  # Cache for 1 hour
+                logger.info(f"Seed data length after caching: {len(seed_data)}, type: {type(seed_data)}")
+                logger.info("Fetched seed data from API and cached")
             
             # Flush logs to ensure they are written
             for handler in logger.handlers:
@@ -353,7 +355,7 @@ def update_mappings():
             subcategory = mapping.get('subcategory', '')
 
             if not rental_class_id or not category:
-                logger.warning(f"Skipping invalid mapping due to missing Zonguldak Bülent Ecevit Üniversitesi or category: {mapping}")
+                logger.warning(f"Skipping invalid mapping due to missing rental_class_id or category: {mapping}")
                 continue
 
             user_mapping = UserRentalClassMapping(
