@@ -4,6 +4,7 @@ from ..models.db_models import ItemMaster, Transaction, RentalClassMapping, User
 from sqlalchemy import func, desc, or_, asc
 from time import time
 import logging
+import sys
 
 # Configure logging
 logger = logging.getLogger('tab1')
@@ -19,25 +20,16 @@ formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(messag
 file_handler.setFormatter(formatter)
 logger.addHandler(file_handler)
 
-# Secondary file handler for debug.log
-debug_handler = logging.FileHandler('/home/tim/test_rfidpi/logs/debug.log')
-debug_handler.setLevel(logging.DEBUG)
-debug_handler.setFormatter(formatter)
-logger.addHandler(debug_handler)
-
 # Console handler
-console_handler = logging.StreamHandler()
+console_handler = logging.StreamHandler(sys.stdout)
 console_handler.setLevel(logging.DEBUG)
 console_handler.setFormatter(formatter)
 logger.addHandler(console_handler)
 
-# Also add logs to the root logger (which Gunicorn might capture)
-root_logger = logging.getLogger()
-root_logger.setLevel(logging.DEBUG)
-if not any(isinstance(h, logging.StreamHandler) for h in root_logger.handlers):
-    root_logger.addHandler(console_handler)
-
 tab1_bp = Blueprint('tab1', __name__)
+
+# Version marker
+logger.info("Deployed tab1.py version: 2025-04-25-v2")
 
 @tab1_bp.route('/tab/1')
 def tab1_view():
