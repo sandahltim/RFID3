@@ -302,4 +302,10 @@ body {
     .filter-sort-controls select {
         width: 100%;
     }
+
+    .subcat-row {
+        min-height: 40px;
+        display: table-row !important;
+        visibility: visible !important;
+    }
 }
