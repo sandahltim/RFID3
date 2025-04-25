@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, request, jsonify, current_app
 from .. import db
 from ..models.db_models import ItemMaster, Transaction, RentalClassMapping, UserRentalClassMapping
-from sqlalchemy import func, desc, or_, asc
+from sqlalchemy import func, desc, or_, asc, text
 from time import time
 import logging
 import sys
@@ -29,13 +29,19 @@ logger.addHandler(console_handler)
 tab1_bp = Blueprint('tab1', __name__)
 
 # Version marker
-logger.info("Deployed tab1.py version: 2025-04-25-v2")
+logger.info("Deployed tab1.py version: 2025-04-25-v3")
 
 @tab1_bp.route('/tab/1')
 def tab1_view():
     try:
         session = db.session()
         logger.info("Starting new session for tab1")
+
+        # Log raw contents of mapping tables
+        raw_base_mappings = session.execute(text("SELECT rental_class_id, category, subcategory FROM rental_class_mappings")).fetchall()
+        raw_user_mappings = session.execute(text("SELECT rental_class_id, category, subcategory FROM user_rental_class_mappings")).fetchall()
+        logger.debug(f"Raw base mappings: {[(row[0], row[1], row[2]) for row in raw_base_mappings]}")
+        logger.debug(f"Raw user mappings: {[(row[0], row[1], row[2]) for row in raw_user_mappings]}")
 
         # Fetch all rental class mappings from both tables
         base_mappings = session.query(RentalClassMapping).all()
@@ -179,9 +185,25 @@ def tab1_subcat_data():
     try:
         session = db.session()
 
-        # Fetch mappings for this category
-        base_mappings = session.query(RentalClassMapping).filter_by(category=category).all()
-        user_mappings = session.query(UserRentalClassMapping).filter_by(category=category).all()
+        # Log raw contents of mapping tables for this category
+        raw_base_mappings = session.execute(
+            text("SELECT rental_class_id, category, subcategory FROM rental_class_mappings WHERE LOWER(category) = :category"),
+            {"category": category.lower()}
+        ).fetchall()
+        raw_user_mappings = session.execute(
+            text("SELECT rental_class_id, category, subcategory FROM user_rental_class_mappings WHERE LOWER(category) = :category"),
+            {"category": category.lower()}
+        ).fetchall()
+        logger.debug(f"Raw base mappings for category {category}: {[(row[0], row[1], row[2]) for row in raw_base_mappings]}")
+        logger.debug(f"Raw user mappings for category {category}: {[(row[0], row[1], row[2]) for row in raw_user_mappings]}")
+
+        # Fetch mappings for this category (case-insensitive)
+        base_mappings = session.query(RentalClassMapping).filter(
+            func.lower(RentalClassMapping.category) == category.lower()
+        ).all()
+        user_mappings = session.query(UserRentalClassMapping).filter(
+            func.lower(UserRentalClassMapping.category) == category.lower()
+        ).all()
         logger.debug(f"Fetched {len(base_mappings)} base mappings for category {category}")
         logger.debug(f"Fetched {len(user_mappings)} user mappings for category {category}")
 
@@ -327,8 +349,14 @@ def tab1_common_names():
         session = db.session()
 
         # Fetch rental class IDs for this category and subcategory
-        base_mappings = session.query(RentalClassMapping).filter_by(category=category, subcategory=subcategory).all()
-        user_mappings = session.query(UserRentalClassMapping).filter_by(category=category, subcategory=subcategory).all()
+        base_mappings = session.query(RentalClassMapping).filter(
+            func.lower(RentalClassMapping.category) == category.lower(),
+            func.lower(RentalClassMapping.subcategory) == subcategory.lower()
+        ).all()
+        user_mappings = session.query(UserRentalClassMapping).filter(
+            func.lower(UserRentalClassMapping.category) == category.lower(),
+            func.lower(UserRentalClassMapping.subcategory) == subcategory.lower()
+        ).all()
 
         mappings_dict = {m.rental_class_id: {'category': m.category, 'subcategory': m.subcategory} for m in base_mappings}
         for um in user_mappings:
@@ -462,8 +490,14 @@ def tab1_data():
         session = db.session()
 
         # Fetch rental class IDs for this category and subcategory
-        base_mappings = session.query(RentalClassMapping).filter_by(category=category, subcategory=subcategory).all()
-        user_mappings = session.query(UserRentalClassMapping).filter_by(category=category, subcategory=subcategory).all()
+        base_mappings = session.query(RentalClassMapping).filter(
+            func.lower(RentalClassMapping.category) == category.lower(),
+            func.lower(RentalClassMapping.subcategory) == subcategory.lower()
+        ).all()
+        user_mappings = session.query(UserRentalClassMapping).filter(
+            func.lower(UserRentalClassMapping.category) == category.lower(),
+            func.lower(UserRentalClassMapping.subcategory) == subcategory.lower()
+        ).all()
 
         mappings_dict = {m.rental_class_id: {'category': m.category, 'subcategory': m.subcategory} for m in base_mappings}
         for um in user_mappings:
@@ -538,8 +572,14 @@ def full_items_by_rental_class():
         session = db.session()
 
         # Fetch rental class IDs for this category and subcategory
-        base_mappings = session.query(RentalClassMapping).filter_by(category=category, subcategory=subcategory).all()
-        user_mappings = session.query(UserRentalClassMapping).filter_by(category=category, subcategory=subcategory).all()
+        base_mappings = session.query(RentalClassMapping).filter(
+            func.lower(RentalClassMapping.category) == category.lower(),
+            func.lower(RentalClassMapping.subcategory) == subcategory.lower()
+        ).all()
+        user_mappings = session.query(UserRentalClassMapping).filter(
+            func.lower(UserRentalClassMapping.category) == category.lower(),
+            func.lower(UserRentalClassMapping.subcategory) == subcategory.lower()
+        ).all()
 
         mappings_dict = {m.rental_class_id: {'category': m.category, 'subcategory': m.subcategory} for m in base_mappings}
         for um in user_mappings:
