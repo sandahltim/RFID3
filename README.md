@@ -198,3 +198,70 @@ The application integrates with three API databases and maintains two local tabl
 - **Tab 5 (Resale/Packs)**: Manages items in specific `bin_location` values, updates via API.
 - **Categories**: Allows manual mapping of rental classes to categories/subcategories.
 
+### Categories and Subcategories Logic (for use in other tabs)
+
+#### Overview
+The Categories tab (`categories.py`) provides functionality to map `rental_class_id` values to categories and subcategories, which is used across tabs to organize inventory data. It also integrates `common_name` data from the `seed_rental_classes` API table.
+
+#### Key Functions and Logic
+
+- **Merging Mappings**:
+  - Both `RentalClassMapping` (base) and `UserRentalClassMapping` (user-defined) tables are queried to create a mapping of `rental_class_id` to category and subcategory.
+  - User mappings take precedence over base mappings.
+  - Example in `categories.py`:
+    ```python
+    base_mappings = session.query(RentalClassMapping).all()
+    user_mappings = session.query(UserRentalClassMapping).all()
+    mappings_dict = {m.rental_class_id: {'category': m.category, 'subcategory': m.subcategory} for m in base_mappings}
+    for um in user_mappings:
+        mappings_dict[um.rental_class_id] = {'category': um.category, 'subcategory': um.subcategory}
+    ```
+
+- **Building `common_name_dict`**:
+  - The `build_common_name_dict` function creates a mapping of `rental_class_id` to `common_name` using data from the `seed_rental_classes` API table.
+  - It normalizes `rental_class_id` by converting to string and stripping whitespace.
+  - Example in `categories.py`:
+    ```python
+    def build_common_name_dict(seed_data):
+        common_name_dict = {}
+        for item in seed_data:
+            try:
+                rental_class_id = item.get('rental_class_id')
+                common_name = item.get('common_name')
+                if rental_class_id and common_name:
+                    normalized_key = str(rental_class_id).strip()
+                    common_name_dict[normalized_key] = common_name
+            except Exception as comp_error:
+                logger.error(f"Error processing item for common_name_dict: {str(comp_error)}", exc_info=True)
+        return common_name_dict
+    ```
+
+- **`/categories/mapping` Endpoint Response**:
+  - The `/categories/mapping` endpoint returns a list of dictionaries with the following structure:
+    ```json
+    [
+        {
+            "category": "Round Linen",
+            "subcategory": "100 m",
+            "rental_class_id": "61885",
+            "common_name": "108 ROUND WHITE LINEN"
+        },
+        ...
+    ]
+    ```
+  - This endpoint can be used by other tabs to fetch categorized data with associated common names.
+
+#### Usage in Other Tabs
+- **Fetching Categories and Subcategories**:
+  - Use the `/categories/mapping` endpoint to get the full list of mappings, which includes `rental_class_id`, `category`, `subcategory`, and `common_name`.
+  - Example: `GET /categories/mapping`
+- **Integrating with `id_item_master`**:
+  - Join the `rental_class_id` from the endpoint response with `id_item_master.rental_class_num` to categorize inventory items.
+  - Ensure to normalize `rental_class_num` using `str().strip()` to match the normalized keys in `common_name_dict`.
+- **Caching**:
+  - The `seed_rental_classes` data is cached with the key `seed_rental_classes` for 1 hour. Ensure to fetch from cache if available to reduce API calls.
+  - The `cache.set` operation should be performed **after** using `common_name_dict` to avoid potential interference.
+
+#### Notes
+- The `common_name_dict` must be constructed before performing lookups to ensure `common_name` values are available.
+- If subcategories are not displaying, verify that `RentalClassMapping` and `UserRentalClassMapping` tables contain data for the given category, and check for case sensitivity in category names.
