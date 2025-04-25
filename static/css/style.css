@@ -235,8 +235,17 @@ body {
 .expandable.collapsed {
     max-height: 0;
     opacity: 0;
+    display: none !important; /* Ensure collapsed state */
 }
 
+.expandable.expanded {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    height: auto !important;
+}
+
+/* Ensure the container and subcat-level are visible */
 .expandable.expanded {
     display: block !important;
     visibility: visible !important;
