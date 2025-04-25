@@ -26,14 +26,28 @@ def manage_categories():
         # Fetch seed data from cache or API
         cache_key = 'seed_rental_classes'
         seed_data = cache.get(cache_key)
+        common_name_dict = {}
         if seed_data is None:
-            api_client = APIClient()
-            seed_data = api_client.get_seed_data()
-            cache.set(cache_key, seed_data, timeout=3600)  # Cache for 1 hour
-            current_app.logger.info("Fetched seed data from API and cached")
+            try:
+                api_client = APIClient()
+                seed_data = api_client.get_seed_data()
+                current_app.logger.debug(f"Seed data fetched from API: {seed_data[:5] if seed_data else 'Empty'}")
+                cache.set(cache_key, seed_data, timeout=3600)  # Cache for 1 hour
+                current_app.logger.info("Fetched seed data from API and cached")
+            except Exception as api_error:
+                current_app.logger.error(f"Failed to fetch seed data from API: {str(api_error)}", exc_info=True)
+                seed_data = []  # Fallback to empty list
 
         # Create a mapping of rental_class_id to common_name
-        common_name_dict = {str(item['rental_class_id']).strip().upper(): item['common_name'] for item in seed_data}
+        try:
+            common_name_dict = {
+                str(item['rental_class_id']).strip().upper(): item['common_name']
+                for item in seed_data
+                if 'rental_class_id' in item and 'common_name' in item
+            }
+        except Exception as dict_error:
+            current_app.logger.error(f"Error creating common_name_dict from seed_data: {str(dict_error)}", exc_info=True)
+            common_name_dict = {}
 
         # Build categories list
         categories = []
@@ -84,14 +98,28 @@ def get_mappings():
         # Fetch seed data from cache or API
         cache_key = 'seed_rental_classes'
         seed_data = cache.get(cache_key)
+        common_name_dict = {}
         if seed_data is None:
-            api_client = APIClient()
-            seed_data = api_client.get_seed_data()
-            cache.set(cache_key, seed_data, timeout=3600)  # Cache for 1 hour
-            current_app.logger.info("Fetched seed data from API and cached")
+            try:
+                api_client = APIClient()
+                seed_data = api_client.get_seed_data()
+                current_app.logger.debug(f"Seed data fetched from API: {seed_data[:5] if seed_data else 'Empty'}")
+                cache.set(cache_key, seed_data, timeout=3600)  # Cache for 1 hour
+                current_app.logger.info("Fetched seed data from API and cached")
+            except Exception as api_error:
+                current_app.logger.error(f"Failed to fetch seed data from API: {str(api_error)}", exc_info=True)
+                seed_data = []  # Fallback to empty list
 
         # Create a mapping of rental_class_id to common_name
-        common_name_dict = {str(item['rental_class_id']).strip().upper(): item['common_name'] for item in seed_data}
+        try:
+            common_name_dict = {
+                str(item['rental_class_id']).strip().upper(): item['common_name']
+                for item in seed_data
+                if 'rental_class_id' in item and 'common_name' in item
+            }
+        except Exception as dict_error:
+            current_app.logger.error(f"Error creating common_name_dict from seed_data: {str(dict_error)}", exc_info=True)
+            common_name_dict = {}
 
         # Build categories list
         categories = []
