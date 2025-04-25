@@ -29,7 +29,7 @@ logger.addHandler(console_handler)
 tab1_bp = Blueprint('tab1', __name__)
 
 # Version marker
-logger.info("Deployed tab1.py version: 2025-04-25-v7")
+logger.info("Deployed tab1.py version: 2025-04-25-v8")
 
 @tab1_bp.route('/tab/1')
 def tab1_view():
@@ -71,11 +71,11 @@ def tab1_view():
         sort = request.args.get('sort', '')
 
         for cat, mappings in categories.items():
-            rental_class_ids = [m['rental_class_id'] for m in mappings]
+            rental_class_ids = [str(m['rental_class_id']) for m in mappings]  # Ensure IDs are strings
 
             # Total items in this category
             total_items_query = session.query(func.count(ItemMaster.tag_id)).filter(
-                func.trim(func.upper(func.cast(ItemMaster.rental_class_num, db.String))).in_(rental_class_ids)
+                func.trim(func.cast(ItemMaster.rental_class_num, db.String)).in_(rental_class_ids)
             )
             if filter_query:
                 total_items_query = total_items_query.filter(
@@ -85,7 +85,7 @@ def tab1_view():
 
             # Items on contracts (status = 'On Rent' or 'Delivered')
             items_on_contracts_query = session.query(func.count(ItemMaster.tag_id)).filter(
-                func.trim(func.upper(func.cast(ItemMaster.rental_class_num, db.String))).in_(rental_class_ids),
+                func.trim(func.cast(ItemMaster.rental_class_num, db.String)).in_(rental_class_ids),
                 ItemMaster.status.in_(['On Rent', 'Delivered'])
             )
             if filter_query:
@@ -106,7 +106,7 @@ def tab1_view():
             ).subquery()
 
             items_in_service_query = session.query(func.count(ItemMaster.tag_id)).filter(
-                func.trim(func.upper(func.cast(ItemMaster.rental_class_num, db.String))).in_(rental_class_ids),
+                func.trim(func.cast(ItemMaster.rental_class_num, db.String)).in_(rental_class_ids),
                 or_(
                     ItemMaster.status.notin_(['Ready to Rent', 'On Rent', 'Delivered']),
                     ItemMaster.tag_id.in_(
@@ -125,7 +125,7 @@ def tab1_view():
 
             # Items available (status = 'Ready to Rent')
             items_available_query = session.query(func.count(ItemMaster.tag_id)).filter(
-                func.trim(func.upper(func.cast(ItemMaster.rental_class_num, db.String))).in_(rental_class_ids),
+                func.trim(func.cast(ItemMaster.rental_class_num, db.String)).in_(rental_class_ids),
                 ItemMaster.status == 'Ready to Rent'
             )
             if filter_query:
@@ -159,7 +159,7 @@ def tab1_view():
         return render_template('tab1.html', categories=category_data, cache_bust=int(time()))
     except Exception as e:
         logger.error(f"Error rendering Tab 1: {str(e)}", exc_info=True)
-        return render_template('tab1.html', categories=[], cache_bust=int(time()))
+        return render_template('tab1.1.html', categories=[], cache_bust=int(time()))
 
 @tab1_bp.route('/tab/1/subcat_data')
 def tab1_subcat_data():
@@ -198,9 +198,9 @@ def tab1_subcat_data():
                 'message': f"No mappings found for category '{category}'. Please add mappings in the Categories tab."
             })
 
-        mappings_dict = {m.rental_class_id: {'category': m.category, 'subcategory': m.subcategory} for m in base_mappings}
+        mappings_dict = {str(m.rental_class_id): {'category': m.category, 'subcategory': m.subcategory} for m in base_mappings}
         for um in user_mappings:
-            mappings_dict[um.rental_class_id] = {'category': um.category, 'subcategory': um.subcategory}
+            mappings_dict[str(um.rental_class_id)] = {'category': um.category, 'subcategory': um.subcategory}
 
         # Group by subcategory
         subcategories = {}
@@ -231,17 +231,18 @@ def tab1_subcat_data():
 
             # Total items in this subcategory
             total_items_query = session.query(func.count(ItemMaster.tag_id)).filter(
-                func.trim(func.upper(func.cast(ItemMaster.rental_class_num, db.String))).in_(rental_class_ids)
+                func.trim(func.cast(ItemMaster.rental_class_num, db.String)).in_(rental_class_ids)
             )
             if filter_query:
                 total_items_query = total_items_query.filter(
                     func.lower(ItemMaster.common_name).like(f'%{filter_query}%')
                 )
             total_items = total_items_query.scalar()
+            logger.debug(f"Total items for subcategory {subcat}: {total_items}")
 
             # Items on contracts (status = 'On Rent' or 'Delivered')
             items_on_contracts_query = session.query(func.count(ItemMaster.tag_id)).filter(
-                func.trim(func.upper(func.cast(ItemMaster.rental_class_num, db.String))).in_(rental_class_ids),
+                func.trim(func.cast(ItemMaster.rental_class_num, db.String)).in_(rental_class_ids),
                 ItemMaster.status.in_(['On Rent', 'Delivered'])
             )
             if filter_query:
@@ -249,6 +250,7 @@ def tab1_subcat_data():
                     func.lower(ItemMaster.common_name).like(f'%{filter_query}%')
                 )
             items_on_contracts = items_on_contracts_query.scalar()
+            logger.debug(f"Items on contracts for subcategory {subcat}: {items_on_contracts}")
 
             # Items in service
             subquery = session.query(
@@ -262,7 +264,7 @@ def tab1_subcat_data():
             ).subquery()
 
             items_in_service_query = session.query(func.count(ItemMaster.tag_id)).filter(
-                func.trim(func.upper(func.cast(ItemMaster.rental_class_num, db.String))).in_(rental_class_ids),
+                func.trim(func.cast(ItemMaster.rental_class_num, db.String)).in_(rental_class_ids),
                 or_(
                     ItemMaster.status.notin_(['Ready to Rent', 'On Rent', 'Delivered']),
                     ItemMaster.tag_id.in_(
@@ -278,10 +280,11 @@ def tab1_subcat_data():
                     func.lower(ItemMaster.common_name).like(f'%{filter_query}%')
                 )
             items_in_service = items_in_service_query.scalar()
+            logger.debug(f"Items in service for subcategory {subcat}: {items_in_service}")
 
             # Items available (status = 'Ready to Rent')
             items_available_query = session.query(func.count(ItemMaster.tag_id)).filter(
-                func.trim(func.upper(func.cast(ItemMaster.rental_class_num, db.String))).in_(rental_class_ids),
+                func.trim(func.cast(ItemMaster.rental_class_num, db.String)).in_(rental_class_ids),
                 ItemMaster.status == 'Ready to Rent'
             )
             if filter_query:
@@ -289,20 +292,23 @@ def tab1_subcat_data():
                     func.lower(ItemMaster.common_name).like(f'%{filter_query}%')
                 )
             items_available = items_available_query.scalar()
+            logger.debug(f"Items available for subcategory {subcat}: {items_available}")
 
-            subcategory_data.append({
-                'subcategory': subcat,
-                'total_items': total_items or 0,
-                'items_on_contracts': items_on_contracts or 0,
-                'items_in_service': items_in_service or 0,
-                'items_available': items_available or 0
-            })
+            # Only include subcategories with at least one item
+            if total_items and total_items > 0:
+                subcategory_data.append({
+                    'subcategory': subcat,
+                    'total_items': total_items or 0,
+                    'items_on_contracts': items_on_contracts or 0,
+                    'items_in_service': items_in_service or 0,
+                    'items_available': items_available or 0
+                })
 
-            # Sort subcategory data if needed
-            if sort == 'total_items_asc':
-                subcategory_data.sort(key=lambda x: x['total_items'])
-            elif sort == 'total_items_desc':
-                subcategory_data.sort(key=lambda x: x['total_items'], reverse=True)
+        # Sort subcategory data if needed
+        if sort == 'total_items_asc':
+            subcategory_data.sort(key=lambda x: x['total_items'])
+        elif sort == 'total_items_desc':
+            subcategory_data.sort(key=lambda x: x['total_items'], reverse=True)
 
         session.close()
         logger.info(f"Returning {len(subcategory_data)} subcategories for category {category}")
@@ -341,9 +347,9 @@ def tab1_common_names():
             func.lower(UserRentalClassMapping.subcategory) == subcategory.lower()
         ).all()
 
-        mappings_dict = {m.rental_class_id: {'category': m.category, 'subcategory': m.subcategory} for m in base_mappings}
+        mappings_dict = {str(m.rental_class_id): {'category': m.category, 'subcategory': m.subcategory} for m in base_mappings}
         for um in user_mappings:
-            mappings_dict[um.rental_class_id] = {'category': um.category, 'subcategory': um.subcategory}
+            mappings_dict[str(um.rental_class_id)] = {'category': um.category, 'subcategory': um.subcategory}
 
         rental_class_ids = list(mappings_dict.keys())
 
@@ -352,7 +358,7 @@ def tab1_common_names():
             ItemMaster.common_name,
             func.count(ItemMaster.tag_id).label('total_items')
         ).filter(
-            func.trim(func.upper(func.cast(ItemMaster.rental_class_num, db.String))).in_(rental_class_ids)
+            func.trim(func.cast(ItemMaster.rental_class_num, db.String)).in_(rental_class_ids)
         )
         if filter_query:
             common_names_query = common_names_query.filter(
@@ -379,7 +385,7 @@ def tab1_common_names():
 
             # Items on contracts (status = 'On Rent' or 'Delivered')
             items_on_contracts_query = session.query(func.count(ItemMaster.tag_id)).filter(
-                func.trim(func.upper(func.cast(ItemMaster.rental_class_num, db.String))).in_(rental_class_ids),
+                func.trim(func.cast(ItemMaster.rental_class_num, db.String)).in_(rental_class_ids),
                 ItemMaster.common_name == name,
                 ItemMaster.status.in_(['On Rent', 'Delivered'])
             )
@@ -401,7 +407,7 @@ def tab1_common_names():
             ).subquery()
 
             items_in_service_query = session.query(func.count(ItemMaster.tag_id)).filter(
-                func.trim(func.upper(func.cast(ItemMaster.rental_class_num, db.String))).in_(rental_class_ids),
+                func.trim(func.cast(ItemMaster.rental_class_num, db.String)).in_(rental_class_ids),
                 ItemMaster.common_name == name,
                 or_(
                     ItemMaster.status.notin_(['Ready to Rent', 'On Rent', 'Delivered']),
@@ -421,7 +427,7 @@ def tab1_common_names():
 
             # Items available (status = 'Ready to Rent')
             items_available_query = session.query(func.count(ItemMaster.tag_id)).filter(
-                func.trim(func.upper(func.cast(ItemMaster.rental_class_num, db.String))).in_(rental_class_ids),
+                func.trim(func.cast(ItemMaster.rental_class_num, db.String)).in_(rental_class_ids),
                 ItemMaster.common_name == name,
                 ItemMaster.status == 'Ready to Rent'
             )
@@ -482,15 +488,15 @@ def tab1_data():
             func.lower(UserRentalClassMapping.subcategory) == subcategory.lower()
         ).all()
 
-        mappings_dict = {m.rental_class_id: {'category': m.category, 'subcategory': m.subcategory} for m in base_mappings}
+        mappings_dict = {str(m.rental_class_id): {'category': m.category, 'subcategory': m.subcategory} for m in base_mappings}
         for um in user_mappings:
-            mappings_dict[um.rental_class_id] = {'category': um.category, 'subcategory': um.subcategory}
+            mappings_dict[str(um.rental_class_id)] = {'category': um.category, 'subcategory': um.subcategory}
 
         rental_class_ids = list(mappings_dict.keys())
 
         # Fetch items
         query = session.query(ItemMaster).filter(
-            func.trim(func.upper(func.cast(ItemMaster.rental_class_num, db.String))).in_(rental_class_ids),
+            func.trim(func.cast(ItemMaster.rental_class_num, db.String)).in_(rental_class_ids),
             ItemMaster.common_name == common_name
         )
         if filter_query:
@@ -564,15 +570,15 @@ def full_items_by_rental_class():
             func.lower(UserRentalClassMapping.subcategory) == subcategory.lower()
         ).all()
 
-        mappings_dict = {m.rental_class_id: {'category': m.category, 'subcategory': m.subcategory} for m in base_mappings}
+        mappings_dict = {str(m.rental_class_id): {'category': m.category, 'subcategory': m.subcategory} for m in base_mappings}
         for um in user_mappings:
-            mappings_dict[um.rental_class_id] = {'category': um.category, 'subcategory': um.subcategory}
+            mappings_dict[str(um.rental_class_id)] = {'category': um.category, 'subcategory': um.subcategory}
 
         rental_class_ids = list(mappings_dict.keys())
 
         # Fetch all items with the same rental_class_num and common_name
         items_query = session.query(ItemMaster).filter(
-            func.trim(func.upper(func.cast(ItemMaster.rental_class_num, db.String))).in_(rental_class_ids),
+            func.trim(func.cast(ItemMaster.rental_class_num, db.String)).in_(rental_class_ids),
             ItemMaster.common_name == common_name
         ).order_by(ItemMaster.tag_id)
 
