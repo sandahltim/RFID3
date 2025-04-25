@@ -44,12 +44,32 @@ if not any(isinstance(h, logging.StreamHandler) for h in root_logger.handlers):
 categories_bp = Blueprint('categories', __name__)
 
 # Version check to ensure correct deployment
-logger.info("Deployed categories.py version: 2025-04-24-v13")
+logger.info("Deployed categories.py version: 2025-04-24-v14")
 
 # Test logging levels
 logger.debug("DEBUG level test message at startup")
 logger.info("INFO level test message at startup")
 logger.warning("WARNING level test message at startup")
+
+def build_common_name_dict(seed_data):
+    """Build a dictionary mapping rental_class_id to common_name from seed_data."""
+    common_name_dict = {}
+    logger.debug("Building common_name_dict explicitly")
+    for idx, item in enumerate(seed_data):
+        try:
+            rental_class_id = item.get('rental_class_id')
+            common_name = item.get('common_name')
+            logger.debug(f"Item {idx}: rental_class_id={rental_class_id}, common_name={common_name}")
+            if rental_class_id and common_name:
+                normalized_key = str(rental_class_id).strip()
+                common_name_dict[normalized_key] = common_name
+                logger.debug(f"Added to common_name_dict: key={normalized_key}, value={common_name}")
+        except Exception as comp_error:
+            logger.error(f"Error processing item {idx} for common_name_dict: {str(comp_error)}", exc_info=True)
+    logger.debug(f"Created common_name_dict with {len(common_name_dict)} entries")
+    sample_common_names = dict(list(common_name_dict.items())[:5])
+    logger.debug(f"Sample of common_name_dict: {sample_common_names}")
+    return common_name_dict
 
 @categories_bp.route('/categories')
 def manage_categories():
@@ -71,7 +91,6 @@ def manage_categories():
         # Fetch seed data from cache or API
         cache_key = 'seed_rental_classes'
         seed_data = cache.get(cache_key)
-        common_name_dict = {}
         if seed_data is None:
             try:
                 api_client = APIClient()
@@ -125,25 +144,8 @@ def manage_categories():
                 logger.debug(f"Number of valid items: {len(valid_items)}")
                 logger.debug(f"Sample valid item: {valid_items[0]}")
             
-            # Explicitly build common_name_dict
-            logger.debug("Building common_name_dict explicitly")
-            common_name_dict = {}
-            for idx, item in enumerate(seed_data):
-                try:
-                    rental_class_id = item.get('rental_class_id')
-                    common_name = item.get('common_name')
-                    logger.debug(f"Item {idx}: rental_class_id={rental_class_id}, common_name={common_name}")
-                    if rental_class_id and common_name:
-                        normalized_key = str(rental_class_id).strip()
-                        common_name_dict[normalized_key] = common_name
-                        logger.debug(f"Added to common_name_dict: key={normalized_key}, value={common_name}")
-                except Exception as comp_error:
-                    logger.error(f"Error processing item {idx} for common_name_dict: {str(comp_error)}", exc_info=True)
-            logger.debug(f"Created common_name_dict with {len(common_name_dict)} entries")
-            
-            # Log a sample of common_name_dict to verify contents
-            sample_common_names = dict(list(common_name_dict.items())[:5])
-            logger.debug(f"Sample of common_name_dict: {sample_common_names}")
+            # Build common_name_dict using the helper function
+            common_name_dict = build_common_name_dict(seed_data)
             
             # Cache the seed_data after processing
             if seed_data and 'seed_rental_class_ids' in locals():
@@ -166,6 +168,7 @@ def manage_categories():
         sample_rental_class_ids = list(mappings_dict.keys())[:5]
         logger.debug(f"Sample rental_class_ids from mappings: {sample_rental_class_ids}")
         # Log a sample of common_name_dict keys for comparison
+        logger.debug(f"Before lookup, common_name_dict has {len(common_name_dict)} entries")
         common_name_dict_keys = list(common_name_dict.keys())[:5]
         logger.debug(f"Sample keys from common_name_dict: {common_name_dict_keys}")
         for rental_class_id, mapping in mappings_dict.items():
@@ -222,7 +225,6 @@ def get_mappings():
         cache.delete(cache_key)
         logger.info("Cleared seed_rental_classes cache to force fresh API call")
         seed_data = cache.get(cache_key)
-        common_name_dict = {}
         if seed_data is None:
             try:
                 api_client = APIClient()
@@ -276,25 +278,8 @@ def get_mappings():
                 logger.debug(f"Number of valid items: {len(valid_items)}")
                 logger.debug(f"Sample valid item: {valid_items[0]}")
             
-            # Explicitly build common_name_dict
-            logger.debug("Building common_name_dict explicitly")
-            common_name_dict = {}
-            for idx, item in enumerate(seed_data):
-                try:
-                    rental_class_id = item.get('rental_class_id')
-                    common_name = item.get('common_name')
-                    logger.debug(f"Item {idx}: rental_class_id={rental_class_id}, common_name={common_name}")
-                    if rental_class_id and common_name:
-                        normalized_key = str(rental_class_id).strip()
-                        common_name_dict[normalized_key] = common_name
-                        logger.debug(f"Added to common_name_dict: key={normalized_key}, value={common_name}")
-                except Exception as comp_error:
-                    logger.error(f"Error processing item {idx} for common_name_dict: {str(comp_error)}", exc_info=True)
-            logger.debug(f"Created common_name_dict with {len(common_name_dict)} entries")
-            
-            # Log a sample of common_name_dict to verify contents
-            sample_common_names = dict(list(common_name_dict.items())[:5])
-            logger.debug(f"Sample of common_name_dict: {sample_common_names}")
+            # Build common_name_dict using the helper function
+            common_name_dict = build_common_name_dict(seed_data)
             
             # Cache the seed_data after processing
             if seed_data and 'seed_rental_class_ids' in locals():
@@ -317,6 +302,7 @@ def get_mappings():
         sample_rental_class_ids = list(mappings_dict.keys())[:5]
         logger.debug(f"Sample rental_class_ids from mappings: {sample_rental_class_ids}")
         # Log a sample of common_name_dict keys for comparison
+        logger.debug(f"Before lookup, common_name_dict has {len(common_name_dict)} entries")
         common_name_dict_keys = list(common_name_dict.keys())[:5]
         logger.debug(f"Sample keys from common_name_dict: {common_name_dict_keys}")
         for rental_class_id, mapping in mappings_dict.items():
