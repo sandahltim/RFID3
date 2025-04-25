@@ -35,6 +35,7 @@ body {
     border-collapse: collapse;
     background-color: #ffffff;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    position: relative; /* Ensure sticky headers work */
 }
 
 .table-bordered th, .table-bordered td {
@@ -42,6 +43,7 @@ body {
     padding: 10px;
     text-align: left;
     white-space: nowrap;
+    min-width: 120px; /* Ensure columns don't collapse */
 }
 
 .table thead th {
@@ -51,6 +53,7 @@ body {
     position: sticky;
     top: 56px; /* Adjust based on navbar height */
     z-index: 10;
+    border-bottom: 2px solid #dee2e6; /* Clear separation */
 }
 
 .table tbody tr:nth-child(odd) {
@@ -59,6 +62,42 @@ body {
 
 .table tbody tr:hover {
     background-color: #e9ecef;
+}
+
+/* Subcategory, common, and item tables */
+.subcat-table, .common-level table, .item-level {
+    width: 100%;
+    overflow-x: auto; /* Allow horizontal scrolling */
+}
+
+.subcat-table thead th,
+.common-level table thead th,
+.item-level thead th {
+    position: sticky;
+    top: 56px; /* Adjust based on navbar height */
+    z-index: 10;
+    background-color: #e9ecef;
+    border-bottom: 2px solid #dee2e6;
+}
+
+.subcat-table td,
+.common-level table td,
+.item-level td {
+    padding: 8px;
+    border: 1px solid #dee2e6;
+    min-width: 120px;
+    white-space: nowrap;
+}
+
+/* Ensure item-level wrapper scrolls properly */
+.item-level-wrapper {
+    margin-left: 1rem;
+    background-color: #dee2e6;
+    padding: 0.5rem;
+    border-left: 3px solid #dc3545;
+    overflow-x: auto;
+    max-height: 600px;
+    overflow-y: auto;
 }
 
 /* Styling for categories column in Tab 2 */
