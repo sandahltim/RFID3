@@ -2,79 +2,66 @@ from flask import Blueprint, render_template, request, jsonify, current_app
 from .. import db, cache
 from ..models.db_models import RentalClassMapping, UserRentalClassMapping
 from ..services.api_client import APIClient
-from sqlalchemy import func, text
+from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from time import time
 import logging
 import sys
 import copy
 
-# Configure logging to ensure logs are captured
+# Configure logging
 logger = logging.getLogger('categories')
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
 
 # Remove existing handlers to avoid duplicates
 logger.handlers = []
 
 # File handler for rfid_dashboard.log
 file_handler = logging.FileHandler('/home/tim/test_rfidpi/logs/rfid_dashboard.log')
-file_handler.setLevel(logging.DEBUG)
+file_handler.setLevel(logging.INFO)
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 file_handler.setFormatter(formatter)
 logger.addHandler(file_handler)
 
 # Secondary file handler for debug.log
 debug_handler = logging.FileHandler('/home/tim/test_rfidpi/logs/debug.log')
-debug_handler.setLevel(logging.DEBUG)
+debug_handler.setLevel(logging.INFO)
 debug_handler.setFormatter(formatter)
 logger.addHandler(debug_handler)
 
 # Console handler
 console_handler = logging.StreamHandler(sys.stdout)
-console_handler.setLevel(logging.DEBUG)
+console_handler.setLevel(logging.INFO)
 console_handler.setFormatter(formatter)
 logger.addHandler(console_handler)
 
 # Also add logs to the root logger (which Gunicorn might capture)
 root_logger = logging.getLogger()
-root_logger.setLevel(logging.DEBUG)
+root_logger.setLevel(logging.INFO)
 if not any(isinstance(h, logging.StreamHandler) for h in root_logger.handlers):
     root_logger.addHandler(console_handler)
 
 categories_bp = Blueprint('categories', __name__)
 
 # Version check to ensure correct deployment
-logger.info("Deployed categories.py version: 2025-04-24-v15")
-
-# Test logging levels
-logger.debug("DEBUG level test message at startup")
-logger.info("INFO level test message at startup")
-logger.warning("WARNING level test message at startup")
+logger.info("Deployed categories.py version: 2025-04-24-v16")
 
 def build_common_name_dict(seed_data):
     """Build a dictionary mapping rental_class_id to common_name from seed_data."""
     common_name_dict = {}
-    logger.debug("Building common_name_dict explicitly")
-    for idx, item in enumerate(seed_data):
+    for item in seed_data:
         try:
             rental_class_id = item.get('rental_class_id')
             common_name = item.get('common_name')
-            logger.debug(f"Item {idx}: rental_class_id={rental_class_id}, common_name={common_name}")
             if rental_class_id and common_name:
                 normalized_key = str(rental_class_id).strip()
                 common_name_dict[normalized_key] = common_name
-                logger.debug(f"Added to common_name_dict: key={normalized_key}, value={common_name}")
         except Exception as comp_error:
-            logger.error(f"Error processing item {idx} for common_name_dict: {str(comp_error)}", exc_info=True)
-    logger.debug(f"Created common_name_dict with {len(common_name_dict)} entries")
-    sample_common_names = dict(list(common_name_dict.items())[:5])
-    logger.debug(f"Sample of common_name_dict: {sample_common_names}")
+            logger.error(f"Error processing item for common_name_dict: {str(comp_error)}", exc_info=True)
     return common_name_dict
 
 @categories_bp.route('/categories')
 def manage_categories():
-    logger.info("TEST: Entering manage_categories endpoint")
-    root_logger.info("TEST: Entering manage_categories endpoint (root logger)")
     try:
         session = db.session()
         logger.info("Starting new session for manage_categories")
@@ -95,106 +82,39 @@ def manage_categories():
             try:
                 api_client = APIClient()
                 seed_data = api_client.get_seed_data()
-                # Check if response is nested under 'data' key
                 if isinstance(seed_data, dict) and 'data' in seed_data:
-                    logger.debug("API response contains 'data' key, extracting nested data")
                     seed_data = seed_data['data']
-                logger.debug(f"Seed data fetched from API (first 5 items): {seed_data[:5] if seed_data else 'Empty'}")
-                # Log all rental_class_id values from seed data
-                seed_rental_class_ids = [item.get('rental_class_id', 'N/A') for item in seed_data]
-                logger.debug(f"All rental_class_ids from seed data: {seed_rental_class_ids}")
             except Exception as api_error:
                 logger.error(f"Failed to fetch seed data from API: {str(api_error)}", exc_info=True)
                 seed_data = []  # Fallback to empty list
-        else:
-            logger.info("Using cached seed data")
-            logger.debug(f"Cached seed data (first 5 items): {seed_data[:5] if seed_data else 'Empty'}")
 
         # Create a mapping of rental_class_id to common_name
         try:
-            # Log seed data details
-            logger.info(f"Seed data length: {len(seed_data)}, type: {type(seed_data)}")
-            print(f"Seed data length: {len(seed_data)}, type: {type(seed_data)}")
-
-            # Debug the dictionary comprehension
-            valid_items = []
-            logger.info("Starting debug loop for seed data items (INFO level)")
-            print("Starting debug loop for seed data items (PRINT statement)")
-            
-            # Simplify the loop to isolate the issue
-            for i in range(min(10, len(seed_data))):
-                item = seed_data[i]
-                logger.info(f"Debug loop iteration {i} (INFO level)")
-                print(f"Debug loop iteration {i} (PRINT statement)")
-                try:
-                    logger.debug(f"Processing item {i}: {item}")
-                    # Log raw keys as strings to check for encoding issues
-                    raw_keys = [str(key) for key in item.keys()]
-                    logger.debug(f"Item {i} - Raw keys: {raw_keys}")
-                    has_rental_class_id = 'rental_class_id' in raw_keys
-                    has_common_name = 'common_name' in raw_keys
-                    logger.debug(f"Item {i} - Keys: {list(item.keys())}, has_rental_class_id: {has_rental_class_id}, has_common_name: {has_common_name}")
-                    if has_rental_class_id and has_common_name:
-                        valid_items.append(item)
-                except Exception as item_error:
-                    logger.error(f"Error processing item {i}: {str(item_error)}", exc_info=True)
-            if not valid_items:
-                logger.warning("No valid items found in debug loop")
-            else:
-                logger.debug(f"Number of valid items: {len(valid_items)}")
-                logger.debug(f"Sample valid item: {valid_items[0]}")
-            
-            # Build common_name_dict using the helper function
             common_name_dict = build_common_name_dict(seed_data)
-            logger.debug(f"After assignment, common_name_dict has {len(common_name_dict)} entries")
-            
-            # Build categories list
-            categories = []
-            # Log a sample of rental_class_ids from mappings_dict for comparison
-            sample_rental_class_ids = list(mappings_dict.keys())[:5]
-            logger.debug(f"Sample rental_class_ids from mappings: {sample_rental_class_ids}")
-            # Log a sample of common_name_dict keys for comparison
-            logger.debug(f"Before lookup, common_name_dict has {len(common_name_dict)} entries")
-            common_name_dict_keys = list(common_name_dict.keys())[:5]
-            logger.debug(f"Sample keys from common_name_dict: {common_name_dict_keys}")
-            for rental_class_id, mapping in mappings_dict.items():
-                logger.debug(f"Raw rental_class_id from mappings_dict: {rental_class_id}, type: {type(rental_class_id)}")
-                normalized_rental_class_id = str(rental_class_id).strip()
-                logger.debug(f"Normalized rental_class_id for lookup: {normalized_rental_class_id}")
-                common_name = common_name_dict.get(normalized_rental_class_id, 'N/A')
-                if common_name == 'N/A':
-                    logger.warning(f"No common name found for rental_class_id {normalized_rental_class_id}")
-                categories.append({
-                    'category': mapping['category'],
-                    'subcategory': mapping['subcategory'],
-                    'rental_class_id': rental_class_id,
-                    'common_name': common_name
-                })
-
-            # Cache the seed_data after lookup
-            if seed_data and 'seed_rental_class_ids' in locals():
-                logger.info(f"Seed data length before caching: {len(seed_data)}, type: {type(seed_data)}")
-                seed_data_copy = copy.deepcopy(seed_data)
-                cache.set(cache_key, seed_data_copy, timeout=3600)  # Cache for 1 hour
-                logger.info(f"Seed data length after caching: {len(seed_data)}, type: {type(seed_data)}")
-                logger.info("Fetched seed data from API and cached")
-                logger.debug(f"After caching, common_name_dict has {len(common_name_dict)} entries")
-            
-            # Flush logs to ensure they are written
-            for handler in logger.handlers:
-                handler.flush()
         except Exception as dict_error:
             logger.error(f"Error creating common_name_dict from seed_data: {str(dict_error)}", exc_info=True)
             common_name_dict = {}
 
+        # Build categories list
+        categories = []
+        for rental_class_id, mapping in mappings_dict.items():
+            normalized_rental_class_id = str(rental_class_id).strip()
+            common_name = common_name_dict.get(normalized_rental_class_id, 'N/A')
+            categories.append({
+                'category': mapping['category'],
+                'subcategory': mapping['subcategory'],
+                'rental_class_id': rental_class_id,
+                'common_name': common_name
+            })
+
+        # Cache the seed_data after lookup
+        if seed_data and 'seed_rental_class_ids' in locals():
+            seed_data_copy = copy.deepcopy(seed_data)
+            cache.set(cache_key, seed_data_copy, timeout=3600)  # Cache for 1 hour
+            logger.info("Fetched seed data from API and cached")
+
         categories.sort(key=lambda x: (x['category'], x['subcategory'], x['rental_class_id']))
         logger.info(f"Fetched {len(categories)} category mappings")
-
-        # Direct query to verify database state
-        raw_base_mappings = session.execute(text("SELECT rental_class_id, category, subcategory FROM rental_class_mappings")).fetchall()
-        raw_user_mappings = session.execute(text("SELECT rental_class_id, category, subcategory FROM user_rental_class_mappings")).fetchall()
-        logger.info(f"Raw base mappings: {[(row[0], row[1], row[2]) for row in raw_base_mappings]}")
-        logger.info(f"Raw user mappings: {[(row[0], row[1], row[2]) for row in raw_user_mappings]}")
 
         session.close()
         return render_template('categories.html', categories=categories, cache_bust=int(time()))
@@ -206,8 +126,6 @@ def manage_categories():
 
 @categories_bp.route('/categories/mapping', methods=['GET'])
 def get_mappings():
-    logger.info("TEST: Entering get_mappings endpoint")
-    root_logger.info("TEST: Entering get_mappings endpoint (root logger)")
     try:
         session = db.session()
         logger.info("Fetching rental class mappings for API")
@@ -223,105 +141,42 @@ def get_mappings():
 
         # Fetch seed data from cache or API
         cache_key = 'seed_rental_classes'
-        # Temporarily clear cache to force a fresh API call for debugging
-        cache.delete(cache_key)
-        logger.info("Cleared seed_rental_classes cache to force fresh API call")
+        cache.delete(cache_key)  # Force a fresh API call
         seed_data = cache.get(cache_key)
         if seed_data is None:
             try:
                 api_client = APIClient()
                 seed_data = api_client.get_seed_data()
-                # Check if response is nested under 'data' key
                 if isinstance(seed_data, dict) and 'data' in seed_data:
-                    logger.debug("API response contains 'data' key, extracting nested data")
                     seed_data = seed_data['data']
-                logger.debug(f"Seed data fetched from API (first 5 items): {seed_data[:5] if seed_data else 'Empty'}")
-                # Log all rental_class_id values from seed data
-                seed_rental_class_ids = [item.get('rental_class_id', 'N/A') for item in seed_data]
-                logger.debug(f"All rental_class_ids from seed data: {seed_rental_class_ids}")
             except Exception as api_error:
                 logger.error(f"Failed to fetch seed data from API: {str(api_error)}", exc_info=True)
                 seed_data = []  # Fallback to empty list
-        else:
-            logger.info("Using cached seed data")
-            logger.debug(f"Cached seed data (first 5 items): {seed_data[:5] if seed_data else 'Empty'}")
 
         # Create a mapping of rental_class_id to common_name
         try:
-            # Log seed data details
-            logger.info(f"Seed data length: {len(seed_data)}, type: {type(seed_data)}")
-            print(f"Seed data length: {len(seed_data)}, type: {type(seed_data)}")
-
-            # Debug the dictionary comprehension
-            valid_items = []
-            logger.info("Starting debug loop for seed data items (INFO level)")
-            print("Starting debug loop for seed data items (PRINT statement)")
-            
-            # Simplify the loop to isolate the issue
-            for i in range(min(10, len(seed_data))):
-                item = seed_data[i]
-                logger.info(f"Debug loop iteration {i} (INFO level)")
-                print(f"Debug loop iteration {i} (PRINT statement)")
-                try:
-                    logger.debug(f"Processing item {i}: {item}")
-                    # Log raw keys as strings to check for encoding issues
-                    raw_keys = [str(key) for key in item.keys()]
-                    logger.debug(f"Item {i} - Raw keys: {raw_keys}")
-                    has_rental_class_id = 'rental_class_id' in raw_keys
-                    has_common_name = 'common_name' in raw_keys
-                    logger.debug(f"Item {i} - Keys: {list(item.keys())}, has_rental_class_id: {has_rental_class_id}, has_common_name: {has_common_name}")
-                    if has_rental_class_id and has_common_name:
-                        valid_items.append(item)
-                except Exception as item_error:
-                    logger.error(f"Error processing item {i}: {str(item_error)}", exc_info=True)
-            if not valid_items:
-                logger.warning("No valid items found in debug loop")
-            else:
-                logger.debug(f"Number of valid items: {len(valid_items)}")
-                logger.debug(f"Sample valid item: {valid_items[0]}")
-            
-            # Build common_name_dict using the helper function
             common_name_dict = build_common_name_dict(seed_data)
-            logger.debug(f"After assignment, common_name_dict has {len(common_name_dict)} entries")
-            
-            # Build categories list
-            categories = []
-            # Log a sample of rental_class_ids from mappings_dict for comparison
-            sample_rental_class_ids = list(mappings_dict.keys())[:5]
-            logger.debug(f"Sample rental_class_ids from mappings: {sample_rental_class_ids}")
-            # Log a sample of common_name_dict keys for comparison
-            logger.debug(f"Before lookup, common_name_dict has {len(common_name_dict)} entries")
-            common_name_dict_keys = list(common_name_dict.keys())[:5]
-            logger.debug(f"Sample keys from common_name_dict: {common_name_dict_keys}")
-            for rental_class_id, mapping in mappings_dict.items():
-                logger.debug(f"Raw rental_class_id from mappings_dict: {rental_class_id}, type: {type(rental_class_id)}")
-                normalized_rental_class_id = str(rental_class_id).strip()
-                logger.debug(f"Normalized rental_class_id for lookup: {normalized_rental_class_id}")
-                common_name = common_name_dict.get(normalized_rental_class_id, 'N/A')
-                if common_name == 'N/A':
-                    logger.warning(f"No common name found for rental_class_id {normalized_rental_class_id} (mapping)")
-                categories.append({
-                    'category': mapping['category'],
-                    'subcategory': mapping['subcategory'],
-                    'rental_class_id': rental_class_id,
-                    'common_name': common_name
-                })
-
-            # Cache the seed_data after lookup
-            if seed_data and 'seed_rental_class_ids' in locals():
-                logger.info(f"Seed data length before caching: {len(seed_data)}, type: {type(seed_data)}")
-                seed_data_copy = copy.deepcopy(seed_data)
-                cache.set(cache_key, seed_data_copy, timeout=3600)  # Cache for 1 hour
-                logger.info(f"Seed data length after caching: {len(seed_data)}, type: {type(seed_data)}")
-                logger.info("Fetched seed data from API and cached")
-                logger.debug(f"After caching, common_name_dict has {len(common_name_dict)} entries")
-            
-            # Flush logs to ensure they are written
-            for handler in logger.handlers:
-                handler.flush()
         except Exception as dict_error:
             logger.error(f"Error creating common_name_dict from seed_data: {str(dict_error)}", exc_info=True)
             common_name_dict = {}
+
+        # Build categories list
+        categories = []
+        for rental_class_id, mapping in mappings_dict.items():
+            normalized_rental_class_id = str(rental_class_id).strip()
+            common_name = common_name_dict.get(normalized_rental_class_id, 'N/A')
+            categories.append({
+                'category': mapping['category'],
+                'subcategory': mapping['subcategory'],
+                'rental_class_id': rental_class_id,
+                'common_name': common_name
+            })
+
+        # Cache the seed_data after lookup
+        if seed_data and 'seed_rental_class_ids' in locals():
+            seed_data_copy = copy.deepcopy(seed_data)
+            cache.set(cache_key, seed_data_copy, timeout=3600)  # Cache for 1 hour
+            logger.info("Fetched seed data from API and cached")
 
         categories.sort(key=lambda x: (x['category'], x['subcategory'], x['rental_class_id']))
         session.close()
@@ -336,13 +191,11 @@ def get_mappings():
 def update_mappings():
     session = None
     try:
-        # Start a new session for this request
         session = db.session()
         logger.info("Starting new session for update_mappings")
 
-        # Get the new mappings from the request
         new_mappings = request.get_json()
-        logger.info(f"Received {len(new_mappings)} new mappings: {new_mappings}")
+        logger.info(f"Received {len(new_mappings)} new mappings")
 
         if not isinstance(new_mappings, list):
             logger.error("Invalid data format received, expected a list")
@@ -368,19 +221,9 @@ def update_mappings():
                 subcategory=subcategory or ''
             )
             session.add(user_mapping)
-            logger.debug(f"Added mapping: rental_class_id={rental_class_id}, category={category}, subcategory={subcategory}")
 
-        # Commit the changes
         session.commit()
         logger.info("Successfully committed rental class mappings")
-
-        # Verify the mappings were saved
-        saved_mappings = session.query(UserRentalClassMapping).all()
-        logger.info(f"Saved mappings after commit: {[(m.rental_class_id, m.category, m.subcategory) for m in saved_mappings]}")
-
-        # Direct query to verify database state
-        raw_user_mappings = session.execute(text("SELECT rental_class_id, category, subcategory FROM user_rental_class_mappings")).fetchall()
-        logger.info(f"Raw user mappings after commit: {[(row[0], row[1], row[2]) for row in raw_user_mappings]}")
 
         return jsonify({'message': 'Mappings updated successfully'})
     except SQLAlchemyError as e:
@@ -414,10 +257,6 @@ def delete_mapping():
         deleted_count = session.query(UserRentalClassMapping).filter_by(rental_class_id=rental_class_id).delete()
         session.commit()
         logger.info(f"Deleted {deleted_count} user mappings for rental_class_id: {rental_class_id}")
-
-        # Verify the deletion
-        remaining_mappings = session.query(UserRentalClassMapping).all()
-        logger.info(f"Remaining user mappings after deletion: {[(m.rental_class_id, m.category, m.subcategory) for m in remaining_mappings]}")
 
         return jsonify({'message': 'Mapping deleted successfully'})
     except SQLAlchemyError as e:
