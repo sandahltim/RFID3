@@ -391,6 +391,10 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
         });
 }
 
+console.log('expand.js version: 2025-04-24 v29 loaded');
+
+// ... (other functions unchanged)
+
 function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1) {
     console.log('loadSubcatData called with', { originalCategory, normalizedCategory, targetId, page });
 
@@ -490,6 +494,7 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
                         </div>
                     `;
                 });
+                console.log('Generated HTML for subcategories:', html); // Debug log to confirm HTML
             } else {
                 html = `<div class="subcat-level"><p>No subcategories found for this category.</p></div>`;
             }
@@ -518,6 +523,8 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
             console.log('loadSubcatData completed for targetId:', targetId);
         });
 }
+
+// ... (rest of the file unchanged)
 
 document.addEventListener('DOMContentLoaded', function() {
     console.log('expand.js: DOMContentLoaded event fired');
