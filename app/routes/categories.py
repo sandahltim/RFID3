@@ -44,7 +44,7 @@ if not any(isinstance(h, logging.StreamHandler) for h in root_logger.handlers):
 categories_bp = Blueprint('categories', __name__)
 
 # Version check to ensure correct deployment
-logger.info("Deployed categories.py version: 2025-04-24-v14")
+logger.info("Deployed categories.py version: 2025-04-24-v15")
 
 # Test logging levels
 logger.debug("DEBUG level test message at startup")
@@ -146,14 +146,39 @@ def manage_categories():
             
             # Build common_name_dict using the helper function
             common_name_dict = build_common_name_dict(seed_data)
+            logger.debug(f"After assignment, common_name_dict has {len(common_name_dict)} entries")
             
-            # Cache the seed_data after processing
+            # Build categories list
+            categories = []
+            # Log a sample of rental_class_ids from mappings_dict for comparison
+            sample_rental_class_ids = list(mappings_dict.keys())[:5]
+            logger.debug(f"Sample rental_class_ids from mappings: {sample_rental_class_ids}")
+            # Log a sample of common_name_dict keys for comparison
+            logger.debug(f"Before lookup, common_name_dict has {len(common_name_dict)} entries")
+            common_name_dict_keys = list(common_name_dict.keys())[:5]
+            logger.debug(f"Sample keys from common_name_dict: {common_name_dict_keys}")
+            for rental_class_id, mapping in mappings_dict.items():
+                logger.debug(f"Raw rental_class_id from mappings_dict: {rental_class_id}, type: {type(rental_class_id)}")
+                normalized_rental_class_id = str(rental_class_id).strip()
+                logger.debug(f"Normalized rental_class_id for lookup: {normalized_rental_class_id}")
+                common_name = common_name_dict.get(normalized_rental_class_id, 'N/A')
+                if common_name == 'N/A':
+                    logger.warning(f"No common name found for rental_class_id {normalized_rental_class_id}")
+                categories.append({
+                    'category': mapping['category'],
+                    'subcategory': mapping['subcategory'],
+                    'rental_class_id': rental_class_id,
+                    'common_name': common_name
+                })
+
+            # Cache the seed_data after lookup
             if seed_data and 'seed_rental_class_ids' in locals():
                 logger.info(f"Seed data length before caching: {len(seed_data)}, type: {type(seed_data)}")
                 seed_data_copy = copy.deepcopy(seed_data)
                 cache.set(cache_key, seed_data_copy, timeout=3600)  # Cache for 1 hour
                 logger.info(f"Seed data length after caching: {len(seed_data)}, type: {type(seed_data)}")
                 logger.info("Fetched seed data from API and cached")
+                logger.debug(f"After caching, common_name_dict has {len(common_name_dict)} entries")
             
             # Flush logs to ensure they are written
             for handler in logger.handlers:
@@ -161,29 +186,6 @@ def manage_categories():
         except Exception as dict_error:
             logger.error(f"Error creating common_name_dict from seed_data: {str(dict_error)}", exc_info=True)
             common_name_dict = {}
-
-        # Build categories list
-        categories = []
-        # Log a sample of rental_class_ids from mappings_dict for comparison
-        sample_rental_class_ids = list(mappings_dict.keys())[:5]
-        logger.debug(f"Sample rental_class_ids from mappings: {sample_rental_class_ids}")
-        # Log a sample of common_name_dict keys for comparison
-        logger.debug(f"Before lookup, common_name_dict has {len(common_name_dict)} entries")
-        common_name_dict_keys = list(common_name_dict.keys())[:5]
-        logger.debug(f"Sample keys from common_name_dict: {common_name_dict_keys}")
-        for rental_class_id, mapping in mappings_dict.items():
-            logger.debug(f"Raw rental_class_id from mappings_dict: {rental_class_id}, type: {type(rental_class_id)}")
-            normalized_rental_class_id = str(rental_class_id).strip()
-            logger.debug(f"Normalized rental_class_id for lookup: {normalized_rental_class_id}")
-            common_name = common_name_dict.get(normalized_rental_class_id, 'N/A')
-            if common_name == 'N/A':
-                logger.warning(f"No common name found for rental_class_id {normalized_rental_class_id}")
-            categories.append({
-                'category': mapping['category'],
-                'subcategory': mapping['subcategory'],
-                'rental_class_id': rental_class_id,
-                'common_name': common_name
-            })
 
         categories.sort(key=lambda x: (x['category'], x['subcategory'], x['rental_class_id']))
         logger.info(f"Fetched {len(categories)} category mappings")
@@ -280,14 +282,39 @@ def get_mappings():
             
             # Build common_name_dict using the helper function
             common_name_dict = build_common_name_dict(seed_data)
+            logger.debug(f"After assignment, common_name_dict has {len(common_name_dict)} entries")
             
-            # Cache the seed_data after processing
+            # Build categories list
+            categories = []
+            # Log a sample of rental_class_ids from mappings_dict for comparison
+            sample_rental_class_ids = list(mappings_dict.keys())[:5]
+            logger.debug(f"Sample rental_class_ids from mappings: {sample_rental_class_ids}")
+            # Log a sample of common_name_dict keys for comparison
+            logger.debug(f"Before lookup, common_name_dict has {len(common_name_dict)} entries")
+            common_name_dict_keys = list(common_name_dict.keys())[:5]
+            logger.debug(f"Sample keys from common_name_dict: {common_name_dict_keys}")
+            for rental_class_id, mapping in mappings_dict.items():
+                logger.debug(f"Raw rental_class_id from mappings_dict: {rental_class_id}, type: {type(rental_class_id)}")
+                normalized_rental_class_id = str(rental_class_id).strip()
+                logger.debug(f"Normalized rental_class_id for lookup: {normalized_rental_class_id}")
+                common_name = common_name_dict.get(normalized_rental_class_id, 'N/A')
+                if common_name == 'N/A':
+                    logger.warning(f"No common name found for rental_class_id {normalized_rental_class_id} (mapping)")
+                categories.append({
+                    'category': mapping['category'],
+                    'subcategory': mapping['subcategory'],
+                    'rental_class_id': rental_class_id,
+                    'common_name': common_name
+                })
+
+            # Cache the seed_data after lookup
             if seed_data and 'seed_rental_class_ids' in locals():
                 logger.info(f"Seed data length before caching: {len(seed_data)}, type: {type(seed_data)}")
                 seed_data_copy = copy.deepcopy(seed_data)
                 cache.set(cache_key, seed_data_copy, timeout=3600)  # Cache for 1 hour
                 logger.info(f"Seed data length after caching: {len(seed_data)}, type: {type(seed_data)}")
                 logger.info("Fetched seed data from API and cached")
+                logger.debug(f"After caching, common_name_dict has {len(common_name_dict)} entries")
             
             # Flush logs to ensure they are written
             for handler in logger.handlers:
@@ -295,29 +322,6 @@ def get_mappings():
         except Exception as dict_error:
             logger.error(f"Error creating common_name_dict from seed_data: {str(dict_error)}", exc_info=True)
             common_name_dict = {}
-
-        # Build categories list
-        categories = []
-        # Log a sample of rental_class_ids from mappings_dict for comparison
-        sample_rental_class_ids = list(mappings_dict.keys())[:5]
-        logger.debug(f"Sample rental_class_ids from mappings: {sample_rental_class_ids}")
-        # Log a sample of common_name_dict keys for comparison
-        logger.debug(f"Before lookup, common_name_dict has {len(common_name_dict)} entries")
-        common_name_dict_keys = list(common_name_dict.keys())[:5]
-        logger.debug(f"Sample keys from common_name_dict: {common_name_dict_keys}")
-        for rental_class_id, mapping in mappings_dict.items():
-            logger.debug(f"Raw rental_class_id from mappings_dict: {rental_class_id}, type: {type(rental_class_id)}")
-            normalized_rental_class_id = str(rental_class_id).strip()
-            logger.debug(f"Normalized rental_class_id for lookup: {normalized_rental_class_id}")
-            common_name = common_name_dict.get(normalized_rental_class_id, 'N/A')
-            if common_name == 'N/A':
-                logger.warning(f"No common name found for rental_class_id {normalized_rental_class_id} (mapping)")
-            categories.append({
-                'category': mapping['category'],
-                'subcategory': mapping['subcategory'],
-                'rental_class_id': rental_class_id,
-                'common_name': common_name
-            })
 
         categories.sort(key=lambda x: (x['category'], x['subcategory'], x['rental_class_id']))
         session.close()
