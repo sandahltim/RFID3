@@ -1,4 +1,4 @@
-console.log('expand.js version: 2025-04-25 v32 loaded');
+console.log('expand.js version: 2025-04-25 v33 loaded');
 
 function showLoading(key) {
     const loadingDiv = document.getElementById(`loading-${key}`);
@@ -329,13 +329,11 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
                     if (data.total_subcats > data.per_page) {
                         const totalPages = Math.ceil(data.total_subcats / data.per_page);
                         html += `
-                            <tr>
-                                <td colspan="6" class="pagination-controls">
-                                    <button class="btn btn-sm btn-secondary" onclick="loadSubcatData('${originalCategory}', '${normalizedCategory}', '${targetId}', ${page - 1})" ${page === 1 ? 'disabled' : ''}>Previous</button>
-                                    <span>Page ${page} of ${totalPages}</span>
-                                    <button class="btn btn-sm btn-secondary" onclick="loadSubcatData('${originalCategory}', '${normalizedCategory}', '${targetId}', ${page + 1})" ${page === totalPages ? 'disabled' : ''}>Next</button>
-                                </td>
-                            </tr>
+                            <div class="pagination-controls">
+                                <button class="btn btn-sm btn-secondary" onclick="loadSubcatData('${originalCategory}', '${normalizedCategory}', '${targetId}', ${page - 1})" ${page === 1 ? 'disabled' : ''}>Previous</button>
+                                <span>Page ${page} of ${totalPages}</span>
+                                <button class="btn btn-sm btn-secondary" onclick="loadSubcatData('${originalCategory}', '${normalizedCategory}', '${targetId}', ${page + 1})" ${page === totalPages ? 'disabled' : ''}>Next</button>
+                            </div>
                         `;
                     }
                 });
@@ -349,11 +347,12 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
             container.classList.remove('collapsed');
             container.classList.add('expanded');
             container.style.display = 'block';
-            console.log('Container updated:', container);
+            console.log('Container updated with HTML:', container.innerHTML);
 
-            // Debug the height and computed style of the subcategory row
+            // Debug the subcategory row
             const subcatRow = container.querySelector('tbody tr.subcat-row');
             if (subcatRow) {
+                console.log('Subcategory row found:', subcatRow);
                 console.log('Subcategory row height:', subcatRow.offsetHeight);
                 const computedStyle = window.getComputedStyle(subcatRow);
                 console.log('Subcategory row computed style:', {
@@ -369,6 +368,7 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
                 // Force a reflow to ensure rendering
                 subcatRow.style.display = 'table-row';
                 void subcatRow.offsetHeight; // Trigger reflow
+                console.log('After reflow, subcategory row height:', subcatRow.offsetHeight);
             } else {
                 console.log('Subcategory row not found in DOM');
             }
