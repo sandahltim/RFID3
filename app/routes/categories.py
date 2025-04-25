@@ -44,9 +44,9 @@ def manage_categories():
         # Create a mapping of rental_class_id to common_name
         try:
             common_name_dict = {
-                str(item['rental_class_id']).strip().upper(): item['common_name']
+                str(item['class_id']).strip().upper(): item['name']
                 for item in seed_data
-                if 'rental_class_id' in item and 'common_name' in item
+                if 'class_id' in item and 'name' in item
             }
             current_app.logger.debug(f"Created common_name_dict with {len(common_name_dict)} entries")
             # Log a sample of common_name_dict to verify contents
@@ -129,9 +129,9 @@ def get_mappings():
         # Create a mapping of rental_class_id to common_name
         try:
             common_name_dict = {
-                str(item['rental_class_id']).strip().upper(): item['common_name']
+                str(item['class_id']).strip().upper(): item['name']
                 for item in seed_data
-                if 'rental_class_id' in item and 'common_name' in item
+                if 'class_id' in item and 'name' in item
             }
             current_app.logger.debug(f"Created common_name_dict with {len(common_name_dict)} entries")
             # Log a sample of common_name_dict to verify contents
