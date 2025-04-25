@@ -29,7 +29,7 @@ logger.addHandler(console_handler)
 tab1_bp = Blueprint('tab1', __name__)
 
 # Version marker
-logger.info("Deployed tab1.py version: 2025-04-25-v3")
+logger.info("Deployed tab1.py version: 2025-04-25-v5")
 
 @tab1_bp.route('/tab/1')
 def tab1_view():
@@ -67,6 +67,10 @@ def tab1_view():
                 'subcategory': data['subcategory']
             })
         logger.debug(f"Grouped into {len(categories)} categories: {list(categories.keys())}")
+
+        # Log rental_class_num values from id_item_master
+        item_master_data = session.execute(text("SELECT tag_id, rental_class_num, status FROM id_item_master")).fetchall()
+        logger.debug(f"Raw id_item_master data: {[(row[0], row[1], row[2]) for row in item_master_data]}")
 
         # Calculate counts for each category
         category_data = []
@@ -310,9 +314,9 @@ def tab1_subcat_data():
             subcategory_data.append({
                 'subcategory': subcat,
                 'total_items': total_items or 0,
-                'on_contracts': items_on_contracts or 0,
-                'in_service': items_in_service or 0,
-                'available': items_available or 0
+                'items_on_contracts': items_on_contracts or 0,
+                'items_in_service': items_in_service or 0,
+                'items_available': items_available or 0
             })
 
             # Sort subcategory data if needed
@@ -452,8 +456,8 @@ def tab1_common_names():
                 'name': name,
                 'total_items': total or 0,
                 'items_on_contracts': items_on_contracts or 0,
-                'in_service': items_in_service or 0,
-                'available': items_available or 0
+                'items_in_service': items_in_service or 0,
+                'items_available': items_available or 0
             })
 
         # Paginate common names
