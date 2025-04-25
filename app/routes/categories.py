@@ -35,6 +35,9 @@ if not any(isinstance(h, logging.StreamHandler) for h in root_logger.handlers):
 
 categories_bp = Blueprint('categories', __name__)
 
+# Version check to ensure correct deployment
+logger.info("Deployed categories.py version: 2025-04-24-v2")
+
 @categories_bp.route('/categories')
 def manage_categories():
     logger.info("TEST: Entering manage_categories endpoint")
@@ -66,7 +69,7 @@ def manage_categories():
                     seed_data = seed_data['data']
                 logger.debug(f"Seed data fetched from API (first 5 items): {seed_data[:5] if seed_data else 'Empty'}")
                 # Log all rental_class_id values from seed data
-                seed_rental_class_ids = [item['rental_class_id'] for item in seed_data if 'rental_class_id' in item]
+                seed_rental_class_ids = [item.get('rental_class_id', 'N/A') for item in seed_data]
                 logger.debug(f"All rental_class_ids from seed data: {seed_rental_class_ids}")
                 cache.set(cache_key, seed_data, timeout=3600)  # Cache for 1 hour
                 logger.info("Fetched seed data from API and cached")
@@ -81,10 +84,12 @@ def manage_categories():
         try:
             # Debug the dictionary comprehension
             valid_items = []
-            for item in seed_data:
-                has_keys = 'rental_class_id' in item and 'common_name' in item
-                logger.debug(f"Item keys: {list(item.keys())}, has_keys: {has_keys}")
-                if has_keys:
+            for idx, item in enumerate(seed_data[:10]):  # Limit to first 10 for brevity
+                logger.debug(f"Processing item {idx}: {item}")
+                has_rental_class_id = 'rental_class_id' in item
+                has_common_name = 'common_name' in item
+                logger.debug(f"Item {idx} - Keys: {list(item.keys())}, has_rental_class_id: {has_rental_class_id}, has_common_name: {has_common_name}")
+                if has_rental_class_id and has_common_name:
                     valid_items.append(item)
             logger.debug(f"Number of valid items: {len(valid_items)}")
             if valid_items:
@@ -171,7 +176,7 @@ def get_mappings():
                     seed_data = seed_data['data']
                 logger.debug(f"Seed data fetched from API (first 5 items): {seed_data[:5] if seed_data else 'Empty'}")
                 # Log all rental_class_id values from seed data
-                seed_rental_class_ids = [item['rental_class_id'] for item in seed_data if 'rental_class_id' in item]
+                seed_rental_class_ids = [item.get('rental_class_id', 'N/A') for item in seed_data]
                 logger.debug(f"All rental_class_ids from seed data: {seed_rental_class_ids}")
                 cache.set(cache_key, seed_data, timeout=3600)  # Cache for 1 hour
                 logger.info("Fetched seed data from API and cached")
@@ -186,10 +191,12 @@ def get_mappings():
         try:
             # Debug the dictionary comprehension
             valid_items = []
-            for item in seed_data:
-                has_keys = 'rental_class_id' in item and 'common_name' in item
-                logger.debug(f"Item keys: {list(item.keys())}, has_keys: {has_keys}")
-                if has_keys:
+            for idx, item in enumerate(seed_data[:10]):  # Limit to first 10 for brevity
+                logger.debug(f"Processing item {idx}: {item}")
+                has_rental_class_id = 'rental_class_id' in item
+                has_common_name = 'common_name' in item
+                logger.debug(f"Item {idx} - Keys: {list(item.keys())}, has_rental_class_id: {has_rental_class_id}, has_common_name: {has_common_name}")
+                if has_rental_class_id and has_common_name:
                     valid_items.append(item)
             logger.debug(f"Number of valid items: {len(valid_items)}")
             if valid_items:
