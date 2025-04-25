@@ -1,4 +1,4 @@
-console.log('expand.js version: 2025-04-25 v40 loaded');
+console.log('expand.js version: 2025-04-25 v41 loaded');
 
 function showLoading(key) {
     const loadingDiv = document.getElementById(`loading-${key}`);
@@ -331,6 +331,15 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
                 });
             } else if (data.message) {
                 console.log('No subcategories message:', data.message);
+                // Fallback: Fetch rental class mappings directly to verify
+                fetch(`/categories/mapping?category=${encodeURIComponent(originalCategory)}`)
+                    .then(mappingResponse => mappingResponse.json())
+                    .then(mappingData => {
+                        console.log('Rental class mappings for category:', originalCategory, mappingData);
+                    })
+                    .catch(mappingError => {
+                        console.error('Error fetching rental class mappings:', mappingError);
+                    });
             } else {
                 console.log('Unexpected response format:', data);
             }
