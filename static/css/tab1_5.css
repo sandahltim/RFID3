@@ -53,7 +53,8 @@
     overflow-x: auto;
     display: table !important;
     visibility: visible !important;
-    table-layout: fixed; /* Ensure consistent column widths */
+    table-layout: auto; /* Changed to auto to allow natural column widths */
+    border-collapse: collapse;
 }
 
 .subcat-table thead, .common-level table thead, .item-level thead {
@@ -74,7 +75,6 @@
     padding: 12px;
     text-align: left;
     white-space: nowrap;
-    min-width: 150px;
 }
 
 .subcat-table tbody, .common-level table tbody, .item-level tbody {
@@ -87,8 +87,6 @@
 .item-level td {
     padding: 12px;
     border: 1px solid #dee2e6;
-    min-width: 150px;
-    white-space: nowrap;
     display: table-cell !important;
     visibility: visible !important;
 }
@@ -98,7 +96,71 @@
     display: table-row !important;
     visibility: visible !important;
     opacity: 1 !important;
-    min-height: 50px !important;
+    height: auto !important;
+}
+
+/* Column widths for subcategory table */
+.subcat-table th:nth-child(1),
+.subcat-table td:nth-child(1) {
+    width: 200px; /* Subcategory */
+}
+
+.subcat-table th:nth-child(2),
+.subcat-table td:nth-child(2) {
+    width: 100px; /* Total Items */
+}
+
+.subcat-table th:nth-child(3),
+.subcat-table td:nth-child(3) {
+    width: 120px; /* Items on Contracts */
+}
+
+.subcat-table th:nth-child(4),
+.subcat-table td:nth-child(4) {
+    width: 100px; /* Items in Service */
+}
+
+.subcat-table th:nth-child(5),
+.subcat-table td:nth-child(5) {
+    width: 100px; /* Items Available */
+}
+
+.subcat-table th:nth-child(6),
+.subcat-table td:nth-child(6) {
+    width: 200px; /* Actions */
+}
+
+/* Column widths for common-level table */
+.common-level table th:nth-child(1),
+.common-level table td:nth-child(1) {
+    width: 200px; /* Common Name */
+    white-space: normal;
+    word-wrap: break-word;
+}
+
+.common-level table th:nth-child(2),
+.common-level table td:nth-child(2) {
+    width: 100px; /* Total Items */
+}
+
+.common-level table th:nth-child(3),
+.common-level table td:nth-child(3) {
+    width: 120px; /* Items on Contracts */
+}
+
+.common-level table th:nth-child(4),
+.common-level table td:nth-child(4) {
+    width: 100px; /* Items in Service */
+}
+
+.common-level table th:nth-child(5),
+.common-level table td:nth-child(5) {
+    width: 100px; /* Items Available */
+}
+
+.common-level table th:nth-child(6),
+.common-level table td:nth-child(6) {
+    width: 200px; /* Actions */
 }
 
 /* Fix item-level table column alignment */
@@ -156,14 +218,6 @@
 .item-level select {
     width: 100%;
     box-sizing: border-box;
-}
-
-/* Common name column wrapping */
-.common-level th:nth-child(1),
-.common-level td:nth-child(1) {
-    white-space: normal;
-    word-wrap: break-word;
-    max-width: 250px;
 }
 
 /* Smooth transition for expanding/collapsing */
@@ -260,13 +314,17 @@
     .item-level td {
         padding: 0.5rem;
         font-size: 0.9rem;
-        min-width: 120px;
     }
 
     .subcat-table th,
     .subcat-table td {
         padding: 0.5rem;
         font-size: 0.9rem;
-        min-width: 120px;
+    }
+
+    .common-level table th,
+    .common-level table td {
+        padding: 0.5rem;
+        font-size: 0.9rem;
     }
 }
