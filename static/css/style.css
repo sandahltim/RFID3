@@ -40,10 +40,10 @@ body {
 
 .table-bordered th, .table-bordered td {
     border: 1px solid #dee2e6 !important;
-    padding: 10px;
+    padding: 12px;
     text-align: left;
     white-space: nowrap;
-    min-width: 120px;
+    min-width: 150px;
 }
 
 .table thead th {
@@ -70,6 +70,7 @@ body {
     overflow-x: auto;
     display: table;
     visibility: visible;
+    table-layout: fixed; /* Ensure consistent column widths */
 }
 
 .subcat-table thead th,
@@ -85,39 +86,92 @@ body {
 .subcat-table td,
 .common-level table td,
 .item-level td {
-    padding: 8px;
+    padding: 12px;
     border: 1px solid #dee2e6;
-    min-width: 120px;
+    min-width: 150px;
     white-space: nowrap;
+}
+
+/* Fix item-level table column alignment */
+.item-level th:nth-child(1),
+.item-level td:nth-child(1) {
+    width: 80px; /* Select column */
+}
+
+.item-level th:nth-child(2),
+.item-level td:nth-child(2) {
+    width: 120px; /* Tag ID */
+}
+
+.item-level th:nth-child(3),
+.item-level td:nth-child(3) {
+    width: 200px; /* Common Name */
+}
+
+.item-level th:nth-child(4),
+.item-level td:nth-child(4) {
+    width: 150px; /* Bin Location */
+}
+
+.item-level th:nth-child(5),
+.item-level td:nth-child(5) {
+    width: 150px; /* Status */
+}
+
+.item-level th:nth-child(6),
+.item-level td:nth-child(6) {
+    width: 150px; /* Last Contract */
+}
+
+.item-level th:nth-child(7),
+.item-level td:nth-child(7) {
+    width: 200px; /* Last Scanned Date */
+}
+
+.item-level th:nth-child(8),
+.item-level td:nth-child(8) {
+    width: 100px; /* Quality */
+}
+
+.item-level th:nth-child(9),
+.item-level td:nth-child(9) {
+    width: 200px; /* Notes */
+}
+
+.item-level th:nth-child(10),
+.item-level td:nth-child(10) {
+    width: 100px; /* Actions */
 }
 
 /* Hierarchy level styling */
 .subcat-level {
-    margin-left: 1.5rem;
+    margin-left: 2rem;
     background-color: #f8f9fa;
-    padding: 0.5rem;
+    padding: 1rem;
     border-left: 3px solid #007bff;
     max-height: 1200px;
     overflow-y: auto;
     display: block;
     visibility: visible;
+    z-index: 1; /* Ensure subcategories are not hidden by headers */
 }
 
 .common-level {
-    margin-left: 1rem;
+    margin-left: 2rem;
     background-color: #e9ecef;
-    padding: 0.5rem;
+    padding: 1rem;
     border-left: 3px solid #28a745;
     max-height: 1200px;
     overflow-y: auto;
     display: block;
     visibility: visible;
+    z-index: 1;
 }
 
 .item-level-wrapper {
-    margin-left: 1rem;
+    margin-left: 2rem;
     background-color: #dee2e6;
-    padding: 0.5rem;
+    padding: 1rem;
     border-left: 3px solid #dc3545;
     overflow-x: auto;
     overflow-y: auto;
@@ -126,12 +180,12 @@ body {
     box-sizing: border-box;
     display: block;
     visibility: visible;
+    z-index: 1;
 }
 
 .item-level {
     width: 100%;
-    table-layout: auto;
-    min-width: 1000px;
+    min-width: 1200px;
     display: table;
     visibility: visible;
 }
@@ -140,7 +194,7 @@ body {
 .common-level td:nth-child(1) {
     white-space: normal;
     word-wrap: break-word;
-    max-width: 200px;
+    max-width: 250px;
 }
 
 /* Style for editable cells */
@@ -188,20 +242,20 @@ body {
 .filter-sort-controls {
     display: flex;
     flex-wrap: wrap;
-    gap: 10px;
-    margin-bottom: 15px;
+    gap: 15px;
+    margin-bottom: 20px;
     background-color: #f1f3f5;
-    padding: 10px;
+    padding: 15px;
     border-radius: 5px;
 }
 
 .filter-sort-controls input,
 .filter-sort-controls select {
     flex: 1;
-    min-width: 150px;
+    min-width: 200px;
     border-radius: 4px;
     border: 1px solid #ced4da;
-    padding: 5px;
+    padding: 8px;
 }
 
 .filter-sort-controls input:focus,
@@ -213,11 +267,11 @@ body {
 /* Button styling */
 .btn-group {
     display: flex;
-    gap: 0.5rem;
+    gap: 0.75rem;
 }
 
 .btn {
-    margin: 2px;
+    margin: 3px;
     transition: background-color 0.2s;
 }
 
@@ -262,8 +316,8 @@ body {
 }
 
 .btn-sm {
-    padding: 0.25rem 0.5rem;
-    font-size: 0.875rem;
+    padding: 0.35rem 0.75rem;
+    font-size: 0.9rem;
 }
 
 /* Loading indicator styling */
@@ -278,17 +332,17 @@ body {
     display: flex;
     justify-content: center;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.75rem;
     position: sticky;
     bottom: 0;
     background-color: #fff;
-    padding: 0.5rem 0;
+    padding: 0.75rem 0;
     z-index: 10;
 }
 
 .pagination-controls .btn {
-    padding: 0.25rem 0.5rem;
-    font-size: 0.875rem;
+    padding: 0.35rem 0.75rem;
+    font-size: 0.9rem;
 }
 
 /* Smooth transition for expanding/collapsing */
@@ -315,28 +369,28 @@ body {
     display: table-row;
     visibility: visible;
     opacity: 1;
-    min-height: 40px;
+    min-height: 50px;
 }
 
 /* Responsive adjustments */
 @media (max-width: 768px) {
     .container {
-        padding: 0.5rem;
+        padding: 0.75rem;
     }
 
     .table th, .table td {
-        padding: 0.3rem;
-        font-size: 0.85rem;
+        padding: 0.5rem;
+        font-size: 0.9rem;
     }
 
     .btn-sm {
-        padding: 0.2rem 0.4rem;
-        font-size: 0.75rem;
+        padding: 0.3rem 0.6rem;
+        font-size: 0.8rem;
     }
 
     .row.mb-3 {
         flex-direction: column;
-        gap: 0.5rem;
+        gap: 0.75rem;
     }
 
     .row.mb-3 .col {
@@ -344,17 +398,17 @@ body {
     }
 
     .subcat-level, .common-level, .item-level-wrapper {
-        margin-left: 0.5rem;
+        margin-left: 0.75rem;
     }
 
     .pagination-controls .btn {
-        padding: 0.2rem 0.4rem;
-        font-size: 0.75rem;
+        padding: 0.3rem 0.6rem;
+        font-size: 0.8rem;
     }
 
     .common-level th:nth-child(1),
     .common-level td:nth-child(1) {
-        max-width: 150px;
+        max-width: 180px;
     }
 
     .filter-sort-controls {
@@ -371,13 +425,13 @@ body {
     }
 
     .item-level {
-        min-width: 800px;
+        min-width: 900px;
     }
 
     .item-level th,
     .item-level td {
-        padding: 0.3rem;
-        font-size: 0.85rem;
-        min-width: 100px;
+        padding: 0.5rem;
+        font-size: 0.9rem;
+        min-width: 120px;
     }
 }
