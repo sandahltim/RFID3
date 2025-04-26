@@ -1,4 +1,4 @@
-test_rfidpi/ RFID2
+test_rfidpi/ RFID2restore
 ├── app/
 │   ├── __init__.py
 │   ├── routes/
@@ -47,7 +47,7 @@ test_rfidpi/ RFID2
 └── logs/
 
 
-git pull origin RFID2
+git pull origin RFID2restore
 > /home/tim/test_rfidpi/logs/gunicorn_error.log
 > /home/tim/test_rfidpi/logs/gunicorn_access.log
 > /home/tim/test_rfidpi/logs/app.log

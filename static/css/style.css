@@ -319,6 +319,28 @@ body {
     display: none !important;
 }
 
+/* Ensure subcategory rows are visible and have proper height */
+.subcat-row {
+    display: table-row !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    min-height: 40px; /* Ensure rows have a minimum height */
+}
+
+/* Ensure table body rows are not collapsed */
+.subcat-table tbody tr {
+    display: table-row !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+/* Ensure the table body itself is visible */
+.subcat-table tbody {
+    display: table-row-group !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
 /* Responsive adjustments */
 @media (max-width: 768px) {
     .container {
