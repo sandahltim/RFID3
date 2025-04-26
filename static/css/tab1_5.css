@@ -70,7 +70,7 @@
 .common-level table thead th,
 .item-level thead th {
     position: sticky;
-    top: 56px; /* Adjusted to match navbar height */
+    top: 56px; /* Match navbar height */
     z-index: 11; /* Higher than table body to ensure headers stay on top */
     background-color: #e9ecef;
     border-bottom: 2px solid #dee2e6;
@@ -86,6 +86,7 @@
     visibility: visible !important;
     z-index: 5; /* Lower than headers to ensure headers stay on top */
     position: relative;
+    padding-top: 60px; /* Add padding to push rows below sticky headers */
 }
 
 .subcat-table td,
