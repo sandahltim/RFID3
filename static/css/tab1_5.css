@@ -11,6 +11,7 @@
     display: block !important;
     visibility: visible !important;
     z-index: 1; /* Ensure subcategories are not hidden by headers */
+    position: relative; /* Ensure proper stacking context */
 }
 
 .common-level {
@@ -23,6 +24,7 @@
     display: block !important;
     visibility: visible !important;
     z-index: 1;
+    position: relative;
 }
 
 .item-level-wrapper {
@@ -38,6 +40,7 @@
     display: block !important;
     visibility: visible !important;
     z-index: 1;
+    position: relative;
 }
 
 .item-level {
@@ -53,21 +56,22 @@
     overflow-x: auto;
     display: table !important;
     visibility: visible !important;
-    table-layout: fixed; /* Revert to fixed to ensure column alignment */
+    table-layout: fixed; /* Ensure consistent column widths */
     border-collapse: collapse;
 }
 
 .subcat-table thead, .common-level table thead, .item-level thead {
     display: table-header-group !important;
     visibility: visible !important;
+    z-index: 10; /* Ensure headers are above body */
 }
 
 .subcat-table thead th,
 .common-level table thead th,
 .item-level thead th {
     position: sticky;
-    top: 70px; /* Adjusted to account for navbar height (56px) + extra padding */
-    z-index: 10;
+    top: 56px; /* Adjusted to match navbar height */
+    z-index: 11; /* Higher than table body to ensure headers stay on top */
     background-color: #e9ecef;
     border-bottom: 2px solid #dee2e6;
     display: table-cell !important;
@@ -80,6 +84,8 @@
 .subcat-table tbody, .common-level table tbody, .item-level tbody {
     display: table-row-group !important;
     visibility: visible !important;
+    z-index: 5; /* Lower than headers to ensure headers stay on top */
+    position: relative;
 }
 
 .subcat-table td,
@@ -98,6 +104,8 @@
     visibility: visible !important;
     opacity: 1 !important;
     height: auto !important;
+    position: relative;
+    z-index: 5; /* Ensure rows are below headers but visible */
 }
 
 /* Column widths for subcategory table */
