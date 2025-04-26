@@ -33,29 +33,39 @@ logger.addHandler(console_handler)
 tab5_bp = Blueprint('tab5', __name__)
 
 # Version marker
-logger.info("Deployed tab5.py version: 2025-04-25-v3")
+logger.info("Deployed tab5.py version: 2025-04-25-v4")
+current_app.logger.info("Deployed tab5.py version: 2025-04-25-v4 (via current_app.logger)")
 
 @tab5_bp.route('/tab/5')
 def tab5_view():
+    # Log using both logger and current_app.logger to ensure visibility
+    logger.info("Tab 5 route accessed")
+    current_app.logger.info("Tab 5 route accessed (via current_app.logger)")
+    
     try:
         # Check if data is in cache
         cache_key = 'tab5_view_data'
         cached_data = cache.get(cache_key)
         if cached_data is not None:
             logger.info("Serving Tab 5 data from cache")
+            current_app.logger.info("Serving Tab 5 data from cache (via current_app.logger)")
             return render_template('tab5.html', categories=cached_data, cache_bust=int(time()))
 
         session = db.session()
         logger.info("Starting new session for tab5")
+        current_app.logger.info("Starting new session for tab5 (via current_app.logger)")
 
         # Fetch all rental class mappings from both tables
         base_mappings = session.query(RentalClassMapping).all()
         user_mappings = session.query(UserRentalClassMapping).all()
         logger.debug(f"Fetched {len(base_mappings)} base mappings and {len(user_mappings)} user mappings")
+        current_app.logger.debug(f"Fetched {len(base_mappings)} base mappings and {len(user_mappings)} user mappings (via current_app.logger)")
         for bm in base_mappings:
             logger.debug(f"Base mapping: rental_class_id={bm.rental_class_id}, category={bm.category}, subcategory={bm.subcategory}")
+            current_app.logger.debug(f"Base mapping: rental_class_id={bm.rental_class_id}, category={bm.category}, subcategory={bm.subcategory} (via current_app.logger)")
         for um in user_mappings:
             logger.debug(f"User mapping: rental_class_id={um.rental_class_id}, category={um.category}, subcategory={um.subcategory}")
+            current_app.logger.debug(f"User mapping: rental_class_id={um.rental_class_id}, category={um.category}, subcategory={um.subcategory} (via current_app.logger)")
 
         # Merge mappings, prioritizing user mappings
         mappings_dict = {m.rental_class_id: {'category': m.category, 'subcategory': m.subcategory} for m in base_mappings}
@@ -65,6 +75,7 @@ def tab5_view():
         # If no mappings exist, return an empty response with a warning
         if not mappings_dict:
             logger.warning("No rental class mappings found in either rental_class_mappings or user_rental_class_mappings")
+            current_app.logger.warning("No rental class mappings found in either rental_class_mappings or user_rental_class_mappings (via current_app.logger)")
             session.close()
             return render_template('tab5.html', categories=[], cache_bust=int(time()))
 
@@ -80,6 +91,7 @@ def tab5_view():
                 'subcategory': data['subcategory']
             })
         logger.debug(f"Grouped categories: {list(categories.keys())}")
+        current_app.logger.debug(f"Grouped categories: {list(categories.keys())} (via current_app.logger)")
 
         # Calculate counts for each category, filtering for resale/pack items
         category_data = []
@@ -89,11 +101,12 @@ def tab5_view():
         for cat, mappings in categories.items():
             rental_class_ids = [str(m['rental_class_id']) for m in mappings]
             logger.debug(f"Processing category {cat} with rental_class_ids: {rental_class_ids}")
+            current_app.logger.debug(f"Processing category {cat} with rental_class_ids: {rental_class_ids} (via current_app.logger)")
 
             # Total items in this category with bin_location in ['resale', 'sold', 'pack', 'burst']
             total_items_query = session.query(func.count(ItemMaster.tag_id)).filter(
                 func.trim(func.cast(ItemMaster.rental_class_num, db.String)).in_(rental_class_ids),
-                func.lower(ItemMaster.bin_location).in_(['resale', 'sold', 'pack', 'burst'])  # Added func.lower for case-insensitive matching
+                func.lower(ItemMaster.bin_location).in_(['resale', 'sold', 'pack', 'burst'])
             )
             if filter_query:
                 total_items_query = total_items_query.filter(
@@ -101,20 +114,24 @@ def tab5_view():
                 )
             total_items = total_items_query.scalar()
             logger.debug(f"Total items for category {cat}: {total_items}")
+            current_app.logger.debug(f"Total items for category {cat}: {total_items} (via current_app.logger)")
 
             # Only include categories with resale/pack items
             if total_items == 0:
                 logger.debug(f"Skipping category {cat} due to zero total items")
+                current_app.logger.debug(f"Skipping category {cat} due to zero total items (via current_app.logger)")
                 # Debug: Check if there are any items with these rental_class_ids
                 all_items = session.query(func.count(ItemMaster.tag_id)).filter(
                     func.trim(func.cast(ItemMaster.rental_class_num, db.String)).in_(rental_class_ids)
                 ).scalar()
                 logger.debug(f"Total items (without bin_location filter) for category {cat}: {all_items}")
+                current_app.logger.debug(f"Total items (without bin_location filter) for category {cat}: {all_items} (via current_app.logger)")
                 if all_items > 0:
                     bin_locations = session.query(ItemMaster.bin_location).filter(
                         func.trim(func.cast(ItemMaster.rental_class_num, db.String)).in_(rental_class_ids)
                     ).distinct().all()
                     logger.debug(f"Bin locations for category {cat}: {[loc[0] for loc in bin_locations]}")
+                    current_app.logger.debug(f"Bin locations for category {cat}: {[loc[0] for loc in bin_locations]} (via current_app.logger)")
                 continue
 
             # Items on contracts (status = 'On Rent' or 'Delivered')
@@ -129,6 +146,7 @@ def tab5_view():
                 )
             items_on_contracts = items_on_contracts_query.scalar()
             logger.debug(f"Items on contracts for category {cat}: {items_on_contracts}")
+            current_app.logger.debug(f"Items on contracts for category {cat}: {items_on_contracts} (via current_app.logger)")
 
             # Items in service
             subquery = session.query(
@@ -160,6 +178,7 @@ def tab5_view():
                 )
             items_in_service = items_in_service_query.scalar()
             logger.debug(f"Items in service for category {cat}: {items_in_service}")
+            current_app.logger.debug(f"Items in service for category {cat}: {items_in_service} (via current_app.logger)")
 
             # Items available (status = 'Ready to Rent')
             items_available_query = session.query(func.count(ItemMaster.tag_id)).filter(
@@ -173,6 +192,7 @@ def tab5_view():
                 )
             items_available = items_available_query.scalar()
             logger.debug(f"Items available for category {cat}: {items_available}")
+            current_app.logger.debug(f"Items available for category {cat}: {items_available} (via current_app.logger)")
 
             category_data.append({
                 'category': cat,
@@ -194,16 +214,21 @@ def tab5_view():
             category_data.sort(key=lambda x: x['total_items'], reverse=True)
 
         logger.info(f"Fetched {len(category_data)} categories for tab5: {[cat['category'] for cat in category_data]}")
+        current_app.logger.info(f"Fetched {len(category_data)} categories for tab5: {[cat['category'] for cat in category_data]} (via current_app.logger)")
 
         # Cache the data
         cache.set(cache_key, category_data, timeout=60)
         logger.info("Cached Tab 5 data")
+        current_app.logger.info("Cached Tab 5 data (via current_app.logger)")
 
         session.close()
         return render_template('tab5.html', categories=category_data, cache_bust=int(time()))
     except Exception as e:
         logger.error(f"Error rendering Tab 5: {str(e)}", exc_info=True)
+        current_app.logger.error(f"Error rendering Tab 5: {str(e)} (via current_app.logger)", exc_info=True)
         return render_template('tab5.html', categories=[], cache_bust=int(time()))
+
+# ... (rest of the tab5.py file remains unchanged, omitted for brevity)
 
 @tab5_bp.route('/tab/5/subcat_data')
 def tab5_subcat_data():

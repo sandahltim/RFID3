@@ -8,17 +8,24 @@ tabs_bp = Blueprint('tabs', __name__)
 def tab_view(tab_num):
     # Route to redirect to the appropriate tab view based on tab number
     # Updated on 2025-04-23 to include Tab 5 (Resale/Rental Packs)
+    current_app.logger.info(f"Routing request for /tab/{tab_num}")
     if tab_num == 1:
+        current_app.logger.info("Redirecting to tab1.tab1_view")
         return redirect(url_for('tab1.tab1_view'))
     elif tab_num == 2:
+        current_app.logger.info("Redirecting to tab2.tab2_view")
         return redirect(url_for('tab2.tab2_view'))
     elif tab_num == 3:
+        current_app.logger.info("Redirecting to tab3.tab3_view")
         return redirect(url_for('tab3.tab3_view'))
     elif tab_num == 4:
+        current_app.logger.info("Redirecting to tab4.tab4_view")
         return redirect(url_for('tab4.tab4_view'))
     elif tab_num == 5:
+        current_app.logger.info("Redirecting to tab5.tab5_view")
         return redirect(url_for('tab5.tab5_view'))
     else:
+        current_app.logger.warning(f"Tab {tab_num} not implemented")
         return jsonify({'error': 'Tab not implemented'}), 404
 
 @tabs_bp.route('/tab/<int:tab_num>/categories')
