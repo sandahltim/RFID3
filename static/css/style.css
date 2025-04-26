@@ -346,6 +346,28 @@ body {
     display: none !important;
 }
 
+/* Ensure edit columns are visible */
+.edit-bin-location,
+.edit-status {
+    display: table-cell !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    min-width: 150px;
+}
+
+/* Ensure the items table renders all columns */
+.item-level {
+    width: 100%;
+    table-layout: auto;
+}
+
+.item-level th,
+.item-level td {
+    display: table-cell !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
 /* Responsive adjustments for mobile and tablet */
 @media (max-width: 768px) {
     .container {
