@@ -1,4 +1,4 @@
-console.log('expand.js version: 2025-04-26-v57 loaded');
+console.log('expand.js version: 2025-04-26-v58 loaded');
 
 // Note: Common function - will be moved to common.js during split
 function showLoading(key) {
@@ -90,6 +90,8 @@ function collapseSection(targetId) {
 
         // Remove from sessionStorage
         sessionStorage.removeItem(`expanded_${targetId}`);
+        sessionStorage.removeItem(`expanded_common_${targetId}`);
+        sessionStorage.removeItem(`expanded_items_${targetId}`);
     }
 }
 
@@ -102,7 +104,7 @@ function loadCommonNames(category, subcategory, targetId, page = 1, contractNumb
         return;
     }
 
-    const containerId = (window.cachedTabNum == 2 || window.cachedTabNum == 4) ? targetId : `common-${targetId}`;
+    const containerId = `common-${targetId}`;
     const container = document.getElementById(containerId);
     if (!container) {
         console.error(`Container with ID ${containerId} not found`);
@@ -281,7 +283,7 @@ function loadCommonNames(category, subcategory, targetId, page = 1, contractNumb
             container.style.display = 'block';
 
             const expandBtn = document.querySelector(`button.expand-btn[data-target-id="common-${targetId}"]`);
-            const collapseBtn = expandBtn ? expandBtn.nextElementSibling : document.querySelector(`button.collapse-btn[data-collapse-target="common-${targetId}"]`) : null;
+            const collapseBtn = expandBtn ? expandBtn.nextElementSibling : null;
             if (expandBtn && collapseBtn) {
                 expandBtn.style.display = 'none';
                 collapseBtn.style.display = 'inline-block';
@@ -424,8 +426,14 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
             container.offsetHeight; // Trigger reflow
             container.style.display = 'block';
 
+            // Ensure the table body is visible
+            const tableBody = container.querySelector('table.subcat-table tbody');
+            if (tableBody) {
+                tableBody.style.display = 'table-row-group';
+            }
+
             const expandBtn = document.querySelector(`button.expand-btn[data-target-id="${targetId}"]`);
-            const collapseBtn = expandBtn ? expandBtn.nextElementSibling : document.querySelector(`button.collapse-btn[data-collapse-target="${targetId}"]`) : null;
+            const collapseBtn = expandBtn ? expandBtn.nextElementSibling : null;
             if (expandBtn && collapseBtn) {
                 expandBtn.style.display = 'none';
                 collapseBtn.style.display = 'inline-block';
@@ -785,7 +793,7 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
             container.style.display = 'block';
 
             const expandBtn = document.querySelector(`button.expand-btn[data-target-id="${targetId}"]`);
-            const collapseBtn = expandBtn ? expandBtn.nextElementSibling : document.querySelector(`button.collapse-btn[data-collapse-target="${targetId}"]`) : null;
+            const collapseBtn = expandBtn ? expandBtn.nextElementSibling : null;
             if (expandBtn && collapseBtn) {
                 expandBtn.style.display = 'none';
                 collapseBtn.style.display = 'inline-block';
@@ -930,6 +938,23 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log('Set window.cachedTabNum:', window.cachedTabNum);
     }
 
+    // Clear outdated sessionStorage entries that don't match current tab
+    Object.keys(sessionStorage).forEach(key => {
+        if (key.startsWith('expanded_') || key.startsWith('expanded_common_') || key.startsWith('expanded_items_')) {
+            try {
+                const state = JSON.parse(sessionStorage.getItem(key));
+                const targetId = key.replace(/^(expanded_|expanded_common_|expanded_items_)/, '');
+                if (!document.getElementById(targetId) && !document.getElementById(`common-${targetId}`) && !document.getElementById(`items-${targetId}`)) {
+                    console.log(`Removing outdated sessionStorage entry: ${key}`);
+                    sessionStorage.removeItem(key);
+                }
+            } catch (e) {
+                console.error('Error parsing sessionStorage for', key, ':', e);
+                sessionStorage.removeItem(key);
+            }
+        }
+    });
+
     // Restore expanded sections from sessionStorage, but only expand the most recently expanded section
     let mostRecentSubcat = null;
     let mostRecentCommon = null;
@@ -940,7 +965,7 @@ document.addEventListener('DOMContentLoaded', function() {
             try {
                 const state = JSON.parse(sessionStorage.getItem(key));
                 const targetId = key.replace('expanded_', '');
-                if (targetId.startsWith('subcat-') && document.getElementById(targetId)) {
+                if (document.getElementById(targetId)) {
                     const normalizedCategory = targetId.replace('subcat-', '');
                     mostRecentSubcat = { targetId, state };
                 }
