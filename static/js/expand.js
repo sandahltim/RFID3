@@ -1,4 +1,4 @@
-console.log('expand.js version: 2025-04-25 v51 loaded');
+console.log('expand.js version: 2025-04-25 v52 loaded');
 
 // Note: Common function - will be moved to common.js during split
 function showLoading(key) {
@@ -87,7 +87,7 @@ function collapseSection(targetId) {
         section.style.display = 'none';
         section.style.opacity = '0';
 
-        const collapseBtn = document.querySelector(`button[onclick="collapseSection('${targetId}')"]`);
+        const collapseBtn = document.querySelector(`button[data-collapse-target="${targetId}"]`);
         const expandBtn = collapseBtn ? collapseBtn.previousElementSibling : null;
         if (expandBtn && collapseBtn) {
             expandBtn.style.display = 'inline-block';
@@ -201,8 +201,8 @@ function loadCommonNames(category, subcategory, targetId, page = 1, contractNumb
                                 <td>${item.items_on_contracts}</td>
                                 <td>${item.total_items}</td>
                                 <td>
-                                    <button class="btn btn-sm btn-secondary expand-btn" onclick="loadItems('${category}', '${subcategory || ''}', '${item.name}', 'items-${rowId}')">Expand</button>
-                                    <button class="btn btn-sm btn-secondary collapse-btn" style="display:none;" onclick="collapseSection('items-${rowId}')">Collapse</button>
+                                    <button class="btn btn-sm btn-secondary expand-btn" data-category="${category}" data-subcategory="${subcategory || ''}" data-common-name="${item.name}" data-target-id="items-${rowId}">Expand</button>
+                                    <button class="btn btn-sm btn-secondary collapse-btn" style="display:none;" data-collapse-target="items-${rowId}">Collapse</button>
                                     <button class="btn btn-sm btn-info print-btn" data-print-level="Common Name" data-print-id="common-table-${key}" data-common-name="${item.name}" data-category="${category}" data-subcategory="${subcategory || ''}">Print Aggregate</button>
                                     <button class="btn btn-sm btn-info print-full-btn" data-common-name="${item.name}" data-category="${category}" data-subcategory="${subcategory || ''}">Print Full List</button>
                                     <div id="loading-${rowId}" style="display:none;" class="loading">Loading...</div>
@@ -223,8 +223,8 @@ function loadCommonNames(category, subcategory, targetId, page = 1, contractNumb
                                 <td>${item.items_in_service}</td>
                                 <td>${item.items_available}</td>
                                 <td>
-                                    <button class="btn btn-sm btn-secondary expand-btn" onclick="loadItems('${category}', '${subcategory || ''}', '${item.name}', 'items-${rowId}')">Expand</button>
-                                    <button class="btn btn-sm btn-secondary collapse-btn" style="display:none;" onclick="collapseSection('items-${rowId}')">Collapse</button>
+                                    <button class="btn btn-sm btn-secondary expand-btn" data-category="${category}" data-subcategory="${subcategory || ''}" data-common-name="${item.name}" data-target-id="items-${rowId}">Expand</button>
+                                    <button class="btn btn-sm btn-secondary collapse-btn" style="display:none;" data-collapse-target="items-${rowId}">Collapse</button>
                                     <button class="btn btn-sm btn-info print-btn" data-print-level="Common Name" data-print-id="common-table-${key}" data-common-name="${item.name}" data-category="${category}" data-subcategory="${subcategory || ''}">Print Aggregate</button>
                                     <button class="btn btn-sm btn-info print-full-btn" data-common-name="${item.name}" data-category="${category}" data-subcategory="${subcategory || ''}">Print Full List</button>
                                     <div id="loading-${rowId}" style="display:none;" class="loading">Loading...</div>
@@ -302,7 +302,7 @@ function loadCommonNames(category, subcategory, targetId, page = 1, contractNumb
                 console.log('Common-level div not found');
             }
 
-            const expandBtn = document.querySelector(`button[onclick*="loadCommonNames('${category}', '${subcategory || ''}', '${targetId}')"]`);
+            const expandBtn = document.querySelector(`button[data-category="${category}"][data-subcategory="${subcategory || ''}"][data-target-id="items-${key}"]`);
             const collapseBtn = expandBtn ? expandBtn.nextElementSibling : null;
             if (expandBtn && collapseBtn) {
                 expandBtn.style.display = 'none';
@@ -414,15 +414,15 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
                                         <td>${subcat.items_in_service}</td>
                                         <td>${subcat.items_available}</td>
                                         <td>
-                                            <button class="btn btn-sm btn-secondary expand-btn" onclick="loadCommonNames('${originalCategory}', '${subcat.subcategory}', '${subcatKey}')">Expand</button>
-                                            <button class="btn btn-sm btn-secondary collapse-btn" style="display:none;" onclick="collapseSection('common-${subcatKey}')">Collapse</button>
+                                            <button class="btn btn-sm btn-secondary expand-btn" data-category="${originalCategory}" data-subcategory="${subcat.subcategory}" data-target-id="subcat-${subcatKey}">Expand</button>
+                                            <button class="btn btn-sm btn-secondary collapse-btn" style="display:none;" data-collapse-target="subcat-${subcatKey}">Collapse</button>
                                             <button class="btn btn-sm btn-info print-btn" data-print-level="Subcategory" data-print-id="subcat-table-${subcatKey}">Print</button>
                                             <div id="loading-${subcatKey}" style="display:none;" class="loading">Loading...</div>
                                         </td>
                                     </tr>
                                     <tr>
                                         <td colspan="${headers.length}">
-                                            <div id="common-${subcatKey}" class="expandable collapsed"></div>
+                                            <div id="subcat-${subcatKey}" class="expandable collapsed"></div>
                                         </td>
                                     </tr>
                                 </tbody>
@@ -903,7 +903,7 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                 console.log('Table re-rendered with display:', table.style.display);
             }
 
-            const expandBtn = document.querySelector(`button[onclick*="loadItems('${category}', '${subcategory || ''}', '${commonName}', '${targetId}')"]`);
+            const expandBtn = document.querySelector(`button[data-category="${category}"][data-subcategory="${subcategory || ''}"][data-target-id="items-${key}"]`);
             const collapseBtn = expandBtn ? expandBtn.nextElementSibling : null;
             if (expandBtn && collapseBtn) {
                 expandBtn.style.display = 'none';
@@ -1061,6 +1061,33 @@ document.addEventListener('click', (event) => {
             dropdown.classList.remove('show');
             dropdown.style.display = 'none';
         });
+    }
+});
+
+// Event delegation for expand buttons
+document.addEventListener('click', (event) => {
+    const expandBtn = event.target.closest('.expand-btn');
+    if (expandBtn) {
+        event.stopPropagation(); // Prevent the document-level click handler from interfering
+        const category = expandBtn.getAttribute('data-category');
+        const subcategory = expandBtn.getAttribute('data-subcategory');
+        const targetId = expandBtn.getAttribute('data-target-id');
+        const commonName = expandBtn.getAttribute('data-common-name');
+
+        if (commonName) {
+            // For common names table expanding to items
+            loadItems(category, subcategory, commonName, targetId);
+        } else {
+            // For subcategory table expanding to common names
+            loadCommonNames(category, subcategory, targetId);
+        }
+    }
+
+    const collapseBtn = event.target.closest('.collapse-btn');
+    if (collapseBtn) {
+        event.stopPropagation();
+        const targetId = collapseBtn.getAttribute('data-collapse-target');
+        collapseSection(targetId);
     }
 });
 
