@@ -1,4 +1,4 @@
-console.log('tab1_5.js version: 2025-04-26-v3 loaded');
+console.log('tab1_5.js version: 2025-04-26-v4 loaded');
 
 // Note: Common function for Tabs 1 and 5
 function hideOtherSubcats(currentCategory, parentCategory) {
@@ -423,36 +423,14 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
                 console.warn('Table body not found in container:', container);
             }
 
-            // Fix selector to handle URL-encoded category names
-            // Try multiple variations of encoded category names
-            const decodedCategory = decodeURIComponent(originalCategory).replace(/'/g, "\\'").replace(/"/g, '\\"');
-            const encodedCategory = encodeURIComponent(originalCategory).replace(/'/g, "\\'").replace(/"/g, '\\"');
-            const doubleEncodedCategory = encodeURIComponent(encodeURIComponent(originalCategory)).replace(/'/g, "\\'").replace(/"/g, '\\"');
-            
-            // Alternative approach: Find the button by data attributes instead of onclick
-            let expandBtn = document.querySelector(`button.expand-btn[data-target-id="subcat-${normalizedCategory}"]`);
-            if (!expandBtn) {
-                // Fallback to onclick selectors
-                expandBtn = document.querySelector(`button.expand-btn[onclick="window.expandCategory('${decodedCategory}', 'subcat-${normalizedCategory}')"]`);
-            }
-            if (!expandBtn) {
-                expandBtn = document.querySelector(`button.expand-btn[onclick="window.expandCategory('${encodedCategory}', 'subcat-${normalizedCategory}')"]`);
-            }
-            if (!expandBtn) {
-                expandBtn = document.querySelector(`button.expand-btn[onclick="window.expandCategory('${doubleEncodedCategory}', 'subcat-${normalizedCategory}')"]`);
-            }
-
+            // Fix selector to handle URL-encoded category names using a more reliable approach
+            const expandBtn = document.querySelector(`button.expand-btn[data-target-id="subcat-${normalizedCategory}"]`);
             const collapseBtn = expandBtn ? expandBtn.nextElementSibling : null;
             if (expandBtn && collapseBtn) {
                 expandBtn.style.display = 'none';
                 collapseBtn.style.display = 'inline-block';
             } else {
-                console.warn('Expand/Collapse buttons not found for selectors:', {
-                    dataTarget: `button.expand-btn[data-target-id="subcat-${normalizedCategory}"]`,
-                    decoded: `button.expand-btn[onclick="window.expandCategory('${decodedCategory}', 'subcat-${normalizedCategory}')"]`,
-                    singleEncoded: `button.expand-btn[onclick="window.expandCategory('${encodedCategory}', 'subcat-${normalizedCategory}')"]`,
-                    doubleEncoded: `button.expand-btn[onclick="window.expandCategory('${doubleEncodedCategory}', 'subcat-${normalizedCategory}')"]`
-                });
+                console.warn('Expand/Collapse buttons not found for selector:', `button.expand-btn[data-target-id="subcat-${normalizedCategory}"]`);
             }
 
             // Save expansion state
@@ -566,7 +544,7 @@ function updateBulkField(key, field) {
     const select = document.getElementById(`bulk-${field}-${key}`);
     if (select.value) {
         const otherField = field === 'bin_location' ? 'status' : 'bin_location';
-        const otherSelect = document.getElementById(`bulk-${otherField}-${key}`);
+        const otherSelect = document.getElementForEachId(`bulk-${otherField}-${key}`);
         otherSelect.value = '';
     }
 }
@@ -629,7 +607,7 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
     }
 
     // Use the correct key for the loading indicator (match the subcat/common level)
-    const key = targetId.split('_').slice(0, -1).join('_'); // Remove the last part to match loading indicator
+    const key = targetId; // Use the full targetId as the key to match the loading indicator
     showLoading(key);
     hideOtherItems(targetId, targetId);
 
