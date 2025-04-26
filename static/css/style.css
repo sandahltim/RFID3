@@ -368,6 +368,71 @@ body {
     opacity: 1 !important;
 }
 
+.container {
+    max-width: 1400px;
+    margin-top: 20px;
+    overflow-x: auto; /* Allow horizontal scrolling at the container level if needed */
+}
+
+/* Ensure the item-level-wrapper scrolls horizontally */
+.item-level-wrapper {
+    margin-left: 1rem;
+    background-color: #dee2e6;
+    padding: 0.5rem;
+    border-left: 3px solid #dc3545;
+    overflow-x: auto !important; /* Force horizontal scrolling */
+    overflow-y: auto !important;
+    max-height: 1200px;
+    min-width: 100%; /* Ensure it takes the full width of the parent */
+    box-sizing: border-box;
+    padding-bottom: 20px;
+}
+
+/* Ensure the items table renders all columns */
+.item-level {
+    width: 100%;
+    table-layout: auto; /* Let the table adjust column widths naturally */
+    min-width: 1200px; /* Increase min-width to accommodate all columns */
+}
+
+/* Ensure edit columns are visible */
+.edit-bin-location,
+.edit-status {
+    display: table-cell !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    min-width: 150px;
+}
+
+/* Ensure all table cells are visible */
+.item-level th,
+.item-level td {
+    display: table-cell !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    padding: 8px;
+    border: 1px solid #dee2e6;
+    white-space: nowrap; /* Prevent wrapping to keep columns compact */
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .item-level-wrapper {
+        min-width: 100%;
+    }
+
+    .item-level {
+        min-width: 1000px; /* Adjust for smaller screens */
+    }
+
+    .item-level th,
+    .item-level td {
+        padding: 0.3rem;
+        font-size: 0.85rem;
+        min-width: 100px; /* Reduce min-width for smaller screens */
+    }
+}
+
 /* Responsive adjustments for mobile and tablet */
 @media (max-width: 768px) {
     .container {
