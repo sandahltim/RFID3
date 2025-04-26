@@ -1,6 +1,6 @@
 console.log('tab.js loaded, cachedTabNum:', window.cachedTabNum);
 
-// Define applyFilters immediately to ensure availability
+// Note: Common function - will be moved to common.js during split
 window.applyFilters = function() {
     console.log('Applying filters');
     const textQuery = document.getElementById('category-filter') ? document.getElementById('category-filter').value.toLowerCase() : document.getElementById('searchInput') ? document.getElementById('searchInput').value.toLowerCase() : '';
@@ -36,12 +36,12 @@ window.applyFilters = function() {
     });
 };
 
-// Refresh table function
+// Note: Common function - will be moved to common.js during split
 function refreshTab() {
     window.location.reload();
 }
 
-// Function to remove "Total Items in Inventory" column from a table
+// Note: Common function - will be moved to tab1_5.js during split
 function removeTotalItemsInventoryColumn(table, tabNum) {
     if (tabNum == 2 || tabNum == 4) {
         const headers = table.querySelectorAll('th');
@@ -58,7 +58,7 @@ function removeTotalItemsInventoryColumn(table, tabNum) {
     }
 }
 
-// Print table function
+// Note: Common function - will be moved to tab1_5.js during split
 async function printTable(level, id, commonName = null, category = null, subcategory = null) {
     console.log(`Printing table: ${level}, ID: ${id}, Common Name: ${commonName}, Category: ${category}, Subcategory: ${subcategory}`);
     const element = document.getElementById(id);
@@ -68,7 +68,7 @@ async function printTable(level, id, commonName = null, category = null, subcate
     }
 
     const tabNum = window.cachedTabNum || 1;
-    const tabName = tabNum == 2 ? 'Open Contracts' : tabNum == 4 ? 'Laundry Contracts' : `Tab ${tabNum}`;
+    const tabName = tabNum == 2 ? 'Open Contracts' : tabNum == 4 ? 'Laundry Contracts' : tabNum == 5 ? 'Resale/Rental Packs' : `Tab ${tabNum}`;
 
     let contractNumber = '';
     if (level === 'Contract') {
@@ -191,7 +191,7 @@ async function printTable(level, id, commonName = null, category = null, subcate
                         text-align: center;
                         margin-bottom: 40px;
                     }
-                    .EDF {
+                    .print-header h1 {
                         font-size: 28px;
                         margin: 0;
                     }
@@ -216,7 +216,8 @@ async function printTable(level, id, commonName = null, category = null, subcate
                         font-size: 14px;
                         white-space: normal;
                         word-wrap: break-word;
-                        min-width: 150px;
+                        min-width: 80px;
+                        max-width: 150px;
                     }
                     th {
                         background-color: #f2f2f2;
@@ -266,6 +267,13 @@ async function printTable(level, id, commonName = null, category = null, subcate
                             page-break-inside: avoid;
                             page-break-after: auto;
                         }
+                        th, td {
+                            font-size: 10px;
+                            min-width: 50px;
+                            max-width: 100px;
+                            padding: 4px;
+                            word-break: break-word;
+                        }
                     }
                 </style>
             </head>
@@ -307,10 +315,11 @@ async function printTable(level, id, commonName = null, category = null, subcate
     console.log('Print triggered successfully');
 }
 
+// Note: Common function - will be moved to tab1_5.js during split
 async function printFullItemList(category, subcategory, commonName) {
     console.log(`Printing full item list for Category: ${category}, Subcategory: ${subcategory}, Common Name: ${commonName}`);
     const tabNum = window.cachedTabNum || 1;
-    const tabName = tabNum == 2 ? 'Open Contracts' : tabNum == 4 ? 'Laundry Contracts' : `Tab ${tabNum}`;
+    const tabName = tabNum == 2 ? 'Open Contracts' : tabNum == 4 ? 'Laundry Contracts' : tabNum == 5 ? 'Resale/Rental Packs' : `Tab ${tabNum}`;
 
     const url = `/tab/${tabNum}/full_items_by_rental_class?category=${encodeURIComponent(category)}&subcategory=${encodeURIComponent(subcategory)}&common_name=${encodeURIComponent(commonName)}`;
     const response = await fetch(url);
@@ -382,8 +391,8 @@ async function printFullItemList(category, subcategory, commonName) {
                         font-size: 12px;
                         white-space: normal;
                         word-wrap: break-word;
-                        min-width: 80px; /* Reduced base width */
-                        max-width: 150px; /* Allow wrapping for long data */
+                        min-width: 80px;
+                        max-width: 150px;
                     }
                     th {
                         background-color: #f2f2f2;
@@ -418,8 +427,8 @@ async function printFullItemList(category, subcategory, commonName) {
                         }
                         th, td {
                             font-size: 10px;
-                            min-width: 50px; /* Further reduced for print */
-                            max-width: 100px; /* Ensure wrapping */
+                            min-width: 50px;
+                            max-width: 100px;
                             padding: 4px;
                             word-break: break-word;
                         }
@@ -462,6 +471,7 @@ async function printFullItemList(category, subcategory, commonName) {
     console.log('Full item list print triggered successfully');
 }
 
+// Note: Common function - will be moved to tab1_5.js during split
 document.addEventListener('DOMContentLoaded', () => {
     console.log('Document loaded, initializing script');
 

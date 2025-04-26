@@ -1,5 +1,6 @@
-console.log('expand.js version: 2025-04-25 v42 loaded');
+console.log('expand.js version: 2025-04-25 v44 loaded');
 
+// Note: Common function - will be moved to common.js during split
 function showLoading(key) {
     const loadingDiv = document.getElementById(`loading-${key}`);
     if (loadingDiv) {
@@ -10,6 +11,7 @@ function showLoading(key) {
     }
 }
 
+// Note: Common function - will be moved to common.js during split
 function hideLoading(key) {
     const loadingDiv = document.getElementById(`loading-${key}`);
     if (loadingDiv) {
@@ -20,6 +22,7 @@ function hideLoading(key) {
     }
 }
 
+// Note: Common function - will be moved to tab1_5.js during split
 function hideOtherSubcats(currentCategory) {
     const subcatDivs = document.querySelectorAll('[id^="subcat-"]');
     console.log('Found subcat divs:', subcatDivs.length);
@@ -39,6 +42,7 @@ function hideOtherSubcats(currentCategory) {
     });
 }
 
+// Note: Common function - will be moved to tab1_5.js during split
 function hideOtherCommonNames(currentTargetId) {
     const commonDivs = document.querySelectorAll('[id^="common-"]');
     console.log('Found common divs:', commonDivs.length);
@@ -55,6 +59,7 @@ function hideOtherCommonNames(currentTargetId) {
     });
 }
 
+// Note: Common function - will be moved to tab1_5.js during split
 function hideOtherItems(currentTargetId) {
     const itemDivs = document.querySelectorAll('[id^="items-"]');
     console.log('Found item divs:', itemDivs.length);
@@ -71,6 +76,7 @@ function hideOtherItems(currentTargetId) {
     });
 }
 
+// Note: Common function - will be moved to tab1_5.js during split
 function collapseSection(targetId) {
     const section = document.getElementById(targetId);
     if (section) {
@@ -89,6 +95,7 @@ function collapseSection(targetId) {
     }
 }
 
+// Note: Common function - will be moved to tab1_5.js during split
 function loadCommonNames(category, subcategory, targetId, page = 1, contractNumber = null) {
     console.log('loadCommonNames called with', { category, subcategory, targetId, page, contractNumber });
 
@@ -288,6 +295,7 @@ function loadCommonNames(category, subcategory, targetId, page = 1, contractNumb
         });
 }
 
+// Note: Common function - will be moved to tab1_5.js during split
 function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1) {
     console.log('loadSubcatData called with', { originalCategory, normalizedCategory, targetId, page });
 
@@ -516,6 +524,91 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
         });
 }
 
+// Note: This function is Tab 5 specific
+function updateBinLocation(tagId, currentBinLocation) {
+    const newBinLocation = document.getElementById(`bin-location-select-${tagId}`).value;
+    if (!newBinLocation) {
+        alert('Please select a new bin location.');
+        return;
+    }
+
+    fetch('/tab/5/update_bin_location', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            tag_id: tagId,
+            bin_location: newBinLocation
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            console.error('Error updating bin location:', data.error);
+            alert('Failed to update bin location: ' + data.error);
+        } else {
+            console.log('Bin location updated successfully:', data);
+            alert('Bin location updated successfully!');
+            // Refresh the items table
+            const itemsContainer = document.getElementById(`items-${tagId.split('-')[0]}`);
+            if (itemsContainer) {
+                const category = itemsContainer.closest('.common-level').querySelector('button[data-category]').getAttribute('data-category');
+                const subcategory = itemsContainer.closest('.common-level').querySelector('button[data-subcategory]').getAttribute('data-subcategory');
+                const commonName = itemsContainer.closest('tr').querySelector('td:first-child').textContent;
+                loadItems(category, subcategory, commonName, `items-${tagId.split('-')[0]}`);
+            }
+        }
+    })
+    .catch(error => {
+        console.error('Error updating bin location:', error);
+        alert('Error updating bin location: ' + error.message);
+    });
+}
+
+// Note: This function is Tab 5 specific
+function updateStatus(tagId, currentStatus) {
+    const newStatus = document.getElementById(`status-select-${tagId}`).value;
+    if (!newStatus) {
+        alert('Please select a new status.');
+        return;
+    }
+
+    fetch('/tab/5/update_status', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            tag_id: tagId,
+            status: newStatus
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            console.error('Error updating status:', data.error);
+            alert('Failed to update status: ' + data.error);
+        } else {
+            console.log('Status updated successfully:', data);
+            alert('Status updated successfully!');
+            // Refresh the items table
+            const itemsContainer = document.getElementById(`items-${tagId.split('-')[0]}`);
+            if (itemsContainer) {
+                const category = itemsContainer.closest('.common-level').querySelector('button[data-category]').getAttribute('data-category');
+                const subcategory = itemsContainer.closest('.common-level').querySelector('button[data-subcategory]').getAttribute('data-subcategory');
+                const commonName = itemsContainer.closest('tr').querySelector('td:first-child').textContent;
+                loadItems(category, subcategory, commonName, `items-${tagId.split('-')[0]}`);
+            }
+        }
+    })
+    .catch(error => {
+        console.error('Error updating status:', error);
+        alert('Error updating status: ' + error.message);
+    });
+}
+
+// Note: Common function - will be moved to tab1_5.js during split
 function loadItems(category, subcategory, commonName, targetId, page = 1) {
     console.log('loadItems called with', { category, subcategory, commonName, targetId, page });
 
@@ -563,6 +656,10 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                 const headers = ['Tag ID', 'Common Name', 'Bin Location', 'Status', 'Last Contract', 'Last Scanned Date'];
                 if (window.cachedTabNum == 1 || window.cachedTabNum == 5) {
                     headers.push('Quality', 'Notes');
+                    if (window.cachedTabNum == 5) {
+                        headers.push('Update Bin Location'); // Tab 5 specific
+                        headers.push('Update Status'); // Tab 5 specific
+                    }
                 }
 
                 html += `
@@ -590,7 +687,7 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                     const lastScanned = item.last_scanned_date ? new Date(item.last_scanned_date).toLocaleString() : 'N/A';
                     if (window.cachedTabNum == 1 || window.cachedTabNum == 5) {
                         html += `
-                            <tr>
+                            <tr data-item-id="${item.tag_id}"> <!-- Added for future mass update -->
                                 <td>${item.tag_id}</td>
                                 <td>${item.common_name}</td>
                                 <td>${item.bin_location || 'N/A'}</td>
@@ -599,6 +696,29 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                                 <td>${lastScanned}</td>
                                 <td>${item.quality || 'N/A'}</td>
                                 <td>${item.notes || 'N/A'}</td>
+                        `;
+                        if (window.cachedTabNum == 5) {
+                            html += `
+                                <td>
+                                    <select id="bin-location-select-${item.tag_id}">
+                                        <option value="">Select Bin Location</option>
+                                        <option value="resale" ${item.bin_location === 'resale' ? 'selected' : ''}>resale</option>
+                                        <option value="sold" ${item.bin_location === 'sold' ? 'selected' : ''}>sold</option>
+                                        <option value="pack" ${item.bin_location === 'pack' ? 'selected' : ''}>pack</option>
+                                        <option value="burst" ${item.bin_location === 'burst' ? 'selected' : ''}>burst</option>
+                                    </select>
+                                    <button class="btn btn-sm btn-primary" onclick="updateBinLocation('${item.tag_id}', '${item.bin_location || ''}')">Save</button>
+                                </td>
+                                <td>
+                                    <select id="status-select-${item.tag_id}" ${item.status !== 'On Rent' && item.status !== 'Delivered' ? 'disabled' : ''}>
+                                        <option value="">Select Status</option>
+                                        <option value="Ready to Rent" ${item.status === 'Ready to Rent' ? 'selected' : ''}>Ready to Rent</option>
+                                    </select>
+                                    <button class="btn btn-sm btn-primary" onclick="updateStatus('${item.tag_id}', '${item.status}')" ${item.status !== 'On Rent' && item.status !== 'Delivered' ? 'disabled' : ''}>Save</button>
+                                </td>
+                            `;
+                        }
+                        html += `
                             </tr>
                         `;
                     } else {
@@ -668,6 +788,7 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
         });
 }
 
+// Note: Common function - will be moved to tab1_5.js during split
 document.addEventListener('DOMContentLoaded', function() {
     console.log('expand.js: DOMContentLoaded event fired');
     window.expandCategory = function(category, targetId, contractNumber = null, page = 1) {
