@@ -1,4 +1,4 @@
-console.log('expand.js version: 2025-04-25 v53 loaded');
+console.log('expand.js version: 2025-04-26-v54 loaded');
 
 // Note: Common function - will be moved to common.js during split
 function showLoading(key) {
@@ -28,16 +28,12 @@ function hideOtherSubcats(currentCategory) {
     console.log('Found subcat divs:', subcatDivs.length);
     subcatDivs.forEach(div => {
         const divId = div.id;
-        console.log('Subcat div ID:', divId);
         if (divId !== `subcat-${currentCategory}`) {
             console.log('Collapsing subcat div:', divId);
             div.classList.remove('expanded');
             div.classList.add('collapsed');
-            div.classList.remove('fade');
             div.style.display = 'none';
             div.style.opacity = '0';
-        } else {
-            console.log(`Keeping subcat div visible: ${divId}`);
         }
     });
 }
@@ -48,12 +44,10 @@ function hideOtherCommonNames(currentTargetId) {
     console.log('Found common divs:', commonDivs.length);
     commonDivs.forEach(div => {
         const divId = div.id;
-        console.log('Common div ID:', divId);
         if (divId !== currentTargetId) {
             console.log('Collapsing common div:', divId);
             div.classList.remove('expanded');
             div.classList.add('collapsed');
-            div.classList.remove('fade');
             div.style.display = 'none';
         }
     });
@@ -65,12 +59,10 @@ function hideOtherItems(currentTargetId) {
     console.log('Found item divs:', itemDivs.length);
     itemDivs.forEach(div => {
         const divId = div.id;
-        console.log('Item div ID:', divId);
         if (divId !== currentTargetId) {
             console.log('Collapsing item div:', divId);
             div.classList.remove('expanded');
             div.classList.add('collapsed');
-            div.classList.remove('fade');
             div.style.display = 'none';
         }
     });
@@ -83,7 +75,6 @@ function collapseSection(targetId) {
     if (section) {
         section.classList.remove('expanded');
         section.classList.add('collapsed');
-        section.classList.remove('fade');
         section.style.display = 'none';
         section.style.opacity = '0';
 
@@ -93,6 +84,9 @@ function collapseSection(targetId) {
             expandBtn.style.display = 'inline-block';
             collapseBtn.style.display = 'none';
         }
+
+        // Remove from sessionStorage
+        sessionStorage.removeItem(`expanded_${targetId}`);
     }
 }
 
@@ -100,7 +94,6 @@ function collapseSection(targetId) {
 function loadCommonNames(category, subcategory, targetId, page = 1, contractNumber = null) {
     console.log('loadCommonNames called with', { category, subcategory, targetId, page, contractNumber });
 
-    // Guard against null parameters
     if (!category || !targetId) {
         console.error('Invalid parameters for loadCommonNames:', { category, subcategory, targetId });
         return;
@@ -112,8 +105,6 @@ function loadCommonNames(category, subcategory, targetId, page = 1, contractNumb
         console.error(`Container with ID ${containerId} not found`);
         return;
     }
-    console.log('Common names container found:', container);
-    console.log('Common names container classes before update:', container.className);
 
     const key = subcategory ? `${category}_${subcategory}` : category;
     showLoading(key);
@@ -131,23 +122,29 @@ function loadCommonNames(category, subcategory, targetId, page = 1, contractNumb
 
     const commonFilter = document.getElementById(`common-filter-${key}`)?.value || '';
     const commonSort = document.getElementById(`common-sort-${key}`)?.value || '';
+    const statusFilter = document.getElementById('statusFilter')?.value || '';
+    const binFilter = document.getElementById('binFilter')?.value || '';
     if (commonFilter) {
         url += `&filter=${encodeURIComponent(commonFilter)}`;
     }
     if (commonSort) {
         url += `&sort=${encodeURIComponent(commonSort)}`;
     }
+    if (statusFilter) {
+        url += `&statusFilter=${encodeURIComponent(statusFilter)}`;
+    }
+    if (binFilter) {
+        url += `&binFilter=${encodeURIComponent(binFilter)}`;
+    }
 
     fetch(url)
         .then(response => {
-            console.log('Fetch finished loading:', `GET "${url}"`, response.status);
             if (!response.ok) {
                 throw new Error(`Common names fetch failed with status ${response.status}: ${response.statusText}`);
             }
             return response.json();
         })
         .then(data => {
-            console.log('Common names data:', data);
             let html = '';
             if (data.common_names && data.common_names.length > 0) {
                 const headers = window.cachedTabNum == 2 || window.cachedTabNum == 4
@@ -167,7 +164,6 @@ function loadCommonNames(category, subcategory, targetId, page = 1, contractNumb
                             </select>
                 `;
 
-                // Add bulk update controls for Tab 5 only
                 if (window.cachedTabNum == 5) {
                     html += `
                         <div class="bulk-update-controls" style="margin-top: 10px;">
@@ -267,45 +263,18 @@ function loadCommonNames(category, subcategory, targetId, page = 1, contractNumb
                 html = `<div class="common-level"><p>No common names found for this ${subcategory ? 'subcategory' : 'category'}.</p></div>`;
             }
 
-            console.log('Setting common names container HTML for targetId:', targetId);
             container.innerHTML = html;
             container.classList.remove('collapsed');
             container.classList.add('expanded');
-            container.classList.remove('fade');
-            container.classList.add('show');
             container.style.display = 'block';
             container.style.opacity = '1';
-            console.log('Common names container classes after update:', container.className);
-            console.log('Common names container updated with HTML:', container.innerHTML);
 
-            // Debug the container's computed style
-            const computedContainerStyle = window.getComputedStyle(container);
-            console.log('Common names container computed style:', {
-                display: computedContainerStyle.display,
-                visibility: computedContainerStyle.visibility,
-                opacity: computedContainerStyle.opacity,
-                height: computedContainerStyle.height,
-                transition: computedContainerStyle.transition
-            });
-
-            // Debug the common-level div
+            // Force reflow
             const commonLevel = container.querySelector('.common-level');
             if (commonLevel) {
-                const computedCommonLevelStyle = window.getComputedStyle(commonLevel);
-                console.log('Common-level computed style:', {
-                    display: computedCommonLevelStyle.display,
-                    visibility: computedCommonLevelStyle.visibility,
-                    opacity: computedCommonLevelStyle.opacity,
-                    height: computedCommonLevelStyle.height
-                });
-
-                // Force a reflow on common-level to ensure rendering
                 commonLevel.style.display = 'none';
                 void commonLevel.offsetHeight;
                 commonLevel.style.display = 'block';
-                console.log('Forced reflow on common-level, new display:', commonLevel.style.display);
-            } else {
-                console.log('Common-level div not found');
             }
 
             const expandBtn = document.querySelector(`button[data-category="${category}"][data-subcategory="${subcategory || ''}"][data-target-id="items-${key}"]`);
@@ -314,20 +283,20 @@ function loadCommonNames(category, subcategory, targetId, page = 1, contractNumb
                 expandBtn.style.display = 'none';
                 collapseBtn.style.display = 'inline-block';
             }
+
+            // Save expansion state
+            sessionStorage.setItem(`expanded_${targetId}`, JSON.stringify({ category, subcategory, page, contractNumber }));
         })
         .catch(error => {
             console.error('Common names fetch error:', error);
             container.innerHTML = `<div class="common-level"><p>Error loading common names: ${error.message}</p></div>`;
             container.classList.remove('collapsed');
             container.classList.add('expanded');
-            container.classList.remove('fade');
-            container.classList.add('show');
             container.style.display = 'block';
             container.style.opacity = '1';
         })
         .finally(() => {
             hideLoading(key);
-            console.log('loadCommonNames completed for targetId:', targetId);
         });
 }
 
@@ -336,13 +305,10 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
     console.log('loadSubcatData called with', { originalCategory, normalizedCategory, targetId, page });
 
     const container = document.getElementById(targetId);
-    console.log('Looking for container with ID:', targetId);
     if (!container) {
         console.error(`Container with ID ${targetId} not found`);
         return;
     }
-    console.log('Container found:', container);
-    console.log('Container classes before update:', container.className);
 
     hideOtherSubcats(normalizedCategory);
     showLoading(normalizedCategory);
@@ -350,45 +316,31 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
     let url = `/tab/${window.cachedTabNum}/subcat_data?category=${encodeURIComponent(originalCategory)}&page=${page}`;
     const subcatFilter = document.getElementById(`subcat-filter-${normalizedCategory}`)?.value || '';
     const subcatSort = document.getElementById(`subcat-sort-${normalizedCategory}`)?.value || '';
+    const statusFilter = document.getElementById('statusFilter')?.value || '';
+    const binFilter = document.getElementById('binFilter')?.value || '';
     if (subcatFilter) {
         url += `&filter=${encodeURIComponent(subcatFilter)}`;
     }
     if (subcatSort) {
         url += `&sort=${encodeURIComponent(subcatSort)}`;
     }
+    if (statusFilter) {
+        url += `&statusFilter=${encodeURIComponent(statusFilter)}`;
+    }
+    if (binFilter) {
+        url += `&binFilter=${encodeURIComponent(binFilter)}`;
+    }
 
     fetch(url)
         .then(response => {
-            console.log('Fetch finished loading:', `GET "${url}"`);
             if (!response.ok) {
                 throw new Error(`Subcategory fetch failed with status ${response.status}`);
             }
             return response.json();
         })
         .then(data => {
-            console.log('Subcategory data received:', data);
-            if (data.subcategories && data.subcategories.length > 0) {
-                console.log('Subcategories found:', data.subcategories);
-                data.subcategories.forEach(subcat => {
-                    console.log(`Subcategory: ${subcat.subcategory}, Total Items: ${subcat.total_items}, Items on Contracts: ${subcat.items_on_contracts}, Items in Service: ${subcat.items_in_service}, Items Available: ${subcat.items_available}`);
-                });
-            } else if (data.message) {
-                console.log('No subcategories message:', data.message);
-                fetch(`/categories/mapping?category=${encodeURIComponent(originalCategory)}`)
-                    .then(mappingResponse => mappingResponse.json())
-                    .then(mappingData => {
-                        console.log('Rental class mappings for category:', originalCategory, mappingData);
-                    })
-                    .catch(mappingError => {
-                        console.error('Error fetching rental class mappings:', mappingError);
-                    });
-            } else {
-                console.log('Unexpected response format:', data);
-            }
-
             let html = '';
             if (data.subcategories && data.subcategories.length > 0) {
-                // Create a single table for all subcategories
                 html += `
                     <div class="filter-sort-controls">
                         <input type="text" id="subcat-filter-${normalizedCategory}" placeholder="Filter subcategories..." value="${subcatFilter}" oninput="loadSubcatData('${originalCategory}', '${normalizedCategory}', '${targetId}', 1)">
@@ -416,7 +368,6 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
                 `;
 
                 data.subcategories.forEach(subcat => {
-                    console.log('Processing subcategory:', subcat);
                     const subcatKey = `${normalizedCategory}_${subcat.subcategory.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
                     html += `
                         <tr class="subcat-row">
@@ -456,49 +407,37 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
                         </div>
                     `;
                 }
-                console.log('Generated HTML for subcategories:', html);
             } else {
                 html = `<div class="subcat-level"><p>No subcategories found for this category.</p></div>`;
             }
 
-            console.log('Setting container HTML for targetId:', targetId);
             container.innerHTML = html;
             container.classList.remove('collapsed');
             container.classList.add('expanded');
-            container.classList.add('show');
             container.style.display = 'block';
             container.style.opacity = '1';
-            console.log('Container classes after update:', container.className);
 
-            // Force repaint of the table
+            // Force reflow
             const table = container.querySelector('table.subcat-table');
             if (table) {
                 table.style.display = 'none';
-                void table.offsetHeight; // Trigger reflow
+                void table.offsetHeight;
                 table.style.display = 'table';
-                console.log('Table re-rendered with display:', table.style.display);
             }
 
-            // Ensure all subcategory rows are visible
-            const subcatRows = container.querySelectorAll('tr.subcat-row');
-            subcatRows.forEach(row => {
-                row.style.display = 'table-row';
-                row.style.opacity = '1';
-                console.log('Subcategory row display set to table-row:', row);
-            });
+            // Save expansion state
+            sessionStorage.setItem(`expanded_${targetId}`, JSON.stringify({ category: originalCategory, page }));
         })
         .catch(error => {
             console.error('Subcategory fetch error:', error);
             container.innerHTML = `<div class="subcat-level"><p>Error loading subcategories: ${error.message}</p></div>`;
             container.classList.remove('collapsed');
             container.classList.add('expanded');
-            container.classList.add('show');
             container.style.display = 'block';
             container.style.opacity = '1';
         })
         .finally(() => {
             hideLoading(normalizedCategory);
-            console.log('loadSubcatData completed for targetId:', targetId);
         });
 }
 
@@ -533,7 +472,6 @@ function bulkUpdateCommonName(category, subcategory, targetId, key) {
         } else {
             console.log('Bulk update successful:', data);
             alert('Bulk update successful!');
-            // Refresh the items table
             loadItems(category, subcategory, document.querySelector(`#common-table-${key} tbody tr td:first-child`).textContent, targetId);
         }
     })
@@ -547,7 +485,7 @@ function bulkUpdateCommonName(category, subcategory, targetId, key) {
 function bulkUpdateSelectedItems(key) {
     const selectedItems = Array.from(document.querySelectorAll(`#item-table-${key} tbody input[type="checkbox"]:checked`))
         .map(checkbox => checkbox.value);
-    
+
     if (selectedItems.length === 0) {
         alert('Please select at least one item to update.');
         return;
@@ -580,7 +518,6 @@ function bulkUpdateSelectedItems(key) {
         } else {
             console.log('Bulk update successful:', data);
             alert('Bulk update successful!');
-            // Refresh the items table
             const category = document.querySelector(`#item-table-${key}`).closest('.common-level').querySelector('button[data-category]').getAttribute('data-category');
             const subcategory = document.querySelector(`#item-table-${key}`).closest('.common-level').querySelector('button[data-subcategory]').getAttribute('data-subcategory');
             const commonName = document.querySelector(`#common-table-${key} tbody tr td:first-child`).textContent;
@@ -596,8 +533,8 @@ function bulkUpdateSelectedItems(key) {
 
 // Note: Tab 5 specific - Update dropdown visibility for bulk update
 function updateBulkField(key, field) {
-    const binLocationSelect = document.getElementById(`bulk-${field}-${key}`);
-    if (binLocationSelect.value) {
+    const select = document.getElementById(`bulk-${field}-${key}`);
+    if (select.value) {
         const otherField = field === 'bin_location' ? 'status' : 'bin_location';
         const otherSelect = document.getElementById(`bulk-${otherField}-${key}`);
         otherSelect.value = '';
@@ -633,7 +570,6 @@ function updateItem(tagId, key) {
         } else {
             console.log('Update successful:', data);
             alert('Update successful!');
-            // Refresh the items table
             const category = document.querySelector(`#item-table-${key}`).closest('.common-level').querySelector('button[data-category]').getAttribute('data-category');
             const subcategory = document.querySelector(`#item-table-${key}`).closest('.common-level').querySelector('button[data-subcategory]').getAttribute('data-subcategory');
             const commonName = document.querySelector(`#common-table-${key} tbody tr td:first-child`).textContent;
@@ -650,7 +586,6 @@ function updateItem(tagId, key) {
 // Note: Common function - will be moved to tab1_5.js during split
 function loadItems(category, subcategory, commonName, targetId, page = 1) {
     console.log('loadItems called with', { category, subcategory, commonName, targetId, page });
-    console.log('Current cachedTabNum in loadItems:', window.cachedTabNum);
 
     const container = document.getElementById(targetId);
     if (!container) {
@@ -674,23 +609,29 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
 
     const itemFilter = document.getElementById(`item-filter-${key}`)?.value || '';
     const itemSort = document.getElementById(`item-sort-${key}`)?.value || '';
+    const statusFilter = document.getElementById('statusFilter')?.value || '';
+    const binFilter = document.getElementById('binFilter')?.value || '';
     if (itemFilter) {
         url += `&filter=${encodeURIComponent(itemFilter)}`;
     }
     if (itemSort) {
         url += `&sort=${encodeURIComponent(itemSort)}`;
     }
+    if (statusFilter) {
+        url += `&statusFilter=${encodeURIComponent(statusFilter)}`;
+    }
+    if (binFilter) {
+        url += `&binFilter=${encodeURIComponent(binFilter)}`;
+    }
 
     fetch(url)
         .then(response => {
-            console.log('Fetch finished loading:', `GET "${url}"`);
             if (!response.ok) {
                 throw new Error(`Items fetch failed with status ${response.status}`);
             }
             return response.json();
         })
         .then(data => {
-            console.log('Items data:', data);
             let html = '';
             if (data.items && data.items.length > 0) {
                 let headers = [];
@@ -701,7 +642,6 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                 } else {
                     headers = ['Tag ID', 'Common Name', 'Bin Location', 'Status', 'Last Contract', 'Last Scanned Date'];
                 }
-                console.log('Generated headers:', headers);
 
                 html += `
                     <div class="item-level-wrapper">
@@ -716,7 +656,6 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                             </select>
                 `;
 
-                // Add bulk update controls for selected items in Tab 5
                 if (window.cachedTabNum == 5) {
                     html += `
                         <div class="bulk-update-controls" style="margin-top: 10px;">
@@ -837,12 +776,9 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                 html = `<div class="item-level-wrapper"><p>No items found for this common name.</p></div>`;
             }
 
-            console.log('Setting container HTML for targetId:', targetId, 'with HTML:', html);
             container.innerHTML = html;
             container.classList.remove('collapsed');
             container.classList.add('expanded');
-            container.classList.remove('fade');
-            container.classList.add('show');
             container.style.display = 'block';
             container.style.opacity = '1';
 
@@ -851,7 +787,6 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                 table.style.display = 'none';
                 void table.offsetHeight;
                 table.style.display = 'table';
-                console.log('Table re-rendered with display:', table.style.display);
             }
 
             const expandBtn = document.querySelector(`button[data-category="${category}"][data-subcategory="${subcategory || ''}"][data-target-id="items-${key}"]`);
@@ -860,20 +795,20 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                 expandBtn.style.display = 'none';
                 collapseBtn.style.display = 'inline-block';
             }
+
+            // Save expansion state
+            sessionStorage.setItem(`expanded_${targetId}`, JSON.stringify({ category, subcategory, commonName, page }));
         })
         .catch(error => {
             console.error('Items fetch error:', error);
             container.innerHTML = `<div class="item-level-wrapper"><p>Error loading items: ${error.message}</p></div>`;
             container.classList.remove('collapsed');
             container.classList.add('expanded');
-            container.classList.remove('fade');
-            container.classList.add('show');
             container.style.display = 'block';
             container.style.opacity = '1';
         })
         .finally(() => {
             hideLoading(key);
-            console.log('loadItems completed for targetId:', targetId);
         });
 }
 
@@ -882,9 +817,7 @@ function showDropdown(event, cell, type, tagId, currentValue) {
     event.stopPropagation();
     console.log('showDropdown called with', { cell, type, tagId, currentValue });
     const dropdown = document.getElementById(`dropdown-${type}-${tagId}`);
-    console.log('Dropdown element:', dropdown);
     if (dropdown) {
-        console.log('Dropdown found, current display:', dropdown.style.display);
         document.querySelectorAll('.dropdown-menu').forEach(d => {
             if (d !== dropdown) {
                 d.classList.remove('show');
@@ -898,18 +831,7 @@ function showDropdown(event, cell, type, tagId, currentValue) {
         dropdown.style.left = `${rect.left + window.scrollX}px`;
         dropdown.style.top = `${rect.bottom + window.scrollY}px`;
         dropdown.style.zIndex = '1000';
-        console.log('Dropdown positioned at:', { left: dropdown.style.left, top: dropdown.style.top, zIndex: dropdown.style.zIndex });
         cell.setAttribute(`data-${type}`, currentValue);
-        const computedStyle = window.getComputedStyle(dropdown);
-        console.log('Dropdown computed style after show:', {
-            display: computedStyle.display,
-            visibility: computedStyle.visibility,
-            opacity: computedStyle.opacity,
-            position: computedStyle.position,
-            left: computedStyle.left,
-            top: computedStyle.top,
-            zIndex: computedStyle.zIndex
-        });
     } else {
         console.error(`Dropdown not found for ${type} with tagId ${tagId}`);
     }
@@ -939,8 +861,6 @@ function saveChanges(tagId) {
 
     const newBinLocation = binLocationCell ? binLocationCell.getAttribute('data-bin-location') : null;
     const newStatus = statusCell ? statusCell.getAttribute('data-status') : null;
-
-    console.log('New values:', { newBinLocation, newStatus });
 
     if (newBinLocation) {
         fetch('/tab/5/update_bin_location', {
@@ -1008,26 +928,35 @@ function saveChanges(tagId) {
 document.addEventListener('DOMContentLoaded', function() {
     console.log('expand.js: DOMContentLoaded event fired');
 
+    // Restore expanded sections from sessionStorage
+    Object.keys(sessionStorage).forEach(key => {
+        if (key.startsWith('expanded_')) {
+            const state = JSON.parse(sessionStorage.getItem(key));
+            const targetId = key.replace('expanded_', '');
+            if (targetId.startsWith('subcat-')) {
+                const normalizedCategory = targetId.replace('subcat-', '');
+                loadSubcatData(state.category, normalizedCategory, targetId, state.page);
+            } else if (targetId.startsWith('common-')) {
+                loadCommonNames(state.category, state.subcategory, targetId, state.page, state.contractNumber);
+            } else if (targetId.startsWith('items-')) {
+                loadItems(state.category, state.subcategory, state.commonName, targetId, state.page);
+            }
+        }
+    });
+
     // Event delegation for expand and collapse buttons
     document.addEventListener('click', (event) => {
-        console.log('Document click event triggered, target:', event.target);
-
         const expandBtn = event.target.closest('.expand-btn');
         if (expandBtn) {
-            console.log('Expand button clicked:', expandBtn);
             event.stopPropagation();
             const category = expandBtn.getAttribute('data-category');
             const subcategory = expandBtn.getAttribute('data-subcategory');
             const targetId = expandBtn.getAttribute('data-target-id');
             const commonName = expandBtn.getAttribute('data-common-name');
 
-            console.log('Expand button attributes:', { category, subcategory, targetId, commonName });
-
             if (commonName) {
-                // For common names table expanding to items
                 loadItems(category, subcategory, commonName, targetId);
             } else {
-                // For subcategory table expanding to common names
                 loadCommonNames(category, subcategory, targetId);
             }
             return;
@@ -1035,7 +964,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
         const collapseBtn = event.target.closest('.collapse-btn');
         if (collapseBtn) {
-            console.log('Collapse button clicked:', collapseBtn);
             event.stopPropagation();
             const targetId = collapseBtn.getAttribute('data-collapse-target');
             collapseSection(targetId);
@@ -1046,7 +974,6 @@ document.addEventListener('DOMContentLoaded', function() {
     // Hide dropdowns when clicking outside (used only in Tab 1)
     document.addEventListener('click', (event) => {
         if (!event.target.closest('.editable') && !event.target.closest('.dropdown-menu')) {
-            console.log('Click outside detected, hiding all dropdowns');
             document.querySelectorAll('.dropdown-menu').forEach(dropdown => {
                 dropdown.classList.remove('show');
                 dropdown.style.display = 'none';
@@ -1063,5 +990,4 @@ document.addEventListener('DOMContentLoaded', function() {
             loadSubcatData(category, normalizedCategory, targetId, page);
         }
     };
-    console.log('expand.js: expandCategory defined');
 });
