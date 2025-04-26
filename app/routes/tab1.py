@@ -30,7 +30,7 @@ logger.addHandler(console_handler)
 tab1_bp = Blueprint('tab1', __name__)
 
 # Version marker
-logger.info("Deployed tab1.py version: 2025-04-26-v14")
+logger.info("Deployed tab1.py version: 2025-04-26-v15")
 
 def get_category_data(session, filter_query='', sort='', status_filter='', bin_filter=''):
     # Fetch all rental class mappings from both tables
@@ -239,11 +239,14 @@ def tab1_subcat_data():
         subcategories = {}
         for rental_class_id, data in mappings_dict.items():
             subcategory = data['subcategory']
+            if not subcategory:  # Skip if subcategory is None or empty
+                continue
             if subcategory not in subcategories:
                 subcategories[subcategory] = []
             subcategories[subcategory].append(rental_class_id)
 
         subcat_list = sorted(subcategories.keys())
+        logger.debug(f"Subcategories for {category}: {subcat_list}")
         if filter_query:
             subcat_list = [s for s in subcat_list if filter_query in s.lower()]
         if sort == 'subcategory_asc':
@@ -271,7 +274,6 @@ def tab1_subcat_data():
                 )
             total_items = total_items_query.scalar() or 0
 
-            # Remove the total_items > 0 check to ensure all subcategories are shown
             items_on_contracts_query = session.query(func.count(ItemMaster.tag_id)).filter(
                 func.trim(func.cast(ItemMaster.rental_class_num, db.String)).in_(rental_class_ids),
                 ItemMaster.status.in_(['On Rent', 'Delivered'])
@@ -339,6 +341,7 @@ def tab1_subcat_data():
         elif sort == 'total_items_desc':
             subcategory_data.sort(key=lambda x: x['total_items'], reverse=True)
 
+        logger.debug(f"Returning subcategory data for {category}: {subcategory_data}")
         session.close()
         return jsonify({
             'subcategories': subcategory_data,
