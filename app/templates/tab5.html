@@ -10,7 +10,36 @@
 
 {% block content %}
 <div class="container mt-4">
-    <h2>Resale/Rental Packs (Tab 5)</h2>
+    <!-- Page title for Tab 5 -->
+    <h2>Resale/Rental Packs</h2>
+    <!-- Filter and search row -->
+    <div class="filter-sort-controls">
+        <input type="text" id="category-filter" placeholder="Filter categories..." oninput="applyCategoryFilters()">
+        <select id="category-sort" onchange="applyCategoryFilters()">
+            <option value="">Sort By...</option>
+            <option value="category_asc">Category (A-Z)</option>
+            <option value="category_desc">Category (Z-A)</option>
+            <option value="total_items_asc">Total Items (Low to High)</option>
+            <option value="total_items_desc">Total Items (High to Low)</option>
+        </select>
+        <select id="statusFilter" onchange="applyCategoryFilters()">
+            <option value="">All Statuses</option>
+            <option value="On Rent">On Rent</option>
+            <option value="Delivered">Delivered</option>
+            <option value="Ready to Rent">Ready to Rent</option>
+        </select>
+        <select id="binFilter" onchange="applyCategoryFilters()">
+            <option value="">All Bin Locations</option>
+            <option value="resale">resale</option>
+            <option value="sold">sold</option>
+            <option value="pack">pack</option>
+            <option value="burst">burst</option>
+        </select>
+        <button class="btn btn-primary" onclick="refreshTab()">Refresh</button>
+        <!-- Button to export sold/burst items to CSV (Tab 5 specific) -->
+        <a href="{{ url_for('tab5.export_sold_burst_csv') }}" class="btn btn-info">Export Sold/Burst Items (CSV)</a>
+    </div>
+    <!-- Table for displaying categories -->
     <table class="table table-bordered" id="category-table">
         <thead>
             <tr>
@@ -24,8 +53,6 @@
         </thead>
         <tbody id="category-rows">
             {% for category in categories %}
-            {% set cat_id = category.cat_id %}
-            {% set encoded_category = category.category | urlencode | replace("'", "\\'") | replace('"', '\\"') %}
             <tr>
                 <td>{{ category.category }}</td>
                 <td>{{ category.total_items }}</td>
@@ -33,19 +60,35 @@
                 <td>{{ category.items_in_service }}</td>
                 <td>{{ category.items_available }}</td>
                 <td>
-                    <button class="btn btn-sm btn-secondary expand-btn" onclick="expandCategory('{{ encoded_category }}', 'subcat-{{ cat_id }}')">Expand</button>
-                    <button class="btn btn-sm btn-secondary collapse-btn" style="display:none;" onclick="collapseSection('subcat-{{ cat_id }}')">Collapse</button>
+                    <button class="btn btn-sm btn-secondary expand-btn" onclick="window.expandCategory('{{ category.category | urlencode | replace('\'', '\\\'') | replace('\"', '\\\"') }}', 'subcat-{{ category.cat_id }}')">Expand</button>
+                    <button class="btn btn-sm btn-secondary collapse-btn" style="display:none;" onclick="collapseSection('subcat-{{ category.cat_id }}')">Collapse</button>
                     <button class="btn btn-sm btn-info print-btn" data-print-level="Category" data-print-id="category-table">Print</button>
-                    <div id="loading-{{ cat_id }}" style="display:none;" class="loading">Loading...</div>
+                    <div id="loading-{{ category.cat_id }}" style="display:none;" class="loading">Loading...</div>
                 </td>
             </tr>
             <tr>
                 <td colspan="6">
-                    <div id="subcat-{{ cat_id }}" class="expandable collapsed"></div>
+                    <div id="subcat-{{ category.cat_id }}" class="expandable collapsed"></div>
                 </td>
             </tr>
             {% endfor %}
         </tbody>
     </table>
 </div>
+
+<!-- JavaScript for refreshing the table -->
+<script>
+function applyCategoryFilters() {
+    const filter = document.getElementById('category-filter').value;
+    const sort = document.getElementById('category-sort').value;
+    let url = '/tab/5?';
+    if (filter) url += `filter=${encodeURIComponent(filter)}&`;
+    if (sort) url += `sort=${encodeURIComponent(sort)}`;
+    window.location.href = url;
+}
+
+function refreshTab() {
+    window.location.reload();
+}
+</script>
 {% endblock %}
