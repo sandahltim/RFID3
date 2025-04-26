@@ -30,18 +30,22 @@ logger.addHandler(console_handler)
 tab1_bp = Blueprint('tab1', __name__)
 
 # Version marker
-logger.info("Deployed tab1.py version: 2025-04-25-v10")
+logger.info("Deployed tab1.py version: 2025-04-25-v12")
 
 @tab1_bp.route('/tab/1')
 def tab1_view():
+    logger.info("Tab 1 route accessed")
+    current_app.logger.info("Tab 1 route accessed")
     try:
         session = db.session()
         logger.info("Starting new session for tab1")
+        current_app.logger.info("Starting new session for tab1")
 
         # Fetch all rental class mappings from both tables
         base_mappings = session.query(RentalClassMapping).all()
         user_mappings = session.query(UserRentalClassMapping).all()
         logger.debug(f"Fetched {len(base_mappings)} base mappings and {len(user_mappings)} user mappings")
+        current_app.logger.debug(f"Fetched {len(base_mappings)} base mappings and {len(user_mappings)} user mappings")
 
         # Merge mappings, prioritizing user mappings
         mappings_dict = {m.rental_class_id: {'category': m.category, 'subcategory': m.subcategory} for m in base_mappings}
@@ -51,6 +55,7 @@ def tab1_view():
         # If no mappings exist, return an empty response with a warning
         if not mappings_dict:
             logger.warning("No rental class mappings found in either rental_class_mappings or user_rental_class_mappings")
+            current_app.logger.warning("No rental class mappings found in either rental_class_mappings or user_rental_class_mappings")
             session.close()
             return render_template('tab1.html', categories=[], cache_bust=int(time()))
 
@@ -73,6 +78,8 @@ def tab1_view():
 
         for cat, mappings in categories.items():
             rental_class_ids = [str(m['rental_class_id']) for m in mappings]
+            logger.debug(f"Processing category {cat} with rental_class_ids: {rental_class_ids}")
+            current_app.logger.debug(f"Processing category {cat} with rental_class_ids: {rental_class_ids}")
 
             # Total items in this category
             total_items_query = session.query(func.count(ItemMaster.tag_id)).filter(
@@ -83,6 +90,8 @@ def tab1_view():
                     func.lower(ItemMaster.common_name).like(f'%{filter_query}%')
                 )
             total_items = total_items_query.scalar()
+            logger.debug(f"Total items for category {cat}: {total_items}")
+            current_app.logger.debug(f"Total items for category {cat}: {total_items}")
 
             # Items on contracts (status = 'On Rent' or 'Delivered')
             items_on_contracts_query = session.query(func.count(ItemMaster.tag_id)).filter(
@@ -94,6 +103,8 @@ def tab1_view():
                     func.lower(ItemMaster.common_name).like(f'%{filter_query}%')
                 )
             items_on_contracts = items_on_contracts_query.scalar()
+            logger.debug(f"Items on contracts for category {cat}: {items_on_contracts}")
+            current_app.logger.debug(f"Items on contracts for category {cat}: {items_on_contracts}")
 
             # Items in service logic
             subquery = session.query(
@@ -123,6 +134,8 @@ def tab1_view():
                     func.lower(ItemMaster.common_name).like(f'%{filter_query}%')
                 )
             items_in_service = items_in_service_query.scalar()
+            logger.debug(f"Items in service for category {cat}: {items_in_service}")
+            current_app.logger.debug(f"Items in service for category {cat}: {items_in_service}")
 
             # Items available (status = 'Ready to Rent')
             items_available_query = session.query(func.count(ItemMaster.tag_id)).filter(
@@ -134,6 +147,8 @@ def tab1_view():
                     func.lower(ItemMaster.common_name).like(f'%{filter_query}%')
                 )
             items_available = items_available_query.scalar()
+            logger.debug(f"Items available for category {cat}: {items_available}")
+            current_app.logger.debug(f"Items available for category {cat}: {items_available}")
 
             category_data.append({
                 'category': cat,
@@ -155,11 +170,13 @@ def tab1_view():
             category_data.sort(key=lambda x: x['total_items'], reverse=True)
 
         logger.info(f"Fetched {len(category_data)} categories for tab1")
+        current_app.logger.info(f"Fetched {len(category_data)} categories for tab1")
 
         session.close()
         return render_template('tab1.html', categories=category_data, cache_bust=int(time()))
     except Exception as e:
         logger.error(f"Error rendering Tab 1: {str(e)}", exc_info=True)
+        current_app.logger.error(f"Error rendering Tab 1: {str(e)}", exc_info=True)
         return render_template('tab1.html', categories=[], cache_bust=int(time()))
 
 @tab1_bp.route('/tab/1/subcat_data')
@@ -173,9 +190,11 @@ def tab1_subcat_data():
 
     if not category:
         logger.error("Category parameter is missing in subcat_data request")
+        current_app.logger.error("Category parameter is missing in subcat_data request")
         return jsonify({'error': 'Category is required'}), 400
 
     logger.info(f"Fetching subcategories for category: {category}")
+    current_app.logger.info(f"Fetching subcategories for category: {category}")
     try:
         session = db.session()
 
@@ -187,16 +206,20 @@ def tab1_subcat_data():
             func.lower(UserRentalClassMapping.category) == category.lower()
         ).all()
         logger.debug(f"Fetched {len(base_mappings)} base mappings and {len(user_mappings)} user mappings for category {category}")
+        current_app.logger.debug(f"Fetched {len(base_mappings)} base mappings and {len(user_mappings)} user mappings for category {category}")
 
         # Log the mappings for debugging
         if base_mappings:
             logger.debug("Base mappings: " + ", ".join([f"{m.rental_class_id}: {m.category} - {m.subcategory}" for m in base_mappings]))
+            current_app.logger.debug("Base mappings: " + ", ".join([f"{m.rental_class_id}: {m.category} - {m.subcategory}" for m in base_mappings]))
         if user_mappings:
             logger.debug("User mappings: " + ", ".join([f"{m.rental_class_id}: {m.category} - {m.subcategory}" for m in user_mappings]))
+            current_app.logger.debug("User mappings: " + ", ".join([f"{m.rental_class_id}: {m.category} - {m.subcategory}" for m in user_mappings]))
 
         # If no mappings exist, return an empty response with a warning
         if not base_mappings and not user_mappings:
             logger.warning(f"No mappings found for category {category} in either rental_class_mappings or user_rental_class_mappings")
+            current_app.logger.warning(f"No mappings found for category {category} in either rental_class_mappings or user_rental_class_mappings")
             session.close()
             return jsonify({
                 'subcategories': [],
@@ -237,6 +260,7 @@ def tab1_subcat_data():
         for subcat in paginated_subcats:
             rental_class_ids = subcategories[subcat]
             logger.debug(f"Processing subcategory {subcat} with rental_class_ids: {rental_class_ids}")
+            current_app.logger.debug(f"Processing subcategory {subcat} with rental_class_ids: {rental_class_ids}")
 
             try:
                 # Total items in this subcategory
@@ -249,6 +273,7 @@ def tab1_subcat_data():
                     )
                 total_items = total_items_query.scalar() or 0
                 logger.debug(f"Total items for subcategory {subcat}: {total_items}")
+                current_app.logger.debug(f"Total items for subcategory {subcat}: {total_items}")
 
                 # Items on contracts (status = 'On Rent' or 'Delivered')
                 items_on_contracts_query = session.query(func.count(ItemMaster.tag_id)).filter(
@@ -261,6 +286,7 @@ def tab1_subcat_data():
                     )
                 items_on_contracts = items_on_contracts_query.scalar() or 0
                 logger.debug(f"Items on contracts for subcategory {subcat}: {items_on_contracts}")
+                current_app.logger.debug(f"Items on contracts for subcategory {subcat}: {items_on_contracts}")
 
                 # Items in service
                 subquery = session.query(
@@ -291,6 +317,7 @@ def tab1_subcat_data():
                     )
                 items_in_service = items_in_service_query.scalar() or 0
                 logger.debug(f"Items in service for subcategory {subcat}: {items_in_service}")
+                current_app.logger.debug(f"Items in service for subcategory {subcat}: {items_in_service}")
 
                 # Items available (status = 'Ready to Rent')
                 items_available_query = session.query(func.count(ItemMaster.tag_id)).filter(
@@ -303,6 +330,7 @@ def tab1_subcat_data():
                     )
                 items_available = items_available_query.scalar() or 0
                 logger.debug(f"Items available for subcategory {subcat}: {items_available}")
+                current_app.logger.debug(f"Items available for subcategory {subcat}: {items_available}")
 
                 # Only include subcategories with at least one item
                 if total_items and total_items > 0:
@@ -315,8 +343,10 @@ def tab1_subcat_data():
                     })
                 else:
                     logger.debug(f"Skipping subcategory {subcat} due to zero total items")
+                    current_app.logger.debug(f"Skipping subcategory {subcat} due to zero total items")
             except Exception as e:
                 logger.error(f"Error calculating counts for subcategory {subcat} in category {category}: {str(e)}", exc_info=True)
+                current_app.logger.error(f"Error calculating counts for subcategory {subcat} in category {category}: {str(e)}", exc_info=True)
                 continue  # Skip this subcategory and continue with others
 
         # Sort subcategory data if needed
@@ -327,6 +357,7 @@ def tab1_subcat_data():
 
         session.close()
         logger.info(f"Returning {len(subcategory_data)} subcategories for category {category}")
+        current_app.logger.info(f"Returning {len(subcategory_data)} subcategories for category {category}")
         return jsonify({
             'subcategories': subcategory_data,
             'total_subcats': total_subcats,
@@ -335,6 +366,7 @@ def tab1_subcat_data():
         })
     except Exception as e:
         logger.error(f"Error fetching subcategory data for category {category}: {str(e)}", exc_info=True)
+        current_app.logger.error(f"Error fetching subcategory data for category {category}: {str(e)}", exc_info=True)
         return jsonify({'error': 'Failed to fetch subcategory data', 'details': str(e)}), 500
 
 @tab1_bp.route('/tab/1/common_names')
@@ -347,6 +379,8 @@ def tab1_common_names():
     sort = request.args.get('sort', '')
 
     if not category or not subcategory:
+        logger.error("Category and subcategory are required in common_names request")
+        current_app.logger.error("Category and subcategory are required in common_names request")
         return jsonify({'error': 'Category and subcategory are required'}), 400
 
     try:
@@ -474,6 +508,7 @@ def tab1_common_names():
             'per_page': per_page
         })
     except Exception as e:
+        logger.error(f"Error fetching common names for category {category}, subcategory {subcategory}: {str(e)}")
         current_app.logger.error(f"Error fetching common names for category {category}, subcategory {subcategory}: {str(e)}")
         return jsonify({'error': 'Failed to fetch common names'}), 500
 
@@ -488,6 +523,8 @@ def tab1_data():
     sort = request.args.get('sort', '')
 
     if not category or not subcategory or not common_name:
+        logger.error("Category, subcategory, and common name are required in data request")
+        current_app.logger.error("Category, subcategory, and common name are required in data request")
         return jsonify({'error': 'Category, subcategory, and common name are required'}), 400
 
     try:
@@ -560,6 +597,7 @@ def tab1_data():
             'per_page': per_page
         })
     except Exception as e:
+        logger.error(f"Error fetching items for category {category}, subcategory {subcategory}, common_name {common_name}: {str(e)}")
         current_app.logger.error(f"Error fetching items for category {category}, subcategory {subcategory}, common_name {common_name}: {str(e)}")
         return jsonify({'error': 'Failed to fetch items'}), 500
 
@@ -570,6 +608,8 @@ def full_items_by_rental_class():
     common_name = unquote(request.args.get('common_name'))
 
     if not category or not subcategory or not common_name:
+        logger.error("Category, subcategory, and common name are required in full_items_by_rental_class request")
+        current_app.logger.error("Category, subcategory, and common name are required in full_items_by_rental_class request")
         return jsonify({'error': 'Category, subcategory, and common name are required'}), 400
 
     try:
@@ -619,5 +659,6 @@ def full_items_by_rental_class():
             'total_items': len(items_data)
         })
     except Exception as e:
+        logger.error(f"Error fetching full items for category {category}, subcategory {subcategory}, common_name {common_name}: {str(e)}")
         current_app.logger.error(f"Error fetching full items for category {category}, subcategory {subcategory}, common_name {common_name}: {str(e)}")
         return jsonify({'error': 'Failed to fetch full items'}), 500
