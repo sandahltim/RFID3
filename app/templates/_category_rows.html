@@ -1,0 +1,20 @@
+{% for category in categories %}
+<tr>
+    <td>{{ category.category }}</td>
+    <td>{{ category.total_items }}</td>
+    <td>{{ category.items_on_contracts }}</td>
+    <td>{{ category.items_in_service }}</td>
+    <td>{{ category.items_available }}</td>
+    <td>
+        <button class="btn btn-sm btn-secondary expand-btn" onclick="window.expandCategory('{{ category.category | urlencode | replace('\'', '\\\'') | replace('\"', '\\\"') }}', 'subcat-{{ category.cat_id }}')">Expand</button>
+        <button class="btn btn-sm btn-secondary collapse-btn" style="display:none;" onclick="collapseSection('subcat-{{ category.cat_id }}')">Collapse</button>
+        <button class="btn btn-sm btn-info print-btn" data-print-level="Category" data-print-id="category-table">Print</button>
+        <div id="loading-{{ category.cat_id }}" style="display:none;" class="loading">Loading...</div>
+    </td>
+</tr>
+<tr>
+    <td colspan="6">
+        <div id="subcat-{{ category.cat_id }}" class="expandable collapsed"></div>
+    </td>
+</tr>
+{% endfor %}

@@ -14,21 +14,21 @@
     <h2>Resale/Rental Packs</h2>
     <!-- Filter and search row -->
     <div class="filter-sort-controls">
-        <input type="text" id="category-filter" placeholder="Filter categories..." oninput="applyCategoryFilters()">
-        <select id="category-sort" onchange="applyCategoryFilters()">
+        <input type="text" id="category-filter" placeholder="Filter categories..." hx-post="/tab/5/filter" hx-target="#category-rows" hx-swap="innerHTML" hx-trigger="input delay:500ms">
+        <select id="category-sort" hx-post="/tab/5/filter" hx-target="#category-rows" hx-swap="innerHTML" hx-trigger="change">
             <option value="">Sort By...</option>
             <option value="category_asc">Category (A-Z)</option>
             <option value="category_desc">Category (Z-A)</option>
             <option value="total_items_asc">Total Items (Low to High)</option>
             <option value="total_items_desc">Total Items (High to Low)</option>
         </select>
-        <select id="statusFilter" onchange="applyCategoryFilters()">
+        <select id="statusFilter" hx-post="/tab/5/filter" hx-target="#category-rows" hx-swap="innerHTML" hx-trigger="change">
             <option value="">All Statuses</option>
             <option value="On Rent">On Rent</option>
             <option value="Delivered">Delivered</option>
             <option value="Ready to Rent">Ready to Rent</option>
         </select>
-        <select id="binFilter" onchange="applyCategoryFilters()">
+        <select id="binFilter" hx-post="/tab/5/filter" hx-target="#category-rows" hx-swap="innerHTML" hx-trigger="change">
             <option value="">All Bin Locations</option>
             <option value="resale">resale</option>
             <option value="sold">sold</option>
@@ -79,20 +79,6 @@
 <!-- JavaScript for refreshing the table -->
 <script>
 console.log('Categories received:', {{ categories | tojson }});  // Debug log
-
-function applyCategoryFilters() {
-    const filter = document.getElementById('category-filter').value;
-    const sort = document.getElementById('category-sort').value;
-    const statusFilter = document.getElementById('statusFilter').value;
-    const binFilter = document.getElementById('binFilter').value;
-    let url = '/tab/5?';
-    if (filter) url += `filter=${encodeURIComponent(filter)}&`;
-    if (sort) url += `sort=${encodeURIComponent(sort)}&`;
-    if (statusFilter) url += `statusFilter=${encodeURIComponent(statusFilter)}&`;
-    if (binFilter) url += `binFilter=${encodeURIComponent(binFilter)}`;
-    window.location.href = url;
-}
-
 function refreshTab() {
     window.location.reload();
 }

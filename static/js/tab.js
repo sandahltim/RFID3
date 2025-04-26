@@ -1,42 +1,6 @@
 console.log('tab.js loaded, cachedTabNum:', window.cachedTabNum);
 
 // Note: Common function - will be moved to common.js during split
-window.applyFilters = function() {
-    console.log('Applying filters');
-    const textQuery = document.getElementById('category-filter') ? document.getElementById('category-filter').value.toLowerCase() : document.getElementById('searchInput') ? document.getElementById('searchInput').value.toLowerCase() : '';
-    const categoryFilter = document.getElementById('categoryFilter') ? document.getElementById('categoryFilter').value.toLowerCase() : '';
-    const statusFilter = document.getElementById('statusFilter') ? document.getElementById('statusFilter').value.toLowerCase() : '';
-    const binLocationFilter = document.getElementById('binFilter') ? document.getElementById('binFilter').value.toLowerCase() : '';
-
-    const tables = document.querySelectorAll('table');
-    tables.forEach(table => {
-        if (table.id !== 'category-table') {
-            console.log(`Skipping filter application for table: ${table.id}`);
-            return;
-        }
-
-        const rows = table.querySelectorAll('tbody tr');
-        rows.forEach(row => {
-            if (row.querySelector('.expandable')) {
-                return;
-            }
-
-            const text = Array.from(row.children).map(cell => cell.textContent.toLowerCase()).join(' ');
-            const categoryCell = row.querySelector('td:first-child') ? row.querySelector('td:first-child').textContent.toLowerCase() : '';
-            const statusCell = row.cells[3] ? row.cells[3].textContent.toLowerCase() : '';
-            const binLocationCell = row.cells[2] ? row.cells[2].textContent.toLowerCase() : '';
-
-            const matchesText = text.includes(textQuery);
-            const matchesCategory = !categoryFilter || categoryCell.includes(categoryFilter);
-            const matchesStatus = !statusFilter || statusCell.includes(statusFilter);
-            const matchesBinLocation = !binLocationFilter || binLocationCell.includes(binLocationFilter);
-
-            row.style.display = (matchesText && matchesCategory && matchesStatus && matchesBinLocation) ? '' : 'none';
-        });
-    });
-};
-
-// Note: Common function - will be moved to common.js during split
 function refreshTab() {
     window.location.reload();
 }
@@ -100,10 +64,8 @@ async function printTable(level, id, commonName = null, category = null, subcate
         if (subcategory) {
             url += `&subcategory=${encodeURIComponent(subcategory)}`;
         }
-        console.log('Fetching items for print aggregate:', url);
         const response = await fetch(url);
         const data = await response.json();
-        console.log('Print aggregate items response:', data);
         const items = data.items || [];
 
         const statusCounts = {};
@@ -294,7 +256,6 @@ async function printTable(level, id, commonName = null, category = null, subcate
                 </div>
                 <script>
                     window.onload = function() {
-                        console.log('Print window loaded, content:', document.body.innerHTML);
                         window.print();
                         window.onafterprint = function() {
                             window.close();
@@ -312,7 +273,6 @@ async function printTable(level, id, commonName = null, category = null, subcate
     }
     printWindow.document.write(printContent);
     printWindow.document.close();
-    console.log('Print triggered successfully');
 }
 
 // Note: Common function - will be moved to tab1_5.js during split
@@ -450,7 +410,6 @@ async function printFullItemList(category, subcategory, commonName) {
                 </div>
                 <script>
                     window.onload = function() {
-                        console.log('Full item list print window loaded, content:', document.body.innerHTML);
                         window.print();
                         window.onafterprint = function() {
                             window.close();
@@ -468,7 +427,6 @@ async function printFullItemList(category, subcategory, commonName) {
     }
     printWindow.document.write(printContent);
     printWindow.document.close();
-    console.log('Full item list print triggered successfully');
 }
 
 // Note: Common function - will be moved to tab1_5.js during split
@@ -479,9 +437,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const pathMatch = window.location.pathname.match(/\/tab\/(\d+)/);
     if (pathMatch) {
         tabNum = parseInt(pathMatch[1], 10);
-        console.log('Extracted tab number from URL:', tabNum);
     } else if (window.location.pathname === '/') {
-        console.log('Homepage detected, defaulting tab number to 1');
         tabNum = 1;
     } else {
         console.warn('No tab number found in URL, using default tab number 1.');
@@ -495,35 +451,19 @@ document.addEventListener('DOMContentLoaded', () => {
         const printFullBtn = event.target.closest('.print-full-btn');
 
         if (printBtn) {
-            console.log('Print button clicked:', printBtn);
             const level = printBtn.getAttribute('data-print-level');
             const id = printBtn.getAttribute('data-print-id');
             const commonName = printBtn.getAttribute('data-common-name');
             const category = printBtn.getAttribute('data-category');
             const subcategory = printBtn.getAttribute('data-subcategory');
-            console.log(`Print button clicked: level=${level}, id=${id}, commonName=${commonName}, category=${category}, subcategory=${subcategory}`);
             printTable(level, id, commonName, category, subcategory);
         }
 
         if (printFullBtn) {
-            console.log('Print full button clicked:', printFullBtn);
             const commonName = printFullBtn.getAttribute('data-common-name');
             const category = printFullBtn.getAttribute('data-category');
             const subcategory = printFullBtn.getAttribute('data-subcategory');
-            console.log(`Print full button clicked: commonName=${commonName}, category=${category}, subcategory=${subcategory}`);
             printFullItemList(category, subcategory, commonName);
         }
     });
-
-    const searchInput = document.getElementById('category-filter') || document.getElementById('searchInput');
-    const categoryFilter = document.getElementById('categoryFilter');
-    const statusFilter = document.getElementById('statusFilter');
-    const binFilter = document.getElementById('binFilter');
-
-    if (searchInput) searchInput.addEventListener('input', window.applyFilters);
-    if (categoryFilter) categoryFilter.addEventListener('change', window.applyFilters);
-    if (statusFilter) statusFilter.addEventListener('change', window.applyFilters);
-    if (binFilter) binFilter.addEventListener('change', window.applyFilters);
-
-    window.applyFilters();
 });
