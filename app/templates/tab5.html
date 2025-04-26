@@ -78,12 +78,18 @@
 
 <!-- JavaScript for refreshing the table -->
 <script>
+console.log('Categories received:', {{ categories | tojson }});  // Debug log
+
 function applyCategoryFilters() {
     const filter = document.getElementById('category-filter').value;
     const sort = document.getElementById('category-sort').value;
+    const statusFilter = document.getElementById('statusFilter').value;
+    const binFilter = document.getElementById('binFilter').value;
     let url = '/tab/5?';
     if (filter) url += `filter=${encodeURIComponent(filter)}&`;
-    if (sort) url += `sort=${encodeURIComponent(sort)}`;
+    if (sort) url += `sort=${encodeURIComponent(sort)}&`;
+    if (statusFilter) url += `statusFilter=${encodeURIComponent(statusFilter)}&`;
+    if (binFilter) url += `binFilter=${encodeURIComponent(binFilter)}`;
     window.location.href = url;
 }
 

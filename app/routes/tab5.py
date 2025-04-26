@@ -9,7 +9,7 @@ import sys
 from urllib.parse import unquote
 import csv
 from io import StringIO
-import json  # Add import for JSON serialization
+import json
 
 # Configure logging
 logger = logging.getLogger('tab5')
@@ -46,11 +46,10 @@ if not any(isinstance(h, logging.StreamHandler) for h in root_logger.handlers):
 tab5_bp = Blueprint('tab5', __name__)
 
 # Version marker
-logger.info("Deployed tab5.py version: 2025-04-25-v14")
+logger.info("Deployed tab5.py version: 2025-04-25-v15")
 
 @tab5_bp.route('/tab/5')
 def tab5_view():
-    # Log using both logger and current_app.logger to ensure visibility
     logger.info("Tab 5 route accessed - Starting execution")
     current_app.logger.info("Tab 5 route accessed - Starting execution")
     
@@ -61,7 +60,6 @@ def tab5_view():
         if cached_data is not None:
             logger.info("Serving Tab 5 data from cache")
             current_app.logger.info("Serving Tab 5 data from cache")
-            # Deserialize the cached data
             cached_data = json.loads(cached_data)
             return render_template('tab5.html', categories=cached_data, cache_bust=int(time()))
 
@@ -86,7 +84,6 @@ def tab5_view():
         for um in user_mappings:
             mappings_dict[um.rental_class_id] = {'category': um.category, 'subcategory': um.subcategory}
 
-        # If no mappings exist, return an empty response with a warning
         if not mappings_dict:
             logger.warning("No rental class mappings found in either rental_class_mappings or user_rental_class_mappings")
             current_app.logger.warning("No rental class mappings found in either rental_class_mappings or user_rental_class_mappings")
@@ -107,29 +104,20 @@ def tab5_view():
         logger.debug(f"Grouped categories: {list(categories.keys())}")
         current_app.logger.debug(f"Grouped categories: {list(categories.keys())}")
 
-        # Calculate counts for each category, filtering for resale/pack items
-        category_data = []
+        # Get filter and sort parameters
         filter_query = request.args.get('filter', '').lower()
+        status_filter = request.args.get('statusFilter', '').lower()
+        bin_filter = request.args.get('binFilter', '').lower()
         sort = request.args.get('sort', '')
 
+        logger.debug(f"Filters applied - filter_query: {filter_query}, status_filter: {status_filter}, bin_filter: {bin_filter}, sort: {sort}")
+
+        # Calculate counts for each category, filtering for resale/pack items
+        category_data = []
         for cat, mappings in categories.items():
             rental_class_ids = [str(m['rental_class_id']).strip() for m in mappings]
             logger.debug(f"Processing category {cat} with rental_class_ids: {rental_class_ids}")
             current_app.logger.debug(f"Processing category {cat} with rental_class_ids: {rental_class_ids}")
-
-            # Test the bin_location condition independently
-            bin_location_test = session.query(func.count(ItemMaster.tag_id)).filter(
-                func.lower(func.trim(func.replace(func.coalesce(ItemMaster.bin_location, ''), '\x00', ''))).in_(['resale', 'sold', 'pack', 'burst'])
-            ).scalar()
-            logger.debug(f"Total items with bin_location in ['resale', 'sold', 'pack', 'burst'] (no rental_class filter): {bin_location_test}")
-            current_app.logger.debug(f"Total items with bin_location in ['resale', 'sold', 'pack', 'burst'] (no rental_class filter): {bin_location_test}")
-
-            # Test the rental_class_num condition independently
-            rental_class_test = session.query(func.count(ItemMaster.tag_id)).filter(
-                func.trim(func.cast(func.replace(ItemMaster.rental_class_num, '\x00', ''), db.String)).in_(rental_class_ids)
-            ).scalar()
-            logger.debug(f"Total items with rental_class_num in {rental_class_ids} (no bin_location filter): {rental_class_test}")
-            current_app.logger.debug(f"Total items with rental_class_num in {rental_class_ids} (no bin_location filter): {rental_class_test}")
 
             # Total items in this category with bin_location in ['resale', 'sold', 'pack', 'burst']
             total_items_query = session.query(func.count(ItemMaster.tag_id)).filter(
@@ -140,34 +128,53 @@ def tab5_view():
                 total_items_query = total_items_query.filter(
                     func.lower(ItemMaster.common_name).like(f'%{filter_query}%')
                 )
+            if status_filter:
+                total_items_query = total_items_query.filter(
+                    func.lower(ItemMaster.status) == status_filter
+                )
+            if bin_filter:
+                total_items_query = total_items_query.filter(
+                    func.lower(func.trim(func.replace(func.coalesce(ItemMaster.bin_location, ''), '\x00', ''))) == bin_filter
+                )
             total_items = total_items_query.scalar()
             logger.debug(f"Total items for category {cat}: {total_items}")
             current_app.logger.debug(f"Total items for category {cat}: {total_items}")
 
-            # Debug: Fetch raw items for this category
+            # Debug: Fetch raw items for this category if total_items is 0
             if total_items == 0:
                 logger.debug(f"Skipping category {cat} due to zero total items")
                 current_app.logger.debug(f"Skipping category {cat} due to zero total items")
-                # Check total items without bin_location filter
-                all_items = session.query(func.count(ItemMaster.tag_id)).filter(
+                # Check total items without bin_location and status filters
+                all_items_query = session.query(func.count(ItemMaster.tag_id)).filter(
                     func.trim(func.cast(func.replace(ItemMaster.rental_class_num, '\x00', ''), db.String)).in_(rental_class_ids)
-                ).scalar()
-                logger.debug(f"Total items (without bin_location filter) for category {cat}: {all_items}")
-                current_app.logger.debug(f"Total items (without bin_location filter) for category {cat}: {all_items}")
+                )
+                if filter_query:
+                    all_items_query = all_items_query.filter(
+                        func.lower(ItemMaster.common_name).like(f'%{filter_query}%')
+                    )
+                all_items = all_items_query.scalar()
+                logger.debug(f"Total items (without bin_location/status filters) for category {cat}: {all_items}")
+                current_app.logger.debug(f"Total items (without bin_location/status filters) for category {cat}: {all_items}")
                 if all_items > 0:
-                    # Fetch raw items to inspect bin_location and rental_class_num
-                    raw_items = session.query(ItemMaster.tag_id, ItemMaster.rental_class_num, ItemMaster.bin_location).filter(
+                    # Fetch raw items to inspect bin_location, status, and rental_class_num
+                    raw_items = session.query(ItemMaster.tag_id, ItemMaster.rental_class_num, ItemMaster.bin_location, ItemMaster.status).filter(
                         func.trim(func.cast(func.replace(ItemMaster.rental_class_num, '\x00', ''), db.String)).in_(rental_class_ids)
                     ).all()
                     for item in raw_items:
-                        logger.debug(f"Item: tag_id={item.tag_id}, rental_class_num={item.rental_class_num}, bin_location={item.bin_location}")
-                        current_app.logger.debug(f"Item: tag_id={item.tag_id}, rental_class_num={item.rental_class_num}, bin_location={item.bin_location}")
+                        logger.debug(f"Item: tag_id={item.tag_id}, rental_class_num={item.rental_class_num}, bin_location={item.bin_location}, status={item.status}")
+                        current_app.logger.debug(f"Item: tag_id={item.tag_id}, rental_class_num={item.rental_class_num}, bin_location={item.bin_location}, status={item.status}")
                     # Fetch distinct bin_locations
                     bin_locations = session.query(ItemMaster.bin_location).filter(
                         func.trim(func.cast(func.replace(ItemMaster.rental_class_num, '\x00', ''), db.String)).in_(rental_class_ids)
                     ).distinct().all()
                     logger.debug(f"Bin locations for category {cat}: {[loc[0] for loc in bin_locations]}")
                     current_app.logger.debug(f"Bin locations for category {cat}: {[loc[0] for loc in bin_locations]}")
+                    # Fetch distinct statuses
+                    statuses = session.query(ItemMaster.status).filter(
+                        func.trim(func.cast(func.replace(ItemMaster.rental_class_num, '\x00', ''), db.String)).in_(rental_class_ids)
+                    ).distinct().all()
+                    logger.debug(f"Statuses for category {cat}: {[status[0] for status in statuses]}")
+                    current_app.logger.debug(f"Statuses for category {cat}: {[status[0] for status in statuses]}")
                     # Fetch distinct rental_class_num values
                     rental_class_nums = session.query(ItemMaster.rental_class_num).filter(
                         func.trim(func.cast(func.replace(ItemMaster.rental_class_num, '\x00', ''), db.String)).in_(rental_class_ids)
@@ -185,6 +192,14 @@ def tab5_view():
             if filter_query:
                 items_on_contracts_query = items_on_contracts_query.filter(
                     func.lower(ItemMaster.common_name).like(f'%{filter_query}%')
+                )
+            if status_filter:
+                items_on_contracts_query = items_on_contracts_query.filter(
+                    func.lower(ItemMaster.status) == status_filter
+                )
+            if bin_filter:
+                items_on_contracts_query = items_on_contracts_query.filter(
+                    func.lower(func.trim(func.replace(func.coalesce(ItemMaster.bin_location, ''), '\x00', ''))) == bin_filter
                 )
             items_on_contracts = items_on_contracts_query.scalar()
             logger.debug(f"Items on contracts for category {cat}: {items_on_contracts}")
@@ -218,6 +233,14 @@ def tab5_view():
                 items_in_service_query = items_in_service_query.filter(
                     func.lower(ItemMaster.common_name).like(f'%{filter_query}%')
                 )
+            if status_filter:
+                items_in_service_query = items_in_service_query.filter(
+                    func.lower(ItemMaster.status) == status_filter
+                )
+            if bin_filter:
+                items_in_service_query = items_in_service_query.filter(
+                    func.lower(func.trim(func.replace(func.coalesce(ItemMaster.bin_location, ''), '\x00', ''))) == bin_filter
+                )
             items_in_service = items_in_service_query.scalar()
             logger.debug(f"Items in service for category {cat}: {items_in_service}")
             current_app.logger.debug(f"Items in service for category {cat}: {items_in_service}")
@@ -231,6 +254,14 @@ def tab5_view():
             if filter_query:
                 items_available_query = items_available_query.filter(
                     func.lower(ItemMaster.common_name).like(f'%{filter_query}%')
+                )
+            if status_filter:
+                items_available_query = items_available_query.filter(
+                    func.lower(ItemMaster.status) == status_filter
+                )
+            if bin_filter:
+                items_available_query = items_available_query.filter(
+                    func.lower(func.trim(func.replace(func.coalesce(ItemMaster.bin_location, ''), '\x00', ''))) == bin_filter
                 )
             items_available = items_available_query.scalar()
             logger.debug(f"Items available for category {cat}: {items_available}")
@@ -259,7 +290,7 @@ def tab5_view():
         current_app.logger.info(f"Fetched {len(category_data)} categories for tab5: {[cat['category'] for cat in category_data]}")
 
         # Cache the data with serialization
-        cache.set(cache_key, json.dumps(category_data), ex=60)  # Serialize to JSON before caching
+        cache.set(cache_key, json.dumps(category_data), ex=60)
         logger.info("Cached Tab 5 data")
         current_app.logger.info("Cached Tab 5 data")
 
@@ -272,11 +303,12 @@ def tab5_view():
 
 @tab5_bp.route('/tab/5/subcat_data')
 def tab5_subcat_data():
-    # Decode the category parameter to handle URL-encoded values
     category = unquote(request.args.get('category'))
     page = int(request.args.get('page', 1))
     per_page = 10
     filter_query = request.args.get('filter', '').lower()
+    status_filter = request.args.get('statusFilter', '').lower()
+    bin_filter = request.args.get('binFilter', '').lower()
     sort = request.args.get('sort', '')
 
     if not category:
@@ -307,7 +339,6 @@ def tab5_subcat_data():
             logger.debug("User mappings: " + ", ".join([f"{m.rental_class_id}: {m.category} - {m.subcategory}" for m in user_mappings]))
             current_app.logger.debug("User mappings: " + ", ".join([f"{m.rental_class_id}: {m.category} - {m.subcategory}" for m in user_mappings]))
 
-        # If no mappings exist, return an empty response with a warning
         if not base_mappings and not user_mappings:
             logger.warning(f"No mappings found for category {category} in either rental_class_mappings or user_rental_class_mappings")
             current_app.logger.warning(f"No mappings found for category {category} in either rental_class_mappings or user_rental_class_mappings")
@@ -363,6 +394,14 @@ def tab5_subcat_data():
                     total_items_query = total_items_query.filter(
                         func.lower(ItemMaster.common_name).like(f'%{filter_query}%')
                     )
+                if status_filter:
+                    total_items_query = total_items_query.filter(
+                        func.lower(ItemMaster.status) == status_filter
+                    )
+                if bin_filter:
+                    total_items_query = total_items_query.filter(
+                        func.lower(func.trim(func.replace(func.coalesce(ItemMaster.bin_location, ''), '\x00', ''))) == bin_filter
+                    )
                 total_items = total_items_query.scalar() or 0
                 logger.debug(f"Total items for subcategory {subcat}: {total_items}")
                 current_app.logger.debug(f"Total items for subcategory {subcat}: {total_items}")
@@ -394,6 +433,14 @@ def tab5_subcat_data():
                 if filter_query:
                     items_on_contracts_query = items_on_contracts_query.filter(
                         func.lower(ItemMaster.common_name).like(f'%{filter_query}%')
+                    )
+                if status_filter:
+                    items_on_contracts_query = items_on_contracts_query.filter(
+                        func.lower(ItemMaster.status) == status_filter
+                    )
+                if bin_filter:
+                    items_on_contracts_query = items_on_contracts_query.filter(
+                        func.lower(func.trim(func.replace(func.coalesce(ItemMaster.bin_location, ''), '\x00', ''))) == bin_filter
                     )
                 items_on_contracts = items_on_contracts_query.scalar() or 0
                 logger.debug(f"Items on contracts for subcategory {subcat}: {items_on_contracts}")
@@ -427,6 +474,14 @@ def tab5_subcat_data():
                     items_in_service_query = items_in_service_query.filter(
                         func.lower(ItemMaster.common_name).like(f'%{filter_query}%')
                     )
+                if status_filter:
+                    items_in_service_query = items_in_service_query.filter(
+                        func.lower(ItemMaster.status) == status_filter
+                    )
+                if bin_filter:
+                    items_in_service_query = items_in_service_query.filter(
+                        func.lower(func.trim(func.replace(func.coalesce(ItemMaster.bin_location, ''), '\x00', ''))) == bin_filter
+                    )
                 items_in_service = items_in_service_query.scalar() or 0
                 logger.debug(f"Items in service for subcategory {subcat}: {items_in_service}")
                 current_app.logger.debug(f"Items in service for subcategory {subcat}: {items_in_service}")
@@ -440,6 +495,14 @@ def tab5_subcat_data():
                 if filter_query:
                     items_available_query = items_available_query.filter(
                         func.lower(ItemMaster.common_name).like(f'%{filter_query}%')
+                    )
+                if status_filter:
+                    items_available_query = items_available_query.filter(
+                        func.lower(ItemMaster.status) == status_filter
+                    )
+                if bin_filter:
+                    items_available_query = items_available_query.filter(
+                        func.lower(func.trim(func.replace(func.coalesce(ItemMaster.bin_location, ''), '\x00', ''))) == bin_filter
                     )
                 items_available = items_available_query.scalar() or 0
                 logger.debug(f"Items available for subcategory {subcat}: {items_available}")
@@ -484,6 +547,8 @@ def tab5_common_names():
     page = int(request.args.get('page', 1))
     per_page = 10
     filter_query = request.args.get('filter', '').lower()
+    status_filter = request.args.get('statusFilter', '').lower()
+    bin_filter = request.args.get('binFilter', '').lower()
     sort = request.args.get('sort', '')
 
     if not category or not subcategory:
@@ -522,6 +587,14 @@ def tab5_common_names():
             common_names_query = common_names_query.filter(
                 func.lower(ItemMaster.common_name).like(f'%{filter_query}%')
             )
+        if status_filter:
+            common_names_query = common_names_query.filter(
+                func.lower(ItemMaster.status) == status_filter
+            )
+        if bin_filter:
+            common_names_query = common_names_query.filter(
+                func.lower(func.trim(func.replace(func.coalesce(ItemMaster.bin_location, ''), '\x00', ''))) == bin_filter
+            )
         common_names_query = common_names_query.group_by(ItemMaster.common_name)
 
         # Apply sorting
@@ -551,6 +624,14 @@ def tab5_common_names():
             if filter_query:
                 items_on_contracts_query = items_on_contracts_query.filter(
                     func.lower(ItemMaster.common_name).like(f'%{filter_query}%')
+                )
+            if status_filter:
+                items_on_contracts_query = items_on_contracts_query.filter(
+                    func.lower(ItemMaster.status) == status_filter
+                )
+            if bin_filter:
+                items_on_contracts_query = items_on_contracts_query.filter(
+                    func.lower(func.trim(func.replace(func.coalesce(ItemMaster.bin_location, ''), '\x00', ''))) == bin_filter
                 )
             items_on_contracts = items_on_contracts_query.scalar()
 
@@ -583,6 +664,14 @@ def tab5_common_names():
                 items_in_service_query = items_in_service_query.filter(
                     func.lower(ItemMaster.common_name).like(f'%{filter_query}%')
                 )
+            if status_filter:
+                items_in_service_query = items_in_service_query.filter(
+                    func.lower(ItemMaster.status) == status_filter
+                )
+            if bin_filter:
+                items_in_service_query = items_in_service_query.filter(
+                    func.lower(func.trim(func.replace(func.coalesce(ItemMaster.bin_location, ''), '\x00', ''))) == bin_filter
+                )
             items_in_service = items_in_service_query.scalar()
 
             # Items available (status = 'Ready to Rent')
@@ -595,6 +684,14 @@ def tab5_common_names():
             if filter_query:
                 items_available_query = items_available_query.filter(
                     func.lower(ItemMaster.common_name).like(f'%{filter_query}%')
+                )
+            if status_filter:
+                items_available_query = items_available_query.filter(
+                    func.lower(ItemMaster.status) == status_filter
+                )
+            if bin_filter:
+                items_available_query = items_available_query.filter(
+                    func.lower(func.trim(func.replace(func.coalesce(ItemMaster.bin_location, ''), '\x00', ''))) == bin_filter
                 )
             items_available = items_available_query.scalar()
 
@@ -632,6 +729,8 @@ def tab5_data():
     page = int(request.args.get('page', 1))
     per_page = 10
     filter_query = request.args.get('filter', '').lower()
+    status_filter = request.args.get('statusFilter', '').lower()
+    bin_filter = request.args.get('binFilter', '').lower()
     sort = request.args.get('sort', '')
 
     if not category or not subcategory or not common_name:
@@ -672,6 +771,14 @@ def tab5_data():
                     func.lower(ItemMaster.status).like(f'%{filter_query}%'),
                     func.lower(ItemMaster.last_contract_num).like(f'%{filter_query}%')
                 )
+            )
+        if status_filter:
+            query = query.filter(
+                func.lower(ItemMaster.status) == status_filter
+            )
+        if bin_filter:
+            query = query.filter(
+                func.lower(func.trim(func.replace(func.coalesce(ItemMaster.bin_location, ''), '\x00', ''))) == bin_filter
             )
 
         # Apply sorting
@@ -716,7 +823,6 @@ def tab5_data():
 
 @tab5_bp.route('/tab/5/update_bin_location', methods=['POST'])
 def update_bin_location():
-    # Note: This endpoint is Tab 5 specific
     try:
         data = request.get_json()
         tag_id = data.get('tag_id')
@@ -755,7 +861,6 @@ def update_bin_location():
 
 @tab5_bp.route('/tab/5/update_status', methods=['POST'])
 def update_status():
-    # Note: This endpoint is Tab 5 specific
     try:
         data = request.get_json()
         tag_id = data.get('tag_id')
@@ -800,7 +905,6 @@ def update_status():
 
 @tab5_bp.route('/tab/5/export_sold_burst_csv')
 def export_sold_burst_csv():
-    # Note: This endpoint is Tab 5 specific
     try:
         session = db.session()
 
