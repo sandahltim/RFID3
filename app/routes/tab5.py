@@ -45,7 +45,7 @@ if not any(isinstance(h, logging.StreamHandler) for h in root_logger.handlers):
 tab5_bp = Blueprint('tab5', __name__)
 
 # Version marker
-logger.info("Deployed tab5.py version: 2025-04-25-v10")
+logger.info("Deployed tab5.py version: 2025-04-25-v12")
 
 @tab5_bp.route('/tab/5')
 def tab5_view():
@@ -113,6 +113,20 @@ def tab5_view():
             rental_class_ids = [str(m['rental_class_id']).strip() for m in mappings]
             logger.debug(f"Processing category {cat} with rental_class_ids: {rental_class_ids}")
             current_app.logger.debug(f"Processing category {cat} with rental_class_ids: {rental_class_ids}")
+
+            # Test the bin_location condition independently
+            bin_location_test = session.query(func.count(ItemMaster.tag_id)).filter(
+                func.lower(func.trim(func.replace(ItemMaster.bin_location, '\x00', ''))).in_(['resale', 'sold', 'pack', 'burst'])
+            ).scalar()
+            logger.debug(f"Total items with bin_location in ['resale', 'sold', 'pack', 'burst'] (no rental_class filter): {bin_location_test}")
+            current_app.logger.debug(f"Total items with bin_location in ['resale', 'sold', 'pack', 'burst'] (no rental_class filter): {bin_location_test}")
+
+            # Test the rental_class_num condition independently
+            rental_class_test = session.query(func.count(ItemMaster.tag_id)).filter(
+                func.trim(func.cast(func.replace(ItemMaster.rental_class_num, '\x00', ''), db.String)).in_(rental_class_ids)
+            ).scalar()
+            logger.debug(f"Total items with rental_class_num in {rental_class_ids} (no bin_location filter): {rental_class_test}")
+            current_app.logger.debug(f"Total items with rental_class_num in {rental_class_ids} (no bin_location filter): {rental_class_test}")
 
             # Total items in this category with bin_location in ['resale', 'sold', 'pack', 'burst']
             total_items_query = session.query(func.count(ItemMaster.tag_id)).filter(
@@ -241,8 +255,8 @@ def tab5_view():
         logger.info(f"Fetched {len(category_data)} categories for tab5: {[cat['category'] for cat in category_data]}")
         current_app.logger.info(f"Fetched {len(category_data)} categories for tab5: {[cat['category'] for cat in category_data]}")
 
-        # Cache the data
-        cache.set(cache_key, category_data, timeout=60)
+        # Cache the data with corrected 'ex' parameter
+        cache.set(cache_key, category_data, ex=60)  # Use 'ex' instead of 'timeout'
         logger.info("Cached Tab 5 data")
         current_app.logger.info("Cached Tab 5 data")
 
