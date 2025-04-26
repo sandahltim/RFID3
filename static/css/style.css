@@ -110,6 +110,8 @@ body {
     border-left: 3px solid #28a745;
     max-height: 1200px;
     overflow-y: auto;
+    display: block;
+    visibility: visible;
 }
 
 .item-level-wrapper {
@@ -122,12 +124,16 @@ body {
     max-height: 1200px;
     min-width: 100%;
     box-sizing: border-box;
+    display: block;
+    visibility: visible;
 }
 
 .item-level {
     width: 100%;
     table-layout: auto;
     min-width: 1000px;
+    display: table;
+    visibility: visible;
 }
 
 .common-level th:nth-child(1),
