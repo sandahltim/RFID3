@@ -1,4 +1,4 @@
-console.log('expand.js version: 2025-04-25 v50 loaded');
+console.log('expand.js version: 2025-04-25 v51 loaded');
 
 // Note: Common function - will be moved to common.js during split
 function showLoading(key) {
@@ -159,6 +159,29 @@ function loadCommonNames(category, subcategory, targetId, page = 1, contractNumb
                                 <option value="total_items_asc" ${commonSort === 'total_items_asc' ? 'selected' : ''}>Total Items (Low to High)</option>
                                 <option value="total_items_desc" ${commonSort === 'total_items_desc' ? 'selected' : ''}>Total Items (High to Low)</option>
                             </select>
+                `;
+
+                // Add bulk update controls for Tab 5 only
+                if (window.cachedTabNum == 5) {
+                    html += `
+                        <div class="bulk-update-controls" style="margin-top: 10px;">
+                            <select id="bulk-bin-location-${key}" onchange="updateBulkField('${key}', 'bin_location')">
+                                <option value="">Update Bin Location...</option>
+                                <option value="resale">resale</option>
+                                <option value="sold">sold</option>
+                                <option value="pack">pack</option>
+                                <option value="burst">burst</option>
+                            </select>
+                            <select id="bulk-status-${key}" onchange="updateBulkField('${key}', 'status')">
+                                <option value="">Update Status...</option>
+                                <option value="Ready to Rent">Ready to Rent</option>
+                            </select>
+                            <button class="btn btn-sm btn-primary" onclick="bulkUpdateCommonName('${category}', '${subcategory || ''}', '${targetId}', '${key}')">Bulk Update</button>
+                        </div>
+                    `;
+                }
+
+                html += `
                         </div>
                         <table class="table table-bordered mt-2" id="common-table-${key}">
                             <thead>
@@ -391,7 +414,7 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
                                         <td>${subcat.items_in_service}</td>
                                         <td>${subcat.items_available}</td>
                                         <td>
-                                            <button class="btn btn-sm btn-secondary expand-btn" onclick="loadCommonNamesWithEvent(event, '${originalCategory}', '${subcat.subcategory}', '${subcatKey}')">Expand</button>
+                                            <button class="btn btn-sm btn-secondary expand-btn" onclick="loadCommonNames('${originalCategory}', '${subcat.subcategory}', '${subcatKey}')">Expand</button>
                                             <button class="btn btn-sm btn-secondary collapse-btn" style="display:none;" onclick="collapseSection('common-${subcatKey}')">Collapse</button>
                                             <button class="btn btn-sm btn-info print-btn" data-print-level="Subcategory" data-print-id="subcat-table-${subcatKey}">Print</button>
                                             <div id="loading-${subcatKey}" style="display:none;" class="loading">Loading...</div>
@@ -528,92 +551,148 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
         });
 }
 
-// Wrapper function to handle event propagation for loadCommonNames
-function loadCommonNamesWithEvent(event, category, subcategory, targetId, page = 1, contractNumber = null) {
-    console.log('loadCommonNamesWithEvent called, stopping propagation');
-    event.stopPropagation();
-    loadCommonNames(category, subcategory, targetId, page, contractNumber);
-}
+// Note: Tab 5 specific - Bulk update for all items under a common name
+function bulkUpdateCommonName(category, subcategory, targetId, key) {
+    const binLocation = document.getElementById(`bulk-bin-location-${key}`).value;
+    const status = document.getElementById(`bulk-status-${key}`).value;
 
-// Note: This function is Tab 5 specific
-function updateBinLocation(tagId, currentBinLocation) {
-    const newBinLocation = document.getElementById(`bin-location-select-${tagId}`).value;
-    if (!newBinLocation) {
-        alert('Please select a new bin location.');
+    if (!binLocation && !status) {
+        alert('Please select a Bin Location or Status to update.');
         return;
     }
 
-    fetch('/tab/5/update_bin_location', {
+    fetch('/tab/5/bulk_update_common_name', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-            tag_id: tagId,
-            bin_location: newBinLocation
+            category: category,
+            subcategory: subcategory,
+            common_name: document.querySelector(`#common-table-${key} tbody tr td:first-child`).textContent,
+            bin_location: binLocation || undefined,
+            status: status || undefined
         })
     })
     .then(response => response.json())
     .then(data => {
         if (data.error) {
-            console.error('Error updating bin location:', data.error);
-            alert('Failed to update bin location: ' + data.error);
+            console.error('Bulk update error:', data.error);
+            alert('Failed to bulk update: ' + data.error);
         } else {
-            console.log('Bin location updated successfully:', data);
-            alert('Bin location updated successfully!');
-            const itemsContainer = document.getElementById(`items-${tagId.split('-')[0]}`);
-            if (itemsContainer) {
-                const category = itemsContainer.closest('.common-level').querySelector('button[data-category]').getAttribute('data-category');
-                const subcategory = itemsContainer.closest('.common-level').querySelector('button[data-subcategory]').getAttribute('data-subcategory');
-                const commonName = itemsContainer.closest('tr').querySelector('td:first-child').textContent;
-                loadItems(category, subcategory, commonName, `items-${tagId.split('-')[0]}`);
-            }
+            console.log('Bulk update successful:', data);
+            alert('Bulk update successful!');
+            // Refresh the items table
+            loadItems(category, subcategory, document.querySelector(`#common-table-${key} tbody tr td:first-child`).textContent, targetId);
         }
     })
     .catch(error => {
-        console.error('Error updating bin location:', error);
-        alert('Error updating bin location: ' + error.message);
+        console.error('Bulk update error:', error);
+        alert('Error during bulk update: ' + error.message);
     });
 }
 
-// Note: This function is Tab 5 specific
-function updateStatus(tagId, currentStatus) {
-    const newStatus = document.getElementById(`status-select-${tagId}`).value;
-    if (!newStatus) {
-        alert('Please select a new status.');
+// Note: Tab 5 specific - Bulk update for selected items
+function bulkUpdateSelectedItems(key) {
+    const selectedItems = Array.from(document.querySelectorAll(`#item-table-${key} tbody input[type="checkbox"]:checked`))
+        .map(checkbox => checkbox.value);
+    
+    if (selectedItems.length === 0) {
+        alert('Please select at least one item to update.');
         return;
     }
 
-    fetch('/tab/5/update_status', {
+    const binLocation = document.getElementById(`bulk-item-bin-location-${key}`).value;
+    const status = document.getElementById(`bulk-item-status-${key}`).value;
+
+    if (!binLocation && !status) {
+        alert('Please select a Bin Location or Status to update.');
+        return;
+    }
+
+    fetch('/tab/5/bulk_update_items', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            tag_ids: selectedItems,
+            bin_location: binLocation || undefined,
+            status: status || undefined
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            console.error('Bulk update error:', data.error);
+            alert('Failed to bulk update: ' + data.error);
+        } else {
+            console.log('Bulk update successful:', data);
+            alert('Bulk update successful!');
+            // Refresh the items table
+            const category = document.querySelector(`#item-table-${key}`).closest('.common-level').querySelector('button[data-category]').getAttribute('data-category');
+            const subcategory = document.querySelector(`#item-table-${key}`).closest('.common-level').querySelector('button[data-subcategory]').getAttribute('data-subcategory');
+            const commonName = document.querySelector(`#common-table-${key} tbody tr td:first-child`).textContent;
+            const targetId = document.querySelector(`#item-table-${key}`).closest('.expandable').id;
+            loadItems(category, subcategory, commonName, targetId);
+        }
+    })
+    .catch(error => {
+        console.error('Bulk update error:', error);
+        alert('Error during bulk update: ' + error.message);
+    });
+}
+
+// Note: Tab 5 specific - Update dropdown visibility for bulk update
+function updateBulkField(key, field) {
+    const binLocationSelect = document.getElementById(`bulk-${field}-${key}`);
+    if (binLocationSelect.value) {
+        const otherField = field === 'bin_location' ? 'status' : 'bin_location';
+        const otherSelect = document.getElementById(`bulk-${otherField}-${key}`);
+        otherSelect.value = '';
+    }
+}
+
+// Note: Tab 5 specific - Update individual item
+function updateItem(tagId, key) {
+    const binLocation = document.getElementById(`bin-location-${tagId}`).value;
+    const status = document.getElementById(`status-${tagId}`).value;
+
+    if (!binLocation && !status) {
+        alert('Please select a Bin Location or Status to update.');
+        return;
+    }
+
+    fetch('/tab/5/update_item', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
         },
         body: JSON.stringify({
             tag_id: tagId,
-            status: newStatus
+            bin_location: binLocation || undefined,
+            status: status || undefined
         })
     })
     .then(response => response.json())
     .then(data => {
         if (data.error) {
-            console.error('Error updating status:', data.error);
-            alert('Failed to update status: ' + data.error);
+            console.error('Update error:', data.error);
+            alert('Failed to update item: ' + data.error);
         } else {
-            console.log('Status updated successfully:', data);
-            alert('Status updated successfully!');
-            const itemsContainer = document.getElementById(`items-${tagId.split('-')[0]}`);
-            if (itemsContainer) {
-                const category = itemsContainer.closest('.common-level').querySelector('button[data-category]').getAttribute('data-category');
-                const subcategory = itemsContainer.closest('.common-level').querySelector('button[data-subcategory]').getAttribute('data-subcategory');
-                const commonName = itemsContainer.closest('tr').querySelector('td:first-child').textContent;
-                loadItems(category, subcategory, commonName, `items-${tagId.split('-')[0]}`);
-            }
+            console.log('Update successful:', data);
+            alert('Update successful!');
+            // Refresh the items table
+            const category = document.querySelector(`#item-table-${key}`).closest('.common-level').querySelector('button[data-category]').getAttribute('data-category');
+            const subcategory = document.querySelector(`#item-table-${key}`).closest('.common-level').querySelector('button[data-subcategory]').getAttribute('data-subcategory');
+            const commonName = document.querySelector(`#common-table-${key} tbody tr td:first-child`).textContent;
+            const targetId = document.querySelector(`#item-table-${key}`).closest('.expandable').id;
+            loadItems(category, subcategory, commonName, targetId);
         }
     })
     .catch(error => {
-        console.error('Error updating status:', error);
-        alert('Error updating status: ' + error.message);
+        console.error('Update error:', error);
+        alert('Error during update: ' + error.message);
     });
 }
 
@@ -663,12 +742,13 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
             console.log('Items data:', data);
             let html = '';
             if (data.items && data.items.length > 0) {
-                const headers = ['Tag ID', 'Common Name', 'Bin Location', 'Status', 'Last Contract', 'Last Scanned Date'];
-                if (window.cachedTabNum == 1 || window.cachedTabNum == 5) {
-                    headers.push('Quality', 'Notes');
-                    if (window.cachedTabNum == 5) {
-                        headers.push('Actions');
-                    }
+                let headers = [];
+                if (window.cachedTabNum == 5) {
+                    headers = ['Select', 'Tag ID', 'Common Name', 'Bin Location', 'Status', 'Last Contract', 'Last Scanned Date', 'Quality', 'Notes', 'Actions'];
+                } else if (window.cachedTabNum == 1) {
+                    headers = ['Tag ID', 'Common Name', 'Bin Location', 'Status', 'Last Contract', 'Last Scanned Date', 'Quality', 'Notes'];
+                } else {
+                    headers = ['Tag ID', 'Common Name', 'Bin Location', 'Status', 'Last Contract', 'Last Scanned Date'];
                 }
                 console.log('Generated headers:', headers);
 
@@ -683,6 +763,29 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                                 <option value="last_scanned_date_desc" ${itemSort === 'last_scanned_date_desc' ? 'selected' : ''}>Last Scanned (Newest)</option>
                                 <option value="last_scanned_date_asc" ${itemSort === 'last_scanned_date_asc' ? 'selected' : ''}>Last Scanned (Oldest)</option>
                             </select>
+                `;
+
+                // Add bulk update controls for selected items in Tab 5
+                if (window.cachedTabNum == 5) {
+                    html += `
+                        <div class="bulk-update-controls" style="margin-top: 10px;">
+                            <select id="bulk-item-bin-location-${key}" onchange="updateBulkField('${key}', 'item-bin-location')">
+                                <option value="">Update Bin Location...</option>
+                                <option value="resale">resale</option>
+                                <option value="sold">sold</option>
+                                <option value="pack">pack</option>
+                                <option value="burst">burst</option>
+                            </select>
+                            <select id="bulk-item-status-${key}" onchange="updateBulkField('${key}', 'item-status')">
+                                <option value="">Update Status...</option>
+                                <option value="Ready to Rent">Ready to Rent</option>
+                            </select>
+                            <button class="btn btn-sm btn-primary" onclick="bulkUpdateSelectedItems('${key}')">Bulk Update Selected</button>
+                        </div>
+                    `;
+                }
+
+                html += `
                         </div>
                         <table class="table table-bordered item-level mt-2" id="item-table-${key}">
                             <thead>
@@ -695,7 +798,37 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
 
                 data.items.forEach(item => {
                     const lastScanned = item.last_scanned_date ? new Date(item.last_scanned_date).toLocaleString() : 'N/A';
-                    if (window.cachedTabNum == 1 || window.cachedTabNum == 5) {
+                    if (window.cachedTabNum == 5) {
+                        html += `
+                            <tr data-item-id="${item.tag_id}">
+                                <td><input type="checkbox" value="${item.tag_id}" class="item-select"></td>
+                                <td>${item.tag_id}</td>
+                                <td>${item.common_name}</td>
+                                <td>
+                                    <select id="bin-location-${item.tag_id}">
+                                        <option value="" ${!item.bin_location ? 'selected' : ''}>Select Bin Location</option>
+                                        <option value="resale" ${item.bin_location === 'resale' ? 'selected' : ''}>resale</option>
+                                        <option value="sold" ${item.bin_location === 'sold' ? 'selected' : ''}>sold</option>
+                                        <option value="pack" ${item.bin_location === 'pack' ? 'selected' : ''}>pack</option>
+                                        <option value="burst" ${item.bin_location === 'burst' ? 'selected' : ''}>burst</option>
+                                    </select>
+                                </td>
+                                <td>
+                                    <select id="status-${item.tag_id}">
+                                        <option value="" ${!item.status ? 'selected' : ''}>Select Status</option>
+                                        <option value="Ready to Rent" ${item.status === 'Ready to Rent' ? 'selected' : ''} ${item.status !== 'On Rent' && item.status !== 'Delivered' ? 'disabled' : ''}>Ready to Rent</option>
+                                    </select>
+                                </td>
+                                <td>${item.last_contract_num || 'N/A'}</td>
+                                <td>${lastScanned}</td>
+                                <td>${item.quality || 'N/A'}</td>
+                                <td>${item.notes || 'N/A'}</td>
+                                <td>
+                                    <button class="btn btn-sm btn-primary save-btn" onclick="updateItem('${item.tag_id}', '${key}')">Save</button>
+                                </td>
+                            </tr>
+                        `;
+                    } else if (window.cachedTabNum == 1) {
                         html += `
                             <tr data-item-id="${item.tag_id}">
                                 <td>${item.tag_id}</td>
@@ -706,24 +839,15 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                                 <td>${lastScanned}</td>
                                 <td>${item.quality || 'N/A'}</td>
                                 <td>${item.notes || 'N/A'}</td>
-                        `;
-                        if (window.cachedTabNum == 5) {
-                            html += `
-                                <td>
-                                    <button class="btn btn-sm btn-primary save-btn" onclick="saveChanges('${item.tag_id}')">Save</button>
-                                    <div id="dropdown-bin-location-${item.tag_id}" class="dropdown-menu">
-                                        <a class="dropdown-item" href="#" onclick="selectOption(event, this, 'bin-location', '${item.tag_id}', 'resale')">resale</a>
-                                        <a class="dropdown-item" href="#" onclick="selectOption(event, this, 'bin-location', '${item.tag_id}', 'sold')">sold</a>
-                                        <a class="dropdown-item" href="#" onclick="selectOption(event, this, 'bin-location', '${item.tag_id}', 'pack')">pack</a>
-                                        <a class="dropdown-item" href="#" onclick="selectOption(event, this, 'bin-location', '${item.tag_id}', 'burst')">burst</a>
-                                    </div>
-                                    <div id="dropdown-status-${item.tag_id}" class="dropdown-menu">
-                                        <a class="dropdown-item" href="#" onclick="selectOption(event, this, 'status', '${item.tag_id}', 'Ready to Rent')" ${item.status !== 'On Rent' && item.status !== 'Delivered' ? 'style="pointer-events: none; color: #ccc;"' : ''}>Ready to Rent</a>
-                                    </div>
-                                </td>
-                            `;
-                        }
-                        html += `
+                                <div id="dropdown-bin-location-${item.tag_id}" class="dropdown-menu">
+                                    <a class="dropdown-item" href="#" onclick="selectOption(event, this, 'bin-location', '${item.tag_id}', 'resale')">resale</a>
+                                    <a class="dropdown-item" href="#" onclick="selectOption(event, this, 'bin-location', '${item.tag_id}', 'sold')">sold</a>
+                                    <a class="dropdown-item" href="#" onclick="selectOption(event, this, 'bin-location', '${item.tag_id}', 'pack')">pack</a>
+                                    <a class="dropdown-item" href="#" onclick="selectOption(event, this, 'bin-location', '${item.tag_id}', 'burst')">burst</a>
+                                </div>
+                                <div id="dropdown-status-${item.tag_id}" class="dropdown-menu">
+                                    <a class="dropdown-item" href="#" onclick="selectOption(event, this, 'status', '${item.tag_id}', 'Ready to Rent')" ${item.status !== 'On Rent' && item.status !== 'Delivered' ? 'style="pointer-events: none; color: #ccc;"' : ''}>Ready to Rent</a>
+                                </div>
                             </tr>
                         `;
                     } else {
@@ -802,7 +926,7 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
         });
 }
 
-// New functions to handle clickable columns and dropdowns
+// New functions to handle clickable columns and dropdowns (used only in Tab 1)
 function showDropdown(event, cell, type, tagId, currentValue) {
     event.stopPropagation();
     console.log('showDropdown called with', { cell, type, tagId, currentValue });
@@ -856,6 +980,7 @@ function selectOption(event, element, type, tagId, value) {
     }
 }
 
+// Note: Used only in Tab 1
 function saveChanges(tagId) {
     console.log('saveChanges called for tagId:', tagId);
     const binLocationCell = document.querySelector(`tr[data-item-id="${tagId}"] td.editable[onclick*="showDropdown(event, this, 'bin-location', '${tagId}'"]`);
@@ -928,7 +1053,7 @@ function saveChanges(tagId) {
     }
 }
 
-// Hide dropdowns when clicking outside
+// Hide dropdowns when clicking outside (used only in Tab 1)
 document.addEventListener('click', (event) => {
     if (!event.target.closest('.editable') && !event.target.closest('.dropdown-menu')) {
         console.log('Click outside detected, hiding all dropdowns');
