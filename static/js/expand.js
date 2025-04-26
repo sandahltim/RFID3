@@ -1,4 +1,4 @@
-console.log('expand.js version: 2025-04-26-v58 loaded');
+console.log('expand.js version: 2025-04-26-v60 loaded');
 
 // Note: Common function - will be moved to common.js during split
 function showLoading(key) {
@@ -111,9 +111,9 @@ function loadCommonNames(category, subcategory, targetId, page = 1, contractNumb
         return;
     }
 
-    const key = subcategory ? `${category}_${subcategory}` : category;
-    showLoading(targetId);
-    hideOtherCommonNames(containerId, key);
+    const key = targetId; // Use targetId as the key to match the loading indicator
+    showLoading(key);
+    hideOtherCommonNames(containerId, targetId);
 
     let url = `/tab/${window.cachedTabNum}/common_names?page=${page}`;
     if (window.cachedTabNum == 2 || window.cachedTabNum == 4) {
@@ -301,7 +301,7 @@ function loadCommonNames(category, subcategory, targetId, page = 1, contractNumb
             container.style.opacity = '1';
         })
         .finally(() => {
-            hideLoading(targetId);
+            hideLoading(key);
         });
 }
 
@@ -432,7 +432,9 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
                 tableBody.style.display = 'table-row-group';
             }
 
-            const expandBtn = document.querySelector(`button.expand-btn[data-target-id="${targetId}"]`);
+            // Fix selector to handle URL-encoded category names
+            const encodedCategory = encodeURIComponent(originalCategory).replace(/'/g, "\\'").replace(/"/g, '\\"');
+            const expandBtn = document.querySelector(`button.expand-btn[onclick="window.expandCategory('${encodedCategory}', 'subcat-${normalizedCategory}')"]`);
             const collapseBtn = expandBtn ? expandBtn.nextElementSibling : null;
             if (expandBtn && collapseBtn) {
                 expandBtn.style.display = 'none';
@@ -612,9 +614,9 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
         return;
     }
 
-    const key = `${category}_${subcategory || ''}_${commonName.replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '')}`;
-    showLoading(targetId);
-    hideOtherItems(targetId, key);
+    const key = targetId; // Use targetId to match the loading indicator
+    showLoading(key);
+    hideOtherItems(targetId, targetId);
 
     let url = `/tab/${window.cachedTabNum}/data?common_name=${encodeURIComponent(commonName)}&page=${page}`;
     if (subcategory) {
@@ -811,7 +813,7 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
             container.style.opacity = '1';
         })
         .finally(() => {
-            hideLoading(targetId);
+            hideLoading(key);
         });
 }
 
@@ -955,63 +957,9 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // Restore expanded sections from sessionStorage, but only expand the most recently expanded section
-    let mostRecentSubcat = null;
-    let mostRecentCommon = null;
-    let mostRecentItem = null;
-
-    Object.keys(sessionStorage).forEach(key => {
-        if (key.startsWith('expanded_')) {
-            try {
-                const state = JSON.parse(sessionStorage.getItem(key));
-                const targetId = key.replace('expanded_', '');
-                if (document.getElementById(targetId)) {
-                    const normalizedCategory = targetId.replace('subcat-', '');
-                    mostRecentSubcat = { targetId, state };
-                }
-            } catch (e) {
-                console.error('Error parsing sessionStorage for', key, ':', e);
-                sessionStorage.removeItem(key);
-            }
-        } else if (key.startsWith('expanded_common_')) {
-            try {
-                const state = JSON.parse(sessionStorage.getItem(key));
-                const targetId = key.replace('expanded_common_', '');
-                if (document.getElementById(`common-${targetId}`)) {
-                    mostRecentCommon = { targetId, state };
-                }
-            } catch (e) {
-                console.error('Error parsing sessionStorage for', key, ':', e);
-                sessionStorage.removeItem(key);
-            }
-        } else if (key.startsWith('expanded_items_')) {
-            try {
-                const state = JSON.parse(sessionStorage.getItem(key));
-                const targetId = key.replace('expanded_items_', '');
-                if (document.getElementById(targetId)) {
-                    mostRecentItem = { targetId, state };
-                }
-            } catch (e) {
-                console.error('Error parsing sessionStorage for', key, ':', e);
-                sessionStorage.removeItem(key);
-            }
-        }
-    });
-
-    // Only restore the most recent expansion at each level
-    if (mostRecentSubcat) {
-        const { targetId, state } = mostRecentSubcat;
-        const normalizedCategory = targetId.replace('subcat-', '');
-        loadSubcatData(state.category, normalizedCategory, targetId, state.page);
-    }
-    if (mostRecentCommon) {
-        const { targetId, state } = mostRecentCommon;
-        loadCommonNames(state.category, state.subcategory, targetId, state.page, state.contractNumber);
-    }
-    if (mostRecentItem) {
-        const { targetId, state } = mostRecentItem;
-        loadItems(state.category, state.subcategory, state.commonName, targetId, state.page);
-    }
+    // Do not automatically expand any sections on load
+    // Expansion state will be restored only when the user explicitly expands a section
+    console.log('Skipping automatic expansion on load');
 
     // Event delegation for expand and collapse buttons
     document.addEventListener('click', (event) => {
