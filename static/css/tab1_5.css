@@ -1,19 +1,6 @@
 /* Styles specific to Tabs 1 and 5 */
 
 /* Hierarchy level styling */
-.subcat-level {
-    margin-left: 2rem;
-    background-color: #f8f9fa;
-    padding: 1rem;
-    border-left: 3px solid #007bff;
-    max-height: 1200px;
-    overflow-y: auto;
-    display: block !important;
-    visibility: visible !important;
-    z-index: 1; /* Ensure subcategories are not hidden by headers */
-    position: relative; /* Ensure proper stacking context */
-}
-
 .common-level {
     margin-left: 2rem;
     background-color: #e9ecef;
@@ -52,7 +39,6 @@
 
 /* Table styling */
 .category-table,
-.subcat-table,
 .common-table,
 .item-table {
     width: 100%;
@@ -63,7 +49,6 @@
 }
 
 .category-table thead,
-.subcat-table thead,
 .common-table thead,
 .item-table thead {
     display: table-header-group !important;
@@ -72,7 +57,6 @@
 }
 
 .category-table thead th,
-.subcat-table thead th,
 .common-table thead th,
 .item-table thead th {
     position: sticky;
@@ -88,7 +72,6 @@
 }
 
 .category-table tbody,
-.subcat-table tbody,
 .common-table tbody,
 .item-table tbody {
     display: table-row-group !important;
@@ -98,7 +81,6 @@
 }
 
 .category-table td,
-.subcat-table td,
 .common-table td,
 .item-table td {
     padding: 12px;
@@ -108,43 +90,21 @@
     white-space: nowrap;
 }
 
-/* Ensure subcategory rows are visible */
-.subcat-row, .subcat-table, .subcat-table tbody, .subcat-table tbody tr {
-    display: table-row !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-    height: auto !important;
-    position: relative;
-    z-index: 5; /* Ensure rows are below headers but visible */
-}
-
 /* Column widths for category table */
 .category-table th:nth-child(1),
 .category-table td:nth-child(1) { width: 200px; } /* Category */
 .category-table th:nth-child(2),
-.category-table td:nth-child(2) { width: 100px; } /* Total Items */
+.category-table td:nth-child(2) { width: 200px; } /* Subcategory Dropdown */
 .category-table th:nth-child(3),
-.category-table td:nth-child(3) { width: 120px; } /* Items on Contracts */
+.category-table td:nth-child(3) { width: 100px; } /* Total Items */
 .category-table th:nth-child(4),
-.category-table td:nth-child(4) { width: 100px; } /* Items in Service */
+.category-table td:nth-child(4) { width: 120px; } /* Items on Contracts */
 .category-table th:nth-child(5),
-.category-table td:nth-child(5) { width: 100px; } /* Items Available */
+.category-table td:nth-child(5) { width: 100px; } /* Items in Service */
 .category-table th:nth-child(6),
-.category-table td:nth-child(6) { width: 200px; } /* Actions */
-
-/* Column widths for subcategory table */
-.subcat-table th:nth-child(1),
-.subcat-table td:nth-child(1) { width: 200px; } /* Subcategory */
-.subcat-table th:nth-child(2),
-.subcat-table td:nth-child(2) { width: 100px; } /* Total Items */
-.subcat-table th:nth-child(3),
-.subcat-table td:nth-child(3) { width: 120px; } /* Items on Contracts */
-.subcat-table th:nth-child(4),
-.subcat-table td:nth-child(4) { width: 100px; } /* Items in Service */
-.subcat-table th:nth-child(5),
-.subcat-table td:nth-child(5) { width: 100px; } /* Items Available */
-.subcat-table th:nth-child(6),
-.subcat-table td:nth-child(6) { width: 200px; } /* Actions */
+.category-table td:nth-child(6) { width: 100px; } /* Items Available */
+.category-table th:nth-child(7),
+.category-table td:nth-child(7) { width: 150px; } /* Actions */
 
 /* Column widths for common names table */
 .common-table th:nth-child(1),
@@ -201,9 +161,11 @@
 .item-table td:nth-child(10) { width: 100px; } /* Actions */
 
 /* Ensure dropdowns don't overflow columns */
+.subcategory-select,
 .item-table select {
     width: 100%;
     box-sizing: border-box;
+    padding: 5px;
 }
 
 /* Smooth transition for expanding/collapsing */
@@ -228,6 +190,8 @@
 /* Bulk update controls for Tab 5 */
 .bulk-update-controls {
     margin-top: 10px;
+    display: flex;
+    gap: 10px;
 }
 
 /* Editable cells for Tab 1 */
@@ -277,9 +241,20 @@
     display: block;
 }
 
+/* Buttons */
+.btn-group {
+    display: flex;
+    gap: 5px;
+}
+
+.btn-sm {
+    padding: 5px 10px;
+    font-size: 14px;
+}
+
 /* Responsive adjustments for Tabs 1 and 5 */
 @media (max-width: 768px) {
-    .subcat-level, .common-level, .item-level-wrapper {
+    .common-level, .item-level-wrapper {
         margin-left: 0.75rem;
     }
 
@@ -298,12 +273,6 @@
 
     .item-table th,
     .item-table td {
-        padding: 0.5rem;
-        font-size: 0.9rem;
-    }
-
-    .subcat-table th,
-    .subcat-table td {
         padding: 0.5rem;
         font-size: 0.9rem;
     }
