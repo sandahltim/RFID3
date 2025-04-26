@@ -7,6 +7,7 @@ body {
 .container {
     max-width: 1400px;
     margin-top: 20px;
+    overflow-x: auto;
 }
 
 /* Navbar styling */
@@ -35,7 +36,7 @@ body {
     border-collapse: collapse;
     background-color: #ffffff;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-    position: relative; /* Ensure sticky headers work */
+    position: relative;
 }
 
 .table-bordered th, .table-bordered td {
@@ -43,7 +44,7 @@ body {
     padding: 10px;
     text-align: left;
     white-space: nowrap;
-    min-width: 120px; /* Ensure columns don't collapse */
+    min-width: 120px;
 }
 
 .table thead th {
@@ -51,9 +52,9 @@ body {
     color: #495057;
     font-weight: bold;
     position: sticky;
-    top: 56px; /* Adjust based on navbar height */
+    top: 56px;
     z-index: 10;
-    border-bottom: 2px solid #dee2e6; /* Clear separation */
+    border-bottom: 2px solid #dee2e6;
 }
 
 .table tbody tr:nth-child(odd) {
@@ -67,14 +68,14 @@ body {
 /* Subcategory, common, and item tables */
 .subcat-table, .common-level table, .item-level {
     width: 100%;
-    overflow-x: auto; /* Allow horizontal scrolling */
+    overflow-x: auto;
 }
 
 .subcat-table thead th,
 .common-level table thead th,
 .item-level thead th {
     position: sticky;
-    top: 56px; /* Adjust based on navbar height */
+    top: 56px;
     z-index: 10;
     background-color: #e9ecef;
     border-bottom: 2px solid #dee2e6;
@@ -89,44 +90,15 @@ body {
     white-space: nowrap;
 }
 
-/* Ensure item-level wrapper scrolls properly */
-.item-level-wrapper {
-    margin-left: 1rem;
-    background-color: #dee2e6;
-    padding: 0.5rem;
-    border-left: 3px solid #dc3545;
-    overflow-x: auto;
-    max-height: 1200px; /* Increased to show more items */
-    overflow-y: auto;
-    padding-bottom: 20px; /* Ensure bottom item isn't cut off */
-}
-
-/* Styling for categories column in Tab 2 */
-.category-cell {
-    padding: 0.5rem;
-    vertical-align: top;
-}
-
-.category-item {
-    margin-bottom: 0.5rem;
-    white-space: normal;
-    word-wrap: break-word;
-    line-height: 1.5;
-}
-
-.category-item:last-child {
-    margin-bottom: 0;
-}
-
 /* Hierarchy level styling */
 .subcat-level {
     margin-left: 1.5rem;
     background-color: #f8f9fa;
     padding: 0.5rem;
     border-left: 3px solid #007bff;
-    max-height: 1200px; /* Increased to show more items */
+    max-height: 1200px;
     overflow-y: auto;
-    padding-bottom: 20px; /* Ensure bottom item isn't cut off */
+    padding-bottom: 20px;
 }
 
 .common-level {
@@ -134,9 +106,9 @@ body {
     background-color: #e9ecef;
     padding: 0.5rem;
     border-left: 3px solid #28a745;
-    max-height: 1200px; /* Increased to show more items */
+    max-height: 1200px;
     overflow-y: auto;
-    padding-bottom: 20px; /* Ensure bottom item isn't cut off */
+    padding-bottom: 20px;
 }
 
 .item-level-wrapper {
@@ -144,15 +116,19 @@ body {
     background-color: #dee2e6;
     padding: 0.5rem;
     border-left: 3px solid #dc3545;
-    overflow-x: auto;
-    max-width: 100%;
-    max-height: 1200px; /* Increased to show more items */
-    overflow-y: auto;
-    padding-bottom: 20px; /* Ensure bottom item isn't cut off */
+    overflow-x: auto !important;
+    overflow-y: auto !important;
+    max-height: 1200px;
+    min-width: 100%;
+    box-sizing: border-box;
+    padding-bottom: 20px;
+    position: relative;
 }
 
 .item-level {
-    min-width: 800px;
+    width: 100%;
+    table-layout: auto;
+    min-width: 1000px; /* Ensure consistent scrollbar */
 }
 
 .common-level th:nth-child(1),
@@ -160,6 +136,47 @@ body {
     white-space: normal;
     word-wrap: break-word;
     max-width: 200px;
+}
+
+/* Style for editable cells */
+.editable {
+    cursor: pointer;
+    position: relative;
+}
+
+.editable:hover {
+    background-color: #e9ecef;
+}
+
+/* Style for dropdown menus */
+.dropdown-menu {
+    display: none;
+    position: absolute;
+    z-index: 1000 !important;
+    min-width: 150px;
+    background-color: #fff;
+    border: 1px solid #dee2e6;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.dropdown-menu.show {
+    display: block !important;
+}
+
+.dropdown-item {
+    padding: 0.25rem 1rem;
+    cursor: pointer;
+    display: block;
+    color: #333;
+}
+
+.dropdown-item:hover {
+    background-color: #f8f9fa;
+}
+
+.dropdown-item[disabled], .dropdown-item[style*="pointer-events: none"] {
+    color: #ccc;
+    cursor: not-allowed;
 }
 
 /* Filter and sort controls */
@@ -278,7 +295,7 @@ body {
 .expandable.collapsed {
     max-height: 0;
     opacity: 0;
-    display: none !important; /* Ensure collapsed state */
+    display: none !important;
 }
 
 .expandable.expanded {
@@ -286,211 +303,13 @@ body {
     visibility: visible !important;
     opacity: 1 !important;
     height: auto !important;
-}
-
-/* Ensure the container and subcat-level are visible */
-.expandable.expanded {
-    display: block !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-    height: auto !important;
-}
-
-.subcat-level {
-    display: block !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-    height: auto !important;
-    overflow: visible !important;
-}
-
-/* Ensure the filter-sort-controls are visible */
-.filter-sort-controls {
-    display: block !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-    margin-bottom: 10px;
-}
-
-/* Ensure the table and its rows are visible */
-.subcat-table {
-    display: table !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-    width: 100%;
-}
-
-.subcat-table thead,
-.subcat-table tbody {
-    display: table-row-group !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-}
-
-.subcat-table tbody tr.subcat-row {
-    min-height: 40px !important;
-    display: table-row !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-}
-
-.subcat-table tbody tr.subcat-row td {
-    min-height: 40px !important;
-    padding: 10px !important;
-    display: table-cell !important;
-    visibility: visible !important;
-    opacity: 1 !important;
 }
 
 .hidden {
     display: none !important;
 }
 
-/* Ensure edit columns are visible */
-.edit-bin-location,
-.edit-status {
-    display: table-cell !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-    min-width: 150px;
-}
-
-/* Ensure the items table renders all columns */
-.item-level {
-    width: 100%;
-    table-layout: auto;
-}
-
-.item-level th,
-.item-level td {
-    display: table-cell !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-}
-
-.container {
-    max-width: 1400px;
-    margin-top: 20px;
-    overflow-x: auto; /* Allow horizontal scrolling at the container level if needed */
-}
-
-/* Ensure the item-level-wrapper scrolls horizontally */
-.item-level-wrapper {
-    margin-left: 1rem;
-    background-color: #dee2e6;
-    padding: 0.5rem;
-    border-left: 3px solid #dc3545;
-    overflow-x: auto !important; /* Force horizontal scrolling */
-    overflow-y: auto !important;
-    max-height: 1200px;
-    min-width: 100%; /* Ensure it takes the full width of the parent */
-    box-sizing: border-box;
-    padding-bottom: 20px;
-}
-
-/* Ensure the items table renders all columns */
-.item-level {
-    width: 100%;
-    table-layout: auto; /* Let the table adjust column widths naturally */
-    min-width: 1200px; /* Increase min-width to accommodate all columns */
-}
-
-/* Ensure edit columns are visible */
-.edit-bin-location,
-.edit-status {
-    display: table-cell !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-    min-width: 150px;
-}
-
-/* Ensure all table cells are visible */
-.item-level th,
-.item-level td {
-    display: table-cell !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-    padding: 8px;
-    border: 1px solid #dee2e6;
-    white-space: nowrap; /* Prevent wrapping to keep columns compact */
-}
-
 /* Responsive adjustments */
-@media (max-width: 768px) {
-    .item-level-wrapper {
-        min-width: 100%;
-    }
-
-    .item-level {
-        min-width: 1000px; /* Adjust for smaller screens */
-    }
-
-    .item-level th,
-    .item-level td {
-        padding: 0.3rem;
-        font-size: 0.85rem;
-        min-width: 100px; /* Reduce min-width for smaller screens */
-    }
-}
-
-/* style.css */
-
-/* Style for editable cells */
-.editable {
-    cursor: pointer;
-    position: relative;
-}
-
-.editable:hover {
-    background-color: #e9ecef;
-}
-
-/* Style for dropdown menus */
-.dropdown-menu {
-    z-index: 1000;
-    min-width: 150px;
-}
-
-.dropdown-item {
-    padding: 0.25rem 1rem;
-    cursor: pointer;
-}
-
-.dropdown-item:hover {
-    background-color: #f8f9fa;
-}
-
-/* Ensure the items table fits within the viewport */
-.item-level-wrapper {
-    margin-left: 1rem;
-    background-color: #dee2e6;
-    padding: 0.5rem;
-    border-left: 3px solid #dc3545;
-    overflow-x: auto !important;
-    overflow-y: auto !important;
-    max-height: 1200px;
-    min-width: 100%;
-    box-sizing: border-box;
-    padding-bottom: 20px;
-}
-
-.item-level {
-    width: 100%;
-    table-layout: auto;
-    min-width: 800px; /* Reduced since we have fewer columns */
-}
-
-.item-level th,
-.item-level td {
-    display: table-cell !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-    padding: 8px;
-    border: 1px solid #dee2e6;
-    white-space: nowrap;
-}
-
-/* Responsive adjustments for mobile and tablet */
 @media (max-width: 768px) {
     .container {
         padding: 0.5rem;
@@ -529,15 +348,6 @@ body {
         max-width: 150px;
     }
 
-    .category-cell {
-        padding: 0.3rem;
-    }
-
-    .category-item {
-        margin-bottom: 0.3rem;
-        font-size: 0.85rem;
-    }
-
     .filter-sort-controls {
         flex-direction: column;
     }
@@ -547,24 +357,18 @@ body {
         width: 100%;
     }
 
-    .subcat-row {
-        min-height: 40px;
-        display: table-row !important;
-        visibility: visible !important;
+    .item-level-wrapper {
+        min-width: 100%;
     }
 
-    .subcat-table tbody tr.subcat-row {
-        min-height: 40px !important;
-        display: table-row !important;
-        visibility: visible !important;
-        opacity: 1 !important;
+    .item-level {
+        min-width: 800px;
     }
-    
-    .subcat-table tbody tr.subcat-row td {
-        min-height: 40px !important;
-        padding: 10px !important;
-        display: table-cell !important;
-        visibility: visible !important;
-        opacity: 1 !important;
+
+    .item-level th,
+    .item-level td {
+        padding: 0.3rem;
+        font-size: 0.85rem;
+        min-width: 100px;
     }
 }

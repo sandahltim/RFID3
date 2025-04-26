@@ -1,4 +1,4 @@
-console.log('expand.js version: 2025-04-25 v44 loaded');
+console.log('expand.js version: 2025-04-25 v45 loaded');
 
 // Note: Common function - will be moved to common.js during split
 function showLoading(key) {
@@ -609,7 +609,6 @@ function updateStatus(tagId, currentStatus) {
 }
 
 // Note: Common function - will be moved to tab1_5.js during split
-// Note: Common function - will be moved to tab1_5.js during split
 function loadItems(category, subcategory, commonName, targetId, page = 1) {
     console.log('loadItems called with', { category, subcategory, commonName, targetId, page });
     console.log('Current cachedTabNum in loadItems:', window.cachedTabNum);
@@ -692,8 +691,8 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                             <tr data-item-id="${item.tag_id}">
                                 <td>${item.tag_id}</td>
                                 <td>${item.common_name}</td>
-                                <td class="editable" onclick="showDropdown(this, 'bin-location', '${item.tag_id}', '${item.bin_location || ''}')">${item.bin_location || 'N/A'}</td>
-                                <td class="editable" onclick="showDropdown(this, 'status', '${item.tag_id}', '${item.status}')">${item.status}</td>
+                                <td class="editable" onclick="showDropdown(event, this, 'bin-location', '${item.tag_id}', '${item.bin_location || ''}')">${item.bin_location || 'N/A'}</td>
+                                <td class="editable" onclick="showDropdown(event, this, 'status', '${item.tag_id}', '${item.status}')">${item.status}</td>
                                 <td>${item.last_contract_num || 'N/A'}</td>
                                 <td>${lastScanned}</td>
                                 <td>${item.quality || 'N/A'}</td>
@@ -703,14 +702,14 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                             html += `
                                 <td>
                                     <button class="btn btn-sm btn-primary save-btn" onclick="saveChanges('${item.tag_id}')">Save</button>
-                                    <div id="dropdown-bin-location-${item.tag_id}" class="dropdown-menu" style="display: none;">
-                                        <a class="dropdown-item" href="#" onclick="selectOption(this, 'bin-location', '${item.tag_id}', 'resale')">resale</a>
-                                        <a class="dropdown-item" href="#" onclick="selectOption(this, 'bin-location', '${item.tag_id}', 'sold')">sold</a>
-                                        <a class="dropdown-item" href="#" onclick="selectOption(this, 'bin-location', '${item.tag_id}', 'pack')">pack</a>
-                                        <a class="dropdown-item" href="#" onclick="selectOption(this, 'bin-location', '${item.tag_id}', 'burst')">burst</a>
+                                    <div id="dropdown-bin-location-${item.tag_id}" class="dropdown-menu">
+                                        <a class="dropdown-item" href="#" onclick="selectOption(event, this, 'bin-location', '${item.tag_id}', 'resale')">resale</a>
+                                        <a class="dropdown-item" href="#" onclick="selectOption(event, this, 'bin-location', '${item.tag_id}', 'sold')">sold</a>
+                                        <a class="dropdown-item" href="#" onclick="selectOption(event, this, 'bin-location', '${item.tag_id}', 'pack')">pack</a>
+                                        <a class="dropdown-item" href="#" onclick="selectOption(event, this, 'bin-location', '${item.tag_id}', 'burst')">burst</a>
                                     </div>
-                                    <div id="dropdown-status-${item.tag_id}" class="dropdown-menu" style="display: none;">
-                                        <a class="dropdown-item" href="#" onclick="selectOption(this, 'status', '${item.tag_id}', 'Ready to Rent')" ${item.status !== 'On Rent' && item.status !== 'Delivered' ? 'style="pointer-events: none; color: #ccc;"' : ''}>Ready to Rent</a>
+                                    <div id="dropdown-status-${item.tag_id}" class="dropdown-menu">
+                                        <a class="dropdown-item" href="#" onclick="selectOption(event, this, 'status', '${item.tag_id}', 'Ready to Rent')" ${item.status !== 'On Rent' && item.status !== 'Delivered' ? 'style="pointer-events: none; color: #ccc;"' : ''}>Ready to Rent</a>
                                     </div>
                                 </td>
                             `;
@@ -796,41 +795,72 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
 }
 
 // New functions to handle clickable columns and dropdowns
-function showDropdown(cell, type, tagId, currentValue) {
+function showDropdown(event, cell, type, tagId, currentValue) {
+    event.stopPropagation(); // Prevent the click from bubbling up and triggering the document click handler
+    console.log('showDropdown called with', { cell, type, tagId, currentValue });
     const dropdown = document.getElementById(`dropdown-${type}-${tagId}`);
+    console.log('Dropdown element:', dropdown);
     if (dropdown) {
+        console.log('Dropdown found, current display:', dropdown.style.display);
         // Hide all other dropdowns
         document.querySelectorAll('.dropdown-menu').forEach(d => {
-            if (d !== dropdown) d.style.display = 'none';
+            if (d !== dropdown) {
+                d.classList.remove('show');
+                d.style.display = 'none';
+            }
         });
-        // Position the dropdown below the cell
+        // Show the dropdown
+        dropdown.classList.add('show');
         dropdown.style.display = 'block';
         const rect = cell.getBoundingClientRect();
         dropdown.style.position = 'absolute';
         dropdown.style.left = `${rect.left + window.scrollX}px`;
         dropdown.style.top = `${rect.bottom + window.scrollY}px`;
+        dropdown.style.zIndex = '1000';
+        console.log('Dropdown positioned at:', { left: dropdown.style.left, top: dropdown.style.top, zIndex: dropdown.style.zIndex });
         // Update the cell content to reflect the current selection
         cell.setAttribute(`data-${type}`, currentValue);
+        // Debug computed style of dropdown
+        const computedStyle = window.getComputedStyle(dropdown);
+        console.log('Dropdown computed style after show:', {
+            display: computedStyle.display,
+            visibility: computedStyle.visibility,
+            opacity: computedStyle.opacity,
+            position: computedStyle.position,
+            left: computedStyle.left,
+            top: computedStyle.top,
+            zIndex: computedStyle.zIndex
+        });
+    } else {
+        console.error(`Dropdown not found for ${type} with tagId ${tagId}`);
     }
 }
 
-function selectOption(element, type, tagId, value) {
+function selectOption(event, element, type, tagId, value) {
     event.preventDefault();
-    const cell = document.querySelector(`tr[data-item-id="${tagId}"] td.editable[onclick*="showDropdown(this, '${type}', '${tagId}'"]`);
+    event.stopPropagation(); // Prevent the click from bubbling up
+    console.log('selectOption called with', { type, tagId, value });
+    const cell = document.querySelector(`tr[data-item-id="${tagId}"] td.editable[onclick*="showDropdown(event, this, '${type}', '${tagId}'"]`);
     if (cell) {
         cell.textContent = value;
         cell.setAttribute(`data-${type}`, value);
         const dropdown = document.getElementById(`dropdown-${type}-${tagId}`);
-        if (dropdown) dropdown.style.display = 'none';
+        if (dropdown) {
+            dropdown.classList.remove('show');
+            dropdown.style.display = 'none';
+        }
     }
 }
 
 function saveChanges(tagId) {
-    const binLocationCell = document.querySelector(`tr[data-item-id="${tagId}"] td.editable[onclick*="showDropdown(this, 'bin-location', '${tagId}'"]`);
-    const statusCell = document.querySelector(`tr[data-item-id="${tagId}"] td.editable[onclick*="showDropdown(this, 'status', '${tagId}'"]`);
+    console.log('saveChanges called for tagId:', tagId);
+    const binLocationCell = document.querySelector(`tr[data-item-id="${tagId}"] td.editable[onclick*="showDropdown(event, this, 'bin-location', '${tagId}'"]`);
+    const statusCell = document.querySelector(`tr[data-item-id="${tagId}"] td.editable[onclick*="showDropdown(event, this, 'status', '${tagId}'"]`);
 
     const newBinLocation = binLocationCell ? binLocationCell.getAttribute('data-bin-location') : null;
     const newStatus = statusCell ? statusCell.getAttribute('data-status') : null;
+
+    console.log('New values:', { newBinLocation, newStatus });
 
     if (newBinLocation) {
         fetch('/tab/5/update_bin_location', {
@@ -898,7 +928,9 @@ function saveChanges(tagId) {
 // Hide dropdowns when clicking outside
 document.addEventListener('click', (event) => {
     if (!event.target.closest('.editable') && !event.target.closest('.dropdown-menu')) {
+        console.log('Click outside detected, hiding all dropdowns');
         document.querySelectorAll('.dropdown-menu').forEach(dropdown => {
+            dropdown.classList.remove('show');
             dropdown.style.display = 'none';
         });
     }
