@@ -612,7 +612,7 @@ function updateStatus(tagId, currentStatus) {
 // Note: Common function - will be moved to tab1_5.js during split
 function loadItems(category, subcategory, commonName, targetId, page = 1) {
     console.log('loadItems called with', { category, subcategory, commonName, targetId, page });
-    console.log('Current cachedTabNum in loadItems:', window.cachedTabNum); // Debug log
+    console.log('Current cachedTabNum in loadItems:', window.cachedTabNum);
 
     const container = document.getElementById(targetId);
     if (!container) {
@@ -663,7 +663,7 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                         headers.push('Update Status');
                     }
                 }
-                console.log('Generated headers:', headers); // Debug log
+                console.log('Generated headers:', headers);
 
                 html += `
                     <div class="item-level-wrapper">
@@ -701,9 +701,9 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                                 <td>${item.notes || 'N/A'}</td>
                         `;
                         if (window.cachedTabNum == 5) {
-                            console.log('Generating edit selectors for item:', item.tag_id); // Debug log
+                            console.log('Generating edit selectors for item:', item.tag_id);
                             html += `
-                                <td>
+                                <td class="edit-bin-location">
                                     <select id="bin-location-select-${item.tag_id}">
                                         <option value="">Select Bin Location</option>
                                         <option value="resale" ${item.bin_location === 'resale' ? 'selected' : ''}>resale</option>
@@ -713,7 +713,7 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                                     </select>
                                     <button class="btn btn-sm btn-primary" onclick="updateBinLocation('${item.tag_id}', '${item.bin_location || ''}')">Save</button>
                                 </td>
-                                <td>
+                                <td class="edit-status">
                                     <select id="status-select-${item.tag_id}" ${item.status !== 'On Rent' && item.status !== 'Delivered' ? 'disabled' : ''}>
                                         <option value="">Select Status</option>
                                         <option value="Ready to Rent" ${item.status === 'Ready to Rent' ? 'selected' : ''}>Ready to Rent</option>
@@ -761,6 +761,7 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                 html = `<div class="item-level-wrapper"><p>No items found for this common name.</p></div>`;
             }
 
+            console.log('Setting container HTML for targetId:', targetId, 'with HTML:', html); // Debug log
             container.innerHTML = html;
             container.classList.remove('collapsed');
             container.classList.add('expanded');
@@ -768,6 +769,15 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
             container.classList.add('show');
             container.style.display = 'block';
             container.style.opacity = '1';
+
+            // Force a re-render of the table
+            const table = container.querySelector('table');
+            if (table) {
+                table.style.display = 'none';
+                void table.offsetHeight; // Trigger reflow
+                table.style.display = 'table';
+                console.log('Table re-rendered with display:', table.style.display);
+            }
 
             const expandBtn = document.querySelector(`button[onclick*="loadItems('${category}', '${subcategory || ''}', '${commonName}', '${targetId}')"]`);
             const collapseBtn = expandBtn ? expandBtn.nextElementSibling : null;
