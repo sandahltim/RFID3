@@ -1,4 +1,4 @@
-console.log('expand.js version: 2025-04-26-v54 loaded');
+console.log('expand.js version: 2025-04-26-v56 loaded');
 
 // Note: Common function - will be moved to common.js during split
 function showLoading(key) {
@@ -112,6 +112,10 @@ function loadCommonNames(category, subcategory, targetId, page = 1, contractNumb
 
     let url = `/tab/${window.cachedTabNum}/common_names?page=${page}`;
     if (window.cachedTabNum == 2 || window.cachedTabNum == 4) {
+        if (!contractNumber) {
+            console.error('Contract number required for Tabs 2 and 4');
+            return;
+        }
         url += `&contract_number=${encodeURIComponent(contractNumber)}`;
     } else {
         url += `&category=${encodeURIComponent(category)}`;
@@ -195,7 +199,7 @@ function loadCommonNames(category, subcategory, targetId, page = 1, contractNumb
                 `;
 
                 data.common_names.forEach(item => {
-                    const rowId = `${key}_${item.name.replace(/\s+/g, '_')}`;
+                    const rowId = `${key}_${item.name.replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '')}`;
                     if (window.cachedTabNum == 2 || window.cachedTabNum == 4) {
                         html += `
                             <tr>
@@ -269,15 +273,11 @@ function loadCommonNames(category, subcategory, targetId, page = 1, contractNumb
             container.style.display = 'block';
             container.style.opacity = '1';
 
-            // Force reflow
-            const commonLevel = container.querySelector('.common-level');
-            if (commonLevel) {
-                commonLevel.style.display = 'none';
-                void commonLevel.offsetHeight;
-                commonLevel.style.display = 'block';
-            }
+            // Force reflow to ensure visibility
+            container.offsetHeight; // Trigger reflow
+            container.style.display = 'block';
 
-            const expandBtn = document.querySelector(`button[data-category="${category}"][data-subcategory="${subcategory || ''}"][data-target-id="items-${key}"]`);
+            const expandBtn = document.querySelector(`button[data-target-id="common-${targetId}"]`);
             const collapseBtn = expandBtn ? expandBtn.nextElementSibling : null;
             if (expandBtn && collapseBtn) {
                 expandBtn.style.display = 'none';
@@ -417,12 +417,15 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
             container.style.display = 'block';
             container.style.opacity = '1';
 
-            // Force reflow
-            const table = container.querySelector('table.subcat-table');
-            if (table) {
-                table.style.display = 'none';
-                void table.offsetHeight;
-                table.style.display = 'table';
+            // Force reflow to ensure visibility
+            container.offsetHeight; // Trigger reflow
+            container.style.display = 'block';
+
+            const expandBtn = document.querySelector(`button[data-target-id="${targetId}"]`);
+            const collapseBtn = expandBtn ? expandBtn.nextElementSibling : null;
+            if (expandBtn && collapseBtn) {
+                expandBtn.style.display = 'none';
+                collapseBtn.style.display = 'inline-block';
             }
 
             // Save expansion state
@@ -587,13 +590,18 @@ function updateItem(tagId, key) {
 function loadItems(category, subcategory, commonName, targetId, page = 1) {
     console.log('loadItems called with', { category, subcategory, commonName, targetId, page });
 
+    if (!category || !subcategory || !commonName || !targetId) {
+        console.error('Invalid parameters for loadItems:', { category, subcategory, commonName, targetId });
+        return;
+    }
+
     const container = document.getElementById(targetId);
     if (!container) {
         console.error(`Container with ID ${targetId} not found`);
         return;
     }
 
-    const key = `${category}_${subcategory || ''}_${commonName.replace(/\s+/g, '_')}`;
+    const key = `${category}_${subcategory || ''}_${commonName.replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '')}`;
     showLoading(key);
     hideOtherItems(targetId);
 
@@ -782,14 +790,11 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
             container.style.display = 'block';
             container.style.opacity = '1';
 
-            const table = container.querySelector('table');
-            if (table) {
-                table.style.display = 'none';
-                void table.offsetHeight;
-                table.style.display = 'table';
-            }
+            // Force reflow to ensure visibility
+            container.offsetHeight; // Trigger reflow
+            container.style.display = 'block';
 
-            const expandBtn = document.querySelector(`button[data-category="${category}"][data-subcategory="${subcategory || ''}"][data-target-id="items-${key}"]`);
+            const expandBtn = document.querySelector(`button[data-target-id="${targetId}"]`);
             const collapseBtn = expandBtn ? expandBtn.nextElementSibling : null;
             if (expandBtn && collapseBtn) {
                 expandBtn.style.display = 'none';
@@ -928,18 +933,30 @@ function saveChanges(tagId) {
 document.addEventListener('DOMContentLoaded', function() {
     console.log('expand.js: DOMContentLoaded event fired');
 
+    // Ensure window.cachedTabNum is set
+    if (!window.cachedTabNum) {
+        const pathMatch = window.location.pathname.match(/\/tab\/(\d+)/);
+        window.cachedTabNum = pathMatch ? parseInt(pathMatch[1], 10) : 1;
+        console.log('Set window.cachedTabNum:', window.cachedTabNum);
+    }
+
     // Restore expanded sections from sessionStorage
     Object.keys(sessionStorage).forEach(key => {
         if (key.startsWith('expanded_')) {
-            const state = JSON.parse(sessionStorage.getItem(key));
-            const targetId = key.replace('expanded_', '');
-            if (targetId.startsWith('subcat-')) {
-                const normalizedCategory = targetId.replace('subcat-', '');
-                loadSubcatData(state.category, normalizedCategory, targetId, state.page);
-            } else if (targetId.startsWith('common-')) {
-                loadCommonNames(state.category, state.subcategory, targetId, state.page, state.contractNumber);
-            } else if (targetId.startsWith('items-')) {
-                loadItems(state.category, state.subcategory, state.commonName, targetId, state.page);
+            try {
+                const state = JSON.parse(sessionStorage.getItem(key));
+                const targetId = key.replace('expanded_', '');
+                if (targetId.startsWith('subcat-')) {
+                    const normalizedCategory = targetId.replace('subcat-', '');
+                    loadSubcatData(state.category, normalizedCategory, targetId, state.page);
+                } else if (targetId.startsWith('common-')) {
+                    loadCommonNames(state.category, state.subcategory, targetId, state.page, state.contractNumber);
+                } else if (targetId.startsWith('items-')) {
+                    loadItems(state.category, state.subcategory, state.commonName, targetId, state.page);
+                }
+            } catch (e) {
+                console.error('Error restoring expansion state for', key, ':', e);
+                sessionStorage.removeItem(key);
             }
         }
     });
@@ -955,9 +972,15 @@ document.addEventListener('DOMContentLoaded', function() {
             const commonName = expandBtn.getAttribute('data-common-name');
 
             if (commonName) {
+                // Expand to item level
                 loadItems(category, subcategory, commonName, targetId);
+            } else if (subcategory) {
+                // Expand to common names level
+                loadCommonNames(category, subcategory, targetId.replace('subcat-', ''));
             } else {
-                loadCommonNames(category, subcategory, targetId);
+                // Expand to subcategory level
+                const normalizedCategory = targetId.replace('subcat-', '');
+                loadSubcatData(category, normalizedCategory, targetId);
             }
             return;
         }
@@ -983,6 +1006,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
     window.expandCategory = function(category, targetId, contractNumber = null, page = 1) {
         console.log('expandCategory called with', { category, targetId, contractNumber, page });
+        if (!category || !targetId) {
+            console.error('Invalid parameters for expandCategory:', { category, targetId });
+            return;
+        }
         const normalizedCategory = targetId.replace('subcat-', '');
         if (window.cachedTabNum == 2 || window.cachedTabNum == 4) {
             loadCommonNames(category, null, targetId, page, contractNumber);
