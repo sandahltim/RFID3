@@ -6,12 +6,15 @@
         <title>RFID Dashboard - {% block title %}{% endblock %}</title>
         <link href="{{ url_for('static', filename='lib/bootstrap/bootstrap.min.css') }}?v={{ cache_bust if cache_bust is defined else '1745516817' }}" rel="stylesheet">
         <link href="{{ url_for('static', filename='css/style.css') }}?v={{ cache_bust if cache_bust is defined else '1745516817' }}" rel="stylesheet">
+        <!-- Load tab1_5.css only for Tabs 1 and 5 -->
+        {% if request.endpoint in ['tab1.tab1_view', 'tab5.tab5_view'] %}
+        <link href="{{ url_for('static', filename='css/tab1_5.css') }}?v={{ cache_bust if cache_bust is defined else '1745516817' }}" rel="stylesheet">
+        {% endif %}
         <script src="{{ url_for('static', filename='lib/bootstrap/bootstrap.bundle.min.js') }}?v={{ cache_bust if cache_bust is defined else '1745516817' }}"></script>
         <script src="{{ url_for('static', filename='lib/htmx/htmx.min.js') }}?v={{ cache_bust if cache_bust is defined else '1745516817' }}"></script>
         <style>
             .loading { color: #888; font-style: italic; }
             .table-bordered th, .table-bordered td { border: 1px solid #dee2e6; }
-            .subcat-level, .expandable.expanded { display: block !important; visibility: visible !important; }
         </style>
         {% block extra_head %}{% endblock %}
     </head>
@@ -55,5 +58,9 @@
     </div>
     <script src="{{ url_for('static', filename='js/tab.js') }}?v={{ (cache_bust if cache_bust is defined else timestamp()) }}"></script>
     <script src="{{ url_for('static', filename='js/expand.js') }}?v={{ (cache_bust if cache_bust is defined else timestamp()) + 2 }}"></script>
-</body>
+    <!-- Load tab1_5.js only for Tabs 1 and 5 -->
+    {% if request.endpoint in ['tab1.tab1_view', 'tab5.tab5_view'] %}
+    <script src="{{ url_for('static', filename='js/tab1_5.js') }}?v={{ (cache_bust if cache_bust is defined else timestamp()) + 3 }}"></script>
+    {% endif %}
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'93690dbfb9424542',t:'MTc0NTcwMTY4OC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>

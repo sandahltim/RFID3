@@ -28,9 +28,11 @@ test_rfidpi/ RFID2restore
 │   │   └── tab.html
 ├── static/
 │   └── css/
+│   │   ├── tab1_5.css
 │   │   └── style.css
 │   └── js/
 │   │   ├── tab.js
+│   │   ├── tab1_5.js
 │   │   └── expand.js
 │   └── lib/
 │        ├── htmx/
@@ -97,7 +99,7 @@ TimeoutStopSec=20
 WantedBy=multi-user.target
 
 
-###setupmariadb.sh
+### setupmariadb.sh
 #!/bin/bash
 # Setup MariaDB and Redis on Raspberry Pi with Bookworm
 
@@ -152,7 +154,7 @@ sudo mkdir -p /home/tim/test_rfidpi/logs
 sudo chown tim:tim /home/tim/test_rfidpi/logs
 sudo chmod 750 /home/tim/test_rfidpi/logs
 
-###migrate_db.sql
+### migrate_db.sql
 -- Drop existing tables if they exist
 DROP TABLE IF EXISTS id_transactions;
 DROP TABLE IF EXISTS id_item_master;
@@ -268,7 +270,7 @@ CREATE TABLE rental_class_mappings (
 
 
 
-###config.py
+### config.py
 import os
 
 # Base directory
@@ -303,7 +305,7 @@ LOG_FILE = os.path.join(BASE_DIR, 'logs', 'rfid_dashboard.log')
 #mariadbhash   *8226E019AE8D0D41243D07D91ABCD8E2F20358BC  root password    MySecureRootPass123
 
 
-###db_model.py
+### db_model.py
 from app import db  # Import db from app/__init__.py
 from datetime import datetime
 

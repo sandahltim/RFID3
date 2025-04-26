@@ -30,7 +30,7 @@ logger.addHandler(console_handler)
 tab1_bp = Blueprint('tab1', __name__)
 
 # Version marker
-logger.info("Deployed tab1.py version: 2025-04-26-v13")
+logger.info("Deployed tab1.py version: 2025-04-26-v14")
 
 def get_category_data(session, filter_query='', sort='', status_filter='', bin_filter=''):
     # Fetch all rental class mappings from both tables
@@ -271,6 +271,7 @@ def tab1_subcat_data():
                 )
             total_items = total_items_query.scalar() or 0
 
+            # Remove the total_items > 0 check to ensure all subcategories are shown
             items_on_contracts_query = session.query(func.count(ItemMaster.tag_id)).filter(
                 func.trim(func.cast(ItemMaster.rental_class_num, db.String)).in_(rental_class_ids),
                 ItemMaster.status.in_(['On Rent', 'Delivered'])
@@ -325,14 +326,13 @@ def tab1_subcat_data():
                 )
             items_available = items_available_query.scalar() or 0
 
-            if total_items > 0:
-                subcategory_data.append({
-                    'subcategory': subcat,
-                    'total_items': total_items,
-                    'items_on_contracts': items_on_contracts,
-                    'items_in_service': items_in_service,
-                    'items_available': items_available
-                })
+            subcategory_data.append({
+                'subcategory': subcat,
+                'total_items': total_items,
+                'items_on_contracts': items_on_contracts,
+                'items_in_service': items_in_service,
+                'items_available': items_available
+            })
 
         if sort == 'total_items_asc':
             subcategory_data.sort(key=lambda x: x['total_items'])
