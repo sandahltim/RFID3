@@ -1,4 +1,4 @@
-console.log('tab1_5.js version: 2025-04-26-v6 loaded');
+console.log('tab1_5.js version: 2025-04-26-v8 loaded');
 
 // Note: Common function for Tabs 1 and 5
 function hideOtherSubcats(currentCategory, parentCategory) {
@@ -297,6 +297,13 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
         return;
     }
 
+    // Check if the container is already loading to prevent double loading
+    if (container.classList.contains('loading')) {
+        console.log(`Container ${targetId} is already loading, skipping...`);
+        return;
+    }
+    container.classList.add('loading');
+
     // Clear the container to prevent duplicate rendering
     container.innerHTML = '';
     hideOtherSubcats(normalizedCategory, normalizedCategory);
@@ -408,6 +415,7 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
             container.classList.add('expanded');
             container.style.display = 'block';
             container.style.opacity = '1';
+            container.classList.remove('loading');
 
             // Force reflow to ensure visibility
             container.offsetHeight; // Trigger reflow
@@ -459,6 +467,7 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
             container.classList.add('expanded');
             container.style.display = 'block';
             container.style.opacity = '1';
+            container.classList.remove('loading');
         })
         .finally(() => {
             hideLoading(normalizedCategory);
@@ -558,7 +567,7 @@ function bulkUpdateSelectedItems(key) {
 // Note: Tab 5 specific - Update dropdown visibility for bulk update
 function updateBulkField(key, field) {
     const select = document.getElementById(`bulk-${field}-${key}`);
-    if (select.value) {
+    if (select && select.value) {
         const otherField = field === 'bin_location' ? 'status' : 'bin_location';
         const otherSelect = document.getElementById(`bulk-${otherField}-${key}`);
         if (otherSelect) {
@@ -623,6 +632,13 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
         console.error(`Container with ID ${targetId} not found`);
         return;
     }
+
+    // Check if the container is already loading to prevent double loading
+    if (container.classList.contains('loading')) {
+        console.log(`Container ${targetId} is already loading, skipping...`);
+        return;
+    }
+    container.classList.add('loading');
 
     // Use the correct key for the loading indicator (match the subcat/common level)
     const key = targetId; // Use the full targetId as the key to match the loading indicator
@@ -800,6 +816,7 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
             container.classList.add('expanded');
             container.style.display = 'block';
             container.style.opacity = '1';
+            container.classList.remove('loading');
 
             // Force reflow to ensure visibility
             container.offsetHeight; // Trigger reflow
@@ -822,6 +839,7 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
             container.classList.add('expanded');
             container.style.display = 'block';
             container.style.opacity = '1';
+            container.classList.remove('loading');
         })
         .finally(() => {
             hideLoading(key);
@@ -967,15 +985,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
             if (commonName) {
                 loadItems(category, subcategory, commonName, targetId);
-            } else if (subcategory) {
+            } else if (subcategory && subcatTargetId) {
                 loadCommonNames(category, subcategory, subcatTargetId);
+            } else if (targetId) {
+                const normalizedCategory = targetId.replace('subcat-', '');
+                loadSubcatData(category, normalizedCategory, targetId);
             } else {
-                const normalizedCategory = targetId ? targetId.replace('subcat-', '') : '';
-                if (category && normalizedCategory && targetId) {
-                    loadSubcatData(category, normalizedCategory, targetId);
-                } else {
-                    console.error('Invalid parameters for loadSubcatData in handleClick:', { category, normalizedCategory, targetId });
-                }
+                console.error('Invalid parameters for handleClick: missing targetId or subcatTargetId', { category, targetId, subcatTargetId });
             }
             return;
         }
