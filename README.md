@@ -542,7 +542,7 @@ def create_app():
 
 
 
-
+### Not all items will have Category or Subcategory assigned until assigned by user.
 
 ### Database Schemas
 

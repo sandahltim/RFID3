@@ -8,8 +8,8 @@
     border-left: 3px solid #007bff;
     max-height: 1200px;
     overflow-y: auto;
-    display: block;
-    visibility: visible;
+    display: block !important;
+    visibility: visible !important;
     z-index: 1; /* Ensure subcategories are not hidden by headers */
 }
 
@@ -20,8 +20,8 @@
     border-left: 3px solid #28a745;
     max-height: 1200px;
     overflow-y: auto;
-    display: block;
-    visibility: visible;
+    display: block !important;
+    visibility: visible !important;
     z-index: 1;
 }
 
@@ -35,25 +35,30 @@
     max-height: 1200px;
     min-width: 100%;
     box-sizing: border-box;
-    display: block;
-    visibility: visible;
+    display: block !important;
+    visibility: visible !important;
     z-index: 1;
 }
 
 .item-level {
     width: 100%;
     min-width: 1200px;
-    display: table;
-    visibility: visible;
+    display: table !important;
+    visibility: visible !important;
 }
 
 /* Subcategory, common, and item tables */
 .subcat-table, .common-level table, .item-level {
     width: 100%;
     overflow-x: auto;
-    display: table;
-    visibility: visible;
+    display: table !important;
+    visibility: visible !important;
     table-layout: fixed; /* Ensure consistent column widths */
+}
+
+.subcat-table thead, .common-level table thead, .item-level thead {
+    display: table-header-group !important;
+    visibility: visible !important;
 }
 
 .subcat-table thead th,
@@ -64,6 +69,17 @@
     z-index: 10;
     background-color: #e9ecef;
     border-bottom: 2px solid #dee2e6;
+    display: table-cell !important;
+    visibility: visible !important;
+    padding: 12px;
+    text-align: left;
+    white-space: nowrap;
+    min-width: 150px;
+}
+
+.subcat-table tbody, .common-level table tbody, .item-level tbody {
+    display: table-row-group !important;
+    visibility: visible !important;
 }
 
 .subcat-table td,
@@ -73,6 +89,16 @@
     border: 1px solid #dee2e6;
     min-width: 150px;
     white-space: nowrap;
+    display: table-cell !important;
+    visibility: visible !important;
+}
+
+/* Ensure subcategory rows are visible */
+.subcat-row, .subcat-table, .subcat-table tbody, .subcat-table tbody tr {
+    display: table-row !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    min-height: 50px !important;
 }
 
 /* Fix item-level table column alignment */
@@ -153,18 +179,10 @@
 }
 
 .expandable.expanded {
-    display: block;
-    visibility: visible;
+    display: block !important;
+    visibility: visible !important;
     opacity: 1;
     max-height: none;
-}
-
-/* Ensure subcategory rows and tables are visible */
-.subcat-row, .subcat-table, .subcat-table tbody, .subcat-table tbody tr {
-    display: table-row;
-    visibility: visible;
-    opacity: 1;
-    min-height: 50px;
 }
 
 /* Bulk update controls for Tab 5 */
@@ -194,7 +212,7 @@
 }
 
 .dropdown-menu.show {
-    display: block;
+    display: block !important;
 }
 
 .dropdown-item {
@@ -240,6 +258,13 @@
 
     .item-level th,
     .item-level td {
+        padding: 0.5rem;
+        font-size: 0.9rem;
+        min-width: 120px;
+    }
+
+    .subcat-table th,
+    .subcat-table td {
         padding: 0.5rem;
         font-size: 0.9rem;
         min-width: 120px;

@@ -1,4 +1,4 @@
-console.log('tab1_5.js version: 2025-04-26-v1 loaded');
+console.log('tab1_5.js version: 2025-04-26-v3 loaded');
 
 // Note: Common function for Tabs 1 and 5
 function hideOtherSubcats(currentCategory, parentCategory) {
@@ -65,6 +65,8 @@ function collapseSection(targetId) {
         if (expandBtn && collapseBtn) {
             expandBtn.style.display = 'inline-block';
             collapseBtn.style.display = 'none';
+        } else {
+            console.warn('Could not find expand/collapse buttons for targetId:', targetId);
         }
 
         // Remove from sessionStorage
@@ -400,6 +402,8 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
             }
 
             container.innerHTML = html;
+            console.log('Rendered HTML for subcategories:', container.innerHTML); // Debug log to inspect DOM
+
             container.classList.remove('collapsed');
             container.classList.add('expanded');
             container.style.display = 'block';
@@ -415,25 +419,36 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
                 tableBody.style.display = 'table-row-group';
                 tableBody.style.visibility = 'visible';
                 tableBody.style.opacity = '1';
+            } else {
+                console.warn('Table body not found in container:', container);
             }
 
-            // Fix selector to handle double-encoded category names
+            // Fix selector to handle URL-encoded category names
+            // Try multiple variations of encoded category names
+            const decodedCategory = decodeURIComponent(originalCategory).replace(/'/g, "\\'").replace(/"/g, '\\"');
             const encodedCategory = encodeURIComponent(originalCategory).replace(/'/g, "\\'").replace(/"/g, '\\"');
             const doubleEncodedCategory = encodeURIComponent(encodeURIComponent(originalCategory)).replace(/'/g, "\\'").replace(/"/g, '\\"');
-            const decodedCategory = decodeURIComponent(originalCategory).replace(/'/g, "\\'").replace(/"/g, '\\"');
-            let expandBtn = document.querySelector(`button.expand-btn[onclick="window.expandCategory('${encodedCategory}', 'subcat-${normalizedCategory}')"]`);
+            
+            // Alternative approach: Find the button by data attributes instead of onclick
+            let expandBtn = document.querySelector(`button.expand-btn[data-target-id="subcat-${normalizedCategory}"]`);
+            if (!expandBtn) {
+                // Fallback to onclick selectors
+                expandBtn = document.querySelector(`button.expand-btn[onclick="window.expandCategory('${decodedCategory}', 'subcat-${normalizedCategory}')"]`);
+            }
+            if (!expandBtn) {
+                expandBtn = document.querySelector(`button.expand-btn[onclick="window.expandCategory('${encodedCategory}', 'subcat-${normalizedCategory}')"]`);
+            }
             if (!expandBtn) {
                 expandBtn = document.querySelector(`button.expand-btn[onclick="window.expandCategory('${doubleEncodedCategory}', 'subcat-${normalizedCategory}')"]`);
             }
-            if (!expandBtn) {
-                expandBtn = document.querySelector(`button.expand-btn[onclick="window.expandCategory('${decodedCategory}', 'subcat-${normalizedCategory}')"]`);
-            }
+
             const collapseBtn = expandBtn ? expandBtn.nextElementSibling : null;
             if (expandBtn && collapseBtn) {
                 expandBtn.style.display = 'none';
                 collapseBtn.style.display = 'inline-block';
             } else {
                 console.warn('Expand/Collapse buttons not found for selectors:', {
+                    dataTarget: `button.expand-btn[data-target-id="subcat-${normalizedCategory}"]`,
                     decoded: `button.expand-btn[onclick="window.expandCategory('${decodedCategory}', 'subcat-${normalizedCategory}')"]`,
                     singleEncoded: `button.expand-btn[onclick="window.expandCategory('${encodedCategory}', 'subcat-${normalizedCategory}')"]`,
                     doubleEncoded: `button.expand-btn[onclick="window.expandCategory('${doubleEncodedCategory}', 'subcat-${normalizedCategory}')"]`
