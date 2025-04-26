@@ -1,4 +1,4 @@
-console.log('expand.js version: 2025-04-25 v41 loaded');
+console.log('expand.js version: 2025-04-25 v42 loaded');
 
 function showLoading(key) {
     const loadingDiv = document.getElementById(`loading-${key}`);
