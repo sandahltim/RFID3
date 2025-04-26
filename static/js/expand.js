@@ -1,4 +1,4 @@
-console.log('expand.js version: 2025-04-25 v49 loaded');
+console.log('expand.js version: 2025-04-25 v50 loaded');
 
 // Note: Common function - will be moved to common.js during split
 function showLoading(key) {
@@ -391,7 +391,7 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
                                         <td>${subcat.items_in_service}</td>
                                         <td>${subcat.items_available}</td>
                                         <td>
-                                            <button class="btn btn-sm btn-secondary expand-btn" onclick="loadCommonNames('${originalCategory}', '${subcat.subcategory}', '${subcatKey}')">Expand</button>
+                                            <button class="btn btn-sm btn-secondary expand-btn" onclick="loadCommonNamesWithEvent(event, '${originalCategory}', '${subcat.subcategory}', '${subcatKey}')">Expand</button>
                                             <button class="btn btn-sm btn-secondary collapse-btn" style="display:none;" onclick="collapseSection('common-${subcatKey}')">Collapse</button>
                                             <button class="btn btn-sm btn-info print-btn" data-print-level="Subcategory" data-print-id="subcat-table-${subcatKey}">Print</button>
                                             <div id="loading-${subcatKey}" style="display:none;" class="loading">Loading...</div>
@@ -526,6 +526,13 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
             hideLoading(normalizedCategory);
             console.log('loadSubcatData completed for targetId:', targetId);
         });
+}
+
+// Wrapper function to handle event propagation for loadCommonNames
+function loadCommonNamesWithEvent(event, category, subcategory, targetId, page = 1, contractNumber = null) {
+    console.log('loadCommonNamesWithEvent called, stopping propagation');
+    event.stopPropagation();
+    loadCommonNames(category, subcategory, targetId, page, contractNumber);
 }
 
 // Note: This function is Tab 5 specific
