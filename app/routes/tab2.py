@@ -3,13 +3,39 @@ from .. import db, cache
 from ..models.db_models import Transaction, ItemMaster
 from sqlalchemy import func, desc
 from time import time
+import logging
+import sys
+
+# Configure logging
+logger = logging.getLogger('tab2')
+logger.setLevel(logging.INFO)
+
+# Remove existing handlers to avoid duplicates
+logger.handlers = []
+
+# File handler for rfid_dashboard.log
+file_handler = logging.FileHandler('/home/tim/test_rfidpi/logs/rfid_dashboard.log')
+file_handler.setLevel(logging.INFO)
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+file_handler.setFormatter(formatter)
+logger.addHandler(file_handler)
+
+# Console handler
+console_handler = logging.StreamHandler(sys.stdout)
+console_handler.setLevel(logging.INFO)
+console_handler.setFormatter(formatter)
+logger.addHandler(console_handler)
 
 tab2_bp = Blueprint('tab2', __name__)
+
+# Version marker
+logger.info("Deployed tab2.py version: 2025-04-25-v1")
 
 @tab2_bp.route('/tab/2')
 def tab2_view():
     try:
         session = db.session()
+        logger.info("Starting new session for tab2")
         current_app.logger.info("Starting new session for tab2")
 
         contracts_query = session.query(
@@ -25,6 +51,7 @@ def tab2_view():
             func.count(ItemMaster.tag_id) > 0
         ).all()
 
+        logger.info(f"Raw contracts query result: {[(c.last_contract_num, c.total_items) for c in contracts_query]}")
         current_app.logger.info(f"Raw contracts query result: {[(c.last_contract_num, c.total_items) for c in contracts_query]}")
 
         contracts = []
@@ -60,10 +87,12 @@ def tab2_view():
             })
 
         contracts.sort(key=lambda x: x['contract_number'])
+        logger.info(f"Fetched {len(contracts)} contracts for tab2: {[c['contract_number'] for c in contracts]}")
         current_app.logger.info(f"Fetched {len(contracts)} contracts for tab2: {[c['contract_number'] for c in contracts]}")
         session.close()
         return render_template('tab2.html', contracts=contracts, cache_bust=int(time()))
     except Exception as e:
+        logger.error(f"Error rendering Tab 2: {str(e)}", exc_info=True)
         current_app.logger.error(f"Error rendering Tab 2: {str(e)}", exc_info=True)
         session.close()
         return render_template('tab2.html', contracts=[], cache_bust=int(time()))
@@ -74,9 +103,11 @@ def tab2_common_names():
     page = int(request.args.get('page', 1))
     per_page = 10
 
+    logger.info(f"Fetching common names for contract_number={contract_number}, page={page}")
     current_app.logger.info(f"Fetching common names for contract_number={contract_number}, page={page}")
 
     if not contract_number:
+        logger.error("Missing required parameter: contract_number is required")
         current_app.logger.error("Missing required parameter: contract_number is required")
         return jsonify({'error': 'Contract number is required'}), 400
 
@@ -93,6 +124,7 @@ def tab2_common_names():
             ItemMaster.common_name
         ).all()
 
+        logger.debug(f"Common names for contract {contract_number}: {[(name, count) for name, count in common_names_query]}")
         current_app.logger.debug(f"Common names for contract {contract_number}: {[(name, count) for name, count in common_names_query]}")
 
         common_names = []
@@ -116,6 +148,7 @@ def tab2_common_names():
         paginated_common_names = common_names[start:end]
 
         session.close()
+        logger.info(f"Returning {len(paginated_common_names)} common names for contract {contract_number}")
         current_app.logger.info(f"Returning {len(paginated_common_names)} common names for contract {contract_number}")
         return jsonify({
             'common_names': paginated_common_names,
@@ -124,6 +157,7 @@ def tab2_common_names():
             'per_page': per_page
         })
     except Exception as e:
+        logger.error(f"Error fetching common names for contract {contract_number}: {str(e)}")
         current_app.logger.error(f"Error fetching common names for contract {contract_number}: {str(e)}")
         session.close()
         return jsonify({'error': 'Failed to fetch common names'}), 500
@@ -135,9 +169,11 @@ def tab2_data():
     page = int(request.args.get('page', 1))
     per_page = 10
 
+    logger.info(f"Fetching items for contract_number={contract_number}, common_name={common_name}, page={page}")
     current_app.logger.info(f"Fetching items for contract_number={contract_number}, common_name={common_name}, page={page}")
 
     if not contract_number or not common_name:
+        logger.error("Missing required parameters: contract number and common name are required")
         current_app.logger.error("Missing required parameters: contract number and common name are required")
         return jsonify({'error': 'Contract number and common name are required'}), 400
 
@@ -165,6 +201,7 @@ def tab2_data():
                 'last_scanned_date': last_scanned_date
             })
 
+        logger.debug(f"Items for contract {contract_number}, common_name {common_name}: {len(items_data)} items")
         current_app.logger.debug(f"Items for contract {contract_number}, common_name {common_name}: {len(items_data)} items")
 
         session.close()
@@ -175,6 +212,7 @@ def tab2_data():
             'per_page': per_page
         })
     except Exception as e:
+        logger.error(f"Error fetching items for contract {contract_number}, common_name {common_name}: {str(e)}")
         current_app.logger.error(f"Error fetching items for contract {contract_number}, common_name {common_name}: {str(e)}")
         session.close()
         return jsonify({'error': 'Failed to fetch items'}), 500
@@ -185,6 +223,8 @@ def full_items_by_rental_class():
     common_name = request.args.get('common_name')
 
     if not contract_number or not common_name:
+        logger.error("Category (contract_number) and common name are required")
+        current_app.logger.error("Category (contract_number) and common name are required")
         return jsonify({'error': 'Category (contract_number) and common name are required'}), 400
 
     try:
@@ -217,6 +257,7 @@ def full_items_by_rental_class():
             'total_items': len(items_data)
         })
     except Exception as e:
+        logger.error(f"Error fetching full items for contract {contract_number}, common_name {common_name}: {str(e)}")
         current_app.logger.error(f"Error fetching full items for contract {contract_number}, common_name {common_name}: {str(e)}")
         return jsonify({'error': 'Failed to fetch full items'}), 500
 
@@ -224,6 +265,7 @@ def full_items_by_rental_class():
 def get_contract_date():
     contract_number = request.args.get('contract_number')
     if not contract_number:
+        logger.error("Missing required parameter: contract_number is required")
         current_app.logger.error("Missing required parameter: contract_number is required")
         return jsonify({'error': 'Contract number is required'}), 400
 
@@ -239,6 +281,7 @@ def get_contract_date():
             return jsonify({'date': latest_transaction.scan_date.isoformat()})
         return jsonify({'date': 'N/A'})
     except Exception as e:
+        logger.error(f"Error fetching contract date for {contract_number}: {str(e)}")
         current_app.logger.error(f"Error fetching contract date for {contract_number}: {str(e)}")
         session.close()
         return jsonify({'error': 'Failed to fetch contract date'}), 500

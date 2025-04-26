@@ -3,13 +3,39 @@ from .. import db, cache
 from ..models.db_models import ItemMaster, Transaction, RentalClassMapping, UserRentalClassMapping
 from sqlalchemy import func, desc, or_
 from time import time
+import logging
+import sys
+
+# Configure logging
+logger = logging.getLogger('tab3')
+logger.setLevel(logging.INFO)
+
+# Remove existing handlers to avoid duplicates
+logger.handlers = []
+
+# File handler for rfid_dashboard.log
+file_handler = logging.FileHandler('/home/tim/test_rfidpi/logs/rfid_dashboard.log')
+file_handler.setLevel(logging.INFO)
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+file_handler.setFormatter(formatter)
+logger.addHandler(file_handler)
+
+# Console handler
+console_handler = logging.StreamHandler(sys.stdout)
+console_handler.setLevel(logging.INFO)
+console_handler.setFormatter(formatter)
+logger.addHandler(console_handler)
 
 tab3_bp = Blueprint('tab3', __name__)
+
+# Version marker
+logger.info("Deployed tab3.py version: 2025-04-25-v1")
 
 @tab3_bp.route('/tab/3')
 def tab3_view():
     try:
         session = db.session()
+        logger.info("Starting new session for tab3")
         current_app.logger.info("Starting new session for tab3")
 
         # Define crew categories
@@ -123,6 +149,7 @@ def tab3_view():
         laundry_crew_items.sort(key=lambda x: x['tag_id'])
         maintenance_crew_items.sort(key=lambda x: x['tag_id'])
 
+        logger.info(f"Fetched {len(tent_crew_items)} items for Tent Crew, {len(laundry_crew_items)} for Laundry Crew, {len(maintenance_crew_items)} for Maintenance Crew")
         current_app.logger.info(f"Fetched {len(tent_crew_items)} items for Tent Crew, {len(laundry_crew_items)} for Laundry Crew, {len(maintenance_crew_items)} for Maintenance Crew")
         session.close()
         return render_template('tab3.html', 
@@ -131,6 +158,7 @@ def tab3_view():
                               maintenance_crew_items=maintenance_crew_items,
                               cache_bust=int(time()))
     except Exception as e:
+        logger.error(f"Error rendering Tab 3: {str(e)}", exc_info=True)
         current_app.logger.error(f"Error rendering Tab 3: {str(e)}", exc_info=True)
         return render_template('tab3.html', 
                               tent_crew_items=[],
