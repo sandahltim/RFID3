@@ -45,7 +45,7 @@ if not any(isinstance(h, logging.StreamHandler) for h in root_logger.handlers):
 tab5_bp = Blueprint('tab5', __name__)
 
 # Version marker
-logger.info("Deployed tab5.py version: 2025-04-25-v8")
+logger.info("Deployed tab5.py version: 2025-04-25-v10")
 
 @tab5_bp.route('/tab/5')
 def tab5_view():
@@ -110,19 +110,19 @@ def tab5_view():
         sort = request.args.get('sort', '')
 
         for cat, mappings in categories.items():
-            rental_class_ids = [str(m['rental_class_id']) for m in mappings]
+            rental_class_ids = [str(m['rental_class_id']).strip() for m in mappings]
             logger.debug(f"Processing category {cat} with rental_class_ids: {rental_class_ids}")
             current_app.logger.debug(f"Processing category {cat} with rental_class_ids: {rental_class_ids}")
 
             # Total items in this category with bin_location in ['resale', 'sold', 'pack', 'burst']
             total_items_query = session.query(func.count(ItemMaster.tag_id)).filter(
-                func.trim(func.cast(ItemMaster.rental_class_num, db.String)).in_(rental_class_ids),
-                func.lower(ItemMaster.bin_location).in_(['resale', 'sold', 'pack', 'burst'])
+                func.trim(func.cast(func.replace(ItemMaster.rental_class_num, '\x00', ''), db.String)).in_(rental_class_ids),
+                func.lower(func.trim(func.replace(ItemMaster.bin_location, '\x00', ''))).in_(['resale', 'sold', 'pack', 'burst'])
             )
             if filter_query:
                 total_items_query = total_items_query.filter(
-バック
-                func.lower(ItemMaster.common_name).like(f'%{filter_query}%')
+                    func.lower(ItemMaster.common_name).like(f'%{filter_query}%')
+                )
             total_items = total_items_query.scalar()
             logger.debug(f"Total items for category {cat}: {total_items}")
             current_app.logger.debug(f"Total items for category {cat}: {total_items}")
@@ -133,31 +133,37 @@ def tab5_view():
                 current_app.logger.debug(f"Skipping category {cat} due to zero total items")
                 # Check total items without bin_location filter
                 all_items = session.query(func.count(ItemMaster.tag_id)).filter(
-                    func.trim(func.cast(ItemMaster.rental_class_num, db.String)).in_(rental_class_ids)
+                    func.trim(func.cast(func.replace(ItemMaster.rental_class_num, '\x00', ''), db.String)).in_(rental_class_ids)
                 ).scalar()
                 logger.debug(f"Total items (without bin_location filter) for category {cat}: {all_items}")
                 current_app.logger.debug(f"Total items (without bin_location filter) for category {cat}: {all_items}")
                 if all_items > 0:
                     # Fetch raw items to inspect bin_location and rental_class_num
                     raw_items = session.query(ItemMaster.tag_id, ItemMaster.rental_class_num, ItemMaster.bin_location).filter(
-                        func.trim(func.cast(ItemMaster.rental_class_num, db.String)).in_(rental_class_ids)
+                        func.trim(func.cast(func.replace(ItemMaster.rental_class_num, '\x00', ''), db.String)).in_(rental_class_ids)
                     ).all()
                     for item in raw_items:
                         logger.debug(f"Item: tag_id={item.tag_id}, rental_class_num={item.rental_class_num}, bin_location={item.bin_location}")
                         current_app.logger.debug(f"Item: tag_id={item.tag_id}, rental_class_num={item.rental_class_num}, bin_location={item.bin_location}")
                     # Fetch distinct bin_locations
                     bin_locations = session.query(ItemMaster.bin_location).filter(
-                        func.trim(func.cast(ItemMaster.rental_class_num, db.String)).in_(rental_class_ids)
+                        func.trim(func.cast(func.replace(ItemMaster.rental_class_num, '\x00', ''), db.String)).in_(rental_class_ids)
                     ).distinct().all()
                     logger.debug(f"Bin locations for category {cat}: {[loc[0] for loc in bin_locations]}")
                     current_app.logger.debug(f"Bin locations for category {cat}: {[loc[0] for loc in bin_locations]}")
+                    # Fetch distinct rental_class_num values
+                    rental_class_nums = session.query(ItemMaster.rental_class_num).filter(
+                        func.trim(func.cast(func.replace(ItemMaster.rental_class_num, '\x00', ''), db.String)).in_(rental_class_ids)
+                    ).distinct().all()
+                    logger.debug(f"Rental class numbers for category {cat}: {[num[0] for num in rental_class_nums]}")
+                    current_app.logger.debug(f"Rental class numbers for category {cat}: {[num[0] for num in rental_class_nums]}")
                 continue
 
             # Items on contracts (status = 'On Rent' or 'Delivered')
             items_on_contracts_query = session.query(func.count(ItemMaster.tag_id)).filter(
-                func.trim(func.cast(ItemMaster.rental_class_num, db.String)).in_(rental_class_ids),
+                func.trim(func.cast(func.replace(ItemMaster.rental_class_num, '\x00', ''), db.String)).in_(rental_class_ids),
                 ItemMaster.status.in_(['On Rent', 'Delivered']),
-                func.lower(ItemMaster.bin_location).in_(['resale', 'sold', 'pack', 'burst'])
+                func.lower(func.trim(func.replace(ItemMaster.bin_location, '\x00', ''))).in_(['resale', 'sold', 'pack', 'burst'])
             )
             if filter_query:
                 items_on_contracts_query = items_on_contracts_query.filter(
@@ -179,8 +185,8 @@ def tab5_view():
             ).subquery()
 
             items_in_service_query = session.query(func.count(ItemMaster.tag_id)).filter(
-                func.trim(func.cast(ItemMaster.rental_class_num, db.String)).in_(rental_class_ids),
-                func.lower(ItemMaster.bin_location).in_(['resale', 'sold', 'pack', 'burst']),
+                func.trim(func.cast(func.replace(ItemMaster.rental_class_num, '\x00', ''), db.String)).in_(rental_class_ids),
+                func.lower(func.trim(func.replace(ItemMaster.bin_location, '\x00', ''))).in_(['resale', 'sold', 'pack', 'burst']),
                 or_(
                     ItemMaster.status.notin_(['Ready to Rent', 'On Rent', 'Delivered']),
                     ItemMaster.tag_id.in_(
@@ -201,9 +207,9 @@ def tab5_view():
 
             # Items available (status = 'Ready to Rent')
             items_available_query = session.query(func.count(ItemMaster.tag_id)).filter(
-                func.trim(func.cast(ItemMaster.rental_class_num, db.String)).in_(rental_class_ids),
+                func.trim(func.cast(func.replace(ItemMaster.rental_class_num, '\x00', ''), db.String)).in_(rental_class_ids),
                 ItemMaster.status == 'Ready to Rent',
-                func.lower(ItemMaster.bin_location).in_(['resale', 'sold', 'pack', 'burst'])
+                func.lower(func.trim(func.replace(ItemMaster.bin_location, '\x00', ''))).in_(['resale', 'sold', 'pack', 'burst'])
             )
             if filter_query:
                 items_available_query = items_available_query.filter(
@@ -333,8 +339,8 @@ def tab5_subcat_data():
             try:
                 # Total items in this subcategory with bin_location in ['resale', 'sold', 'pack', 'burst']
                 total_items_query = session.query(func.count(ItemMaster.tag_id)).filter(
-                    func.trim(func.cast(ItemMaster.rental_class_num, db.String)).in_(rental_class_ids),
-                    func.lower(ItemMaster.bin_location).in_(['resale', 'sold', 'pack', 'burst'])
+                    func.trim(func.cast(func.replace(ItemMaster.rental_class_num, '\x00', ''), db.String)).in_(rental_class_ids),
+                    func.lower(func.trim(func.replace(ItemMaster.bin_location, '\x00', ''))).in_(['resale', 'sold', 'pack', 'burst'])
                 )
                 if filter_query:
                     total_items_query = total_items_query.filter(
@@ -350,13 +356,13 @@ def tab5_subcat_data():
                     current_app.logger.debug(f"Skipping subcategory {subcat} due to zero total items")
                     # Debug: Check if there are any items with these rental_class_ids
                     all_items = session.query(func.count(ItemMaster.tag_id)).filter(
-                        func.trim(func.cast(ItemMaster.rental_class_num, db.String)).in_(rental_class_ids)
+                        func.trim(func.cast(func.replace(ItemMaster.rental_class_num, '\x00', ''), db.String)).in_(rental_class_ids)
                     ).scalar()
                     logger.debug(f"Total items (without bin_location filter) for subcategory {subcat}: {all_items}")
                     current_app.logger.debug(f"Total items (without bin_location filter) for subcategory {subcat}: {all_items}")
                     if all_items > 0:
                         bin_locations = session.query(ItemMaster.bin_location).filter(
-                            func.trim(func.cast(ItemMaster.rental_class_num, db.String)).in_(rental_class_ids)
+                            func.trim(func.cast(func.replace(ItemMaster.rental_class_num, '\x00', ''), db.String)).in_(rental_class_ids)
                         ).distinct().all()
                         logger.debug(f"Bin locations for subcategory {subcat}: {[loc[0] for loc in bin_locations]}")
                         current_app.logger.debug(f"Bin locations for subcategory {subcat}: {[loc[0] for loc in bin_locations]}")
@@ -364,9 +370,9 @@ def tab5_subcat_data():
 
                 # Items on contracts (status = 'On Rent' or 'Delivered')
                 items_on_contracts_query = session.query(func.count(ItemMaster.tag_id)).filter(
-                    func.trim(func.cast(ItemMaster.rental_class_num, db.String)).in_(rental_class_ids),
+                    func.trim(func.cast(func.replace(ItemMaster.rental_class_num, '\x00', ''), db.String)).in_(rental_class_ids),
                     ItemMaster.status.in_(['On Rent', 'Delivered']),
-                    func.lower(ItemMaster.bin_location).in_(['resale', 'sold', 'pack', 'burst'])
+                    func.lower(func.trim(func.replace(ItemMaster.bin_location, '\x00', ''))).in_(['resale', 'sold', 'pack', 'burst'])
                 )
                 if filter_query:
                     items_on_contracts_query = items_on_contracts_query.filter(
@@ -388,8 +394,8 @@ def tab5_subcat_data():
                 ).subquery()
 
                 items_in_service_query = session.query(func.count(ItemMaster.tag_id)).filter(
-                    func.trim(func.cast(ItemMaster.rental_class_num, db.String)).in_(rental_class_ids),
-                    func.lower(ItemMaster.bin_location).in_(['resale', 'sold', 'pack', 'burst']),
+                    func.trim(func.cast(func.replace(ItemMaster.rental_class_num, '\x00', ''), db.String)).in_(rental_class_ids),
+                    func.lower(func.trim(func.replace(ItemMaster.bin_location, '\x00', ''))).in_(['resale', 'sold', 'pack', 'burst']),
                     or_(
                         ItemMaster.status.notin_(['Ready to Rent', 'On Rent', 'Delivered']),
                         ItemMaster.tag_id.in_(
@@ -410,9 +416,9 @@ def tab5_subcat_data():
 
                 # Items available (status = 'Ready to Rent')
                 items_available_query = session.query(func.count(ItemMaster.tag_id)).filter(
-                    func.trim(func.cast(ItemMaster.rental_class_num, db.String)).in_(rental_class_ids),
+                    func.trim(func.cast(func.replace(ItemMaster.rental_class_num, '\x00', ''), db.String)).in_(rental_class_ids),
                     ItemMaster.status == 'Ready to Rent',
-                    func.lower(ItemMaster.bin_location).in_(['resale', 'sold', 'pack', 'burst'])
+                    func.lower(func.trim(func.replace(ItemMaster.bin_location, '\x00', ''))).in_(['resale', 'sold', 'pack', 'burst'])
                 )
                 if filter_query:
                     items_available_query = items_available_query.filter(
@@ -464,6 +470,8 @@ def tab5_common_names():
     sort = request.args.get('sort', '')
 
     if not category or not subcategory:
+        logger.error("Category and subcategory are required in common_names request")
+        current_app.logger.error("Category and subcategory are required in common_names request")
         return jsonify({'error': 'Category and subcategory are required'}), 400
 
     try:
@@ -490,8 +498,8 @@ def tab5_common_names():
             ItemMaster.common_name,
             func.count(ItemMaster.tag_id).label('total_items')
         ).filter(
-            func.trim(func.cast(ItemMaster.rental_class_num, db.String)).in_(rental_class_ids),
-            func.lower(ItemMaster.bin_location).in_(['resale', 'sold', 'pack', 'burst'])
+            func.trim(func.cast(func.replace(ItemMaster.rental_class_num, '\x00', ''), db.String)).in_(rental_class_ids),
+            func.lower(func.trim(func.replace(ItemMaster.bin_location, '\x00', ''))).in_(['resale', 'sold', 'pack', 'burst'])
         )
         if filter_query:
             common_names_query = common_names_query.filter(
@@ -518,10 +526,10 @@ def tab5_common_names():
 
             # Items on contracts (status = 'On Rent' or 'Delivered')
             items_on_contracts_query = session.query(func.count(ItemMaster.tag_id)).filter(
-                func.trim(func.cast(ItemMaster.rental_class_num, db.String)).in_(rental_class_ids),
+                func.trim(func.cast(func.replace(ItemMaster.rental_class_num, '\x00', ''), db.String)).in_(rental_class_ids),
                 ItemMaster.common_name == name,
                 ItemMaster.status.in_(['On Rent', 'Delivered']),
-                func.lower(ItemMaster.bin_location).in_(['resale', 'sold', 'pack', 'burst'])
+                func.lower(func.trim(func.replace(ItemMaster.bin_location, '\x00', ''))).in_(['resale', 'sold', 'pack', 'burst'])
             )
             if filter_query:
                 items_on_contracts_query = items_on_contracts_query.filter(
@@ -541,9 +549,9 @@ def tab5_common_names():
             ).subquery()
 
             items_in_service_query = session.query(func.count(ItemMaster.tag_id)).filter(
-                func.trim(func.cast(ItemMaster.rental_class_num, db.String)).in_(rental_class_ids),
+                func.trim(func.cast(func.replace(ItemMaster.rental_class_num, '\x00', ''), db.String)).in_(rental_class_ids),
                 ItemMaster.common_name == name,
-                func.lower(ItemMaster.bin_location).in_(['resale', 'sold', 'pack', 'burst']),
+                func.lower(func.trim(func.replace(ItemMaster.bin_location, '\x00', ''))).in_(['resale', 'sold', 'pack', 'burst']),
                 or_(
                     ItemMaster.status.notin_(['Ready to Rent', 'On Rent', 'Delivered']),
                     ItemMaster.tag_id.in_(
@@ -562,10 +570,10 @@ def tab5_common_names():
 
             # Items available (status = 'Ready to Rent')
             items_available_query = session.query(func.count(ItemMaster.tag_id)).filter(
-                func.trim(func.cast(ItemMaster.rental_class_num, db.String)).in_(rental_class_ids),
+                func.trim(func.cast(func.replace(ItemMaster.rental_class_num, '\x00', ''), db.String)).in_(rental_class_ids),
                 ItemMaster.common_name == name,
                 ItemMaster.status == 'Ready to Rent',
-                func.lower(ItemMaster.bin_location).in_(['resale', 'sold', 'pack', 'burst'])
+                func.lower(func.trim(func.replace(ItemMaster.bin_location, '\x00', ''))).in_(['resale', 'sold', 'pack', 'burst'])
             )
             if filter_query:
                 items_available_query = items_available_query.filter(
@@ -596,6 +604,7 @@ def tab5_common_names():
         })
     except Exception as e:
         logger.error(f"Error fetching common names for category {category}, subcategory {subcategory}: {str(e)}")
+        current_app.logger.error(f"Error fetching common names for category {category}, subcategory {subcategory}: {str(e)}")
         return jsonify({'error': 'Failed to fetch common names'}), 500
 
 @tab5_bp.route('/tab/5/data')
@@ -609,6 +618,8 @@ def tab5_data():
     sort = request.args.get('sort', '')
 
     if not category or not subcategory or not common_name:
+        logger.error("Category, subcategory, and common name are required in data request")
+        current_app.logger.error("Category, subcategory, and common name are required in data request")
         return jsonify({'error': 'Category, subcategory, and common name are required'}), 400
 
     try:
@@ -632,9 +643,9 @@ def tab5_data():
 
         # Fetch items
         query = session.query(ItemMaster).filter(
-            func.trim(func.cast(ItemMaster.rental_class_num, db.String)).in_(rental_class_ids),
+            func.trim(func.cast(func.replace(ItemMaster.rental_class_num, '\x00', ''), db.String)).in_(rental_class_ids),
             ItemMaster.common_name == common_name,
-            func.lower(ItemMaster.bin_location).in_(['resale', 'sold', 'pack', 'burst'])
+            func.lower(func.trim(func.replace(ItemMaster.bin_location, '\x00', ''))).in_(['resale', 'sold', 'pack', 'burst'])
         )
         if filter_query:
             query = query.filter(
@@ -683,6 +694,7 @@ def tab5_data():
         })
     except Exception as e:
         logger.error(f"Error fetching items for category {category}, subcategory {subcategory}, common_name {common_name}: {str(e)}")
+        current_app.logger.error(f"Error fetching items for category {category}, subcategory {subcategory}, common_name {common_name}: {str(e)}")
         return jsonify({'error': 'Failed to fetch items'}), 500
 
 @tab5_bp.route('/tab/5/update_bin_location', methods=['POST'])
@@ -715,10 +727,12 @@ def update_bin_location():
 
         session.close()
         logger.info(f"Updated bin_location for tag_id {tag_id} to {new_bin_location}")
+        current_app.logger.info(f"Updated bin_location for tag_id {tag_id} to {new_bin_location}")
         return jsonify({'message': 'Bin location updated successfully'})
     except Exception as e:
         session.rollback()
         logger.error(f"Error updating bin location for tag {tag_id}: {str(e)}")
+        current_app.logger.error(f"Error updating bin location for tag {tag_id}: {str(e)}")
         session.close()
         return jsonify({'error': str(e)}), 500
 
@@ -758,10 +772,12 @@ def update_status():
 
         session.close()
         logger.info(f"Updated status for tag_id {tag_id} to {new_status}")
+        current_app.logger.info(f"Updated status for tag_id {tag_id} to {new_status}")
         return jsonify({'message': 'Status updated successfully'})
     except Exception as e:
         session.rollback()
         logger.error(f"Error updating status for tag {tag_id}: {str(e)}")
+        current_app.logger.error(f"Error updating status for tag {tag_id}: {str(e)}")
         session.close()
         return jsonify({'error': str(e)}), 500
 
@@ -773,7 +789,7 @@ def export_sold_burst_csv():
 
         # Fetch all items with bin_location in ['sold', 'burst']
         items = session.query(ItemMaster).filter(
-            func.lower(ItemMaster.bin_location).in_(['sold', 'burst'])
+            func.lower(func.trim(func.replace(ItemMaster.bin_location, '\x00', ''))).in_(['sold', 'burst'])
         ).all()
 
         # Create CSV in memory
@@ -808,6 +824,7 @@ def export_sold_burst_csv():
         )
     except Exception as e:
         logger.error(f"Error exporting sold/burst items to CSV: {str(e)}")
+        current_app.logger.error(f"Error exporting sold/burst items to CSV: {str(e)}")
         return jsonify({'error': 'Failed to export CSV'}), 500
 
 @tab5_bp.route('/tab/5/full_items_by_rental_class')
@@ -817,6 +834,8 @@ def full_items_by_rental_class():
     common_name = unquote(request.args.get('common_name'))
 
     if not category or not subcategory or not common_name:
+        logger.error("Category, subcategory, and common name are required in full_items_by_rental_class request")
+        current_app.logger.error("Category, subcategory, and common name are required in full_items_by_rental_class request")
         return jsonify({'error': 'Category, subcategory, and common name are required'}), 400
 
     try:
@@ -840,9 +859,9 @@ def full_items_by_rental_class():
 
         # Fetch all items with the same rental_class_num and common_name
         items_query = session.query(ItemMaster).filter(
-            func.trim(func.cast(ItemMaster.rental_class_num, db.String)).in_(rental_class_ids),
+            func.trim(func.cast(func.replace(ItemMaster.rental_class_num, '\x00', ''), db.String)).in_(rental_class_ids),
             ItemMaster.common_name == common_name,
-            func.lower(ItemMaster.bin_location).in_(['resale', 'sold', 'pack', 'burst'])
+            func.lower(func.trim(func.replace(ItemMaster.bin_location, '\x00', ''))).in_(['resale', 'sold', 'pack', 'burst'])
         ).order_by(ItemMaster.tag_id)
 
         items = items_query.all()
@@ -868,4 +887,5 @@ def full_items_by_rental_class():
         })
     except Exception as e:
         logger.error(f"Error fetching full items for category {category}, subcategory {subcategory}, common_name {common_name}: {str(e)}")
+        current_app.logger.error(f"Error fetching full items for category {category}, subcategory {subcategory}, common_name {common_name}: {str(e)}")
         return jsonify({'error': 'Failed to fetch full items'}), 500
