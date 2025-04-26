@@ -1,4 +1,4 @@
-console.log('expand.js version: 2025-04-25 v45 loaded');
+console.log('expand.js version: 2025-04-25 v46 loaded');
 
 // Note: Common function - will be moved to common.js during split
 function showLoading(key) {
@@ -472,6 +472,12 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
                     opacity: computedSubcatLevelStyle.opacity,
                     height: computedSubcatLevelStyle.height
                 });
+
+                // Force a reflow on subcat-level to ensure rendering
+                subcatLevel.style.display = 'none';
+                void subcatLevel.offsetHeight;
+                subcatLevel.style.display = 'block';
+                console.log('Forced reflow on subcat-level, new display:', subcatLevel.style.display);
             } else {
                 console.log('Subcat-level div not found');
             }
@@ -658,7 +664,7 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                 if (window.cachedTabNum == 1 || window.cachedTabNum == 5) {
                     headers.push('Quality', 'Notes');
                     if (window.cachedTabNum == 5) {
-                        headers.push('Actions'); // Add a single "Actions" column for the Save button
+                        headers.push('Actions');
                     }
                 }
                 console.log('Generated headers:', headers);
@@ -796,20 +802,18 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
 
 // New functions to handle clickable columns and dropdowns
 function showDropdown(event, cell, type, tagId, currentValue) {
-    event.stopPropagation(); // Prevent the click from bubbling up and triggering the document click handler
+    event.stopPropagation();
     console.log('showDropdown called with', { cell, type, tagId, currentValue });
     const dropdown = document.getElementById(`dropdown-${type}-${tagId}`);
     console.log('Dropdown element:', dropdown);
     if (dropdown) {
         console.log('Dropdown found, current display:', dropdown.style.display);
-        // Hide all other dropdowns
         document.querySelectorAll('.dropdown-menu').forEach(d => {
             if (d !== dropdown) {
                 d.classList.remove('show');
                 d.style.display = 'none';
             }
         });
-        // Show the dropdown
         dropdown.classList.add('show');
         dropdown.style.display = 'block';
         const rect = cell.getBoundingClientRect();
@@ -818,9 +822,7 @@ function showDropdown(event, cell, type, tagId, currentValue) {
         dropdown.style.top = `${rect.bottom + window.scrollY}px`;
         dropdown.style.zIndex = '1000';
         console.log('Dropdown positioned at:', { left: dropdown.style.left, top: dropdown.style.top, zIndex: dropdown.style.zIndex });
-        // Update the cell content to reflect the current selection
         cell.setAttribute(`data-${type}`, currentValue);
-        // Debug computed style of dropdown
         const computedStyle = window.getComputedStyle(dropdown);
         console.log('Dropdown computed style after show:', {
             display: computedStyle.display,
@@ -838,7 +840,7 @@ function showDropdown(event, cell, type, tagId, currentValue) {
 
 function selectOption(event, element, type, tagId, value) {
     event.preventDefault();
-    event.stopPropagation(); // Prevent the click from bubbling up
+    event.stopPropagation();
     console.log('selectOption called with', { type, tagId, value });
     const cell = document.querySelector(`tr[data-item-id="${tagId}"] td.editable[onclick*="showDropdown(event, this, '${type}', '${tagId}'"]`);
     if (cell) {
@@ -908,7 +910,6 @@ function saveChanges(tagId) {
             } else {
                 console.log('Status updated successfully:', data);
                 alert('Status updated successfully!');
-                // Refresh the table to reflect the updated status
                 const itemsContainer = document.getElementById(`items-${tagId.split('-')[0]}`);
                 if (itemsContainer) {
                     const category = itemsContainer.closest('.common-level').querySelector('button[data-category]').getAttribute('data-category');
