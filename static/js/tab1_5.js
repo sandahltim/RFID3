@@ -1,4 +1,4 @@
-console.log('tab1_5.js version: 2025-04-26-v8 loaded');
+console.log('tab1_5.js version: 2025-04-26-v9 loaded');
 
 // Note: Common function for Tabs 1 and 5
 function hideOtherSubcats(currentCategory, parentCategory) {
@@ -640,8 +640,8 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
     }
     container.classList.add('loading');
 
-    // Use the correct key for the loading indicator (match the subcat/common level)
-    const key = targetId; // Use the full targetId as the key to match the loading indicator
+    // Use the correct key for the loading indicator
+    const key = targetId.split('-').slice(1).join('-'); // Match the loading indicator ID (e.g., "resale_testing_resale_test_resale")
     showLoading(key);
     hideOtherItems(targetId, targetId);
 
@@ -983,7 +983,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const subcatTargetId = expandBtn.getAttribute('data-subcat-target-id');
             const commonName = expandBtn.getAttribute('data-common-name');
 
-            if (commonName) {
+            if (commonName && targetId) {
                 loadItems(category, subcategory, commonName, targetId);
             } else if (subcategory && subcatTargetId) {
                 loadCommonNames(category, subcategory, subcatTargetId);

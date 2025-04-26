@@ -86,7 +86,7 @@
     visibility: visible !important;
     z-index: 5; /* Lower than headers to ensure headers stay on top */
     position: relative;
-    padding-top: 60px; /* Add padding to push rows below sticky headers */
+    /* Removed padding-top to prevent pushing rows down */
 }
 
 .subcat-table td,
