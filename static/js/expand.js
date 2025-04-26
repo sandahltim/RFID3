@@ -659,8 +659,7 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                 if (window.cachedTabNum == 1 || window.cachedTabNum == 5) {
                     headers.push('Quality', 'Notes');
                     if (window.cachedTabNum == 5) {
-                        headers.push('Update Bin Location');
-                        headers.push('Update Status');
+                        headers.push('Actions'); // Add a single "Actions" column for the Save button
                     }
                 }
                 console.log('Generated headers:', headers);
@@ -693,32 +692,26 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                             <tr data-item-id="${item.tag_id}">
                                 <td>${item.tag_id}</td>
                                 <td>${item.common_name}</td>
-                                <td>${item.bin_location || 'N/A'}</td>
-                                <td>${item.status}</td>
+                                <td class="editable" onclick="showDropdown(this, 'bin-location', '${item.tag_id}', '${item.bin_location || ''}')">${item.bin_location || 'N/A'}</td>
+                                <td class="editable" onclick="showDropdown(this, 'status', '${item.tag_id}', '${item.status}')">${item.status}</td>
                                 <td>${item.last_contract_num || 'N/A'}</td>
                                 <td>${lastScanned}</td>
                                 <td>${item.quality || 'N/A'}</td>
                                 <td>${item.notes || 'N/A'}</td>
                         `;
                         if (window.cachedTabNum == 5) {
-                            console.log('Generating edit selectors for item:', item.tag_id);
                             html += `
-                                <td class="edit-bin-location">
-                                    <select id="bin-location-select-${item.tag_id}">
-                                        <option value="">Select Bin Location</option>
-                                        <option value="resale" ${item.bin_location === 'resale' ? 'selected' : ''}>resale</option>
-                                        <option value="sold" ${item.bin_location === 'sold' ? 'selected' : ''}>sold</option>
-                                        <option value="pack" ${item.bin_location === 'pack' ? 'selected' : ''}>pack</option>
-                                        <option value="burst" ${item.bin_location === 'burst' ? 'selected' : ''}>burst</option>
-                                    </select>
-                                    <button class="btn btn-sm btn-primary" onclick="updateBinLocation('${item.tag_id}', '${item.bin_location || ''}')">Save</button>
-                                </td>
-                                <td class="edit-status">
-                                    <select id="status-select-${item.tag_id}" ${item.status !== 'On Rent' && item.status !== 'Delivered' ? 'disabled' : ''}>
-                                        <option value="">Select Status</option>
-                                        <option value="Ready to Rent" ${item.status === 'Ready to Rent' ? 'selected' : ''}>Ready to Rent</option>
-                                    </select>
-                                    <button class="btn btn-sm btn-primary" onclick="updateStatus('${item.tag_id}', '${item.status}')" ${item.status !== 'On Rent' && item.status !== 'Delivered' ? 'disabled' : ''}>Save</button>
+                                <td>
+                                    <button class="btn btn-sm btn-primary save-btn" onclick="saveChanges('${item.tag_id}')">Save</button>
+                                    <div id="dropdown-bin-location-${item.tag_id}" class="dropdown-menu" style="display: none;">
+                                        <a class="dropdown-item" href="#" onclick="selectOption(this, 'bin-location', '${item.tag_id}', 'resale')">resale</a>
+                                        <a class="dropdown-item" href="#" onclick="selectOption(this, 'bin-location', '${item.tag_id}', 'sold')">sold</a>
+                                        <a class="dropdown-item" href="#" onclick="selectOption(this, 'bin-location', '${item.tag_id}', 'pack')">pack</a>
+                                        <a class="dropdown-item" href="#" onclick="selectOption(this, 'bin-location', '${item.tag_id}', 'burst')">burst</a>
+                                    </div>
+                                    <div id="dropdown-status-${item.tag_id}" class="dropdown-menu" style="display: none;">
+                                        <a class="dropdown-item" href="#" onclick="selectOption(this, 'status', '${item.tag_id}', 'Ready to Rent')" ${item.status !== 'On Rent' && item.status !== 'Delivered' ? 'style="pointer-events: none; color: #ccc;"' : ''}>Ready to Rent</a>
+                                    </div>
                                 </td>
                             `;
                         }
@@ -761,7 +754,7 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                 html = `<div class="item-level-wrapper"><p>No items found for this common name.</p></div>`;
             }
 
-            console.log('Setting container HTML for targetId:', targetId, 'with HTML:', html); // Debug log
+            console.log('Setting container HTML for targetId:', targetId, 'with HTML:', html);
             container.innerHTML = html;
             container.classList.remove('collapsed');
             container.classList.add('expanded');
@@ -774,7 +767,7 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
             const table = container.querySelector('table');
             if (table) {
                 table.style.display = 'none';
-                void table.offsetHeight; // Trigger reflow
+                void table.offsetHeight;
                 table.style.display = 'table';
                 console.log('Table re-rendered with display:', table.style.display);
             }
@@ -801,6 +794,115 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
             console.log('loadItems completed for targetId:', targetId);
         });
 }
+
+// New functions to handle clickable columns and dropdowns
+function showDropdown(cell, type, tagId, currentValue) {
+    const dropdown = document.getElementById(`dropdown-${type}-${tagId}`);
+    if (dropdown) {
+        // Hide all other dropdowns
+        document.querySelectorAll('.dropdown-menu').forEach(d => {
+            if (d !== dropdown) d.style.display = 'none';
+        });
+        // Position the dropdown below the cell
+        dropdown.style.display = 'block';
+        const rect = cell.getBoundingClientRect();
+        dropdown.style.position = 'absolute';
+        dropdown.style.left = `${rect.left + window.scrollX}px`;
+        dropdown.style.top = `${rect.bottom + window.scrollY}px`;
+        // Update the cell content to reflect the current selection
+        cell.setAttribute(`data-${type}`, currentValue);
+    }
+}
+
+function selectOption(element, type, tagId, value) {
+    event.preventDefault();
+    const cell = document.querySelector(`tr[data-item-id="${tagId}"] td.editable[onclick*="showDropdown(this, '${type}', '${tagId}'"]`);
+    if (cell) {
+        cell.textContent = value;
+        cell.setAttribute(`data-${type}`, value);
+        const dropdown = document.getElementById(`dropdown-${type}-${tagId}`);
+        if (dropdown) dropdown.style.display = 'none';
+    }
+}
+
+function saveChanges(tagId) {
+    const binLocationCell = document.querySelector(`tr[data-item-id="${tagId}"] td.editable[onclick*="showDropdown(this, 'bin-location', '${tagId}'"]`);
+    const statusCell = document.querySelector(`tr[data-item-id="${tagId}"] td.editable[onclick*="showDropdown(this, 'status', '${tagId}'"]`);
+
+    const newBinLocation = binLocationCell ? binLocationCell.getAttribute('data-bin-location') : null;
+    const newStatus = statusCell ? statusCell.getAttribute('data-status') : null;
+
+    if (newBinLocation) {
+        fetch('/tab/5/update_bin_location', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                tag_id: tagId,
+                bin_location: newBinLocation
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                console.error('Error updating bin location:', data.error);
+                alert('Failed to update bin location: ' + data.error);
+            } else {
+                console.log('Bin location updated successfully:', data);
+                alert('Bin location updated successfully!');
+            }
+        })
+        .catch(error => {
+            console.error('Error updating bin location:', error);
+            alert('Error updating bin location: ' + error.message);
+        });
+    }
+
+    if (newStatus) {
+        fetch('/tab/5/update_status', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                tag_id: tagId,
+                status: newStatus
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                console.error('Error updating status:', data.error);
+                alert('Failed to update status: ' + data.error);
+            } else {
+                console.log('Status updated successfully:', data);
+                alert('Status updated successfully!');
+                // Refresh the table to reflect the updated status
+                const itemsContainer = document.getElementById(`items-${tagId.split('-')[0]}`);
+                if (itemsContainer) {
+                    const category = itemsContainer.closest('.common-level').querySelector('button[data-category]').getAttribute('data-category');
+                    const subcategory = itemsContainer.closest('.common-level').querySelector('button[data-subcategory]').getAttribute('data-subcategory');
+                    const commonName = itemsContainer.closest('tr').querySelector('td:first-child').textContent;
+                    loadItems(category, subcategory, commonName, `items-${tagId.split('-')[0]}`);
+                }
+            }
+        })
+        .catch(error => {
+            console.error('Error updating status:', error);
+            alert('Error updating status: ' + error.message);
+        });
+    }
+}
+
+// Hide dropdowns when clicking outside
+document.addEventListener('click', (event) => {
+    if (!event.target.closest('.editable') && !event.target.closest('.dropdown-menu')) {
+        document.querySelectorAll('.dropdown-menu').forEach(dropdown => {
+            dropdown.style.display = 'none';
+        });
+    }
+});
 
 // Note: Common function - will be moved to tab1_5.js during split
 document.addEventListener('DOMContentLoaded', function() {
