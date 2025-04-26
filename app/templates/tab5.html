@@ -40,7 +40,7 @@
         <a href="{{ url_for('tab5.export_sold_burst_csv') }}" class="btn btn-info">Export Sold/Burst Items (CSV)</a>
     </div>
     <!-- Table for displaying categories -->
-    <table class="table table-bordered" id="category-table">
+    <table class="table table-bordered category-table" id="category-table">
         <thead>
             <tr>
                 <th>Category</th>
@@ -60,8 +60,8 @@
                 <td>{{ category.items_in_service }}</td>
                 <td>{{ category.items_available }}</td>
                 <td>
-                    <button class="btn btn-sm btn-secondary expand-btn" onclick="window.expandCategory('{{ category.category | urlencode | replace('\'', '\\\'') | replace('\"', '\\\"') }}', 'subcat-{{ category.cat_id }}')">Expand</button>
-                    <button class="btn btn-sm btn-secondary collapse-btn" style="display:none;" onclick="collapseSection('subcat-{{ category.cat_id }}')">Collapse</button>
+                    <button class="btn btn-sm btn-secondary expand-btn" data-target-id="subcat-{{ category.cat_id }}" data-category="{{ category.category | urlencode | replace('\'', '\\\'') | replace('\"', '\\\"') }}" onclick="window.expandCategory('{{ category.category | urlencode | replace('\'', '\\\'') | replace('\"', '\\\"') }}', 'subcat-{{ category.cat_id }}')">Expand</button>
+                    <button class="btn btn-sm btn-secondary collapse-btn" style="display:none;" data-collapse-target="subcat-{{ category.cat_id }}" onclick="collapseSection('subcat-{{ category.cat_id }}')">Collapse</button>
                     <button class="btn btn-sm btn-info print-btn" data-print-level="Category" data-print-id="category-table">Print</button>
                     <div id="loading-{{ category.cat_id }}" style="display:none;" class="loading">Loading...</div>
                 </td>

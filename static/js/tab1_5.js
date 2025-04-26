@@ -1,4 +1,4 @@
-console.log('tab1_5.js version: 2025-04-26-v9 loaded');
+console.log('tab1_5.js version: 2025-04-26-v10 loaded');
 
 // Note: Common function for Tabs 1 and 5
 function hideOtherSubcats(currentCategory, parentCategory) {
@@ -176,7 +176,7 @@ function loadCommonNames(category, subcategory, targetId, page = 1, contractNumb
 
                 html += `
                         </div>
-                        <table class="table table-bordered mt-2" id="common-table-${key}">
+                        <table class="common-table" id="common-table-${key}">
                             <thead>
                                 <tr>
                                     ${headers.map(header => `<th>${header}</th>`).join('')}
@@ -350,7 +350,7 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
                         </select>
                     </div>
                     <div class="subcat-level">
-                        <table class="table table-bordered subcat-table mt-2" id="subcat-table-${normalizedCategory}">
+                        <table class="subcat-table" id="subcat-table-${normalizedCategory}">
                             <thead>
                                 <tr>
                                     <th>Subcategory</th>
@@ -640,7 +640,7 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
     }
     container.classList.add('loading');
 
-    // Use the correct key for the loading indicator
+    // Use the correct key for the loading indicator (match the subcat/common level)
     const key = targetId.split('-').slice(1).join('-'); // Match the loading indicator ID (e.g., "resale_testing_resale_test_resale")
     showLoading(key);
     hideOtherItems(targetId, targetId);
@@ -725,7 +725,7 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
 
                 html += `
                         </div>
-                        <table class="table table-bordered item-level mt-2" id="item-table-${key}">
+                        <table class="item-table" id="item-table-${key}">
                             <thead>
                                 <tr>
                                     ${headers.map(header => `<th>${header}</th>`).join('')}

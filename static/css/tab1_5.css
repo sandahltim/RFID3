@@ -50,25 +50,31 @@
     visibility: visible !important;
 }
 
-/* Subcategory, common, and item tables */
-.subcat-table, .common-level table, .item-level {
+/* Table styling */
+.category-table,
+.subcat-table,
+.common-table,
+.item-table {
     width: 100%;
-    overflow-x: auto;
-    display: table !important;
-    visibility: visible !important;
     table-layout: fixed; /* Ensure consistent column widths */
     border-collapse: collapse;
+    display: table !important;
+    visibility: visible !important;
 }
 
-.subcat-table thead, .common-level table thead, .item-level thead {
+.category-table thead,
+.subcat-table thead,
+.common-table thead,
+.item-table thead {
     display: table-header-group !important;
     visibility: visible !important;
     z-index: 10; /* Ensure headers are above body */
 }
 
+.category-table thead th,
 .subcat-table thead th,
-.common-level table thead th,
-.item-level thead th {
+.common-table thead th,
+.item-table thead th {
     position: sticky;
     top: 56px; /* Match navbar height */
     z-index: 11; /* Higher than table body to ensure headers stay on top */
@@ -81,17 +87,20 @@
     white-space: nowrap;
 }
 
-.subcat-table tbody, .common-level table tbody, .item-level tbody {
+.category-table tbody,
+.subcat-table tbody,
+.common-table tbody,
+.item-table tbody {
     display: table-row-group !important;
     visibility: visible !important;
     z-index: 5; /* Lower than headers to ensure headers stay on top */
     position: relative;
-    /* Removed padding-top to prevent pushing rows down */
 }
 
+.category-table td,
 .subcat-table td,
-.common-level table td,
-.item-level td {
+.common-table td,
+.item-table td {
     padding: 12px;
     border: 1px solid #dee2e6;
     display: table-cell !important;
@@ -109,123 +118,90 @@
     z-index: 5; /* Ensure rows are below headers but visible */
 }
 
+/* Column widths for category table */
+.category-table th:nth-child(1),
+.category-table td:nth-child(1) { width: 200px; } /* Category */
+.category-table th:nth-child(2),
+.category-table td:nth-child(2) { width: 100px; } /* Total Items */
+.category-table th:nth-child(3),
+.category-table td:nth-child(3) { width: 120px; } /* Items on Contracts */
+.category-table th:nth-child(4),
+.category-table td:nth-child(4) { width: 100px; } /* Items in Service */
+.category-table th:nth-child(5),
+.category-table td:nth-child(5) { width: 100px; } /* Items Available */
+.category-table th:nth-child(6),
+.category-table td:nth-child(6) { width: 200px; } /* Actions */
+
 /* Column widths for subcategory table */
 .subcat-table th:nth-child(1),
-.subcat-table td:nth-child(1) {
-    width: 200px; /* Subcategory */
-}
-
+.subcat-table td:nth-child(1) { width: 200px; } /* Subcategory */
 .subcat-table th:nth-child(2),
-.subcat-table td:nth-child(2) {
-    width: 100px; /* Total Items */
-}
-
+.subcat-table td:nth-child(2) { width: 100px; } /* Total Items */
 .subcat-table th:nth-child(3),
-.subcat-table td:nth-child(3) {
-    width: 120px; /* Items on Contracts */
-}
-
+.subcat-table td:nth-child(3) { width: 120px; } /* Items on Contracts */
 .subcat-table th:nth-child(4),
-.subcat-table td:nth-child(4) {
-    width: 100px; /* Items in Service */
-}
-
+.subcat-table td:nth-child(4) { width: 100px; } /* Items in Service */
 .subcat-table th:nth-child(5),
-.subcat-table td:nth-child(5) {
-    width: 100px; /* Items Available */
-}
-
+.subcat-table td:nth-child(5) { width: 100px; } /* Items Available */
 .subcat-table th:nth-child(6),
-.subcat-table td:nth-child(6) {
-    width: 200px; /* Actions */
-}
+.subcat-table td:nth-child(6) { width: 200px; } /* Actions */
 
-/* Column widths for common-level table */
-.common-level table th:nth-child(1),
-.common-level table td:nth-child(1) {
-    width: 200px; /* Common Name */
-    white-space: normal;
-    word-wrap: break-word;
-}
+/* Column widths for common names table */
+.common-table th:nth-child(1),
+.common-table td:nth-child(1) { width: 200px; white-space: normal; word-wrap: break-word; } /* Common Name */
+.common-table th:nth-child(2),
+.common-table td:nth-child(2) { width: 100px; } /* Total Items */
+.common-table th:nth-child(3),
+.common-table td:nth-child(3) { width: 120px; } /* Items on Contracts */
+.common-table th:nth-child(4),
+.common-table td:nth-child(4) { width: 100px; } /* Items in Service */
+.common-table th:nth-child(5),
+.common-table td:nth-child(5) { width: 100px; } /* Items Available */
+.common-table th:nth-child(6),
+.common-table td:nth-child(6) { width: 200px; } /* Actions */
 
-.common-level table th:nth-child(2),
-.common-level table td:nth-child(2) {
-    width: 100px; /* Total Items */
-}
+/* Column widths for items table (Tab 1) */
+.item-table th:nth-child(1),
+.item-table td:nth-child(1) { width: 100px; } /* Tag ID */
+.item-table th:nth-child(2),
+.item-table td:nth-child(2) { width: 200px; } /* Common Name */
+.item-table th:nth-child(3),
+.item-table td:nth-child(3) { width: 180px; } /* Bin Location */
+.item-table th:nth-child(4),
+.item-table td:nth-child(4) { width: 180px; } /* Status */
+.item-table th:nth-child(5),
+.item-table td:nth-child(5) { width: 150px; } /* Last Contract */
+.item-table th:nth-child(6),
+.item-table td:nth-child(6) { width: 200px; } /* Last Scanned Date */
+.item-table th:nth-child(7),
+.item-table td:nth-child(7) { width: 100px; } /* Quality */
+.item-table th:nth-child(8),
+.item-table td:nth-child(8) { width: 200px; } /* Notes */
 
-.common-level table th:nth-child(3),
-.common-level table td:nth-child(3) {
-    width: 120px; /* Items on Contracts */
-}
-
-.common-level table th:nth-child(4),
-.common-level table td:nth-child(4) {
-    width: 100px; /* Items in Service */
-}
-
-.common-level table th:nth-child(5),
-.common-level table td:nth-child(5) {
-    width: 100px; /* Items Available */
-}
-
-.common-level table th:nth-child(6),
-.common-level table td:nth-child(6) {
-    width: 200px; /* Actions */
-}
-
-/* Fix item-level table column alignment */
-.item-level th:nth-child(1),
-.item-level td:nth-child(1) {
-    width: 60px; /* Select column (Tab 5) */
-}
-
-.item-level th:nth-child(2),
-.item-level td:nth-child(2) {
-    width: 100px; /* Tag ID */
-}
-
-.item-level th:nth-child(3),
-.item-level td:nth-child(3) {
-    width: 200px; /* Common Name */
-}
-
-.item-level th:nth-child(4),
-.item-level td:nth-child(4) {
-    width: 180px; /* Bin Location */
-}
-
-.item-level th:nth-child(5),
-.item-level td:nth-child(5) {
-    width: 180px; /* Status */
-}
-
-.item-level th:nth-child(6),
-.item-level td:nth-child(6) {
-    width: 150px; /* Last Contract */
-}
-
-.item-level th:nth-child(7),
-.item-level td:nth-child(7) {
-    width: 200px; /* Last Scanned Date */
-}
-
-.item-level th:nth-child(8),
-.item-level td:nth-child(8) {
-    width: 100px; /* Quality */
-}
-
-.item-level th:nth-child(9),
-.item-level td:nth-child(9) {
-    width: 200px; /* Notes */
-}
-
-.item-level th:nth-child(10),
-.item-level td:nth-child(10) {
-    width: 100px; /* Actions (Tab 5) */
-}
+/* Column widths for items table (Tab 5) */
+.item-table th:nth-child(1),
+.item-table td:nth-child(1) { width: 60px; } /* Select */
+.item-table th:nth-child(2),
+.item-table td:nth-child(2) { width: 100px; } /* Tag ID */
+.item-table th:nth-child(3),
+.item-table td:nth-child(3) { width: 200px; } /* Common Name */
+.item-table th:nth-child(4),
+.item-table td:nth-child(4) { width: 180px; } /* Bin Location */
+.item-table th:nth-child(5),
+.item-table td:nth-child(5) { width: 180px; } /* Status */
+.item-table th:nth-child(6),
+.item-table td:nth-child(6) { width: 150px; } /* Last Contract */
+.item-table th:nth-child(7),
+.item-table td:nth-child(7) { width: 200px; } /* Last Scanned Date */
+.item-table th:nth-child(8),
+.item-table td:nth-child(8) { width: 100px; } /* Quality */
+.item-table th:nth-child(9),
+.item-table td:nth-child(9) { width: 200px; } /* Notes */
+.item-table th:nth-child(10),
+.item-table td:nth-child(10) { width: 100px; } /* Actions */
 
 /* Ensure dropdowns don't overflow columns */
-.item-level select {
+.item-table select {
     width: 100%;
     box-sizing: border-box;
 }
@@ -307,8 +283,8 @@
         margin-left: 0.75rem;
     }
 
-    .common-level th:nth-child(1),
-    .common-level td:nth-child(1) {
+    .common-table th:nth-child(1),
+    .common-table td:nth-child(1) {
         max-width: 180px;
     }
 
@@ -316,12 +292,12 @@
         min-width: 100%;
     }
 
-    .item-level {
+    .item-table {
         min-width: 900px;
     }
 
-    .item-level th,
-    .item-level td {
+    .item-table th,
+    .item-table td {
         padding: 0.5rem;
         font-size: 0.9rem;
     }
@@ -332,8 +308,8 @@
         font-size: 0.9rem;
     }
 
-    .common-level table th,
-    .common-level table td {
+    .common-table th,
+    .common-table td {
         padding: 0.5rem;
         font-size: 0.9rem;
     }
