@@ -95,12 +95,12 @@ body {
 /* Fix item-level table column alignment */
 .item-level th:nth-child(1),
 .item-level td:nth-child(1) {
-    width: 80px; /* Select column */
+    width: 60px; /* Select column */
 }
 
 .item-level th:nth-child(2),
 .item-level td:nth-child(2) {
-    width: 120px; /* Tag ID */
+    width: 100px; /* Tag ID */
 }
 
 .item-level th:nth-child(3),
@@ -110,12 +110,12 @@ body {
 
 .item-level th:nth-child(4),
 .item-level td:nth-child(4) {
-    width: 150px; /* Bin Location */
+    width: 180px; /* Bin Location */
 }
 
 .item-level th:nth-child(5),
 .item-level td:nth-child(5) {
-    width: 150px; /* Status */
+    width: 180px; /* Status */
 }
 
 .item-level th:nth-child(6),
@@ -141,6 +141,12 @@ body {
 .item-level th:nth-child(10),
 .item-level td:nth-child(10) {
     width: 100px; /* Actions */
+}
+
+/* Ensure dropdowns don't overflow columns */
+.item-level select {
+    width: 100%;
+    box-sizing: border-box;
 }
 
 /* Hierarchy level styling */

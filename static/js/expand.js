@@ -1,4 +1,4 @@
-console.log('expand.js version: 2025-04-26-v60 loaded');
+console.log('expand.js version: 2025-04-26-v61 loaded');
 
 // Note: Common function - will be moved to common.js during split
 function showLoading(key) {
@@ -73,6 +73,10 @@ function hideOtherItems(currentTargetId, parentCommonName) {
 
 // Note: Common function - will be moved to tab1_5.js during split
 function collapseSection(targetId) {
+    if (!targetId) {
+        console.error('collapseSection called with undefined or null targetId');
+        return;
+    }
     console.log('collapseSection called for targetId:', targetId);
     const section = document.getElementById(targetId);
     if (section) {
@@ -315,6 +319,8 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
         return;
     }
 
+    // Clear the container to prevent duplicate rendering
+    container.innerHTML = '';
     hideOtherSubcats(normalizedCategory, normalizedCategory);
     showLoading(normalizedCategory);
 
@@ -372,28 +378,33 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
                             <tbody>
                 `;
 
-                data.subcategories.forEach(subcat => {
-                    const subcatKey = `${normalizedCategory}_${subcat.subcategory.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
-                    html += `
-                        <tr class="subcat-row">
-                            <td>${subcat.subcategory}</td>
-                            <td>${subcat.total_items}</td>
-                            <td>${subcat.items_on_contracts}</td>
-                            <td>${subcat.items_in_service}</td>
-                            <td>${subcat.items_available}</td>
-                            <td>
-                                <button class="btn btn-sm btn-secondary expand-btn" data-category="${originalCategory}" data-subcategory="${subcat.subcategory}" data-target-id="${subcatKey}">Expand</button>
-                                <button class="btn btn-sm btn-secondary collapse-btn" style="display:none;" data-collapse-target="common-${subcatKey}">Collapse</button>
-                                <button class="btn btn-sm btn-info print-btn" data-print-level="Subcategory" data-print-id="subcat-table-${subcatKey}">Print</button>
-                                <div id="loading-${subcatKey}" style="display:none;" class="loading">Loading...</div>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td colspan="6">
-                                <div id="common-${subcatKey}" class="expandable collapsed"></div>
-                            </td>
-                        </tr>
-                    `;
+                // Ensure unique subcategories by using a Set
+                const uniqueSubcats = [...new Set(data.subcategories.map(subcat => subcat.subcategory))];
+                uniqueSubcats.forEach(subcatName => {
+                    const subcat = data.subcategories.find(s => s.subcategory === subcatName);
+                    if (subcat) {
+                        const subcatKey = `${normalizedCategory}_${subcat.subcategory.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
+                        html += `
+                            <tr class="subcat-row">
+                                <td>${subcat.subcategory}</td>
+                                <td>${subcat.total_items}</td>
+                                <td>${subcat.items_on_contracts}</td>
+                                <td>${subcat.items_in_service}</td>
+                                <td>${subcat.items_available}</td>
+                                <td>
+                                    <button class="btn btn-sm btn-secondary expand-btn" data-category="${originalCategory}" data-subcategory="${subcat.subcategory}" data-target-id="${subcatKey}">Expand</button>
+                                    <button class="btn btn-sm btn-secondary collapse-btn" style="display:none;" data-collapse-target="common-${subcatKey}">Collapse</button>
+                                    <button class="btn btn-sm btn-info print-btn" data-print-level="Subcategory" data-print-id="subcat-table-${subcatKey}">Print</button>
+                                    <div id="loading-${subcatKey}" style="display:none;" class="loading">Loading...</div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td colspan="6">
+                                    <div id="common-${subcatKey}" class="expandable collapsed"></div>
+                                </td>
+                            </tr>
+                        `;
+                    }
                 });
 
                 html += `
@@ -439,6 +450,8 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
             if (expandBtn && collapseBtn) {
                 expandBtn.style.display = 'none';
                 collapseBtn.style.display = 'inline-block';
+            } else {
+                console.warn('Expand/Collapse buttons not found for selector:', `button.expand-btn[onclick="window.expandCategory('${encodedCategory}', 'subcat-${normalizedCategory}')"]`);
             }
 
             // Save expansion state
@@ -958,7 +971,6 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // Do not automatically expand any sections on load
-    // Expansion state will be restored only when the user explicitly expands a section
     console.log('Skipping automatic expansion on load');
 
     // Event delegation for expand and collapse buttons
@@ -993,6 +1005,39 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
     });
+
+    // Prevent duplicate event listeners by removing existing ones
+    document.removeEventListener('click', handleClick);
+    document.addEventListener('click', handleClick);
+
+    function handleClick(event) {
+        const expandBtn = event.target.closest('.expand-btn');
+        if (expandBtn) {
+            event.stopPropagation();
+            const category = expandBtn.getAttribute('data-category');
+            const subcategory = expandBtn.getAttribute('data-subcategory');
+            const targetId = expandBtn.getAttribute('data-target-id');
+            const commonName = expandBtn.getAttribute('data-common-name');
+
+            if (commonName) {
+                loadItems(category, subcategory, commonName, targetId);
+            } else if (subcategory) {
+                loadCommonNames(category, subcategory, targetId);
+            } else {
+                const normalizedCategory = targetId.replace('subcat-', '');
+                loadSubcatData(category, normalizedCategory, targetId);
+            }
+            return;
+        }
+
+        const collapseBtn = event.target.closest('.collapse-btn');
+        if (collapseBtn) {
+            event.stopPropagation();
+            const targetId = collapseBtn.getAttribute('data-collapse-target');
+            collapseSection(targetId);
+            return;
+        }
+    }
 
     // Hide dropdowns when clicking outside (used only in Tab 1)
     document.addEventListener('click', (event) => {
