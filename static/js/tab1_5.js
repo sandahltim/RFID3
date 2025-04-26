@@ -1,4 +1,4 @@
-console.log('tab1_5.js version: 2025-04-26-v4 loaded');
+console.log('tab1_5.js version: 2025-04-26-v5 loaded');
 
 // Note: Common function for Tabs 1 and 5
 function hideOtherSubcats(currentCategory, parentCategory) {
@@ -367,7 +367,7 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
                             <td>${subcat.items_in_service}</td>
                             <td>${subcat.items_available}</td>
                             <td>
-                                <button class="btn btn-sm btn-secondary expand-btn" data-category="${originalCategory}" data-subcategory="${subcat.subcategory}" data-target-id="${subcatKey}">Expand</button>
+                                <button class="btn btn-sm btn-secondary expand-btn" data-target-id="subcat-${normalizedCategory}" data-subcategory="${subcat.subcategory}" data-subcat-target-id="${subcatKey}">Expand</button>
                                 <button class="btn btn-sm btn-secondary collapse-btn" style="display:none;" data-collapse-target="common-${subcatKey}">Collapse</button>
                                 <button class="btn btn-sm btn-info print-btn" data-print-level="Subcategory" data-print-id="subcat-table-${subcatKey}">Print</button>
                                 <div id="loading-${subcatKey}" style="display:none;" class="loading">Loading...</div>
@@ -419,18 +419,26 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
                 tableBody.style.display = 'table-row-group';
                 tableBody.style.visibility = 'visible';
                 tableBody.style.opacity = '1';
+
+                // Ensure all rows are visible
+                const rows = tableBody.querySelectorAll('tr.subcat-row');
+                rows.forEach(row => {
+                    row.style.display = 'table-row';
+                    row.style.visibility = 'visible';
+                    row.style.opacity = '1';
+                });
             } else {
                 console.warn('Table body not found in container:', container);
             }
 
-            // Fix selector to handle URL-encoded category names using a more reliable approach
-            const expandBtn = document.querySelector(`button.expand-btn[data-target-id="subcat-${normalizedCategory}"]`);
+            // Fix selector to handle expand/collapse buttons
+            const expandBtn = container.parentElement.parentElement.querySelector(`button.expand-btn[data-target-id="subcat-${normalizedCategory}"]`);
             const collapseBtn = expandBtn ? expandBtn.nextElementSibling : null;
             if (expandBtn && collapseBtn) {
                 expandBtn.style.display = 'none';
                 collapseBtn.style.display = 'inline-block';
             } else {
-                console.warn('Expand/Collapse buttons not found for selector:', `button.expand-btn[data-target-id="subcat-${normalizedCategory}"]`);
+                console.warn('Expand/Collapse buttons not found in parent row for selector:', `button.expand-btn[data-target-id="subcat-${normalizedCategory}"]`);
             }
 
             // Save expansion state
@@ -544,8 +552,10 @@ function updateBulkField(key, field) {
     const select = document.getElementById(`bulk-${field}-${key}`);
     if (select.value) {
         const otherField = field === 'bin_location' ? 'status' : 'bin_location';
-        const otherSelect = document.getElementForEachId(`bulk-${otherField}-${key}`);
-        otherSelect.value = '';
+        const otherSelect = document.getElementById(`bulk-${otherField}-${key}`);
+        if (otherSelect) {
+            otherSelect.value = '';
+        }
     }
 }
 
@@ -941,15 +951,16 @@ document.addEventListener('DOMContentLoaded', function() {
         const expandBtn = event.target.closest('.expand-btn');
         if (expandBtn) {
             event.stopPropagation();
-            const category = expandBtn.getAttribute('data-category');
+            const category = expandBtn.getAttribute('data-category') || window.cachedTabNum;
             const subcategory = expandBtn.getAttribute('data-subcategory');
             const targetId = expandBtn.getAttribute('data-target-id');
+            const subcatTargetId = expandBtn.getAttribute('data-subcat-target-id');
             const commonName = expandBtn.getAttribute('data-common-name');
 
             if (commonName) {
                 loadItems(category, subcategory, commonName, targetId);
             } else if (subcategory) {
-                loadCommonNames(category, subcategory, targetId);
+                loadCommonNames(category, subcategory, subcatTargetId);
             } else {
                 const normalizedCategory = targetId.replace('subcat-', '');
                 loadSubcatData(category, normalizedCategory, targetId);

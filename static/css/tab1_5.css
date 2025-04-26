@@ -53,7 +53,7 @@
     overflow-x: auto;
     display: table !important;
     visibility: visible !important;
-    table-layout: auto; /* Changed to auto to allow natural column widths */
+    table-layout: fixed; /* Revert to fixed to ensure column alignment */
     border-collapse: collapse;
 }
 
@@ -66,7 +66,7 @@
 .common-level table thead th,
 .item-level thead th {
     position: sticky;
-    top: 56px;
+    top: 70px; /* Adjusted to account for navbar height (56px) + extra padding */
     z-index: 10;
     background-color: #e9ecef;
     border-bottom: 2px solid #dee2e6;
@@ -89,6 +89,7 @@
     border: 1px solid #dee2e6;
     display: table-cell !important;
     visibility: visible !important;
+    white-space: nowrap;
 }
 
 /* Ensure subcategory rows are visible */
