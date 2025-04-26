@@ -1,4 +1,4 @@
-console.log('expand.js version: 2025-04-25 v46 loaded');
+console.log('expand.js version: 2025-04-25 v47 loaded');
 
 // Note: Common function - will be moved to common.js during split
 function showLoading(key) {
@@ -177,8 +177,8 @@ function loadCommonNames(category, subcategory, targetId, page = 1, contractNumb
                                 <td>${item.items_on_contracts}</td>
                                 <td>${item.total_items}</td>
                                 <td>
-                                    <button class="btn btn-sm btn-secondary expand-btn" onclick="loadItems('${category}', '${subcategory || ''}', '${item.name}', 'items-${rowId}')">Expand</button>
-                                    <button class="btn btn-sm btn-secondary collapse-btn" style="display:none;" onclick="collapseSection('items-${rowId}')">Collapse</button>
+                                    <button class="btn btn-sm btn-secondary expand-btn" onclick="event.stopPropagation(); loadItems('${category}', '${subcategory || ''}', '${item.name}', 'items-${rowId}')">Expand</button>
+                                    <button class="btn btn-sm btn-secondary collapse-btn" style="display:none;" onclick="event.stopPropagation(); collapseSection('items-${rowId}')">Collapse</button>
                                     <button class="btn btn-sm btn-info print-btn" data-print-level="Common Name" data-print-id="common-table-${key}" data-common-name="${item.name}" data-category="${category}" data-subcategory="${subcategory || ''}">Print Aggregate</button>
                                     <button class="btn btn-sm btn-info print-full-btn" data-common-name="${item.name}" data-category="${category}" data-subcategory="${subcategory || ''}">Print Full List</button>
                                     <div id="loading-${rowId}" style="display:none;" class="loading">Loading...</div>
@@ -199,8 +199,8 @@ function loadCommonNames(category, subcategory, targetId, page = 1, contractNumb
                                 <td>${item.items_in_service}</td>
                                 <td>${item.items_available}</td>
                                 <td>
-                                    <button class="btn btn-sm btn-secondary expand-btn" onclick="loadItems('${category}', '${subcategory || ''}', '${item.name}', 'items-${rowId}')">Expand</button>
-                                    <button class="btn btn-sm btn-secondary collapse-btn" style="display:none;" onclick="collapseSection('items-${rowId}')">Collapse</button>
+                                    <button class="btn btn-sm btn-secondary expand-btn" onclick="event.stopPropagation(); loadItems('${category}', '${subcategory || ''}', '${item.name}', 'items-${rowId}')">Expand</button>
+                                    <button class="btn btn-sm btn-secondary collapse-btn" style="display:none;" onclick="event.stopPropagation(); collapseSection('items-${rowId}')">Collapse</button>
                                     <button class="btn btn-sm btn-info print-btn" data-print-level="Common Name" data-print-id="common-table-${key}" data-common-name="${item.name}" data-category="${category}" data-subcategory="${subcategory || ''}">Print Aggregate</button>
                                     <button class="btn btn-sm btn-info print-full-btn" data-common-name="${item.name}" data-category="${category}" data-subcategory="${subcategory || ''}">Print Full List</button>
                                     <div id="loading-${rowId}" style="display:none;" class="loading">Loading...</div>
@@ -220,9 +220,9 @@ function loadCommonNames(category, subcategory, targetId, page = 1, contractNumb
                     html += `
                         <tr>
                             <td colspan="${headers.length}" class="pagination-controls">
-                                <button class="btn btn-sm btn-secondary" onclick="loadCommonNames('${category}', '${subcategory || ''}', '${targetId}', ${page - 1}, '${contractNumber || ''}')" ${page === 1 ? 'disabled' : ''}>Previous</button>
+                                <button class="btn btn-sm btn-secondary" onclick="event.stopPropagation(); loadCommonNames('${category}', '${subcategory || ''}', '${targetId}', ${page - 1}, '${contractNumber || ''}')" ${page === 1 ? 'disabled' : ''}>Previous</button>
                                 <span>Page ${page} of ${totalPages}</span>
-                                <button class="btn btn-sm btn-secondary" onclick="loadCommonNames('${category}', '${subcategory || ''}', '${targetId}', ${page + 1}, '${contractNumber || ''}')" ${page === totalPages ? 'disabled' : ''}>Next</button>
+                                <button class="btn btn-sm btn-secondary" onclick="event.stopPropagation(); loadCommonNames('${category}', '${subcategory || ''}', '${targetId}', ${page + 1}, '${contractNumber || ''}')" ${page === totalPages ? 'disabled' : ''}>Next</button>
                             </td>
                         </tr>
                     `;
@@ -268,6 +268,12 @@ function loadCommonNames(category, subcategory, targetId, page = 1, contractNumb
                     opacity: computedCommonLevelStyle.opacity,
                     height: computedCommonLevelStyle.height
                 });
+
+                // Force a reflow on common-level to ensure rendering
+                commonLevel.style.display = 'none';
+                void commonLevel.offsetHeight;
+                commonLevel.style.display = 'block';
+                console.log('Forced reflow on common-level, new display:', commonLevel.style.display);
             } else {
                 console.log('Common-level div not found');
             }
@@ -331,7 +337,6 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
         })
         .then(data => {
             console.log('Subcategory data received:', data);
-            // Detailed logging of the response
             if (data.subcategories && data.subcategories.length > 0) {
                 console.log('Subcategories found:', data.subcategories);
                 data.subcategories.forEach(subcat => {
@@ -339,7 +344,6 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
                 });
             } else if (data.message) {
                 console.log('No subcategories message:', data.message);
-                // Fallback: Fetch rental class mappings directly to verify
                 fetch(`/categories/mapping?category=${encodeURIComponent(originalCategory)}`)
                     .then(mappingResponse => mappingResponse.json())
                     .then(mappingData => {
@@ -386,8 +390,8 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
                                         <td>${subcat.items_in_service}</td>
                                         <td>${subcat.items_available}</td>
                                         <td>
-                                            <button class="btn btn-sm btn-secondary expand-btn" onclick="loadCommonNames('${originalCategory}', '${subcat.subcategory}', '${subcatKey}')">Expand</button>
-                                            <button class="btn btn-sm btn-secondary collapse-btn" style="display:none;" onclick="collapseSection('common-${subcatKey}')">Collapse</button>
+                                            <button class="btn btn-sm btn-secondary expand-btn" onclick="event.stopPropagation(); loadCommonNames('${originalCategory}', '${subcat.subcategory}', '${subcatKey}')">Expand</button>
+                                            <button class="btn btn-sm btn-secondary collapse-btn" style="display:none;" onclick="event.stopPropagation(); collapseSection('common-${subcatKey}')">Collapse</button>
                                             <button class="btn btn-sm btn-info print-btn" data-print-level="Subcategory" data-print-id="subcat-table-${subcatKey}">Print</button>
                                             <div id="loading-${subcatKey}" style="display:none;" class="loading">Loading...</div>
                                         </td>
@@ -406,9 +410,9 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
                         const totalPages = Math.ceil(data.total_subcats / data.per_page);
                         html += `
                             <div class="pagination-controls">
-                                <button class="btn btn-sm btn-secondary" onclick="loadSubcatData('${originalCategory}', '${normalizedCategory}', '${targetId}', ${page - 1})" ${page === 1 ? 'disabled' : ''}>Previous</button>
+                                <button class="btn btn-sm btn-secondary" onclick="event.stopPropagation(); loadSubcatData('${originalCategory}', '${normalizedCategory}', '${targetId}', ${page - 1})" ${page === 1 ? 'disabled' : ''}>Previous</button>
                                 <span>Page ${page} of ${totalPages}</span>
-                                <button class="btn btn-sm btn-secondary" onclick="loadSubcatData('${originalCategory}', '${normalizedCategory}', '${targetId}', ${page + 1})" ${page === totalPages ? 'disabled' : ''}>Next</button>
+                                <button class="btn btn-sm btn-secondary" onclick="event.stopPropagation(); loadSubcatData('${originalCategory}', '${normalizedCategory}', '${targetId}', ${page + 1})" ${page === totalPages ? 'disabled' : ''}>Next</button>
                             </div>
                         `;
                     }
@@ -429,7 +433,6 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
             console.log('Container classes after update:', container.className);
             console.log('Container updated with HTML:', container.innerHTML);
 
-            // Debug the container's computed style
             const computedContainerStyle = window.getComputedStyle(container);
             console.log('Container computed style:', {
                 display: computedContainerStyle.display,
@@ -439,7 +442,6 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
                 transition: computedContainerStyle.transition
             });
 
-            // Debug the parent <td> and <tr> styles
             const parentTd = container.parentElement;
             if (parentTd) {
                 const computedTdStyle = window.getComputedStyle(parentTd);
@@ -462,7 +464,6 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
                 }
             }
 
-            // Debug the subcat-level div
             const subcatLevel = container.querySelector('.subcat-level');
             if (subcatLevel) {
                 const computedSubcatLevelStyle = window.getComputedStyle(subcatLevel);
@@ -473,7 +474,6 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
                     height: computedSubcatLevelStyle.height
                 });
 
-                // Force a reflow on subcat-level to ensure rendering
                 subcatLevel.style.display = 'none';
                 void subcatLevel.offsetHeight;
                 subcatLevel.style.display = 'block';
@@ -482,7 +482,6 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
                 console.log('Subcat-level div not found');
             }
 
-            // Debug the subcategory row
             const subcatRow = container.querySelector('tbody tr.subcat-row');
             if (subcatRow) {
                 console.log('Subcategory row found:', subcatRow);
@@ -498,14 +497,12 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
                     opacity: computedStyle.opacity
                 });
 
-                // Force a reflow on the container to ensure rendering
                 container.style.display = 'none';
                 void container.offsetHeight;
                 container.style.display = 'block';
                 container.style.opacity = '1';
                 console.log('After container reflow, container display:', container.style.display, 'opacity:', container.style.opacity);
 
-                // Force a reflow on the row
                 subcatRow.style.display = 'table-row';
                 subcatRow.style.opacity = '1';
                 void subcatRow.offsetHeight;
@@ -556,7 +553,6 @@ function updateBinLocation(tagId, currentBinLocation) {
         } else {
             console.log('Bin location updated successfully:', data);
             alert('Bin location updated successfully!');
-            // Refresh the items table
             const itemsContainer = document.getElementById(`items-${tagId.split('-')[0]}`);
             if (itemsContainer) {
                 const category = itemsContainer.closest('.common-level').querySelector('button[data-category]').getAttribute('data-category');
@@ -598,7 +594,6 @@ function updateStatus(tagId, currentStatus) {
         } else {
             console.log('Status updated successfully:', data);
             alert('Status updated successfully!');
-            // Refresh the items table
             const itemsContainer = document.getElementById(`items-${tagId.split('-')[0]}`);
             if (itemsContainer) {
                 const category = itemsContainer.closest('.common-level').querySelector('button[data-category]').getAttribute('data-category');
@@ -707,7 +702,7 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                         if (window.cachedTabNum == 5) {
                             html += `
                                 <td>
-                                    <button class="btn btn-sm btn-primary save-btn" onclick="saveChanges('${item.tag_id}')">Save</button>
+                                    <button class="btn btn-sm btn-primary save-btn" onclick="event.stopPropagation(); saveChanges('${item.tag_id}')">Save</button>
                                     <div id="dropdown-bin-location-${item.tag_id}" class="dropdown-menu">
                                         <a class="dropdown-item" href="#" onclick="selectOption(event, this, 'bin-location', '${item.tag_id}', 'resale')">resale</a>
                                         <a class="dropdown-item" href="#" onclick="selectOption(event, this, 'bin-location', '${item.tag_id}', 'sold')">sold</a>
@@ -742,9 +737,9 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                     html += `
                         <tr>
                             <td colspan="${headers.length}" class="pagination-controls">
-                                <button class="btn btn-sm btn-secondary" onclick="loadItems('${category}', '${subcategory || ''}', '${commonName}', '${targetId}', ${page - 1})" ${page === 1 ? 'disabled' : ''}>Previous</button>
+                                <button class="btn btn-sm btn-secondary" onclick="event.stopPropagation(); loadItems('${category}', '${subcategory || ''}', '${commonName}', '${targetId}', ${page - 1})" ${page === 1 ? 'disabled' : ''}>Previous</button>
                                 <span>Page ${page} of ${totalPages}</span>
-                                <button class="btn btn-sm btn-secondary" onclick="loadItems('${category}', '${subcategory || ''}', '${commonName}', '${targetId}', ${page + 1})" ${page === totalPages ? 'disabled' : ''}>Next</button>
+                                <button class="btn btn-sm btn-secondary" onclick="event.stopPropagation(); loadItems('${category}', '${subcategory || ''}', '${commonName}', '${targetId}', ${page + 1})" ${page === totalPages ? 'disabled' : ''}>Next</button>
                             </td>
                         </tr>
                     `;
@@ -768,7 +763,6 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
             container.style.display = 'block';
             container.style.opacity = '1';
 
-            // Force a re-render of the table
             const table = container.querySelector('table');
             if (table) {
                 table.style.display = 'none';
