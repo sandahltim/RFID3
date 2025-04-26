@@ -388,6 +388,7 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
 
             let html = '';
             if (data.subcategories && data.subcategories.length > 0) {
+                // Create a single table for all subcategories
                 html += `
                     <div class="filter-sort-controls">
                         <input type="text" id="subcat-filter-${normalizedCategory}" placeholder="Filter subcategories..." value="${subcatFilter}" oninput="loadSubcatData('${originalCategory}', '${normalizedCategory}', '${targetId}', 1)">
@@ -399,54 +400,62 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
                             <option value="total_items_desc" ${subcatSort === 'total_items_desc' ? 'selected' : ''}>Total Items (High to Low)</option>
                         </select>
                     </div>
+                    <div class="subcat-level">
+                        <table class="table table-bordered subcat-table mt-2" id="subcat-table-${normalizedCategory}">
+                            <thead>
+                                <tr>
+                                    <th>Subcategory</th>
+                                    <th>Total Items</th>
+                                    <th>Items on Contracts</th>
+                                    <th>Items in Service</th>
+                                    <th>Items Available</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
                 `;
+
                 data.subcategories.forEach(subcat => {
                     console.log('Processing subcategory:', subcat);
                     const subcatKey = `${normalizedCategory}_${subcat.subcategory.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
-                    const headers = ['Subcategory', 'Total Items', 'Items on Contracts', 'Items in Service', 'Items Available', 'Actions'];
                     html += `
-                        <div class="subcat-level">
-                            <table class="table table-bordered subcat-table mt-2" id="subcat-table-${subcatKey}">
-                                <thead>
-                                    <tr>
-                                        ${headers.map(header => `<th>${header}</th>`).join('')}
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr class="subcat-row">
-                                        <td>${subcat.subcategory}</td>
-                                        <td>${subcat.total_items}</td>
-                                        <td>${subcat.items_on_contracts}</td>
-                                        <td>${subcat.items_in_service}</td>
-                                        <td>${subcat.items_available}</td>
-                                        <td>
-                                            <button class="btn btn-sm btn-secondary expand-btn" data-category="${originalCategory}" data-subcategory="${subcat.subcategory}" data-target-id="subcat-${subcatKey}">Expand</button>
-                                            <button class="btn btn-sm btn-secondary collapse-btn" style="display:none;" data-collapse-target="subcat-${subcatKey}">Collapse</button>
-                                            <button class="btn btn-sm btn-info print-btn" data-print-level="Subcategory" data-print-id="subcat-table-${subcatKey}">Print</button>
-                                            <div id="loading-${subcatKey}" style="display:none;" class="loading">Loading...</div>
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <td colspan="${headers.length}">
-                                            <div id="subcat-${subcatKey}" class="expandable collapsed"></div>
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
+                        <tr class="subcat-row">
+                            <td>${subcat.subcategory}</td>
+                            <td>${subcat.total_items}</td>
+                            <td>${subcat.items_on_contracts}</td>
+                            <td>${subcat.items_in_service}</td>
+                            <td>${subcat.items_available}</td>
+                            <td>
+                                <button class="btn btn-sm btn-secondary expand-btn" data-category="${originalCategory}" data-subcategory="${subcat.subcategory}" data-target-id="subcat-${subcatKey}">Expand</button>
+                                <button class="btn btn-sm btn-secondary collapse-btn" style="display:none;" data-collapse-target="subcat-${subcatKey}">Collapse</button>
+                                <button class="btn btn-sm btn-info print-btn" data-print-level="Subcategory" data-print-id="subcat-table-${subcatKey}">Print</button>
+                                <div id="loading-${subcatKey}" style="display:none;" class="loading">Loading...</div>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td colspan="6">
+                                <div id="subcat-${subcatKey}" class="expandable collapsed"></div>
+                            </td>
+                        </tr>
+                    `;
+                });
+
+                html += `
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+
+                if (data.total_subcats > data.per_page) {
+                    const totalPages = Math.ceil(data.total_subcats / data.per_page);
+                    html += `
+                        <div class="pagination-controls">
+                            <button class="btn btn-sm btn-secondary" onclick="loadSubcatData('${originalCategory}', '${normalizedCategory}', '${targetId}', ${page - 1})" ${page === 1 ? 'disabled' : ''}>Previous</button>
+                            <span>Page ${page} of ${totalPages}</span>
+                            <button class="btn btn-sm btn-secondary" onclick="loadSubcatData('${originalCategory}', '${normalizedCategory}', '${targetId}', ${page + 1})" ${page === totalPages ? 'disabled' : ''}>Next</button>
                         </div>
                     `;
-
-                    if (data.total_subcats > data.per_page) {
-                        const totalPages = Math.ceil(data.total_subcats / data.per_page);
-                        html += `
-                            <div class="pagination-controls">
-                                <button class="btn btn-sm btn-secondary" onclick="loadSubcatData('${originalCategory}', '${normalizedCategory}', '${targetId}', ${page - 1})" ${page === 1 ? 'disabled' : ''}>Previous</button>
-                                <span>Page ${page} of ${totalPages}</span>
-                                <button class="btn btn-sm btn-secondary" onclick="loadSubcatData('${originalCategory}', '${normalizedCategory}', '${targetId}', ${page + 1})" ${page === totalPages ? 'disabled' : ''}>Next</button>
-                            </div>
-                        `;
-                    }
-                });
+                }
                 console.log('Generated HTML for subcategories:', html);
             } else {
                 html = `<div class="subcat-level"><p>No subcategories found for this category.</p></div>`;
@@ -456,97 +465,33 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
             container.innerHTML = html;
             container.classList.remove('collapsed');
             container.classList.add('expanded');
-            container.classList.remove('fade');
             container.classList.add('show');
             container.style.display = 'block';
             container.style.opacity = '1';
             console.log('Container classes after update:', container.className);
-            console.log('Container updated with HTML:', container.innerHTML);
 
-            const computedContainerStyle = window.getComputedStyle(container);
-            console.log('Container computed style:', {
-                display: computedContainerStyle.display,
-                visibility: computedContainerStyle.visibility,
-                opacity: computedContainerStyle.opacity,
-                height: computedContainerStyle.height,
-                transition: computedContainerStyle.transition
+            // Force repaint of the table
+            const table = container.querySelector('table.subcat-table');
+            if (table) {
+                table.style.display = 'none';
+                void table.offsetHeight; // Trigger reflow
+                table.style.display = 'table';
+                console.log('Table re-rendered with display:', table.style.display);
+            }
+
+            // Ensure all subcategory rows are visible
+            const subcatRows = container.querySelectorAll('tr.subcat-row');
+            subcatRows.forEach(row => {
+                row.style.display = 'table-row';
+                row.style.opacity = '1';
+                console.log('Subcategory row display set to table-row:', row);
             });
-
-            const parentTd = container.parentElement;
-            if (parentTd) {
-                const computedTdStyle = window.getComputedStyle(parentTd);
-                console.log('Parent <td> computed style:', {
-                    display: computedTdStyle.display,
-                    visibility: computedTdStyle.visibility,
-                    opacity: computedTdStyle.opacity,
-                    height: computedTdStyle.height
-                });
-
-                const parentTr = parentTd.parentElement;
-                if (parentTr) {
-                    const computedTrStyle = window.getComputedStyle(parentTr);
-                    console.log('Parent <tr> computed style:', {
-                        display: computedTrStyle.display,
-                        visibility: computedTrStyle.visibility,
-                        opacity: computedTrStyle.opacity,
-                        height: computedTrStyle.height
-                    });
-                }
-            }
-
-            const subcatLevel = container.querySelector('.subcat-level');
-            if (subcatLevel) {
-                const computedSubcatLevelStyle = window.getComputedStyle(subcatLevel);
-                console.log('Subcat-level computed style:', {
-                    display: computedSubcatLevelStyle.display,
-                    visibility: computedSubcatLevelStyle.visibility,
-                    opacity: computedSubcatLevelStyle.opacity,
-                    height: computedSubcatLevelStyle.height
-                });
-
-                subcatLevel.style.display = 'none';
-                void subcatLevel.offsetHeight;
-                subcatLevel.style.display = 'block';
-                console.log('Forced reflow on subcat-level, new display:', subcatLevel.style.display);
-            } else {
-                console.log('Subcat-level div not found');
-            }
-
-            const subcatRow = container.querySelector('tbody tr.subcat-row');
-            if (subcatRow) {
-                console.log('Subcategory row found:', subcatRow);
-                console.log('Subcategory row height:', subcatRow.offsetHeight);
-                const computedStyle = window.getComputedStyle(subcatRow);
-                console.log('Subcategory row computed style:', {
-                    display: computedStyle.display,
-                    visibility: computedStyle.visibility,
-                    height: computedStyle.height,
-                    minHeight: computedStyle.minHeight,
-                    padding: computedStyle.padding,
-                    margin: computedStyle.margin,
-                    opacity: computedStyle.opacity
-                });
-
-                container.style.display = 'none';
-                void container.offsetHeight;
-                container.style.display = 'block';
-                container.style.opacity = '1';
-                console.log('After container reflow, container display:', container.style.display, 'opacity:', container.style.opacity);
-
-                subcatRow.style.display = 'table-row';
-                subcatRow.style.opacity = '1';
-                void subcatRow.offsetHeight;
-                console.log('After row reflow, subcategory row height:', subcatRow.offsetHeight);
-            } else {
-                console.log('Subcategory row not found in DOM');
-            }
         })
         .catch(error => {
             console.error('Subcategory fetch error:', error);
             container.innerHTML = `<div class="subcat-level"><p>Error loading subcategories: ${error.message}</p></div>`;
             container.classList.remove('collapsed');
             container.classList.add('expanded');
-            container.classList.remove('fade');
             container.classList.add('show');
             container.style.display = 'block';
             container.style.opacity = '1';
