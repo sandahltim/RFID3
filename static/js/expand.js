@@ -1,4 +1,4 @@
-console.log('expand.js version: 2025-04-25 v52 loaded');
+console.log('expand.js version: 2025-04-25 v53 loaded');
 
 // Note: Common function - will be moved to common.js during split
 function showLoading(key) {
@@ -99,6 +99,12 @@ function collapseSection(targetId) {
 // Note: Common function - will be moved to tab1_5.js during split
 function loadCommonNames(category, subcategory, targetId, page = 1, contractNumber = null) {
     console.log('loadCommonNames called with', { category, subcategory, targetId, page, contractNumber });
+
+    // Guard against null parameters
+    if (!category || !targetId) {
+        console.error('Invalid parameters for loadCommonNames:', { category, subcategory, targetId });
+        return;
+    }
 
     const containerId = (window.cachedTabNum == 2 || window.cachedTabNum == 4) ? targetId : `common-${targetId}`;
     const container = document.getElementById(containerId);
@@ -1053,47 +1059,56 @@ function saveChanges(tagId) {
     }
 }
 
-// Hide dropdowns when clicking outside (used only in Tab 1)
-document.addEventListener('click', (event) => {
-    if (!event.target.closest('.editable') && !event.target.closest('.dropdown-menu')) {
-        console.log('Click outside detected, hiding all dropdowns');
-        document.querySelectorAll('.dropdown-menu').forEach(dropdown => {
-            dropdown.classList.remove('show');
-            dropdown.style.display = 'none';
-        });
-    }
-});
-
-// Event delegation for expand buttons
-document.addEventListener('click', (event) => {
-    const expandBtn = event.target.closest('.expand-btn');
-    if (expandBtn) {
-        event.stopPropagation(); // Prevent the document-level click handler from interfering
-        const category = expandBtn.getAttribute('data-category');
-        const subcategory = expandBtn.getAttribute('data-subcategory');
-        const targetId = expandBtn.getAttribute('data-target-id');
-        const commonName = expandBtn.getAttribute('data-common-name');
-
-        if (commonName) {
-            // For common names table expanding to items
-            loadItems(category, subcategory, commonName, targetId);
-        } else {
-            // For subcategory table expanding to common names
-            loadCommonNames(category, subcategory, targetId);
-        }
-    }
-
-    const collapseBtn = event.target.closest('.collapse-btn');
-    if (collapseBtn) {
-        event.stopPropagation();
-        const targetId = collapseBtn.getAttribute('data-collapse-target');
-        collapseSection(targetId);
-    }
-});
-
 // Note: Common function - will be moved to tab1_5.js during split
 document.addEventListener('DOMContentLoaded', function() {
     console.log('expand.js: DOMContentLoaded event fired');
+
+    // Event delegation for expand and collapse buttons
+    document.addEventListener('click', (event) => {
+        console.log('Document click event triggered, target:', event.target);
+
+        const expandBtn = event.target.closest('.expand-btn');
+        if (expandBtn) {
+            console.log('Expand button clicked:', expandBtn);
+            event.stopPropagation();
+            const category = expandBtn.getAttribute('data-category');
+            const subcategory = expandBtn.getAttribute('data-subcategory');
+            const targetId = expandBtn.getAttribute('data-target-id');
+            const commonName = expandBtn.getAttribute('data-common-name');
+
+            console.log('Expand button attributes:', { category, subcategory, targetId, commonName });
+
+            if (commonName) {
+                // For common names table expanding to items
+                loadItems(category, subcategory, commonName, targetId);
+            } else {
+                // For subcategory table expanding to common names
+                loadCommonNames(category, subcategory, targetId);
+            }
+            return;
+        }
+
+        const collapseBtn = event.target.closest('.collapse-btn');
+        if (collapseBtn) {
+            console.log('Collapse button clicked:', collapseBtn);
+            event.stopPropagation();
+            const targetId = collapseBtn.getAttribute('data-collapse-target');
+            collapseSection(targetId);
+            return;
+        }
+    });
+
+    // Hide dropdowns when clicking outside (used only in Tab 1)
+    document.addEventListener('click', (event) => {
+        if (!event.target.closest('.editable') && !event.target.closest('.dropdown-menu')) {
+            console.log('Click outside detected, hiding all dropdowns');
+            document.querySelectorAll('.dropdown-menu').forEach(dropdown => {
+                dropdown.classList.remove('show');
+                dropdown.style.display = 'none';
+            });
+        }
+    });
+
     window.expandCategory = function(category, targetId, contractNumber = null, page = 1) {
         console.log('expandCategory called with', { category, targetId, contractNumber, page });
         const normalizedCategory = targetId.replace('subcat-', '');
