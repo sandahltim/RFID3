@@ -1,4 +1,4 @@
-console.log('expand.js version: 2025-04-25 v47 loaded');
+console.log('expand.js version: 2025-04-25 v48 loaded');
 
 // Note: Common function - will be moved to common.js during split
 function showLoading(key) {
@@ -77,7 +77,9 @@ function hideOtherItems(currentTargetId) {
 }
 
 // Note: Common function - will be moved to tab1_5.js during split
-function collapseSection(targetId) {
+function collapseSection(event, targetId) {
+    if (event) event.stopPropagation();
+    console.log('collapseSection called for targetId:', targetId);
     const section = document.getElementById(targetId);
     if (section) {
         section.classList.remove('expanded');
@@ -86,8 +88,8 @@ function collapseSection(targetId) {
         section.style.display = 'none';
         section.style.opacity = '0';
 
-        const expandBtn = document.querySelector(`button[onclick*="${targetId}"]`);
-        const collapseBtn = expandBtn ? expandBtn.nextElementSibling : null;
+        const collapseBtn = document.querySelector(`button[onclick*="collapseSection(event, '${targetId}')"]`);
+        const expandBtn = collapseBtn ? collapseBtn.previousElementSibling : null;
         if (expandBtn && collapseBtn) {
             expandBtn.style.display = 'inline-block';
             collapseBtn.style.display = 'none';
@@ -96,7 +98,8 @@ function collapseSection(targetId) {
 }
 
 // Note: Common function - will be moved to tab1_5.js during split
-function loadCommonNames(category, subcategory, targetId, page = 1, contractNumber = null) {
+function loadCommonNames(event, category, subcategory, targetId, page = 1, contractNumber = null) {
+    if (event) event.stopPropagation();
     console.log('loadCommonNames called with', { category, subcategory, targetId, page, contractNumber });
 
     const containerId = (window.cachedTabNum == 2 || window.cachedTabNum == 4) ? targetId : `common-${targetId}`;
@@ -150,8 +153,8 @@ function loadCommonNames(category, subcategory, targetId, page = 1, contractNumb
                 html += `
                     <div class="common-level">
                         <div class="filter-sort-controls">
-                            <input type="text" id="common-filter-${key}" placeholder="Filter common names..." value="${commonFilter}" oninput="loadCommonNames('${category}', '${subcategory || ''}', '${targetId}', 1, '${contractNumber || ''}')">
-                            <select id="common-sort-${key}" onchange="loadCommonNames('${category}', '${subcategory || ''}', '${targetId}', 1, '${contractNumber || ''}')">
+                            <input type="text" id="common-filter-${key}" placeholder="Filter common names..." value="${commonFilter}" oninput="loadCommonNames(event, '${category}', '${subcategory || ''}', '${targetId}', 1, '${contractNumber || ''}')">
+                            <select id="common-sort-${key}" onchange="loadCommonNames(event, '${category}', '${subcategory || ''}', '${targetId}', 1, '${contractNumber || ''}')">
                                 <option value="">Sort By...</option>
                                 <option value="name_asc" ${commonSort === 'name_asc' ? 'selected' : ''}>Name (A-Z)</option>
                                 <option value="name_desc" ${commonSort === 'name_desc' ? 'selected' : ''}>Name (Z-A)</option>
@@ -177,8 +180,8 @@ function loadCommonNames(category, subcategory, targetId, page = 1, contractNumb
                                 <td>${item.items_on_contracts}</td>
                                 <td>${item.total_items}</td>
                                 <td>
-                                    <button class="btn btn-sm btn-secondary expand-btn" onclick="event.stopPropagation(); loadItems('${category}', '${subcategory || ''}', '${item.name}', 'items-${rowId}')">Expand</button>
-                                    <button class="btn btn-sm btn-secondary collapse-btn" style="display:none;" onclick="event.stopPropagation(); collapseSection('items-${rowId}')">Collapse</button>
+                                    <button class="btn btn-sm btn-secondary expand-btn" onclick="loadItems(event, '${category}', '${subcategory || ''}', '${item.name}', 'items-${rowId}')">Expand</button>
+                                    <button class="btn btn-sm btn-secondary collapse-btn" style="display:none;" onclick="collapseSection(event, 'items-${rowId}')">Collapse</button>
                                     <button class="btn btn-sm btn-info print-btn" data-print-level="Common Name" data-print-id="common-table-${key}" data-common-name="${item.name}" data-category="${category}" data-subcategory="${subcategory || ''}">Print Aggregate</button>
                                     <button class="btn btn-sm btn-info print-full-btn" data-common-name="${item.name}" data-category="${category}" data-subcategory="${subcategory || ''}">Print Full List</button>
                                     <div id="loading-${rowId}" style="display:none;" class="loading">Loading...</div>
@@ -199,8 +202,8 @@ function loadCommonNames(category, subcategory, targetId, page = 1, contractNumb
                                 <td>${item.items_in_service}</td>
                                 <td>${item.items_available}</td>
                                 <td>
-                                    <button class="btn btn-sm btn-secondary expand-btn" onclick="event.stopPropagation(); loadItems('${category}', '${subcategory || ''}', '${item.name}', 'items-${rowId}')">Expand</button>
-                                    <button class="btn btn-sm btn-secondary collapse-btn" style="display:none;" onclick="event.stopPropagation(); collapseSection('items-${rowId}')">Collapse</button>
+                                    <button class="btn btn-sm btn-secondary expand-btn" onclick="loadItems(event, '${category}', '${subcategory || ''}', '${item.name}', 'items-${rowId}')">Expand</button>
+                                    <button class="btn btn-sm btn-secondary collapse-btn" style="display:none;" onclick="collapseSection(event, 'items-${rowId}')">Collapse</button>
                                     <button class="btn btn-sm btn-info print-btn" data-print-level="Common Name" data-print-id="common-table-${key}" data-common-name="${item.name}" data-category="${category}" data-subcategory="${subcategory || ''}">Print Aggregate</button>
                                     <button class="btn btn-sm btn-info print-full-btn" data-common-name="${item.name}" data-category="${category}" data-subcategory="${subcategory || ''}">Print Full List</button>
                                     <div id="loading-${rowId}" style="display:none;" class="loading">Loading...</div>
@@ -220,9 +223,9 @@ function loadCommonNames(category, subcategory, targetId, page = 1, contractNumb
                     html += `
                         <tr>
                             <td colspan="${headers.length}" class="pagination-controls">
-                                <button class="btn btn-sm btn-secondary" onclick="event.stopPropagation(); loadCommonNames('${category}', '${subcategory || ''}', '${targetId}', ${page - 1}, '${contractNumber || ''}')" ${page === 1 ? 'disabled' : ''}>Previous</button>
+                                <button class="btn btn-sm btn-secondary" onclick="loadCommonNames(event, '${category}', '${subcategory || ''}', '${targetId}', ${page - 1}, '${contractNumber || ''}')" ${page === 1 ? 'disabled' : ''}>Previous</button>
                                 <span>Page ${page} of ${totalPages}</span>
-                                <button class="btn btn-sm btn-secondary" onclick="event.stopPropagation(); loadCommonNames('${category}', '${subcategory || ''}', '${targetId}', ${page + 1}, '${contractNumber || ''}')" ${page === totalPages ? 'disabled' : ''}>Next</button>
+                                <button class="btn btn-sm btn-secondary" onclick="loadCommonNames(event, '${category}', '${subcategory || ''}', '${targetId}', ${page + 1}, '${contractNumber || ''}')" ${page === totalPages ? 'disabled' : ''}>Next</button>
                             </td>
                         </tr>
                     `;
@@ -278,7 +281,7 @@ function loadCommonNames(category, subcategory, targetId, page = 1, contractNumb
                 console.log('Common-level div not found');
             }
 
-            const expandBtn = document.querySelector(`button[onclick*="loadCommonNames('${category}', '${subcategory || ''}', '${targetId}')"]`);
+            const expandBtn = document.querySelector(`button[onclick*="loadCommonNames(event, '${category}', '${subcategory || ''}', '${targetId}')"]`);
             const collapseBtn = expandBtn ? expandBtn.nextElementSibling : null;
             if (expandBtn && collapseBtn) {
                 expandBtn.style.display = 'none';
@@ -302,7 +305,7 @@ function loadCommonNames(category, subcategory, targetId, page = 1, contractNumb
 }
 
 // Note: Common function - will be moved to tab1_5.js during split
-function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1) {
+function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1) esperienze di trading di criptovalute online
     console.log('loadSubcatData called with', { originalCategory, normalizedCategory, targetId, page });
 
     const container = document.getElementById(targetId);
@@ -390,8 +393,8 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
                                         <td>${subcat.items_in_service}</td>
                                         <td>${subcat.items_available}</td>
                                         <td>
-                                            <button class="btn btn-sm btn-secondary expand-btn" onclick="event.stopPropagation(); loadCommonNames('${originalCategory}', '${subcat.subcategory}', '${subcatKey}')">Expand</button>
-                                            <button class="btn btn-sm btn-secondary collapse-btn" style="display:none;" onclick="event.stopPropagation(); collapseSection('common-${subcatKey}')">Collapse</button>
+                                            <button class="btn btn-sm btn-secondary expand-btn" onclick="loadCommonNames(event, '${originalCategory}', '${subcat.subcategory}', '${subcatKey}')">Expand</button>
+                                            <button class="btn btn-sm btn-secondary collapse-btn" style="display:none;" onclick="collapseSection(event, 'common-${subcatKey}')">Collapse</button>
                                             <button class="btn btn-sm btn-info print-btn" data-print-level="Subcategory" data-print-id="subcat-table-${subcatKey}">Print</button>
                                             <div id="loading-${subcatKey}" style="display:none;" class="loading">Loading...</div>
                                         </td>
@@ -410,9 +413,9 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
                         const totalPages = Math.ceil(data.total_subcats / data.per_page);
                         html += `
                             <div class="pagination-controls">
-                                <button class="btn btn-sm btn-secondary" onclick="event.stopPropagation(); loadSubcatData('${originalCategory}', '${normalizedCategory}', '${targetId}', ${page - 1})" ${page === 1 ? 'disabled' : ''}>Previous</button>
+                                <button class="btn btn-sm btn-secondary" onclick="loadSubcatData('${originalCategory}', '${normalizedCategory}', '${targetId}', ${page - 1})" ${page === 1 ? 'disabled' : ''}>Previous</button>
                                 <span>Page ${page} of ${totalPages}</span>
-                                <button class="btn btn-sm btn-secondary" onclick="event.stopPropagation(); loadSubcatData('${originalCategory}', '${normalizedCategory}', '${targetId}', ${page + 1})" ${page === totalPages ? 'disabled' : ''}>Next</button>
+                                <button class="btn btn-sm btn-secondary" onclick="loadSubcatData('${originalCategory}', '${normalizedCategory}', '${targetId}', ${page + 1})" ${page === totalPages ? 'disabled' : ''}>Next</button>
                             </div>
                         `;
                     }
@@ -558,7 +561,7 @@ function updateBinLocation(tagId, currentBinLocation) {
                 const category = itemsContainer.closest('.common-level').querySelector('button[data-category]').getAttribute('data-category');
                 const subcategory = itemsContainer.closest('.common-level').querySelector('button[data-subcategory]').getAttribute('data-subcategory');
                 const commonName = itemsContainer.closest('tr').querySelector('td:first-child').textContent;
-                loadItems(category, subcategory, commonName, `items-${tagId.split('-')[0]}`);
+                loadItems(null, category, subcategory, commonName, `items-${tagId.split('-')[0]}`);
             }
         }
     })
@@ -599,7 +602,7 @@ function updateStatus(tagId, currentStatus) {
                 const category = itemsContainer.closest('.common-level').querySelector('button[data-category]').getAttribute('data-category');
                 const subcategory = itemsContainer.closest('.common-level').querySelector('button[data-subcategory]').getAttribute('data-subcategory');
                 const commonName = itemsContainer.closest('tr').querySelector('td:first-child').textContent;
-                loadItems(category, subcategory, commonName, `items-${tagId.split('-')[0]}`);
+                loadItems(null, category, subcategory, commonName, `items-${tagId.split('-')[0]}`);
             }
         }
     })
@@ -610,7 +613,8 @@ function updateStatus(tagId, currentStatus) {
 }
 
 // Note: Common function - will be moved to tab1_5.js during split
-function loadItems(category, subcategory, commonName, targetId, page = 1) {
+function loadItems(event, category, subcategory, commonName, targetId, page = 1) {
+    if (event) event.stopPropagation();
     console.log('loadItems called with', { category, subcategory, commonName, targetId, page });
     console.log('Current cachedTabNum in loadItems:', window.cachedTabNum);
 
@@ -667,8 +671,8 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                 html += `
                     <div class="item-level-wrapper">
                         <div class="filter-sort-controls">
-                            <input type="text" id="item-filter-${key}" placeholder="Filter items..." value="${itemFilter}" oninput="loadItems('${category}', '${subcategory || ''}', '${commonName}', '${targetId}', 1)">
-                            <select id="item-sort-${key}" onchange="loadItems('${category}', '${subcategory || ''}', '${commonName}', '${targetId}', 1)">
+                            <input type="text" id="item-filter-${key}" placeholder="Filter items..." value="${itemFilter}" oninput="loadItems(event, '${category}', '${subcategory || ''}', '${commonName}', '${targetId}', 1)">
+                            <select id="item-sort-${key}" onchange="loadItems(event, '${category}', '${subcategory || ''}', '${commonName}', '${targetId}', 1)">
                                 <option value="">Sort By...</option>
                                 <option value="tag_id_asc" ${itemSort === 'tag_id_asc' ? 'selected' : ''}>Tag ID (A-Z)</option>
                                 <option value="tag_id_desc" ${itemSort === 'tag_id_desc' ? 'selected' : ''}>Tag ID (Z-A)</option>
@@ -702,7 +706,7 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                         if (window.cachedTabNum == 5) {
                             html += `
                                 <td>
-                                    <button class="btn btn-sm btn-primary save-btn" onclick="event.stopPropagation(); saveChanges('${item.tag_id}')">Save</button>
+                                    <button class="btn btn-sm btn-primary save-btn" onclick="saveChanges('${item.tag_id}')">Save</button>
                                     <div id="dropdown-bin-location-${item.tag_id}" class="dropdown-menu">
                                         <a class="dropdown-item" href="#" onclick="selectOption(event, this, 'bin-location', '${item.tag_id}', 'resale')">resale</a>
                                         <a class="dropdown-item" href="#" onclick="selectOption(event, this, 'bin-location', '${item.tag_id}', 'sold')">sold</a>
@@ -737,9 +741,9 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                     html += `
                         <tr>
                             <td colspan="${headers.length}" class="pagination-controls">
-                                <button class="btn btn-sm btn-secondary" onclick="event.stopPropagation(); loadItems('${category}', '${subcategory || ''}', '${commonName}', '${targetId}', ${page - 1})" ${page === 1 ? 'disabled' : ''}>Previous</button>
+                                <button class="btn btn-sm btn-secondary" onclick="loadItems(event, '${category}', '${subcategory || ''}', '${commonName}', '${targetId}', ${page - 1})" ${page === 1 ? 'disabled' : ''}>Previous</button>
                                 <span>Page ${page} of ${totalPages}</span>
-                                <button class="btn btn-sm btn-secondary" onclick="event.stopPropagation(); loadItems('${category}', '${subcategory || ''}', '${commonName}', '${targetId}', ${page + 1})" ${page === totalPages ? 'disabled' : ''}>Next</button>
+                                <button class="btn btn-sm btn-secondary" onclick="loadItems(event, '${category}', '${subcategory || ''}', '${commonName}', '${targetId}', ${page + 1})" ${page === totalPages ? 'disabled' : ''}>Next</button>
                             </td>
                         </tr>
                     `;
@@ -771,7 +775,7 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                 console.log('Table re-rendered with display:', table.style.display);
             }
 
-            const expandBtn = document.querySelector(`button[onclick*="loadItems('${category}', '${subcategory || ''}', '${commonName}', '${targetId}')"]`);
+            const expandBtn = document.querySelector(`button[onclick*="loadItems(event, '${category}', '${subcategory || ''}', '${commonName}', '${targetId}')"]`);
             const collapseBtn = expandBtn ? expandBtn.nextElementSibling : null;
             if (expandBtn && collapseBtn) {
                 expandBtn.style.display = 'none';
@@ -909,7 +913,7 @@ function saveChanges(tagId) {
                     const category = itemsContainer.closest('.common-level').querySelector('button[data-category]').getAttribute('data-category');
                     const subcategory = itemsContainer.closest('.common-level').querySelector('button[data-subcategory]').getAttribute('data-subcategory');
                     const commonName = itemsContainer.closest('tr').querySelector('td:first-child').textContent;
-                    loadItems(category, subcategory, commonName, `items-${tagId.split('-')[0]}`);
+                    loadItems(null, category, subcategory, commonName, `items-${tagId.split('-')[0]}`);
                 }
             }
         })
@@ -938,7 +942,7 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log('expandCategory called with', { category, targetId, contractNumber, page });
         const normalizedCategory = targetId.replace('subcat-', '');
         if (window.cachedTabNum == 2 || window.cachedTabNum == 4) {
-            loadCommonNames(category, null, targetId, page, contractNumber);
+            loadCommonNames(null, category, null, targetId, page, contractNumber);
         } else {
             loadSubcatData(category, normalizedCategory, targetId, page);
         }
