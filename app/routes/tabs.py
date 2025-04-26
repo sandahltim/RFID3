@@ -1,30 +1,62 @@
-from flask import Blueprint, redirect, url_for, jsonify
+from flask import Blueprint, redirect, url_for, jsonify, current_app
+import logging
+import sys
+
+# Configure logging
+logger = logging.getLogger('tabs')
+logger.setLevel(logging.INFO)
+
+# Remove existing handlers to avoid duplicates
+logger.handlers = []
+
+# File handler for rfid_dashboard.log
+file_handler = logging.FileHandler('/home/tim/test_rfidpi/logs/rfid_dashboard.log')
+file_handler.setLevel(logging.INFO)
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+file_handler.setFormatter(formatter)
+logger.addHandler(file_handler)
+
+# Console handler
+console_handler = logging.StreamHandler(sys.stdout)
+console_handler.setLevel(logging.INFO)
+console_handler.setFormatter(formatter)
+logger.addHandler(console_handler)
 
 # Blueprint for routing tabs - DO NOT MODIFY BLUEPRINT NAME
 # Added on 2025-04-21 to handle tab routing
 tabs_bp = Blueprint('tabs', __name__)
 
+# Version marker
+logger.info("Deployed tabs.py version: 2025-04-25-v2")
+
 @tabs_bp.route('/tab/<int:tab_num>')
 def tab_view(tab_num):
     # Route to redirect to the appropriate tab view based on tab number
     # Updated on 2025-04-23 to include Tab 5 (Resale/Rental Packs)
+    logger.info(f"Routing request for /tab/{tab_num}")
     current_app.logger.info(f"Routing request for /tab/{tab_num}")
     if tab_num == 1:
+        logger.info("Redirecting to tab1.tab1_view")
         current_app.logger.info("Redirecting to tab1.tab1_view")
         return redirect(url_for('tab1.tab1_view'))
     elif tab_num == 2:
+        logger.info("Redirecting to tab2.tab2_view")
         current_app.logger.info("Redirecting to tab2.tab2_view")
         return redirect(url_for('tab2.tab2_view'))
     elif tab_num == 3:
+        logger.info("Redirecting to tab3.tab3_view")
         current_app.logger.info("Redirecting to tab3.tab3_view")
         return redirect(url_for('tab3.tab3_view'))
     elif tab_num == 4:
+        logger.info("Redirecting to tab4.tab4_view")
         current_app.logger.info("Redirecting to tab4.tab4_view")
         return redirect(url_for('tab4.tab4_view'))
     elif tab_num == 5:
+        logger.info("Redirecting to tab5.tab5_view")
         current_app.logger.info("Redirecting to tab5.tab5_view")
         return redirect(url_for('tab5.tab5_view'))
     else:
+        logger.warning(f"Tab {tab_num} not implemented")
         current_app.logger.warning(f"Tab {tab_num} not implemented")
         return jsonify({'error': 'Tab not implemented'}), 404
 

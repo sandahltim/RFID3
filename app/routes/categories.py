@@ -44,7 +44,7 @@ if not any(isinstance(h, logging.StreamHandler) for h in root_logger.handlers):
 categories_bp = Blueprint('categories', __name__)
 
 # Version check to ensure correct deployment
-logger.info("Deployed categories.py version: 2025-04-24-v16")
+logger.info("Deployed categories.py version: 2025-04-25-v17")
 
 def build_common_name_dict(seed_data):
     """Build a dictionary mapping rental_class_id to common_name from seed_data."""
@@ -58,6 +58,7 @@ def build_common_name_dict(seed_data):
                 common_name_dict[normalized_key] = common_name
         except Exception as comp_error:
             logger.error(f"Error processing item for common_name_dict: {str(comp_error)}", exc_info=True)
+            current_app.logger.error(f"Error processing item for common_name_dict: {str(comp_error)}", exc_info=True)
     return common_name_dict
 
 @categories_bp.route('/categories')
@@ -65,6 +66,7 @@ def manage_categories():
     try:
         session = db.session()
         logger.info("Starting new session for manage_categories")
+        current_app.logger.info("Starting new session for manage_categories")
 
         # Fetch all rental class mappings from both tables
         base_mappings = session.query(RentalClassMapping).all()
@@ -86,6 +88,7 @@ def manage_categories():
                     seed_data = seed_data['data']
             except Exception as api_error:
                 logger.error(f"Failed to fetch seed data from API: {str(api_error)}", exc_info=True)
+                current_app.logger.error(f"Failed to fetch seed data from API: {str(api_error)}", exc_info=True)
                 seed_data = []  # Fallback to empty list
 
         # Create a mapping of rental_class_id to common_name
@@ -93,6 +96,7 @@ def manage_categories():
             common_name_dict = build_common_name_dict(seed_data)
         except Exception as dict_error:
             logger.error(f"Error creating common_name_dict from seed_data: {str(dict_error)}", exc_info=True)
+            current_app.logger.error(f"Error creating common_name_dict from seed_data: {str(dict_error)}", exc_info=True)
             common_name_dict = {}
 
         # Build categories list
@@ -112,14 +116,17 @@ def manage_categories():
             seed_data_copy = copy.deepcopy(seed_data)
             cache.set(cache_key, seed_data_copy, timeout=3600)  # Cache for 1 hour
             logger.info("Fetched seed data from API and cached")
+            current_app.logger.info("Fetched seed data from API and cached")
 
         categories.sort(key=lambda x: (x['category'], x['subcategory'], x['rental_class_id']))
         logger.info(f"Fetched {len(categories)} category mappings")
+        current_app.logger.info(f"Fetched {len(categories)} category mappings")
 
         session.close()
         return render_template('categories.html', categories=categories, cache_bust=int(time()))
     except Exception as e:
         logger.error(f"Error rendering categories page: {str(e)}", exc_info=True)
+        current_app.logger.error(f"Error rendering categories page: {str(e)}", exc_info=True)
         if 'session' in locals():
             session.close()
         return render_template('categories.html', categories=[])
@@ -129,6 +136,7 @@ def get_mappings():
     try:
         session = db.session()
         logger.info("Fetching rental class mappings for API")
+        current_app.logger.info("Fetching rental class mappings for API")
 
         # Fetch all rental class mappings
         base_mappings = session.query(RentalClassMapping).all()
@@ -151,6 +159,7 @@ def get_mappings():
                     seed_data = seed_data['data']
             except Exception as api_error:
                 logger.error(f"Failed to fetch seed data from API: {str(api_error)}", exc_info=True)
+                current_app.logger.error(f"Failed to fetch seed data from API: {str(api_error)}", exc_info=True)
                 seed_data = []  # Fallback to empty list
 
         # Create a mapping of rental_class_id to common_name
@@ -158,6 +167,7 @@ def get_mappings():
             common_name_dict = build_common_name_dict(seed_data)
         except Exception as dict_error:
             logger.error(f"Error creating common_name_dict from seed_data: {str(dict_error)}", exc_info=True)
+            current_app.logger.error(f"Error creating common_name_dict from seed_data: {str(dict_error)}", exc_info=True)
             common_name_dict = {}
 
         # Build categories list
@@ -177,12 +187,14 @@ def get_mappings():
             seed_data_copy = copy.deepcopy(seed_data)
             cache.set(cache_key, seed_data_copy, timeout=3600)  # Cache for 1 hour
             logger.info("Fetched seed data from API and cached")
+            current_app.logger.info("Fetched seed data from API and cached")
 
         categories.sort(key=lambda x: (x['category'], x['subcategory'], x['rental_class_id']))
         session.close()
         return jsonify(categories)
     except Exception as e:
         logger.error(f"Error fetching mappings: {str(e)}")
+        current_app.logger.error(f"Error fetching mappings: {str(e)}")
         if 'session' in locals():
             session.close()
         return jsonify({'error': 'Failed to fetch mappings'}), 500
@@ -193,17 +205,21 @@ def update_mappings():
     try:
         session = db.session()
         logger.info("Starting new session for update_mappings")
+        current_app.logger.info("Starting new session for update_mappings")
 
         new_mappings = request.get_json()
         logger.info(f"Received {len(new_mappings)} new mappings")
+        current_app.logger.info(f"Received {len(new_mappings)} new mappings")
 
         if not isinstance(new_mappings, list):
             logger.error("Invalid data format received, expected a list")
+            current_app.logger.error("Invalid data format received, expected a list")
             return jsonify({'error': 'Invalid data format, expected a list'}), 400
 
         # Clear existing user mappings
         deleted_count = session.query(UserRentalClassMapping).delete()
         logger.info(f"Deleted {deleted_count} existing user mappings")
+        current_app.logger.info(f"Deleted {deleted_count} existing user mappings")
 
         # Add new user mappings
         for mapping in new_mappings:
@@ -213,6 +229,7 @@ def update_mappings():
 
             if not rental_class_id or not category:
                 logger.warning(f"Skipping invalid mapping due to missing rental_class_id or category: {mapping}")
+                current_app.logger.warning(f"Skipping invalid mapping due to missing rental_class_id or category: {mapping}")
                 continue
 
             user_mapping = UserRentalClassMapping(
@@ -224,15 +241,18 @@ def update_mappings():
 
         session.commit()
         logger.info("Successfully committed rental class mappings")
+        current_app.logger.info("Successfully committed rental class mappings")
 
         return jsonify({'message': 'Mappings updated successfully'})
     except SQLAlchemyError as e:
         logger.error(f"Database error during update_mappings: {str(e)}", exc_info=True)
+        current_app.logger.error(f"Database error during update_mappings: {str(e)}", exc_info=True)
         if session:
             session.rollback()
         return jsonify({'error': f'Database error: {str(e)}'}), 500
     except Exception as e:
         logger.error(f"Unexpected error during update_mappings: {str(e)}", exc_info=True)
+        current_app.logger.error(f"Unexpected error during update_mappings: {str(e)}", exc_info=True)
         if session:
             session.rollback()
         return jsonify({'error': f'Unexpected error: {str(e)}'}), 500
@@ -240,6 +260,7 @@ def update_mappings():
         if session:
             session.close()
             logger.info("Database session closed for update_mappings")
+            current_app.logger.info("Database session closed for update_mappings")
 
 @categories_bp.route('/categories/delete', methods=['POST'])
 def delete_mapping():
@@ -251,21 +272,26 @@ def delete_mapping():
 
         if not rental_class_id:
             logger.error("Missing rental_class_id in delete request")
+            current_app.logger.error("Missing rental_class_id in delete request")
             return jsonify({'error': 'Rental class ID is required'}), 400
 
         logger.info(f"Deleting mapping for rental_class_id: {rental_class_id}")
+        current_app.logger.info(f"Deleting mapping for rental_class_id: {rental_class_id}")
         deleted_count = session.query(UserRentalClassMapping).filter_by(rental_class_id=rental_class_id).delete()
         session.commit()
         logger.info(f"Deleted {deleted_count} user mappings for rental_class_id: {rental_class_id}")
+        current_app.logger.info(f"Deleted {deleted_count} user mappings for rental_class_id: {rental_class_id}")
 
         return jsonify({'message': 'Mapping deleted successfully'})
     except SQLAlchemyError as e:
         logger.error(f"Database error during delete_mapping: {str(e)}", exc_info=True)
+        current_app.logger.error(f"Database error during delete_mapping: {str(e)}", exc_info=True)
         if session:
             session.rollback()
         return jsonify({'error': f'Database error: {str(e)}'}), 500
     except Exception as e:
         logger.error(f"Unexpected error during delete_mapping: {str(e)}", exc_info=True)
+        current_app.logger.error(f"Unexpected error during delete_mapping: {str(e)}", exc_info=True)
         if session:
             session.rollback()
         return jsonify({'error': f'Unexpected error: {str(e)}'}), 500
@@ -273,3 +299,4 @@ def delete_mapping():
         if session:
             session.close()
             logger.info("Database session closed for delete_mapping")
+            current_app.logger.info("Database session closed for delete_mapping")

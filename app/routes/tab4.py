@@ -3,23 +3,54 @@ from .. import db, cache
 from ..models.db_models import Transaction, ItemMaster, HandCountedItems
 from sqlalchemy import func, desc
 from time import time
+import logging
+import sys
+
+# Configure logging
+logger = logging.getLogger('tab4')
+logger.setLevel(logging.INFO)
+
+# Remove existing handlers to avoid duplicates
+logger.handlers = []
+
+# File handler for rfid_dashboard.log
+file_handler = logging.FileHandler('/home/tim/test_rfidpi/logs/rfid_dashboard.log')
+file_handler.setLevel(logging.INFO)
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+file_handler.setFormatter(formatter)
+logger.addHandler(file_handler)
+
+# Console handler
+console_handler = logging.StreamHandler(sys.stdout)
+console_handler.setLevel(logging.INFO)
+console_handler.setFormatter(formatter)
+logger.addHandler(console_handler)
 
 tab4_bp = Blueprint('tab4', __name__)
 
+# Version marker
+logger.info("Deployed tab4.py version: 2025-04-25-v1")
+
 @tab4_bp.route('/tab/4')
 def tab4_view():
+    logger.info("Route /tab/4 accessed")
     current_app.logger.info("Route /tab/4 accessed")
     try:
+        logger.info("Attempting to create database session")
         current_app.logger.info("Attempting to create database session")
         session = db.session()
+        logger.info("Database session created successfully")
         current_app.logger.info("Database session created successfully")
 
         # Verify database connection
+        logger.info("Testing database connection")
         current_app.logger.info("Testing database connection")
         session.execute("SELECT 1")
+        logger.info("Database connection test successful")
         current_app.logger.info("Database connection test successful")
 
         # Fetch laundry contracts from id_item_master (contract numbers starting with 'L' or 'l')
+        logger.info("Executing contracts query")
         current_app.logger.info("Executing contracts query")
         contracts_query = session.query(
             ItemMaster.last_contract_num,
@@ -35,10 +66,12 @@ def tab4_view():
             func.count(ItemMaster.tag_id) > 0
         ).all()
 
+        logger.info(f"Raw laundry contracts query result: {[(c.last_contract_num, c.total_items) for c in contracts_query]}")
         current_app.logger.info(f"Raw laundry contracts query result: {[(c.last_contract_num, c.total_items) for c in contracts_query]}")
 
         contracts = []
         for contract_number, total_items in contracts_query:
+            logger.debug(f"Processing contract: {contract_number} with {total_items} items")
             current_app.logger.debug(f"Processing contract: {contract_number} with {total_items} items")
 
             # Fetch additional details from id_transactions for this contract
@@ -54,6 +87,7 @@ def tab4_view():
 
             client_name = latest_transaction.client_name if latest_transaction else 'N/A'
             scan_date = latest_transaction.scan_date.isoformat() if latest_transaction and latest_transaction.scan_date else 'N/A'
+            logger.debug(f"Contract {contract_number}: client_name={client_name}, scan_date={scan_date}")
             current_app.logger.debug(f"Contract {contract_number}: client_name={client_name}, scan_date={scan_date}")
 
             # Count items on this contract
@@ -76,11 +110,14 @@ def tab4_view():
             })
 
         contracts.sort(key=lambda x: x['contract_number'])
+        logger.info(f"Fetched {len(contracts)} laundry contracts for tab4: {[c['contract_number'] for c in contracts]}")
         current_app.logger.info(f"Fetched {len(contracts)} laundry contracts for tab4: {[c['contract_number'] for c in contracts]}")
         session.close()
+        logger.info(f"Rendering tab4.html with contracts: {[c['contract_number'] for c in contracts]}")
         current_app.logger.info(f"Rendering tab4.html with contracts: {[c['contract_number'] for c in contracts]}")
         return render_template('tab4.html', contracts=contracts, cache_bust=int(time()))
     except Exception as e:
+        logger.error(f"Error rendering Tab 4: {str(e)}", exc_info=True)
         current_app.logger.error(f"Error rendering Tab 4: {str(e)}", exc_info=True)
         if 'session' in locals():
             session.close()
@@ -92,9 +129,11 @@ def tab4_common_names():
     page = int(request.args.get('page', 1))
     per_page = 10
 
+    logger.info(f"Fetching common names for contract_number={contract_number}, page={page}")
     current_app.logger.info(f"Fetching common names for contract_number={contract_number}, page={page}")
 
     if not contract_number:
+        logger.error("Missing required parameter: contract_number is required")
         current_app.logger.error("Missing required parameter: contract_number is required")
         return jsonify({'error': 'Contract number is required'}), 400
 
@@ -112,6 +151,7 @@ def tab4_common_names():
             ItemMaster.common_name
         ).all()
 
+        logger.debug(f"Common names for laundry contract {contract_number}: {[(name, count) for name, count in common_names_query]}")
         current_app.logger.debug(f"Common names for laundry contract {contract_number}: {[(name, count) for name, count in common_names_query]}")
 
         common_names = []
@@ -137,6 +177,7 @@ def tab4_common_names():
         paginated_common_names = common_names[start:end]
 
         session.close()
+        logger.info(f"Returning {len(paginated_common_names)} common names for contract {contract_number}")
         current_app.logger.info(f"Returning {len(paginated_common_names)} common names for contract {contract_number}")
         return jsonify({
             'common_names': paginated_common_names,
@@ -145,6 +186,7 @@ def tab4_common_names():
             'per_page': per_page
         })
     except Exception as e:
+        logger.error(f"Error fetching common names for contract {contract_number}: {str(e)}")
         current_app.logger.error(f"Error fetching common names for contract {contract_number}: {str(e)}")
         if 'session' in locals():
             session.close()
@@ -157,9 +199,11 @@ def tab4_data():
     page = int(request.args.get('page', 1))
     per_page = 10
 
+    logger.info(f"Fetching items for contract_number={contract_number}, common_name={common_name}, page={page}")
     current_app.logger.info(f"Fetching items for contract_number={contract_number}, common_name={common_name}, page={page}")
 
     if not contract_number or not common_name:
+        logger.error("Missing required parameters: contract number and common name are required")
         current_app.logger.error("Missing required parameters: contract number and common name are required")
         return jsonify({'error': 'Contract number and common name are required'}), 400
 
@@ -189,6 +233,7 @@ def tab4_data():
                 'last_scanned_date': last_scanned_date
             })
 
+        logger.debug(f"Items for laundry contract {contract_number}, common_name {common_name}: {len(items_data)} items")
         current_app.logger.debug(f"Items for laundry contract {contract_number}, common_name {common_name}: {len(items_data)} items")
 
         session.close()
@@ -199,6 +244,7 @@ def tab4_data():
             'per_page': per_page
         })
     except Exception as e:
+        logger.error(f"Error fetching items for contract {contract_number}, common_name {common_name}: {str(e)}")
         current_app.logger.error(f"Error fetching items for contract {contract_number}, common_name {common_name}: {str(e)}")
         if 'session' in locals():
             session.close()
@@ -207,6 +253,7 @@ def tab4_data():
 @tab4_bp.route('/tab/4/hand_counted_items')
 def tab4_hand_counted_items():
     contract_number = request.args.get('contract_number')
+    logger.info(f"Fetching hand-counted items for contract_number={contract_number}")
     current_app.logger.info(f"Fetching hand-counted items for contract_number={contract_number}")
     try:
         session = db.session()
@@ -214,6 +261,7 @@ def tab4_hand_counted_items():
             HandCountedItems.contract_number == contract_number
         ).all()
         session.close()
+        logger.info(f"Found {len(items)} hand-counted items for contract {contract_number}")
         current_app.logger.info(f"Found {len(items)} hand-counted items for contract {contract_number}")
 
         # Render HTML rows for HTMX to insert into the table
@@ -235,6 +283,7 @@ def tab4_hand_counted_items():
                 """
         return html
     except Exception as e:
+        logger.error(f"Error fetching hand-counted items for contract {contract_number}: {str(e)}")
         current_app.logger.error(f"Error fetching hand-counted items for contract {contract_number}: {str(e)}")
         if 'session' in locals():
             session.close()
@@ -249,9 +298,11 @@ def add_hand_counted_item():
     action = data.get('action')
     employee_name = data.get('employee_name')
 
+    logger.info(f"Adding hand-counted item: contract_number={contract_number}, item_name={item_name}, quantity={quantity}, action={action}, employee_name={employee_name}")
     current_app.logger.info(f"Adding hand-counted item: contract_number={contract_number}, item_name={item_name}, quantity={quantity}, action={action}, employee_name={employee_name}")
 
     if not all([contract_number, item_name, quantity, action, employee_name]):
+        logger.error("Missing required fields for adding hand-counted item")
         current_app.logger.error("Missing required fields for adding hand-counted item")
         return jsonify({'error': 'All fields are required'}), 400
 
@@ -267,9 +318,11 @@ def add_hand_counted_item():
         session.add(hand_counted_item)
         session.commit()
         session.close()
+        logger.info(f"Successfully added hand-counted item for contract {contract_number}")
         current_app.logger.info(f"Successfully added hand-counted item for contract {contract_number}")
         return jsonify({'message': 'Item added successfully'})
     except Exception as e:
+        logger.error(f"Error adding hand-counted item: {str(e)}")
         current_app.logger.error(f"Error adding hand-counted item: {str(e)}")
         if 'session' in locals():
             session.rollback()
@@ -285,9 +338,11 @@ def remove_hand_counted_item():
     action = data.get('action')
     employee_name = data.get('employee_name')
 
+    logger.info(f"Removing hand-counted item: contract_number={contract_number}, item_name={item_name}, quantity={quantity}, action={action}, employee_name={employee_name}")
     current_app.logger.info(f"Removing hand-counted item: contract_number={contract_number}, item_name={item_name}, quantity={quantity}, action={action}, employee_name={employee_name}")
 
     if not all([contract_number, item_name, quantity, action, employee_name]):
+        logger.error("Missing required fields for removing hand-counted item")
         current_app.logger.error("Missing required fields for removing hand-counted item")
         return jsonify({'error': 'All fields are required'}), 400
 
@@ -303,9 +358,11 @@ def remove_hand_counted_item():
         session.add(hand_counted_item)
         session.commit()
         session.close()
+        logger.info(f"Successfully removed hand-counted item for contract {contract_number}")
         current_app.logger.info(f"Successfully removed hand-counted item for contract {contract_number}")
         return jsonify({'message': 'Item removed successfully'})
     except Exception as e:
+        logger.error(f"Error removing hand-counted item: {str(e)}")
         current_app.logger.error(f"Error removing hand-counted item: {str(e)}")
         if 'session' in locals():
             session.rollback()
@@ -318,6 +375,8 @@ def full_items_by_rental_class():
     common_name = request.args.get('common_name')
 
     if not contract_number or not common_name:
+        logger.error("Category (contract_number) and common name are required")
+        current_app.logger.error("Category (contract_number) and common name are required")
         return jsonify({'error': 'Category (contract_number) and common name are required'}), 400
 
     try:
@@ -351,5 +410,6 @@ def full_items_by_rental_class():
             'total_items': len(items_data)
         })
     except Exception as e:
+        logger.error(f"Error fetching full items for contract {contract_number}, common_name {common_name}: {str(e)}")
         current_app.logger.error(f"Error fetching full items for contract {contract_number}, common_name {common_name}: {str(e)}")
         return jsonify({'error': 'Failed to fetch full items'}), 500
