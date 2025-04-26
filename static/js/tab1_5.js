@@ -1,50 +1,4 @@
-console.log('tab1_5.js version: 2025-04-26-v10 loaded');
-
-// Note: Common function for Tabs 1 and 5
-function hideOtherSubcats(currentCategory, parentCategory) {
-    const subcatDivs = document.querySelectorAll(`[id^="subcat-${parentCategory}_"]`);
-    console.log('Found subcat divs for parent', parentCategory, ':', subcatDivs.length);
-    subcatDivs.forEach(div => {
-        const divId = div.id;
-        if (divId !== `subcat-${currentCategory}`) {
-            console.log('Collapsing subcat div:', divId);
-            div.classList.remove('expanded');
-            div.classList.add('collapsed');
-            div.style.display = 'none';
-            div.style.opacity = '0';
-        }
-    });
-}
-
-// Note: Common function for Tabs 1 and 5
-function hideOtherCommonNames(currentTargetId, parentSubcategory) {
-    const commonDivs = document.querySelectorAll(`[id^="common-${parentSubcategory}_"]`);
-    console.log('Found common divs for parent', parentSubcategory, ':', commonDivs.length);
-    commonDivs.forEach(div => {
-        const divId = div.id;
-        if (divId !== currentTargetId) {
-            console.log('Collapsing common div:', divId);
-            div.classList.remove('expanded');
-            div.classList.add('collapsed');
-            div.style.display = 'none';
-        }
-    });
-}
-
-// Note: Common function for Tabs 1 and 5
-function hideOtherItems(currentTargetId, parentCommonName) {
-    const itemDivs = document.querySelectorAll(`[id^="items-${parentCommonName}_"]`);
-    console.log('Found item divs for parent', parentCommonName, ':', itemDivs.length);
-    itemDivs.forEach(div => {
-        const divId = div.id;
-        if (divId !== currentTargetId) {
-            console.log('Collapsing item div:', divId);
-            div.classList.remove('expanded');
-            div.classList.add('collapsed');
-            div.style.display = 'none';
-        }
-    });
-}
+console.log('tab1_5.js version: 2025-04-26-v11 loaded');
 
 // Note: Common function for Tabs 1 and 5
 function collapseSection(targetId) {
@@ -71,225 +25,25 @@ function collapseSection(targetId) {
 
         // Remove from sessionStorage
         sessionStorage.removeItem(`expanded_${targetId}`);
-        sessionStorage.removeItem(`expanded_common_${targetId}`);
-        sessionStorage.removeItem(`expanded_items_${targetId}`);
     }
 }
 
 // Note: Common function for Tabs 1 and 5
-function loadCommonNames(category, subcategory, targetId, page = 1, contractNumber = null) {
-    console.log('loadCommonNames called with', { category, subcategory, targetId, page, contractNumber });
+function loadCommonNames(selectElement) {
+    const subcategory = selectElement.value;
+    const category = selectElement.getAttribute('data-category');
+    const targetId = selectElement.closest('tr').nextElementSibling.querySelector('.common-level').id;
+    if (!subcategory) {
+        collapseSection(targetId);
+        return;
+    }
 
-    if (!category || !targetId) {
+    console.log('loadCommonNames called with', { category, subcategory, targetId });
+
+    if (!category || !subcategory || !targetId) {
         console.error('Invalid parameters for loadCommonNames:', { category, subcategory, targetId });
         return;
     }
-
-    // Adjust containerId based on whether there's a subcategory (Tabs 1, 5) or not (Tabs 2, 4)
-    const containerId = (window.cachedTabNum == 2 || window.cachedTabNum == 4) ? targetId : `common-${targetId}`;
-    const container = document.getElementById(containerId);
-    if (!container) {
-        console.error(`Container with ID ${containerId} not found`);
-        return;
-    }
-
-    const key = targetId; // Use targetId as the key to match the loading indicator
-    showLoading(key);
-    hideOtherCommonNames(containerId, targetId);
-
-    let url = `/tab/${window.cachedTabNum}/common_names?page=${page}`;
-    if (window.cachedTabNum == 2 || window.cachedTabNum == 4) {
-        if (!contractNumber) {
-            console.error('Contract number required for Tabs 2 and 4');
-            return;
-        }
-        url += `&contract_number=${encodeURIComponent(contractNumber)}`;
-    } else {
-        url += `&category=${encodeURIComponent(category)}`;
-    }
-    if (subcategory) {
-        url += `&subcategory=${encodeURIComponent(subcategory)}`;
-    }
-
-    const commonFilter = document.getElementById(`common-filter-${key}`)?.value || '';
-    const commonSort = document.getElementById(`common-sort-${key}`)?.value || '';
-    const statusFilter = document.getElementById('statusFilter')?.value || '';
-    const binFilter = document.getElementById('binFilter')?.value || '';
-    if (commonFilter) {
-        url += `&filter=${encodeURIComponent(commonFilter)}`;
-    }
-    if (commonSort) {
-        url += `&sort=${encodeURIComponent(commonSort)}`;
-    }
-    if (statusFilter) {
-        url += `&statusFilter=${encodeURIComponent(statusFilter)}`;
-    }
-    if (binFilter) {
-        url += `&binFilter=${encodeURIComponent(binFilter)}`;
-    }
-
-    fetch(url)
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`Common names fetch failed with status ${response.status}: ${response.statusText}`);
-            }
-            return response.json();
-        })
-        .then(data => {
-            let html = '';
-            if (data.common_names && data.common_names.length > 0) {
-                const headers = window.cachedTabNum == 2 || window.cachedTabNum == 4
-                    ? ['Common Name', 'Items on Contract', 'Total Items in Inventory', 'Actions']
-                    : ['Common Name', 'Total Items', 'Items on Contracts', 'Items in Service', 'Items Available', 'Actions'];
-
-                html += `
-                    <div class="common-level">
-                        <div class="filter-sort-controls">
-                            <input type="text" id="common-filter-${key}" placeholder="Filter common names..." value="${commonFilter}" oninput="loadCommonNames('${category}', '${subcategory || ''}', '${targetId}', 1, '${contractNumber || ''}')">
-                            <select id="common-sort-${key}" onchange="loadCommonNames('${category}', '${subcategory || ''}', '${targetId}', 1, '${contractNumber || ''}')">
-                                <option value="">Sort By...</option>
-                                <option value="name_asc" ${commonSort === 'name_asc' ? 'selected' : ''}>Name (A-Z)</option>
-                                <option value="name_desc" ${commonSort === 'name_desc' ? 'selected' : ''}>Name (Z-A)</option>
-                                <option value="total_items_asc" ${commonSort === 'total_items_asc' ? 'selected' : ''}>Total Items (Low to High)</option>
-                                <option value="total_items_desc" ${commonSort === 'total_items_desc' ? 'selected' : ''}>Total Items (High to Low)</option>
-                            </select>
-                `;
-
-                if (window.cachedTabNum == 5) {
-                    html += `
-                        <div class="bulk-update-controls" style="margin-top: 10px;">
-                            <select id="bulk-bin-location-${key}" onchange="updateBulkField('${key}', 'bin_location')">
-                                <option value="">Update Bin Location...</option>
-                                <option value="resale">resale</option>
-                                <option value="sold">sold</option>
-                                <option value="pack">pack</option>
-                                <option value="burst">burst</option>
-                            </select>
-                            <select id="bulk-status-${key}" onchange="updateBulkField('${key}', 'status')">
-                                <option value="">Update Status...</option>
-                                <option value="Ready to Rent">Ready to Rent</option>
-                            </select>
-                            <button class="btn btn-sm btn-primary" onclick="bulkUpdateCommonName('${category}', '${subcategory || ''}', '${targetId}', '${key}')">Bulk Update</button>
-                        </div>
-                    `;
-                }
-
-                html += `
-                        </div>
-                        <table class="common-table" id="common-table-${key}">
-                            <thead>
-                                <tr>
-                                    ${headers.map(header => `<th>${header}</th>`).join('')}
-                                </tr>
-                            </thead>
-                            <tbody>
-                `;
-
-                data.common_names.forEach(item => {
-                    const rowId = `${key}_${item.name.replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '')}`;
-                    if (window.cachedTabNum == 2 || window.cachedTabNum == 4) {
-                        html += `
-                            <tr>
-                                <td>${item.name}</td>
-                                <td>${item.items_on_contracts}</td>
-                                <td>${item.total_items}</td>
-                                <td>
-                                    <button class="btn btn-sm btn-secondary expand-btn" data-category="${category}" data-subcategory="${subcategory || ''}" data-common-name="${item.name}" data-target-id="items-${rowId}">Expand</button>
-                                    <button class="btn btn-sm btn-secondary collapse-btn" style="display:none;" data-collapse-target="items-${rowId}">Collapse</button>
-                                    <button class="btn btn-sm btn-info print-btn" data-print-level="Common Name" data-print-id="common-table-${key}" data-common-name="${item.name}" data-category="${category}" data-subcategory="${subcategory || ''}">Print Aggregate</button>
-                                    <button class="btn btn-sm btn-info print-full-btn" data-common-name="${item.name}" data-category="${category}" data-subcategory="${subcategory || ''}">Print Full List</button>
-                                    <div id="loading-${rowId}" style="display:none;" class="loading">Loading...</div>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td colspan="${headers.length}">
-                                    <div id="items-${rowId}" class="expandable collapsed"></div>
-                                </td>
-                            </tr>
-                        `;
-                    } else {
-                        html += `
-                            <tr>
-                                <td>${item.name}</td>
-                                <td>${item.total_items}</td>
-                                <td>${item.items_on_contracts}</td>
-                                <td>${item.items_in_service}</td>
-                                <td>${item.items_available}</td>
-                                <td>
-                                    <button class="btn btn-sm btn-secondary expand-btn" data-category="${category}" data-subcategory="${subcategory || ''}" data-common-name="${item.name}" data-target-id="items-${rowId}">Expand</button>
-                                    <button class="btn btn-sm btn-secondary collapse-btn" style="display:none;" data-collapse-target="items-${rowId}">Collapse</button>
-                                    <button class="btn btn-sm btn-info print-btn" data-print-level="Common Name" data-print-id="common-table-${key}" data-common-name="${item.name}" data-category="${category}" data-subcategory="${subcategory || ''}">Print Aggregate</button>
-                                    <button class="btn btn-sm btn-info print-full-btn" data-common-name="${item.name}" data-category="${category}" data-subcategory="${subcategory || ''}">Print Full List</button>
-                                    <div id="loading-${rowId}" style="display:none;" class="loading">Loading...</div>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td colspan="${headers.length}">
-                                    <div id="items-${rowId}" class="expandable collapsed"></div>
-                                </td>
-                            </tr>
-                        `;
-                    }
-                });
-
-                if (data.total_common_names > data.per_page) {
-                    const totalPages = Math.ceil(data.total_common_names / data.per_page);
-                    html += `
-                        <tr>
-                            <td colspan="${headers.length}" class="pagination-controls">
-                                <button class="btn btn-sm btn-secondary" onclick="loadCommonNames('${category}', '${subcategory || ''}', '${targetId}', ${page - 1}, '${contractNumber || ''}')" ${page === 1 ? 'disabled' : ''}>Previous</button>
-                                <span>Page ${page} of ${totalPages}</span>
-                                <button class="btn btn-sm btn-secondary" onclick="loadCommonNames('${category}', '${subcategory || ''}', '${targetId}', ${page + 1}, '${contractNumber || ''}')" ${page === totalPages ? 'disabled' : ''}>Next</button>
-                            </td>
-                        </tr>
-                    `;
-                }
-
-                html += `
-                            </tbody>
-                        </table>
-                    </div>
-                `;
-            } else {
-                html = `<div class="common-level"><p>No common names found for this ${subcategory ? 'subcategory' : 'category'}.</p></div>`;
-            }
-
-            container.innerHTML = html;
-            container.classList.remove('collapsed');
-            container.classList.add('expanded');
-            container.style.display = 'block';
-            container.style.opacity = '1';
-
-            // Force reflow to ensure visibility
-            container.offsetHeight; // Trigger reflow
-            container.style.display = 'block';
-
-            const expandBtn = document.querySelector(`button.expand-btn[data-target-id="${containerId}"]`);
-            const collapseBtn = expandBtn ? expandBtn.nextElementSibling : null;
-            if (expandBtn && collapseBtn) {
-                expandBtn.style.display = 'none';
-                collapseBtn.style.display = 'inline-block';
-            }
-
-            // Save expansion state
-            sessionStorage.setItem(`expanded_common_${targetId}`, JSON.stringify({ category, subcategory, page, contractNumber }));
-        })
-        .catch(error => {
-            console.error('Common names fetch error:', error);
-            container.innerHTML = `<div class="common-level"><p>Error loading common names: ${error.message}</p></div>`;
-            container.classList.remove('collapsed');
-            container.classList.add('expanded');
-            container.style.display = 'block';
-            container.style.opacity = '1';
-        })
-        .finally(() => {
-            hideLoading(key);
-        });
-}
-
-// Note: Common function for Tabs 1 and 5
-function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1) {
-    console.log('loadSubcatData called with', { originalCategory, normalizedCategory, targetId, page });
 
     const container = document.getElementById(targetId);
     if (!container) {
@@ -297,180 +51,139 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
         return;
     }
 
-    // Check if the container is already loading to prevent double loading
-    if (container.classList.contains('loading')) {
-        console.log(`Container ${targetId} is already loading, skipping...`);
-        return;
-    }
-    container.classList.add('loading');
+    showLoading(targetId.split('-')[1]);
+    container.innerHTML = ''; // Clear previous content
 
-    // Clear the container to prevent duplicate rendering
-    container.innerHTML = '';
-    hideOtherSubcats(normalizedCategory, normalizedCategory);
-    showLoading(normalizedCategory);
-
-    let url = `/tab/${window.cachedTabNum}/subcat_data?category=${encodeURIComponent(originalCategory)}&page=${page}`;
-    const subcatFilter = document.getElementById(`subcat-filter-${normalizedCategory}`)?.value || '';
-    const subcatSort = document.getElementById(`subcat-sort-${normalizedCategory}`)?.value || '';
+    let url = `/tab/${window.cachedTabNum}/common_names?category=${encodeURIComponent(category)}&subcategory=${encodeURIComponent(subcategory)}&page=1`;
+    const commonFilter = document.getElementById(`common-filter-${targetId}`)?.value || '';
+    const commonSort = document.getElementById(`common-sort-${targetId}`)?.value || '';
     const statusFilter = document.getElementById('statusFilter')?.value || '';
     const binFilter = document.getElementById('binFilter')?.value || '';
-    if (subcatFilter) {
-        url += `&filter=${encodeURIComponent(subcatFilter)}`;
-    }
-    if (subcatSort) {
-        url += `&sort=${encodeURIComponent(subcatSort)}`;
-    }
-    if (statusFilter) {
-        url += `&statusFilter=${encodeURIComponent(statusFilter)}`;
-    }
-    if (binFilter) {
-        url += `&binFilter=${encodeURIComponent(binFilter)}`;
-    }
+    if (commonFilter) url += `&filter=${encodeURIComponent(commonFilter)}`;
+    if (commonSort) url += `&sort=${encodeURIComponent(commonSort)}`;
+    if (statusFilter) url += `&statusFilter=${encodeURIComponent(statusFilter)}`;
+    if (binFilter) url += `&binFilter=${encodeURIComponent(binFilter)}`;
 
     fetch(url)
         .then(response => {
             if (!response.ok) {
-                throw new Error(`Subcategory fetch failed with status ${response.status}`);
+                throw new Error(`Common names fetch failed with status ${response.status}`);
             }
             return response.json();
         })
         .then(data => {
-            console.log('Subcategory data received:', data);
             let html = '';
-            if (data.subcategories && data.subcategories.length > 0) {
+            if (data.common_names && data.common_names.length > 0) {
                 html += `
                     <div class="filter-sort-controls">
-                        <input type="text" id="subcat-filter-${normalizedCategory}" placeholder="Filter subcategories..." value="${subcatFilter}" oninput="loadSubcatData('${originalCategory}', '${normalizedCategory}', '${targetId}', 1)">
-                        <select id="subcat-sort-${normalizedCategory}" onchange="loadSubcatData('${originalCategory}', '${normalizedCategory}', '${targetId}', 1)">
+                        <input type="text" id="common-filter-${targetId}" placeholder="Filter common names..." value="${commonFilter}" oninput="loadCommonNames(this.closest('tr').previousElementSibling.querySelector('.subcategory-select'))">
+                        <select id="common-sort-${targetId}" onchange="loadCommonNames(this.closest('tr').previousElementSibling.querySelector('.subcategory-select'))">
                             <option value="">Sort By...</option>
-                            <option value="subcategory_asc" ${subcatSort === 'subcategory_asc' ? 'selected' : ''}>Subcategory (A-Z)</option>
-                            <option value="subcategory_desc" ${subcatSort === 'subcategory_desc' ? 'selected' : ''}>Subcategory (Z-A)</option>
-                            <option value="total_items_asc" ${subcatSort === 'total_items_asc' ? 'selected' : ''}>Total Items (Low to High)</option>
-                            <option value="total_items_desc" ${subcatSort === 'total_items_desc' ? 'selected' : ''}>Total Items (High to Low)</option>
+                            <option value="name_asc" ${commonSort === 'name_asc' ? 'selected' : ''}>Name (A-Z)</option>
+                            <option value="name_desc" ${commonSort === 'name_desc' ? 'selected' : ''}>Name (Z-A)</option>
+                            <option value="total_items_asc" ${commonSort === 'total_items_asc' ? 'selected' : ''}>Total Items (Low to High)</option>
+                            <option value="total_items_desc" ${commonSort === 'total_items_desc' ? 'selected' : ''}>Total Items (High to Low)</option>
                         </select>
-                    </div>
-                    <div class="subcat-level">
-                        <table class="subcat-table" id="subcat-table-${normalizedCategory}">
-                            <thead>
-                                <tr>
-                                    <th>Subcategory</th>
-                                    <th>Total Items</th>
-                                    <th>Items on Contracts</th>
-                                    <th>Items in Service</th>
-                                    <th>Items Available</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
                 `;
 
-                data.subcategories.forEach(subcat => {
-                    const subcatKey = `${normalizedCategory}_${subcat.subcategory.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
+                if (window.cachedTabNum == 5) {
                     html += `
-                        <tr class="subcat-row">
-                            <td>${subcat.subcategory}</td>
-                            <td>${subcat.total_items}</td>
-                            <td>${subcat.items_on_contracts}</td>
-                            <td>${subcat.items_in_service}</td>
-                            <td>${subcat.items_available}</td>
+                        <div class="bulk-update-controls">
+                            <select id="bulk-bin-location-${targetId}" onchange="updateBulkField('${targetId}', 'bin_location')">
+                                <option value="">Update Bin Location...</option>
+                                <option value="resale">resale</option>
+                                <option value="sold">sold</option>
+                                <option value="pack">pack</option>
+                                <option value="burst">burst</option>
+                            </select>
+                            <select id="bulk-status-${targetId}" onchange="updateBulkField('${targetId}', 'status')">
+                                <option value="">Update Status...</option>
+                                <option value="Ready to Rent">Ready to Rent</option>
+                            </select>
+                            <button class="btn btn-sm btn-primary" onclick="bulkUpdateCommonName('${category}', '${subcategory}', '${targetId}', '${targetId}')">Bulk Update</button>
+                        </div>
+                    `;
+                }
+
+                html += `
+                    </div>
+                    <table class="common-table" id="common-table-${targetId}">
+                        <thead>
+                            <tr>
+                                <th>Common Name</th>
+                                <th>Total Items</th>
+                                <th>Items on Contracts</th>
+                                <th>Items in Service</th>
+                                <th>Items Available</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                `;
+
+                data.common_names.forEach(item => {
+                    const rowId = `${targetId}_${item.name.replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '')}`;
+                    html += `
+                        <tr>
+                            <td>${item.name}</td>
+                            <td>${item.total_items}</td>
+                            <td>${item.items_on_contracts}</td>
+                            <td>${item.items_in_service}</td>
+                            <td>${item.items_available}</td>
                             <td>
-                                <button class="btn btn-sm btn-secondary expand-btn" data-category="${originalCategory}" data-subcategory="${subcat.subcategory}" data-subcat-target-id="${subcatKey}">Expand</button>
-                                <button class="btn btn-sm btn-secondary collapse-btn" style="display:none;" data-collapse-target="common-${subcatKey}">Collapse</button>
-                                <button class="btn btn-sm btn-info print-btn" data-print-level="Subcategory" data-print-id="subcat-table-${subcatKey}">Print</button>
-                                <div id="loading-${subcatKey}" style="display:none;" class="loading">Loading...</div>
+                                <div class="btn-group">
+                                    <button class="btn btn-sm btn-secondary expand-btn" data-category="${category}" data-subcategory="${subcategory}" data-common-name="${item.name}" data-target-id="items-${rowId}">Expand Items</button>
+                                    <button class="btn btn-sm btn-secondary collapse-btn" style="display:none;" data-collapse-target="items-${rowId}">Collapse</button>
+                                    <button class="btn btn-sm btn-info print-btn" data-print-level="Common Name" data-print-id="common-table-${targetId}" data-common-name="${item.name}" data-category="${category}" data-subcategory="${subcategory}">Print Aggregate</button>
+                                    <button class="btn btn-sm btn-info print-full-btn" data-common-name="${item.name}" data-category="${category}" data-subcategory="${subcategory}">Print Full List</button>
+                                </div>
                             </td>
                         </tr>
                         <tr>
                             <td colspan="6">
-                                <div id="common-${subcatKey}" class="expandable collapsed"></div>
+                                <div id="items-${rowId}" class="expandable collapsed"></div>
                             </td>
                         </tr>
                     `;
                 });
 
-                html += `
-                            </tbody>
-                        </table>
-                    </div>
-                `;
-
-                if (data.total_subcats > data.per_page) {
-                    const totalPages = Math.ceil(data.total_subcats / data.per_page);
+                if (data.total_common_names > data.per_page) {
+                    const totalPages = Math.ceil(data.total_common_names / data.per_page);
                     html += `
-                        <div class="pagination-controls">
-                            <button class="btn btn-sm btn-secondary" onclick="loadSubcatData('${originalCategory}', '${normalizedCategory}', '${targetId}', ${page - 1})" ${page === 1 ? 'disabled' : ''}>Previous</button>
-                            <span>Page ${page} of ${totalPages}</span>
-                            <button class="btn btn-sm btn-secondary" onclick="loadSubcatData('${originalCategory}', '${normalizedCategory}', '${targetId}', ${page + 1})" ${page === totalPages ? 'disabled' : ''}>Next</button>
-                        </div>
+                        <tr>
+                            <td colspan="6" class="pagination-controls">
+                                <button class="btn btn-sm btn-secondary" onclick="loadCommonNames(this.closest('tr').previousElementSibling.querySelector('.subcategory-select'), ${data.page - 1})" ${data.page === 1 ? 'disabled' : ''}>Previous</button>
+                                <span>Page ${data.page} of ${totalPages}</span>
+                                <button class="btn btn-sm btn-secondary" onclick="loadCommonNames(this.closest('tr').previousElementSibling.querySelector('.subcategory-select'), ${data.page + 1})" ${data.page === totalPages ? 'disabled' : ''}>Next</button>
+                            </td>
+                        </tr>
                     `;
                 }
+
+                html += `
+                        </tbody>
+                    </table>
+                `;
             } else {
-                html = `<div class="subcat-level"><p>No subcategories found for this category.</p></div>`;
+                html = `<p>No common names found for this subcategory.</p>`;
             }
 
             container.innerHTML = html;
-            console.log('Rendered HTML for subcategories:', container.innerHTML); // Debug log to inspect DOM
-
             container.classList.remove('collapsed');
             container.classList.add('expanded');
             container.style.display = 'block';
             container.style.opacity = '1';
-            container.classList.remove('loading');
-
-            // Force reflow to ensure visibility
-            container.offsetHeight; // Trigger reflow
-            container.style.display = 'block';
-
-            // Ensure the table body is visible
-            const tableBody = container.querySelector('table.subcat-table tbody');
-            if (tableBody) {
-                tableBody.style.display = 'table-row-group';
-                tableBody.style.visibility = 'visible';
-                tableBody.style.opacity = '1';
-
-                // Ensure all rows are visible
-                const rows = tableBody.querySelectorAll('tr.subcat-row');
-                rows.forEach(row => {
-                    row.style.display = 'table-row';
-                    row.style.visibility = 'visible';
-                    row.style.opacity = '1';
-                });
-            } else {
-                console.warn('Table body not found in container:', container);
-            }
-
-            // Debug: Log the parent row to inspect the expand/collapse buttons
-            const parentRow = container.closest('tr');
-            if (parentRow) {
-                console.log('Parent row HTML:', parentRow.outerHTML);
-            } else {
-                console.warn('Parent row not found for container:', container);
-            }
-
-            // Fix selector to handle expand/collapse buttons
-            const expandBtn = parentRow ? parentRow.querySelector(`button.expand-btn[data-target-id="subcat-${normalizedCategory}"]`) : null;
-            const collapseBtn = expandBtn ? expandBtn.nextElementSibling : null;
-            if (expandBtn && collapseBtn) {
-                expandBtn.style.display = 'none';
-                collapseBtn.style.display = 'inline-block';
-            } else {
-                console.warn('Expand/Collapse buttons not found in parent row for selector:', `button.expand-btn[data-target-id="subcat-${normalizedCategory}"]`);
-            }
-
-            // Save expansion state
-            sessionStorage.setItem(`expanded_${targetId}`, JSON.stringify({ category: originalCategory, page }));
         })
         .catch(error => {
-            console.error('Subcategory fetch error:', error);
-            container.innerHTML = `<div class="subcat-level"><p>Error loading subcategories: ${error.message}</p></div>`;
+            console.error('Common names fetch error:', error);
+            container.innerHTML = `<p>Error loading common names: ${error.message}</p>`;
             container.classList.remove('collapsed');
             container.classList.add('expanded');
             container.style.display = 'block';
             container.style.opacity = '1';
-            container.classList.remove('loading');
         })
         .finally(() => {
-            hideLoading(normalizedCategory);
+            hideLoading(targetId.split('-')[1]);
         });
 }
 
@@ -633,44 +346,24 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
         return;
     }
 
-    // Check if the container is already loading to prevent double loading
     if (container.classList.contains('loading')) {
         console.log(`Container ${targetId} is already loading, skipping...`);
         return;
     }
     container.classList.add('loading');
 
-    // Use the correct key for the loading indicator (match the subcat/common level)
-    const key = targetId.split('-').slice(1).join('-'); // Match the loading indicator ID (e.g., "resale_testing_resale_test_resale")
+    const key = targetId.split('-')[1];
     showLoading(key);
-    hideOtherItems(targetId, targetId);
 
-    let url = `/tab/${window.cachedTabNum}/data?common_name=${encodeURIComponent(commonName)}&page=${page}`;
-    if (subcategory) {
-        url += `&subcategory=${encodeURIComponent(subcategory)}`;
-    }
-    if (window.cachedTabNum == 2 || window.cachedTabNum == 4) {
-        url += `&contract_number=${encodeURIComponent(category)}`;
-    } else {
-        url += `&category=${encodeURIComponent(category)}`;
-    }
-
+    let url = `/tab/${window.cachedTabNum}/data?common_name=${encodeURIComponent(commonName)}&page=${page}&subcategory=${encodeURIComponent(subcategory)}&category=${encodeURIComponent(category)}`;
     const itemFilter = document.getElementById(`item-filter-${key}`)?.value || '';
     const itemSort = document.getElementById(`item-sort-${key}`)?.value || '';
     const statusFilter = document.getElementById('statusFilter')?.value || '';
     const binFilter = document.getElementById('binFilter')?.value || '';
-    if (itemFilter) {
-        url += `&filter=${encodeURIComponent(itemFilter)}`;
-    }
-    if (itemSort) {
-        url += `&sort=${encodeURIComponent(itemSort)}`;
-    }
-    if (statusFilter) {
-        url += `&statusFilter=${encodeURIComponent(statusFilter)}`;
-    }
-    if (binFilter) {
-        url += `&binFilter=${encodeURIComponent(binFilter)}`;
-    }
+    if (itemFilter) url += `&filter=${encodeURIComponent(itemFilter)}`;
+    if (itemSort) url += `&sort=${encodeURIComponent(itemSort)}`;
+    if (statusFilter) url += `&statusFilter=${encodeURIComponent(statusFilter)}`;
+    if (binFilter) url += `&binFilter=${encodeURIComponent(binFilter)}`;
 
     fetch(url)
         .then(response => {
@@ -694,8 +387,8 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                 html += `
                     <div class="item-level-wrapper">
                         <div class="filter-sort-controls">
-                            <input type="text" id="item-filter-${key}" placeholder="Filter items..." value="${itemFilter}" oninput="loadItems('${category}', '${subcategory || ''}', '${commonName}', '${targetId}', 1)">
-                            <select id="item-sort-${key}" onchange="loadItems('${category}', '${subcategory || ''}', '${commonName}', '${targetId}', 1)">
+                            <input type="text" id="item-filter-${key}" placeholder="Filter items..." value="${itemFilter}" oninput="loadItems('${category}', '${subcategory}', '${commonName}', '${targetId}', 1)">
+                            <select id="item-sort-${key}" onchange="loadItems('${category}', '${subcategory}', '${commonName}', '${targetId}', 1)">
                                 <option value="">Sort By...</option>
                                 <option value="tag_id_asc" ${itemSort === 'tag_id_asc' ? 'selected' : ''}>Tag ID (A-Z)</option>
                                 <option value="tag_id_desc" ${itemSort === 'tag_id_desc' ? 'selected' : ''}>Tag ID (Z-A)</option>
@@ -706,7 +399,7 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
 
                 if (window.cachedTabNum == 5) {
                     html += `
-                        <div class="bulk-update-controls" style="margin-top: 10px;">
+                        <div class="bulk-update-controls">
                             <select id="bulk-item-bin-location-${key}" onchange="updateBulkField('${key}', 'item-bin-location')">
                                 <option value="">Update Bin Location...</option>
                                 <option value="resale">resale</option>
@@ -818,10 +511,6 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
             container.style.opacity = '1';
             container.classList.remove('loading');
 
-            // Force reflow to ensure visibility
-            container.offsetHeight; // Trigger reflow
-            container.style.display = 'block';
-
             const expandBtn = document.querySelector(`button.expand-btn[data-target-id="${targetId}"]`);
             const collapseBtn = expandBtn ? expandBtn.nextElementSibling : null;
             if (expandBtn && collapseBtn) {
@@ -829,7 +518,6 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                 collapseBtn.style.display = 'inline-block';
             }
 
-            // Save expansion state
             sessionStorage.setItem(`expanded_items_${targetId}`, JSON.stringify({ category, subcategory, commonName, page }));
         })
         .catch(error => {
@@ -963,13 +651,11 @@ function saveChanges(tagId) {
 document.addEventListener('DOMContentLoaded', function() {
     console.log('tab1_5.js: DOMContentLoaded event fired');
 
-    // Only proceed if we're on Tab 1 or Tab 5
     if (window.cachedTabNum !== 1 && window.cachedTabNum !== 5) {
         console.log('Not Tab 1 or Tab 5, skipping event listeners');
         return;
     }
 
-    // Remove any existing click event listeners to prevent duplicates
     document.removeEventListener('click', handleClick);
     document.addEventListener('click', handleClick);
 
@@ -977,21 +663,13 @@ document.addEventListener('DOMContentLoaded', function() {
         const expandBtn = event.target.closest('.expand-btn');
         if (expandBtn) {
             event.stopPropagation();
-            const category = expandBtn.getAttribute('data-category') || window.cachedTabNum;
+            const category = expandBtn.getAttribute('data-category');
             const subcategory = expandBtn.getAttribute('data-subcategory');
-            const targetId = expandBtn.getAttribute('data-target-id');
-            const subcatTargetId = expandBtn.getAttribute('data-subcat-target-id');
             const commonName = expandBtn.getAttribute('data-common-name');
+            const targetId = expandBtn.getAttribute('data-target-id');
 
             if (commonName && targetId) {
                 loadItems(category, subcategory, commonName, targetId);
-            } else if (subcategory && subcatTargetId) {
-                loadCommonNames(category, subcategory, subcatTargetId);
-            } else if (targetId) {
-                const normalizedCategory = targetId.replace('subcat-', '');
-                loadSubcatData(category, normalizedCategory, targetId);
-            } else {
-                console.error('Invalid parameters for handleClick: missing targetId or subcatTargetId', { category, targetId, subcatTargetId });
             }
             return;
         }
@@ -1005,7 +683,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Hide dropdowns when clicking outside (used only in Tab 1)
     if (window.cachedTabNum === 1) {
         document.removeEventListener('click', handleDropdownClick);
         document.addEventListener('click', handleDropdownClick);
@@ -1019,19 +696,4 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
     }
-
-    // Define expandCategory for Tabs 1 and 5
-    window.expandCategory = function(category, targetId, contractNumber = null, page = 1) {
-        console.log('expandCategory called with', { category, targetId, contractNumber, page });
-        if (!category || !targetId) {
-            console.error('Invalid parameters for expandCategory:', { category, targetId });
-            return;
-        }
-        const normalizedCategory = targetId.replace('subcat-', '');
-        if (window.cachedTabNum == 2 || window.cachedTabNum == 4) {
-            loadCommonNames(category, null, targetId, page, contractNumber);
-        } else {
-            loadSubcatData(category, normalizedCategory, targetId, page);
-        }
-    };
 });

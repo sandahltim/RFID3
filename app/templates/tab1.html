@@ -1,3 +1,4 @@
+<!DOCTYPE html>
 {% extends "base.html" %}
 
 {% block content %}
@@ -34,6 +35,7 @@
         <thead>
             <tr>
                 <th>Category</th>
+                <th>Subcategory</th>
                 <th>Total Items</th>
                 <th>Items on Contracts</th>
                 <th>Items in Service</th>
@@ -45,20 +47,23 @@
             {% for category in categories %}
             <tr>
                 <td>{{ category.category }}</td>
+                <td>
+                    <select class="subcategory-select" data-category="{{ category.category | urlencode | replace('\'', '\\\'') | replace('\"', '\\\"') }}" onchange="loadCommonNames(this)">
+                        <option value="">Select Subcategory...</option>
+                        <!-- Subcategories will be populated dynamically via JavaScript -->
+                    </select>
+                </td>
                 <td>{{ category.total_items }}</td>
                 <td>{{ category.items_on_contracts }}</td>
                 <td>{{ category.items_in_service }}</td>
                 <td>{{ category.items_available }}</td>
                 <td>
-                    <button class="btn btn-sm btn-secondary expand-btn" data-target-id="subcat-{{ category.cat_id }}" data-category="{{ category.category | urlencode | replace('\'', '\\\'') | replace('\"', '\\\"') }}" onclick="window.expandCategory('{{ category.category | urlencode | replace('\'', '\\\'') | replace('\"', '\\\"') }}', 'subcat-{{ category.cat_id }}')">Expand</button>
-                    <button class="btn btn-sm btn-secondary collapse-btn" style="display:none;" data-collapse-target="subcat-{{ category.cat_id }}" onclick="collapseSection('subcat-{{ category.cat_id }}')">Collapse</button>
-                    <button class="btn btn-sm btn-info print-btn" data-print-level="Category" data-print-id="category-table">Print</button>
-                    <div id="loading-{{ category.cat_id }}" style="display:none;" class="loading">Loading...</div>
+                    <button class="btn btn-sm btn-info print-btn" data-print-level="Category" data-print-id="category-table">Print Category</button>
                 </td>
             </tr>
             <tr>
-                <td colspan="6">
-                    <div id="subcat-{{ category.cat_id }}" class="expandable collapsed"></div>
+                <td colspan="7">
+                    <div id="common-{{ category.cat_id }}" class="common-level expandable collapsed"></div>
                 </td>
             </tr>
             {% endfor %}
@@ -71,5 +76,24 @@
 function refreshTab() {
     window.location.reload();
 }
+
+// Populate subcategory dropdowns on page load
+document.addEventListener('DOMContentLoaded', function() {
+    const selects = document.querySelectorAll('.subcategory-select');
+    selects.forEach(select => {
+        const category = select.getAttribute('data-category');
+        fetch(`/tab/1/subcat_data?category=${category}`)
+            .then(response => response.json())
+            .then(data => {
+                data.subcategories.forEach(subcat => {
+                    const option = document.createElement('option');
+                    option.value = subcat.subcategory;
+                    option.textContent = subcat.subcategory;
+                    select.appendChild(option);
+                });
+            })
+            .catch(error => console.error('Error fetching subcategories:', error));
+    });
+});
 </script>
 {% endblock %}
