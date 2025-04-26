@@ -46,7 +46,7 @@ if not any(isinstance(h, logging.StreamHandler) for h in root_logger.handlers):
 tab5_bp = Blueprint('tab5', __name__)
 
 # Version marker
-logger.info("Deployed tab5.py version: 2025-04-26-v16")
+logger.info("Deployed tab5.py version: 2025-04-26-v17")
 
 def get_category_data(session, filter_query='', sort='', status_filter='', bin_filter=''):
     # Check if data is in cache
@@ -89,6 +89,7 @@ def get_category_data(session, filter_query='', sort='', status_filter='', bin_f
             continue
         rental_class_ids = [str(m['rental_class_id']).strip() for m in mappings]
 
+        # Always filter by bin_location for Tab 5
         total_items_query = session.query(func.count(ItemMaster.tag_id)).filter(
             func.trim(func.cast(func.replace(ItemMaster.rental_class_num, '\x00', ''), db.String)).in_(rental_class_ids),
             func.lower(func.trim(func.replace(func.coalesce(ItemMaster.bin_location, ''), '\x00', ''))).in_(['resale', 'sold', 'pack', 'burst'])
@@ -158,6 +159,10 @@ def get_category_data(session, filter_query='', sort='', status_filter='', bin_f
             )
         items_available = items_available_query.scalar() or 0
 
+        # Only include categories with items matching the bin_location filter
+        if total_items == 0:
+            continue
+
         category_data.append({
             'category': cat,
             'cat_id': cat.lower().replace(' ', '_').replace('/', '_'),
@@ -219,6 +224,8 @@ def tab5_filter():
     except Exception as e:
         logger.error(f"Error filtering Tab 5: {str(e)}", exc_info=True)
         return jsonify({'error': 'Failed to filter categories'}), 500
+
+# Rest of the file remains unchanged...
 
 @tab5_bp.route('/tab/5/subcat_data')
 def tab5_subcat_data():
