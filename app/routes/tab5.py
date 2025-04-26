@@ -24,22 +24,34 @@ formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(messag
 file_handler.setFormatter(formatter)
 logger.addHandler(file_handler)
 
+# Secondary file handler for debug.log
+debug_handler = logging.FileHandler('/home/tim/test_rfidpi/logs/debug.log')
+debug_handler.setLevel(logging.DEBUG)
+debug_handler.setFormatter(formatter)
+logger.addHandler(debug_handler)
+
 # Console handler
 console_handler = logging.StreamHandler(sys.stdout)
 console_handler.setLevel(logging.DEBUG)
 console_handler.setFormatter(formatter)
 logger.addHandler(console_handler)
 
+# Also add logs to the root logger (which Gunicorn might capture)
+root_logger = logging.getLogger()
+root_logger.setLevel(logging.DEBUG)
+if not any(isinstance(h, logging.StreamHandler) for h in root_logger.handlers):
+    root_logger.addHandler(console_handler)
+
 tab5_bp = Blueprint('tab5', __name__)
 
 # Version marker
-logger.info("Deployed tab5.py version: 2025-04-25-v7")
+logger.info("Deployed tab5.py version: 2025-04-25-v8")
 
 @tab5_bp.route('/tab/5')
 def tab5_view():
-    # Log using both logger and current_app.logger (inside route where context exists)
-    logger.info("Tab 5 route accessed")
-    current_app.logger.info("Tab 5 route accessed")
+    # Log using both logger and current_app.logger to ensure visibility
+    logger.info("Tab 5 route accessed - Starting execution")
+    current_app.logger.info("Tab 5 route accessed - Starting execution")
     
     try:
         # Check if data is in cache
@@ -109,8 +121,8 @@ def tab5_view():
             )
             if filter_query:
                 total_items_query = total_items_query.filter(
-                    func.lower(ItemMaster.common_name).like(f'%{filter_query}%')
-                )
+バック
+                func.lower(ItemMaster.common_name).like(f'%{filter_query}%')
             total_items = total_items_query.scalar()
             logger.debug(f"Total items for category {cat}: {total_items}")
             current_app.logger.debug(f"Total items for category {cat}: {total_items}")
