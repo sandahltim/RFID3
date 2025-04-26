@@ -1,4 +1,4 @@
-console.log('tab1_5.js version: 2025-04-26-v5 loaded');
+console.log('tab1_5.js version: 2025-04-26-v6 loaded');
 
 // Note: Common function for Tabs 1 and 5
 function hideOtherSubcats(currentCategory, parentCategory) {
@@ -367,7 +367,7 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
                             <td>${subcat.items_in_service}</td>
                             <td>${subcat.items_available}</td>
                             <td>
-                                <button class="btn btn-sm btn-secondary expand-btn" data-target-id="subcat-${normalizedCategory}" data-subcategory="${subcat.subcategory}" data-subcat-target-id="${subcatKey}">Expand</button>
+                                <button class="btn btn-sm btn-secondary expand-btn" data-category="${originalCategory}" data-subcategory="${subcat.subcategory}" data-subcat-target-id="${subcatKey}">Expand</button>
                                 <button class="btn btn-sm btn-secondary collapse-btn" style="display:none;" data-collapse-target="common-${subcatKey}">Collapse</button>
                                 <button class="btn btn-sm btn-info print-btn" data-print-level="Subcategory" data-print-id="subcat-table-${subcatKey}">Print</button>
                                 <div id="loading-${subcatKey}" style="display:none;" class="loading">Loading...</div>
@@ -431,8 +431,16 @@ function loadSubcatData(originalCategory, normalizedCategory, targetId, page = 1
                 console.warn('Table body not found in container:', container);
             }
 
+            // Debug: Log the parent row to inspect the expand/collapse buttons
+            const parentRow = container.closest('tr');
+            if (parentRow) {
+                console.log('Parent row HTML:', parentRow.outerHTML);
+            } else {
+                console.warn('Parent row not found for container:', container);
+            }
+
             // Fix selector to handle expand/collapse buttons
-            const expandBtn = container.parentElement.parentElement.querySelector(`button.expand-btn[data-target-id="subcat-${normalizedCategory}"]`);
+            const expandBtn = parentRow ? parentRow.querySelector(`button.expand-btn[data-target-id="subcat-${normalizedCategory}"]`) : null;
             const collapseBtn = expandBtn ? expandBtn.nextElementSibling : null;
             if (expandBtn && collapseBtn) {
                 expandBtn.style.display = 'none';
@@ -962,8 +970,12 @@ document.addEventListener('DOMContentLoaded', function() {
             } else if (subcategory) {
                 loadCommonNames(category, subcategory, subcatTargetId);
             } else {
-                const normalizedCategory = targetId.replace('subcat-', '');
-                loadSubcatData(category, normalizedCategory, targetId);
+                const normalizedCategory = targetId ? targetId.replace('subcat-', '') : '';
+                if (category && normalizedCategory && targetId) {
+                    loadSubcatData(category, normalizedCategory, targetId);
+                } else {
+                    console.error('Invalid parameters for loadSubcatData in handleClick:', { category, normalizedCategory, targetId });
+                }
             }
             return;
         }
