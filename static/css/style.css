@@ -64,186 +64,6 @@ body {
     background-color: #e9ecef;
 }
 
-/* Subcategory, common, and item tables */
-.subcat-table, .common-level table, .item-level {
-    width: 100%;
-    overflow-x: auto;
-    display: table;
-    visibility: visible;
-    table-layout: fixed; /* Ensure consistent column widths */
-}
-
-.subcat-table thead th,
-.common-level table thead th,
-.item-level thead th {
-    position: sticky;
-    top: 56px;
-    z-index: 10;
-    background-color: #e9ecef;
-    border-bottom: 2px solid #dee2e6;
-}
-
-.subcat-table td,
-.common-level table td,
-.item-level td {
-    padding: 12px;
-    border: 1px solid #dee2e6;
-    min-width: 150px;
-    white-space: nowrap;
-}
-
-/* Fix item-level table column alignment */
-.item-level th:nth-child(1),
-.item-level td:nth-child(1) {
-    width: 60px; /* Select column */
-}
-
-.item-level th:nth-child(2),
-.item-level td:nth-child(2) {
-    width: 100px; /* Tag ID */
-}
-
-.item-level th:nth-child(3),
-.item-level td:nth-child(3) {
-    width: 200px; /* Common Name */
-}
-
-.item-level th:nth-child(4),
-.item-level td:nth-child(4) {
-    width: 180px; /* Bin Location */
-}
-
-.item-level th:nth-child(5),
-.item-level td:nth-child(5) {
-    width: 180px; /* Status */
-}
-
-.item-level th:nth-child(6),
-.item-level td:nth-child(6) {
-    width: 150px; /* Last Contract */
-}
-
-.item-level th:nth-child(7),
-.item-level td:nth-child(7) {
-    width: 200px; /* Last Scanned Date */
-}
-
-.item-level th:nth-child(8),
-.item-level td:nth-child(8) {
-    width: 100px; /* Quality */
-}
-
-.item-level th:nth-child(9),
-.item-level td:nth-child(9) {
-    width: 200px; /* Notes */
-}
-
-.item-level th:nth-child(10),
-.item-level td:nth-child(10) {
-    width: 100px; /* Actions */
-}
-
-/* Ensure dropdowns don't overflow columns */
-.item-level select {
-    width: 100%;
-    box-sizing: border-box;
-}
-
-/* Hierarchy level styling */
-.subcat-level {
-    margin-left: 2rem;
-    background-color: #f8f9fa;
-    padding: 1rem;
-    border-left: 3px solid #007bff;
-    max-height: 1200px;
-    overflow-y: auto;
-    display: block;
-    visibility: visible;
-    z-index: 1; /* Ensure subcategories are not hidden by headers */
-}
-
-.common-level {
-    margin-left: 2rem;
-    background-color: #e9ecef;
-    padding: 1rem;
-    border-left: 3px solid #28a745;
-    max-height: 1200px;
-    overflow-y: auto;
-    display: block;
-    visibility: visible;
-    z-index: 1;
-}
-
-.item-level-wrapper {
-    margin-left: 2rem;
-    background-color: #dee2e6;
-    padding: 1rem;
-    border-left: 3px solid #dc3545;
-    overflow-x: auto;
-    overflow-y: auto;
-    max-height: 1200px;
-    min-width: 100%;
-    box-sizing: border-box;
-    display: block;
-    visibility: visible;
-    z-index: 1;
-}
-
-.item-level {
-    width: 100%;
-    min-width: 1200px;
-    display: table;
-    visibility: visible;
-}
-
-.common-level th:nth-child(1),
-.common-level td:nth-child(1) {
-    white-space: normal;
-    word-wrap: break-word;
-    max-width: 250px;
-}
-
-/* Style for editable cells */
-.editable {
-    cursor: pointer;
-    position: relative;
-}
-
-.editable:hover {
-    background-color: #e9ecef;
-}
-
-/* Style for dropdown menus */
-.dropdown-menu {
-    display: none;
-    position: absolute;
-    z-index: 1000;
-    min-width: 150px;
-    background-color: #fff;
-    border: 1px solid #dee2e6;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-.dropdown-menu.show {
-    display: block;
-}
-
-.dropdown-item {
-    padding: 0.25rem 1rem;
-    cursor: pointer;
-    display: block;
-    color: #333;
-}
-
-.dropdown-item:hover {
-    background-color: #f8f9fa;
-}
-
-.dropdown-item[disabled], .dropdown-item[style*="pointer-events: none"] {
-    color: #ccc;
-    cursor: not-allowed;
-}
-
 /* Filter and sort controls */
 .filter-sort-controls {
     display: flex;
@@ -351,33 +171,6 @@ body {
     font-size: 0.9rem;
 }
 
-/* Smooth transition for expanding/collapsing */
-.expandable {
-    transition: max-height 0.3s ease, opacity 0.3s ease;
-    overflow: hidden;
-}
-
-.expandable.collapsed {
-    max-height: 0;
-    opacity: 0;
-    display: none;
-}
-
-.expandable.expanded {
-    display: block;
-    visibility: visible;
-    opacity: 1;
-    max-height: none;
-}
-
-/* Ensure subcategory rows and tables are visible */
-.subcat-row, .subcat-table, .subcat-table tbody, .subcat-table tbody tr {
-    display: table-row;
-    visibility: visible;
-    opacity: 1;
-    min-height: 50px;
-}
-
 /* Responsive adjustments */
 @media (max-width: 768px) {
     .container {
@@ -403,18 +196,9 @@ body {
         width: 100%;
     }
 
-    .subcat-level, .common-level, .item-level-wrapper {
-        margin-left: 0.75rem;
-    }
-
     .pagination-controls .btn {
         padding: 0.3rem 0.6rem;
         font-size: 0.8rem;
-    }
-
-    .common-level th:nth-child(1),
-    .common-level td:nth-child(1) {
-        max-width: 180px;
     }
 
     .filter-sort-controls {
@@ -424,20 +208,5 @@ body {
     .filter-sort-controls input,
     .filter-sort-controls select {
         width: 100%;
-    }
-
-    .item-level-wrapper {
-        min-width: 100%;
-    }
-
-    .item-level {
-        min-width: 900px;
-    }
-
-    .item-level th,
-    .item-level td {
-        padding: 0.5rem;
-        font-size: 0.9rem;
-        min-width: 120px;
     }
 }
