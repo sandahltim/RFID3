@@ -69,6 +69,9 @@ body {
 .subcat-table, .common-level table, .item-level {
     width: 100%;
     overflow-x: auto;
+    display: table !important;
+    visibility: visible !important;
+    opacity: 1 !important;
 }
 
 .subcat-table thead th,
@@ -99,6 +102,10 @@ body {
     max-height: 1200px;
     overflow-y: auto;
     padding-bottom: 20px;
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    height: auto !important;
 }
 
 .common-level {
@@ -128,7 +135,7 @@ body {
 .item-level {
     width: 100%;
     table-layout: auto;
-    min-width: 1000px; /* Ensure consistent scrollbar */
+    min-width: 1000px;
 }
 
 .common-level th:nth-child(1),
@@ -188,6 +195,9 @@ body {
     background-color: #f1f3f5;
     padding: 10px;
     border-radius: 5px;
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
 }
 
 .filter-sort-controls input,
