@@ -609,8 +609,10 @@ function updateStatus(tagId, currentStatus) {
 }
 
 // Note: Common function - will be moved to tab1_5.js during split
+// Note: Common function - will be moved to tab1_5.js during split
 function loadItems(category, subcategory, commonName, targetId, page = 1) {
     console.log('loadItems called with', { category, subcategory, commonName, targetId, page });
+    console.log('Current cachedTabNum in loadItems:', window.cachedTabNum); // Debug log
 
     const container = document.getElementById(targetId);
     if (!container) {
@@ -657,10 +659,11 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                 if (window.cachedTabNum == 1 || window.cachedTabNum == 5) {
                     headers.push('Quality', 'Notes');
                     if (window.cachedTabNum == 5) {
-                        headers.push('Update Bin Location'); // Tab 5 specific
-                        headers.push('Update Status'); // Tab 5 specific
+                        headers.push('Update Bin Location');
+                        headers.push('Update Status');
                     }
                 }
+                console.log('Generated headers:', headers); // Debug log
 
                 html += `
                     <div class="item-level-wrapper">
@@ -687,7 +690,7 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                     const lastScanned = item.last_scanned_date ? new Date(item.last_scanned_date).toLocaleString() : 'N/A';
                     if (window.cachedTabNum == 1 || window.cachedTabNum == 5) {
                         html += `
-                            <tr data-item-id="${item.tag_id}"> <!-- Added for future mass update -->
+                            <tr data-item-id="${item.tag_id}">
                                 <td>${item.tag_id}</td>
                                 <td>${item.common_name}</td>
                                 <td>${item.bin_location || 'N/A'}</td>
@@ -698,6 +701,7 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                                 <td>${item.notes || 'N/A'}</td>
                         `;
                         if (window.cachedTabNum == 5) {
+                            console.log('Generating edit selectors for item:', item.tag_id); // Debug log
                             html += `
                                 <td>
                                     <select id="bin-location-select-${item.tag_id}">
