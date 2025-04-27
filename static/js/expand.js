@@ -1,4 +1,4 @@
-console.log('expand.js version: 2025-04-27-v66 loaded');
+console.log('expand.js version: 2025-04-27-v69 loaded');
 
 // Note: Common function - will be moved to common.js during split
 function showLoading(key) {
@@ -29,8 +29,14 @@ function toggleCollapseButton(targetId) {
     if (expandBtn && collapseBtn) {
         expandBtn.style.display = expandBtn.style.display === 'none' ? 'inline-block' : 'none';
         collapseBtn.style.display = collapseBtn.style.display === 'none' ? 'inline-block' : 'none';
+    } else {
+        console.warn(`Expand or collapse button not found for targetId ${targetId}`);
     }
 }
+
+// Sorting state for common names and items tables
+let commonSortState = {};
+let itemSortState = {};
 
 // Note: Event listener for Tabs 2, 3, 4, Categories, and Home
 document.addEventListener('DOMContentLoaded', function() {
@@ -39,8 +45,10 @@ document.addEventListener('DOMContentLoaded', function() {
     // Ensure window.cachedTabNum is set
     if (!window.cachedTabNum) {
         const pathMatch = window.location.pathname.match(/\/tab\/(\d+)/);
-        window.cachedTabNum = pathMatch ? parseInt(pathMatch[1], 10) : 1;
-        console.log('Set window.cachedTabNum:', window.cachedTabNum);
+        window.cachedTabNum = pathMatch ? parseInt(pathMatch[1], 10) : (window.location.pathname === '/' ? 1 : null);
+        console.log('expand.js: Set window.cachedTabNum:', window.cachedTabNum);
+    } else {
+        console.log('expand.js: window.cachedTabNum already set:', window.cachedTabNum);
     }
 
     // Skip if we're on Tab 1 or Tab 5, as they use tab1_5.js
@@ -71,12 +79,24 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Remove any existing click event listeners to prevent duplicates
     document.removeEventListener('click', handleClick);
+    console.log('Attaching click event listener for expand.js');
     document.addEventListener('click', handleClick);
 
+    // Delegate input events for filtering
+    document.addEventListener('input', function(event) {
+        const input = event.target.closest('.filter-row input');
+        if (input) {
+            const table = input.closest('table');
+            applyFilters(table);
+        }
+    });
+
     function handleClick(event) {
+        console.log('handleClick triggered', event.target);
         const expandBtn = event.target.closest('.expand-btn');
         if (expandBtn) {
             event.stopPropagation();
+            console.log('Expand button clicked:', expandBtn);
             const category = expandBtn.getAttribute('data-category');
             const commonName = expandBtn.getAttribute('data-common-name');
             const targetId = expandBtn.getAttribute('data-target-id');
@@ -84,9 +104,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
             if (commonName) {
                 // Expand to items level
+                console.log('Expanding items for:', { contractNumber, commonName, targetId });
                 expandItems(contractNumber, commonName, targetId);
             } else {
                 // Expand to common names level (Tabs 2 and 4)
+                console.log('Expanding common names for:', { contractNumber, targetId });
                 expandCategory(contractNumber, targetId, contractNumber);
             }
             return;
@@ -95,9 +117,41 @@ document.addEventListener('DOMContentLoaded', function() {
         const collapseBtn = event.target.closest('.collapse-btn');
         if (collapseBtn) {
             event.stopPropagation();
+            console.log('Collapse button clicked:', collapseBtn);
             const targetId = collapseBtn.getAttribute('data-collapse-target');
             collapseSection(targetId);
             return;
+        }
+
+        const header = event.target.closest('.common-table th');
+        if (header) {
+            console.log('Common table header clicked:', header);
+            const table = header.closest('table');
+            const contractNumber = table.closest('.expandable').id.replace('common-', '');
+            const column = header.textContent.trim().toLowerCase().replace(/\s+/g, '_');
+            sortCommonNames(contractNumber, column);
+            return;
+        }
+
+        const itemHeader = event.target.closest('.item-table th');
+        if (itemHeader) {
+            console.log('Item table header clicked:', itemHeader);
+            const table = itemHeader.closest('table');
+            const itemId = table.closest('.expandable').id;
+            const contractNumber = itemId.split('-')[0];
+            const commonName = itemId.split('-').slice(1).join('-').replace(/_/g, ' ');
+            const column = itemHeader.textContent.trim().toLowerCase().replace(/\s+/g, '_');
+            sortItems(contractNumber, commonName, column);
+            return;
+        }
+
+        const clearFiltersBtn = event.target.closest('.clear-filters');
+        if (clearFiltersBtn) {
+            console.log('Clear filters button clicked:', clearFiltersBtn);
+            const table = clearFiltersBtn.closest('table');
+            const row = table.querySelector('.filter-row');
+            row.querySelectorAll('input').forEach(input => input.value = '');
+            applyFilters(table);
         }
     }
 
@@ -115,7 +169,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (targetElement.classList.contains('expanded')) {
             console.log(`Section ${targetId} is already expanded, collapsing instead`);
             collapseSection(targetId);
-            return;
+            returnJOHN;
         }
 
         // Show loading indicator
@@ -141,10 +195,16 @@ document.addEventListener('DOMContentLoaded', function() {
                     <table class="common-table">
                         <thead>
                             <tr>
-                                <th>Common Name</th>
-                                <th>Items on Contract</th>
-                                <th>Total Items in Inventory</th>
+                                <th>Common Name <span class="sort-arrow"></span></th>
+                                <th>Items on Contract <span class="sort-arrow"></span></th>
+                                <th>Total Items in Inventory <span class="sort-arrow"></span></th>
                                 <th>Actions</th>
+                            </tr>
+                            <tr class="filter-row">
+                                <th><input type="text" placeholder="Filter..." data-column="name"></th>
+                                <th><input type="text" placeholder="Filter..." data-column="on_contracts"></th>
+                                <th><input type="text" placeholder="Filter..." data-column="total_items_inventory"></th>
+                                <th><button class="btn btn-sm btn-secondary clear-filters">Clear Filters</button></th>
                             </tr>
                         </thead>
                         <tbody>
@@ -194,6 +254,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 targetElement.classList.remove('collapsed');
                 targetElement.classList.add('expanded');
                 toggleCollapseButton(targetId);
+
+                // Apply filters to the newly loaded table
+                const table = targetElement.querySelector('.common-table');
+                if (table) applyFilters(table);
 
                 // Save expanded state
                 sessionStorage.setItem(`expanded_${targetId}`, JSON.stringify({ expanded: true }));
@@ -249,12 +313,20 @@ document.addEventListener('DOMContentLoaded', function() {
                         <table class="item-table">
                             <thead>
                                 <tr>
-                                    <th>Tag ID</th>
-                                    <th>Common Name</th>
-                                    <th>Bin Location</th>
-                                    <th>Status</th>
-                                    <th>Last Contract</th>
-                                    <th>Last Scanned Date</th>
+                                    <th>Tag ID <span class="sort-arrow"></span></th>
+                                    <th>Common Name <span class="sort-arrow"></span></th>
+                                    <th>Bin Location <span class="sort-arrow"></span></th>
+                                    <th>Status <span class="sort-arrow"></span></th>
+                                    <th>Last Contract <span class="sort-arrow"></span></th>
+                                    <th>Last Scanned Date <span class="sort-arrow"></span></th>
+                                </tr>
+                                <tr class="filter-row">
+                                    <th><input type="text" placeholder="Filter..." data-column="tag_id"></th>
+                                    <th><input type="text" placeholder="Filter..." data-column="common_name"></th>
+                                    <th><input type="text" placeholder="Filter..." data-column="bin_location"></th>
+                                    <th><input type="text" placeholder="Filter..." data-column="status"></th>
+                                    <th><input type="text" placeholder="Filter..." data-column="last_contract_num"></th>
+                                    <th><input type="text" placeholder="Filter..." data-column="last_scanned_date"></th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -296,6 +368,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 targetElement.classList.add('expanded');
                 toggleCollapseButton(targetId);
 
+                // Apply filters to the newly loaded table
+                const table = targetElement.querySelector('.item-table');
+                if (table) applyFilters(table);
+
                 // Save expanded state
                 sessionStorage.setItem(`expanded_items_${targetId}`, JSON.stringify({ expanded: true }));
             })
@@ -308,8 +384,217 @@ document.addEventListener('DOMContentLoaded', function() {
             });
     }
 
+    // Function to sort common names table
+    function sortCommonNames(contractNumber, column) {
+        const targetId = `common-${contractNumber}`;
+        if (!commonSortState[contractNumber]) {
+            commonSortState[contractNumber] = { column: '', direction: '' };
+        }
+
+        let direction = 'asc';
+        if (commonSortState[contractNumber].column === column) {
+            direction = commonSortState[contractNumber].direction === 'asc' ? 'desc' : 'asc';
+        }
+        commonSortState[contractNumber] = { column, direction };
+
+        // Update sort arrows
+        const headers = document.querySelectorAll(`#${targetId} .common-table thead tr:first-child th`);
+        headers.forEach(header => {
+            const sortArrow = header.querySelector('.sort-arrow') || document.createElement('span');
+            sortArrow.className = 'sort-arrow';
+            if (!header.querySelector('.sort-arrow')) header.appendChild(sortArrow);
+            if (header.textContent.trim().toLowerCase().replace(/\s+/g, '_') === column) {
+                sortArrow.textContent = direction === 'asc' ? '↑' : '↓';
+            } else {
+                sortArrow.textContent = '';
+            }
+        });
+
+        // Fetch sorted data
+        fetch(`/tab/${window.cachedTabNum}/common_names?contract_number=${encodeURIComponent(contractNumber)}&sort=${column}_${direction}`)
+            .then(response => response.json())
+            .then(data => {
+                const targetElement = document.getElementById(targetId);
+                if (!targetElement) return;
+
+                const commonNames = data.common_names || [];
+                const totalCommonNames = data.total_common_names || 0;
+                const perPage = data.per_page || 10;
+                const currentPage = data.page || 1;
+
+                let html = `
+                    <table class="common-table">
+                        <thead>
+                            <tr>
+                                <th>Common Name <span class="sort-arrow"></span></th>
+                                <th>Items on Contract <span class="sort-arrow"></span></th>
+                                <th>Total Items in Inventory <span class="sort-arrow"></span></th>
+                                <th>Actions</th>
+                            </tr>
+                            <tr class="filter-row">
+                                <th><input type="text" placeholder="Filter..." data-column="name"></th>
+                                <th><input type="text" placeholder="Filter..." data-column="on_contracts"></th>
+                                <th><input type="text" placeholder="Filter..." data-column="total_items_inventory"></th>
+                                <th><button class="btn btn-sm btn-secondary clear-filters">Clear Filters</button></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                `;
+
+                commonNames.forEach(common => {
+                    const commonId = `${contractNumber}-${common.name.replace(/[^a-zA-Z0-9]/g, '_')}`;
+                    html += `
+                        <tr>
+                            <td>${common.name}</td>
+                            <td>${common.on_contracts}</td>
+                            <td>${common.total_items_inventory}</td>
+                            <td>
+                                <button class="btn btn-sm btn-secondary expand-btn" data-common-name="${common.name}" data-target-id="items-${commonId}" data-contract-number="${contractNumber}">Expand</button>
+                                <button class="btn btn-sm btn-secondary collapse-btn" data-collapse-target="items-${commonId}" style="display:none;">Collapse</button>
+                                <button class="btn btn-sm btn-info print-btn" data-print-level="Common Name" data-print-id="items-${commonId}" data-common-name="${common.name}" data-category="${contractNumber}">Print</button>
+                                <button class="btn btn-sm btn-info print-full-btn" data-common-name="${common.name}" data-category="${contractNumber}">Print Full List</button>
+                                <div id="loading-${commonId}" style="display:none;" class="loading">Loading...</div>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td colspan="4">
+                                <div id="items-${commonId}" class="expandable collapsed item-level"></div>
+                            </td>
+                        </tr>
+                    `;
+                });
+
+                html += `
+                        </tbody>
+                    </table>
+                `;
+
+                // Add pagination controls
+                if (totalCommonNames > perPage) {
+                    const totalPages = Math.ceil(totalCommonNames / perPage);
+                    html += `
+                        <div class="pagination-controls">
+                            <button class="btn btn-sm btn-secondary" onclick="window.expandCategory('${contractNumber}', '${targetId}', '${contractNumber}', ${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''}>Previous</button>
+                            <span>Page ${currentPage} of ${totalPages}</span>
+                            <button class="btn btn-sm btn-secondary" onclick="window.expandCategory('${contractNumber}', '${targetId}', '${contractNumber}', ${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''}>Next</button>
+                        </div>
+                    `;
+                }
+
+                targetElement.innerHTML = html;
+                const table = targetElement.querySelector('.common-table');
+                if (table) applyFilters(table);
+            })
+            .catch(error => {
+                console.error('Error sorting common names:', error);
+            });
+    }
+
+    // Function to sort items table
+    function sortItems(contractNumber, commonName, column) {
+        const targetId = `items-${contractNumber}-${commonName.replace(/[^a-zA-Z0-9]/g, '_')}`;
+        if (!itemSortState[targetId]) {
+            itemSortState[targetId] = { column: '', direction: '' };
+        }
+
+        let direction = 'asc';
+        if (itemSortState[targetId].column === column) {
+            direction = itemSortState[targetId].direction === 'asc' ? 'desc' : 'asc';
+        }
+        itemSortState[targetId] = { column, direction };
+
+        // Update sort arrows
+        const headers = document.querySelectorAll(`#${targetId} .item-table thead tr:first-child th`);
+        headers.forEach(header => {
+            const sortArrow = header.querySelector('.sort-arrow') || document.createElement('span');
+            sortArrow.className = 'sort-arrow';
+            if (!header.querySelector('.sort-arrow')) header.appendChild(sortArrow);
+            if (header.textContent.trim().toLowerCase().replace(/\s+/g, '_') === column) {
+                sortArrow.textContent = direction === 'asc' ? '↑' : '↓';
+            } else {
+                sortArrow.textContent = '';
+            }
+        });
+
+        // Fetch sorted data
+        fetch(`/tab/${window.cachedTabNum}/data?contract_number=${encodeURIComponent(contractNumber)}&common_name=${encodeURIComponent(commonName)}&sort=${column}_${direction}`)
+            .then(response => response.json())
+            .then(data => {
+                const targetElement = document.getElementById(targetId);
+                if (!targetElement) return;
+
+                const items = data.items || [];
+                const totalItems = data.total_items || 0;
+                const perPage = data.per_page || 10;
+                const currentPage = data.page || 1;
+
+                let html = `
+                    <div class="item-level-wrapper">
+                        <table class="item-table">
+                            <thead>
+                                <tr>
+                                    <th>Tag ID <span class="sort-arrow"></span></th>
+                                    <th>Common Name <span class="sort-arrow"></span></th>
+                                    <th>Bin Location <span class="sort-arrow"></span></th>
+                                    <th>Status <span class="sort-arrow"></span></th>
+                                    <th>Last Contract <span class="sort-arrow"></span></th>
+                                    <th>Last Scanned Date <span class="sort-arrow"></span></th>
+                                </tr>
+                                <tr class="filter-row">
+                                    <th><input type="text" placeholder="Filter..." data-column="tag_id"></th>
+                                    <th><input type="text" placeholder="Filter..." data-column="common_name"></th>
+                                    <th><input type="text" placeholder="Filter..." data-column="bin_location"></th>
+                                    <th><input type="text" placeholder="Filter..." data-column="status"></th>
+                                    <th><input type="text" placeholder="Filter..." data-column="last_contract_num"></th>
+                                    <th><input type="text" placeholder="Filter..." data-column="last_scanned_date"></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                `;
+
+                items.forEach(item => {
+                    html += `
+                        <tr>
+                            <td>${item.tag_id}</td>
+                            <td>${item.common_name}</td>
+                            <td>${item.bin_location || 'N/A'}</td>
+                            <td>${item.status}</td>
+                            <td>${item.last_contract_num || 'N/A'}</td>
+                            <td>${item.last_scanned_date || 'N/A'}</td>
+                        </tr>
+                    `;
+                });
+
+                html += `
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+
+                // Add pagination controls if needed
+                if (totalItems > perPage) {
+                    const totalPages = Math.ceil(totalItems / perPage);
+                    html += `
+                        <div class="pagination-controls">
+                            <button class="btn btn-sm btn-secondary" onclick="expandItems('${contractNumber}', '${commonName}', '${targetId}', ${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''}>Previous</button>
+                            <span>Page ${currentPage} of ${totalPages}</span>
+                            <button class="btn btn-sm btn-secondary" onclick="expandItems('${contractNumber}', '${commonName}', '${targetId}', ${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''}>Next</button>
+                        </div>
+                    `;
+                }
+
+                targetElement.innerHTML = html;
+                const table = targetElement.querySelector('.item-table');
+                if (table) applyFilters(table);
+            })
+            .catch(error => {
+                console.error('Error sorting items:', error);
+            });
+    }
+
     // Function to collapse a section
     function collapseSection(targetId) {
+        console.log('collapseSection called with targetId:', targetId);
         const targetElement = document.getElementById(targetId);
         if (targetElement) {
             targetElement.classList.remove('expanded');
@@ -318,6 +603,65 @@ document.addEventListener('DOMContentLoaded', function() {
             toggleCollapseButton(targetId);
             sessionStorage.removeItem(`expanded_${targetId}`);
             sessionStorage.removeItem(`expanded_items_${targetId}`);
+            console.log(`Section ${targetId} collapsed`);
+        } else {
+            console.error(`Target element with ID ${targetId} not found for collapsing`);
         }
+    }
+
+    // Function to apply client-side filtering
+    function applyFilters(table) {
+        console.log('applyFilters called for table:', table);
+        const filterInputs = table.querySelectorAll('.filter-row input');
+        const rows = table.querySelectorAll('tbody tr:not(.expandable)');
+
+        const filters = {};
+        filterInputs.forEach(input => {
+            const column = input.getAttribute('data-column');
+            filters[column] = input.value.toLowerCase();
+            console.log(`Filter applied - column: ${column}, value: ${filters[column]}`);
+        });
+
+        let visibleRows = 0;
+        rows.forEach(row => {
+            let showRow = true;
+            Object.keys(filters).forEach(column => {
+                const cell = row.querySelector(`td:nth-child(${Array.from(table.querySelector('thead tr:first-child th')).findIndex(th => th.textContent.trim().toLowerCase().replace(/\s+/g, '_') === column) + 1})`);
+                if (cell) {
+                    const value = cell.textContent.toLowerCase();
+                    if (filters[column] && !value.includes(filters[column])) {
+                        showRow = false;
+                    }
+                }
+            });
+
+            if (showRow) {
+                row.style.display = '';
+                visibleRows++;
+                const expandableRow = row.nextElementSibling;
+                if (expandableRow) {
+                    expandableRow.style.display = '';
+                }
+            } else {
+                row.style.display = 'none';
+                const expandableRow = row.nextElementSibling;
+                if (expandableRow) {
+                    expandableRow.style.display = 'none';
+                }
+            }
+        });
+
+        // Update row count
+        let rowCountDiv = table.nextElementSibling;
+        while (rowCountDiv && !rowCountDiv.classList.contains('row-count') && !rowCountDiv.classList.contains('pagination-controls')) {
+            rowCountDiv = rowCountDiv.nextElementSibling;
+        }
+        if (!rowCountDiv || !rowCountDiv.classList.contains('row-count')) {
+            rowCountDiv = document.createElement('div');
+            rowCountDiv.className = 'row-count';
+            table.insertAdjacentElement('afterend', rowCountDiv);
+        }
+        rowCountDiv.textContent = `Showing ${visibleRows} of ${rows.length} rows`;
+        console.log(`Filter applied - showing ${visibleRows} of ${rows.length} rows`);
     }
 });
