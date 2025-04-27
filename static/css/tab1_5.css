@@ -6,18 +6,10 @@
     background-color: #e9ecef;
     padding: 1rem;
     border-left: 3px solid #28a745;
-    max-height: 1200px;
-    overflow-y: auto;
     display: block !important;
     visibility: visible !important;
     z-index: 1;
     position: relative;
-}
-
-.common-table-wrapper {
-    overflow-y: auto; /* Enable vertical scrolling */
-    max-height: 600px; /* Set a max height to trigger scrolling */
-    width: 100%;
 }
 
 .item-level-wrapper {
