@@ -1,10 +1,8 @@
 import logging
 from datetime import datetime, timedelta
 from sqlalchemy.exc import SQLAlchemyError
-from apscheduler.schedulers.background import BackgroundScheduler
 from app.models.db_models import ItemMaster, Transaction, RentalClassMapping, db
 from app.services.api_client import APIClient
-from config import FULL_REFRESH_INTERVAL, INCREMENTAL_REFRESH_INTERVAL
 from flask import Blueprint, jsonify, current_app
 
 logger = logging.getLogger(__name__)
@@ -183,31 +181,16 @@ def incremental_refresh():
         session.close()
         logger.debug("Incremental refresh session closed")
 
-def init_scheduler(app):
-    scheduler = BackgroundScheduler()
-
-    def run_with_context():
-        with app.app_context():
-            incremental_refresh()
-
-    scheduler.add_job(
-        run_with_context,
-        'interval',
-        seconds=INCREMENTAL_REFRESH_INTERVAL,
-        id='incremental_refresh'
-    )
-
-    scheduler.add_job(
-        full_refresh,
-        'interval',
-        seconds=FULL_REFRESH_INTERVAL,
-        id='full_refresh'
-    )
-
-    scheduler.start()
-    logger.info("Scheduler started with incremental and full refresh jobs")
-
-    return scheduler
+@refresh_bp.route('/full_refresh', methods=['POST'])
+def full_refresh_endpoint():
+    try:
+        current_app.logger.info("Starting full refresh via endpoint")
+        full_refresh()
+        current_app.logger.info("Full refresh completed successfully")
+        return jsonify({'status': 'success', 'message': 'Full refresh completed successfully'})
+    except Exception as e:
+        current_app.logger.error(f"Full refresh failed: {str(e)}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
 
 @refresh_bp.route('/clear_api_data', methods=['POST'])
 def clear_api_data():

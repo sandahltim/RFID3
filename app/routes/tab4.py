@@ -9,28 +9,28 @@ import sys
 
 # Configure logging
 logger = logging.getLogger('tab4')
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG)  # Change to DEBUG for more detailed logging
 
 # Remove existing handlers to avoid duplicates
 logger.handlers = []
 
 # File handler for rfid_dashboard.log
 file_handler = logging.FileHandler('/home/tim/test_rfidpi/logs/rfid_dashboard.log')
-file_handler.setLevel(logging.INFO)
+file_handler.setLevel(logging.DEBUG)
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 file_handler.setFormatter(formatter)
 logger.addHandler(file_handler)
 
 # Console handler
 console_handler = logging.StreamHandler(sys.stdout)
-console_handler.setLevel(logging.INFO)
+console_handler.setLevel(logging.DEBUG)
 console_handler.setFormatter(formatter)
 logger.addHandler(console_handler)
 
 tab4_bp = Blueprint('tab4', __name__)
 
 # Version marker
-logger.info("Deployed tab4.py version: 2025-04-27-v2")
+logger.info("Deployed tab4.py version: 2025-04-27-v3")
 
 @tab4_bp.route('/tab/4')
 def tab4_view():
@@ -50,6 +50,10 @@ def tab4_view():
         logger.info("Database connection test successful")
         current_app.logger.info("Database connection test successful")
 
+        # Debug: Fetch all contract numbers to see what's in the database
+        all_contracts = session.query(ItemMaster.last_contract_num).distinct().all()
+        logger.debug(f"All distinct contract numbers in ItemMaster: {[c[0] for c in all_contracts]}")
+
         # Fetch laundry contracts from id_item_master (contract numbers starting with 'L' or 'l')
         logger.info("Executing contracts query")
         current_app.logger.info("Executing contracts query")
@@ -60,7 +64,7 @@ def tab4_view():
             ItemMaster.status.in_(['On Rent', 'Delivered']),
             ItemMaster.last_contract_num != None,
             ItemMaster.last_contract_num != '00000',
-            func.lower(ItemMaster.last_contract_num).like('[lL]%')
+            func.lower(func.trim(ItemMaster.last_contract_num)).like('[lL]%')
         ).group_by(
             ItemMaster.last_contract_num
         ).having(

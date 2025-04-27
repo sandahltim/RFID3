@@ -8,28 +8,28 @@ import sys
 
 # Configure logging
 logger = logging.getLogger('tab2')
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG)  # Change to DEBUG for more detailed logging
 
 # Remove existing handlers to avoid duplicates
 logger.handlers = []
 
 # File handler for rfid_dashboard.log
 file_handler = logging.FileHandler('/home/tim/test_rfidpi/logs/rfid_dashboard.log')
-file_handler.setLevel(logging.INFO)
+file_handler.setLevel(logging.DEBUG)
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 file_handler.setFormatter(formatter)
 logger.addHandler(file_handler)
 
 # Console handler
 console_handler = logging.StreamHandler(sys.stdout)
-console_handler.setLevel(logging.INFO)
+console_handler.setLevel(logging.DEBUG)
 console_handler.setFormatter(formatter)
 logger.addHandler(console_handler)
 
 tab2_bp = Blueprint('tab2', __name__)
 
 # Version marker
-logger.info("Deployed tab2.py version: 2025-04-27-v2")
+logger.info("Deployed tab2.py version: 2025-04-27-v3")
 
 @tab2_bp.route('/tab/2')
 def tab2_view():
@@ -38,13 +38,18 @@ def tab2_view():
         logger.info("Starting new session for tab2")
         current_app.logger.info("Starting new session for tab2")
 
+        # Debug: Fetch all contract numbers to see what's in the database
+        all_contracts = session.query(ItemMaster.last_contract_num).distinct().all()
+        logger.debug(f"All distinct contract numbers in ItemMaster: {[c[0] for c in all_contracts]}")
+
         contracts_query = session.query(
             ItemMaster.last_contract_num,
             func.count(ItemMaster.tag_id).label('total_items')
         ).filter(
             ItemMaster.status.in_(['On Rent', 'Delivered']),
             ItemMaster.last_contract_num != None,
-            ItemMaster.last_contract_num != '00000'
+            ItemMaster.last_contract_num != '00000',
+            ~func.lower(func.trim(ItemMaster.last_contract_num)).like('[lL]%')  # Exclude laundry contracts
         ).group_by(
             ItemMaster.last_contract_num
         ).having(
@@ -93,7 +98,7 @@ def tab2_view():
         return render_template('tab2.html', contracts=contracts, cache_bust=int(time()))
     except Exception as e:
         logger.error(f"Error rendering Tab 2: {str(e)}", exc_info=True)
-        current_app.logger.error(f"Error rendering Tab 2: {str(e)}", exc_info=True)
+        current_app.logger.error(f"Error rendering cuts Tab 2: {str(e)}", exc_info=True)
         session.close()
         return render_template('tab2.html', contracts=[], cache_bust=int(time()))
 

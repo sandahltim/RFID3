@@ -5,59 +5,64 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}RFID Dashboard{% endblock %}</title>
     <!-- Bootstrap CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='lib/bootstrap/bootstrap.min.css') }}" rel="stylesheet">
     <!-- Custom CSS -->
-    <link rel="stylesheet" href="/static/css/tab1_5.css?v=1745716000">
-    {% block extra_head %}{% endblock %}
+    <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
+    <!-- HTMX -->
+    <script src="{{ url_for('static', filename='lib/htmx/htmx.min.js') }}"></script>
+    <!-- JavaScript files -->
+    <script>
+        // Set window.cachedTabNum early based on the URL
+        (function() {
+            const pathMatch = window.location.pathname.match(/\/tab\/(\d+)/);
+            window.cachedTabNum = pathMatch ? parseInt(pathMatch[1], 10) : (window.location.pathname === '/' ? 1 : null);
+            console.log('base.html: window.cachedTabNum set to', window.cachedTabNum);
+        })();
+    </script>
+    <script src="{{ url_for('static', filename='js/tab.js') }}?v={{ cache_bust }}"></script>
+    <script src="{{ url_for('static', filename='js/expand.js') }}?v={{ cache_bust }}"></script>
+    <script src="{{ url_for('static', filename='js/tab1_5.js') }}?v={{ cache_bust }}"></script>
+    <!-- Bootstrap JS -->
+    <script src="{{ url_for('static', filename='lib/bootstrap/bootstrap.bundle.min.js') }}"></script>
+    {% block head %}{% endblock %}
 </head>
 <body>
     <!-- Navigation Bar -->
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
-        <div class="container-fluid">
-            <a class="navbar-brand" href="/">RFID Dashboard</a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav">
-                    <li class="nav-item">
-                        <a class="nav-link" href="/">Home</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="/tab/1">Rental Inventory</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="/tab/2">Open Contracts</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="/tab/3">Service</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="/tab/4">Laundry Contracts</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="/tab/5">Resale</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="/categories">Manage Categories</a>
-                    </li>
-                </ul>
-            </div>
+        <a class="navbar-brand" href="/">RFID DASHBOARD</a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <ul class="navbar-nav">
+                <li class="nav-item">
+                    <a class="nav-link" href="/">Home</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="/tab/1">Rental Inventory</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="/tab/2">Open Contracts</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="/tab/3">Service</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="/tab/4">Laundry Contracts</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="/tab/5">Resale</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="/categories">Manage Categories</a>
+                </li>
+            </ul>
         </div>
     </nav>
 
     <!-- Main Content -->
-    <div class="container mt-4">
-        {% block content %}
-        {% endblock %}
+    <div class="container">
+        {% block content %}{% endblock %}
     </div>
-
-    <!-- Bootstrap JS and Dependencies -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <!-- HTMX -->
-    <script src="https://unpkg.com/htmx.org@1.9.6"></script>
-    <!-- Custom JS -->
-    <script src="/static/js/tab.js"></script>
-    <script src="/static/js/tab1_5.js"></script>
 </body>
 </html>
