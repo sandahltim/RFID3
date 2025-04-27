@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, request, jsonify, current_app
 from .. import db, cache
 from ..models.db_models import Transaction, ItemMaster, HandCountedItems
-from sqlalchemy import func, desc, asc
+from sqlalchemy import func, desc, asc, or_
 from time import time
 from datetime import datetime
 import logging
@@ -30,7 +30,7 @@ logger.addHandler(console_handler)
 tab4_bp = Blueprint('tab4', __name__)
 
 # Version marker
-logger.info("Deployed tab4.py version: 2025-04-27-v20")
+logger.info("Deployed tab4.py version: 2025-04-27-v22")
 
 @tab4_bp.route('/tab/4')
 def tab4_view():
@@ -39,116 +39,138 @@ def tab4_view():
         logger.info("Starting new session for tab4")
         current_app.logger.info("Starting new session for tab4")
 
-        # Debug: Fetch all contract numbers to see what's in the database
-        all_contracts = session.query(ItemMaster.last_contract_num).distinct().all()
-        logger.debug(f"All distinct contract numbers in ItemMaster: {[c[0] for c in all_contracts]}")
-
-        # Step 1: Fetch contract numbers from id_item_master
-        logger.info("Fetching contracts from id_item_master")
-        item_master_contracts_query = session.query(
-            ItemMaster.last_contract_num,
-            func.count(ItemMaster.tag_id).label('total_items')
+        # Step 1: Query ItemMaster for items with status 'On Rent' or 'Delivered' and contract starting with 'L'
+        logger.info("Fetching items from id_item_master with status 'On Rent' or 'Delivered' and contract starting with 'L'")
+        item_master_query = session.query(
+            ItemMaster.last_contract_num.label('contract_number'),
+            func.count(ItemMaster.tag_id).label('items_on_contract'),
+            func.sum(func.case([(ItemMaster.status.in_(['On Rent', 'Delivered']), 1)], else_=0)).label('items_on_contract_filtered')
         ).filter(
             ItemMaster.last_contract_num != None,
-            ItemMaster.last_contract_num != '00000'
+            ItemMaster.last_contract_num != '00000',
+            func.upper(ItemMaster.last_contract_num).like('L%')
         ).group_by(
             ItemMaster.last_contract_num
         ).having(
             func.count(ItemMaster.tag_id) > 0
+        ).subquery()
+
+        # Step 2: Join with Transaction to get the latest transaction details for each contract
+        logger.info("Joining with Transaction to get latest transaction details")
+        latest_transaction_subquery = session.query(
+            Transaction.contract_number,
+            Transaction.client_name,
+            Transaction.scan_date,
+            func.row_number().over(
+                partition_by=Transaction.contract_number,
+                order_by=desc(Transaction.scan_date)
+            ).label('rn')
+        ).filter(
+            Transaction.contract_number.in_(
+                session.query(item_master_query.c.contract_number)
+            ),
+            Transaction.scan_type == 'Rental'
+        ).subquery()
+
+        latest_transactions = session.query(
+            latest_transaction_subquery.c.contract_number,
+            latest_transaction_subquery.c.client_name,
+            latest_transaction_subquery.c.scan_date
+        ).filter(
+            latest_transaction_subquery.c.rn == 1
+        ).subquery()
+
+        # Step 3: Combine ItemMaster data with Transaction data
+        contracts_from_items = session.query(
+            item_master_query.c.contract_number,
+            latest_transactions.c.client_name,
+            latest_transactions.c.scan_date,
+            item_master_query.c.items_on_contract,
+            item_master_query.c.items_on_contract_filtered
+        ).outerjoin(
+            latest_transactions,
+            item_master_query.c.contract_number == latest_transactions.c.contract_number
         ).all()
 
-        logger.info(f"Raw contracts from id_item_master: {[(c.last_contract_num, c.total_items) for c in item_master_contracts_query]}")
-        current_app.logger.info(f"Raw contracts from id_item_master: {[(c.last_contract_num, c.total_items) for c in item_master_contracts_query]}")
+        logger.info(f"Contracts from ItemMaster after joining with Transaction: {[(c.contract_number, c.items_on_contract_filtered) for c in contracts_from_items]}")
 
-        # Step 2: Fetch contract numbers from HandCountedItems
-        logger.info("Fetching contract numbers from HandCountedItems")
-        hand_counted_contracts_query = session.query(
+        # Step 4: Fetch hand-counted items for contracts starting with 'L'
+        logger.info("Fetching hand-counted items for contracts starting with 'L'")
+        hand_counted_query = session.query(
             HandCountedItems.contract_number,
-            func.count(HandCountedItems.id).label('hand_counted_entries')
+            func.sum(HandCountedItems.quantity).label('hand_counted_items_total')
         ).filter(
-            HandCountedItems.contract_number != None
+            HandCountedItems.contract_number != None,
+            func.upper(HandCountedItems.contract_number).like('L%'),
+            HandCountedItems.action == 'Added'
         ).group_by(
             HandCountedItems.contract_number
         ).having(
-            func.count(HandCountedItems.id) > 0
+            func.sum(HandCountedItems.quantity) > 0
         ).all()
 
-        logger.info(f"Raw contracts from HandCountedItems: {[(c.contract_number, c.hand_counted_entries) for c in hand_counted_contracts_query]}")
-        current_app.logger.info(f"Raw contracts from HandCountedItems: {[(c.contract_number, c.hand_counted_entries) for c in hand_counted_contracts_query]}")
+        logger.info(f"Hand-counted contracts: {[(c.contract_number, c.hand_counted_items_total) for c in hand_counted_query]}")
 
-        # Step 3: Combine contract numbers from both sources
-        contract_numbers = set()
-        for contract_number, _ in item_master_contracts_query:
-            contract_numbers.add(contract_number)
-        for contract_number, _ in hand_counted_contracts_query:
-            contract_numbers.add(contract_number)
-
-        logger.info(f"Combined unique contract numbers: {list(contract_numbers)}")
-        current_app.logger.info(f"Combined unique contract numbers: {list(contract_numbers)}")
-
-        # Step 4: Build the contracts list
-        contracts = []
-        for contract_number in contract_numbers:
-            logger.debug(f"Processing contract: {contract_number}")
-            current_app.logger.debug(f"Processing contract: {contract_number}")
-
-            # Count items on this contract from id_item_master with status 'On Rent' or 'Delivered'
-            items_on_contract = session.query(func.count(ItemMaster.tag_id)).filter(
-                ItemMaster.last_contract_num == contract_number,
-                ItemMaster.status.in_(['On Rent', 'Delivered'])
-            ).scalar()
-
-            # Total items in inventory for this contract from id_item_master (all statuses)
-            total_items_inventory = session.query(func.count(ItemMaster.tag_id)).filter(
-                ItemMaster.last_contract_num == contract_number
-            ).scalar()
-
-            # Fetch hand-counted items for this contract (group by item_name for expansion later)
-            hand_counted_items_query = session.query(
-                HandCountedItems.item_name,
-                func.sum(HandCountedItems.quantity).label('total_quantity')
-            ).filter(
-                HandCountedItems.contract_number == contract_number,
-                HandCountedItems.action == 'Added'
-            ).group_by(
-                HandCountedItems.item_name
-            ).all()
-
-            hand_counted_items_total = sum(item.total_quantity for item in hand_counted_items_query) if hand_counted_items_query else 0
-
-            logger.debug(f"Hand-counted items for contract {contract_number}: {[(item.item_name, item.total_quantity) for item in hand_counted_items_query]}")
-            logger.debug(f"Total hand-counted items quantity for contract {contract_number}: {hand_counted_items_total}")
-
-            # Combine counts for display
-            total_items_on_contract = (items_on_contract or 0) + (hand_counted_items_total or 0)
-
-            # Include contracts that have either items on contract (including hand-counted) or items in inventory
-            if total_items_on_contract == 0 and total_items_inventory == 0:
-                logger.debug(f"Skipping contract {contract_number}: No items on contract and no items in inventory")
-                continue
-
-            # Fetch additional details from id_transactions for this contract
-            latest_transaction = session.query(
-                Transaction.client_name,
-                Transaction.scan_date
-            ).filter(
-                Transaction.contract_number == contract_number,
-                Transaction.scan_type == 'Rental'
-            ).order_by(
-                desc(Transaction.scan_date)
-            ).first()
-
-            client_name = latest_transaction.client_name if latest_transaction else 'N/A'
-            scan_date = latest_transaction.scan_date.isoformat() if latest_transaction and latest_transaction.scan_date else 'N/A'
-
-            contracts.append({
+        # Step 5: Combine ItemMaster and HandCountedItems data
+        contracts_dict = {}
+        
+        # Process ItemMaster contracts
+        for contract in contracts_from_items:
+            contract_number = contract.contract_number
+            contracts_dict[contract_number] = {
                 'contract_number': contract_number,
-                'client_name': client_name,
-                'scan_date': scan_date,
-                'items_on_contract': total_items_on_contract or 0,
-                'total_items_inventory': total_items_inventory or 0,
-                'hand_counted_items': hand_counted_items_total or 0
-            })
+                'client_name': contract.client_name if contract.client_name else 'N/A',
+                'scan_date': contract.scan_date.isoformat() if contract.scan_date else 'N/A',
+                'items_on_contract': contract.items_on_contract_filtered or 0,  # Only On Rent or Delivered
+                'total_items_inventory': contract.items_on_contract or 0,  # All items
+                'hand_counted_items': 0
+            }
+
+        # Add or update with HandCountedItems
+        for hc_contract in hand_counted_query:
+            contract_number = hc_contract.contract_number
+            hand_counted_total = hc_contract.hand_counted_items_total or 0
+
+            if contract_number in contracts_dict:
+                # Contract already exists from ItemMaster, update hand-counted items
+                contracts_dict[contract_number]['hand_counted_items'] = hand_counted_total
+                contracts_dict[contract_number]['items_on_contract'] += hand_counted_total
+            else:
+                # New contract from HandCountedItems
+                # We need to fetch total_items_inventory and transaction details
+                total_items_inventory = session.query(func.count(ItemMaster.tag_id)).filter(
+                    ItemMaster.last_contract_num == contract_number
+                ).scalar() or 0
+
+                # Fetch latest transaction for this contract
+                latest_transaction = session.query(
+                    Transaction.client_name,
+                    Transaction.scan_date
+                ).filter(
+                    Transaction.contract_number == contract_number,
+                    Transaction.scan_type == 'Rental'
+                ).order_by(
+                    desc(Transaction.scan_date)
+                ).first()
+
+                contracts_dict[contract_number] = {
+                    'contract_number': contract_number,
+                    'client_name': latest_transaction.client_name if latest_transaction else 'N/A',
+                    'scan_date': latest_transaction.scan_date.isoformat() if latest_transaction and latest_transaction.scan_date else 'N/A',
+                    'items_on_contract': hand_counted_total,
+                    'total_items_inventory': total_items_inventory,
+                    'hand_counted_items': hand_counted_total
+                }
+
+        # Step 6: Filter out contracts with no items on contract and no inventory
+        contracts = []
+        for contract in contracts_dict.values():
+            total_items_on_contract = contract['items_on_contract']
+            total_items_inventory = contract['total_items_inventory']
+            if total_items_on_contract == 0 and total_items_inventory == 0:
+                logger.debug(f"Skipping contract {contract['contract_number']}: No items on contract and no items in inventory")
+                continue
+            contracts.append(contract)
 
         contracts.sort(key=lambda x: x['contract_number'])
         logger.info(f"Fetched {len(contracts)} contracts for tab4: {[c['contract_number'] for c in contracts]}")
@@ -158,7 +180,8 @@ def tab4_view():
     except Exception as e:
         logger.error(f"Error rendering Tab 4: {str(e)}", exc_info=True)
         current_app.logger.error(f"Error rendering Tab 4: {str(e)}", exc_info=True)
-        session.close()
+        if 'session' in locals():
+            session.close()
         return render_template('tab4.html', contracts=[], cache_bust=int(time()))
 
 @tab4_bp.route('/tab/4/common_names')
@@ -542,7 +565,7 @@ def remove_hand_counted_item():
         if 'session' in locals():
             session.rollback()
             session.close()
-        return jsonify({'error': 'Failed to remove item'}), 500
+        return jsonify({'error': 'Failed to add item'}), 500
 
 @tab4_bp.route('/tab/4/full_items_by_rental_class')
 def full_items_by_rental_class():
