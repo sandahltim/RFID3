@@ -30,7 +30,7 @@ logger.addHandler(console_handler)
 tab4_bp = Blueprint('tab4', __name__)
 
 # Version marker
-logger.info("Deployed tab4.py version: 2025-04-27-v3")
+logger.info("Deployed tab4.py version: 2025-04-27-v6-reverted")
 
 @tab4_bp.route('/tab/4')
 def tab4_view():
@@ -54,6 +54,28 @@ def tab4_view():
         all_contracts = session.query(ItemMaster.last_contract_num).distinct().all()
         logger.debug(f"All distinct contract numbers in ItemMaster: {[c[0] for c in all_contracts]}")
 
+        # Debug: Check all items to see their contract numbers and statuses
+        all_items = session.query(ItemMaster).all()
+        logger.debug(f"All items in ItemMaster: {len(all_items)} items")
+        for item in all_items:
+            logger.debug(f"Item: tag_id={item.tag_id}, last_contract_num='{item.last_contract_num}', status={item.status}")
+
+        # Debug: Check items with 'L4' specifically
+        l4_items = session.query(ItemMaster).filter(
+            func.trim(ItemMaster.last_contract_num) == 'L4'
+        ).all()
+        logger.debug(f"Items with last_contract_num 'L4': {len(l4_items)}")
+        for item in l4_items:
+            logger.debug(f"Item with last_contract_num 'L4': tag_id={item.tag_id}, status={item.status}, last_contract_num='{item.last_contract_num}'")
+
+        # Debug: Check items starting with 'L' or 'l'
+        laundry_items = session.query(ItemMaster).filter(
+            func.lower(func.trim(ItemMaster.last_contract_num)).like('[lL]%')
+        ).all()
+        logger.debug(f"Items with last_contract_num starting with 'L' or 'l': {len(laundry_items)}")
+        for item in laundry_items:
+            logger.debug(f"Laundry item: tag_id={item.tag_id}, last_contract_num='{item.last_contract_num}', status={item.status}")
+
         # Fetch laundry contracts from id_item_master (contract numbers starting with 'L' or 'l')
         logger.info("Executing contracts query")
         current_app.logger.info("Executing contracts query")
@@ -61,9 +83,6 @@ def tab4_view():
             ItemMaster.last_contract_num,
             func.count(ItemMaster.tag_id).label('total_items')
         ).filter(
-            ItemMaster.status.in_(['On Rent', 'Delivered']),
-            ItemMaster.last_contract_num != None,
-            ItemMaster.last_contract_num != '00000',
             func.lower(func.trim(ItemMaster.last_contract_num)).like('[lL]%')
         ).group_by(
             ItemMaster.last_contract_num
@@ -97,8 +116,7 @@ def tab4_view():
 
             # Count items on this contract
             items_on_contract = session.query(func.count(ItemMaster.tag_id)).filter(
-                ItemMaster.last_contract_num == contract_number,
-                ItemMaster.status.in_(['On Rent', 'Delivered'])
+                ItemMaster.last_contract_num == contract_number
             ).scalar()
 
             # Total items in inventory for this contract
@@ -151,8 +169,7 @@ def tab4_common_names():
             ItemMaster.common_name,
             func.count(ItemMaster.tag_id).label('on_contracts')
         ).filter(
-            ItemMaster.last_contract_num == contract_number,
-            ItemMaster.status.in_(['On Rent', 'Delivered'])
+            ItemMaster.last_contract_num == contract_number
         ).group_by(
             ItemMaster.common_name
         )
@@ -245,8 +262,7 @@ def tab4_data():
         # Fetch items on this contract
         query = session.query(ItemMaster).filter(
             ItemMaster.last_contract_num == contract_number,
-            ItemMaster.common_name == common_name,
-            ItemMaster.status.in_(['On Rent', 'Delivered'])
+            ItemMaster.common_name == common_name
         )
 
         # Apply sorting
