@@ -1,8 +1,9 @@
 from flask import Blueprint, render_template, request, jsonify, current_app
 from .. import db, cache
 from ..models.db_models import Transaction, ItemMaster, HandCountedItems
-from sqlalchemy import func, desc
+from sqlalchemy import func, desc, asc
 from time import time
+from datetime import datetime
 import logging
 import sys
 
@@ -29,7 +30,7 @@ logger.addHandler(console_handler)
 tab4_bp = Blueprint('tab4', __name__)
 
 # Version marker
-logger.info("Deployed tab4.py version: 2025-04-25-v1")
+logger.info("Deployed tab4.py version: 2025-04-27-v2")
 
 @tab4_bp.route('/tab/4')
 def tab4_view():
@@ -128,9 +129,10 @@ def tab4_common_names():
     contract_number = request.args.get('contract_number')
     page = int(request.args.get('page', 1))
     per_page = 10
+    sort = request.args.get('sort', '')
 
-    logger.info(f"Fetching common names for contract_number={contract_number}, page={page}")
-    current_app.logger.info(f"Fetching common names for contract_number={contract_number}, page={page}")
+    logger.info(f"Fetching common names for contract_number={contract_number}, page={page}, sort={sort}")
+    current_app.logger.info(f"Fetching common names for contract_number={contract_number}, page={page}, sort={sort}")
 
     if not contract_number:
         logger.error("Missing required parameter: contract_number is required")
@@ -149,13 +151,29 @@ def tab4_common_names():
             ItemMaster.status.in_(['On Rent', 'Delivered'])
         ).group_by(
             ItemMaster.common_name
-        ).all()
+        )
 
-        logger.debug(f"Common names for laundry contract {contract_number}: {[(name, count) for name, count in common_names_query]}")
-        current_app.logger.debug(f"Common names for laundry contract {contract_number}: {[(name, count) for name, count in common_names_query]}")
+        # Apply sorting
+        if sort == 'name_asc':
+            common_names_query = common_names_query.order_by(asc(func.lower(ItemMaster.common_name)))
+        elif sort == 'name_desc':
+            common_names_query = common_names_query.order_by(desc(func.lower(ItemMaster.common_name)))
+        elif sort == 'on_contracts_asc':
+            common_names_query = common_names_query.order_by(asc('on_contracts'))
+        elif sort == 'on_contracts_desc':
+            common_names_query = common_names_query.order_by(desc('on_contracts'))
+        elif sort == 'total_items_inventory_asc':
+            common_names_query = common_names_query.order_by(asc('total_items_inventory'))
+        elif sort == 'total_items_inventory_desc':
+            common_names_query = common_names_query.order_by(desc('total_items_inventory'))
+
+        common_names_all = common_names_query.all()
+
+        logger.debug(f"Common names for laundry contract {contract_number}: {[(name, count) for name, count in common_names_all]}")
+        current_app.logger.debug(f"Common names for laundry contract {contract_number}: {[(name, count) for name, count in common_names_all]}")
 
         common_names = []
-        for name, on_contracts in common_names_query:
+        for name, on_contracts in common_names_all:
             if not name:
                 continue
 
@@ -169,6 +187,15 @@ def tab4_common_names():
                 'on_contracts': on_contracts or 0,
                 'total_items_inventory': total_items_inventory or 0
             })
+
+        # Apply sorting for computed fields if necessary
+        if sort in ['total_items_inventory_asc', 'total_items_inventory_desc']:
+            sort_field = sort.split('_')[0]
+            sort_direction = sort.split('_')[-1]
+            common_names.sort(
+                key=lambda x: x[sort_field],
+                reverse=(sort_direction == 'desc')
+            )
 
         # Paginate common names
         total_common_names = len(common_names)
@@ -198,9 +225,10 @@ def tab4_data():
     common_name = request.args.get('common_name')
     page = int(request.args.get('page', 1))
     per_page = 10
+    sort = request.args.get('sort', '')
 
-    logger.info(f"Fetching items for contract_number={contract_number}, common_name={common_name}, page={page}")
-    current_app.logger.info(f"Fetching items for contract_number={contract_number}, common_name={common_name}, page={page}")
+    logger.info(f"Fetching items for contract_number={contract_number}, common_name={common_name}, page={page}, sort={sort}")
+    current_app.logger.info(f"Fetching items for contract_number={contract_number}, common_name={common_name}, page={page}, sort={sort}")
 
     if not contract_number or not common_name:
         logger.error("Missing required parameters: contract number and common name are required")
@@ -217,9 +245,35 @@ def tab4_data():
             ItemMaster.status.in_(['On Rent', 'Delivered'])
         )
 
+        # Apply sorting
+        if sort == 'tag_id_asc':
+            query = query.order_by(asc(ItemMaster.tag_id))
+        elif sort == 'tag_id_desc':
+            query = query.order_by(desc(ItemMaster.tag_id))
+        elif sort == 'common_name_asc':
+            query = query.order_by(asc(func.lower(ItemMaster.common_name)))
+        elif sort == 'common_name_desc':
+            query = query.order_by(desc(func.lower(ItemMaster.common_name)))
+        elif sort == 'bin_location_asc':
+            query = query.order_by(asc(func.lower(func.coalesce(ItemMaster.bin_location, ''))))
+        elif sort == 'bin_location_desc':
+            query = query.order_by(desc(func.lower(func.coalesce(ItemMaster.bin_location, ''))))
+        elif sort == 'status_asc':
+            query = query.order_by(asc(func.lower(ItemMaster.status)))
+        elif sort == 'status_desc':
+            query = query.order_by(desc(func.lower(ItemMaster.status)))
+        elif sort == 'last_contract_asc':
+            query = query.order_by(asc(func.lower(func.coalesce(ItemMaster.last_contract_num, ''))))
+        elif sort == 'last_contract_desc':
+            query = query.order_by(desc(func.lower(func.coalesce(ItemMaster.last_contract_num, ''))))
+        elif sort == 'last_scanned_date_asc':
+            query = query.order_by(asc(ItemMaster.date_last_scanned))
+        elif sort == 'last_scanned_date_desc':
+            query = query.order_by(desc(ItemMaster.date_last_scanned))
+
         # Paginate items
         total_items = query.count()
-        items = query.order_by(ItemMaster.tag_id).offset((page - 1) * per_page).limit(per_page).all()
+        items = query.offset((page - 1) * per_page).limit(per_page).all()
 
         items_data = []
         for item in items:
@@ -313,7 +367,8 @@ def add_hand_counted_item():
             item_name=item_name,
             quantity=quantity,
             action=action,
-            user=employee_name
+            user=employee_name,
+            timestamp=datetime.now()
         )
         session.add(hand_counted_item)
         session.commit()
@@ -353,7 +408,8 @@ def remove_hand_counted_item():
             item_name=item_name,
             quantity=quantity,
             action=action,
-            user=employee_name
+            user=employee_name,
+            timestamp=datetime.now()
         )
         session.add(hand_counted_item)
         session.commit()
@@ -413,3 +469,28 @@ def full_items_by_rental_class():
         logger.error(f"Error fetching full items for contract {contract_number}, common_name {common_name}: {str(e)}")
         current_app.logger.error(f"Error fetching full items for contract {contract_number}, common_name {common_name}: {str(e)}")
         return jsonify({'error': 'Failed to fetch full items'}), 500
+
+@tab4_bp.route('/get_contract_date')
+def get_contract_date():
+    contract_number = request.args.get('contract_number')
+    if not contract_number:
+        logger.error("Missing required parameter: contract_number is required")
+        current_app.logger.error("Missing required parameter: contract_number is required")
+        return jsonify({'error': 'Contract number is required'}), 400
+
+    try:
+        session = db.session()
+        latest_transaction = session.query(Transaction.scan_date).filter(
+            Transaction.contract_number == contract_number,
+            Transaction.scan_type == 'Rental'
+        ).order_by(desc(Transaction.scan_date)).first()
+
+        session.close()
+        if latest_transaction and latest_transaction.scan_date:
+            return jsonify({'date': latest_transaction.scan_date.isoformat()})
+        return jsonify({'date': 'N/A'})
+    except Exception as e:
+        logger.error(f"Error fetching contract date for {contract_number}: {str(e)}")
+        current_app.logger.error(f"Error fetching contract date for {contract_number}: {str(e)}")
+        session.close()
+        return jsonify({'error': 'Failed to fetch contract date'}), 500

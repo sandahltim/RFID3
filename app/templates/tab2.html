@@ -5,31 +5,23 @@
     <!-- Page title -->
     <h2>Open Contracts</h2>
     <!-- Filter and search row -->
-    <div class="row mb-3">
-        <div class="col">
-            <input type="text" class="form-control" placeholder="Search contract number, customer name, etc." id="searchInput">
-        </div>
-        <div class="col">
-            <select class="form-control" id="statusFilter">
-                <option value="">All Statuses</option>
-                <option value="On Rent">On Rent</option>
-                <option value="Delivered">Delivered</option>
-            </select>
-        </div>
-        <div class="col">
-            <select class="form-control" id="binFilter">
-                <option value="">All Bin Locations</option>
-                {% for bin in ['resale', 'sold', 'pack', 'burst'] %}
-                <option value="{{ bin }}">{{ bin }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div class="col">
-            <button class="btn btn-primary" onclick="refreshTab()">Refresh</button>
-        </div>
+    <div class="filter-sort-controls">
+        <input type="text" class="form-control" placeholder="Search contract number, customer name, etc." id="searchInput">
+        <select class="form-control" id="statusFilter">
+            <option value="">All Statuses</option>
+            <option value="On Rent">On Rent</option>
+            <option value="Delivered">Delivered</option>
+        </select>
+        <select class="form-control" id="binFilter">
+            <option value="">All Bin Locations</option>
+            {% for bin in ['resale', 'sold', 'pack', 'burst'] %}
+            <option value="{{ bin }}">{{ bin }}</option>
+            {% endfor %}
+        </select>
+        <button class="btn btn-primary" onclick="refreshTab()">Refresh</button>
     </div>
     <!-- Table for displaying contracts -->
-    <table class="table table-bordered" id="category-table">
+    <table class="category-table" id="category-table">
         <thead id="category-table-header">
             <tr>
                 <th>Contract Number</th>
@@ -49,8 +41,8 @@
                 <td>{{ contract.total_items_inventory }}</td>
                 <td>{{ contract.scan_date }}</td>
                 <td>
-                    <button class="btn btn-sm btn-secondary expand-btn" onclick="window.expandCategory('{{ contract.contract_number | urlencode | replace('\'', '\\\'') | replace('"', '\\"') }}', 'common-{{ contract.contract_number }}', '{{ contract.contract_number | urlencode | replace('\'', '\\\'') | replace('"', '\\"') }}')">Expand</button>
-                    <button class="btn btn-sm btn-secondary collapse-btn" style="display:none;" onclick="collapseSection('common-{{ contract.contract_number }}')">Collapse</button>
+                    <button class="btn btn-sm btn-secondary expand-btn" data-contract-number="{{ contract.contract_number }}" data-target-id="common-{{ contract.contract_number }}">Expand</button>
+                    <button class="btn btn-sm btn-secondary collapse-btn" data-collapse-target="common-{{ contract.contract_number }}" style="display:none;">Collapse</button>
                     <button class="btn btn-sm btn-info print-btn" data-print-level="Contract" data-print-id="category-table">Print</button>
                     <div id="loading-{{ contract.contract_number }}" style="display:none;" class="loading">Loading...</div>
                 </td>
@@ -65,17 +57,40 @@
     </table>
 </div>
 
-<!-- JavaScript for refreshing the table -->
+<!-- JavaScript for refreshing the table and filtering -->
 <script>
 function refreshTab() {
     window.location.reload();
 }
 
-// Apply filters to all tables based on user input
-if (typeof window.applyFilters === 'function') {
-    window.applyFilters();
-} else {
-    console.warn('applyFilters function is not available, skipping filter application');
-}
+// Apply filters to the contract table based on user input
+document.addEventListener('input', function() {
+    const searchInput = document.getElementById('searchInput').value.toLowerCase();
+    const statusFilter = document.getElementById('statusFilter').value.toLowerCase();
+    const binFilter = document.getElementById('binFilter').value.toLowerCase();
+
+    const rows = document.querySelectorAll('#category-rows > tr:not([style*="display: none"]):not(.expandable)');
+    rows.forEach(row => {
+        const contractNumber = row.cells[0].textContent.toLowerCase();
+        const clientName = row.cells[1].textContent.toLowerCase();
+        const matchesSearch = contractNumber.includes(searchInput) || clientName.includes(searchInput);
+
+        if (matchesSearch) {
+            row.style.display = '';
+            // Show the expandable row as well
+            const expandableRow = row.nextElementSibling;
+            if (expandableRow) {
+                expandableRow.style.display = '';
+            }
+        } else {
+            row.style.display = 'none';
+            // Hide the expandable row
+            const expandableRow = row.nextElementSibling;
+            if (expandableRow) {
+                expandableRow.style.display = 'none';
+            }
+        }
+    });
+});
 </script>
 {% endblock %}

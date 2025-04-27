@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, request, jsonify, current_app
 from .. import db, cache
 from ..models.db_models import Transaction, ItemMaster
-from sqlalchemy import func, desc
+from sqlalchemy import func, desc, asc
 from time import time
 import logging
 import sys
@@ -29,7 +29,7 @@ logger.addHandler(console_handler)
 tab2_bp = Blueprint('tab2', __name__)
 
 # Version marker
-logger.info("Deployed tab2.py version: 2025-04-25-v1")
+logger.info("Deployed tab2.py version: 2025-04-27-v2")
 
 @tab2_bp.route('/tab/2')
 def tab2_view():
@@ -102,9 +102,10 @@ def tab2_common_names():
     contract_number = request.args.get('contract_number')
     page = int(request.args.get('page', 1))
     per_page = 10
+    sort = request.args.get('sort', '')
 
-    logger.info(f"Fetching common names for contract_number={contract_number}, page={page}")
-    current_app.logger.info(f"Fetching common names for contract_number={contract_number}, page={page}")
+    logger.info(f"Fetching common names for contract_number={contract_number}, page={page}, sort={sort}")
+    current_app.logger.info(f"Fetching common names for contract_number={contract_number}, page={page}, sort={sort}")
 
     if not contract_number:
         logger.error("Missing required parameter: contract_number is required")
@@ -122,13 +123,29 @@ def tab2_common_names():
             ItemMaster.status.in_(['On Rent', 'Delivered'])
         ).group_by(
             ItemMaster.common_name
-        ).all()
+        )
 
-        logger.debug(f"Common names for contract {contract_number}: {[(name, count) for name, count in common_names_query]}")
-        current_app.logger.debug(f"Common names for contract {contract_number}: {[(name, count) for name, count in common_names_query]}")
+        # Apply sorting
+        if sort == 'name_asc':
+            common_names_query = common_names_query.order_by(asc(func.lower(ItemMaster.common_name)))
+        elif sort == 'name_desc':
+            common_names_query = common_names_query.order_by(desc(func.lower(ItemMaster.common_name)))
+        elif sort == 'on_contracts_asc':
+            common_names_query = common_names_query.order_by(asc('on_contracts'))
+        elif sort == 'on_contracts_desc':
+            common_names_query = common_names_query.order_by(desc('on_contracts'))
+        elif sort == 'total_items_inventory_asc':
+            common_names_query = common_names_query.order_by(asc('total_items_inventory'))
+        elif sort == 'total_items_inventory_desc':
+            common_names_query = common_names_query.order_by(desc('total_items_inventory'))
+
+        common_names_all = common_names_query.all()
+
+        logger.debug(f"Common names for contract {contract_number}: {[(name, count) for name, count in common_names_all]}")
+        current_app.logger.debug(f"Common names for contract {contract_number}: {[(name, count) for name, count in common_names_all]}")
 
         common_names = []
-        for name, on_contracts in common_names_query:
+        for name, on_contracts in common_names_all:
             if not name:
                 continue
 
@@ -141,6 +158,15 @@ def tab2_common_names():
                 'on_contracts': on_contracts or 0,
                 'total_items_inventory': total_items_inventory or 0
             })
+
+        # Apply sorting for computed fields if necessary
+        if sort in ['total_items_inventory_asc', 'total_items_inventory_desc']:
+            sort_field = sort.split('_')[0]
+            sort_direction = sort.split('_')[-1]
+            common_names.sort(
+                key=lambda x: x[sort_field],
+                reverse=(sort_direction == 'desc')
+            )
 
         total_common_names = len(common_names)
         start = (page - 1) * per_page
@@ -168,9 +194,10 @@ def tab2_data():
     common_name = request.args.get('common_name')
     page = int(request.args.get('page', 1))
     per_page = 10
+    sort = request.args.get('sort', '')
 
-    logger.info(f"Fetching items for contract_number={contract_number}, common_name={common_name}, page={page}")
-    current_app.logger.info(f"Fetching items for contract_number={contract_number}, common_name={common_name}, page={page}")
+    logger.info(f"Fetching items for contract_number={contract_number}, common_name={common_name}, page={page}, sort={sort}")
+    current_app.logger.info(f"Fetching items for contract_number={contract_number}, common_name={common_name}, page={page}, sort={sort}")
 
     if not contract_number or not common_name:
         logger.error("Missing required parameters: contract number and common name are required")
@@ -186,8 +213,34 @@ def tab2_data():
             ItemMaster.status.in_(['On Rent', 'Delivered'])
         )
 
+        # Apply sorting
+        if sort == 'tag_id_asc':
+            query = query.order_by(asc(ItemMaster.tag_id))
+        elif sort == 'tag_id_desc':
+            query = query.order_by(desc(ItemMaster.tag_id))
+        elif sort == 'common_name_asc':
+            query = query.order_by(asc(func.lower(ItemMaster.common_name)))
+        elif sort == 'common_name_desc':
+            query = query.order_by(desc(func.lower(ItemMaster.common_name)))
+        elif sort == 'bin_location_asc':
+            query = query.order_by(asc(func.lower(func.coalesce(ItemMaster.bin_location, ''))))
+        elif sort == 'bin_location_desc':
+            query = query.order_by(desc(func.lower(func.coalesce(ItemMaster.bin_location, ''))))
+        elif sort == 'status_asc':
+            query = query.order_by(asc(func.lower(ItemMaster.status)))
+        elif sort == 'status_desc':
+            query = query.order_by(desc(func.lower(ItemMaster.status)))
+        elif sort == 'last_contract_asc':
+            query = query.order_by(asc(func.lower(func.coalesce(ItemMaster.last_contract_num, ''))))
+        elif sort == 'last_contract_desc':
+            query = query.order_by(desc(func.lower(func.coalesce(ItemMaster.last_contract_num, ''))))
+        elif sort == 'last_scanned_date_asc':
+            query = query.order_by(asc(ItemMaster.date_last_scanned))
+        elif sort == 'last_scanned_date_desc':
+            query = query.order_by(desc(ItemMaster.date_last_scanned))
+
         total_items = query.count()
-        items = query.order_by(ItemMaster.tag_id).offset((page - 1) * per_page).limit(per_page).all()
+        items = query.offset((page - 1) * per_page).limit(per_page).all()
 
         items_data = []
         for item in items:
