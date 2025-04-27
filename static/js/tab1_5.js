@@ -1,4 +1,4 @@
-console.log('tab1_5.js version: 2025-04-26-v20 loaded');
+console.log('tab1_5.js version: 2025-04-27-v21 loaded');
 
 // Note: Common function for Tabs 1 and 5
 function showLoading(targetId) {
@@ -92,11 +92,9 @@ function loadCommonNames(selectElement, page = 1) {
 
     let url = `/tab/${window.cachedTabNum}/common_names?category=${encodeURIComponent(category)}&subcategory=${encodeURIComponent(subcategory)}&page=${page}`;
     const commonFilter = document.getElementById(`common-filter-${targetId}`)?.value || '';
-    const commonSort = document.getElementById(`common-sort-${targetId}`)?.value || '';
     const statusFilter = document.getElementById('statusFilter')?.value || '';
     const binFilter = document.getElementById('binFilter')?.value || '';
     if (commonFilter) url += `&filter=${encodeURIComponent(commonFilter)}`;
-    if (commonSort) url += `&sort=${encodeURIComponent(commonSort)}`;
     if (statusFilter) url += `&statusFilter=${encodeURIComponent(statusFilter)}`;
     if (binFilter) url += `&binFilter=${encodeURIComponent(binFilter)}`;
 
@@ -108,7 +106,7 @@ function loadCommonNames(selectElement, page = 1) {
             return response.json();
         })
         .then(data => {
-            console.log('Common names data received:', data); // Debug log
+            console.log('Common names data received:', data);
             let html = '';
             if (data.common_names && data.common_names.length > 0) {
                 // Calculate subcategory totals
@@ -126,13 +124,6 @@ function loadCommonNames(selectElement, page = 1) {
                 html += `
                     <div class="filter-sort-controls">
                         <input type="text" id="common-filter-${targetId}" placeholder="Filter common names..." value="${commonFilter}" oninput="loadCommonNames(this.closest('.common-level').previousElementSibling.querySelector('.subcategory-select'))">
-                        <select id="common-sort-${targetId}" onchange="loadCommonNames(this.closest('.common-level').previousElementSibling.querySelector('.subcategory-select'))">
-                            <option value="">Sort By...</option>
-                            <option value="name_asc" ${commonSort === 'name_asc' ? 'selected' : ''}>Name (A-Z)</option>
-                            <option value="name_desc" ${commonSort === 'name_desc' ? 'selected' : ''}>Name (Z-A)</option>
-                            <option value="total_items_asc" ${commonSort === 'total_items_asc' ? 'selected' : ''}>Total Items (Low to High)</option>
-                            <option value="total_items_desc" ${commonSort === 'total_items_desc' ? 'selected' : ''}>Total Items (High to Low)</option>
-                        </select>
                 `;
 
                 if (window.cachedTabNum == 5) {
@@ -160,12 +151,30 @@ function loadCommonNames(selectElement, page = 1) {
                     <table class="common-table" id="common-table-${targetId}">
                         <thead>
                             <tr>
-                                <th>Common Name</th>
-                                <th>Total Items</th>
-                                <th>Items on Contracts</th>
-                                <th>Items in Service</th>
-                                <th>Items Available</th>
+                                <th onclick="sortCommonNames('${targetId}', 'name', '${category}', '${subcategory}')">
+                                    Common Name <span class="sort-arrow"></span>
+                                </th>
+                                <th onclick="sortCommonNames('${targetId}', 'total_items', '${category}', '${subcategory}')">
+                                    Total Items <span class="sort-arrow"></span>
+                                </th>
+                                <th onclick="sortCommonNames('${targetId}', 'items_on_contracts', '${category}', '${subcategory}')">
+                                    Items on Contracts <span class="sort-arrow"></span>
+                                </th>
+                                <th onclick="sortCommonNames('${targetId}', 'items_in_service', '${category}', '${subcategory}')">
+                                    Items in Service <span class="sort-arrow"></span>
+                                </th>
+                                <th onclick="sortCommonNames('${targetId}', 'items_available', '${category}', '${subcategory}')">
+                                    Items Available <span class="sort-arrow"></span>
+                                </th>
                                 <th>Actions</th>
+                            </tr>
+                            <tr class="filter-row">
+                                <th><input type="text" class="column-filter" data-column="name" placeholder="Filter..." oninput="filterCommonNames('${targetId}')"></th>
+                                <th><input type="text" class="column-filter" data-column="total_items" placeholder="Filter..." oninput="filterCommonNames('${targetId}')"></th>
+                                <th><input type="text" class="column-filter" data-column="items_on_contracts" placeholder="Filter..." oninput="filterCommonNames('${targetId}')"></th>
+                                <th><input type="text" class="column-filter" data-column="items_in_service" placeholder="Filter..." oninput="filterCommonNames('${targetId}')"></th>
+                                <th><input type="text" class="column-filter" data-column="items_available" placeholder="Filter..." oninput="filterCommonNames('${targetId}')"></th>
+                                <th><button class="btn btn-sm btn-secondary clear-filters" onclick="clearCommonNameFilters('${targetId}')">Clear Filters</button></th>
                             </tr>
                         </thead>
                         <tbody>
@@ -200,6 +209,7 @@ function loadCommonNames(selectElement, page = 1) {
                 html += `
                         </tbody>
                     </table>
+                    <div class="row-count" id="common-row-count-${targetId}">Rows: ${data.common_names.length} / ${data.total_common_names}</div>
                 `;
 
                 if (data.total_common_names > data.per_page) {
@@ -233,6 +243,207 @@ function loadCommonNames(selectElement, page = 1) {
         .finally(() => {
             hideLoading(targetId);
         });
+}
+
+// Note: Sort Common Names Table
+let commonSortState = {};
+function sortCommonNames(targetId, column, category, subcategory) {
+    if (!commonSortState[targetId]) {
+        commonSortState[targetId] = { column: '', direction: '' };
+    }
+
+    const currentSort = commonSortState[targetId];
+    let direction = 'asc';
+    if (currentSort.column === column) {
+        direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
+    }
+
+    commonSortState[targetId] = { column, direction };
+
+    // Update sort arrows
+    const headers = document.querySelectorAll(`#common-table-${targetId} thead tr:first-child th`);
+    headers.forEach(header => {
+        const sortArrow = header.querySelector('.sort-arrow');
+        if (header.textContent.trim().startsWith(column.replace('_', ' ').toUpperCase())) {
+            sortArrow.textContent = direction === 'asc' ? '↑' : '↓';
+        } else {
+            sortArrow.textContent = '';
+        }
+    });
+
+    // Fetch sorted data from server
+    const page = 1; // Reset to first page on sort
+    let url = `/tab/${window.cachedTabNum}/common_names?category=${encodeURIComponent(category)}&subcategory=${encodeURIComponent(subcategory)}&page=${page}&sort=${column}_${direction}`;
+    const commonFilter = document.getElementById(`common-filter-${targetId}`)?.value || '';
+    const statusFilter = document.getElementById('statusFilter')?.value || '';
+    const binFilter = document.getElementById('binFilter')?.value || '';
+    if (commonFilter) url += `&filter=${encodeURIComponent(commonFilter)}`;
+    if (statusFilter) url += `&statusFilter=${encodeURIComponent(statusFilter)}`;
+    if (binFilter) url += `&binFilter=${encodeURIComponent(binFilter)}`;
+
+    fetch(url)
+        .then(response => response.json())
+        .then(data => {
+            const container = document.getElementById(targetId);
+            let html = `
+                <div class="filter-sort-controls">
+                    <input type="text" id="common-filter-${targetId}" placeholder="Filter common names..." value="${commonFilter}" oninput="loadCommonNames(this.closest('.common-level').previousElementSibling.querySelector('.subcategory-select'))">
+            `;
+
+            if (window.cachedTabNum == 5) {
+                html += `
+                    <div class="bulk-update-controls">
+                        <select id="bulk-bin-location-${targetId}" onchange="updateBulkField('${targetId}', 'bin_location')">
+                            <option value="">Update Bin Location...</option>
+                            <option value="resale">resale</option>
+                            <option value="sold">sold</option>
+                            <option value="pack">pack</option>
+                            <option value="burst">burst</option>
+                        </select>
+                        <select id="bulk-status-${targetId}" onchange="updateBulkField('${targetId}', 'status')">
+                            <option value="">Update Status...</option>
+                            <option value="Ready to Rent">Ready to Rent</option>
+                            <option value="Sold">Sold</option>
+                        </select>
+                        <button class="btn btn-sm btn-primary" onclick="bulkUpdateCommonName('${category}', '${subcategory}', '${targetId}', '${targetId}')">Bulk Update</button>
+                    </div>
+                `;
+            }
+
+            html += `
+                </div>
+                <table class="common-table" id="common-table-${targetId}">
+                    <thead>
+                        <tr>
+                            <th onclick="sortCommonNames('${targetId}', 'name', '${category}', '${subcategory}')">
+                                Common Name <span class="sort-arrow">${column === 'name' ? (direction === 'asc' ? '↑' : '↓') : ''}</span>
+                            </th>
+                            <th onclick="sortCommonNames('${targetId}', 'total_items', '${category}', '${subcategory}')">
+                                Total Items <span class="sort-arrow">${column === 'total_items' ? (direction === 'asc' ? '↑' : '↓') : ''}</span>
+                            </th>
+                            <th onclick="sortCommonNames('${targetId}', 'items_on_contracts', '${category}', '${subcategory}')">
+                                Items on Contracts <span class="sort-arrow">${column === 'items_on_contracts' ? (direction === 'asc' ? '↑' : '↓') : ''}</span>
+                            </th>
+                            <th onclick="sortCommonNames('${targetId}', 'items_in_service', '${category}', '${subcategory}')">
+                                Items in Service <span class="sort-arrow">${column === 'items_in_service' ? (direction === 'asc' ? '↑' : '↓') : ''}</span>
+                            </th>
+                            <th onclick="sortCommonNames('${targetId}', 'items_available', '${category}', '${subcategory}')">
+                                Items Available <span class="sort-arrow">${column === 'items_available' ? (direction === 'asc' ? '↑' : '↓') : ''}</span>
+                            </th>
+                            <th>Actions</th>
+                        </tr>
+                        <tr class="filter-row">
+                            <th><input type="text" class="column-filter" data-column="name" placeholder="Filter..." oninput="filterCommonNames('${targetId}')"></th>
+                            <th><input type="text" class="column-filter" data-column="total_items" placeholder="Filter..." oninput="filterCommonNames('${targetId}')"></th>
+                            <th><input type="text" class="column-filter" data-column="items_on_contracts" placeholder="Filter..." oninput="filterCommonNames('${targetId}')"></th>
+                            <th><input type="text" class="column-filter" data-column="items_in_service" placeholder="Filter..." oninput="filterCommonNames('${targetId}')"></th>
+                            <th><input type="text" class="column-filter" data-column="items_available" placeholder="Filter..." oninput="filterCommonNames('${targetId}')"></th>
+                            <th><button class="btn btn-sm btn-secondary clear-filters" onclick="clearCommonNameFilters('${targetId}')">Clear Filters</button></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            data.common_names.forEach(item => {
+                const rowId = `${targetId}_${item.name.replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '')}`;
+                html += `
+                    <tr>
+                        <td>${item.name}</td>
+                        <td>${item.total_items}</td>
+                        <td>${item.items_on_contracts}</td>
+                        <td>${item.items_in_service}</td>
+                        <td>${item.items_available}</td>
+                        <td>
+                            <div class="btn-group">
+                                <button class="btn btn-sm btn-secondary expand-btn" data-category="${category}" data-subcategory="${subcategory}" data-common-name="${item.name}" data-target-id="items-${rowId}">Expand Items</button>
+                                <button class="btn btn-sm btn-secondary collapse-btn" style="display:none;" data-collapse-target="items-${rowId}">Collapse</button>
+                                <button class="btn btn-sm btn-info print-btn" data-print-level="Common Name" data-print-id="common-table-${targetId}" data-common-name="${item.name}" data-category="${category}" data-subcategory="${subcategory}">Print Aggregate</button>
+                                <button class="btn btn-sm btn-info print-full-btn" data-common-name="${item.name}" data-category="${category}" data-subcategory="${subcategory}">Print Full List</button>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td colspan="6">
+                            <div id="items-${rowId}" class="expandable collapsed"></div>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            html += `
+                    </tbody>
+                </table>
+                <div class="row-count" id="common-row-count-${targetId}">Rows: ${data.common_names.length} / ${data.total_common_names}</div>
+            `;
+
+            if (data.total_common_names > data.per_page) {
+                const totalPages = Math.ceil(data.total_common_names / data.per_page);
+                html += `
+                    <div class="pagination-controls">
+                        <button class="btn btn-sm btn-secondary" onclick="loadCommonNames(this.closest('.common-level').previousElementSibling.querySelector('.subcategory-select'), ${data.page - 1})" ${data.page === 1 ? 'disabled' : ''}>Previous</button>
+                        <span>Page ${data.page} of ${totalPages}</span>
+                        <button class="btn btn-sm btn-secondary" onclick="loadCommonNames(this.closest('.common-level').previousElementSibling.querySelector('.subcategory-select'), ${data.page + 1})" ${data.page === totalPages ? 'disabled' : ''}>Next</button>
+                    </div>
+                `;
+            }
+
+            container.innerHTML = html;
+            container.classList.remove('collapsed');
+            container.classList.add('expanded');
+            container.style.display = 'block';
+            container.style.opacity = '1';
+        })
+        .catch(error => {
+            console.error('Sort common names error:', error);
+        });
+}
+
+// Note: Filter Common Names Table (Client-Side)
+function filterCommonNames(targetId) {
+    const table = document.querySelector(`#common-table-${targetId}`);
+    const rows = table.querySelectorAll('tbody tr:not([style*="display: none"]):not(.expandable-row)');
+    const filters = {};
+    const filterInputs = table.querySelectorAll('.column-filter');
+
+    filterInputs.forEach(input => {
+        const column = input.getAttribute('data-column');
+        const value = input.value.trim().toLowerCase();
+        if (value) {
+            filters[column] = value;
+        }
+    });
+
+    let visibleRows = 0;
+    rows.forEach(row => {
+        let showRow = true;
+        for (const [column, value] of Object.entries(filters)) {
+            const cellIndex = {
+                'name': 0,
+                'total_items': 1,
+                'items_on_contracts': 2,
+                'items_in_service': 3,
+                'items_available': 4
+            }[column];
+            const cellValue = row.cells[cellIndex].textContent.toLowerCase();
+            if (!cellValue.includes(value)) {
+                showRow = false;
+                break;
+            }
+        }
+        row.style.display = showRow ? '' : 'none';
+        if (showRow) visibleRows++;
+    });
+
+    const rowCountEl = document.getElementById(`common-row-count-${targetId}`);
+    const totalRows = rows.length;
+    rowCountEl.textContent = `Rows: ${visibleRows} / ${totalRows}`;
+}
+
+// Note: Clear Common Name Filters
+function clearCommonNameFilters(targetId) {
+    const filterInputs = document.querySelectorAll(`#common-table-${targetId} .column-filter`);
+    filterInputs.forEach(input => input.value = '');
+    filterCommonNames(targetId);
 }
 
 // Note: Tab 5 specific - Bulk update for all items under a common name
@@ -432,12 +643,8 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
     showLoading(key);
 
     let url = `/tab/${window.cachedTabNum}/data?common_name=${encodeURIComponent(commonName)}&page=${page}&subcategory=${encodeURIComponent(subcategory)}&category=${encodeURIComponent(category)}`;
-    const itemFilter = document.getElementById(`item-filter-${key}`)?.value || '';
-    const itemSort = document.getElementById(`item-sort-${key}`)?.value || '';
     const statusFilter = document.getElementById('statusFilter')?.value || '';
     const binFilter = document.getElementById('binFilter')?.value || '';
-    if (itemFilter) url += `&filter=${encodeURIComponent(itemFilter)}`;
-    if (itemSort) url += `&sort=${encodeURIComponent(itemSort)}`;
     if (statusFilter) url += `&statusFilter=${encodeURIComponent(statusFilter)}`;
     if (binFilter) url += `&binFilter=${encodeURIComponent(binFilter)}`;
 
@@ -449,7 +656,7 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
             return response.json();
         })
         .then(data => {
-            console.log('Items data received:', data); // Debug log
+            console.log('Items data received:', data);
             let html = '';
             if (data.items && data.items.length > 0) {
                 let headers = [];
@@ -464,14 +671,6 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                 html += `
                     <div class="item-level-wrapper">
                         <div class="filter-sort-controls">
-                            <input type="text" id="item-filter-${key}" placeholder="Filter items..." value="${itemFilter}" oninput="loadItems('${category}', '${subcategory}', '${commonName}', '${targetId}', 1)">
-                            <select id="item-sort-${key}" onchange="loadItems('${category}', '${subcategory}', '${commonName}', '${targetId}', 1)">
-                                <option value="">Sort By...</option>
-                                <option value="tag_id_asc" ${itemSort === 'tag_id_asc' ? 'selected' : ''}>Tag ID (A-Z)</option>
-                                <option value="tag_id_desc" ${itemSort === 'tag_id_desc' ? 'selected' : ''}>Tag ID (Z-A)</option>
-                                <option value="last_scanned_date_desc" ${itemSort === 'last_scanned_date_desc' ? 'selected' : ''}>Last Scanned (Newest)</option>
-                                <option value="last_scanned_date_asc" ${itemSort === 'last_scanned_date_asc' ? 'selected' : ''}>Last Scanned (Oldest)</option>
-                            </select>
                 `;
 
                 if (window.cachedTabNum == 5) {
@@ -499,7 +698,24 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                         <table class="item-table" id="item-table-${key}">
                             <thead>
                                 <tr>
-                                    ${headers.map(header => `<th>${header}</th>`).join('')}
+                                    ${headers.map((header, index) => {
+                                        const sortableColumns = ['Tag ID', 'Common Name', 'Bin Location', 'Status', 'Last Contract', 'Last Scanned Date', 'Quality', 'Notes'];
+                                        if (sortableColumns.includes(header)) {
+                                            const columnKey = header.toLowerCase().replace(/\s+/g, '_');
+                                            return `<th onclick="sortItems('${key}', '${columnKey}', '${category}', '${subcategory}', '${commonName}')">${header} <span class="sort-arrow"></span></th>`;
+                                        }
+                                        return `<th>${header}</th>`;
+                                    }).join('')}
+                                </tr>
+                                <tr class="filter-row">
+                                    ${headers.map((header, index) => {
+                                        const filterableColumns = ['Select', 'Actions'];
+                                        if (!filterableColumns.includes(header)) {
+                                            const columnKey = header.toLowerCase().replace(/\s+/g, '_');
+                                            return `<th><input type="text" class="column-filter" data-column="${columnKey}" placeholder="Filter..." oninput="filterItems('${key}')"></th>`;
+                                        }
+                                        return `<th><button class="btn btn-sm btn-secondary clear-filters" onclick="clearItemFilters('${key}')">Clear Filters</button></th>`;
+                                    }).join('')}
                                 </tr>
                             </thead>
                             <tbody>
@@ -581,6 +797,7 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                 html += `
                             </tbody>
                         </table>
+                        <div class="row-count" id="item-row-count-${key}">Rows: ${data.items.length} / ${data.total_items}</div>
                 `;
 
                 // Add pagination for items if total_items exceeds per_page
@@ -630,6 +847,273 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
         .finally(() => {
             hideLoading(key);
         });
+}
+
+// Note: Sort Items Table
+let itemSortState = {};
+function sortItems(targetId, column, category, subcategory, commonName) {
+    if (!itemSortState[targetId]) {
+        itemSortState[targetId] = { column: '', direction: '' };
+    }
+
+    const currentSort = itemSortState[targetId];
+    let direction = 'asc';
+    if (currentSort.column === column) {
+        direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
+    }
+
+    itemSortState[targetId] = { column, direction };
+
+    // Update sort arrows
+    const headers = document.querySelectorAll(`#item-table-${targetId} thead tr:first-child th`);
+    headers.forEach(header => {
+        const sortArrow = header.querySelector('.sort-arrow');
+        if (header.textContent.trim().toLowerCase().replace(/\s+/g, '_') === column) {
+            sortArrow.textContent = direction === 'asc' ? '↑' : '↓';
+        } else {
+            sortArrow.textContent = '';
+        }
+    });
+
+    // Fetch sorted data from server
+    const page = 1; // Reset to first page on sort
+    let url = `/tab/${window.cachedTabNum}/data?common_name=${encodeURIComponent(commonName)}&page=${page}&subcategory=${encodeURIComponent(subcategory)}&category=${encodeURIComponent(category)}&sort=${column}_${direction}`;
+    const statusFilter = document.getElementById('statusFilter')?.value || '';
+    const binFilter = document.getElementById('binFilter')?.value || '';
+    if (statusFilter) url += `&statusFilter=${encodeURIComponent(statusFilter)}`;
+    if (binFilter) url += `&binFilter=${encodeURIComponent(binFilter)}`;
+
+    fetch(url)
+        .then(response => response.json())
+        .then(data => {
+            const container = document.getElementById(targetId);
+            let html = `
+                <div class="item-level-wrapper">
+                    <div class="filter-sort-controls">
+            `;
+
+            if (window.cachedTabNum == 5) {
+                html += `
+                    <div class="bulk-update-controls">
+                        <select id="bulk-item-bin-location-${targetId}" onchange="updateBulkField('${targetId}', 'item-bin-location')">
+                            <option value="">Update Bin Location...</option>
+                            <option value="resale">resale</option>
+                            <option value="sold">sold</option>
+                            <option value="pack">pack</option>
+                            <option value="burst">burst</option>
+                        </select>
+                        <select id="bulk-item-status-${targetId}" onchange="updateBulkField('${targetId}', 'item-status')">
+                            <option value="">Update Status...</option>
+                            <option value="Ready to Rent">Ready to Rent</option>
+                            <option value="Sold">Sold</option>
+                        </select>
+                        <button class="btn btn-sm btn-primary" onclick="bulkUpdateSelectedItems('${targetId}')">Bulk Update Selected</button>
+                    </div>
+                `;
+            }
+
+            html += `
+                    </div>
+                    <table class="item-table" id="item-table-${targetId}">
+                        <thead>
+                            <tr>
+                                ${window.cachedTabNum == 5 ? `<th>Select</th>` : ''}
+                                <th onclick="sortItems('${targetId}', 'tag_id', '${category}', '${subcategory}', '${commonName}')">
+                                    Tag ID <span class="sort-arrow">${column === 'tag_id' ? (direction === 'asc' ? '↑' : '↓') : ''}</span>
+                                </th>
+                                <th onclick="sortItems('${targetId}', 'common_name', '${category}', '${subcategory}', '${commonName}')">
+                                    Common Name <span class="sort-arrow">${column === 'common_name' ? (direction === 'asc' ? '↑' : '↓') : ''}</span>
+                                </th>
+                                <th onclick="sortItems('${targetId}', 'bin_location', '${category}', '${subcategory}', '${commonName}')">
+                                    Bin Location <span class="sort-arrow">${column === 'bin_location' ? (direction === 'asc' ? '↑' : '↓') : ''}</span>
+                                </th>
+                                <th onclick="sortItems('${targetId}', 'status', '${category}', '${subcategory}', '${commonName}')">
+                                    Status <span class="sort-arrow">${column === 'status' ? (direction === 'asc' ? '↑' : '↓') : ''}</span>
+                                </th>
+                                <th onclick="sortItems('${targetId}', 'last_contract', '${category}', '${subcategory}', '${commonName}')">
+                                    Last Contract <span class="sort-arrow">${column === 'last_contract' ? (direction === 'asc' ? '↑' : '↓') : ''}</span>
+                                </th>
+                                <th onclick="sortItems('${targetId}', 'last_scanned_date', '${category}', '${subcategory}', '${commonName}')">
+                                    Last Scanned Date <span class="sort-arrow">${column === 'last_scanned_date' ? (direction === 'asc' ? '↑' : '↓') : ''}</span>
+                                </th>
+                                <th onclick="sortItems('${targetId}', 'quality', '${category}', '${subcategory}', '${commonName}')">
+                                    Quality <span class="sort-arrow">${column === 'quality' ? (direction === 'asc' ? '↑' : '↓') : ''}</span>
+                                </th>
+                                <th onclick="sortItems('${targetId}', 'notes', '${category}', '${subcategory}', '${commonName}')">
+                                    Notes <span class="sort-arrow">${column === 'notes' ? (direction === 'asc' ? '↑' : '↓') : ''}</span>
+                                </th>
+                                ${window.cachedTabNum == 5 ? `<th>Actions</th>` : ''}
+                            </tr>
+                            <tr class="filter-row">
+                                ${window.cachedTabNum == 5 ? `<th></th>` : ''}
+                                <th><input type="text" class="column-filter" data-column="tag_id" placeholder="Filter..." oninput="filterItems('${targetId}')"></th>
+                                <th><input type="text" class="column-filter" data-column="common_name" placeholder="Filter..." oninput="filterItems('${targetId}')"></th>
+                                <th><input type="text" class="column-filter" data-column="bin_location" placeholder="Filter..." oninput="filterItems('${targetId}')"></th>
+                                <th><input type="text" class="column-filter" data-column="status" placeholder="Filter..." oninput="filterItems('${targetId}')"></th>
+                                <th><input type="text" class="column-filter" data-column="last_contract" placeholder="Filter..." oninput="filterItems('${targetId}')"></th>
+                                <th><input type="text" class="column-filter" data-column="last_scanned_date" placeholder="Filter..." oninput="filterItems('${targetId}')"></th>
+                                <th><input type="text" class="column-filter" data-column="quality" placeholder="Filter..." oninput="filterItems('${targetId}')"></th>
+                                <th><input type="text" class="column-filter" data-column="notes" placeholder="Filter..." oninput="filterItems('${targetId}')"></th>
+                                ${window.cachedTabNum == 5 ? `<th><button class="btn btn-sm btn-secondary clear-filters" onclick="clearItemFilters('${targetId}')">Clear Filters</button></th>` : `<th></th>`}
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+
+            data.items.forEach(item => {
+                const lastScanned = item.last_scanned_date ? new Date(item.last_scanned_date).toLocaleString() : 'N/A';
+                if (window.cachedTabNum == 5) {
+                    const currentStatus = item.status || 'N/A';
+                    const canSetReadyToRent = currentStatus === 'On Rent' || currentStatus === 'Delivered' || currentStatus === 'Sold';
+                    html += `
+                        <tr data-item-id="${item.tag_id}">
+                            <td><input type="checkbox" value="${item.tag_id}" class="item-select"></td>
+                            <td>${item.tag_id}</td>
+                            <td>${item.common_name}</td>
+                            <td>
+                                <select id="bin-location-${item.tag_id}">
+                                    <option value="" ${!item.bin_location ? 'selected' : ''}>Select Bin Location</option>
+                                    <option value="resale" ${item.bin_location === 'resale' ? 'selected' : ''}>resale</option>
+                                    <option value="sold" ${item.bin_location === 'sold' ? 'selected' : ''}>sold</option>
+                                    <option value="pack" ${item.bin_location === 'pack' ? 'selected' : ''}>pack</option>
+                                    <option value="burst" ${item.bin_location === 'burst' ? 'selected' : ''}>burst</option>
+                                </select>
+                            </td>
+                            <td>
+                                <select id="status-${item.tag_id}">
+                                    <option value="${currentStatus}" selected>${currentStatus}</option>
+                                    <option value="Ready to Rent" ${canSetReadyToRent ? '' : 'disabled'}>Ready to Rent</option>
+                                    <option value="Sold">Sold</option>
+                                    <option value="On Rent" disabled>On Rent</option>
+                                    <option value="Delivered" disabled>Delivered</option>
+                                </select>
+                            </td>
+                            <td>${item.last_contract_num || 'N/A'}</td>
+                            <td>${lastScanned}</td>
+                            <td>${item.quality || 'N/A'}</td>
+                            <td>${item.notes || 'N/A'}</td>
+                            <td>
+                                <button class="btn btn-sm btn-primary save-btn" onclick="updateItem('${item.tag_id}', '${targetId}', '${category}', '${subcategory}', '${item.common_name}', '${targetId}')">Save</button>
+                            </td>
+                        </tr>
+                    `;
+                } else if (window.cachedTabNum == 1) {
+                    html += `
+                        <tr data-item-id="${item.tag_id}">
+                            <td>${item.tag_id}</td>
+                            <td>${item.common_name}</td>
+                            <td class="editable" onclick="showDropdown(event, this, 'bin-location', '${item.tag_id}', '${item.bin_location || ''}')">${item.bin_location || 'N/A'}</td>
+                            <td class="editable" onclick="showDropdown(event, this, 'status', '${item.tag_id}', '${item.status}')">${item.status}</td>
+                            <td>${item.last_contract_num || 'N/A'}</td>
+                            <td>${lastScanned}</td>
+                            <td>${item.quality || 'N/A'}</td>
+                            <td>${item.notes || 'N/A'}</td>
+                            <div id="dropdown-bin-location-${item.tag_id}" class="dropdown-menu">
+                                <a class="dropdown-item" href="#" onclick="selectOption(event, this, 'bin-location', '${item.tag_id}', 'resale')">resale</a>
+                                <a class="dropdown-item" href="#" onclick="selectOption(event, this, 'bin-location', '${item.tag_id}', 'sold')">sold</a>
+                                <a class="dropdown-item" href="#" onclick="selectOption(event, this, 'bin-location', '${item.tag_id}', 'pack')">pack</a>
+                                <a class="dropdown-item" href="#" onclick="selectOption(event, this, 'bin-location', '${item.tag_id}', 'burst')">burst</a>
+                            </div>
+                            <div id="dropdown-status-${item.tag_id}" class="dropdown-menu">
+                                <a class="dropdown-item" href="#" onclick="selectOption(event, this, 'status', '${item.tag_id}', 'Ready to Rent')" ${item.status !== 'On Rent' && item.status !== 'Delivered' ? 'style="pointer-events: none; color: #ccc;"' : ''}>Ready to Rent</a>
+                            </div>
+                        </tr>
+                    `;
+                } else {
+                    html += `
+                        <tr>
+                            <td>${item.tag_id}</td>
+                            <td>${item.common_name}</td>
+                            <td>${item.bin_location || 'N/A'}</td>
+                            <td>${item.status}</td>
+                            <td>${item.last_contract_num || 'N/A'}</td>
+                            <td>${lastScanned}</td>
+                        </tr>
+                    `;
+                }
+            });
+
+            html += `
+                        </tbody>
+                    </table>
+                    <div class="row-count" id="item-row-count-${targetId}">Rows: ${data.items.length} / ${data.total_items}</div>
+            `;
+
+            if (data.total_items > data.per_page) {
+                const totalPages = Math.ceil(data.total_items / data.per_page);
+                html += `
+                    <div class="pagination-controls">
+                        <button class="btn btn-sm btn-secondary" onclick="loadItems('${category}', '${subcategory}', '${commonName}', '${targetId}', ${data.page - 1})" ${data.page === 1 ? 'disabled' : ''}>Previous</button>
+                        <span>Page ${data.page} of ${totalPages}</span>
+                        <button class="btn btn-sm btn-secondary" onclick="loadItems('${category}', '${subcategory}', '${commonName}', '${targetId}', ${data.page + 1})" ${data.page === totalPages ? 'disabled' : ''}>Next</button>
+                    </div>
+                `;
+            }
+
+            html += `
+                </div>
+            `;
+
+            container.innerHTML = html;
+            container.classList.remove('collapsed');
+            container.classList.add('expanded');
+            container.style.display = 'block';
+            container.style.opacity = '1';
+        })
+        .catch(error => {
+            console.error('Sort items error:', error);
+        });
+}
+
+// Note: Filter Items Table (Client-Side)
+function filterItems(targetId) {
+    const table = document.querySelector(`#item-table-${targetId}`);
+    const rows = table.querySelectorAll('tbody tr');
+    const filters = {};
+    const filterInputs = table.querySelectorAll('.column-filter');
+
+    filterInputs.forEach(input => {
+        const column = input.getAttribute('data-column');
+        const value = input.value.trim().toLowerCase();
+        if (value) {
+            filters[column] = value;
+        }
+    });
+
+    let visibleRows = 0;
+    rows.forEach(row => {
+        let showRow = true;
+        for (const [column, value] of Object.entries(filters)) {
+            const cellIndex = {
+                'tag_id': window.cachedTabNum == 5 ? 1 : 0,
+                'common_name': window.cachedTabNum == 5 ? 2 : 1,
+                'bin_location': window.cachedTabNum == 5 ? 3 : 2,
+                'status': window.cachedTabNum == 5 ? 4 : 3,
+                'last_contract': window.cachedTabNum == 5 ? 5 : 4,
+                'last_scanned_date': window.cachedTabNum == 5 ? 6 : 5,
+                'quality': window.cachedTabNum == 5 ? 7 : 6,
+                'notes': window.cachedTabNum == 5 ? 8 : 7
+            }[column];
+            const cellValue = row.cells[cellIndex].textContent.toLowerCase();
+            if (!cellValue.includes(value)) {
+                showRow = false;
+                break;
+            }
+        }
+        row.style.display = showRow ? '' : 'none';
+        if (showRow) visibleRows++;
+    });
+
+    const rowCountEl = document.getElementById(`item-row-count-${targetId}`);
+    const totalRows = rows.length;
+    rowCountEl.textContent = `Rows: ${visibleRows} / ${totalRows}`;
+}
+
+// Note: Clear Item Filters
+function clearItemFilters(targetId) {
+    const filterInputs = document.querySelectorAll(`#item-table-${targetId} .column-filter`);
+    filterInputs.forEach(input => input.value = '');
+    filterItems(targetId);
 }
 
 // Note: Used only in Tab 1
