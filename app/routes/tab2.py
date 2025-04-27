@@ -29,7 +29,7 @@ logger.addHandler(console_handler)
 tab2_bp = Blueprint('tab2', __name__)
 
 # Version marker
-logger.info("Deployed tab2.py version: 2025-04-27-v3")
+logger.info("Deployed tab2.py version: 2025-04-27-v4")
 
 @tab2_bp.route('/tab/2')
 def tab2_view():
@@ -49,7 +49,7 @@ def tab2_view():
             ItemMaster.status.in_(['On Rent', 'Delivered']),
             ItemMaster.last_contract_num != None,
             ItemMaster.last_contract_num != '00000',
-            ~func.lower(func.trim(ItemMaster.last_contract_num)).like('[lL]%')  # Exclude laundry contracts
+            ~func.trim(ItemMaster.last_contract_num).op('REGEXP')('^L[0-9]+$')  # Exclude laundry contracts
         ).group_by(
             ItemMaster.last_contract_num
         ).having(
@@ -98,7 +98,7 @@ def tab2_view():
         return render_template('tab2.html', contracts=contracts, cache_bust=int(time()))
     except Exception as e:
         logger.error(f"Error rendering Tab 2: {str(e)}", exc_info=True)
-        current_app.logger.error(f"Error rendering cuts Tab 2: {str(e)}", exc_info=True)
+        current_app.logger.error(f"Error rendering Tab 2: {str(e)}", exc_info=True)
         session.close()
         return render_template('tab2.html', contracts=[], cache_bust=int(time()))
 
