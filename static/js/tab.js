@@ -122,10 +122,12 @@ async function printTable(level, id, commonName = null, category = null, subcate
         if (level === 'Contract') {
             let commonTable;
             if (id.startsWith('common-')) {
-                // If printing an expanded common names table directly
-                commonTable = printElement;
+                // Check if the common table is expanded
+                if (printElement.classList.contains('expanded')) {
+                    commonTable = printElement.querySelector('.common-table');
+                }
             } else {
-                // Otherwise, find the expanded common names table for the contract
+                // Find the corresponding expandable section
                 const row = element.closest('tr');
                 if (row) {
                     const nextRow = row.nextElementSibling;
@@ -141,7 +143,7 @@ async function printTable(level, id, commonName = null, category = null, subcate
             if (commonTable) {
                 tableWrapper = commonTable.cloneNode(true);
             } else {
-                // If no common table is expanded, fetch the common names data
+                // Fetch the common names data if not expanded
                 const url = `/tab/${tabNum}/common_names?contract_number=${encodeURIComponent(contractNumber)}`;
                 const response = await fetch(url);
                 const data = await response.json();
@@ -208,6 +210,43 @@ async function printTable(level, id, commonName = null, category = null, subcate
                         color: #666;
                         margin: 5px 0;
                     }
+                    table {
+                        border-collapse: collapse;
+                        width: 100%;
+                        margin-top: 20px;
+                    }
+                    th, td {
+                        border: 1px solid #ccc;
+                        padding: 12px;
+                        text-align: center;
+                        font-size: 14px;
+                        white-space: normal;
+                        word-wrap: break-word;
+                    }
+                    th {
+                        background-color: #f2f2f2;
+                        font-weight: bold;
+                    }
+                    td {
+                        vertical-align: middle;
+                    }
+                    .hidden {
+                        display: none;
+                    }
+                    .common-level {
+                        margin-left: 1rem;
+                        background-color: #e9ecef;
+                        padding: 0.5rem;
+                        border-left: 3px solid #28a745;
+                        margin-top: 10px;
+                    }
+                    .item-level-wrapper {
+                        margin-left: 1rem;
+                        background-color: #dee2e6;
+                        padding: 0.5rem;
+                        border-left: 3px solid #dc3545;
+                        margin-top: 10px;
+                    }
                     .signature-line {
                         margin-top: 40px;
                         border-top: 1px solid #000;
@@ -215,6 +254,29 @@ async function printTable(level, id, commonName = null, category = null, subcate
                         text-align: center;
                         padding-top: 10px;
                         font-size: 14px;
+                    }
+                    @media print {
+                        body {
+                            margin: 0;
+                        }
+                        .print-header {
+                            position: static;
+                            width: 100%;
+                            margin-bottom: 20px;
+                        }
+                        table {
+                            page-break-inside: auto;
+                        }
+                        tr {
+                            page-break-inside: avoid;
+                            page-break-after: auto;
+                        }
+                        th, td {
+                            font-size: 10px;
+                            padding: 4px;
+                            word-break: break-word;
+                            text-align: center;
+                        }
                     }
                 </style>
             </head>
@@ -283,7 +345,7 @@ async function printFullItemList(category, subcategory, commonName) {
                     <td>${item.bin_location || 'N/A'}</td>
                     <td>${item.status}</td>
                     <td>${item.last_contract_num || 'N/A'}</td>
-                    <td>${item.last_scanned_date || 'N/A'}</td>
+                    <td>${formatDateTime(item.last_scanned_date)}</td>
                     <td>${item.quality || 'N/A'}</td>
                     <td>${item.notes || 'N/A'}</td>
                 </tr>
@@ -319,6 +381,26 @@ async function printFullItemList(category, subcategory, commonName) {
                         color: #666;
                         margin: 5px 0;
                     }
+                    table {
+                        border-collapse: collapse;
+                        width: 100%;
+                        margin-top: 20px;
+                    }
+                    th, td {
+                        border: 1px solid #ccc;
+                        padding: 8px;
+                        text-align: center;
+                        font-size: 12px;
+                        white-space: normal;
+                        word-wrap: break-word;
+                    }
+                    th {
+                        background-color: #f2f2f2;
+                        font-weight: bold;
+                    }
+                    td {
+                        vertical-align: middle;
+                    }
                     .signature-line {
                         margin-top: 40px;
                         border-top: 1px solid #000;
@@ -326,6 +408,29 @@ async function printFullItemList(category, subcategory, commonName) {
                         text-align: center;
                         padding-top: 10px;
                         font-size: 14px;
+                    }
+                    @media print {
+                        body {
+                            margin: 0;
+                        }
+                        .print-header {
+                            position: static;
+                            width: 100%;
+                            margin-bottom: 20px;
+                        }
+                        table {
+                            page-break-inside: auto;
+                        }
+                        tr {
+                            page-break-inside: avoid;
+                            page-break-after: auto;
+                        }
+                        th, td {
+                            font-size: 10px;
+                            padding: 4px;
+                            word-break: break-word;
+                            text-align: center;
+                        }
                     }
                 </style>
             </head>

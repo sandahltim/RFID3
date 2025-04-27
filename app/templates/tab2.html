@@ -35,7 +35,9 @@
         <tbody id="category-rows">
             {% for contract in contracts %}
             <tr>
-                <td>{{ contract.contract_number }}</td>
+                <td class="expandable-cell" onclick="window.expandCategory('{{ contract.contract_number | urlencode | replace('\'', '\\\'') | replace('"', '\\"') }}', 'common-{{ contract.contract_number }}', '{{ contract.contract_number }}')">
+                    {{ contract.contract_number }}
+                </td>
                 <td>{{ contract.client_name }}</td>
                 <td>{{ contract.items_on_contract }}</td>
                 <td>{{ contract.total_items_inventory }}</td>
