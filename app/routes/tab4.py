@@ -1,25 +1,25 @@
 from flask import Blueprint, render_template, request, jsonify, current_app
 from .. import db, cache
 from ..models.db_models import Transaction, ItemMaster, HandCountedItems
-from sqlalchemy import func, desc, asc, or_
+from sqlalchemy import func, desc, asc
 from time import time
 from datetime import datetime
 import logging
 import sys
 
-# Configure logging
+# Configure logging for Tab 4
 logger = logging.getLogger('tab4')
 logger.setLevel(logging.DEBUG)  # Change to DEBUG for more detailed logging
 
 # Remove existing handlers to avoid duplicates
 logger.handlers = []
 
-# File handler for rfid_dashboard.log
-file_handler = logging.FileHandler('/home/tim/test_rfidpi/logs/rfid_dashboard.log')
-file_handler.setLevel(logging.DEBUG)
+# File handler for tab4.log
+tab4_file_handler = logging.FileHandler('/home/tim/test_rfidpi/logs/tab4.log')
+tab4_file_handler.setLevel(logging.DEBUG)
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-file_handler.setFormatter(formatter)
-logger.addHandler(file_handler)
+tab4_file_handler.setFormatter(formatter)
+logger.addHandler(tab4_file_handler)
 
 # Console handler
 console_handler = logging.StreamHandler(sys.stdout)
@@ -27,10 +27,16 @@ console_handler.setLevel(logging.DEBUG)
 console_handler.setFormatter(formatter)
 logger.addHandler(console_handler)
 
+# Also log to the main rfid_dashboard.log
+main_file_handler = logging.FileHandler('/home/tim/test_rfidpi/logs/rfid_dashboard.log')
+main_file_handler.setLevel(logging.DEBUG)
+main_file_handler.setFormatter(formatter)
+logger.addHandler(main_file_handler)
+
 tab4_bp = Blueprint('tab4', __name__)
 
 # Version marker
-logger.info("Deployed tab4.py version: 2025-04-27-v22")
+logger.info("Deployed tab4.py version: 2025-04-27-v23")
 
 @tab4_bp.route('/tab/4')
 def tab4_view():
@@ -41,62 +47,65 @@ def tab4_view():
 
         # Step 1: Query ItemMaster for items with status 'On Rent' or 'Delivered' and contract starting with 'L'
         logger.info("Fetching items from id_item_master with status 'On Rent' or 'Delivered' and contract starting with 'L'")
-        item_master_query = session.query(
+        item_master_contracts = session.query(
             ItemMaster.last_contract_num.label('contract_number'),
-            func.count(ItemMaster.tag_id).label('items_on_contract'),
-            func.sum(func.case([(ItemMaster.status.in_(['On Rent', 'Delivered']), 1)], else_=0)).label('items_on_contract_filtered')
+            func.count(ItemMaster.tag_id).label('items_on_contract')
         ).filter(
             ItemMaster.last_contract_num != None,
             ItemMaster.last_contract_num != '00000',
+            ItemMaster.status.in_(['On Rent', 'Delivered']),
             func.upper(ItemMaster.last_contract_num).like('L%')
         ).group_by(
             ItemMaster.last_contract_num
         ).having(
             func.count(ItemMaster.tag_id) > 0
-        ).subquery()
-
-        # Step 2: Join with Transaction to get the latest transaction details for each contract
-        logger.info("Joining with Transaction to get latest transaction details")
-        latest_transaction_subquery = session.query(
-            Transaction.contract_number,
-            Transaction.client_name,
-            Transaction.scan_date,
-            func.row_number().over(
-                partition_by=Transaction.contract_number,
-                order_by=desc(Transaction.scan_date)
-            ).label('rn')
-        ).filter(
-            Transaction.contract_number.in_(
-                session.query(item_master_query.c.contract_number)
-            ),
-            Transaction.scan_type == 'Rental'
-        ).subquery()
-
-        latest_transactions = session.query(
-            latest_transaction_subquery.c.contract_number,
-            latest_transaction_subquery.c.client_name,
-            latest_transaction_subquery.c.scan_date
-        ).filter(
-            latest_transaction_subquery.c.rn == 1
-        ).subquery()
-
-        # Step 3: Combine ItemMaster data with Transaction data
-        contracts_from_items = session.query(
-            item_master_query.c.contract_number,
-            latest_transactions.c.client_name,
-            latest_transactions.c.scan_date,
-            item_master_query.c.items_on_contract,
-            item_master_query.c.items_on_contract_filtered
-        ).outerjoin(
-            latest_transactions,
-            item_master_query.c.contract_number == latest_transactions.c.contract_number
         ).all()
 
-        logger.info(f"Contracts from ItemMaster after joining with Transaction: {[(c.contract_number, c.items_on_contract_filtered) for c in contracts_from_items]}")
+        logger.info(f"Contracts from ItemMaster: {[(c.contract_number, c.items_on_contract) for c in item_master_contracts]}")
+
+        # Step 2: Fetch total_items_inventory for these contracts
+        contract_numbers_from_items = [c.contract_number for c in item_master_contracts]
+        total_items_inventory_query = session.query(
+            ItemMaster.last_contract_num.label('contract_number'),
+            func.count(ItemMaster.tag_id).label('total_items_inventory')
+        ).filter(
+            ItemMaster.last_contract_num.in_(contract_numbers_from_items)
+        ).group_by(
+            ItemMaster.last_contract_num
+        ).all()
+
+        total_items_inventory_dict = {item.contract_number: item.total_items_inventory for item in total_items_inventory_query}
+        logger.info(f"Total items inventory for ItemMaster contracts: {total_items_inventory_dict}")
+
+        # Step 3: Fetch the latest transaction details for these contracts
+        logger.info("Fetching latest transaction details for ItemMaster contracts")
+        latest_transactions = {}
+        if contract_numbers_from_items:
+            transaction_query = session.query(
+                Transaction.contract_number,
+                Transaction.client_name,
+                Transaction.scan_date
+            ).filter(
+                Transaction.contract_number.in_(contract_numbers_from_items),
+                Transaction.scan_type == 'Rental'
+            ).order_by(
+                Transaction.contract_number,
+                desc(Transaction.scan_date)
+            ).distinct(
+                Transaction.contract_number
+            ).all()
+
+            latest_transactions = {
+                t.contract_number: {
+                    'client_name': t.client_name if t.client_name else 'N/A',
+                    'scan_date': t.scan_date.isoformat() if t.scan_date else 'N/A'
+                } for t in transaction_query
+            }
+        logger.info(f"Latest transactions for ItemMaster contracts: {latest_transactions}")
 
         # Step 4: Fetch hand-counted items for contracts starting with 'L'
         logger.info("Fetching hand-counted items for contracts starting with 'L'")
-        hand_counted_query = session.query(
+        hand_counted_contracts = session.query(
             HandCountedItems.contract_number,
             func.sum(HandCountedItems.quantity).label('hand_counted_items_total')
         ).filter(
@@ -109,25 +118,26 @@ def tab4_view():
             func.sum(HandCountedItems.quantity) > 0
         ).all()
 
-        logger.info(f"Hand-counted contracts: {[(c.contract_number, c.hand_counted_items_total) for c in hand_counted_query]}")
+        logger.info(f"Hand-counted contracts: {[(c.contract_number, c.hand_counted_items_total) for c in hand_counted_contracts]}")
 
         # Step 5: Combine ItemMaster and HandCountedItems data
         contracts_dict = {}
-        
+
         # Process ItemMaster contracts
-        for contract in contracts_from_items:
+        for contract in item_master_contracts:
             contract_number = contract.contract_number
+            transaction_info = latest_transactions.get(contract_number, {'client_name': 'N/A', 'scan_date': 'N/A'})
             contracts_dict[contract_number] = {
                 'contract_number': contract_number,
-                'client_name': contract.client_name if contract.client_name else 'N/A',
-                'scan_date': contract.scan_date.isoformat() if contract.scan_date else 'N/A',
-                'items_on_contract': contract.items_on_contract_filtered or 0,  # Only On Rent or Delivered
-                'total_items_inventory': contract.items_on_contract or 0,  # All items
+                'client_name': transaction_info['client_name'],
+                'scan_date': transaction_info['scan_date'],
+                'items_on_contract': contract.items_on_contract or 0,
+                'total_items_inventory': total_items_inventory_dict.get(contract_number, 0),
                 'hand_counted_items': 0
             }
 
         # Add or update with HandCountedItems
-        for hc_contract in hand_counted_query:
+        for hc_contract in hand_counted_contracts:
             contract_number = hc_contract.contract_number
             hand_counted_total = hc_contract.hand_counted_items_total or 0
 
@@ -137,7 +147,7 @@ def tab4_view():
                 contracts_dict[contract_number]['items_on_contract'] += hand_counted_total
             else:
                 # New contract from HandCountedItems
-                # We need to fetch total_items_inventory and transaction details
+                # Fetch total_items_inventory
                 total_items_inventory = session.query(func.count(ItemMaster.tag_id)).filter(
                     ItemMaster.last_contract_num == contract_number
                 ).scalar() or 0
