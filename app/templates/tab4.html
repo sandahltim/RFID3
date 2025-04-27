@@ -25,6 +25,7 @@
                 <th>Customer Name</th>
                 <th>Items on Contract</th>
                 <th>Total Items in Inventory</th>
+                <th>Hand-Counted Entries</th>
                 <th>Last Scanned Date</th>
                 <th>Actions</th>
             </tr>
@@ -38,6 +39,7 @@
                 <td>{{ contract.client_name }}</td>
                 <td>{{ contract.items_on_contract }}</td>
                 <td>{{ contract.total_items_inventory }}</td>
+                <td>{{ contract.hand_counted_items }}</td>
                 <td>{{ contract.scan_date }}</td>
                 <td>
                     <button class="btn btn-sm btn-secondary expand-btn" data-contract-number="{{ contract.contract_number }}" data-target-id="common-{{ contract.contract_number }}">Expand</button>
@@ -47,7 +49,7 @@
                 </td>
             </tr>
             <tr>
-                <td colspan="6">
+                <td colspan="7">
                     <div id="common-{{ contract.contract_number }}" class="expandable collapsed"></div>
                 </td>
             </tr>
@@ -153,6 +155,8 @@ function addHandCountedItem() {
             document.getElementById('hand-counted-employee').value = '';
             // Refresh the hand-counted items table
             filterHandCountedItems();
+            // Refresh the entire page to update the contracts table
+            setTimeout(() => refreshTab(), 500);
         }
     })
     .catch(error => {
@@ -199,6 +203,8 @@ function removeHandCountedItem() {
             document.getElementById('hand-counted-employee').value = '';
             // Refresh the hand-counted items table
             filterHandCountedItems();
+            // Refresh the entire page to update the contracts table
+            setTimeout(() => refreshTab(), 500);
         }
     })
     .catch(error => {
