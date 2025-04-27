@@ -30,7 +30,7 @@ logger.addHandler(console_handler)
 tab4_bp = Blueprint('tab4', __name__)
 
 # Version marker
-logger.info("Deployed tab4.py version: 2025-04-27-v16")
+logger.info("Deployed tab4.py version: 2025-04-27-v17")
 
 @tab4_bp.route('/tab/4')
 def tab4_view():
@@ -50,13 +50,17 @@ def tab4_view():
         logger.info("Database connection test successful")
         current_app.logger.info("Database connection test successful")
 
+        # Debug: Fetch all distinct contract numbers to see what's in the database
+        all_contracts = session.query(ItemMaster.last_contract_num).distinct().all()
+        logger.debug(f"All distinct contract numbers in ItemMaster: {[c[0] for c in all_contracts]}")
+
         # Step 1: Fetch contract numbers from id_item_master (laundry contracts)
         logger.info("Fetching laundry contracts from id_item_master")
         item_master_contracts_query = session.query(
             ItemMaster.last_contract_num,
             func.count(ItemMaster.tag_id).label('total_items')
         ).filter(
-            func.trim(ItemMaster.last_contract_num).op('REGEXP')('^L[0-9]*$'),
+            func.trim(func.lower(ItemMaster.last_contract_num)).op('REGEXP')('^l[0-9]*$'),
             ItemMaster.last_contract_num != None,
             ItemMaster.last_contract_num != '00000'
         ).group_by(
@@ -83,7 +87,7 @@ def tab4_view():
             HandCountedItems.contract_number,
             func.count(HandCountedItems.id).label('hand_counted_entries')
         ).filter(
-            func.trim(HandCountedItems.contract_number).op('REGEXP')('^L[0-9]*$'),
+            func.trim(func.lower(HandCountedItems.contract_number)).op('REGEXP')('^l[0-9]*$'),
             HandCountedItems.contract_number != None
         ).group_by(
             HandCountedItems.contract_number
@@ -110,9 +114,15 @@ def tab4_view():
             logger.debug(f"Processing contract: {contract_number}")
             current_app.logger.debug(f"Processing contract: {contract_number}")
 
-            # Count items on this contract from id_item_master (temporarily remove status filter for debugging)
+            # Count items on this contract from id_item_master (status filter removed for debugging)
             items_on_contract = session.query(func.count(ItemMaster.tag_id)).filter(
                 ItemMaster.last_contract_num == contract_number
+            ).scalar()
+
+            # Count items with status 'On Rent' or 'Delivered' for display
+            items_on_contract_status = session.query(func.count(ItemMaster.tag_id)).filter(
+                ItemMaster.last_contract_num == contract_number,
+                ItemMaster.status.in_(['On Rent', 'Delivered'])
             ).scalar()
 
             # Total items in inventory for this contract from id_item_master
@@ -126,7 +136,7 @@ def tab4_view():
             ).scalar()
 
             # Log the counts for debugging
-            logger.debug(f"Contract {contract_number}: items_on_contract={items_on_contract}, total_items_inventory={total_items_inventory}, hand_counted_items={hand_counted_items}")
+            logger.debug(f"Contract {contract_number}: items_on_contract={items_on_contract}, items_on_contract_status={items_on_contract_status}, total_items_inventory={total_items_inventory}, hand_counted_items={hand_counted_items}")
 
             # Skip contracts with no items on contract and no hand-counted entries
             if (items_on_contract == 0 or items_on_contract is None) and (hand_counted_items == 0 or hand_counted_items is None):
@@ -146,14 +156,14 @@ def tab4_view():
 
             client_name = latest_transaction.client_name if latest_transaction else 'N/A'
             scan_date = latest_transaction.scan_date.isoformat() if latest_transaction and latest_transaction.scan_date else 'N/A'
-            logger.debug(f"Contract {contract_number}: client_name={client_name}, scan_date={scan_date}, items_on_contract={items_on_contract}, total_items_inventory={total_items_inventory}, hand_counted_items={hand_counted_items}")
-            current_app.logger.debug(f"Contract {contract_number}: client_name={client_name}, scan_date={scan_date}, items_on_contract={items_on_contract}, total_items_inventory={total_items_inventory}, hand_counted_items={hand_counted_items}")
+            logger.debug(f"Contract {contract_number}: client_name={client_name}, scan_date={scan_date}, items_on_contract={items_on_contract_status}, total_items_inventory={total_items_inventory}, hand_counted_items={hand_counted_items}")
+            current_app.logger.debug(f"Contract {contract_number}: client_name={client_name}, scan_date={scan_date}, items_on_contract={items_on_contract_status}, total_items_inventory={total_items_inventory}, hand_counted_items={hand_counted_items}")
 
             contracts.append({
                 'contract_number': contract_number,
                 'client_name': client_name,
                 'scan_date': scan_date,
-                'items_on_contract': items_on_contract or 0,
+                'items_on_contract': items_on_contract_status or 0,
                 'total_items_inventory': total_items_inventory or 0,
                 'hand_counted_items': hand_counted_items or 0
             })

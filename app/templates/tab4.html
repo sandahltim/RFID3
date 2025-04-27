@@ -21,13 +21,22 @@
     <table class="category-table" id="category-table">
         <thead id="category-table-header">
             <tr>
-                <th>Contract Number</th>
-                <th>Customer Name</th>
-                <th>Items on Contract</th>
-                <th>Total Items in Inventory</th>
-                <th>Hand-Counted Entries</th>
-                <th>Last Scanned Date</th>
+                <th>Contract Number <span class="sort-arrow"></span></th>
+                <th>Customer Name <span class="sort-arrow"></span></th>
+                <th>Items on Contract <span class="sort-arrow"></span></th>
+                <th>Total Items in Inventory <span class="sort-arrow"></span></th>
+                <th>Hand-Counted Entries <span class="sort-arrow"></span></th>
+                <th>Last Scanned Date <span class="sort-arrow"></span></th>
                 <th>Actions</th>
+            </tr>
+            <tr class="filter-row">
+                <th><input type="text" class="form-control form-control-sm" placeholder="Filter..." data-column="contract_number"></th>
+                <th><input type="text" class="form-control form-control-sm" placeholder="Filter..." data-column="client_name"></th>
+                <th><input type="text" class="form-control form-control-sm" placeholder="Filter..." data-column="items_on_contract"></th>
+                <th><input type="text" class="form-control form-control-sm" placeholder="Filter..." data-column="total_items_inventory"></th>
+                <th><input type="text" class="form-control form-control-sm" placeholder="Filter..." data-column="hand_counted_items"></th>
+                <th><input type="text" class="form-control form-control-sm" placeholder="Filter..." data-column="scan_date"></th>
+                <th><button class="btn btn-sm btn-secondary clear-filters">Clear Filters</button></th>
             </tr>
         </thead>
         <tbody id="category-rows">
@@ -212,5 +221,15 @@ function removeHandCountedItem() {
         alert('Failed to remove item. Please try again.');
     });
 }
+
+// Apply filters to the category table on load
+document.addEventListener('DOMContentLoaded', function() {
+    const categoryTable = document.getElementById('category-table');
+    if (categoryTable && typeof window.applyFilters === 'function') {
+        window.applyFilters(categoryTable);
+    } else {
+        console.warn('applyFilters function or category-table not found, skipping filter application');
+    }
+});
 </script>
 {% endblock %}
