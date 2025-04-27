@@ -3,6 +3,7 @@
 {% block content %}
 <div class="container mt-4">
     <h2>Laundry Contracts</h2>
+    <!-- Filter and search row -->
     <div class="filter-sort-controls">
         <input type="text" class="form-control" placeholder="Search contract number, customer name, etc." id="searchInput">
         <select class="form-control" id="statusFilter">
@@ -18,6 +19,7 @@
         </select>
         <button class="btn btn-primary" onclick="refreshTab()">Refresh</button>
     </div>
+    <!-- Table for displaying contracts -->
     <table class="category-table" id="category-table">
         <thead id="category-table-header">
             <tr>
@@ -115,6 +117,7 @@
     </table>
 </div>
 
+<!-- JavaScript for refreshing the table and filtering -->
 <script>
 function refreshTab() {
     window.location.reload();
@@ -221,5 +224,35 @@ function removeHandCountedItem() {
         alert('Failed to remove item. Please try again.');
     });
 }
+
+// Apply filters to the contract table based on user input (mirroring tab2.html)
+document.addEventListener('input', function() {
+    const searchInput = document.getElementById('searchInput').value.toLowerCase();
+    const statusFilter = document.getElementById('statusFilter').value.toLowerCase();
+    const binFilter = document.getElementById('binFilter').value.toLowerCase();
+
+    const rows = document.querySelectorAll('#category-rows > tr:not([style*="display: none"]):not(.expandable)');
+    rows.forEach(row => {
+        const contractNumber = row.cells[0].textContent.toLowerCase();
+        const clientName = row.cells[1].textContent.toLowerCase();
+        const matchesSearch = contractNumber.includes(searchInput) || clientName.includes(searchInput);
+
+        if (matchesSearch) {
+            row.style.display = '';
+            // Show the expandable row as well
+            const expandableRow = row.nextElementSibling;
+            if (expandableRow) {
+                expandableRow.style.display = '';
+            }
+        } else {
+            row.style.display = 'none';
+            // Hide the expandable row
+            const expandableRow = row.nextElementSibling;
+            if (expandableRow) {
+                expandableRow.style.display = 'none';
+            }
+        }
+    });
+});
 </script>
 {% endblock %}

@@ -30,56 +30,35 @@ logger.addHandler(console_handler)
 tab4_bp = Blueprint('tab4', __name__)
 
 # Version marker
-logger.info("Deployed tab4.py version: 2025-04-27-v19")
+logger.info("Deployed tab4.py version: 2025-04-27-v20")
 
 @tab4_bp.route('/tab/4')
 def tab4_view():
-    logger.info("Route /tab/4 accessed")
-    current_app.logger.info("Route /tab/4 accessed")
     try:
-        logger.info("Attempting to create database session")
-        current_app.logger.info("Attempting to create database session")
         session = db.session()
-        logger.info("Database session created successfully")
-        current_app.logger.info("Database session created successfully")
+        logger.info("Starting new session for tab4")
+        current_app.logger.info("Starting new session for tab4")
 
-        # Verify database connection
-        logger.info("Testing database connection")
-        current_app.logger.info("Testing database connection")
-        session.execute("SELECT 1")
-        logger.info("Database connection test successful")
-        current_app.logger.info("Database connection test successful")
-
-        # Debug: Fetch all distinct contract numbers to see what's in the database
+        # Debug: Fetch all contract numbers to see what's in the database
         all_contracts = session.query(ItemMaster.last_contract_num).distinct().all()
         logger.debug(f"All distinct contract numbers in ItemMaster: {[c[0] for c in all_contracts]}")
 
-        # Step 1: Fetch contract numbers from id_item_master (laundry contracts)
-        logger.info("Fetching laundry contracts from id_item_master")
+        # Step 1: Fetch contract numbers from id_item_master
+        logger.info("Fetching contracts from id_item_master")
         item_master_contracts_query = session.query(
             ItemMaster.last_contract_num,
             func.count(ItemMaster.tag_id).label('total_items')
         ).filter(
             ItemMaster.last_contract_num != None,
-            ItemMaster.last_contract_num != '00000',
-            func.upper(ItemMaster.last_contract_num).like('L%')  # Include contracts starting with 'L' (case-insensitive)
+            ItemMaster.last_contract_num != '00000'
         ).group_by(
             ItemMaster.last_contract_num
         ).having(
             func.count(ItemMaster.tag_id) > 0
         ).all()
 
-        logger.info(f"Raw laundry contracts from id_item_master: {[(c.last_contract_num, c.total_items) for c in item_master_contracts_query]}")
-        current_app.logger.info(f"Raw laundry contracts from id_item_master: {[(c.last_contract_num, c.total_items) for c in item_master_contracts_query]}")
-
-        # Debug: Log all items for each contract number from id_item_master
-        for contract_number, total_items in item_master_contracts_query:
-            items = session.query(ItemMaster).filter(
-                ItemMaster.last_contract_num == contract_number
-            ).all()
-            logger.debug(f"Items for contract {contract_number} (total {total_items}):")
-            for item in items:
-                logger.debug(f"  tag_id={item.tag_id}, status={item.status}, last_contract_num={item.last_contract_num}")
+        logger.info(f"Raw contracts from id_item_master: {[(c.last_contract_num, c.total_items) for c in item_master_contracts_query]}")
+        current_app.logger.info(f"Raw contracts from id_item_master: {[(c.last_contract_num, c.total_items) for c in item_master_contracts_query]}")
 
         # Step 2: Fetch contract numbers from HandCountedItems
         logger.info("Fetching contract numbers from HandCountedItems")
@@ -87,8 +66,7 @@ def tab4_view():
             HandCountedItems.contract_number,
             func.count(HandCountedItems.id).label('hand_counted_entries')
         ).filter(
-            HandCountedItems.contract_number != None,
-            func.upper(HandCountedItems.contract_number).like('L%')  # Include contracts starting with 'L' (case-insensitive)
+            HandCountedItems.contract_number != None
         ).group_by(
             HandCountedItems.contract_number
         ).having(
@@ -141,10 +119,10 @@ def tab4_view():
             logger.debug(f"Hand-counted items for contract {contract_number}: {[(item.item_name, item.total_quantity) for item in hand_counted_items_query]}")
             logger.debug(f"Total hand-counted items quantity for contract {contract_number}: {hand_counted_items_total}")
 
-            # Combine counts for display (hand-counted items are treated as additional items on contract)
+            # Combine counts for display
             total_items_on_contract = (items_on_contract or 0) + (hand_counted_items_total or 0)
 
-            # Skip contracts with no items on contract (including hand-counted items)
+            # Include contracts that have either items on contract (including hand-counted) or items in inventory
             if total_items_on_contract == 0 and total_items_inventory == 0:
                 logger.debug(f"Skipping contract {contract_number}: No items on contract and no items in inventory")
                 continue
@@ -162,8 +140,6 @@ def tab4_view():
 
             client_name = latest_transaction.client_name if latest_transaction else 'N/A'
             scan_date = latest_transaction.scan_date.isoformat() if latest_transaction and latest_transaction.scan_date else 'N/A'
-            logger.debug(f"Contract {contract_number}: client_name={client_name}, scan_date={scan_date}, items_on_contract={items_on_contract}, total_items_inventory={total_items_inventory}, hand_counted_items_total={hand_counted_items_total}")
-            current_app.logger.debug(f"Contract {contract_number}: client_name={client_name}, scan_date={scan_date}, items_on_contract={items_on_contract}, total_items_inventory={total_items_inventory}, hand_counted_items_total={hand_counted_items_total}")
 
             contracts.append({
                 'contract_number': contract_number,
@@ -175,17 +151,14 @@ def tab4_view():
             })
 
         contracts.sort(key=lambda x: x['contract_number'])
-        logger.info(f"Fetched {len(contracts)} laundry contracts for tab4: {[c['contract_number'] for c in contracts]}")
-        current_app.logger.info(f"Fetched {len(contracts)} laundry contracts for tab4: {[c['contract_number'] for c in contracts]}")
+        logger.info(f"Fetched {len(contracts)} contracts for tab4: {[c['contract_number'] for c in contracts]}")
+        current_app.logger.info(f"Fetched {len(contracts)} contracts for tab4: {[c['contract_number'] for c in contracts]}")
         session.close()
-        logger.info(f"Rendering tab4.html with contracts: {[c['contract_number'] for c in contracts]}")
-        current_app.logger.info(f"Rendering tab4.html with contracts: {[c['contract_number'] for c in contracts]}")
         return render_template('tab4.html', contracts=contracts, cache_bust=int(time()))
     except Exception as e:
         logger.error(f"Error rendering Tab 4: {str(e)}", exc_info=True)
         current_app.logger.error(f"Error rendering Tab 4: {str(e)}", exc_info=True)
-        if 'session' in locals():
-            session.close()
+        session.close()
         return render_template('tab4.html', contracts=[], cache_bust=int(time()))
 
 @tab4_bp.route('/tab/4/common_names')
@@ -269,10 +242,8 @@ def tab4_common_names():
             if not name:
                 continue
             if name in common_names:
-                # If the item name exists in both, add the hand-counted quantity
                 common_names[name]['on_contracts'] += on_contracts or 0
             else:
-                # If only in hand-counted items, add it with zero inventory from id_item_master
                 common_names[name] = {
                     'name': name,
                     'on_contracts': on_contracts or 0,
@@ -379,7 +350,7 @@ def tab4_data():
 
             for item in items:
                 items_data.append({
-                    'tag_id': f"HC-{item.id}",  # Use a pseudo tag_id for hand-counted items
+                    'tag_id': f"HC-{item.id}",
                     'common_name': item.item_name,
                     'bin_location': 'N/A',
                     'status': 'Hand-Counted',
@@ -575,7 +546,7 @@ def remove_hand_counted_item():
 
 @tab4_bp.route('/tab/4/full_items_by_rental_class')
 def full_items_by_rental_class():
-    contract_number = request.args.get('category')  # Using 'category' as contract_number for consistency with JS
+    contract_number = request.args.get('category')
     common_name = request.args.get('common_name')
 
     if not contract_number or not common_name:
