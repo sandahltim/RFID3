@@ -1,174 +1,120 @@
+<!DOCTYPE html>
 {% extends "base.html" %}
 
 {% block title %}Resale/Rental Packs{% endblock %}
 
-{% block head %}
-    {{ super() }}
-    <script src="{{ url_for('static', filename='js/tab1_5.js') }}?v={{ cache_bust }}"></script>
-    <script>
-        window.cachedTabNum = 5;
-        console.log('tab5.html: window.cachedTabNum set to', window.cachedTabNum);
-
-        // Function to populate subcategory dropdowns
-        function populateSubcategoryDropdowns() {
-            console.log('populateSubcategoryDropdowns: Starting to populate subcategory dropdowns');
-            const selects = document.querySelectorAll('.subcategory-select');
-            if (selects.length === 0) {
-                console.warn('populateSubcategoryDropdowns: No subcategory selects found');
-                return;
-            }
-
-            selects.forEach(select => {
-                const category = select.getAttribute('data-category');
-                console.log('populateSubcategoryDropdowns: Fetching subcategories for category:', category);
-
-                fetch(`/tab/${window.cachedTabNum}/subcat_data?category=${encodeURIComponent(category)}`)
-                    .then(response => {
-                        if (!response.ok) {
-                            throw new Error(`HTTP error! Status: ${response.status}`);
-                        }
-                        return response.json();
-                    })
-                    .then(subcatData => {
-                        console.log('populateSubcategoryDropdowns: Received data for category', category, ':', subcatData);
-                        // Clear existing options except the placeholder
-                        select.innerHTML = '<option value="">Select Subcategory...</option>';
-                        if (subcatData.subcategories && subcatData.subcategories.length > 0) {
-                            subcatData.subcategories.forEach(subcat => {
-                                const option = document.createElement('option');
-                                option.value = subcat.subcategory;
-                                option.textContent = subcat.subcategory;
-                                select.appendChild(option);
-                            });
-                        } else {
-                            console.warn('populateSubcategoryDropdowns: No subcategories found for category', category);
-                        }
-                    })
-                    .catch(error => {
-                        console.error('populateSubcategoryDropdowns: Error loading subcategories for category', category, ':', error);
-                    });
-            });
-        }
-
-        // Initialize subcategory dropdowns on page load
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log('DOMContentLoaded: Initializing subcategory dropdowns');
-            populateSubcategoryDropdowns();
-        });
-
-        // Refresh category table when status or bin filter changes
-        document.getElementById('category-filter-form')?.addEventListener('submit', function(event) {
-            event.preventDefault();
-            const formData = new FormData(this);
-            fetch('/tab/5/filter', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.error) {
-                    console.error('Error refreshing categories:', data.error);
-                    return;
-                }
-                const tbody = document.querySelector('#category-table tbody');
-                tbody.innerHTML = '';
-                data.forEach(category => {
-                    const row = document.createElement('tr');
-                    row.innerHTML = `
-                        <td>${category.category}</td>
-                        <td>
-                            <select class="subcategory-select" data-category="${category.category}" onchange="loadCommonNames(this)">
-                                <option value="">Select Subcategory...</option>
-                            </select>
-                        </td>
-                        <td>${category.total_items}</td>
-                        <td>${category.items_on_contracts}</td>
-                        <td>${category.items_in_service}</td>
-                        <td>${category.items_available}</td>
-                        <td>
-                            <button class="btn btn-sm btn-info print-btn" data-print-level="Category" data-print-id="${category.cat_id}" data-category="${category.category}">
-                                Print Category
-                            </button>
-                        </td>
-                    `;
-                    tbody.appendChild(row);
-                    const expandableRow = document.createElement('tr');
-                    expandableRow.innerHTML = `
-                        <td colspan="7">
-                            <div id="common-${category.cat_id}" class="common-level collapsed"></div>
-                        </td>
-                    `;
-                    tbody.appendChild(expandableRow);
-                });
-                populateSubcategoryDropdowns();
-            })
-            .catch(error => {
-                console.error('Error refreshing categories:', error);
-            });
-        });
-    </script>
+{% block extra_head %}
+<script>
+    window.cachedTabNum = 5; // Set tab number
+</script>
 {% endblock %}
 
 {% block content %}
+<div class="container mt-4">
+    <!-- Page title for Tab 5 -->
     <h2>Resale/Rental Packs</h2>
+    <!-- Filter and search row -->
     <div class="filter-sort-controls">
-        <form id="category-filter-form" onsubmit="return false;">
-            <select id="statusFilter" name="statusFilter" onchange="this.form.dispatchEvent(new Event('submit'))">
-                <option value="">ALL STATUSES</option>
-                <option value="Ready to Rent">Ready to Rent</option>
-                <option value="On Rent">On Rent</option>
-                <option value="Delivered">Delivered</option>
-                <option value="Sold">Sold</option>
-            </select>
-            <select id="binFilter" name="binFilter" onchange="this.form.dispatchEvent(new Event('submit'))">
-                <option value="">ALL BIN LOCATIONS</option>
-                <option value="resale">resale</option>
-                <option value="sold">sold</option>
-                <option value="pack">pack</option>
-                <option value="burst">burst</option>
-            </select>
-            <button type="button" class="btn btn-sm btn-primary" onclick="this.form.dispatchEvent(new Event('submit'))">Refresh</button>
-        </form>
-        <button class="btn btn-sm btn-info export-btn" onclick="window.location.href='/tab/5/export_sold_burst_csv'">Export Sold/Burst Items (CSV)</button>
+        <input type="text" id="category-filter" placeholder="Filter categories..." hx-post="/tab/5/filter" hx-target="#category-rows" hx-swap="innerHTML" hx-trigger="input delay:500ms">
+        <select id="category-sort" hx-post="/tab/5/filter" hx-target="#category-rows" hx-swap="innerHTML" hx-trigger="change">
+            <option value="">Sort By...</option>
+            <option value="category_asc">Category (A-Z)</option>
+            <option value="category_desc">Category (Z-A)</option>
+            <option value="total_items_asc">Total Items (Low to High)</option>
+            <option value="total_items_desc">Total Items (High to Low)</option>
+        </select>
+        <select id="statusFilter" hx-post="/tab/5/filter" hx-target="#category-rows" hx-swap="innerHTML" hx-trigger="change">
+            <option value="">All Statuses</option>
+            <option value="On Rent">On Rent</option>
+            <option value="Delivered">Delivered</option>
+            <option value="Ready to Rent">Ready to Rent</option>
+        </select>
+        <select id="binFilter" hx-post="/tab/5/filter" hx-target="#category-rows" hx-swap="innerHTML" hx-trigger="change">
+            <option value="">All Bin Locations</option>
+            <option value="resale">resale</option>
+            <option value="sold">sold</option>
+            <option value="pack">pack</option>
+            <option value="burst">burst</option>
+        </select>
+        <button class="btn btn-primary" onclick="refreshTab()">Refresh</button>
+        <!-- Button to export sold/burst items to CSV (Tab 5 specific) -->
+        <a href="{{ url_for('tab5.export_sold_burst_csv') }}" class="btn btn-info">Export Sold/Burst Items (CSV)</a>
     </div>
-
-    <table class="category-table" id="category-table">
+    <!-- Table for displaying categories -->
+    <table class="table table-bordered category-table" id="category-table">
         <thead>
             <tr>
-                <th>CATEGORY</th>
-                <th>SUBCATEGORY</th>
-                <th>TOTAL ITEMS</th>
-                <th>ITEMS ON CONTRACTS</th>
-                <th>ITEMS IN SERVICE</th>
-                <th>ITEMS AVAILABLE</th>
-                <th>ACTIONS</th>
+                <th>Category</th>
+                <th>Subcategory</th>
+                <th>Total Items</th>
+                <th>Items on Contracts</th>
+                <th>Items in Service</th>
+                <th>Items Available</th>
+                <th>Actions</th>
             </tr>
         </thead>
-        <tbody>
+        <tbody id="category-rows">
             {% for category in categories %}
-                <tr>
-                    <td>{{ category.category }}</td>
-                    <td>
-                        <select class="subcategory-select" data-category="{{ category.category }}" onchange="loadCommonNames(this)">
-                            <option value="">Select Subcategory...</option>
-                        </select>
-                    </td>
-                    <td>{{ category.total_items }}</td>
-                    <td>{{ category.items_on_contracts }}</td>
-                    <td>{{ category.items_in_service }}</td>
-                    <td>{{ category.items_available }}</td>
-                    <td>
-                        <button class="btn btn-sm btn-info print-btn" data-print-level="Category" data-print-id="{{ category.cat_id }}" data-category="{{ category.category }}">
-                            Print Category
-                        </button>
-                    </td>
-                </tr>
-                <tr>
-                    <td colspan="7">
-                        <div id="common-{{ category.cat_id }}" class="common-level collapsed"></div>
-                    </td>
-                </tr>
+            <tr>
+                <td>{{ category.category }}</td>
+                <td>
+                    <select class="subcategory-select" data-category="{{ category.category | urlencode | replace('\'', '\\\'') | replace('\"', '\\\"') }}" onchange="loadCommonNames(this)">
+                        <option value="">Select Subcategory...</option>
+                        <!-- Subcategories will be populated dynamically via JavaScript -->
+                    </select>
+                    <div id="loading-subcat-{{ category.cat_id }}" class="loading-indicator" style="display: none;">Loading...</div>
+                </td>
+                <td>{{ category.total_items }}</td>
+                <td>{{ category.items_on_contracts }}</td>
+                <td>{{ category.items_in_service }}</td>
+                <td>{{ category.items_available }}</td>
+                <td>
+                    <button class="btn btn-sm btn-info print-btn" data-print-level="Category" data-print-id="category-table">Print Category</button>
+                </td>
+            </tr>
+            <tr>
+                <td colspan="7">
+                    <div id="common-{{ category.cat_id }}" class="common-level expandable collapsed"></div>
+                </td>
+            </tr>
             {% endfor %}
         </tbody>
     </table>
+</div>
+
+<!-- JavaScript for refreshing the table -->
+<script>
+function refreshTab() {
+    window.location.reload();
+}
+
+// Populate subcategory dropdowns on page load
+document.addEventListener('DOMContentLoaded', function() {
+    const selects = document.querySelectorAll('.subcategory-select');
+    selects.forEach(select => {
+        const category = select.getAttribute('data-category');
+        const catId = select.closest('tr').nextElementSibling.querySelector('.common-level').id.split('-')[1];
+        const loadingDiv = document.getElementById(`loading-subcat-${catId}`);
+        if (loadingDiv) {
+            loadingDiv.style.display = 'block';
+        }
+        fetch(`/tab/5/subcat_data?category=${category}`)
+            .then(response => response.json())
+            .then(data => {
+                data.subcategories.forEach(subcat => {
+                    const option = document.createElement('option');
+                    option.value = subcat.subcategory;
+                    option.textContent = subcat.subcategory;
+                    select.appendChild(option);
+                });
+            })
+            .catch(error => console.error('Error fetching subcategories:', error))
+            .finally(() => {
+                if (loadingDiv) {
+                    loadingDiv.style.display = 'none';
+                }
+            });
+    });
+});
+</script>
 {% endblock %}

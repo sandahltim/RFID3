@@ -47,11 +47,11 @@ if not any(isinstance(h, logging.StreamHandler) for h in root_logger.handlers):
 tab5_bp = Blueprint('tab5', __name__)
 
 # Version marker
-logger.info("Deployed tab5.py version: 2025-04-27-v24")
+logger.info("Deployed tab5.py version: 2025-04-26-v21")
 
-def get_category_data(session, status_filter='', bin_filter=''):
+def get_category_data(session, filter_query='', sort='', status_filter='', bin_filter=''):
     # Check if data is in cache
-    cache_key = f'tab5_view_data_{status_filter}_{bin_filter}'
+    cache_key = f'tab5_view_data_{filter_query}_{sort}_{status_filter}_{bin_filter}'
     cached_data = cache.get(cache_key)
     if cached_data is not None:
         logger.info("Serving Tab 5 data from cache")
@@ -86,6 +86,8 @@ def get_category_data(session, status_filter='', bin_filter=''):
     # Calculate counts for each category
     category_data = []
     for cat, mappings in categories.items():
+        if filter_query and filter_query not in cat.lower():
+            continue
         rental_class_ids = [str(m['rental_class_id']).strip() for m in mappings]
 
         # Always filter by bin_location for Tab 5
@@ -171,8 +173,15 @@ def get_category_data(session, status_filter='', bin_filter=''):
             'items_available': items_available
         })
 
-    # Sort categories alphabetically by default
-    category_data.sort(key=lambda x: x['category'].lower())
+    # Sort category data
+    if sort == 'category_asc':
+        category_data.sort(key=lambda x: x['category'].lower())
+    elif sort == 'category_desc':
+        category_data.sort(key=lambda x: x['category'].lower(), reverse=True)
+    elif sort == 'total_items_asc':
+        category_data.sort(key=lambda x: x['total_items'])
+    elif sort == 'total_items_desc':
+        category_data.sort(key=lambda x: x['total_items'], reverse=True)
 
     # Cache the data
     cache.set(cache_key, json.dumps(category_data), ex=60)
@@ -184,10 +193,12 @@ def tab5_view():
     logger.info("Tab 5 route accessed")
     try:
         session = db.session()
+        filter_query = request.args.get('filter', '').lower()
+        sort = request.args.get('sort', '')
         status_filter = request.args.get('statusFilter', '').lower()
         bin_filter = request.args.get('binFilter', '').lower()
 
-        category_data = get_category_data(session, status_filter, bin_filter)
+        category_data = get_category_data(session, filter_query, sort, status_filter, bin_filter)
         logger.info(f"Fetched {len(category_data)} categories for tab5")
 
         session.close()
@@ -201,13 +212,15 @@ def tab5_filter():
     logger.info("Tab 5 filter route accessed")
     try:
         session = db.session()
+        filter_query = request.form.get('category-filter', '').lower()
+        sort = request.form.get('category-sort', '')
         status_filter = request.form.get('statusFilter', '').lower()
         bin_filter = request.form.get('binFilter', '').lower()
 
-        category_data = get_category_data(session, status_filter, bin_filter)
+        category_data = get_category_data(session, filter_query, sort, status_filter, bin_filter)
         session.close()
 
-        return jsonify(category_data)  # Return JSON data directly
+        return jsonify(category_data)  # Return JSON data directly since we're not using _category_rows.html
     except Exception as e:
         logger.error(f"Error filtering Tab 5: {str(e)}", exc_info=True)
         return jsonify({'error': 'Failed to filter categories'}), 500
@@ -217,14 +230,16 @@ def tab5_subcat_data():
     category = unquote(request.args.get('category'))
     page = int(request.args.get('page', 1))
     per_page = 10
+    filter_query = request.args.get('filter', '').lower()
     status_filter = request.args.get('statusFilter', '').lower()
     bin_filter = request.args.get('binFilter', '').lower()
+    sort = request.args.get('sort', '')
 
     if not category:
         logger.error("Category parameter is missing in subcat_data request")
         return jsonify({'error': 'Category is required'}), 400
 
-    logger.info(f"subcat_data: Fetching subcategories for category: {category}")
+    logger.info(f"Fetching subcategories for category: {category}")
     try:
         session = db.session()
 
@@ -235,10 +250,8 @@ def tab5_subcat_data():
             func.lower(UserRentalClassMapping.category) == category.lower()
         ).all()
 
-        logger.debug(f"subcat_data: Found {len(base_mappings)} base mappings and {len(user_mappings)} user mappings for category {category}")
-
         if not base_mappings and not user_mappings:
-            logger.warning(f"subcat_data: No mappings found for category {category}")
+            logger.warning(f"No mappings found for category {category}")
             session.close()
             return jsonify({
                 'subcategories': [],
@@ -252,8 +265,6 @@ def tab5_subcat_data():
         for um in user_mappings:
             mappings_dict[str(um.rental_class_id)] = {'category': um.category, 'subcategory': um.subcategory}
 
-        logger.debug(f"subcat_data: Mappings dictionary: {mappings_dict}")
-
         subcategories = {}
         for rental_class_id, data in mappings_dict.items():
             subcategory = data['subcategory']
@@ -261,12 +272,13 @@ def tab5_subcat_data():
                 subcategories[subcategory] = []
             subcategories[subcategory].append(rental_class_id)
 
-        logger.debug(f"subcat_data: Subcategories before sorting: {subcategories}")
-
-        # Sort subcategories alphabetically
         subcat_list = sorted(subcategories.keys())
-
-        logger.debug(f"subcat_data: Subcategories after sorting: {subcat_list}")
+        if filter_query:
+            subcat_list = [s for s in subcat_list if filter_query in s.lower()]
+        if sort == 'subcategory_asc':
+            subcat_list.sort()
+        elif sort == 'subcategory_desc':
+            subcat_list.sort(reverse=True)
 
         total_subcats = len(subcat_list)
         start = (page - 1) * per_page
@@ -290,7 +302,6 @@ def tab5_subcat_data():
             total_items = total_items_query.scalar() or 0
 
             if total_items == 0:
-                logger.debug(f"subcat_data: Skipping subcategory {subcat} with 0 items")
                 continue
 
             items_on_contracts_query = session.query(func.count(ItemMaster.tag_id)).filter(
@@ -358,7 +369,10 @@ def tab5_subcat_data():
                 'items_available': items_available
             })
 
-        logger.debug(f"subcat_data: Returning subcategory data: {subcategory_data}")
+        if sort == 'total_items_asc':
+            subcategory_data.sort(key=lambda x: x['total_items'])
+        elif sort == 'total_items_desc':
+            subcategory_data.sort(key=lambda x: x['total_items'], reverse=True)
 
         session.close()
         return jsonify({
@@ -368,8 +382,7 @@ def tab5_subcat_data():
             'per_page': per_page
         })
     except Exception as e:
-        logger.error(f"subcat_data: Error fetching subcategory data for category {category}: {str(e)}", exc_info=True)
-        session.close()
+        logger.error(f"Error fetching subcategory data for category {category}: {str(e)}", exc_info=True)
         return jsonify({'error': 'Failed to fetch subcategory data', 'details': str(e)}), 500
 
 @tab5_bp.route('/tab/5/common_names')
@@ -424,7 +437,6 @@ def tab5_common_names():
             )
         common_names_query = common_names_query.group_by(ItemMaster.common_name)
 
-        # Apply sorting
         if sort == 'name_asc':
             common_names_query = common_names_query.order_by(asc(func.lower(ItemMaster.common_name)))
         elif sort == 'name_desc':
@@ -433,18 +445,6 @@ def tab5_common_names():
             common_names_query = common_names_query.order_by(asc('total_items'))
         elif sort == 'total_items_desc':
             common_names_query = common_names_query.order_by(desc('total_items'))
-        elif sort == 'items_on_contracts_asc':
-            common_names_query = common_names_query.order_by(asc('items_on_contracts'))
-        elif sort == 'items_on_contracts_desc':
-            common_names_query = common_names_query.order_by(desc('items_on_contracts'))
-        elif sort == 'items_in_service_asc':
-            common_names_query = common_names_query.order_by(asc('items_in_service'))
-        elif sort == 'items_in_service_desc':
-            common_names_query = common_names_query.order_by(desc('items_in_service'))
-        elif sort == 'items_available_asc':
-            common_names_query = common_names_query.order_by(asc('items_available'))
-        elif sort == 'items_available_desc':
-            common_names_query = common_names_query.order_by(desc('items_available'))
 
         common_names_all = common_names_query.all()
         common_names = []
@@ -532,15 +532,6 @@ def tab5_common_names():
                 'items_available': items_available
             })
 
-        # Apply sorting to computed fields if necessary
-        if sort in ['items_on_contracts_asc', 'items_on_contracts_desc', 'items_in_service_asc', 'items_in_service_desc', 'items_available_asc', 'items_available_desc']:
-            sort_field = sort.split('_')[0]
-            sort_direction = sort.split('_')[-1]
-            common_names.sort(
-                key=lambda x: x[sort_field],
-                reverse=(sort_direction == 'desc')
-            )
-
         total_common_names = len(common_names)
         start = (page - 1) * per_page
         end = start + per_page
@@ -564,6 +555,7 @@ def tab5_data():
     common_name = unquote(request.args.get('common_name'))
     page = int(request.args.get('page', 1))
     per_page = 10
+    filter_query = request.args.get('filter', '').lower()
     status_filter = request.args.get('statusFilter', '').lower()
     bin_filter = request.args.get('binFilter', '').lower()
     sort = request.args.get('sort', '')
@@ -595,6 +587,15 @@ def tab5_data():
             ItemMaster.common_name == common_name,
             func.lower(func.trim(func.replace(func.coalesce(ItemMaster.bin_location, ''), '\x00', ''))).in_(['resale', 'sold', 'pack', 'burst'])
         )
+        if filter_query:
+            query = query.filter(
+                or_(
+                    func.lower(ItemMaster.tag_id).like(f'%{filter_query}%'),
+                    func.lower(ItemMaster.bin_location).like(f'%{filter_query}%'),
+                    func.lower(ItemMaster.status).like(f'%{filter_query}%'),
+                    func.lower(ItemMaster.last_contract_num).like(f'%{filter_query}%')
+                )
+            )
         if status_filter:
             query = query.filter(func.lower(ItemMaster.status) == status_filter.lower())
         if bin_filter:
@@ -602,39 +603,14 @@ def tab5_data():
                 func.lower(func.trim(func.replace(func.coalesce(ItemMaster.bin_location, ''), '\x00', ''))) == bin_filter.lower()
             )
 
-        # Apply sorting
         if sort == 'tag_id_asc':
             query = query.order_by(asc(ItemMaster.tag_id))
         elif sort == 'tag_id_desc':
             query = query.order_by(desc(ItemMaster.tag_id))
-        elif sort == 'common_name_asc':
-            query = query.order_by(asc(func.lower(ItemMaster.common_name)))
-        elif sort == 'common_name_desc':
-            query = query.order_by(desc(func.lower(ItemMaster.common_name)))
-        elif sort == 'bin_location_asc':
-            query = query.order_by(asc(func.lower(func.coalesce(ItemMaster.bin_location, ''))))
-        elif sort == 'bin_location_desc':
-            query = query.order_by(desc(func.lower(func.coalesce(ItemMaster.bin_location, ''))))
-        elif sort == 'status_asc':
-            query = query.order_by(asc(func.lower(ItemMaster.status)))
-        elif sort == 'status_desc':
-            query = query.order_by(desc(func.lower(ItemMaster.status)))
-        elif sort == 'last_contract_asc':
-            query = query.order_by(asc(func.lower(func.coalesce(ItemMaster.last_contract_num, ''))))
-        elif sort == 'last_contract_desc':
-            query = query.order_by(desc(func.lower(func.coalesce(ItemMaster.last_contract_num, ''))))
         elif sort == 'last_scanned_date_asc':
             query = query.order_by(asc(ItemMaster.date_last_scanned))
         elif sort == 'last_scanned_date_desc':
             query = query.order_by(desc(ItemMaster.date_last_scanned))
-        elif sort == 'quality_asc':
-            query = query.order_by(asc(func.lower(func.coalesce(ItemMaster.quality, ''))))
-        elif sort == 'quality_desc':
-            query = query.order_by(desc(func.lower(func.coalesce(ItemMaster.quality, ''))))
-        elif sort == 'notes_asc':
-            query = query.order_by(asc(func.lower(func.coalesce(ItemMaster.notes, ''))))
-        elif sort == 'notes_desc':
-            query = query.order_by(desc(func.lower(func.coalesce(ItemMaster.notes, ''))))
 
         total_items = query.count()
         items = query.offset((page - 1) * per_page).limit(per_page).all()
