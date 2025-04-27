@@ -47,7 +47,7 @@ if not any(isinstance(h, logging.StreamHandler) for h in root_logger.handlers):
 tab1_bp = Blueprint('tab1', __name__)
 
 # Version marker
-logger.info("Deployed tab1.py version: 2025-04-27-v23")
+logger.info("Deployed tab1.py version: 2025-04-27-v24")
 
 def get_category_data(session, status_filter='', bin_filter=''):
     cache_key = f'tab1_view_data_{status_filter}_{bin_filter}'
@@ -212,7 +212,7 @@ def tab1_subcat_data():
         logger.error("Category parameter is missing in subcat_data request")
         return jsonify({'error': 'Category is required'}), 400
 
-    logger.info(f"Fetching subcategories for category: {category}")
+    logger.info(f"subcat_data: Fetching subcategories for category: {category}")
     try:
         session = db.session()
 
@@ -223,8 +223,10 @@ def tab1_subcat_data():
             func.lower(UserRentalClassMapping.category) == category.lower()
         ).all()
 
+        logger.debug(f"subcat_data: Found {len(base_mappings)} base mappings and {len(user_mappings)} user mappings for category {category}")
+
         if not base_mappings and not user_mappings:
-            logger.warning(f"No mappings found for category {category}")
+            logger.warning(f"subcat_data: No mappings found for category {category}")
             session.close()
             return jsonify({
                 'subcategories': [],
@@ -238,6 +240,8 @@ def tab1_subcat_data():
         for um in user_mappings:
             mappings_dict[str(um.rental_class_id)] = {'category': um.category, 'subcategory': um.subcategory}
 
+        logger.debug(f"subcat_data: Mappings dictionary: {mappings_dict}")
+
         subcategories = {}
         for rental_class_id, data in mappings_dict.items():
             subcategory = data['subcategory']
@@ -245,8 +249,12 @@ def tab1_subcat_data():
                 subcategories[subcategory] = []
             subcategories[subcategory].append(rental_class_id)
 
+        logger.debug(f"subcat_data: Subcategories before sorting: {subcategories}")
+
         # Sort subcategories alphabetically
         subcat_list = sorted(subcategories.keys())
+
+        logger.debug(f"subcat_data: Subcategories after sorting: {subcat_list}")
 
         total_subcats = len(subcat_list)
         start = (page - 1) * per_page
@@ -269,6 +277,7 @@ def tab1_subcat_data():
             total_items = total_items_query.scalar() or 0
 
             if total_items == 0:
+                logger.debug(f"subcat_data: Skipping subcategory {subcat} with 0 items")
                 continue
 
             items_on_contracts_query = session.query(func.count(ItemMaster.tag_id)).filter(
@@ -308,7 +317,7 @@ def tab1_subcat_data():
             if status_filter:
                 items_in_service_query = items_in_service_query.filter(func.lower(ItemMaster.status) == status_filter.lower())
             if bin_filter:
-                items_in_service_query = items_in_service_query.value(
+                items_in_service_query = items_in_service_query.filter(
                     func.lower(func.trim(func.replace(func.coalesce(ItemMaster.bin_location, ''), '\x00', ''))) == bin_filter.lower()
                 )
             items_in_service = items_in_service_query.scalar() or 0
@@ -333,6 +342,8 @@ def tab1_subcat_data():
                 'items_available': items_available
             })
 
+        logger.debug(f"subcat_data: Returning subcategory data: {subcategory_data}")
+
         session.close()
         return jsonify({
             'subcategories': subcategory_data,
@@ -341,7 +352,8 @@ def tab1_subcat_data():
             'per_page': per_page
         })
     except Exception as e:
-        logger.error(f"Error fetching subcategory data for category {category}: {str(e)}", exc_info=True)
+        logger.error(f"subcat_data: Error fetching subcategory data for category {category}: {str(e)}", exc_info=True)
+        session.close()
         return jsonify({'error': 'Failed to fetch subcategory data', 'details': str(e)}), 500
 
 @tab1_bp.route('/tab/1/common_names')

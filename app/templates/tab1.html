@@ -9,58 +9,69 @@
         window.cachedTabNum = 1;
         console.log('tab1.html: window.cachedTabNum set to', window.cachedTabNum);
 
-        let categorySortState = { column: '', direction: '' };
-
-        function sortCategories(column) {
-            if (!categorySortState.column) {
-                categorySortState = { column: '', direction: '' };
+        // Function to populate subcategory dropdowns
+        function populateSubcategoryDropdowns() {
+            console.log('populateSubcategoryDropdowns: Starting to populate subcategory dropdowns');
+            const selects = document.querySelectorAll('.subcategory-select');
+            if (selects.length === 0) {
+                console.warn('populateSubcategoryDropdowns: No subcategory selects found');
+                return;
             }
 
-            let direction = 'asc';
-            if (categorySortState.column === column) {
-                direction = categorySortState.direction === 'asc' ? 'desc' : 'asc';
-            } else {
-                categorySortState = { column, direction };
-            }
+            selects.forEach(select => {
+                const category = select.getAttribute('data-category');
+                console.log('populateSubcategoryDropdowns: Fetching subcategories for category:', category);
 
-            categorySortState = { column, direction };
-
-            // Update sort arrows
-            const headers = document.querySelectorAll('#category-table thead tr:first-child th');
-            headers.forEach(header => {
-                const sortArrow = header.querySelector('.sort-arrow');
-                if (header.textContent.trim().toLowerCase().replace(/\s+/g, '_') === column) {
-                    sortArrow.textContent = direction === 'asc' ? '↑' : '↓';
-                } else {
-                    sortArrow.textContent = '';
-                }
+                fetch(`/tab/${window.cachedTabNum}/subcat_data?category=${encodeURIComponent(category)}`)
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`HTTP error! Status: ${response.status}`);
+                        }
+                        return response.json();
+                    })
+                    .then(subcatData => {
+                        console.log('populateSubcategoryDropdowns: Received data for category', category, ':', subcatData);
+                        // Clear existing options except the placeholder
+                        select.innerHTML = '<option value="">Select Subcategory...</option>';
+                        if (subcatData.subcategories && subcatData.subcategories.length > 0) {
+                            subcatData.subcategories.forEach(subcat => {
+                                const option = document.createElement('option');
+                                option.value = subcat.subcategory;
+                                option.textContent = subcat.subcategory;
+                                select.appendChild(option);
+                            });
+                        } else {
+                            console.warn('populateSubcategoryDropdowns: No subcategories found for category', category);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('populateSubcategoryDropdowns: Error loading subcategories for category', category, ':', error);
+                    });
             });
+        }
 
-            // Fetch sorted data
-            const form = document.getElementById('category-filter-form');
-            const formData = new FormData(form);
-            formData.set('category-sort', `${column}_${direction}`);
+        // Initialize subcategory dropdowns on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOMContentLoaded: Initializing subcategory dropdowns');
+            populateSubcategoryDropdowns();
+        });
 
+        // Refresh category table when status or bin filter changes
+        document.getElementById('category-filter-form')?.addEventListener('submit', function(event) {
+            event.preventDefault();
+            const formData = new FormData(this);
             fetch('/tab/1/filter', {
                 method: 'POST',
                 body: formData
             })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error('Failed to sort categories');
-                }
-                return response.json();
-            })
+            .then(response => response.json())
             .then(data => {
                 if (data.error) {
-                    console.error('Server returned an error:', data.error);
+                    console.error('Error refreshing categories:', data.error);
                     return;
                 }
-
-                // Update the category table
                 const tbody = document.querySelector('#category-table tbody');
-                tbody.innerHTML = ''; // Clear existing rows
-
+                tbody.innerHTML = '';
                 data.forEach(category => {
                     const row = document.createElement('tr');
                     row.innerHTML = `
@@ -68,7 +79,6 @@
                         <td>
                             <select class="subcategory-select" data-category="${category.category}" onchange="loadCommonNames(this)">
                                 <option value="">Select Subcategory...</option>
-                                <!-- Subcategories will be populated dynamically -->
                             </select>
                         </td>
                         <td>${category.total_items}</td>
@@ -82,28 +92,20 @@
                         </td>
                     `;
                     tbody.appendChild(row);
+                    const expandableRow = document.createElement('tr');
+                    expandableRow.innerHTML = `
+                        <td colspan="7">
+                            <div id="common-${category.cat_id}" class="common-level collapsed"></div>
+                        </td>
+                    `;
+                    tbody.appendChild(expandableRow);
                 });
-
-                // Re-attach event listeners for subcategory selects
-                document.querySelectorAll('.subcategory-select').forEach(select => {
-                    const category = select.getAttribute('data-category');
-                    fetch(`/tab/${window.cachedTabNum}/subcat_data?category=${encodeURIComponent(category)}`)
-                        .then(response => response.json())
-                        .then(subcatData => {
-                            subcatData.subcategories.forEach(subcat => {
-                                const option = document.createElement('option');
-                                option.value = subcat.subcategory;
-                                option.textContent = subcat.subcategory;
-                                select.appendChild(option);
-                            });
-                        })
-                        .catch(error => console.error('Error loading subcategories:', error));
-                });
+                populateSubcategoryDropdowns();
             })
             .catch(error => {
-                console.error('Error sorting categories:', error);
+                console.error('Error refreshing categories:', error);
             });
-        }
+        });
     </script>
 {% endblock %}
 
@@ -111,7 +113,6 @@
     <h2>Rental Inventory</h2>
     <div class="filter-sort-controls">
         <form id="category-filter-form" onsubmit="return false;">
-            <input type="text" id="category-filter" name="category-filter" placeholder="Filter categories..." oninput="this.form.dispatchEvent(new Event('submit'))">
             <select id="statusFilter" name="statusFilter" onchange="this.form.dispatchEvent(new Event('submit'))">
                 <option value="">ALL STATUSES</option>
                 <option value="Ready to Rent">Ready to Rent</option>
@@ -133,12 +134,12 @@
     <table class="category-table" id="category-table">
         <thead>
             <tr>
-                <th onclick="sortCategories('category')">CATEGORY <span class="sort-arrow"></span></th>
+                <th>CATEGORY</th>
                 <th>SUBCATEGORY</th>
-                <th onclick="sortCategories('total_items')">TOTAL ITEMS <span class="sort-arrow"></span></th>
-                <th onclick="sortCategories('items_on_contracts')">ITEMS ON CONTRACTS <span class="sort-arrow"></span></th>
-                <th onclick="sortCategories('items_in_service')">ITEMS IN SERVICE <span class="sort-arrow"></span></th>
-                <th onclick="sortCategories('items_available')">ITEMS AVAILABLE <span class="sort-arrow"></span></th>
+                <th>TOTAL ITEMS</th>
+                <th>ITEMS ON CONTRACTS</th>
+                <th>ITEMS IN SERVICE</th>
+                <th>ITEMS AVAILABLE</th>
                 <th>ACTIONS</th>
             </tr>
         </thead>
