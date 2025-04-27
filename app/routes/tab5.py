@@ -4,6 +4,7 @@ from ..models.db_models import ItemMaster, Transaction, RentalClassMapping, User
 from ..services.api_client import APIClient
 from sqlalchemy import func, desc, or_, asc, text
 from time import time
+from datetime import datetime
 import logging
 import sys
 from urllib.parse import unquote
@@ -46,7 +47,7 @@ if not any(isinstance(h, logging.StreamHandler) for h in root_logger.handlers):
 tab5_bp = Blueprint('tab5', __name__)
 
 # Version marker
-logger.info("Deployed tab5.py version: 2025-04-26-v18")
+logger.info("Deployed tab5.py version: 2025-04-26-v19")
 
 def get_category_data(session, filter_query='', sort='', status_filter='', bin_filter=''):
     # Check if data is in cache
@@ -659,7 +660,9 @@ def update_bin_location():
             return jsonify({'error': 'Item not found'}), 404
 
         # Update local database
+        current_time = datetime.now()
         item.bin_location = new_bin_location
+        item.date_last_scanned = current_time
         session.commit()
 
         # Update external API
@@ -667,7 +670,7 @@ def update_bin_location():
         api_client.update_bin_location(tag_id, new_bin_location)
 
         session.close()
-        logger.info(f"Updated bin_location for tag_id {tag_id} to {new_bin_location}")
+        logger.info(f"Updated bin_location for tag_id {tag_id} to {new_bin_location} and date_last_scanned to {current_time}")
         return jsonify({'message': 'Bin location updated successfully'})
     except Exception as e:
         session.rollback()
@@ -699,7 +702,9 @@ def update_status():
             return jsonify({'error': 'Status can only be updated from "On Rent" or "Delivered"'}), 400
 
         # Update local database
+        current_time = datetime.now()
         item.status = new_status
+        item.date_last_scanned = current_time
         session.commit()
 
         # Update external API
@@ -707,7 +712,7 @@ def update_status():
         api_client.update_status(tag_id, new_status)
 
         session.close()
-        logger.info(f"Updated status for tag_id {tag_id} to {new_status}")
+        logger.info(f"Updated status for tag_id {tag_id} to {new_status} and date_last_scanned to {current_time}")
         return jsonify({'message': 'Status updated successfully'})
     except Exception as e:
         session.rollback()
@@ -861,16 +866,19 @@ def bulk_update_common_name():
 
         api_client = APIClient()
         updated_items = 0
+        current_time = datetime.now()
 
         for item in items:
             if new_bin_location and new_bin_location in ['resale', 'sold', 'pack', 'burst']:
                 item.bin_location = new_bin_location
+                item.date_last_scanned = current_time
                 api_client.update_bin_location(item.tag_id, new_bin_location)
                 updated_items += 1
 
             if new_status and new_status == 'Ready to Rent':
                 if item.status in ['On Rent', 'Delivered']:
                     item.status = new_status
+                    item.date_last_scanned = current_time
                     api_client.update_status(item.tag_id, new_status)
                     updated_items += 1
 
@@ -908,16 +916,19 @@ def bulk_update_items():
 
         api_client = APIClient()
         updated_items = 0
+        current_time = datetime.now()
 
         for item in items:
             if new_bin_location and new_bin_location in ['resale', 'sold', 'pack', 'burst']:
                 item.bin_location = new_bin_location
+                item.date_last_scanned = current_time
                 api_client.update_bin_location(item.tag_id, new_bin_location)
                 updated_items += 1
 
             if new_status and new_status == 'Ready to Rent':
                 if item.status in ['On Rent', 'Delivered']:
                     item.status = new_status
+                    item.date_last_scanned = current_time
                     api_client.update_status(item.tag_id, new_status)
                     updated_items += 1
 
