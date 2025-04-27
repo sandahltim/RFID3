@@ -47,11 +47,11 @@ if not any(isinstance(h, logging.StreamHandler) for h in root_logger.handlers):
 tab5_bp = Blueprint('tab5', __name__)
 
 # Version marker
-logger.info("Deployed tab5.py version: 2025-04-27-v23")
+logger.info("Deployed tab5.py version: 2025-04-27-v22")
 
-def get_category_data(session, status_filter='', bin_filter=''):
+def get_category_data(session, filter_query='', sort='', status_filter='', bin_filter=''):
     # Check if data is in cache
-    cache_key = f'tab5_view_data_{status_filter}_{bin_filter}'
+    cache_key = f'tab5_view_data_{filter_query}_{sort}_{status_filter}_{bin_filter}'
     cached_data = cache.get(cache_key)
     if cached_data is not None:
         logger.info("Serving Tab 5 data from cache")
@@ -86,6 +86,8 @@ def get_category_data(session, status_filter='', bin_filter=''):
     # Calculate counts for each category
     category_data = []
     for cat, mappings in categories.items():
+        if filter_query and filter_query not in cat.lower():
+            continue
         rental_class_ids = [str(m['rental_class_id']).strip() for m in mappings]
 
         # Always filter by bin_location for Tab 5
@@ -171,8 +173,15 @@ def get_category_data(session, status_filter='', bin_filter=''):
             'items_available': items_available
         })
 
-    # Sort categories alphabetically by default
-    category_data.sort(key=lambda x: x['category'].lower())
+    # Sort category data
+    if sort == 'category_asc':
+        category_data.sort(key=lambda x: x['category'].lower())
+    elif sort == 'category_desc':
+        category_data.sort(key=lambda x: x['category'].lower(), reverse=True)
+    elif sort == 'total_items_asc':
+        category_data.sort(key=lambda x: x['total_items'])
+    elif sort == 'total_items_desc':
+        category_data.sort(key=lambda x: x['total_items'], reverse=True)
 
     # Cache the data
     cache.set(cache_key, json.dumps(category_data), ex=60)
@@ -184,10 +193,12 @@ def tab5_view():
     logger.info("Tab 5 route accessed")
     try:
         session = db.session()
+        filter_query = request.args.get('filter', '').lower()
+        sort = request.args.get('sort', '')
         status_filter = request.args.get('statusFilter', '').lower()
         bin_filter = request.args.get('binFilter', '').lower()
 
-        category_data = get_category_data(session, status_filter, bin_filter)
+        category_data = get_category_data(session, filter_query, sort, status_filter, bin_filter)
         logger.info(f"Fetched {len(category_data)} categories for tab5")
 
         session.close()
@@ -201,13 +212,15 @@ def tab5_filter():
     logger.info("Tab 5 filter route accessed")
     try:
         session = db.session()
+        filter_query = request.form.get('category-filter', '').lower()
+        sort = request.form.get('category-sort', '')
         status_filter = request.form.get('statusFilter', '').lower()
         bin_filter = request.form.get('binFilter', '').lower()
 
-        category_data = get_category_data(session, status_filter, bin_filter)
+        category_data = get_category_data(session, filter_query, sort, status_filter, bin_filter)
         session.close()
 
-        return jsonify(category_data)  # Return JSON data directly
+        return jsonify(category_data)  # Return JSON data directly since we're not using _category_rows.html
     except Exception as e:
         logger.error(f"Error filtering Tab 5: {str(e)}", exc_info=True)
         return jsonify({'error': 'Failed to filter categories'}), 500
@@ -217,8 +230,10 @@ def tab5_subcat_data():
     category = unquote(request.args.get('category'))
     page = int(request.args.get('page', 1))
     per_page = 10
+    filter_query = request.args.get('filter', '').lower()
     status_filter = request.args.get('statusFilter', '').lower()
     bin_filter = request.args.get('binFilter', '').lower()
+    sort = request.args.get('sort', '')
 
     if not category:
         logger.error("Category parameter is missing in subcat_data request")
@@ -257,8 +272,13 @@ def tab5_subcat_data():
                 subcategories[subcategory] = []
             subcategories[subcategory].append(rental_class_id)
 
-        # Sort subcategories alphabetically
         subcat_list = sorted(subcategories.keys())
+        if filter_query:
+            subcat_list = [s for s in subcat_list if filter_query in s.lower()]
+        if sort == 'subcategory_asc':
+            subcat_list.sort()
+        elif sort == 'subcategory_desc':
+            subcat_list.sort(reverse=True)
 
         total_subcats = len(subcat_list)
         start = (page - 1) * per_page
@@ -348,6 +368,11 @@ def tab5_subcat_data():
                 'items_in_service': items_in_service,
                 'items_available': items_available
             })
+
+        if sort == 'total_items_asc':
+            subcategory_data.sort(key=lambda x: x['total_items'])
+        elif sort == 'total_items_desc':
+            subcategory_data.sort(key=lambda x: x['total_items'], reverse=True)
 
         session.close()
         return jsonify({
@@ -778,7 +803,7 @@ def full_items_by_rental_class():
     subcategory = unquote(request.args.get('subcategory'))
     common_name = unquote(request.args.get('common_name'))
 
-    if not category or not subcategory or not common_name:
+    if not category or not subcategory or not Relatively:
         logger.error("Category, subcategory, and common name are required in full_items_by_rental_class request")
         return jsonify({'error': 'Category, subcategory, and common name are required'}), 400
 
