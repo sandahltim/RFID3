@@ -46,7 +46,7 @@ if not any(isinstance(h, logging.StreamHandler) for h in root_logger.handlers):
 tab5_bp = Blueprint('tab5', __name__)
 
 # Version marker
-logger.info("Deployed tab5.py version: 2025-04-26-v17")
+logger.info("Deployed tab5.py version: 2025-04-26-v18")
 
 def get_category_data(session, filter_query='', sort='', status_filter='', bin_filter=''):
     # Check if data is in cache
@@ -219,13 +219,10 @@ def tab5_filter():
         category_data = get_category_data(session, filter_query, sort, status_filter, bin_filter)
         session.close()
 
-        # Render only the table rows for HTMX
-        return render_template('_category_rows.html', categories=category_data)
+        return jsonify(category_data)  # Return JSON data directly since we're not using _category_rows.html
     except Exception as e:
         logger.error(f"Error filtering Tab 5: {str(e)}", exc_info=True)
         return jsonify({'error': 'Failed to filter categories'}), 500
-
-# Rest of the file remains unchanged...
 
 @tab5_bp.route('/tab/5/subcat_data')
 def tab5_subcat_data():
@@ -815,3 +812,122 @@ def full_items_by_rental_class():
     except Exception as e:
         logger.error(f"Error fetching full items for category {category}, subcategory {subcategory}, common_name {common_name}: {str(e)}")
         return jsonify({'error': 'Failed to fetch full items'}), 500
+
+@tab5_bp.route('/tab/5/bulk_update_common_name', methods=['POST'])
+def bulk_update_common_name():
+    try:
+        data = request.get_json()
+        category = data.get('category')
+        subcategory = data.get('subcategory')
+        common_name = data.get('common_name')
+        new_bin_location = data.get('bin_location')
+        new_status = data.get('status')
+
+        if not category or not subcategory or not common_name:
+            return jsonify({'error': 'Category, subcategory, and common name are required'}), 400
+
+        if not new_bin_location and not new_status:
+            return jsonify({'error': 'At least one of bin_location or status must be provided'}), 400
+
+        session = db.session()
+
+        # Get rental class IDs for the category and subcategory
+        base_mappings = session.query(RentalClassMapping).filter(
+            func.lower(RentalClassMapping.category) == category.lower(),
+            func.lower(RentalClassMapping.subcategory) == subcategory.lower()
+        ).all()
+        user_mappings = session.query(UserRentalClassMapping).filter(
+            func.lower(UserRentalClassMapping.category) == category.lower(),
+            func.lower(UserRentalClassMapping.subcategory) == subcategory.lower()
+        ).all()
+
+        mappings_dict = {str(m.rental_class_id): {'category': m.category, 'subcategory': m.subcategory} for m in base_mappings}
+        for um in user_mappings:
+            mappings_dict[str(um.rental_class_id)] = {'category': um.category, 'subcategory': um.subcategory}
+
+        rental_class_ids = list(mappings_dict.keys())
+
+        # Query items matching the criteria
+        query = session.query(ItemMaster).filter(
+            func.trim(func.cast(func.replace(ItemMaster.rental_class_num, '\x00', ''), db.String)).in_(rental_class_ids),
+            ItemMaster.common_name == common_name,
+            func.lower(func.trim(func.replace(func.coalesce(ItemMaster.bin_location, ''), '\x00', ''))).in_(['resale', 'sold', 'pack', 'burst'])
+        )
+
+        items = query.all()
+        if not items:
+            session.close()
+            return jsonify({'error': 'No items found for the given criteria'}), 404
+
+        api_client = APIClient()
+        updated_items = 0
+
+        for item in items:
+            if new_bin_location and new_bin_location in ['resale', 'sold', 'pack', 'burst']:
+                item.bin_location = new_bin_location
+                api_client.update_bin_location(item.tag_id, new_bin_location)
+                updated_items += 1
+
+            if new_status and new_status == 'Ready to Rent':
+                if item.status in ['On Rent', 'Delivered']:
+                    item.status = new_status
+                    api_client.update_status(item.tag_id, new_status)
+                    updated_items += 1
+
+        session.commit()
+        session.close()
+
+        logger.info(f"Bulk updated {updated_items} items for category {category}, subcategory {subcategory}, common_name {common_name}")
+        return jsonify({'message': f'Bulk update successful, updated {updated_items} items'})
+    except Exception as e:
+        session.rollback()
+        logger.error(f"Error in bulk update for common name {common_name}: {str(e)}")
+        session.close()
+        return jsonify({'error': str(e)}), 500
+
+@tab5_bp.route('/tab/5/bulk_update_items', methods=['POST'])
+def bulk_update_items():
+    try:
+        data = request.get_json()
+        tag_ids = data.get('tag_ids', [])
+        new_bin_location = data.get('bin_location')
+        new_status = data.get('status')
+
+        if not tag_ids:
+            return jsonify({'error': 'Tag IDs are required'}), 400
+
+        if not new_bin_location and not new_status:
+            return jsonify({'error': 'At least one of bin_location or status must be provided'}), 400
+
+        session = db.session()
+        items = session.query(ItemMaster).filter(ItemMaster.tag_id.in_(tag_ids)).all()
+
+        if not items:
+            session.close()
+            return jsonify({'error': 'No items found for the given tag IDs'}), 404
+
+        api_client = APIClient()
+        updated_items = 0
+
+        for item in items:
+            if new_bin_location and new_bin_location in ['resale', 'sold', 'pack', 'burst']:
+                item.bin_location = new_bin_location
+                api_client.update_bin_location(item.tag_id, new_bin_location)
+                updated_items += 1
+
+            if new_status and new_status == 'Ready to Rent':
+                if item.status in ['On Rent', 'Delivered']:
+                    item.status = new_status
+                    api_client.update_status(item.tag_id, new_status)
+                    updated_items += 1
+
+        session.commit()
+        session.close()
+
+        logger.info(f"Bulk updated {updated_items} items for tag_ids {tag_ids}")
+        return jsonify({'message': f'Bulk update successful, updated {updated_items} items'})
+    except Exception as e:
+        session.rollback()
+        logger.error(f"Error in bulk update for tag_ids {tag_ids}: {str(e)}")
+        session.close()
+        return jsonify({'error': str(e)}), 500

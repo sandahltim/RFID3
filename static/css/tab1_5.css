@@ -54,7 +54,7 @@
 
 .item-table {
     table-layout: auto; /* Allow natural column widths for item table */
-    min-width: 1200px; /* Ensure enough width for all columns */
+    min-width: 1400px; /* Increased to accommodate all columns comfortably */
 }
 
 /* Ensure headers and cells are centered */
@@ -123,43 +123,43 @@
 
 /* Column widths for items table (Tab 1) - auto adjusted */
 .item-table th:nth-child(1),
-.item-table td:nth-child(1) { min-width: 100px; } /* Tag ID */
+.item-table td:nth-child(1) { min-width: 120px; } /* Tag ID */
 .item-table th:nth-child(2),
-.item-table td:nth-child(2) { min-width: 200px; white-space: normal; word-wrap: break-word; } /* Common Name */
+.item-table td:nth-child(2) { min-width: 220px; white-space: normal; word-wrap: break-word; } /* Common Name */
 .item-table th:nth-child(3),
-.item-table td:nth-child(3) { min-width: 150px; } /* Bin Location */
+.item-table td:nth-child(3) { min-width: 160px; } /* Bin Location */
 .item-table th:nth-child(4),
-.item-table td:nth-child(4) { min-width: 150px; } /* Status */
+.item-table td:nth-child(4) { min-width: 160px; } /* Status */
 .item-table th:nth-child(5),
-.item-table td:nth-child(5) { min-width: 120px; } /* Last Contract */
+.item-table td:nth-child(5) { min-width: 130px; } /* Last Contract */
 .item-table th:nth-child(6),
-.item-table td:nth-child(6) { min-width: 150px; } /* Last Scanned Date */
+.item-table td:nth-child(6) { min-width: 160px; } /* Last Scanned Date */
 .item-table th:nth-child(7),
-.item-table td:nth-child(7) { min-width: 80px; } /* Quality */
+.item-table td:nth-child(7) { min-width: 90px; } /* Quality */
 .item-table th:nth-child(8),
-.item-table td:nth-child(8) { min-width: 150px; white-space: normal; word-wrap: break-word; } /* Notes */
+.item-table td:nth-child(8) { min-width: 160px; white-space: normal; word-wrap: break-word; } /* Notes */
 
 /* Column widths for items table (Tab 5) - auto adjusted */
 .item-table th:nth-child(1),
-.item-table td:nth-child(1) { min-width: 50px; } /* Select */
+.item-table td:nth-child(1) { min-width: 60px; } /* Select */
 .item-table th:nth-child(2),
-.item-table td:nth-child(2) { min-width: 100px; } /* Tag ID */
+.item-table td:nth-child(2) { min-width: 120px; } /* Tag ID */
 .item-table th:nth-child(3),
-.item-table td:nth-child(3) { min-width: 200px; white-space: normal; word-wrap: break-word; } /* Common Name */
+.item-table td:nth-child(3) { min-width: 220px; white-space: normal; word-wrap: break-word; } /* Common Name */
 .item-table th:nth-child(4),
-.item-table td:nth-child(4) { min-width: 150px; } /* Bin Location */
+.item-table td:nth-child(4) { min-width: 160px; } /* Bin Location */
 .item-table th:nth-child(5),
-.item-table td:nth-child(5) { min-width: 150px; } /* Status */
+.item-table td:nth-child(5) { min-width: 160px; } /* Status */
 .item-table th:nth-child(6),
-.item-table td:nth-child(6) { min-width: 120px; } /* Last Contract */
+.item-table td:nth-child(6) { min-width: 130px; } /* Last Contract */
 .item-table th:nth-child(7),
-.item-table td:nth-child(7) { min-width: 150px; } /* Last Scanned Date */
+.item-table td:nth-child(7) { min-width: 160px; } /* Last Scanned Date */
 .item-table th:nth-child(8),
-.item-table td:nth-child(8) { min-width: 80px; } /* Quality */
+.item-table td:nth-child(8) { min-width: 90px; } /* Quality */
 .item-table th:nth-child(9),
-.item-table td:nth-child(9) { min-width: 150px; white-space: normal; word-wrap: break-word; } /* Notes */
+.item-table td:nth-child(9) { min-width: 160px; white-space: normal; word-wrap: break-word; } /* Notes */
 .item-table th:nth-child(10),
-.item-table td:nth-child(10) { min-width: 80px; } /* Actions */
+.item-table td:nth-child(10) { min-width: 90px; } /* Actions */
 
 /* Ensure dropdowns don't overflow columns */
 .subcategory-select,

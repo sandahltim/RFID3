@@ -1,4 +1,4 @@
-console.log('tab1_5.js version: 2025-04-26-v15 loaded');
+console.log('tab1_5.js version: 2025-04-26-v16 loaded');
 
 // Note: Common function for Tabs 1 and 5
 function showLoading(targetId) {
@@ -346,36 +346,68 @@ function updateItem(tagId, key) {
         return;
     }
 
-    fetch('/tab/5/update_item', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            tag_id: tagId,
-            bin_location: binLocation || undefined,
-            status: status || undefined
-        })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.error) {
-            console.error('Update error:', data.error);
-            alert('Failed to update item: ' + data.error);
-        } else {
-            console.log('Update successful:', data);
+    const promises = [];
+
+    // Update bin location if provided
+    if (binLocation) {
+        promises.push(
+            fetch('/tab/5/update_bin_location', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    tag_id: tagId,
+                    bin_location: binLocation
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    throw new Error(`Failed to update bin location: ${data.error}`);
+                }
+                return { field: 'bin_location', data };
+            })
+        );
+    }
+
+    // Update status if provided
+    if (status) {
+        promises.push(
+            fetch('/tab/5/update_status', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    tag_id: tagId,
+                    status: status
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    throw new Error(`Failed to update status: ${data.error}`);
+                }
+                return { field: 'status', data };
+            })
+        );
+    }
+
+    Promise.all(promises)
+        .then(results => {
+            console.log('Update successful:', results);
             alert('Update successful!');
             const category = document.querySelector(`#item-table-${key}`).closest('.common-level').querySelector('button[data-category]').getAttribute('data-category');
             const subcategory = document.querySelector(`#item-table-${key}`).closest('.common-level').querySelector('button[data-subcategory]').getAttribute('data-subcategory');
             const commonName = document.querySelector(`#common-table-${key} tbody tr td:first-child`).textContent;
             const targetId = document.querySelector(`#item-table-${key}`).closest('.expandable').id;
             loadItems(category, subcategory, commonName, targetId);
-        }
-    })
-    .catch(error => {
-        console.error('Update error:', error);
-        alert('Error during update: ' + error.message);
-    });
+        })
+        .catch(error => {
+            console.error('Update error:', error);
+            alert('Error during update: ' + error.message);
+        });
 }
 
 // Note: Common function for Tabs 1 and 5
