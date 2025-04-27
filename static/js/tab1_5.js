@@ -1,4 +1,4 @@
-console.log('tab1_5.js version: 2025-04-26-v12 loaded');
+console.log('tab1_5.js version: 2025-04-26-v13 loaded');
 
 // Note: Common function for Tabs 1 and 5
 function showLoading(targetId) {
@@ -155,18 +155,19 @@ function loadCommonNames(selectElement, page = 1) {
 
                 html += `
                     </div>
-                    <table class="common-table" id="common-table-${targetId}">
-                        <thead>
-                            <tr>
-                                <th>Common Name</th>
-                                <th>Total Items</th>
-                                <th>Items on Contracts</th>
-                                <th>Items in Service</th>
-                                <th>Items Available</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
+                    <div class="common-table-wrapper">
+                        <table class="common-table" id="common-table-${targetId}">
+                            <thead>
+                                <tr>
+                                    <th>Common Name</th>
+                                    <th>Total Items</th>
+                                    <th>Items on Contracts</th>
+                                    <th>Items in Service</th>
+                                    <th>Items Available</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
                 `;
 
                 data.common_names.forEach(item => {
@@ -195,22 +196,24 @@ function loadCommonNames(selectElement, page = 1) {
                     `;
                 });
 
+                html += `
+                            </tbody>
+                        </table>
+                `;
+
                 if (data.total_common_names > data.per_page) {
                     const totalPages = Math.ceil(data.total_common_names / data.per_page);
                     html += `
-                        <tr>
-                            <td colspan="6" class="pagination-controls">
-                                <button class="btn btn-sm btn-secondary" onclick="loadCommonNames(this.closest('tr').previousElementSibling.querySelector('.subcategory-select'), ${data.page - 1})" ${data.page === 1 ? 'disabled' : ''}>Previous</button>
-                                <span>Page ${data.page} of ${totalPages}</span>
-                                <button class="btn btn-sm btn-secondary" onclick="loadCommonNames(this.closest('tr').previousElementSibling.querySelector('.subcategory-select'), ${data.page + 1})" ${data.page === totalPages ? 'disabled' : ''}>Next</button>
-                            </td>
-                        </tr>
+                        <div class="pagination-controls">
+                            <button class="btn btn-sm btn-secondary" onclick="loadCommonNames(this.closest('.common-level').previousElementSibling.querySelector('.subcategory-select'), ${data.page - 1})" ${data.page === 1 ? 'disabled' : ''}>Previous</button>
+                            <span>Page ${data.page} of ${totalPages}</span>
+                            <button class="btn btn-sm btn-secondary" onclick="loadCommonNames(this.closest('.common-level').previousElementSibling.querySelector('.subcategory-select'), ${data.page + 1})" ${data.page === totalPages ? 'disabled' : ''}>Next</button>
+                        </div>
                     `;
                 }
 
                 html += `
-                        </tbody>
-                    </table>
+                    </div>
                 `;
             } else {
                 html = `<p>No common names found for this subcategory.</p>`;

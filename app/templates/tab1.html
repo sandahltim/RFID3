@@ -52,6 +52,7 @@
                         <option value="">Select Subcategory...</option>
                         <!-- Subcategories will be populated dynamically via JavaScript -->
                     </select>
+                    <div id="loading-subcat-{{ category.cat_id }}" class="loading-indicator" style="display: none;">Loading...</div>
                 </td>
                 <td>{{ category.total_items }}</td>
                 <td>{{ category.items_on_contracts }}</td>
@@ -82,6 +83,11 @@ document.addEventListener('DOMContentLoaded', function() {
     const selects = document.querySelectorAll('.subcategory-select');
     selects.forEach(select => {
         const category = select.getAttribute('data-category');
+        const catId = select.closest('tr').nextElementSibling.querySelector('.common-level').id.split('-')[1];
+        const loadingDiv = document.getElementById(`loading-subcat-${catId}`);
+        if (loadingDiv) {
+            loadingDiv.style.display = 'block';
+        }
         fetch(`/tab/1/subcat_data?category=${category}`)
             .then(response => response.json())
             .then(data => {
@@ -92,7 +98,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     select.appendChild(option);
                 });
             })
-            .catch(error => console.error('Error fetching subcategories:', error));
+            .catch(error => console.error('Error fetching subcategories:', error))
+            .finally(() => {
+                if (loadingDiv) {
+                    loadingDiv.style.display = 'none';
+                }
+            });
     });
 });
 </script>
