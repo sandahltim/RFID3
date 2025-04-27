@@ -1,4 +1,4 @@
-console.log('tab1_5.js version: 2025-04-26-v18 loaded');
+console.log('tab1_5.js version: 2025-04-26-v19 loaded');
 
 // Note: Common function for Tabs 1 and 5
 function showLoading(targetId) {
@@ -509,7 +509,7 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                     const lastScanned = item.last_scanned_date ? new Date(item.last_scanned_date).toLocaleString() : 'N/A';
                     if (window.cachedTabNum == 5) {
                         const currentStatus = item.status || 'N/A';
-                        const isOnRentOrDelivered = currentStatus === 'On Rent' || currentStatus === 'Delivered';
+                        const canSetReadyToRent = currentStatus === 'On Rent' || currentStatus === 'Delivered' || currentStatus === 'Sold';
                         html += `
                             <tr data-item-id="${item.tag_id}">
                                 <td><input type="checkbox" value="${item.tag_id}" class="item-select"></td>
@@ -527,7 +527,7 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                                 <td>
                                     <select id="status-${item.tag_id}">
                                         <option value="${currentStatus}" selected>${currentStatus}</option>
-                                        <option value="Ready to Rent" ${isOnRentOrDelivered ? '' : 'disabled'}>Ready to Rent</option>
+                                        <option value="Ready to Rent" ${canSetReadyToRent ? '' : 'disabled'}>Ready to Rent</option>
                                         <option value="Sold">Sold</option>
                                         <option value="On Rent" disabled>On Rent</option>
                                         <option value="Delivered" disabled>Delivered</option>
@@ -772,7 +772,7 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        const collapseBtn = event.target.closest('.collapse-btn');
+        const collapseBtn = event.target closest('.collapse-btn');
         if (collapseBtn) {
             event.stopPropagation();
             const targetId = collapseBtn.getAttribute('data-collapse-target');
