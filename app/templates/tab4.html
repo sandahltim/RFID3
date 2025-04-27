@@ -3,30 +3,22 @@
 {% block content %}
 <div class="container mt-4">
     <h2>Laundry Contracts</h2>
-    <div class="row mb-3">
-        <div class="col">
-            <input type="text" class="form-control" placeholder="Search contract number, customer name, etc." id="searchInput">
-        </div>
-        <div class="col">
-            <select class="form-control" id="statusFilter">
-                <option value="">All Statuses</option>
-                <option value="On Rent">On Rent</option>
-                <option value="Delivered">Delivered</option>
-            </select>
-        </div>
-        <div class="col">
-            <select class="form-control" id="binFilter">
-                <option value="">All Bin Locations</option>
-                {% for bin in ['resale', 'sold', 'pack', 'burst'] %}
-                <option value="{{ bin }}">{{ bin }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div class="col">
-            <button class="btn btn-primary" onclick="refreshTab()">Refresh</button>
-        </div>
+    <div class="filter-sort-controls">
+        <input type="text" class="form-control" placeholder="Search contract number, customer name, etc." id="searchInput">
+        <select class="form-control" id="statusFilter">
+            <option value="">All Statuses</option>
+            <option value="On Rent">On Rent</option>
+            <option value="Delivered">Delivered</option>
+        </select>
+        <select class="form-control" id="binFilter">
+            <option value="">All Bin Locations</option>
+            {% for bin in ['resale', 'sold', 'pack', 'burst'] %}
+            <option value="{{ bin }}">{{ bin }}</option>
+            {% endfor %}
+        </select>
+        <button class="btn btn-primary" onclick="refreshTab()">Refresh</button>
     </div>
-    <table class="table table-bordered" id="category-table">
+    <table class="category-table" id="category-table">
         <thead id="category-table-header">
             <tr>
                 <th>Contract Number</th>
@@ -46,8 +38,8 @@
                 <td>{{ contract.total_items_inventory }}</td>
                 <td>{{ contract.scan_date }}</td>
                 <td>
-                    <button class="btn btn-sm btn-secondary expand-btn" onclick="window.expandCategory('{{ contract.contract_number | urlencode | replace('\'', '\\\'') | replace('"', '\\"') }}', 'common-{{ contract.contract_number }}', '{{ contract.contract_number | urlencode | replace('\'', '\\\'') | replace('"', '\\"') }}')">Expand</button>
-                    <button class="btn btn-sm btn-secondary collapse-btn" style="display:none;" onclick="collapseSection('common-{{ contract.contract_number }}')">Collapse</button>
+                    <button class="btn btn-sm btn-secondary expand-btn" data-contract-number="{{ contract.contract_number }}" data-target-id="common-{{ contract.contract_number }}">Expand</button>
+                    <button class="btn btn-sm btn-secondary collapse-btn" data-collapse-target="common-{{ contract.contract_number }}" style="display:none;">Collapse</button>
                     <button class="btn btn-sm btn-info print-btn" data-print-level="Contract" data-print-id="category-table">Print</button>
                     <div id="loading-{{ contract.contract_number }}" style="display:none;" class="loading">Loading...</div>
                 </td>
@@ -176,5 +168,37 @@ function removeHandCountedItem(contractNumber) {
         alert('Failed to remove item');
     });
 }
+
+// Apply filters to the contract table based on user input
+document.addEventListener('input', function() {
+    const searchInput = document.getElementById('searchInput').value.toLowerCase();
+    const statusFilter = document.getElementById('statusFilter').value.toLowerCase();
+    const binFilter = document.getElementById('binFilter').value.toLowerCase();
+
+    const rows = document.querySelectorAll('#category-rows > tr:not([style*="display: none"]):not(.expandable)');
+    rows.forEach(row => {
+        const contractNumber = row.cells[0].textContent.toLowerCase();
+        const clientName = row.cells[1].textContent.toLowerCase();
+        const matchesSearch = contractNumber.includes(searchInput) || clientName.includes(searchInput);
+
+        if (matchesSearch) {
+            row.style.display = '';
+            // Show the expandable row and hand-counted items row
+            let nextRow = row.nextElementSibling;
+            while (nextRow && (nextRow.cells[0].colSpan > 1)) {
+                nextRow.style.display = '';
+                nextRow = nextRow.nextElementSibling;
+            }
+        } else {
+            row.style.display = 'none';
+            // Hide the expandable row and hand-counted items row
+            let nextRow = row.nextElementSibling;
+            while (nextRow && (nextRow.cells[0].colSpan > 1)) {
+                nextRow.style.display = 'none';
+                nextRow = nextRow.nextElementSibling;
+            }
+        }
+    });
+});
 </script>
 {% endblock %}
