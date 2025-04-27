@@ -37,6 +37,11 @@ function removeTotalItemsInventoryColumn(table, tabNum) {
     }
 }
 
+// Normalize common name by removing quotes and extra spaces
+function normalizeCommonName(commonName) {
+    return commonName.replace(/['"]/g, '').replace(/\s+/g, ' ').trim();
+}
+
 // Note: Common function - will be moved to tab1_5.js during split
 async function printTable(level, id, commonName = null, category = null, subcategory = null) {
     console.log(`Printing table: ${level}, ID: ${id}, Common Name: ${commonName}, Category: ${category}, Subcategory: ${subcategory}`);
@@ -272,8 +277,8 @@ async function printTable(level, id, commonName = null, category = null, subcate
                             page-break-after: auto;
                         }
                         th, td {
-                            font-size: 10px;
-                            padding: 4px;
+                            font-size: 8pt; /* Reduced font size for print */
+                            padding: 4px 8px; /* Reduced padding for print */
                             word-break: break-word;
                             text-align: center;
                         }
@@ -322,7 +327,11 @@ async function printFullItemList(category, subcategory, commonName) {
     const tabNum = window.cachedTabNum || 1;
     const tabName = tabNum == 2 ? 'Open Contracts' : tabNum == 4 ? 'Laundry Contracts' : tabNum == 5 ? 'Resale/Rental Packs' : `Tab ${tabNum}`;
 
-    const url = `/tab/${tabNum}/full_items_by_rental_class?category=${encodeURIComponent(category)}&subcategory=${subcategory ? encodeURIComponent(subcategory) : 'null'}&common_name=${encodeURIComponent(commonName)}`;
+    // Normalize the commonName to remove quotes and extra spaces
+    const normalizedCommonName = normalizeCommonName(commonName);
+    console.log(`Normalized Common Name: ${normalizedCommonName}`);
+
+    const url = `/tab/${tabNum}/full_items_by_rental_class?category=${encodeURIComponent(category)}&subcategory=${subcategory ? encodeURIComponent(subcategory) : 'null'}&common_name=${encodeURIComponent(normalizedCommonName)}`;
     const response = await fetch(url);
     const data = await response.json();
     const items = data.items || [];
@@ -426,8 +435,8 @@ async function printFullItemList(category, subcategory, commonName) {
                             page-break-after: auto;
                         }
                         th, td {
-                            font-size: 10px;
-                            padding: 4px;
+                            font-size: 8pt; /* Reduced font size for print */
+                            padding: 4px 8px; /* Reduced padding for print */
                             word-break: break-word;
                             text-align: center;
                         }
