@@ -1,4 +1,4 @@
-console.log('tab1_5.js version: 2025-04-26-v13 loaded');
+console.log('tab1_5.js version: 2025-04-26-v14 loaded');
 
 // Note: Common function for Tabs 1 and 5
 function showLoading(targetId) {
@@ -74,7 +74,7 @@ function loadCommonNames(selectElement, page = 1) {
         return;
     }
 
-    console.log('loadCommonNames called with', { category, subcategory, targetId });
+    console.log('loadCommonNames called with', { category, subcategory, targetId, page });
 
     if (!category || !subcategory || !targetId) {
         console.error('Invalid parameters for loadCommonNames:', { category, subcategory, targetId });
@@ -108,6 +108,7 @@ function loadCommonNames(selectElement, page = 1) {
             return response.json();
         })
         .then(data => {
+            console.log('Common names data received:', data); // Debug log
             let html = '';
             if (data.common_names && data.common_names.length > 0) {
                 // Calculate subcategory totals
@@ -124,8 +125,8 @@ function loadCommonNames(selectElement, page = 1) {
 
                 html += `
                     <div class="filter-sort-controls">
-                        <input type="text" id="common-filter-${targetId}" placeholder="Filter common names..." value="${commonFilter}" oninput="loadCommonNames(this.closest('tr').previousElementSibling.querySelector('.subcategory-select'))">
-                        <select id="common-sort-${targetId}" onchange="loadCommonNames(this.closest('tr').previousElementSibling.querySelector('.subcategory-select'))">
+                        <input type="text" id="common-filter-${targetId}" placeholder="Filter common names..." value="${commonFilter}" oninput="loadCommonNames(this.closest('.common-level').previousElementSibling.querySelector('.subcategory-select'))">
+                        <select id="common-sort-${targetId}" onchange="loadCommonNames(this.closest('.common-level').previousElementSibling.querySelector('.subcategory-select'))">
                             <option value="">Sort By...</option>
                             <option value="name_asc" ${commonSort === 'name_asc' ? 'selected' : ''}>Name (A-Z)</option>
                             <option value="name_desc" ${commonSort === 'name_desc' ? 'selected' : ''}>Name (Z-A)</option>
@@ -155,25 +156,24 @@ function loadCommonNames(selectElement, page = 1) {
 
                 html += `
                     </div>
-                    <div class="common-table-wrapper">
-                        <table class="common-table" id="common-table-${targetId}">
-                            <thead>
-                                <tr>
-                                    <th>Common Name</th>
-                                    <th>Total Items</th>
-                                    <th>Items on Contracts</th>
-                                    <th>Items in Service</th>
-                                    <th>Items Available</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
+                    <table class="common-table" id="common-table-${targetId}">
+                        <thead>
+                            <tr>
+                                <th>Common Name</th>
+                                <th>Total Items</th>
+                                <th>Items on Contracts</th>
+                                <th>Items in Service</th>
+                                <th>Items Available</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody style="max-height: 600px; overflow-y: auto; display: block;">
                 `;
 
                 data.common_names.forEach(item => {
                     const rowId = `${targetId}_${item.name.replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '')}`;
                     html += `
-                        <tr>
+                        <tr style="display: table; width: 100%; table-layout: fixed;">
                             <td>${item.name}</td>
                             <td>${item.total_items}</td>
                             <td>${item.items_on_contracts}</td>
@@ -188,7 +188,7 @@ function loadCommonNames(selectElement, page = 1) {
                                 </div>
                             </td>
                         </tr>
-                        <tr>
+                        <tr style="display: table; width: 100%; table-layout: fixed;">
                             <td colspan="6">
                                 <div id="items-${rowId}" class="expandable collapsed"></div>
                             </td>
@@ -197,8 +197,8 @@ function loadCommonNames(selectElement, page = 1) {
                 });
 
                 html += `
-                            </tbody>
-                        </table>
+                        </tbody>
+                    </table>
                 `;
 
                 if (data.total_common_names > data.per_page) {
@@ -211,10 +211,6 @@ function loadCommonNames(selectElement, page = 1) {
                         </div>
                     `;
                 }
-
-                html += `
-                    </div>
-                `;
             } else {
                 html = `<p>No common names found for this subcategory.</p>`;
             }
