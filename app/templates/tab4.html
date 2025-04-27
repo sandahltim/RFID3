@@ -81,6 +81,11 @@
             <button class="btn btn-danger" onclick="removeHandCountedItem()">Remove Item</button>
         </div>
     </div>
+    <div class="row mb-3">
+        <div class="col">
+            <input type="text" class="form-control" placeholder="Filter by Contract Number" id="hand-counted-filter" oninput="filterHandCountedItems()">
+        </div>
+    </div>
     <table class="table table-bordered">
         <thead>
             <tr>
@@ -102,6 +107,12 @@
 <script>
 function refreshTab() {
     window.location.reload();
+}
+
+function filterHandCountedItems() {
+    const contractNumber = document.getElementById('hand-counted-filter').value;
+    const url = contractNumber ? `/tab/4/hand_counted_items?contract_number=${encodeURIComponent(contractNumber)}` : '/tab/4/hand_counted_items';
+    htmx.ajax('GET', url, '#hand-counted-items');
 }
 
 function addHandCountedItem() {
@@ -141,7 +152,7 @@ function addHandCountedItem() {
             document.getElementById('hand-counted-quantity').value = '';
             document.getElementById('hand-counted-employee').value = '';
             // Refresh the hand-counted items table
-            htmx.trigger('#hand-counted-items', 'refreshTab');
+            filterHandCountedItems();
         }
     })
     .catch(error => {
@@ -187,7 +198,7 @@ function removeHandCountedItem() {
             document.getElementById('hand-counted-quantity').value = '';
             document.getElementById('hand-counted-employee').value = '';
             // Refresh the hand-counted items table
-            htmx.trigger('#hand-counted-items', 'refreshTab');
+            filterHandCountedItems();
         }
     })
     .catch(error => {
