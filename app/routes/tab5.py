@@ -47,7 +47,7 @@ if not any(isinstance(h, logging.StreamHandler) for h in root_logger.handlers):
 tab5_bp = Blueprint('tab5', __name__)
 
 # Version marker
-logger.info("Deployed tab5.py version: 2025-04-27-v22")
+logger.info("Deployed tab5.py version: 2025-04-26-v21")
 
 def get_category_data(session, filter_query='', sort='', status_filter='', bin_filter=''):
     # Check if data is in cache
@@ -437,7 +437,6 @@ def tab5_common_names():
             )
         common_names_query = common_names_query.group_by(ItemMaster.common_name)
 
-        # Apply sorting
         if sort == 'name_asc':
             common_names_query = common_names_query.order_by(asc(func.lower(ItemMaster.common_name)))
         elif sort == 'name_desc':
@@ -446,18 +445,6 @@ def tab5_common_names():
             common_names_query = common_names_query.order_by(asc('total_items'))
         elif sort == 'total_items_desc':
             common_names_query = common_names_query.order_by(desc('total_items'))
-        elif sort == 'items_on_contracts_asc':
-            common_names_query = common_names_query.order_by(asc('items_on_contracts'))
-        elif sort == 'items_on_contracts_desc':
-            common_names_query = common_names_query.order_by(desc('items_on_contracts'))
-        elif sort == 'items_in_service_asc':
-            common_names_query = common_names_query.order_by(asc('items_in_service'))
-        elif sort == 'items_in_service_desc':
-            common_names_query = common_names_query.order_by(desc('items_in_service'))
-        elif sort == 'items_available_asc':
-            common_names_query = common_names_query.order_by(asc('items_available'))
-        elif sort == 'items_available_desc':
-            common_names_query = common_names_query.order_by(desc('items_available'))
 
         common_names_all = common_names_query.all()
         common_names = []
@@ -545,15 +532,6 @@ def tab5_common_names():
                 'items_available': items_available
             })
 
-        # Apply sorting to computed fields if necessary
-        if sort in ['items_on_contracts_asc', 'items_on_contracts_desc', 'items_in_service_asc', 'items_in_service_desc', 'items_available_asc', 'items_available_desc']:
-            sort_field = sort.split('_')[0]
-            sort_direction = sort.split('_')[-1]
-            common_names.sort(
-                key=lambda x: x[sort_field],
-                reverse=(sort_direction == 'desc')
-            )
-
         total_common_names = len(common_names)
         start = (page - 1) * per_page
         end = start + per_page
@@ -577,6 +555,7 @@ def tab5_data():
     common_name = unquote(request.args.get('common_name'))
     page = int(request.args.get('page', 1))
     per_page = 10
+    filter_query = request.args.get('filter', '').lower()
     status_filter = request.args.get('statusFilter', '').lower()
     bin_filter = request.args.get('binFilter', '').lower()
     sort = request.args.get('sort', '')
@@ -608,6 +587,15 @@ def tab5_data():
             ItemMaster.common_name == common_name,
             func.lower(func.trim(func.replace(func.coalesce(ItemMaster.bin_location, ''), '\x00', ''))).in_(['resale', 'sold', 'pack', 'burst'])
         )
+        if filter_query:
+            query = query.filter(
+                or_(
+                    func.lower(ItemMaster.tag_id).like(f'%{filter_query}%'),
+                    func.lower(ItemMaster.bin_location).like(f'%{filter_query}%'),
+                    func.lower(ItemMaster.status).like(f'%{filter_query}%'),
+                    func.lower(ItemMaster.last_contract_num).like(f'%{filter_query}%')
+                )
+            )
         if status_filter:
             query = query.filter(func.lower(ItemMaster.status) == status_filter.lower())
         if bin_filter:
@@ -615,39 +603,14 @@ def tab5_data():
                 func.lower(func.trim(func.replace(func.coalesce(ItemMaster.bin_location, ''), '\x00', ''))) == bin_filter.lower()
             )
 
-        # Apply sorting
         if sort == 'tag_id_asc':
             query = query.order_by(asc(ItemMaster.tag_id))
         elif sort == 'tag_id_desc':
             query = query.order_by(desc(ItemMaster.tag_id))
-        elif sort == 'common_name_asc':
-            query = query.order_by(asc(func.lower(ItemMaster.common_name)))
-        elif sort == 'common_name_desc':
-            query = query.order_by(desc(func.lower(ItemMaster.common_name)))
-        elif sort == 'bin_location_asc':
-            query = query.order_by(asc(func.lower(func.coalesce(ItemMaster.bin_location, ''))))
-        elif sort == 'bin_location_desc':
-            query = query.order_by(desc(func.lower(func.coalesce(ItemMaster.bin_location, ''))))
-        elif sort == 'status_asc':
-            query = query.order_by(asc(func.lower(ItemMaster.status)))
-        elif sort == 'status_desc':
-            query = query.order_by(desc(func.lower(ItemMaster.status)))
-        elif sort == 'last_contract_asc':
-            query = query.order_by(asc(func.lower(func.coalesce(ItemMaster.last_contract_num, ''))))
-        elif sort == 'last_contract_desc':
-            query = query.order_by(desc(func.lower(func.coalesce(ItemMaster.last_contract_num, ''))))
         elif sort == 'last_scanned_date_asc':
             query = query.order_by(asc(ItemMaster.date_last_scanned))
         elif sort == 'last_scanned_date_desc':
             query = query.order_by(desc(ItemMaster.date_last_scanned))
-        elif sort == 'quality_asc':
-            query = query.order_by(asc(func.lower(func.coalesce(ItemMaster.quality, ''))))
-        elif sort == 'quality_desc':
-            query = query.order_by(desc(func.lower(func.coalesce(ItemMaster.quality, ''))))
-        elif sort == 'notes_asc':
-            query = query.order_by(asc(func.lower(func.coalesce(ItemMaster.notes, ''))))
-        elif sort == 'notes_desc':
-            query = query.order_by(desc(func.lower(func.coalesce(ItemMaster.notes, ''))))
 
         total_items = query.count()
         items = query.offset((page - 1) * per_page).limit(per_page).all()
@@ -803,7 +766,7 @@ def full_items_by_rental_class():
     subcategory = unquote(request.args.get('subcategory'))
     common_name = unquote(request.args.get('common_name'))
 
-    if not category or not subcategory or not Relatively:
+    if not category or not subcategory or not common_name:
         logger.error("Category, subcategory, and common name are required in full_items_by_rental_class request")
         return jsonify({'error': 'Category, subcategory, and common name are required'}), 400
 
