@@ -47,7 +47,7 @@ if not any(isinstance(h, logging.StreamHandler) for h in root_logger.handlers):
 tab5_bp = Blueprint('tab5', __name__)
 
 # Version marker
-logger.info("Deployed tab5.py version: 2025-04-26-v20")
+logger.info("Deployed tab5.py version: 2025-04-26-v21")
 
 def get_category_data(session, filter_query='', sort='', status_filter='', bin_filter=''):
     # Check if data is in cache
@@ -697,10 +697,10 @@ def update_status():
             session.close()
             return jsonify({'error': 'Item not found'}), 404
 
-        # For "Ready to Rent", only allow update from "On Rent" or "Delivered"
-        if new_status == 'Ready to Rent' and item.status not in ['On Rent', 'Delivered']:
+        # For "Ready to Rent", only allow update from "On Rent", "Delivered", or "Sold"
+        if new_status == 'Ready to Rent' and item.status not in ['On Rent', 'Delivered', 'Sold']:
             session.close()
-            return jsonify({'error': 'Status can only be updated to "Ready to Rent" from "On Rent" or "Delivered"'}), 400
+            return jsonify({'error': 'Status can only be updated to "Ready to Rent" from "On Rent", "Delivered", or "Sold"'}), 400
 
         # Update local database
         current_time = datetime.now()
@@ -880,7 +880,7 @@ def bulk_update_common_name():
                 if new_status not in ['Ready to Rent', 'Sold']:
                     session.close()
                     return jsonify({'error': 'Status can only be updated to "Ready to Rent" or "Sold"'}), 400
-                if new_status == 'Ready to Rent' and item.status not in ['On Rent', 'Delivered']:
+                if new_status == 'Ready to Rent' and item.status not in ['On Rent', 'Delivered', 'Sold']:
                     continue  # Skip items that can't be updated to "Ready to Rent"
                 item.status = new_status
                 item.date_last_scanned = current_time
@@ -934,7 +934,7 @@ def bulk_update_items():
                 if new_status not in ['Ready to Rent', 'Sold']:
                     session.close()
                     return jsonify({'error': 'Status can only be updated to "Ready to Rent" or "Sold"'}), 400
-                if new_status == 'Ready to Rent' and item.status not in ['On Rent', 'Delivered']:
+                if new_status == 'Ready to Rent' and item.status not in ['On Rent', 'Delivered', 'Sold']:
                     continue  # Skip items that can't be updated to "Ready to Rent"
                 item.status = new_status
                 item.date_last_scanned = current_time
