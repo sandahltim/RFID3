@@ -1,4 +1,25 @@
-console.log('tab1_5.js version: 2025-04-26-v11 loaded');
+console.log('tab1_5.js version: 2025-04-26-v12 loaded');
+
+// Note: Common function for Tabs 1 and 5
+function showLoading(targetId) {
+    const loadingDiv = document.createElement('div');
+    loadingDiv.id = `loading-${targetId}`;
+    loadingDiv.className = 'loading-indicator';
+    loadingDiv.textContent = 'Loading...';
+    loadingDiv.style.display = 'block';
+    const container = document.getElementById(targetId);
+    if (container) {
+        container.appendChild(loadingDiv);
+    }
+}
+
+// Note: Common function for Tabs 1 and 5
+function hideLoading(targetId) {
+    const loadingDiv = document.getElementById(`loading-${targetId}`);
+    if (loadingDiv) {
+        loadingDiv.remove();
+    }
+}
 
 // Note: Common function for Tabs 1 and 5
 function collapseSection(targetId) {
@@ -23,18 +44,33 @@ function collapseSection(targetId) {
             console.warn('Could not find expand/collapse buttons for targetId:', targetId);
         }
 
-        // Remove from sessionStorage
         sessionStorage.removeItem(`expanded_${targetId}`);
     }
 }
 
 // Note: Common function for Tabs 1 and 5
-function loadCommonNames(selectElement) {
+function loadCommonNames(selectElement, page = 1) {
     const subcategory = selectElement.value;
     const category = selectElement.getAttribute('data-category');
     const targetId = selectElement.closest('tr').nextElementSibling.querySelector('.common-level').id;
+    const categoryRow = selectElement.closest('tr');
+
     if (!subcategory) {
         collapseSection(targetId);
+        // Reset category row data to original totals
+        fetch(`/tab/${window.cachedTabNum}/subcat_data?category=${encodeURIComponent(category)}`)
+            .then(response => response.json())
+            .then(data => {
+                const totalItems = data.subcategories.reduce((sum, subcat) => sum + subcat.total_items, 0);
+                const itemsOnContracts = data.subcategories.reduce((sum, subcat) => sum + subcat.items_on_contracts, 0);
+                const itemsInService = data.subcategories.reduce((sum, subcat) => sum + subcat.items_in_service, 0);
+                const itemsAvailable = data.subcategories.reduce((sum, subcat) => sum + subcat.items_available, 0);
+                categoryRow.cells[2].textContent = totalItems;
+                categoryRow.cells[3].textContent = itemsOnContracts;
+                categoryRow.cells[4].textContent = itemsInService;
+                categoryRow.cells[5].textContent = itemsAvailable;
+            })
+            .catch(error => console.error('Error resetting category totals:', error));
         return;
     }
 
@@ -51,10 +87,10 @@ function loadCommonNames(selectElement) {
         return;
     }
 
-    showLoading(targetId.split('-')[1]);
+    showLoading(targetId);
     container.innerHTML = ''; // Clear previous content
 
-    let url = `/tab/${window.cachedTabNum}/common_names?category=${encodeURIComponent(category)}&subcategory=${encodeURIComponent(subcategory)}&page=1`;
+    let url = `/tab/${window.cachedTabNum}/common_names?category=${encodeURIComponent(category)}&subcategory=${encodeURIComponent(subcategory)}&page=${page}`;
     const commonFilter = document.getElementById(`common-filter-${targetId}`)?.value || '';
     const commonSort = document.getElementById(`common-sort-${targetId}`)?.value || '';
     const statusFilter = document.getElementById('statusFilter')?.value || '';
@@ -74,6 +110,18 @@ function loadCommonNames(selectElement) {
         .then(data => {
             let html = '';
             if (data.common_names && data.common_names.length > 0) {
+                // Calculate subcategory totals
+                const totalItems = data.common_names.reduce((sum, item) => sum + item.total_items, 0);
+                const itemsOnContracts = data.common_names.reduce((sum, item) => sum + item.items_on_contracts, 0);
+                const itemsInService = data.common_names.reduce((sum, item) => sum + item.items_in_service, 0);
+                const itemsAvailable = data.common_names.reduce((sum, item) => sum + item.items_available, 0);
+
+                // Update category row with subcategory totals
+                categoryRow.cells[2].textContent = totalItems;
+                categoryRow.cells[3].textContent = itemsOnContracts;
+                categoryRow.cells[4].textContent = itemsInService;
+                categoryRow.cells[5].textContent = itemsAvailable;
+
                 html += `
                     <div class="filter-sort-controls">
                         <input type="text" id="common-filter-${targetId}" placeholder="Filter common names..." value="${commonFilter}" oninput="loadCommonNames(this.closest('tr').previousElementSibling.querySelector('.subcategory-select'))">
@@ -183,7 +231,7 @@ function loadCommonNames(selectElement) {
             container.style.opacity = '1';
         })
         .finally(() => {
-            hideLoading(targetId.split('-')[1]);
+            hideLoading(targetId);
         });
 }
 
@@ -352,7 +400,7 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
     }
     container.classList.add('loading');
 
-    const key = targetId.split('-')[1];
+    const key = targetId;
     showLoading(key);
 
     let url = `/tab/${window.cachedTabNum}/data?common_name=${encodeURIComponent(commonName)}&page=${page}&subcategory=${encodeURIComponent(subcategory)}&category=${encodeURIComponent(category)}`;

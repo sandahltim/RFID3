@@ -19,7 +19,7 @@
     background-color: #dee2e6;
     padding: 1rem;
     border-left: 3px solid #dc3545;
-    overflow-x: auto;
+    overflow-x: auto; /* Ensure horizontal scrollbar is always visible */
     overflow-y: auto;
     max-height: 1200px;
     min-width: 100%;
@@ -28,11 +28,13 @@
     visibility: visible !important;
     z-index: 1;
     position: relative;
+    scrollbar-width: auto; /* Ensure scrollbar is visible */
+    -ms-overflow-style: auto; /* For IE/Edge */
 }
 
 .item-level {
     width: 100%;
-    min-width: 1200px;
+    min-width: 1200px; /* Ensure enough width for all columns */
     display: table !important;
     visibility: visible !important;
 }
@@ -42,20 +44,38 @@
 .common-table,
 .item-table {
     width: 100%;
-    table-layout: fixed; /* Ensure consistent column widths */
     border-collapse: collapse;
     display: table !important;
     visibility: visible !important;
 }
 
-.category-table thead,
-.common-table thead,
-.item-table thead {
-    display: table-header-group !important;
-    visibility: visible !important;
-    z-index: 10; /* Ensure headers are above body */
+.category-table {
+    table-layout: fixed; /* Fixed layout for category table to ensure consistent column widths */
 }
 
+.common-table,
+.item-table {
+    table-layout: auto; /* Auto layout to adjust column widths based on content */
+    min-width: 100%; /* Ensure table takes full width */
+}
+
+/* Ensure headers and cells are centered */
+.category-table thead th,
+.common-table thead th,
+.item-table thead th,
+.category-table td,
+.common-table td,
+.item-table td {
+    text-align: center; /* Center data horizontally */
+    vertical-align: middle; /* Center data vertically */
+    padding: 12px;
+    border: 1px solid #dee2e6;
+    display: table-cell !important;
+    visibility: visible !important;
+    white-space: nowrap; /* Prevent wrapping */
+}
+
+/* Sticky headers */
 .category-table thead th,
 .common-table thead th,
 .item-table thead th {
@@ -64,11 +84,6 @@
     z-index: 11; /* Higher than table body to ensure headers stay on top */
     background-color: #e9ecef;
     border-bottom: 2px solid #dee2e6;
-    display: table-cell !important;
-    visibility: visible !important;
-    padding: 12px;
-    text-align: left;
-    white-space: nowrap;
 }
 
 .category-table tbody,
@@ -80,85 +95,75 @@
     position: relative;
 }
 
-.category-table td,
-.common-table td,
-.item-table td {
-    padding: 12px;
-    border: 1px solid #dee2e6;
-    display: table-cell !important;
-    visibility: visible !important;
-    white-space: nowrap;
-}
-
 /* Column widths for category table */
 .category-table th:nth-child(1),
-.category-table td:nth-child(1) { width: 200px; } /* Category */
+.category-table td:nth-child(1) { width: 15%; } /* Category */
 .category-table th:nth-child(2),
-.category-table td:nth-child(2) { width: 200px; } /* Subcategory Dropdown */
+.category-table td:nth-child(2) { width: 20%; } /* Subcategory Dropdown */
 .category-table th:nth-child(3),
-.category-table td:nth-child(3) { width: 100px; } /* Total Items */
+.category-table td:nth-child(3) { width: 10%; } /* Total Items */
 .category-table th:nth-child(4),
-.category-table td:nth-child(4) { width: 120px; } /* Items on Contracts */
+.category-table td:nth-child(4) { width: 15%; } /* Items on Contracts */
 .category-table th:nth-child(5),
-.category-table td:nth-child(5) { width: 100px; } /* Items in Service */
+.category-table td:nth-child(5) { width: 15%; } /* Items in Service */
 .category-table th:nth-child(6),
-.category-table td:nth-child(6) { width: 100px; } /* Items Available */
+.category-table td:nth-child(6) { width: 15%; } /* Items Available */
 .category-table th:nth-child(7),
-.category-table td:nth-child(7) { width: 150px; } /* Actions */
+.category-table td:nth-child(7) { width: 10%; } /* Actions */
 
-/* Column widths for common names table */
+/* Column widths for common names table - auto adjust */
 .common-table th:nth-child(1),
-.common-table td:nth-child(1) { width: 200px; white-space: normal; word-wrap: break-word; } /* Common Name */
+.common-table td:nth-child(1) { min-width: 200px; white-space: normal; word-wrap: break-word; } /* Common Name */
 .common-table th:nth-child(2),
-.common-table td:nth-child(2) { width: 100px; } /* Total Items */
+.common-table td:nth-child(2) { min-width: 100px; } /* Total Items */
 .common-table th:nth-child(3),
-.common-table td:nth-child(3) { width: 120px; } /* Items on Contracts */
+.common-table td:nth-child(3) { min-width: 120px; } /* Items on Contracts */
 .common-table th:nth-child(4),
-.common-table td:nth-child(4) { width: 100px; } /* Items in Service */
+.common-table td:nth-child(4) { min-width: 100px; } /* Items in Service */
 .common-table th:nth-child(5),
-.common-table td:nth-child(5) { width: 100px; } /* Items Available */
+.common-table td:nth-child(5) { min-width: 100px; } /* Items Available */
 .common-table th:nth-child(6),
-.common-table td:nth-child(6) { width: 200px; } /* Actions */
+.common-table td:nth-child(6) { min-width: 200px; } /* Actions */
 
-/* Column widths for items table (Tab 1) */
+/* Column widths for items table (Tab 1) - auto adjust */
 .item-table th:nth-child(1),
-.item-table td:nth-child(1) { width: 100px; } /* Tag ID */
+.item-table td:nth-child(1) { min-width: 100px; } /* Tag ID */
 .item-table th:nth-child(2),
-.item-table td:nth-child(2) { width: 200px; } /* Common Name */
+.item-table td:nth-child(2) { min-width: 200px; } /* Common Name */
 .item-table th:nth-child(3),
-.item-table td:nth-child(3) { width: 180px; } /* Bin Location */
+.item-table td:nth-child(3) { min-width: 180px; } /* Bin Location */
 .item-table th:nth-child(4),
-.item-table td:nth-child(4) { width: 180px; } /* Status */
+.item-table td:nth-child(4) { min-width: 180px; } /* Status */
 .item-table th:nth-child(5),
-.item-table td:nth-child(5) { width: 150px; } /* Last Contract */
+.item-table td:nth-child(5) { min-width: 150px; } /* Last Contract */
 .item-table th:nth-child(6),
-.item-table td:nth-child(6) { width: 200px; } /* Last Scanned Date */
+.item-table td:nth-child(6) { min-width: 200px; } /* Last Scanned Date */
 .item-table th:nth-child(7),
-.item-table td:nth-child(7) { width: 100px; } /* Quality */
+.item-table td:nth-child(7) { min-width: 100px; } /* Quality */
 .item-table th:nth-child(8),
-.item-table td:nth-child(8) { width: 200px; } /* Notes */
+.item-table td:nth-child(8) { min-width: 200px; } /* Notes */
 
-/* Column widths for items table (Tab 5) */
+/* Column widths for items table (Tab 5) - auto adjust */
 .item-table th:nth-child(1),
-.item-table td:nth-child(1) { width: 60px; } /* Select */
+.item-table td:nth-child(1) { min-width: 60px; } /* Select */
 .item-table th:nth-child(2),
-.item-table td:nth-child(2) { width: 100px; } /* Tag ID */
+.item-table td:nth-child(2) { min-width: 100px; } /* Tag ID */
 .item-table th:nth-child(3),
-.item-table td:nth-child(3) { width: 200px; } /* Common Name */
+.item-table td:nth-child(3) { min-width: 200px; } /* Common Name */
 .item-table th:nth-child(4),
-.item-table td:nth-child(4) { width: 180px; } /* Bin Location */
+.item-table td:nth-child(4) { min-width: 180px; } /* Bin Location */
 .item-table th:nth-child(5),
-.item-table td:nth-child(5) { width: 180px; } /* Status */
+.item-table td:nth-child(5) { min-width: 180px; } /* Status */
 .item-table th:nth-child(6),
-.item-table td:nth-child(6) { width: 150px; } /* Last Contract */
+.item-table td:nth-child(6) { min-width: 150px; } /* Last Contract */
 .item-table th:nth-child(7),
-.item-table td:nth-child(7) { width: 200px; } /* Last Scanned Date */
+.item-table td:nth-child(7) { min-width: 200px; } /* Last Scanned Date */
 .item-table th:nth-child(8),
-.item-table td:nth-child(8) { width: 100px; } /* Quality */
+.item-table td:nth-child(8) { min-width: 100px; } /* Quality */
 .item-table th:nth-child(9),
-.item-table td:nth-child(9) { width: 200px; } /* Notes */
+.item-table td:nth-child(9) { min-width: 200px; } /* Notes */
 .item-table th:nth-child(10),
-.item-table td:nth-child(10) { width: 100px; } /* Actions */
+.item-table td:nth-child(10) { min-width: 100px; } /* Actions */
 
 /* Ensure dropdowns don't overflow columns */
 .subcategory-select,
@@ -245,6 +250,7 @@
 .btn-group {
     display: flex;
     gap: 5px;
+    justify-content: center; /* Center buttons in the cell */
 }
 
 .btn-sm {
@@ -282,4 +288,13 @@
         padding: 0.5rem;
         font-size: 0.9rem;
     }
+}
+
+/* Loading indicator */
+.loading-indicator {
+    font-style: italic;
+    color: #666;
+    text-align: center;
+    padding: 10px;
+    display: none;
 }
