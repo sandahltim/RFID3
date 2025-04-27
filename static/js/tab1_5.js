@@ -1,4 +1,4 @@
-console.log('tab1_5.js version: 2025-04-26-v14 loaded');
+console.log('tab1_5.js version: 2025-04-26-v15 loaded');
 
 // Note: Common function for Tabs 1 and 5
 function showLoading(targetId) {
@@ -167,13 +167,13 @@ function loadCommonNames(selectElement, page = 1) {
                                 <th>Actions</th>
                             </tr>
                         </thead>
-                        <tbody style="max-height: 600px; overflow-y: auto; display: block;">
+                        <tbody>
                 `;
 
                 data.common_names.forEach(item => {
                     const rowId = `${targetId}_${item.name.replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '')}`;
                     html += `
-                        <tr style="display: table; width: 100%; table-layout: fixed;">
+                        <tr>
                             <td>${item.name}</td>
                             <td>${item.total_items}</td>
                             <td>${item.items_on_contracts}</td>
@@ -188,7 +188,7 @@ function loadCommonNames(selectElement, page = 1) {
                                 </div>
                             </td>
                         </tr>
-                        <tr style="display: table; width: 100%; table-layout: fixed;">
+                        <tr>
                             <td colspan="6">
                                 <div id="items-${rowId}" class="expandable collapsed"></div>
                             </td>
@@ -420,6 +420,7 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
             return response.json();
         })
         .then(data => {
+            console.log('Items data received:', data); // Debug log
             let html = '';
             if (data.items && data.items.length > 0) {
                 let headers = [];
@@ -545,6 +546,21 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                 html += `
                             </tbody>
                         </table>
+                `;
+
+                // Add pagination for items if total_items exceeds per_page
+                if (data.total_items > data.per_page) {
+                    const totalPages = Math.ceil(data.total_items / data.per_page);
+                    html += `
+                        <div class="pagination-controls">
+                            <button class="btn btn-sm btn-secondary" onclick="loadItems('${category}', '${subcategory}', '${commonName}', '${targetId}', ${data.page - 1})" ${data.page === 1 ? 'disabled' : ''}>Previous</button>
+                            <span>Page ${data.page} of ${totalPages}</span>
+                            <button class="btn btn-sm btn-secondary" onclick="loadItems('${category}', '${subcategory}', '${commonName}', '${targetId}', ${data.page + 1})" ${data.page === totalPages ? 'disabled' : ''}>Next</button>
+                        </div>
+                    `;
+                }
+
+                html += `
                     </div>
                 `;
             } else {
