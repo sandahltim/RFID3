@@ -30,7 +30,7 @@ logger.addHandler(console_handler)
 tab4_bp = Blueprint('tab4', __name__)
 
 # Version marker
-logger.info("Deployed tab4.py version: 2025-04-27-v18")
+logger.info("Deployed tab4.py version: 2025-04-27-v19")
 
 @tab4_bp.route('/tab/4')
 def tab4_view():
@@ -62,7 +62,7 @@ def tab4_view():
         ).filter(
             ItemMaster.last_contract_num != None,
             ItemMaster.last_contract_num != '00000',
-            ~func.trim(ItemMaster.last_contract_num).op('REGEXP')('^[0-9]+')  # Exclude contracts starting with a number
+            func.upper(ItemMaster.last_contract_num).like('L%')  # Include contracts starting with 'L' (case-insensitive)
         ).group_by(
             ItemMaster.last_contract_num
         ).having(
@@ -88,7 +88,7 @@ def tab4_view():
             func.count(HandCountedItems.id).label('hand_counted_entries')
         ).filter(
             HandCountedItems.contract_number != None,
-            ~func.trim(HandCountedItems.contract_number).op('REGEXP')('^[0-9]+')  # Exclude contracts starting with a number
+            func.upper(HandCountedItems.contract_number).like('L%')  # Include contracts starting with 'L' (case-insensitive)
         ).group_by(
             HandCountedItems.contract_number
         ).having(
@@ -114,33 +114,39 @@ def tab4_view():
             logger.debug(f"Processing contract: {contract_number}")
             current_app.logger.debug(f"Processing contract: {contract_number}")
 
-            # Count items on this contract from id_item_master (status filter removed for inclusion)
+            # Count items on this contract from id_item_master with status 'On Rent' or 'Delivered'
             items_on_contract = session.query(func.count(ItemMaster.tag_id)).filter(
-                ItemMaster.last_contract_num == contract_number
-            ).scalar()
-
-            # Count items with status 'On Rent' or 'Delivered' for display
-            items_on_contract_status = session.query(func.count(ItemMaster.tag_id)).filter(
                 ItemMaster.last_contract_num == contract_number,
                 ItemMaster.status.in_(['On Rent', 'Delivered'])
             ).scalar()
 
-            # Total items in inventory for this contract from id_item_master
+            # Total items in inventory for this contract from id_item_master (all statuses)
             total_items_inventory = session.query(func.count(ItemMaster.tag_id)).filter(
                 ItemMaster.last_contract_num == contract_number
             ).scalar()
 
-            # Fetch hand-counted items for this contract
-            hand_counted_items = session.query(func.count(HandCountedItems.id)).filter(
-                HandCountedItems.contract_number == contract_number
-            ).scalar()
+            # Fetch hand-counted items for this contract (group by item_name for expansion later)
+            hand_counted_items_query = session.query(
+                HandCountedItems.item_name,
+                func.sum(HandCountedItems.quantity).label('total_quantity')
+            ).filter(
+                HandCountedItems.contract_number == contract_number,
+                HandCountedItems.action == 'Added'
+            ).group_by(
+                HandCountedItems.item_name
+            ).all()
 
-            # Log the counts for debugging
-            logger.debug(f"Contract {contract_number}: items_on_contract={items_on_contract}, items_on_contract_status={items_on_contract_status}, total_items_inventory={total_items_inventory}, hand_counted_items={hand_counted_items}")
+            hand_counted_items_total = sum(item.total_quantity for item in hand_counted_items_query) if hand_counted_items_query else 0
 
-            # Skip contracts with no items on contract and no hand-counted entries
-            if (items_on_contract == 0 or items_on_contract is None) and (hand_counted_items == 0 or hand_counted_items is None):
-                logger.debug(f"Skipping contract {contract_number}: No items on contract and no hand-counted entries")
+            logger.debug(f"Hand-counted items for contract {contract_number}: {[(item.item_name, item.total_quantity) for item in hand_counted_items_query]}")
+            logger.debug(f"Total hand-counted items quantity for contract {contract_number}: {hand_counted_items_total}")
+
+            # Combine counts for display (hand-counted items are treated as additional items on contract)
+            total_items_on_contract = (items_on_contract or 0) + (hand_counted_items_total or 0)
+
+            # Skip contracts with no items on contract (including hand-counted items)
+            if total_items_on_contract == 0 and total_items_inventory == 0:
+                logger.debug(f"Skipping contract {contract_number}: No items on contract and no items in inventory")
                 continue
 
             # Fetch additional details from id_transactions for this contract
@@ -156,16 +162,16 @@ def tab4_view():
 
             client_name = latest_transaction.client_name if latest_transaction else 'N/A'
             scan_date = latest_transaction.scan_date.isoformat() if latest_transaction and latest_transaction.scan_date else 'N/A'
-            logger.debug(f"Contract {contract_number}: client_name={client_name}, scan_date={scan_date}, items_on_contract={items_on_contract_status}, total_items_inventory={total_items_inventory}, hand_counted_items={hand_counted_items}")
-            current_app.logger.debug(f"Contract {contract_number}: client_name={client_name}, scan_date={scan_date}, items_on_contract={items_on_contract_status}, total_items_inventory={total_items_inventory}, hand_counted_items={hand_counted_items}")
+            logger.debug(f"Contract {contract_number}: client_name={client_name}, scan_date={scan_date}, items_on_contract={items_on_contract}, total_items_inventory={total_items_inventory}, hand_counted_items_total={hand_counted_items_total}")
+            current_app.logger.debug(f"Contract {contract_number}: client_name={client_name}, scan_date={scan_date}, items_on_contract={items_on_contract}, total_items_inventory={total_items_inventory}, hand_counted_items_total={hand_counted_items_total}")
 
             contracts.append({
                 'contract_number': contract_number,
                 'client_name': client_name,
                 'scan_date': scan_date,
-                'items_on_contract': items_on_contract_status or 0,
+                'items_on_contract': total_items_on_contract or 0,
                 'total_items_inventory': total_items_inventory or 0,
-                'hand_counted_items': hand_counted_items or 0
+                'hand_counted_items': hand_counted_items_total or 0
             })
 
         contracts.sort(key=lambda x: x['contract_number'])
@@ -200,7 +206,7 @@ def tab4_common_names():
     try:
         session = db.session()
 
-        # Fetch common names for items on this contract
+        # Fetch common names for items on this contract from id_item_master
         common_names_query = session.query(
             ItemMaster.common_name,
             func.count(ItemMaster.tag_id).label('on_contracts')
@@ -227,39 +233,83 @@ def tab4_common_names():
 
         common_names_all = common_names_query.all()
 
-        logger.debug(f"Common names for laundry contract {contract_number}: {[(name, count) for name, count in common_names_all]}")
-        current_app.logger.debug(f"Common names for laundry contract {contract_number}: {[(name, count) for name, count in common_names_all]}")
+        logger.debug(f"Common names from id_item_master for contract {contract_number}: {[(name, count) for name, count in common_names_all]}")
+        current_app.logger.debug(f"Common names from id_item_master for contract {contract_number}: {[(name, count) for name, count in common_names_all]}")
 
-        common_names = []
+        # Fetch hand-counted items to include as "common names"
+        hand_counted_items_query = session.query(
+            HandCountedItems.item_name.label('common_name'),
+            func.sum(HandCountedItems.quantity).label('on_contracts')
+        ).filter(
+            HandCountedItems.contract_number == contract_number,
+            HandCountedItems.action == 'Added'
+        ).group_by(
+            HandCountedItems.item_name
+        ).all()
+
+        logger.debug(f"Hand-counted items as common names for contract {contract_number}: {[(name, count) for name, count in hand_counted_items_query]}")
+        current_app.logger.debug(f"Hand-counted items as common names for contract {contract_number}: {[(name, count) for name, count in hand_counted_items_query]}")
+
+        # Combine common names from id_item_master and hand_counted_items
+        common_names = {}
         for name, on_contracts in common_names_all:
             if not name:
                 continue
-
-            # Total items in inventory for this common name
             total_items_inventory = session.query(func.count(ItemMaster.tag_id)).filter(
                 ItemMaster.common_name == name
             ).scalar()
-
-            common_names.append({
+            common_names[name] = {
                 'name': name,
                 'on_contracts': on_contracts or 0,
-                'total_items_inventory': total_items_inventory or 0
-            })
+                'total_items_inventory': total_items_inventory or 0,
+                'is_hand_counted': False
+            }
+
+        for name, on_contracts in hand_counted_items_query:
+            if not name:
+                continue
+            if name in common_names:
+                # If the item name exists in both, add the hand-counted quantity
+                common_names[name]['on_contracts'] += on_contracts or 0
+            else:
+                # If only in hand-counted items, add it with zero inventory from id_item_master
+                common_names[name] = {
+                    'name': name,
+                    'on_contracts': on_contracts or 0,
+                    'total_items_inventory': 0,
+                    'is_hand_counted': True
+                }
+
+        common_names_list = list(common_names.values())
 
         # Apply sorting for computed fields if necessary
         if sort in ['total_items_inventory_asc', 'total_items_inventory_desc']:
             sort_field = sort.split('_')[0]
             sort_direction = sort.split('_')[-1]
-            common_names.sort(
+            common_names_list.sort(
+                key=lambda x: x[sort_field],
+                reverse=(sort_direction == 'desc')
+            )
+        elif sort in ['name_asc', 'name_desc']:
+            sort_field = 'name'
+            sort_direction = sort.split('_')[-1]
+            common_names_list.sort(
+                key=lambda x: x[sort_field].lower(),
+                reverse=(sort_direction == 'desc')
+            )
+        elif sort in ['on_contracts_asc', 'on_contracts_desc']:
+            sort_field = 'on_contracts'
+            sort_direction = sort.split('_')[-1]
+            common_names_list.sort(
                 key=lambda x: x[sort_field],
                 reverse=(sort_direction == 'desc')
             )
 
         # Paginate common names
-        total_common_names = len(common_names)
+        total_common_names = len(common_names_list)
         start = (page - 1) * per_page
         end = start + per_page
-        paginated_common_names = common_names[start:end]
+        paginated_common_names = common_names_list[start:end]
 
         session.close()
         logger.info(f"Returning {len(paginated_common_names)} common names for contract {contract_number}")
@@ -296,57 +346,96 @@ def tab4_data():
     try:
         session = db.session()
 
-        # Fetch items on this contract
-        query = session.query(ItemMaster).filter(
-            ItemMaster.last_contract_num == contract_number,
-            ItemMaster.common_name == common_name,
-            ItemMaster.status.in_(['On Rent', 'Delivered'])
-        )
-
-        # Apply sorting
-        if sort == 'tag_id_asc':
-            query = query.order_by(asc(ItemMaster.tag_id))
-        elif sort == 'tag_id_desc':
-            query = query.order_by(desc(ItemMaster.tag_id))
-        elif sort == 'common_name_asc':
-            query = query.order_by(asc(func.lower(ItemMaster.common_name)))
-        elif sort == 'common_name_desc':
-            query = query.order_by(desc(func.lower(ItemMaster.common_name)))
-        elif sort == 'bin_location_asc':
-            query = query.order_by(asc(func.lower(func.coalesce(ItemMaster.bin_location, ''))))
-        elif sort == 'bin_location_desc':
-            query = query.order_by(desc(func.lower(func.coalesce(ItemMaster.bin_location, ''))))
-        elif sort == 'status_asc':
-            query = query.order_by(asc(func.lower(ItemMaster.status)))
-        elif sort == 'status_desc':
-            query = query.order_by(desc(func.lower(ItemMaster.status)))
-        elif sort == 'last_contract_asc':
-            query = query.order_by(asc(func.lower(func.coalesce(ItemMaster.last_contract_num, ''))))
-        elif sort == 'last_contract_desc':
-            query = query.order_by(desc(func.lower(func.coalesce(ItemMaster.last_contract_num, ''))))
-        elif sort == 'last_scanned_date_asc':
-            query = query.order_by(asc(ItemMaster.date_last_scanned))
-        elif sort == 'last_scanned_date_desc':
-            query = query.order_by(desc(ItemMaster.date_last_scanned))
-
-        # Paginate items
-        total_items = query.count()
-        items = query.offset((page - 1) * per_page).limit(per_page).all()
+        # Check if this common_name exists in HandCountedItems
+        is_hand_counted = session.query(HandCountedItems).filter(
+            HandCountedItems.contract_number == contract_number,
+            HandCountedItems.item_name == common_name,
+            HandCountedItems.action == 'Added'
+        ).first() is not None
 
         items_data = []
-        for item in items:
-            last_scanned_date = item.date_last_scanned.isoformat() if item.date_last_scanned else 'N/A'
-            items_data.append({
-                'tag_id': item.tag_id,
-                'common_name': item.common_name,
-                'bin_location': item.bin_location,
-                'status': item.status,
-                'last_contract_num': item.last_contract_num,
-                'last_scanned_date': last_scanned_date
-            })
+        total_items = 0
 
-        logger.debug(f"Items for laundry contract {contract_number}, common_name {common_name}: {len(items_data)} items")
-        current_app.logger.debug(f"Items for laundry contract {contract_number}, common_name {common_name}: {len(items_data)} items")
+        if is_hand_counted:
+            # Fetch hand-counted items
+            query = session.query(HandCountedItems).filter(
+                HandCountedItems.contract_number == contract_number,
+                HandCountedItems.item_name == common_name,
+                HandCountedItems.action == 'Added'
+            )
+
+            # Apply sorting (limited for hand-counted items)
+            if sort == 'tag_id_asc':
+                query = query.order_by(asc(HandCountedItems.id))
+            elif sort == 'tag_id_desc':
+                query = query.order_by(desc(HandCountedItems.id))
+            elif sort == 'last_scanned_date_asc':
+                query = query.order_by(asc(HandCountedItems.timestamp))
+            elif sort == 'last_scanned_date_desc':
+                query = query.order_by(desc(HandCountedItems.timestamp))
+
+            total_items = query.count()
+            items = query.offset((page - 1) * per_page).limit(per_page).all()
+
+            for item in items:
+                items_data.append({
+                    'tag_id': f"HC-{item.id}",  # Use a pseudo tag_id for hand-counted items
+                    'common_name': item.item_name,
+                    'bin_location': 'N/A',
+                    'status': 'Hand-Counted',
+                    'last_contract_num': item.contract_number,
+                    'last_scanned_date': item.timestamp.isoformat() if item.timestamp else 'N/A'
+                })
+        else:
+            # Fetch items from id_item_master
+            query = session.query(ItemMaster).filter(
+                ItemMaster.last_contract_num == contract_number,
+                ItemMaster.common_name == common_name,
+                ItemMaster.status.in_(['On Rent', 'Delivered'])
+            )
+
+            # Apply sorting
+            if sort == 'tag_id_asc':
+                query = query.order_by(asc(ItemMaster.tag_id))
+            elif sort == 'tag_id_desc':
+                query = query.order_by(desc(ItemMaster.tag_id))
+            elif sort == 'common_name_asc':
+                query = query.order_by(asc(func.lower(ItemMaster.common_name)))
+            elif sort == 'common_name_desc':
+                query = query.order_by(desc(func.lower(ItemMaster.common_name)))
+            elif sort == 'bin_location_asc':
+                query = query.order_by(asc(func.lower(func.coalesce(ItemMaster.bin_location, ''))))
+            elif sort == 'bin_location_desc':
+                query = query.order_by(desc(func.lower(func.coalesce(ItemMaster.bin_location, ''))))
+            elif sort == 'status_asc':
+                query = query.order_by(asc(func.lower(ItemMaster.status)))
+            elif sort == 'status_desc':
+                query = query.order_by(desc(func.lower(ItemMaster.status)))
+            elif sort == 'last_contract_asc':
+                query = query.order_by(asc(func.lower(func.coalesce(ItemMaster.last_contract_num, ''))))
+            elif sort == 'last_contract_desc':
+                query = query.order_by(desc(func.lower(func.coalesce(ItemMaster.last_contract_num, ''))))
+            elif sort == 'last_scanned_date_asc':
+                query = query.order_by(asc(ItemMaster.date_last_scanned))
+            elif sort == 'last_scanned_date_desc':
+                query = query.order_by(desc(ItemMaster.date_last_scanned))
+
+            total_items = query.count()
+            items = query.offset((page - 1) * per_page).limit(per_page).all()
+
+            for item in items:
+                last_scanned_date = item.date_last_scanned.isoformat() if item.date_last_scanned else 'N/A'
+                items_data.append({
+                    'tag_id': item.tag_id,
+                    'common_name': item.common_name,
+                    'bin_location': item.bin_location,
+                    'status': item.status,
+                    'last_contract_num': item.last_contract_num,
+                    'last_scanned_date': last_scanned_date
+                })
+
+        logger.debug(f"Items for contract {contract_number}, common_name {common_name}: {len(items_data)} items")
+        current_app.logger.debug(f"Items for contract {contract_number}, common_name {common_name}: {len(items_data)} items")
 
         session.close()
         return jsonify({
@@ -497,28 +586,59 @@ def full_items_by_rental_class():
     try:
         session = db.session()
 
-        # Fetch all items with the same contract_number and common_name
-        items_query = session.query(ItemMaster).filter(
-            ItemMaster.last_contract_num == contract_number,
-            ItemMaster.common_name == common_name,
-            ItemMaster.status.in_(['On Rent', 'Delivered'])
-        ).order_by(ItemMaster.tag_id)
+        # Check if this common_name exists in HandCountedItems
+        is_hand_counted = session.query(HandCountedItems).filter(
+            HandCountedItems.contract_number == contract_number,
+            HandCountedItems.item_name == common_name,
+            HandCountedItems.action == 'Added'
+        ).first() is not None
 
-        items = items_query.all()
         items_data = []
-        for item in items:
-            last_scanned_date = item.date_last_scanned.isoformat() if item.date_last_scanned else 'N/A'
-            items_data.append({
-                'tag_id': item.tag_id,
-                'common_name': item.common_name,
-                'rental_class_num': item.rental_class_num,
-                'bin_location': item.bin_location,
-                'status': item.status,
-                'last_contract_num': item.last_contract_num,
-                'last_scanned_date': last_scanned_date,
-                'quality': item.quality,
-                'notes': item.notes
-            })
+
+        if is_hand_counted:
+            # Fetch all hand-counted items with the same contract_number and item_name
+            items_query = session.query(HandCountedItems).filter(
+                HandCountedItems.contract_number == contract_number,
+                HandCountedItems.item_name == common_name,
+                HandCountedItems.action == 'Added'
+            ).order_by(HandCountedItems.id)
+
+            items = items_query.all()
+            for item in items:
+                last_scanned_date = item.timestamp.isoformat() if item.timestamp else 'N/A'
+                items_data.append({
+                    'tag_id': f"HC-{item.id}",
+                    'common_name': item.item_name,
+                    'rental_class_num': 'N/A',
+                    'bin_location': 'N/A',
+                    'status': 'Hand-Counted',
+                    'last_contract_num': item.contract_number,
+                    'last_scanned_date': last_scanned_date,
+                    'quality': 'N/A',
+                    'notes': 'N/A'
+                })
+        else:
+            # Fetch all items with the same contract_number and common_name from id_item_master
+            items_query = session.query(ItemMaster).filter(
+                ItemMaster.last_contract_num == contract_number,
+                ItemMaster.common_name == common_name,
+                ItemMaster.status.in_(['On Rent', 'Delivered'])
+            ).order_by(ItemMaster.tag_id)
+
+            items = items_query.all()
+            for item in items:
+                last_scanned_date = item.date_last_scanned.isoformat() if item.date_last_scanned else 'N/A'
+                items_data.append({
+                    'tag_id': item.tag_id,
+                    'common_name': item.common_name,
+                    'rental_class_num': item.rental_class_num,
+                    'bin_location': item.bin_location,
+                    'status': item.status,
+                    'last_contract_num': item.last_contract_num,
+                    'last_scanned_date': last_scanned_date,
+                    'quality': item.quality,
+                    'notes': item.notes
+                })
 
         session.close()
         return jsonify({

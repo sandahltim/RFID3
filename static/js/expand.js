@@ -1,4 +1,4 @@
-console.log('expand.js version: 2025-04-27-v72 loaded - confirming script load');
+console.log('expand.js version: 2025-04-27-v73 loaded - confirming script load');
 
 // Note: Common function - will be moved to common.js during split
 function showLoading(key) {
@@ -76,6 +76,14 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Do not automatically expand any sections on load
     console.log('Skipping automatic expansion on load');
+
+    // Apply filters to the category table on load
+    const categoryTable = document.getElementById('category-table');
+    if (categoryTable) {
+        applyFilters(categoryTable);
+    } else {
+        console.warn('Category table not found, skipping filter application');
+    }
 
     // Remove any existing click event listeners to prevent duplicates
     document.removeEventListener('click', handleClick);
@@ -218,7 +226,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         <tr>
                             <td class="expandable-cell" onclick="expandItems('${contractNumber}', '${escapedCommonName}', 'items-${commonId}')">${common.name}</td>
                             <td>${common.on_contracts}</td>
-                            <td>${common.total_items_inventory}</td>
+                            <td>${common.is_hand_counted ? 'N/A' : common.total_items_inventory}</td>
                             <td>
                                 <button class="btn btn-sm btn-secondary expand-btn" data-common-name="${common.name}" data-target-id="items-${commonId}" data-contract-number="${contractNumber}">Expand</button>
                                 <button class="btn btn-sm btn-secondary collapse-btn" data-collapse-target="items-${commonId}" style="display:none;">Collapse</button>
@@ -453,7 +461,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         <tr>
                             <td class="expandable-cell" onclick="expandItems('${contractNumber}', '${escapedCommonName}', 'items-${commonId}')">${common.name}</td>
                             <td>${common.on_contracts}</td>
-                            <td>${common.total_items_inventory}</td>
+                            <td>${common.is_hand_counted ? 'N/A' : common.total_items_inventory}</td>
                             <td>
                                 <button class="btn btn-sm btn-secondary expand-btn" data-common-name="${common.name}" data-target-id="items-${commonId}" data-contract-number="${contractNumber}">Expand</button>
                                 <button class="btn btn-sm btn-secondary collapse-btn" data-collapse-target="items-${commonId}" style="display:none;">Collapse</button>

@@ -221,15 +221,5 @@ function removeHandCountedItem() {
         alert('Failed to remove item. Please try again.');
     });
 }
-
-// Apply filters to the category table on load
-document.addEventListener('DOMContentLoaded', function() {
-    const categoryTable = document.getElementById('category-table');
-    if (categoryTable && typeof window.applyFilters === 'function') {
-        window.applyFilters(categoryTable);
-    } else {
-        console.warn('applyFilters function or category-table not found, skipping filter application');
-    }
-});
 </script>
 {% endblock %}
