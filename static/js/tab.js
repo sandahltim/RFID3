@@ -1,6 +1,21 @@
 console.log('tab.js loaded, cachedTabNum:', window.cachedTabNum);
 
 // Note: Common function - will be moved to common.js during split
+function formatDateTime(dateTimeStr) {
+    if (!dateTimeStr) return 'N/A';
+    const date = new Date(dateTimeStr);
+    return date.toLocaleString('en-US', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: true
+    });
+}
+
+// Note: Common function - will be moved to common.js during split
 function refreshTab() {
     window.location.reload();
 }
@@ -36,8 +51,15 @@ async function printTable(level, id, commonName = null, category = null, subcate
 
     let contractNumber = '';
     if (level === 'Contract') {
-        const contractCell = element.querySelector('td:first-child');
-        contractNumber = contractCell ? contractCell.textContent.trim() : '';
+        // For contract level, the ID might be 'category-table' or 'common-<contract_number>'
+        if (id.startsWith('common-')) {
+            contractNumber = id.replace('common-', '');
+        } else {
+            const contractCell = element.querySelector('td:first-child');
+            contractNumber = contractCell ? contractCell.textContent.trim() : '';
+        }
+    } else {
+        contractNumber = category || '';
     }
 
     let contractDate = 'N/A';
@@ -45,7 +67,7 @@ async function printTable(level, id, commonName = null, category = null, subcate
         try {
             const response = await fetch(`/get_contract_date?contract_number=${encodeURIComponent(contractNumber)}`);
             const data = await response.json();
-            contractDate = data.date ? new Date(data.date).toLocaleString() : 'N/A';
+            contractDate = data.date ? formatDateTime(data.date) : 'N/A';
         } catch (error) {
             console.error('Error fetching contract date:', error);
         }
@@ -98,16 +120,53 @@ async function printTable(level, id, commonName = null, category = null, subcate
         printElement = element.cloneNode(true);
 
         if (level === 'Contract') {
-            const header = document.getElementById('category-table-header');
-            if (header) {
+            let commonTable;
+            if (id.startsWith('common-')) {
+                // If printing an expanded common names table directly
+                commonTable = printElement;
+            } else {
+                // Otherwise, find the expanded common names table for the contract
+                const row = element.closest('tr');
+                if (row) {
+                    const nextRow = row.nextElementSibling;
+                    if (nextRow) {
+                        const expandedContent = nextRow.querySelector('.expandable.expanded');
+                        if (expandedContent) {
+                            commonTable = expandedContent.querySelector('.common-table');
+                        }
+                    }
+                }
+            }
+
+            if (commonTable) {
+                tableWrapper = commonTable.cloneNode(true);
+            } else {
+                // If no common table is expanded, fetch the common names data
+                const url = `/tab/${tabNum}/common_names?contract_number=${encodeURIComponent(contractNumber)}`;
+                const response = await fetch(url);
+                const data = await response.json();
+                const commonNames = data.common_names || [];
+
                 tableWrapper = document.createElement('table');
                 tableWrapper.className = 'table table-bordered';
-                tableWrapper.appendChild(header.cloneNode(true));
-                const tbody = document.createElement('tbody');
-                tbody.appendChild(printElement);
-                tableWrapper.appendChild(tbody);
-            } else {
-                tableWrapper = printElement;
+                tableWrapper.innerHTML = `
+                    <thead>
+                        <tr>
+                            <th>Common Name</th>
+                            <th>Items on Contract</th>
+                            <th>Total Items in Inventory</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${commonNames.map(common => `
+                            <tr>
+                                <td>${common.name}</td>
+                                <td>${common.on_contracts}</td>
+                                <td>${common.total_items_inventory}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                `;
             }
         } else {
             tableWrapper = printElement;
@@ -115,26 +174,8 @@ async function printTable(level, id, commonName = null, category = null, subcate
 
         removeTotalItemsInventoryColumn(tableWrapper, tabNum);
 
-        const row = element.closest('tr');
-        if (row) {
-            const nextRow = row.nextElementSibling;
-            if (nextRow) {
-                const expandedContent = nextRow.querySelector('.expandable.expanded');
-                if (expandedContent) {
-                    const expandedClone = expandedContent.cloneNode(true);
-                    expandedClone.querySelectorAll('.btn, .loading, .expandable.collapsed, .pagination-controls, .filter-sort-controls').forEach(el => el.remove());
-                    const nestedTables = expandedClone.querySelectorAll('table');
-                    nestedTables.forEach(nestedTable => {
-                        removeTotalItemsInventoryColumn(nestedTable, tabNum);
-                    });
-                    const expandedWrapper = document.createElement('div');
-                    expandedWrapper.appendChild(expandedClone);
-                    tableWrapper.appendChild(expandedWrapper);
-                }
-            }
-        }
-
-        tableWrapper.querySelectorAll('.btn, .loading, .expandable.collapsed, .pagination-controls, .filter-sort-controls').forEach(el => el.remove());
+        // Remove buttons and other interactive elements
+        tableWrapper.querySelectorAll('.btn, .loading, .expandable.collapsed, .pagination-controls, .filter-sort-controls, .filter-row').forEach(el => el.remove());
     }
 
     tableWrapper.querySelectorAll('br').forEach(br => br.remove());
@@ -142,10 +183,11 @@ async function printTable(level, id, commonName = null, category = null, subcate
     const printContent = `
         <html>
             <head>
-                <title>RFID Dashboard - ${tabName} - ${level}</title>
+                <title>Broadway Tent and Event - ${tabName} - ${level}</title>
+                <link href="/static/css/style.css" rel="stylesheet">
                 <style>
                     body {
-                        font-family: Arial, sans-serif;
+                        font-family: 'Roboto', sans-serif;
                         margin: 20px;
                         color: #333;
                     }
@@ -166,45 +208,6 @@ async function printTable(level, id, commonName = null, category = null, subcate
                         color: #666;
                         margin: 5px 0;
                     }
-                    table {
-                        border-collapse: collapse;
-                        width: 100%;
-                        margin-top: 20px;
-                    }
-                    th, td {
-                        border: 1px solid #ccc;
-                        padding: 12px;
-                        text-align: left;
-                        font-size: 14px;
-                        white-space: normal;
-                        word-wrap: break-word;
-                        min-width: 80px;
-                        max-width: 150px;
-                    }
-                    th {
-                        background-color: #f2f2f2;
-                        font-weight: bold;
-                    }
-                    td {
-                        vertical-align: top;
-                    }
-                    .hidden {
-                        display: none;
-                    }
-                    .common-level {
-                        margin-left: 1rem;
-                        background-color: #e9ecef;
-                        padding: 0.5rem;
-                        border-left: 3px solid #28a745;
-                        margin-top: 10px;
-                    }
-                    .item-level-wrapper {
-                        margin-left: 1rem;
-                        background-color: #dee2e6;
-                        padding: 0.5rem;
-                        border-left: 3px solid #dc3545;
-                        margin-top: 10px;
-                    }
                     .signature-line {
                         margin-top: 40px;
                         border-top: 1px solid #000;
@@ -212,30 +215,6 @@ async function printTable(level, id, commonName = null, category = null, subcate
                         text-align: center;
                         padding-top: 10px;
                         font-size: 14px;
-                    }
-                    @media print {
-                        body {
-                            margin: 0;
-                        }
-                        .print-header {
-                            position: static;
-                            width: 100%;
-                            margin-bottom: 20px;
-                        }
-                        table {
-                            page-break-inside: auto;
-                        }
-                        tr {
-                            page-break-inside: avoid;
-                            page-break-after: auto;
-                        }
-                        th, td {
-                            font-size: 10px;
-                            min-width: 50px;
-                            max-width: 100px;
-                            padding: 4px;
-                            word-break: break-word;
-                        }
                     }
                 </style>
             </head>
@@ -281,7 +260,7 @@ async function printFullItemList(category, subcategory, commonName) {
     const tabNum = window.cachedTabNum || 1;
     const tabName = tabNum == 2 ? 'Open Contracts' : tabNum == 4 ? 'Laundry Contracts' : tabNum == 5 ? 'Resale/Rental Packs' : `Tab ${tabNum}`;
 
-    const url = `/tab/${tabNum}/full_items_by_rental_class?category=${encodeURIComponent(category)}&subcategory=${encodeURIComponent(subcategory)}&common_name=${encodeURIComponent(commonName)}`;
+    const url = `/tab/${tabNum}/full_items_by_rental_class?category=${encodeURIComponent(category)}&subcategory=${subcategory ? encodeURIComponent(subcategory) : 'null'}&common_name=${encodeURIComponent(commonName)}`;
     const response = await fetch(url);
     const data = await response.json();
     const items = data.items || [];
@@ -315,10 +294,11 @@ async function printFullItemList(category, subcategory, commonName) {
     const printContent = `
         <html>
             <head>
-                <title>RFID Dashboard - ${tabName} - Full Item List</title>
+                <title>Broadway Tent and Event - ${tabName} - Full Item List</title>
+                <link href="/static/css/style.css" rel="stylesheet">
                 <style>
                     body {
-                        font-family: Arial, sans-serif;
+                        font-family: 'Roboto', sans-serif;
                         margin: 20px;
                         color: #333;
                     }
@@ -339,28 +319,6 @@ async function printFullItemList(category, subcategory, commonName) {
                         color: #666;
                         margin: 5px 0;
                     }
-                    table {
-                        border-collapse: collapse;
-                        width: 100%;
-                        margin-top: 20px;
-                    }
-                    th, td {
-                        border: 1px solid #ccc;
-                        padding: 8px;
-                        text-align: left;
-                        font-size: 12px;
-                        white-space: normal;
-                        word-wrap: break-word;
-                        min-width: 80px;
-                        max-width: 150px;
-                    }
-                    th {
-                        background-color: #f2f2f2;
-                        font-weight: bold;
-                    }
-                    td {
-                        vertical-align: top;
-                    }
                     .signature-line {
                         margin-top: 40px;
                         border-top: 1px solid #000;
@@ -368,30 +326,6 @@ async function printFullItemList(category, subcategory, commonName) {
                         text-align: center;
                         padding-top: 10px;
                         font-size: 14px;
-                    }
-                    @media print {
-                        body {
-                            margin: 0;
-                        }
-                        .print-header {
-                            position: static;
-                            width: 100%;
-                            margin-bottom: 20px;
-                        }
-                        table {
-                            page-break-inside: auto;
-                        }
-                        tr {
-                            page-break-inside: avoid;
-                            page-break-after: auto;
-                        }
-                        th, td {
-                            font-size: 10px;
-                            min-width: 50px;
-                            max-width: 100px;
-                            padding: 4px;
-                            word-break: break-word;
-                        }
                     }
                 </style>
             </head>

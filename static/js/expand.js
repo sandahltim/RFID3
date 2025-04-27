@@ -1,4 +1,4 @@
-console.log('expand.js version: 2025-04-27-v70 loaded - confirming script load');
+console.log('expand.js version: 2025-04-27-v71 loaded - confirming script load');
 
 // Note: Common function - will be moved to common.js during split
 function showLoading(key) {
@@ -254,7 +254,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 targetElement.innerHTML = html;
                 targetElement.classList.remove('collapsed');
-                targetElement.classList.add('expandedව:expanded');
+                targetElement.classList.add('expanded');
                 toggleCollapseButton(targetId);
 
                 // Apply filters to the newly loaded table

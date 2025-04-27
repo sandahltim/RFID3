@@ -1,8 +1,42 @@
-/* Custom styles for RFID Dashboard */
+/* Custom styles for RFID Dashboard - Broadway Tent and Event */
+
+/* Define Broadway Tent and Event colors */
+:root {
+    --bte-royal-blue: #003087;
+    --bte-gold: #FFC107;
+    --bte-light-gray: #F8F9FA;
+    --bte-medium-gray: #DEE2E6;
+    --bte-dark-gray: #343A40;
+}
 
 /* General container padding */
 .container {
-    padding-top: 20px;
+    padding-top: 40px;
+    background-color: var(--bte-light-gray);
+    font-family: 'Roboto', sans-serif;
+}
+
+/* Navigation bar styling */
+.navbar {
+    background-color: var(--bte-royal-blue) !important;
+    padding: 15px 20px;
+}
+
+.navbar-brand, .navbar-nav .nav-link {
+    color: var(--bte-gold) !important;
+    font-weight: 500;
+    font-size: 1.1rem;
+}
+
+.navbar-brand:hover, .navbar-nav .nav-link:hover {
+    color: var(--bte-light-gray) !important;
+}
+
+/* Headings */
+h2 {
+    color: var(--bte-royal-blue);
+    font-weight: 700;
+    margin-bottom: 20px;
 }
 
 /* Expandable sections */
@@ -20,94 +54,206 @@
 
 /* Loading indicator */
 .loading {
-    color: #007bff;
+    color: var(--bte-royal-blue);
     font-style: italic;
     margin-left: 10px;
+    font-size: 0.9rem;
+}
+
+/* Filter and sort controls */
+.filter-sort-controls {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+}
+
+.filter-sort-controls .form-control {
+    border: 1px solid var(--bte-medium-gray);
+    border-radius: 4px;
+    padding: 8px 12px;
+    font-size: 0.95rem;
+    max-width: 200px;
+}
+
+.filter-sort-controls .form-control:focus {
+    border-color: var(--bte-royal-blue);
+    box-shadow: 0 0 5px rgba(0, 48, 135, 0.3);
+    outline: none;
 }
 
 /* Pagination controls */
 .pagination-controls {
     text-align: center;
-    margin-top: 10px;
+    margin-top: 20px;
+    margin-bottom: 20px;
 }
 
 .pagination-controls .btn {
-    margin: 0 5px;
+    margin: 0 10px;
+    background-color: var(--bte-royal-blue);
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    font-size: 0.9rem;
+}
+
+.pagination-controls .btn:hover {
+    background-color: var(--bte-gold);
+    color: var(--bte-dark-gray);
+}
+
+.pagination-controls .btn:disabled {
+    background-color: var(--bte-medium-gray);
+    cursor: not-allowed;
 }
 
 /* Filter row inputs */
 .filter-row input {
     width: 100%;
     box-sizing: border-box;
+    border: 1px solid var(--bte-medium-gray);
+    border-radius: 4px;
+    padding: 8px 12px;
+    font-size: 0.9rem;
+}
+
+.filter-row input:focus {
+    border-color: var(--bte-royal-blue);
+    box-shadow: 0 0 5px rgba(0, 48, 135, 0.3);
+    outline: none;
 }
 
 /* Subcategory and item level containers */
 .subcategory-container, .item-level-wrapper {
-    margin-top: 10px;
-    border-left: 2px solid #dee2e6; /* Add a subtle border to indicate hierarchy */
-    padding-left: 10px;
+    margin-top: 20px;
+    padding-left: 20px;
+    border-left: 4px solid var(--bte-gold);
 }
 
 /* Row count display */
 .row-count {
-    font-size: 0.9em;
-    color: #6c757d;
-    margin-top: 5px;
+    font-size: 0.9rem;
+    color: var(--bte-dark-gray);
+    margin-top: 15px;
+    font-style: italic;
 }
 
-/* Ensure tables are responsive */
+/* Ensure tables are responsive and styled */
 .table {
     width: 100%;
-    margin-bottom: 1rem;
-    color: #212529;
-    font-size: 0.95em; /* Slightly smaller font for better fit */
+    margin-bottom: 2rem;
+    color: var(--bte-dark-gray);
+    font-size: 1rem;
+    background-color: white;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+    border-collapse: separate;
+    border-spacing: 0;
 }
 
 .table th,
 .table td {
-    padding: 0.5rem; /* Reduced padding for a tighter look */
-    vertical-align: middle; /* Center content vertically */
-    border-top: 1px solid #dee2e6;
+    padding: 15px 20px;
+    vertical-align: middle;
+    border: 1px solid var(--bte-medium-gray);
 }
 
 .table thead th {
-    vertical-align: bottom;
-    border-bottom: 2px solid #dee2e6;
+    background-color: var(--bte-royal-blue);
+    color: white;
+    border-bottom: 2px solid var(--bte-medium-gray);
+    text-align: left;
+    font-weight: 600;
+    font-size: 1rem;
 }
 
-.table tbody + tbody {
-    border-top: 2px solid #dee2e6;
+.table tbody tr:nth-child(odd) {
+    background-color: var(--bte-light-gray);
 }
 
-.table-bordered {
-    border: 1px solid #dee2e6;
+.table tbody tr:hover {
+    background-color: rgba(255, 193, 7, 0.15); /* Light gold hover effect */
 }
 
 .table-bordered th,
 .table-bordered td {
-    border: 1px solid #dee2e6;
-}
-
-.table-hover tbody tr:hover {
-    background-color: rgba(0, 0, 0, 0.075);
-}
-
-.thead-dark th {
-    color: #fff;
-    background-color: #343a40;
-    border-color: #454d55;
+    border: 1px solid var(--bte-medium-gray);
 }
 
 /* Small buttons */
 .btn-sm {
-    padding: 0.25rem 0.5rem;
-    font-size: 0.875rem;
+    padding: 8px 16px;
+    font-size: 0.9rem;
     line-height: 1.5;
-    border-radius: 0.2rem;
+    border-radius: 4px;
+    margin-right: 8px;
+}
+
+.btn-secondary {
+    background-color: var(--bte-royal-blue);
+    border-color: var(--bte-royal-blue);
+    color: white;
+}
+
+.btn-secondary:hover {
+    background-color: var(--bte-gold);
+    border-color: var(--bte-gold);
+    color: var(--bte-dark-gray);
+}
+
+.btn-info {
+    background-color: #17A2B8;
+    border-color: #17A2B8;
+    color: white;
+}
+
+.btn-info:hover {
+    background-color: #138496;
+    border-color: #138496;
 }
 
 /* Filter inputs */
 .filter-row input.form-control-sm {
-    padding: 0.25rem 0.5rem;
-    font-size: 0.875rem;
+    padding: 8px 12px;
+    font-size: 0.9rem;
+}
+
+/* Print styles */
+@media print {
+    body {
+        background-color: white;
+        color: black;
+        font-family: 'Roboto', sans-serif;
+    }
+    .navbar, .btn, .pagination-controls, .filter-row, .loading, .row-count, .filter-sort-controls {
+        display: none !important;
+    }
+    .table {
+        box-shadow: none;
+        font-size: 11pt;
+    }
+    .table thead th {
+        background-color: white !important;
+        color: black !important;
+        border: 1px solid black !important;
+    }
+    .table th, .table td {
+        border: 1px solid black !important;
+        color: black !important;
+        padding: 8px 10px;
+    }
+    .table tbody tr:nth-child(odd) {
+        background-color: white !important;
+    }
+    .subcategory-container, .item-level-wrapper {
+        border-left: none !important;
+        padding-left: 0 !important;
+        margin-left: 10px;
+    }
+    .print-header {
+        margin-bottom: 30px;
+    }
+    .print-header h1, .print-header h2 {
+        color: black !important;
+    }
 }
