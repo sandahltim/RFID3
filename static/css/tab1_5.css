@@ -107,7 +107,7 @@
 
 /* Column widths for common names table */
 .common-table th:nth-child(1),
-.common-table td:nth-child(1) { width: 30%; white-space: normal; word-wrap: break-word; } /* Common Name */
+.common-table td:nth-child(1) { width: 25%; white-space: normal; word-wrap: break-word; } /* Common Name */
 .common-table th:nth-child(2),
 .common-table td:nth-child(2) { width: 10%; } /* Total Items */
 .common-table th:nth-child(3),
@@ -117,7 +117,7 @@
 .common-table th:nth-child(5),
 .common-table td:nth-child(5) { width: 15%; } /* Items Available */
 .common-table th:nth-child(6),
-.common-table td:nth-child(6) { width: 15%; } /* Actions */
+.common-table td:nth-child(6) { width: 20%; white-space: normal; } /* Actions - Increased width for buttons */
 
 /* Column widths for items table (Tab 1) */
 .item-table th:nth-child(1),

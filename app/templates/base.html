@@ -1,66 +1,64 @@
 <!DOCTYPE html>
 <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>RFID Dashboard - {% block title %}{% endblock %}</title>
-        <link href="{{ url_for('static', filename='lib/bootstrap/bootstrap.min.css') }}?v={{ cache_bust if cache_bust is defined else '1745516817' }}" rel="stylesheet">
-        <link href="{{ url_for('static', filename='css/style.css') }}?v={{ cache_bust if cache_bust is defined else '1745516817' }}" rel="stylesheet">
-        <!-- Load tab1_5.css only for Tabs 1 and 5 -->
-        {% if request.endpoint in ['tab1.tab1_view', 'tab5.tab5_view'] %}
-        <link href="{{ url_for('static', filename='css/tab1_5.css') }}?v={{ cache_bust if cache_bust is defined else '1745516817' }}" rel="stylesheet">
-        {% endif %}
-        <script src="{{ url_for('static', filename='lib/bootstrap/bootstrap.bundle.min.js') }}?v={{ cache_bust if cache_bust is defined else '1745516817' }}"></script>
-        <script src="{{ url_for('static', filename='lib/htmx/htmx.min.js') }}?v={{ cache_bust if cache_bust is defined else '1745516817' }}"></script>
-        <style>
-            .loading { color: #888; font-style: italic; }
-            .table-bordered th, .table-bordered td { border: 1px solid #dee2e6; }
-        </style>
-        {% block extra_head %}{% endblock %}
-    </head>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}RFID Dashboard{% endblock %}</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="/static/css/styles.css">
+    <link rel="stylesheet" href="/static/css/tab1_5.css">
+    {% block extra_head %}{% endblock %}
+</head>
 <body>
+    <!-- Navigation Bar -->
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
         <div class="container-fluid">
-            <a class="navbar-brand" href="{{ url_for('home.home') }}">RFID Dashboard</a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+            <a class="navbar-brand" href="/">RFID Dashboard</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
                 <span class="navbar-toggler-icon"></span>
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav">
                     <li class="nav-item">
-                        <a class="nav-link {% if request.endpoint == 'home.home' %}active{% endif %}" href="{{ url_for('home.home') }}">Home</a>
+                        <a class="nav-link" href="/">Home</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {% if request.endpoint == 'tab1.tab1_view' %}active{% endif %}" href="{{ url_for('tabs.tab_view', tab_num=1) }}">Rental Inventory</a>
+                        <a class="nav-link" href="/tab/1">Rental Inventory</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {% if request.endpoint == 'tab2.tab2_view' %}active{% endif %}" href="{{ url_for('tabs.tab_view', tab_num=2) }}">Open Contracts</a>
+                        <a class="nav-link" href="/tab/2">Open Contracts</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {% if request.endpoint == 'tab3.tab3_view' %}active{% endif %}" href="{{ url_for('tabs.tab_view', tab_num=3) }}">Service</a>
+                        <a class="nav-link" href="/tab/3">Service</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {% if request.endpoint == 'tab4.tab4_view' %}active{% endif %}" href="{{ url_for('tabs.tab_view', tab_num=4) }}">Laundry Contracts</a>
+                        <a class="nav-link" href="/tab/4">Laundry Contracts</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {% if request.endpoint == 'tab5.tab5_view' %}active{% endif %}" href="{{ url_for('tabs.tab_view', tab_num=5) }}">Resale</a>
+                        <a class="nav-link" href="/tab/5">Resale</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {% if request.endpoint == 'categories.manage_categories' %}active{% endif %}" href="{{ url_for('categories.manage_categories') }}">Manage Categories</a>
+                        <a class="nav-link" href="/categories">Manage Categories</a>
                     </li>
                 </ul>
             </div>
         </div>
     </nav>
+
+    <!-- Main Content -->
     <div class="container mt-4">
         {% block content %}
         {% endblock %}
     </div>
-    <script src="{{ url_for('static', filename='js/tab.js') }}?v={{ (cache_bust if cache_bust is defined else timestamp()) }}"></script>
-    <script src="{{ url_for('static', filename='js/expand.js') }}?v={{ (cache_bust if cache_bust is defined else timestamp()) + 2 }}"></script>
-    <!-- Load tab1_5.js only for Tabs 1 and 5 -->
-    {% if request.endpoint in ['tab1.tab1_view', 'tab5.tab5_view'] %}
-    <script src="{{ url_for('static', filename='js/tab1_5.js') }}?v={{ (cache_bust if cache_bust is defined else timestamp()) + 3 }}"></script>
-    {% endif %}
-<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'93690dbfb9424542',t:'MTc0NTcwMTY4OC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+
+    <!-- Bootstrap JS and Dependencies -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- HTMX -->
+    <script src="https://unpkg.com/htmx.org@1.9.6"></script>
+    <!-- Custom JS -->
+    <script src="/static/js/tab.js"></script>
+    <script src="/static/js/tab1_5.js"></script>
+</body>
 </html>
