@@ -47,7 +47,7 @@ if not any(isinstance(h, logging.StreamHandler) for h in root_logger.handlers):
 tab5_bp = Blueprint('tab5', __name__)
 
 # Version marker
-logger.info("Deployed tab5.py version: 2025-04-26-v19")
+logger.info("Deployed tab5.py version: 2025-04-26-v20")
 
 def get_category_data(session, filter_query='', sort='', status_filter='', bin_filter=''):
     # Check if data is in cache
@@ -688,8 +688,8 @@ def update_status():
         if not tag_id or not new_status:
             return jsonify({'error': 'Tag ID and status are required'}), 400
 
-        if new_status != 'Ready to Rent':
-            return jsonify({'error': 'Status can only be updated to "Ready to Rent"'}), 400
+        if new_status not in ['Ready to Rent', 'Sold']:
+            return jsonify({'error': 'Status can only be updated to "Ready to Rent" or "Sold"'}), 400
 
         session = db.session()
         item = session.query(ItemMaster).filter_by(tag_id=tag_id).first()
@@ -697,9 +697,10 @@ def update_status():
             session.close()
             return jsonify({'error': 'Item not found'}), 404
 
-        if item.status not in ['On Rent', 'Delivered']:
+        # For "Ready to Rent", only allow update from "On Rent" or "Delivered"
+        if new_status == 'Ready to Rent' and item.status not in ['On Rent', 'Delivered']:
             session.close()
-            return jsonify({'error': 'Status can only be updated from "On Rent" or "Delivered"'}), 400
+            return jsonify({'error': 'Status can only be updated to "Ready to Rent" from "On Rent" or "Delivered"'}), 400
 
         # Update local database
         current_time = datetime.now()
@@ -875,12 +876,16 @@ def bulk_update_common_name():
                 api_client.update_bin_location(item.tag_id, new_bin_location)
                 updated_items += 1
 
-            if new_status and new_status == 'Ready to Rent':
-                if item.status in ['On Rent', 'Delivered']:
-                    item.status = new_status
-                    item.date_last_scanned = current_time
-                    api_client.update_status(item.tag_id, new_status)
-                    updated_items += 1
+            if new_status:
+                if new_status not in ['Ready to Rent', 'Sold']:
+                    session.close()
+                    return jsonify({'error': 'Status can only be updated to "Ready to Rent" or "Sold"'}), 400
+                if new_status == 'Ready to Rent' and item.status not in ['On Rent', 'Delivered']:
+                    continue  # Skip items that can't be updated to "Ready to Rent"
+                item.status = new_status
+                item.date_last_scanned = current_time
+                api_client.update_status(item.tag_id, new_status)
+                updated_items += 1
 
         session.commit()
         session.close()
@@ -925,12 +930,16 @@ def bulk_update_items():
                 api_client.update_bin_location(item.tag_id, new_bin_location)
                 updated_items += 1
 
-            if new_status and new_status == 'Ready to Rent':
-                if item.status in ['On Rent', 'Delivered']:
-                    item.status = new_status
-                    item.date_last_scanned = current_time
-                    api_client.update_status(item.tag_id, new_status)
-                    updated_items += 1
+            if new_status:
+                if new_status not in ['Ready to Rent', 'Sold']:
+                    session.close()
+                    return jsonify({'error': 'Status can only be updated to "Ready to Rent" or "Sold"'}), 400
+                if new_status == 'Ready to Rent' and item.status not in ['On Rent', 'Delivered']:
+                    continue  # Skip items that can't be updated to "Ready to Rent"
+                item.status = new_status
+                item.date_last_scanned = current_time
+                api_client.update_status(item.tag_id, new_status)
+                updated_items += 1
 
         session.commit()
         session.close()

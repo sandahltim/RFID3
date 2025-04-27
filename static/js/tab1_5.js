@@ -1,4 +1,4 @@
-console.log('tab1_5.js version: 2025-04-26-v17 loaded');
+console.log('tab1_5.js version: 2025-04-26-v18 loaded');
 
 // Note: Common function for Tabs 1 and 5
 function showLoading(targetId) {
@@ -148,6 +148,7 @@ function loadCommonNames(selectElement, page = 1) {
                             <select id="bulk-status-${targetId}" onchange="updateBulkField('${targetId}', 'status')">
                                 <option value="">Update Status...</option>
                                 <option value="Ready to Rent">Ready to Rent</option>
+                                <option value="Sold">Sold</option>
                             </select>
                             <button class="btn btn-sm btn-primary" onclick="bulkUpdateCommonName('${category}', '${subcategory}', '${targetId}', '${targetId}')">Bulk Update</button>
                         </div>
@@ -486,6 +487,7 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                             <select id="bulk-item-status-${key}" onchange="updateBulkField('${key}', 'item-status')">
                                 <option value="">Update Status...</option>
                                 <option value="Ready to Rent">Ready to Rent</option>
+                                <option value="Sold">Sold</option>
                             </select>
                             <button class="btn btn-sm btn-primary" onclick="bulkUpdateSelectedItems('${key}')">Bulk Update Selected</button>
                         </div>
@@ -506,6 +508,8 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                 data.items.forEach(item => {
                     const lastScanned = item.last_scanned_date ? new Date(item.last_scanned_date).toLocaleString() : 'N/A';
                     if (window.cachedTabNum == 5) {
+                        const currentStatus = item.status || 'N/A';
+                        const isOnRentOrDelivered = currentStatus === 'On Rent' || currentStatus === 'Delivered';
                         html += `
                             <tr data-item-id="${item.tag_id}">
                                 <td><input type="checkbox" value="${item.tag_id}" class="item-select"></td>
@@ -522,8 +526,11 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                                 </td>
                                 <td>
                                     <select id="status-${item.tag_id}">
-                                        <option value="" ${!item.status ? 'selected' : ''}>Select Status</option>
-                                        <option value="Ready to Rent" ${item.status === 'Ready to Rent' ? 'selected' : ''} ${item.status !== 'On Rent' && item.status !== 'Delivered' ? 'disabled' : ''}>Ready to Rent</option>
+                                        <option value="${currentStatus}" selected>${currentStatus}</option>
+                                        <option value="Ready to Rent" ${isOnRentOrDelivered ? '' : 'disabled'}>Ready to Rent</option>
+                                        <option value="Sold">Sold</option>
+                                        <option value="On Rent" disabled>On Rent</option>
+                                        <option value="Delivered" disabled>Delivered</option>
                                     </select>
                                 </td>
                                 <td>${item.last_contract_num || 'N/A'}</td>
@@ -642,7 +649,7 @@ function showDropdown(event, cell, type, tagId, currentValue) {
         const rect = cell.getBoundingClientRect();
         dropdown.style.position = 'absolute';
         dropdown.style.left = `${rect.left + window.scrollX}px`;
-        dropdown.style.toggle = `${rect.bottom + window.scrollY}px`;
+        dropdown.style.top = `${rect.bottom + window.scrollY}px`;
         dropdown.style.zIndex = '1000';
         cell.setAttribute(`data-${type}`, currentValue);
     } else {
