@@ -51,49 +51,50 @@
                     <div id="common-{{ contract.contract_number }}" class="expandable collapsed"></div>
                 </td>
             </tr>
-            <tr>
-                <td colspan="6">
-                    <h4>Hand-Counted Items</h4>
-                    <div class="row mb-3">
-                        <div class="col">
-                            <input type="text" class="form-control" placeholder="Item Name" id="hand-counted-item-name-{{ contract.contract_number }}">
-                        </div>
-                        <div class="col">
-                            <input type="number" class="form-control" placeholder="Quantity" id="hand-counted-quantity-{{ contract.contract_number }}">
-                        </div>
-                        <div class="col">
-                            <select class="form-control" id="hand-counted-action-{{ contract.contract_number }}">
-                                <option value="Added">Added</option>
-                                <option value="Removed">Removed</option>
-                            </select>
-                        </div>
-                        <div class="col">
-                            <input type="text" class="form-control" placeholder="Employee Name" id="hand-counted-employee-{{ contract.contract_number }}">
-                        </div>
-                        <div class="col">
-                            <button class="btn btn-success" onclick="addHandCountedItem('{{ contract.contract_number }}')">Add Item</button>
-                            <button class="btn btn-danger" onclick="removeHandCountedItem('{{ contract.contract_number }}')">Remove Item</button>
-                        </div>
-                    </div>
-                    <table class="table table-bordered">
-                        <thead>
-                            <tr>
-                                <th>Contract Number</th>
-                                <th>Item Name</th>
-                                <th>Quantity</th>
-                                <th>Action</th>
-                                <th>Timestamp</th>
-                                <th>User</th>
-                            </tr>
-                        </thead>
-                        <tbody id="hand-counted-items-{{ contract.contract_number }}" 
-                               hx-get="{{ url_for('tab4.tab4_hand_counted_items', contract_number=contract.contract_number) }}"
-                               hx-trigger="load, refreshTab from:body">
-                        </tbody>
-                    </table>
-                </td>
-            </tr>
             {% endfor %}
+        </tbody>
+    </table>
+
+    <!-- Hand-Counted Items Section (always visible) -->
+    <h4>Hand-Counted Items</h4>
+    <div class="row mb-3">
+        <div class="col">
+            <input type="text" class="form-control" placeholder="Contract Number" id="hand-counted-contract-number">
+        </div>
+        <div class="col">
+            <input type="text" class="form-control" placeholder="Item Name" id="hand-counted-item-name">
+        </div>
+        <div class="col">
+            <input type="number" class="form-control" placeholder="Quantity" id="hand-counted-quantity">
+        </div>
+        <div class="col">
+            <select class="form-control" id="hand-counted-action">
+                <option value="Added">Added</option>
+                <option value="Removed">Removed</option>
+            </select>
+        </div>
+        <div class="col">
+            <input type="text" class="form-control" placeholder="Employee Name" id="hand-counted-employee">
+        </div>
+        <div class="col">
+            <button class="btn btn-success" onclick="addHandCountedItem()">Add Item</button>
+            <button class="btn btn-danger" onclick="removeHandCountedItem()">Remove Item</button>
+        </div>
+    </div>
+    <table class="table table-bordered">
+        <thead>
+            <tr>
+                <th>Contract Number</th>
+                <th>Item Name</th>
+                <th>Quantity</th>
+                <th>Action</th>
+                <th>Timestamp</th>
+                <th>User</th>
+            </tr>
+        </thead>
+        <tbody id="hand-counted-items" 
+               hx-get="{{ url_for('tab4.tab4_hand_counted_items') }}"
+               hx-trigger="load, refreshTab from:body">
         </tbody>
     </table>
 </div>
@@ -103,11 +104,17 @@ function refreshTab() {
     window.location.reload();
 }
 
-function addHandCountedItem(contractNumber) {
-    const itemName = document.getElementById(`hand-counted-item-name-${contractNumber}`).value;
-    const quantity = document.getElementById(`hand-counted-quantity-${contractNumber}`).value;
-    const action = document.getElementById(`hand-counted-action-${contractNumber}`).value;
-    const employeeName = document.getElementById(`hand-counted-employee-${contractNumber}`).value;
+function addHandCountedItem() {
+    const contractNumber = document.getElementById('hand-counted-contract-number').value;
+    const itemName = document.getElementById('hand-counted-item-name').value;
+    const quantity = document.getElementById('hand-counted-quantity').value;
+    const action = document.getElementById('hand-counted-action').value;
+    const employeeName = document.getElementById('hand-counted-employee').value;
+
+    if (!contractNumber || !itemName || !quantity || !employeeName) {
+        alert('Please fill in all fields: Contract Number, Item Name, Quantity, and Employee Name.');
+        return;
+    }
 
     fetch('/tab/4/add_hand_counted_item', {
         method: 'POST',
@@ -128,20 +135,32 @@ function addHandCountedItem(contractNumber) {
             alert('Error: ' + data.error);
         } else {
             alert(data.message);
-            htmx.trigger(`#hand-counted-items-${contractNumber}`, 'refreshTab');
+            // Clear the form
+            document.getElementById('hand-counted-contract-number').value = '';
+            document.getElementById('hand-counted-item-name').value = '';
+            document.getElementById('hand-counted-quantity').value = '';
+            document.getElementById('hand-counted-employee').value = '';
+            // Refresh the hand-counted items table
+            htmx.trigger('#hand-counted-items', 'refreshTab');
         }
     })
     .catch(error => {
         console.error('Error adding hand-counted item:', error);
-        alert('Failed to add item');
+        alert('Failed to add item. Please try again.');
     });
 }
 
-function removeHandCountedItem(contractNumber) {
-    const itemName = document.getElementById(`hand-counted-item-name-${contractNumber}`).value;
-    const quantity = document.getElementById(`hand-counted-quantity-${contractNumber}`).value;
-    const action = document.getElementById(`hand-counted-action-${contractNumber}`).value;
-    const employeeName = document.getElementById(`hand-counted-employee-${contractNumber}`).value;
+function removeHandCountedItem() {
+    const contractNumber = document.getElementById('hand-counted-contract-number').value;
+    const itemName = document.getElementById('hand-counted-item-name').value;
+    const quantity = document.getElementById('hand-counted-quantity').value;
+    const action = document.getElementById('hand-counted-action').value;
+    const employeeName = document.getElementById('hand-counted-employee').value;
+
+    if (!contractNumber || !itemName || !quantity || !employeeName) {
+        alert('Please fill in all fields: Contract Number, Item Name, Quantity, and Employee Name.');
+        return;
+    }
 
     fetch('/tab/4/remove_hand_counted_item', {
         method: 'POST',
@@ -162,45 +181,19 @@ function removeHandCountedItem(contractNumber) {
             alert('Error: ' + data.error);
         } else {
             alert(data.message);
-            htmx.trigger(`#hand-counted-items-${contractNumber}`, 'refreshTab');
+            // Clear the form
+            document.getElementById('hand-counted-contract-number').value = '';
+            document.getElementById('hand-counted-item-name').value = '';
+            document.getElementById('hand-counted-quantity').value = '';
+            document.getElementById('hand-counted-employee').value = '';
+            // Refresh the hand-counted items table
+            htmx.trigger('#hand-counted-items', 'refreshTab');
         }
     })
     .catch(error => {
         console.error('Error removing hand-counted item:', error);
-        alert('Failed to remove item');
+        alert('Failed to remove item. Please try again.');
     });
 }
-
-// Apply filters to the contract table based on user input
-document.addEventListener('input', function() {
-    const searchInput = document.getElementById('searchInput').value.toLowerCase();
-    const statusFilter = document.getElementById('statusFilter').value.toLowerCase();
-    const binFilter = document.getElementById('binFilter').value.toLowerCase();
-
-    const rows = document.querySelectorAll('#category-rows > tr:not([style*="display: none"]):not(.expandable)');
-    rows.forEach(row => {
-        const contractNumber = row.cells[0].textContent.toLowerCase();
-        const clientName = row.cells[1].textContent.toLowerCase();
-        const matchesSearch = contractNumber.includes(searchInput) || clientName.includes(searchInput);
-
-        if (matchesSearch) {
-            row.style.display = '';
-            // Show the expandable row and hand-counted items row
-            let nextRow = row.nextElementSibling;
-            while (nextRow && (nextRow.cells[0].colSpan > 1)) {
-                nextRow.style.display = '';
-                nextRow = nextRow.nextElementSibling;
-            }
-        } else {
-            row.style.display = 'none';
-            // Hide the expandable row and hand-counted items row
-            let nextRow = row.nextElementSibling;
-            while (nextRow && (nextRow.cells[0].colSpan > 1)) {
-                nextRow.style.display = 'none';
-                nextRow = nextRow.nextElementSibling;
-            }
-        }
-    });
-});
 </script>
 {% endblock %}
