@@ -30,7 +30,7 @@ logger.addHandler(console_handler)
 tab4_bp = Blueprint('tab4', __name__)
 
 # Version marker
-logger.info("Deployed tab4.py version: 2025-04-27-v15")
+logger.info("Deployed tab4.py version: 2025-04-27-v16")
 
 @tab4_bp.route('/tab/4')
 def tab4_view():
@@ -65,8 +65,17 @@ def tab4_view():
             func.count(ItemMaster.tag_id) > 0
         ).all()
 
-        logger.info(f"Raw laundry contracts from id_item_master (without status filter): {[(c.last_contract_num, c.total_items) for c in item_master_contracts_query]}")
-        current_app.logger.info(f"Raw laundry contracts from id_item_master (without status filter): {[(c.last_contract_num, c.total_items) for c in item_master_contracts_query]}")
+        logger.info(f"Raw laundry contracts from id_item_master: {[(c.last_contract_num, c.total_items) for c in item_master_contracts_query]}")
+        current_app.logger.info(f"Raw laundry contracts from id_item_master: {[(c.last_contract_num, c.total_items) for c in item_master_contracts_query]}")
+
+        # Debug: Log all items for each contract number from id_item_master
+        for contract_number, total_items in item_master_contracts_query:
+            items = session.query(ItemMaster).filter(
+                ItemMaster.last_contract_num == contract_number
+            ).all()
+            logger.debug(f"Items for contract {contract_number} (total {total_items}):")
+            for item in items:
+                logger.debug(f"  tag_id={item.tag_id}, status={item.status}, last_contract_num={item.last_contract_num}")
 
         # Step 2: Fetch contract numbers from HandCountedItems
         logger.info("Fetching contract numbers from HandCountedItems")
@@ -101,10 +110,9 @@ def tab4_view():
             logger.debug(f"Processing contract: {contract_number}")
             current_app.logger.debug(f"Processing contract: {contract_number}")
 
-            # Count items on this contract with status 'On Rent' or 'Delivered' from id_item_master
+            # Count items on this contract from id_item_master (temporarily remove status filter for debugging)
             items_on_contract = session.query(func.count(ItemMaster.tag_id)).filter(
-                ItemMaster.last_contract_num == contract_number,
-                ItemMaster.status.in_(['On Rent', 'Delivered'])
+                ItemMaster.last_contract_num == contract_number
             ).scalar()
 
             # Total items in inventory for this contract from id_item_master
@@ -116,6 +124,9 @@ def tab4_view():
             hand_counted_items = session.query(func.count(HandCountedItems.id)).filter(
                 HandCountedItems.contract_number == contract_number
             ).scalar()
+
+            # Log the counts for debugging
+            logger.debug(f"Contract {contract_number}: items_on_contract={items_on_contract}, total_items_inventory={total_items_inventory}, hand_counted_items={hand_counted_items}")
 
             # Skip contracts with no items on contract and no hand-counted entries
             if (items_on_contract == 0 or items_on_contract is None) and (hand_counted_items == 0 or hand_counted_items is None):
