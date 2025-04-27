@@ -1,4 +1,4 @@
-console.log('expand.js version: 2025-04-27-v69 loaded');
+console.log('expand.js version: 2025-04-27-v70 loaded - confirming script load');
 
 // Note: Common function - will be moved to common.js during split
 function showLoading(key) {
@@ -169,7 +169,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (targetElement.classList.contains('expanded')) {
             console.log(`Section ${targetId} is already expanded, collapsing instead`);
             collapseSection(targetId);
-            returnJOHN;
+            return;
         }
 
         // Show loading indicator
@@ -190,24 +190,25 @@ document.addEventListener('DOMContentLoaded', function() {
                 const perPage = data.per_page || 10;
                 const currentPage = data.page || 1;
 
-                // Build the common names table
+                // Build the common names table with consistent styling
                 let html = `
-                    <table class="common-table">
-                        <thead>
-                            <tr>
-                                <th>Common Name <span class="sort-arrow"></span></th>
-                                <th>Items on Contract <span class="sort-arrow"></span></th>
-                                <th>Total Items in Inventory <span class="sort-arrow"></span></th>
-                                <th>Actions</th>
-                            </tr>
-                            <tr class="filter-row">
-                                <th><input type="text" placeholder="Filter..." data-column="name"></th>
-                                <th><input type="text" placeholder="Filter..." data-column="on_contracts"></th>
-                                <th><input type="text" placeholder="Filter..." data-column="total_items_inventory"></th>
-                                <th><button class="btn btn-sm btn-secondary clear-filters">Clear Filters</button></th>
-                            </tr>
-                        </thead>
-                        <tbody>
+                    <div class="subcategory-container">
+                        <table class="table table-bordered table-hover common-table">
+                            <thead class="thead-dark">
+                                <tr>
+                                    <th>Common Name <span class="sort-arrow"></span></th>
+                                    <th>Items on Contract <span class="sort-arrow"></span></th>
+                                    <th>Total Items in Inventory <span class="sort-arrow"></span></th>
+                                    <th>Actions</th>
+                                </tr>
+                                <tr class="filter-row">
+                                    <th><input type="text" class="form-control form-control-sm" placeholder="Filter..." data-column="name"></th>
+                                    <th><input type="text" class="form-control form-control-sm" placeholder="Filter..." data-column="on_contracts"></th>
+                                    <th><input type="text" class="form-control form-control-sm" placeholder="Filter..." data-column="total_items_inventory"></th>
+                                    <th><button class="btn btn-sm btn-secondary clear-filters">Clear Filters</button></th>
+                                </tr>
+                            </thead>
+                            <tbody>
                 `;
 
                 commonNames.forEach(common => {
@@ -234,17 +235,18 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
 
                 html += `
-                        </tbody>
-                    </table>
+                            </tbody>
+                        </table>
+                    </div>
                 `;
 
                 // Add pagination controls if needed
                 if (totalCommonNames > perPage) {
                     const totalPages = Math.ceil(totalCommonNames / perPage);
                     html += `
-                        <div class="pagination-controls">
+                        <div class="pagination-controls mt-2">
                             <button class="btn btn-sm btn-secondary" onclick="window.expandCategory('${category}', '${targetId}', '${contractNumber}', ${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''}>Previous</button>
-                            <span>Page ${currentPage} of ${totalPages}</span>
+                            <span class="mx-2">Page ${currentPage} of ${totalPages}</span>
                             <button class="btn btn-sm btn-secondary" onclick="window.expandCategory('${category}', '${targetId}', '${contractNumber}', ${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''}>Next</button>
                         </div>
                     `;
@@ -252,7 +254,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 targetElement.innerHTML = html;
                 targetElement.classList.remove('collapsed');
-                targetElement.classList.add('expanded');
+                targetElement.classList.add('expandedව:expanded');
                 toggleCollapseButton(targetId);
 
                 // Apply filters to the newly loaded table
@@ -307,11 +309,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 const perPage = data.per_page || 10;
                 const currentPage = data.page || 1;
 
-                // Build the items table
+                // Build the items table with consistent styling
                 let html = `
-                    <div class="item-level-wrapper">
-                        <table class="item-table">
-                            <thead>
+                    <div class="item-level-wrapper ml-4">
+                        <table class="table table-bordered table-hover item-table">
+                            <thead class="thead-dark">
                                 <tr>
                                     <th>Tag ID <span class="sort-arrow"></span></th>
                                     <th>Common Name <span class="sort-arrow"></span></th>
@@ -321,12 +323,12 @@ document.addEventListener('DOMContentLoaded', function() {
                                     <th>Last Scanned Date <span class="sort-arrow"></span></th>
                                 </tr>
                                 <tr class="filter-row">
-                                    <th><input type="text" placeholder="Filter..." data-column="tag_id"></th>
-                                    <th><input type="text" placeholder="Filter..." data-column="common_name"></th>
-                                    <th><input type="text" placeholder="Filter..." data-column="bin_location"></th>
-                                    <th><input type="text" placeholder="Filter..." data-column="status"></th>
-                                    <th><input type="text" placeholder="Filter..." data-column="last_contract_num"></th>
-                                    <th><input type="text" placeholder="Filter..." data-column="last_scanned_date"></th>
+                                    <th><input type="text" class="form-control form-control-sm" placeholder="Filter..." data-column="tag_id"></th>
+                                    <th><input type="text" class="form-control form-control-sm" placeholder="Filter..." data-column="common_name"></th>
+                                    <th><input type="text" class="form-control form-control-sm" placeholder="Filter..." data-column="bin_location"></th>
+                                    <th><input type="text" class="form-control form-control-sm" placeholder="Filter..." data-column="status"></th>
+                                    <th><input type="text" class="form-control form-control-sm" placeholder="Filter..." data-column="last_contract_num"></th>
+                                    <th><input type="text" class="form-control form-control-sm" placeholder="Filter..." data-column="last_scanned_date"></th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -355,9 +357,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (totalItems > perPage) {
                     const totalPages = Math.ceil(totalItems / perPage);
                     html += `
-                        <div class="pagination-controls">
+                        <div class="pagination-controls mt-2 ml-4">
                             <button class="btn btn-sm btn-secondary" onclick="expandItems('${contractNumber}', '${commonName}', '${targetId}', ${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''}>Previous</button>
-                            <span>Page ${currentPage} of ${totalPages}</span>
+                            <span class="mx-2">Page ${currentPage} of ${totalPages}</span>
                             <button class="btn btn-sm btn-secondary" onclick="expandItems('${contractNumber}', '${commonName}', '${targetId}', ${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''}>Next</button>
                         </div>
                     `;
@@ -423,22 +425,23 @@ document.addEventListener('DOMContentLoaded', function() {
                 const currentPage = data.page || 1;
 
                 let html = `
-                    <table class="common-table">
-                        <thead>
-                            <tr>
-                                <th>Common Name <span class="sort-arrow"></span></th>
-                                <th>Items on Contract <span class="sort-arrow"></span></th>
-                                <th>Total Items in Inventory <span class="sort-arrow"></span></th>
-                                <th>Actions</th>
-                            </tr>
-                            <tr class="filter-row">
-                                <th><input type="text" placeholder="Filter..." data-column="name"></th>
-                                <th><input type="text" placeholder="Filter..." data-column="on_contracts"></th>
-                                <th><input type="text" placeholder="Filter..." data-column="total_items_inventory"></th>
-                                <th><button class="btn btn-sm btn-secondary clear-filters">Clear Filters</button></th>
-                            </tr>
-                        </thead>
-                        <tbody>
+                    <div class="subcategory-container">
+                        <table class="table table-bordered table-hover common-table">
+                            <thead class="thead-dark">
+                                <tr>
+                                    <th>Common Name <span class="sort-arrow"></span></th>
+                                    <th>Items on Contract <span class="sort-arrow"></span></th>
+                                    <th>Total Items in Inventory <span class="sort-arrow"></span></th>
+                                    <th>Actions</th>
+                                </tr>
+                                <tr class="filter-row">
+                                    <th><input type="text" class="form-control form-control-sm" placeholder="Filter..." data-column="name"></th>
+                                    <th><input type="text" class="form-control form-control-sm" placeholder="Filter..." data-column="on_contracts"></th>
+                                    <th><input type="text" class="form-control form-control-sm" placeholder="Filter..." data-column="total_items_inventory"></th>
+                                    <th><button class="btn btn-sm btn-secondary clear-filters">Clear Filters</button></th>
+                                </tr>
+                            </thead>
+                            <tbody>
                 `;
 
                 commonNames.forEach(common => {
@@ -465,17 +468,18 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
 
                 html += `
-                        </tbody>
-                    </table>
+                            </tbody>
+                        </table>
+                    </div>
                 `;
 
                 // Add pagination controls
                 if (totalCommonNames > perPage) {
                     const totalPages = Math.ceil(totalCommonNames / perPage);
                     html += `
-                        <div class="pagination-controls">
+                        <div class="pagination-controls mt-2">
                             <button class="btn btn-sm btn-secondary" onclick="window.expandCategory('${contractNumber}', '${targetId}', '${contractNumber}', ${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''}>Previous</button>
-                            <span>Page ${currentPage} of ${totalPages}</span>
+                            <span class="mx-2">Page ${currentPage} of ${totalPages}</span>
                             <button class="btn btn-sm btn-secondary" onclick="window.expandCategory('${contractNumber}', '${targetId}', '${contractNumber}', ${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''}>Next</button>
                         </div>
                     `;
@@ -529,9 +533,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 const currentPage = data.page || 1;
 
                 let html = `
-                    <div class="item-level-wrapper">
-                        <table class="item-table">
-                            <thead>
+                    <div class="item-level-wrapper ml-4">
+                        <table class="table table-bordered table-hover item-table">
+                            <thead class="thead-dark">
                                 <tr>
                                     <th>Tag ID <span class="sort-arrow"></span></th>
                                     <th>Common Name <span class="sort-arrow"></span></th>
@@ -541,12 +545,12 @@ document.addEventListener('DOMContentLoaded', function() {
                                     <th>Last Scanned Date <span class="sort-arrow"></span></th>
                                 </tr>
                                 <tr class="filter-row">
-                                    <th><input type="text" placeholder="Filter..." data-column="tag_id"></th>
-                                    <th><input type="text" placeholder="Filter..." data-column="common_name"></th>
-                                    <th><input type="text" placeholder="Filter..." data-column="bin_location"></th>
-                                    <th><input type="text" placeholder="Filter..." data-column="status"></th>
-                                    <th><input type="text" placeholder="Filter..." data-column="last_contract_num"></th>
-                                    <th><input type="text" placeholder="Filter..." data-column="last_scanned_date"></th>
+                                    <th><input type="text" class="form-control form-control-sm" placeholder="Filter..." data-column="tag_id"></th>
+                                    <th><input type="text" class="form-control form-control-sm" placeholder="Filter..." data-column="common_name"></th>
+                                    <th><input type="text" class="form-control form-control-sm" placeholder="Filter..." data-column="bin_location"></th>
+                                    <th><input type="text" class="form-control form-control-sm" placeholder="Filter..." data-column="status"></th>
+                                    <th><input type="text" class="form-control form-control-sm" placeholder="Filter..." data-column="last_contract_num"></th>
+                                    <th><input type="text" class="form-control form-control-sm" placeholder="Filter..." data-column="last_scanned_date"></th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -571,13 +575,13 @@ document.addEventListener('DOMContentLoaded', function() {
                     </div>
                 `;
 
-                // Add pagination controls if needed
+                // Add pagination controls
                 if (totalItems > perPage) {
                     const totalPages = Math.ceil(totalItems / perPage);
                     html += `
-                        <div class="pagination-controls">
+                        <div class="pagination-controls mt-2 ml-4">
                             <button class="btn btn-sm btn-secondary" onclick="expandItems('${contractNumber}', '${commonName}', '${targetId}', ${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''}>Previous</button>
-                            <span>Page ${currentPage} of ${totalPages}</span>
+                            <span class="mx-2">Page ${currentPage} of ${totalPages}</span>
                             <button class="btn btn-sm btn-secondary" onclick="expandItems('${contractNumber}', '${commonName}', '${targetId}', ${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''}>Next</button>
                         </div>
                     `;
@@ -658,7 +662,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         if (!rowCountDiv || !rowCountDiv.classList.contains('row-count')) {
             rowCountDiv = document.createElement('div');
-            rowCountDiv.className = 'row-count';
+            rowCountDiv.className = 'row-count mt-2';
             table.insertAdjacentElement('afterend', rowCountDiv);
         }
         rowCountDiv.textContent = `Showing ${visibleRows} of ${rows.length} rows`;

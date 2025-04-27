@@ -19,9 +19,9 @@
             console.log('base.html: window.cachedTabNum set to', window.cachedTabNum);
         })();
     </script>
-    <script src="{{ url_for('static', filename='js/tab.js') }}?v={{ cache_bust }}"></script>
-    <script src="{{ url_for('static', filename='js/expand.js') }}?v={{ cache_bust }}"></script>
-    <script src="{{ url_for('static', filename='js/tab1_5.js') }}?v={{ cache_bust }}"></script>
+    <script src="{{ url_for('static', filename='js/tab.js') }}?v={{ cache_bust }}-20250427-v3"></script>
+    <script src="{{ url_for('static', filename='js/expand.js') }}?v={{ cache_bust }}-20250427-v3"></script>
+    <script src="{{ url_for('static', filename='js/tab1_5.js') }}?v={{ cache_bust }}-20250427-v3"></script>
     <!-- Bootstrap JS -->
     <script src="{{ url_for('static', filename='lib/bootstrap/bootstrap.bundle.min.js') }}"></script>
     {% block head %}{% endblock %}
