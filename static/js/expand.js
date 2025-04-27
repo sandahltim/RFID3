@@ -1,4 +1,4 @@
-console.log('expand.js version: 2025-04-27-v71 loaded - confirming script load');
+console.log('expand.js version: 2025-04-27-v72 loaded - confirming script load');
 
 // Note: Common function - will be moved to common.js during split
 function showLoading(key) {
@@ -213,9 +213,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 commonNames.forEach(common => {
                     const commonId = `${contractNumber}-${common.name.replace(/[^a-zA-Z0-9]/g, '_')}`;
+                    const escapedCommonName = common.name.replace(/'/g, "\\'").replace(/"/g, '\\"');
                     html += `
                         <tr>
-                            <td>${common.name}</td>
+                            <td class="expandable-cell" onclick="expandItems('${contractNumber}', '${escapedCommonName}', 'items-${commonId}')">${common.name}</td>
                             <td>${common.on_contracts}</td>
                             <td>${common.total_items_inventory}</td>
                             <td>
@@ -274,7 +275,7 @@ document.addEventListener('DOMContentLoaded', function() {
     };
 
     // Function to expand items under a common name
-    function expandItems(contractNumber, commonName, targetId, page = 1) {
+    window.expandItems = function(contractNumber, commonName, targetId, page = 1) {
         console.log('expandItems called with', { contractNumber, commonName, targetId, page });
 
         const targetElement = document.getElementById(targetId);
@@ -354,13 +355,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 `;
 
                 // Add pagination controls if needed
+                const escapedCommonName = commonName.replace(/'/g, "\\'").replace(/"/g, '\\"');
                 if (totalItems > perPage) {
                     const totalPages = Math.ceil(totalItems / perPage);
                     html += `
                         <div class="pagination-controls mt-2 ml-4">
-                            <button class="btn btn-sm btn-secondary" onclick="expandItems('${contractNumber}', '${commonName}', '${targetId}', ${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''}>Previous</button>
+                            <button class="btn btn-sm btn-secondary" onclick="expandItems('${contractNumber}', '${escapedCommonName}', '${targetId}', ${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''}>Previous</button>
                             <span class="mx-2">Page ${currentPage} of ${totalPages}</span>
-                            <button class="btn btn-sm btn-secondary" onclick="expandItems('${contractNumber}', '${commonName}', '${targetId}', ${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''}>Next</button>
+                            <button class="btn btn-sm btn-secondary" onclick="expandItems('${contractNumber}', '${escapedCommonName}', '${targetId}', ${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''}>Next</button>
                         </div>
                     `;
                 }
@@ -446,9 +448,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 commonNames.forEach(common => {
                     const commonId = `${contractNumber}-${common.name.replace(/[^a-zA-Z0-9]/g, '_')}`;
+                    const escapedCommonName = common.name.replace(/'/g, "\\'").replace(/"/g, '\\"');
                     html += `
                         <tr>
-                            <td>${common.name}</td>
+                            <td class="expandable-cell" onclick="expandItems('${contractNumber}', '${escapedCommonName}', 'items-${commonId}')">${common.name}</td>
                             <td>${common.on_contracts}</td>
                             <td>${common.total_items_inventory}</td>
                             <td>
@@ -576,13 +579,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 `;
 
                 // Add pagination controls
+                const escapedCommonName = commonName.replace(/'/g, "\\'").replace(/"/g, '\\"');
                 if (totalItems > perPage) {
                     const totalPages = Math.ceil(totalItems / perPage);
                     html += `
                         <div class="pagination-controls mt-2 ml-4">
-                            <button class="btn btn-sm btn-secondary" onclick="expandItems('${contractNumber}', '${commonName}', '${targetId}', ${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''}>Previous</button>
+                            <button class="btn btn-sm btn-secondary" onclick="expandItems('${contractNumber}', '${escapedCommonName}', '${targetId}', ${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''}>Previous</button>
                             <span class="mx-2">Page ${currentPage} of ${totalPages}</span>
-                            <button class="btn btn-sm btn-secondary" onclick="expandItems('${contractNumber}', '${commonName}', '${targetId}', ${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''}>Next</button>
+                            <button class="btn btn-sm btn-secondary" onclick="expandItems('${contractNumber}', '${escapedCommonName}', '${targetId}', ${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''}>Next</button>
                         </div>
                     `;
                 }
