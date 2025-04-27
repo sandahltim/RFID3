@@ -30,7 +30,7 @@ logger.addHandler(console_handler)
 tab4_bp = Blueprint('tab4', __name__)
 
 # Version marker
-logger.info("Deployed tab4.py version: 2025-04-27-v17")
+logger.info("Deployed tab4.py version: 2025-04-27-v18")
 
 @tab4_bp.route('/tab/4')
 def tab4_view():
@@ -60,9 +60,9 @@ def tab4_view():
             ItemMaster.last_contract_num,
             func.count(ItemMaster.tag_id).label('total_items')
         ).filter(
-            func.trim(func.lower(ItemMaster.last_contract_num)).op('REGEXP')('^l[0-9]*$'),
             ItemMaster.last_contract_num != None,
-            ItemMaster.last_contract_num != '00000'
+            ItemMaster.last_contract_num != '00000',
+            ~func.trim(ItemMaster.last_contract_num).op('REGEXP')('^[0-9]+')  # Exclude contracts starting with a number
         ).group_by(
             ItemMaster.last_contract_num
         ).having(
@@ -87,8 +87,8 @@ def tab4_view():
             HandCountedItems.contract_number,
             func.count(HandCountedItems.id).label('hand_counted_entries')
         ).filter(
-            func.trim(func.lower(HandCountedItems.contract_number)).op('REGEXP')('^l[0-9]*$'),
-            HandCountedItems.contract_number != None
+            HandCountedItems.contract_number != None,
+            ~func.trim(HandCountedItems.contract_number).op('REGEXP')('^[0-9]+')  # Exclude contracts starting with a number
         ).group_by(
             HandCountedItems.contract_number
         ).having(
@@ -114,7 +114,7 @@ def tab4_view():
             logger.debug(f"Processing contract: {contract_number}")
             current_app.logger.debug(f"Processing contract: {contract_number}")
 
-            # Count items on this contract from id_item_master (status filter removed for debugging)
+            # Count items on this contract from id_item_master (status filter removed for inclusion)
             items_on_contract = session.query(func.count(ItemMaster.tag_id)).filter(
                 ItemMaster.last_contract_num == contract_number
             ).scalar()
