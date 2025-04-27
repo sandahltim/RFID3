@@ -1,4 +1,4 @@
-console.log('tab1_5.js version: 2025-04-26-v16 loaded');
+console.log('tab1_5.js version: 2025-04-26-v17 loaded');
 
 // Note: Common function for Tabs 1 and 5
 function showLoading(targetId) {
@@ -337,7 +337,7 @@ function updateBulkField(key, field) {
 }
 
 // Note: Tab 5 specific - Update individual item
-function updateItem(tagId, key) {
+function updateItem(tagId, key, category, subcategory, commonName, targetId) {
     const binLocation = document.getElementById(`bin-location-${tagId}`).value;
     const status = document.getElementById(`status-${tagId}`).value;
 
@@ -398,10 +398,6 @@ function updateItem(tagId, key) {
         .then(results => {
             console.log('Update successful:', results);
             alert('Update successful!');
-            const category = document.querySelector(`#item-table-${key}`).closest('.common-level').querySelector('button[data-category]').getAttribute('data-category');
-            const subcategory = document.querySelector(`#item-table-${key}`).closest('.common-level').querySelector('button[data-subcategory]').getAttribute('data-subcategory');
-            const commonName = document.querySelector(`#common-table-${key} tbody tr td:first-child`).textContent;
-            const targetId = document.querySelector(`#item-table-${key}`).closest('.expandable').id;
             loadItems(category, subcategory, commonName, targetId);
         })
         .catch(error => {
@@ -535,7 +531,7 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                                 <td>${item.quality || 'N/A'}</td>
                                 <td>${item.notes || 'N/A'}</td>
                                 <td>
-                                    <button class="btn btn-sm btn-primary save-btn" onclick="updateItem('${item.tag_id}', '${key}')">Save</button>
+                                    <button class="btn btn-sm btn-primary save-btn" onclick="updateItem('${item.tag_id}', '${key}', '${category}', '${subcategory}', '${item.common_name}', '${targetId}')">Save</button>
                                 </td>
                             </tr>
                         `;
@@ -646,7 +642,7 @@ function showDropdown(event, cell, type, tagId, currentValue) {
         const rect = cell.getBoundingClientRect();
         dropdown.style.position = 'absolute';
         dropdown.style.left = `${rect.left + window.scrollX}px`;
-        dropdown.style.top = `${rect.bottom + window.scrollY}px`;
+        dropdown.style.toggle = `${rect.bottom + window.scrollY}px`;
         dropdown.style.zIndex = '1000';
         cell.setAttribute(`data-${type}`, currentValue);
     } else {
