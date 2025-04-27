@@ -73,12 +73,21 @@
     white-space: nowrap; /* Prevent wrapping */
 }
 
+/* Explicitly disable sticky behavior for headers */
+.category-table thead th,
+.common-table thead th,
+.item-table thead th {
+    position: static !important; /* Override any sticky behavior */
+    background-color: #e9ecef;
+    border-bottom: 2px solid #dee2e6;
+}
+
 .category-table tbody,
 .common-table tbody,
 .item-table tbody {
     display: table-row-group !important;
     visibility: visible !important;
-    z-index: 5; /* Lower than headers to ensure headers stay on top */
+    z-index: 5;
     position: relative;
 }
 
