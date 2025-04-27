@@ -11,6 +11,7 @@ class APIClient:
     def __init__(self):
         self.base_url = "https://cs.iot.ptshome.com/api/v1/data/"
         self.auth_url = LOGIN_URL
+        self.item_master_endpoint = "14223767938169344381"  # For updating item master records
         self.token = None
         self.token_expiry = None
         self.authenticate()
@@ -39,44 +40,66 @@ class APIClient:
         logger.error("Failed to fetch access token after 5 attempts")
         raise Exception("Failed to fetch access token after 5 attempts")
 
-    def _make_request(self, endpoint_id, params=None):
+    def _make_request(self, endpoint_id, params=None, method='GET', data=None):
         if not params:
             params = {}
-        params['offset'] = params.get('offset', 0)
-        params['limit'] = params.get('limit', 200)
-        params['returncount'] = params.get('returncount', True)
+        if method == 'GET':
+            params['offset'] = params.get('offset', 0)
+            params['limit'] = params.get('limit', 200)
+            params['returncount'] = params.get('returncount', True)
 
         if self.token_expiry and datetime.now() >= self.token_expiry:
             self.authenticate()
 
         headers = {"Authorization": f"Bearer {self.token}"}
         url = f"{self.base_url}{endpoint_id}"
-        all_data = []
-        while True:
-            query_string = '&'.join([f"{k}={quote(str(v))}" for k, v in params.items()])
-            full_url = f"{url}?{query_string}"
-            logger.debug(f"Making request to full URL: {full_url}")
-            logger.debug(f"Request headers: {headers}")
+
+        if method == 'GET':
+            all_data = []
+            while True:
+                query_string = '&'.join([f"{k}={quote(str(v))}" for k, v in params.items()])
+                full_url = f"{url}?{query_string}"
+                logger.debug(f"Making GET request to full URL: {full_url}")
+                logger.debug(f"Request headers: {headers}")
+                try:
+                    response = requests.get(url, headers=headers, params=params, timeout=20)
+                    data = response.json()
+                    logger.debug(f"API response: {response.status_code} {response.reason}, response: {data}")
+                    if response.status_code != 200:
+                        logger.error(f"Request failed: {response.status_code} {response.reason}, response: {data}")
+                        raise Exception(f"{response.status_code} {response.reason}")
+                    records = data.get('data', [])
+                    total_count = data.get('totalcount', 0)
+                    offset = params['offset']
+                    logger.debug(f"Fetched {len(records)} records, Total Count: {total_count}, Offset: {offset}")
+                    all_data.extend(records)
+                    if len(records) < params['limit'] or offset + len(records) >= total_count:
+                        break
+                    params['offset'] += len(records)
+                except requests.RequestException as e:
+                    logger.error(f"Request failed: {str(e)}")
+                    raise
+            logger.debug(f"Total records fetched: {len(all_data)}")
+            return all_data
+        elif method in ['POST', 'PATCH']:
+            logger.debug(f"Making {method} request to URL: {url}")
+            logger.debug(f"Request headers: {headers}, data: {data}")
             try:
-                response = requests.get(url, headers=headers, params=params, timeout=20)
+                if method == 'POST':
+                    response = requests.post(url, headers=headers, json=data, timeout=20)
+                else:
+                    response = requests.patch(url, headers=headers, json=data, timeout=20)
                 data = response.json()
                 logger.debug(f"API response: {response.status_code} {response.reason}, response: {data}")
-                if response.status_code != 200:
+                if response.status_code not in [200, 201]:
                     logger.error(f"Request failed: {response.status_code} {response.reason}, response: {data}")
                     raise Exception(f"{response.status_code} {response.reason}")
-                records = data.get('data', [])
-                total_count = data.get('totalcount', 0)
-                offset = params['offset']
-                logger.debug(f"Fetched {len(records)} records, Total Count: {total_count}, Offset: {offset}")
-                all_data.extend(records)
-                if len(records) < params['limit'] or offset + len(records) >= total_count:
-                    break
-                params['offset'] += len(records)
+                return data
             except requests.RequestException as e:
                 logger.error(f"Request failed: {str(e)}")
                 raise
-        logger.debug(f"Total records fetched: {len(all_data)}")
-        return all_data
+        else:
+            raise ValueError(f"Unsupported method: {method}")
 
     def get_item_master(self, since_date=None):
         params = {}
@@ -133,3 +156,63 @@ class APIClient:
         data = self._make_request("14223767938169215907", params)
         logger.debug(f"Seed data sample: {data[:5] if data else 'No data'}")
         return data
+
+    def update_bin_location(self, tag_id, bin_location):
+        """
+        Update the bin location of an item in the Item Master via the API.
+        Also updates the date_last_scanned to the current timestamp.
+        """
+        if not tag_id or not bin_location:
+            raise ValueError("tag_id and bin_location are required")
+
+        # First, fetch the current item record to get its full data
+        params = {
+            'filter[eq]': f"tag_id,eq,'{tag_id}'"
+        }
+        items = self._make_request(self.item_master_endpoint, params)
+        if not items:
+            raise Exception(f"Item with tag_id {tag_id} not found in Item Master")
+
+        item = items[0]  # Assuming tag_id is unique, take the first match
+        # Update the bin_location and date_last_scanned fields
+        current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        update_data = {
+            'tag_id': tag_id,
+            'bin_location': bin_location,
+            'date_last_scanned': current_time
+        }
+
+        # Send the updated fields back to the API using PATCH
+        response = self._make_request(self.item_master_endpoint, method='PATCH', data=[update_data])
+        logger.info(f"Updated bin_location for tag_id {tag_id} to {bin_location} and date_last_scanned to {current_time} via API")
+        return response
+
+    def update_status(self, tag_id, status):
+        """
+        Update the status of an item in the Item Master via the API.
+        Also updates the date_last_scanned to the current timestamp.
+        """
+        if not tag_id or not status:
+            raise ValueError("tag_id and status are required")
+
+        # First, fetch the current item record to get its full data
+        params = {
+            'filter[eq]': f"tag_id,eq,'{tag_id}'"
+        }
+        items = self._make_request(self.item_master_endpoint, params)
+        if not items:
+            raise Exception(f"Item with tag_id {tag_id} not found in Item Master")
+
+        item = items[0]  # Assuming tag_id is unique, take the first match
+        # Update the status and date_last_scanned fields
+        current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        update_data = {
+            'tag_id': tag_id,
+            'status': status,
+            'date_last_scanned': current_time
+        }
+
+        # Send the updated fields back to the API using PATCH
+        response = self._make_request(self.item_master_endpoint, method='PATCH', data=[update_data])
+        logger.info(f"Updated status for tag_id {tag_id} to {status} and date_last_scanned to {current_time} via API")
+        return response
