@@ -32,7 +32,9 @@
         <tbody id="category-rows">
             {% for contract in contracts %}
             <tr>
-                <td>{{ contract.contract_number }}</td>
+                <td class="expandable-cell" onclick="window.expandCategory('{{ contract.contract_number | urlencode | replace('\'', '\\\'') | replace('"', '\\"') }}', 'common-{{ contract.contract_number }}', '{{ contract.contract_number }}')">
+                    {{ contract.contract_number }}
+                </td>
                 <td>{{ contract.client_name }}</td>
                 <td>{{ contract.items_on_contract }}</td>
                 <td>{{ contract.total_items_inventory }}</td>
@@ -40,7 +42,7 @@
                 <td>
                     <button class="btn btn-sm btn-secondary expand-btn" data-contract-number="{{ contract.contract_number }}" data-target-id="common-{{ contract.contract_number }}">Expand</button>
                     <button class="btn btn-sm btn-secondary collapse-btn" data-collapse-target="common-{{ contract.contract_number }}" style="display:none;">Collapse</button>
-                    <button class="btn btn-sm btn-info print-btn" data-print-level="Contract" data-print-id="category-table">Print</button>
+                    <button class="btn btn-sm btn-info print-btn" data-print-level="Contract" data-print-id="common-{{ contract.contract_number }}" data-contract-number="{{ contract.contract_number }}">Print</button>
                     <div id="loading-{{ contract.contract_number }}" style="display:none;" class="loading">Loading...</div>
                 </td>
             </tr>
