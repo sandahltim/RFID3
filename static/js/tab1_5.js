@@ -1,4 +1,4 @@
-console.log('tab1_5.js version: 2025-04-26-v19 loaded');
+console.log('tab1_5.js version: 2025-04-26-v20 loaded');
 
 // Note: Common function for Tabs 1 and 5
 function showLoading(targetId) {
@@ -772,7 +772,7 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        const collapseBtn = event.target closest('.collapse-btn');
+        const collapseBtn = event.target.closest('.collapse-btn');
         if (collapseBtn) {
             event.stopPropagation();
             const targetId = collapseBtn.getAttribute('data-collapse-target');
