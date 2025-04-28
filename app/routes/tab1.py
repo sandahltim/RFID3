@@ -30,7 +30,7 @@ logger.addHandler(console_handler)
 tab1_bp = Blueprint('tab1', __name__)
 
 # Version marker
-logger.info("Deployed tab1.py version: 2025-04-26-v15")
+logger.info("Deployed tab1.py version: 2025-04-28-v16")
 
 def get_category_data(session, filter_query='', sort='', status_filter='', bin_filter=''):
     # Fetch all rental class mappings from both tables
@@ -144,7 +144,10 @@ def get_category_data(session, filter_query='', sort='', status_filter='', bin_f
             'items_available': items_available
         })
 
-    # Sort category data
+    # Sort category data alphabetically by default if no sort parameter is provided
+    if not sort:
+        sort = 'category_asc'
+
     if sort == 'category_asc':
         category_data.sort(key=lambda x: x['category'].lower())
     elif sort == 'category_desc':
