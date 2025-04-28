@@ -36,7 +36,7 @@ logger.addHandler(main_file_handler)
 tab4_bp = Blueprint('tab4', __name__)
 
 # Version marker
-logger.info("Deployed tab4.py version: 2025-04-28-v28")
+logger.info("Deployed tab4.py version: 2025-04-28-v29")
 
 @tab4_bp.route('/tab/4')
 def tab4_view():
@@ -608,6 +608,18 @@ def add_hand_counted_item():
         current_app.logger.error("Missing required fields for adding hand-counted item")
         return jsonify({'error': 'All fields are required'}), 400
 
+    # Validate quantity
+    try:
+        quantity = int(quantity)
+        if quantity <= 0:
+            logger.error("Quantity must be a positive integer")
+            current_app.logger.error("Quantity must be a positive integer")
+            return jsonify({'error': 'Quantity must be a positive integer'}), 400
+    except ValueError:
+        logger.error("Quantity must be a valid integer")
+        current_app.logger.error("Quantity must be a valid integer")
+        return jsonify({'error': 'Quantity must be a valid integer'}), 400
+
     try:
         session = db.session()
         hand_counted_item = HandCountedItems(
@@ -637,7 +649,7 @@ def remove_hand_counted_item():
     data = request.get_json()
     contract_number = data.get('contract_number')
     item_name = data.get('item_name')
-    quantity = int(data.get('quantity'))
+    quantity = data.get('quantity')
     action = data.get('action')
     employee_name = data.get('employee_name')
 
@@ -648,6 +660,18 @@ def remove_hand_counted_item():
         logger.error("Missing required fields for removing hand-counted item")
         current_app.logger.error("Missing required fields for removing hand-counted item")
         return jsonify({'error': 'All fields are required'}), 400
+
+    # Validate quantity
+    try:
+        quantity = int(quantity)
+        if quantity <= 0:
+            logger.error("Quantity must be a positive integer")
+            current_app.logger.error("Quantity must be a positive integer")
+            return jsonify({'error': 'Quantity must be a positive integer'}), 400
+    except ValueError:
+        logger.error("Quantity must be a valid integer")
+        current_app.logger.error("Quantity must be a valid integer")
+        return jsonify({'error': 'Quantity must be a valid integer'}), 400
 
     try:
         session = db.session()

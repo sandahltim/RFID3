@@ -98,6 +98,32 @@
 
 <!-- JavaScript for refreshing the table, filtering, and managing hand-counted items -->
 <script>
+// Function to format dates as "Thurs, Aug 21 2025 4:55 pm"
+function formatDate(isoDateString) {
+    if (!isoDateString || isoDateString === 'N/A') return 'N/A';
+    try {
+        const date = new Date(isoDateString);
+        if (isNaN(date.getTime())) return isoDateString; // Return as-is if invalid date
+
+        const days = ['Sun', 'Mon', 'Tues', 'Wed', 'Thurs', 'Fri', 'Sat'];
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sept', 'Oct', 'Nov', 'Dec'];
+
+        const dayName = days[date.getDay()];
+        const monthName = months[date.getMonth()];
+        const day = date.getDate();
+        const year = date.getFullYear();
+        let hours = date.getHours();
+        const minutes = date.getMinutes().toString().padStart(2, '0');
+        const ampm = hours >= 12 ? 'pm' : 'am';
+        hours = hours % 12 || 12; // Convert 0 or 12 to 12 for 12-hour format
+
+        return `${dayName}, ${monthName} ${day} ${year} ${hours}:${minutes} ${ampm}`;
+    } catch (error) {
+        console.error('Error formatting date:', error);
+        return isoDateString;
+    }
+}
+
 function refreshTab() {
     window.location.reload();
 }
