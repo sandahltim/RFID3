@@ -17,11 +17,12 @@
                     <th>Status</th>
                     <th>Bin Location</th>
                     <th>Last Contract</th>
+                    <th>Last Scanned Date</th>
                     <th>Location of Repair</th>
                     <th>Repair Types</th>
                 </tr>
             </thead>
-            <tbody>
+            <tbody id="tent-crew-items">
                 {% for item in tent_crew_items %}
                     <tr>
                         <td>{{ item.tag_id }}</td>
@@ -29,6 +30,7 @@
                         <td>{{ item.status }}</td>
                         <td>{{ item.bin_location }}</td>
                         <td>{{ item.last_contract_num }}</td>
+                        <td class="date-last-scanned">{{ item.date_last_scanned }}</td>
                         <td>{{ item.location_of_repair }}</td>
                         <td>{{ item.repair_types | join(', ') }}</td>
                     </tr>
@@ -50,11 +52,12 @@
                     <th>Status</th>
                     <th>Bin Location</th>
                     <th>Last Contract</th>
+                    <th>Last Scanned Date</th>
                     <th>Location of Repair</th>
                     <th>Repair Types</th>
                 </tr>
             </thead>
-            <tbody>
+            <tbody id="laundry-crew-items">
                 {% for item in laundry_crew_items %}
                     <tr>
                         <td>{{ item.tag_id }}</td>
@@ -62,6 +65,7 @@
                         <td>{{ item.status }}</td>
                         <td>{{ item.bin_location }}</td>
                         <td>{{ item.last_contract_num }}</td>
+                        <td class="date-last-scanned">{{ item.date_last_scanned }}</td>
                         <td>{{ item.location_of_repair }}</td>
                         <td>{{ item.repair_types | join(', ') }}</td>
                     </tr>
@@ -83,11 +87,12 @@
                     <th>Status</th>
                     <th>Bin Location</th>
                     <th>Last Contract</th>
+                    <th>Last Scanned Date</th>
                     <th>Location of Repair</th>
                     <th>Repair Types</th>
                 </tr>
             </thead>
-            <tbody>
+            <tbody id="maintenance-crew-items">
                 {% for item in maintenance_crew_items %}
                     <tr>
                         <td>{{ item.tag_id }}</td>
@@ -95,6 +100,7 @@
                         <td>{{ item.status }}</td>
                         <td>{{ item.bin_location }}</td>
                         <td>{{ item.last_contract_num }}</td>
+                        <td class="date-last-scanned">{{ item.date_last_scanned }}</td>
                         <td>{{ item.location_of_repair }}</td>
                         <td>{{ item.repair_types | join(', ') }}</td>
                     </tr>
@@ -105,4 +111,25 @@
         <p>No items currently in service for the Maintenance Crew.</p>
     {% endif %}
 </div>
+
+<script>
+// Format dates in all tables on page load
+document.addEventListener('DOMContentLoaded', function() {
+    const sections = ['tent-crew-items', 'laundry-crew-items', 'maintenance-crew-items'];
+    sections.forEach(sectionId => {
+        const tbody = document.getElementById(sectionId);
+        if (tbody) {
+            const rows = tbody.querySelectorAll('tr');
+            rows.forEach(row => {
+                const dateCell = row.querySelector('.date-last-scanned');
+                if (dateCell) {
+                    const rawDate = dateCell.textContent.trim();
+                    const formattedDate = formatDate(rawDate); // Use formatDate from common.js
+                    dateCell.textContent = formattedDate;
+                }
+            });
+        }
+    });
+});
+</script>
 {% endblock %}
