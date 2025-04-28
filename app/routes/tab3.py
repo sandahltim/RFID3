@@ -29,7 +29,7 @@ logger.addHandler(console_handler)
 tab3_bp = Blueprint('tab3', __name__)
 
 # Version marker
-logger.info("Deployed tab3.py version: 2025-04-25-v1")
+logger.info("Deployed tab3.py version: 2025-04-27-v2")
 
 @tab3_bp.route('/tab/3')
 def tab3_view():
@@ -50,7 +50,7 @@ def tab3_view():
         for um in user_mappings:
             mappings_dict[um.rental_class_id] = {'category': um.category, 'subcategory': um.subcategory}
 
-        # Identify items in service
+        # Subquery to get the most recent transaction per tag_id
         subquery = session.query(
             Transaction.tag_id,
             Transaction.scan_date,
@@ -69,10 +69,14 @@ def tab3_view():
             Transaction.buckle,
             Transaction.wet,
             Transaction.other
-        ).order_by(
-            Transaction.scan_date.desc()
+        ).filter(
+            Transaction.scan_date == session.query(func.max(Transaction.scan_date))
+                .filter(Transaction.tag_id == Transaction.tag_id)
+                .correlate(Transaction)
+                .scalar_subquery()
         ).subquery()
 
+        # Identify items in service, excluding 'Sold' status
         items_in_service_query = session.query(
             ItemMaster,
             subquery.c.location_of_repair,
@@ -93,13 +97,12 @@ def tab3_view():
             subquery,
             ItemMaster.tag_id == subquery.c.tag_id
         ).filter(
+            ItemMaster.status != 'Sold',  # Exclude 'Sold' items
             or_(
                 ItemMaster.status.notin_(['Ready to Rent', 'On Rent', 'Delivered']),
-                (subquery.c.service_required == True) & (
-                    subquery.c.scan_date == session.query(func.max(Transaction.scan_date)).filter(Transaction.tag_id == ItemMaster.tag_id).correlate(ItemMaster).scalar_subquery()
-                )
+                (subquery.c.service_required == True)
             )
-        ).all()
+        ).distinct(ItemMaster.tag_id).all()
 
         # Categorize items by crew
         tent_crew_items = []
@@ -160,6 +163,8 @@ def tab3_view():
     except Exception as e:
         logger.error(f"Error rendering Tab 3: {str(e)}", exc_info=True)
         current_app.logger.error(f"Error rendering Tab 3: {str(e)}", exc_info=True)
+        if 'session' in locals():
+            session.close()
         return render_template('tab3.html', 
                               tent_crew_items=[],
                               laundry_crew_items=[],
