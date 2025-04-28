@@ -298,7 +298,7 @@ TRANSACTION_URL = 'https://cs.iot.ptshome.com/api/v1/data/14223767938169346196'
 SEED_URL = 'https://cs.iot.ptshome.com/api/v1/data/14223767938169215907'
 
 # Refresh intervals (seconds)
-FULL_REFRESH_INTERVAL = 300  # 5 minutes
+FULL_REFRESH_INTERVAL = 1800  # 30 minutes
 INCREMENTAL_REFRESH_INTERVAL = 30  # 30 seconds
 
 # Logging
