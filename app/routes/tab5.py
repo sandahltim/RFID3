@@ -47,7 +47,7 @@ if not any(isinstance(h, logging.StreamHandler) for h in root_logger.handlers):
 tab5_bp = Blueprint('tab5', __name__)
 
 # Version marker
-logger.info("Deployed tab5.py version: 2025-04-27-v22")
+logger.info("Deployed tab5.py version: 2025-04-28-v23")
 
 def get_category_data(session, filter_query='', sort='', status_filter='', bin_filter=''):
     # Check if data is in cache
@@ -768,31 +768,29 @@ def update_resale_pack_to_sold():
         session.close()
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
-@tab5_bp.route('/tab/5/export_sold_burst_csv')
-def export_sold_burst_csv():
+@tab5_bp.route('/tab/5/export_sold_items_csv')
+def export_sold_items_csv():
     try:
         session = db.session()
 
+        # Fetch items with bin_location in ['resale', 'sold', 'pack', 'burst'] and status 'Sold'
         items = session.query(ItemMaster).filter(
-            func.lower(func.trim(func.replace(func.coalesce(ItemMaster.bin_location, ''), '\x00', ''))).in_(['sold', 'burst'])
+            func.lower(func.trim(func.replace(func.coalesce(ItemMaster.bin_location, ''), '\x00', ''))).in_(['resale', 'sold', 'pack', 'burst']),
+            ItemMaster.status == 'Sold'
         ).all()
 
         output = StringIO()
         writer = csv.writer(output)
 
-        headers = ['Tag ID', 'Common Name', 'Bin Location', 'Status', 'Last Scanned Date', 'Quality', 'Notes']
+        # Define headers
+        headers = ['Tag ID', 'Common Name']
         writer.writerow(headers)
 
+        # Write item data
         for item in items:
-            last_scanned_date = item.date_last_scanned.isoformat() if item.date_last_scanned else 'N/A'
             writer.writerow([
                 item.tag_id,
-                item.common_name,
-                item.bin_location,
-                item.status,
-                last_scanned_date,
-                item.quality or 'N/A',
-                item.notes or 'N/A'
+                item.common_name
             ])
 
         session.close()
@@ -801,15 +799,15 @@ def export_sold_burst_csv():
         return Response(
             output.getvalue(),
             mimetype='text/csv',
-            headers={'Content-Disposition': 'attachment; filename=sold_burst_items.csv'}
+            headers={'Content-Disposition': 'attachment; filename=sold_items.csv'}
         )
     except Exception as e:
-        logger.error(f"Error exporting sold/burst items to CSV: {str(e)}")
+        logger.error(f"Error exporting sold items to CSV: {str(e)}")
         return jsonify({'error': 'Failed to export CSV'}), 500
 
 @tab5_bp.route('/tab/5/full_items_by_rental_class')
 def full_items_by_rental_class():
-    category = unquote(request.args.get('category'))
+    category = unquote(request.args.get('category DIESEL'))
     subcategory = unquote(request.args.get('subcategory'))
     common_name = unquote(request.args.get('common_name'))
 
