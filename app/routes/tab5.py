@@ -47,7 +47,7 @@ if not any(isinstance(h, logging.StreamHandler) for h in root_logger.handlers):
 tab5_bp = Blueprint('tab5', __name__)
 
 # Version marker
-logger.info("Deployed tab5.py version: 2025-04-28-v23")
+logger.info("Deployed tab5.py version: 2025-04-28-v24")
 
 def get_category_data(session, filter_query='', sort='', status_filter='', bin_filter=''):
     # Check if data is in cache
@@ -268,6 +268,8 @@ def tab5_subcat_data():
         subcategories = {}
         for rental_class_id, data in mappings_dict.items():
             subcategory = data['subcategory']
+            if not subcategory:  # Skip empty subcategories
+                continue
             if subcategory not in subcategories:
                 subcategories[subcategory] = []
             subcategories[subcategory].append(rental_class_id)
@@ -300,9 +302,6 @@ def tab5_subcat_data():
                     func.lower(func.trim(func.replace(func.coalesce(ItemMaster.bin_location, ''), '\x00', ''))) == bin_filter.lower()
                 )
             total_items = total_items_query.scalar() or 0
-
-            if total_items == 0:
-                continue
 
             items_on_contracts_query = session.query(func.count(ItemMaster.tag_id)).filter(
                 func.trim(func.cast(func.replace(ItemMaster.rental_class_num, '\x00', ''), db.String)).in_(rental_class_ids),
@@ -361,6 +360,7 @@ def tab5_subcat_data():
                 )
             items_available = items_available_query.scalar() or 0
 
+            # Include the subcategory in the response even if total_items is 0
             subcategory_data.append({
                 'subcategory': subcat,
                 'total_items': total_items,
@@ -807,7 +807,7 @@ def export_sold_items_csv():
 
 @tab5_bp.route('/tab/5/full_items_by_rental_class')
 def full_items_by_rental_class():
-    category = unquote(request.args.get('category DIESEL'))
+    category = unquote(request.args.get('category'))
     subcategory = unquote(request.args.get('subcategory'))
     common_name = unquote(request.args.get('common_name'))
 
