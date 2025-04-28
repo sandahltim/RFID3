@@ -1,4 +1,31 @@
-console.log('common.js version: 2025-04-27-v4 loaded - confirming script load');
+console.log('common.js version: 2025-04-27-v6 loaded - confirming script load');
+
+// Function to format ISO date strings into "Thurs, Aug 21 2025 4:55 pm"
+function formatDate(isoDateString) {
+    if (!isoDateString || isoDateString === 'N/A') return 'N/A';
+    try {
+        const date = new Date(isoDateString);
+        if (isNaN(date.getTime())) return 'N/A';
+
+        const days = ['Sun', 'Mon', 'Tues', 'Wed', 'Thurs', 'Fri', 'Sat'];
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+        const dayName = days[date.getDay()];
+        const monthName = months[date.getMonth()];
+        const day = date.getDate();
+        const year = date.getFullYear();
+
+        let hours = date.getHours();
+        const minutes = date.getMinutes().toString().padStart(2, '0');
+        const ampm = hours >= 12 ? 'pm' : 'am';
+        hours = hours % 12 || 12; // Convert 0 to 12 for midnight
+
+        return `${dayName}, ${monthName} ${day} ${year} ${hours}:${minutes} ${ampm}`;
+    } catch (error) {
+        console.error('Error formatting date:', isoDateString, error);
+        return 'N/A';
+    }
+}
 
 // Global filter state
 let globalFilter = {
@@ -69,20 +96,8 @@ function applyFilterToAllLevels() {
             const subcatSelect = row.querySelector('.subcategory-select');
             const options = subcatSelect ? subcatSelect.querySelectorAll('option:not([value=""])') : [];
             let visibleOptions = 0;
-
-            if (globalFilter.commonName) {
-                options.forEach(option => {
-                    const subcatValue = option.textContent.toLowerCase();
-                    const matchesFilter = subcatValue.includes(globalFilter.commonName);
-                    option.style.display = matchesFilter ? '' : 'none';
-                    if (matchesFilter) visibleOptions++;
-                });
-            } else {
-                options.forEach(option => {
-                    option.style.display = '';
-                    visibleOptions++;
-                });
-            }
+            const selectedOption = subcatSelect ? subcatSelect.options[subcatSelect.selectedIndex] : null;
+            const selectedValue = selectedOption ? selectedOption.value : '';
 
             // Check if the expanded common name table contains matching items
             const expandableRow = row.nextElementSibling;
@@ -150,8 +165,31 @@ function applyFilterToAllLevels() {
                 }
             }
 
-            // Show the category row if there are visible subcategory options or matching common names
+            // Filter subcategory dropdown options, but ensure the selected option is considered
             if (globalFilter.commonName) {
+                options.forEach(option => {
+                    let showOption = false;
+                    const subcatValue = option.textContent.toLowerCase();
+                    // Show the option if it matches the filter or if it's the selected option and has matching common names
+                    if (subcatValue.includes(globalFilter.commonName)) {
+                        showOption = true;
+                    } else if (option.value === selectedValue && hasMatchingCommonNames) {
+                        showOption = true;
+                    }
+                    option.style.display = showOption ? '' : 'none';
+                    if (showOption) visibleOptions++;
+                });
+            } else {
+                options.forEach(option => {
+                    option.style.display = '';
+                    visibleOptions++;
+                });
+            }
+
+            // Show the category row if there are visible subcategory options, matching common names, or if no filter is applied
+            if (!globalFilter.commonName && !globalFilter.contractNumber) {
+                showRow = true;
+            } else {
                 showRow = visibleOptions > 0 || hasMatchingCommonNames;
             }
 
