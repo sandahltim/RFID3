@@ -1,4 +1,4 @@
-console.log('expand.js version: 2025-04-27-v74 loaded - confirming script load');
+console.log('expand.js version: 2025-04-27-v75 loaded - confirming script load');
 
 // Note: Common function - will be moved to common.js during split
 function showLoading(key) {
@@ -52,13 +52,16 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('commonNameFilter').value = globalFilter.commonName || '';
         document.getElementById('contractNumberFilter').value = globalFilter.contractNumber || '';
         applyGlobalFilter(); // Apply the saved filter on page load
+    } else {
+        // Ensure all data is shown by default
+        applyFilterToAllLevels();
     }
 });
 
 // Apply global filter function
 window.applyGlobalFilter = function() {
-    const commonName = document.getElementById('commonNameFilter').value.toLowerCase();
-    const contractNumber = document.getElementById('contractNumberFilter').value.toLowerCase();
+    const commonName = document.getElementById('commonNameFilter').value.toLowerCase().trim();
+    const contractNumber = document.getElementById('contractNumberFilter').value.toLowerCase().trim();
 
     globalFilter = {
         commonName: commonName,
@@ -116,28 +119,9 @@ function applyFilterToTable(table) {
     const rows = table.querySelectorAll('tbody tr:not(.expandable)');
     let visibleRows = 0;
 
-    rows.forEach(row => {
-        let showRow = true;
-
-        // Get the relevant cells based on the table type
-        const contractCell = row.querySelector('td:nth-child(1)'); // Contract Number or Category
-        const commonNameCell = row.querySelector('td:nth-child(2)') || row.querySelector('td:nth-child(1)'); // Common Name (varies by table)
-
-        if (globalFilter.contractNumber) {
-            const contractValue = contractCell ? contractCell.textContent.toLowerCase() : '';
-            if (!contractValue.includes(globalFilter.contractNumber)) {
-                showRow = false;
-            }
-        }
-
-        if (globalFilter.commonName) {
-            const commonNameValue = commonNameCell ? commonNameCell.textContent.toLowerCase() : '';
-            if (!commonNameValue.includes(globalFilter.commonName)) {
-                showRow = false;
-            }
-        }
-
-        if (showRow) {
+    // If no filter criteria are set, show all rows
+    if (!globalFilter.commonName && !globalFilter.contractNumber) {
+        rows.forEach(row => {
             row.style.display = '';
             visibleRows++;
             const expandableRow = row.nextElementSibling;
@@ -149,14 +133,50 @@ function applyFilterToTable(table) {
                     applyFilterToTable(childTable);
                 }
             }
-        } else {
-            row.style.display = 'none';
-            const expandableRow = row.nextElementSibling;
-            if (expandableRow && expandableRow.classList.contains('expandable')) {
-                expandableRow.style.display = 'none';
+        });
+    } else {
+        rows.forEach(row => {
+            let showRow = true;
+
+            // Get the relevant cells based on the table type
+            const contractCell = row.querySelector('td:nth-child(1)'); // Contract Number or Category
+            const commonNameCell = row.querySelector('td:nth-child(2)') || row.querySelector('td:nth-child(1)'); // Common Name (varies by table)
+
+            if (globalFilter.contractNumber) {
+                const contractValue = contractCell ? contractCell.textContent.toLowerCase() : '';
+                if (!contractValue.includes(globalFilter.contractNumber)) {
+                    showRow = false;
+                }
             }
-        }
-    });
+
+            if (globalFilter.commonName) {
+                const commonNameValue = commonNameCell ? commonNameCell.textContent.toLowerCase() : '';
+                if (!commonNameValue.includes(globalFilter.commonName)) {
+                    showRow = false;
+                }
+            }
+
+            if (showRow) {
+                row.style.display = '';
+                visibleRows++;
+                const expandableRow = row.nextElementSibling;
+                if (expandableRow && expandableRow.classList.contains('expandable')) {
+                    expandableRow.style.display = '';
+                    // If this row has an expanded section, reapply filter to its children
+                    const childTable = expandableRow.querySelector('.common-table, .item-table');
+                    if (childTable) {
+                        applyFilterToTable(childTable);
+                    }
+                }
+            } else {
+                row.style.display = 'none';
+                const expandableRow = row.nextElementSibling;
+                if (expandableRow && expandableRow.classList.contains('expandable')) {
+                    expandableRow.style.display = 'none';
+                }
+            }
+        });
+    }
 
     // Update row count
     let rowCountDiv = table.nextElementSibling;
