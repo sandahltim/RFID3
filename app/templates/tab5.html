@@ -129,28 +129,41 @@ document.addEventListener('DOMContentLoaded', function() {
     // Add bulk update controls after the items table is loaded
     document.body.addEventListener('htmx:afterSwap', function(event) {
         const target = event.target;
-        if (target.classList.contains('item-level')) {
+        console.log('HTMX afterSwap triggered for target:', target);
+        if (target.classList.contains('item-table')) {
+            console.log('Item table detected, adding bulk update controls');
             const wrapper = target.closest('.item-level-wrapper');
-            if (wrapper && !wrapper.querySelector('.bulk-update-controls')) {
-                const bulkControls = document.createElement('div');
-                bulkControls.className = 'bulk-update-controls';
-                bulkControls.innerHTML = `
-                    <select id="bulk-bin-location" class="form-control">
-                        <option value="">Select Bin Location...</option>
-                        <option value="resale">Resale</option>
-                        <option value="sold">Sold</option>
-                        <option value="pack">Pack</option>
-                        <option value="burst">Burst</option>
-                    </select>
-                    <select id="bulk-status" class="form-control">
-                        <option value="">Select Status...</option>
-                        <option value="Ready to Rent">Ready to Rent</option>
-                        <option value="Sold">Sold</option>
-                    </select>
-                    <button class="btn btn-primary" onclick="bulkUpdateItems()">Update Selected</button>
-                `;
-                wrapper.appendChild(bulkControls);
+            if (wrapper) {
+                console.log('Found item-level-wrapper:', wrapper);
+                if (!wrapper.querySelector('.bulk-update-controls')) {
+                    console.log('Adding bulk update controls');
+                    const bulkControls = document.createElement('div');
+                    bulkControls.className = 'bulk-update-controls';
+                    bulkControls.innerHTML = `
+                        <select id="bulk-bin-location" class="form-control">
+                            <option value="">Select Bin Location...</option>
+                            <option value="resale">Resale</option>
+                            <option value="sold">Sold</option>
+                            <option value="pack">Pack</option>
+                            <option value="burst">Burst</option>
+                        </select>
+                        <select id="bulk-status" class="form-control">
+                            <option value="">Select Status...</option>
+                            <option value="Ready to Rent">Ready to Rent</option>
+                            <option value="Sold">Sold</option>
+                        </select>
+                        <button class="btn btn-primary" onclick="bulkUpdateItems()">Update Selected</button>
+                    `;
+                    wrapper.appendChild(bulkControls);
+                    console.log('Bulk update controls added successfully');
+                } else {
+                    console.log('Bulk update controls already exist');
+                }
+            } else {
+                console.warn('Item-level-wrapper not found for item table');
             }
+        } else {
+            console.log('Target is not an item-table:', target.classList);
         }
     });
 });
