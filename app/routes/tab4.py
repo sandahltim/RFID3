@@ -9,34 +9,34 @@ import sys
 
 # Configure logging for Tab 4
 logger = logging.getLogger('tab4')
-logger.setLevel(logging.DEBUG)  # Change to DEBUG for more detailed logging
+logger.setLevel(logging.INFO)  # Changed from DEBUG to INFO to reduce verbosity
 
 # Remove existing handlers to avoid duplicates
 logger.handlers = []
 
 # File handler for tab4.log
 tab4_file_handler = logging.FileHandler('/home/tim/test_rfidpi/logs/tab4.log')
-tab4_file_handler.setLevel(logging.DEBUG)
+tab4_file_handler.setLevel(logging.INFO)
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 tab4_file_handler.setFormatter(formatter)
 logger.addHandler(tab4_file_handler)
 
 # Console handler
 console_handler = logging.StreamHandler(sys.stdout)
-console_handler.setLevel(logging.DEBUG)
+console_handler.setLevel(logging.INFO)
 console_handler.setFormatter(formatter)
 logger.addHandler(console_handler)
 
 # Also log to the main rfid_dashboard.log
 main_file_handler = logging.FileHandler('/home/tim/test_rfidpi/logs/rfid_dashboard.log')
-main_file_handler.setLevel(logging.DEBUG)
+main_file_handler.setLevel(logging.INFO)
 main_file_handler.setFormatter(formatter)
 logger.addHandler(main_file_handler)
 
 tab4_bp = Blueprint('tab4', __name__)
 
 # Version marker
-logger.info("Deployed tab4.py version: 2025-04-27-v23")
+logger.info("Deployed tab4.py version: 2025-04-27-v24")
 
 @tab4_bp.route('/tab/4')
 def tab4_view():
@@ -178,7 +178,7 @@ def tab4_view():
             total_items_on_contract = contract['items_on_contract']
             total_items_inventory = contract['total_items_inventory']
             if total_items_on_contract == 0 and total_items_inventory == 0:
-                logger.debug(f"Skipping contract {contract['contract_number']}: No items on contract and no items in inventory")
+                logger.info(f"Skipping contract {contract['contract_number']}: No items on contract and no items in inventory")
                 continue
             contracts.append(contract)
 
@@ -239,8 +239,8 @@ def tab4_common_names():
 
         common_names_all = common_names_query.all()
 
-        logger.debug(f"Common names from id_item_master for contract {contract_number}: {[(name, count) for name, count in common_names_all]}")
-        current_app.logger.debug(f"Common names from id_item_master for contract {contract_number}: {[(name, count) for name, count in common_names_all]}")
+        logger.info(f"Common names from id_item_master for contract {contract_number}: {[(name, count) for name, count in common_names_all]}")
+        current_app.logger.info(f"Common names from id_item_master for contract {contract_number}: {[(name, count) for name, count in common_names_all]}")
 
         # Fetch hand-counted items to include as "common names"
         hand_counted_items_query = session.query(
@@ -253,8 +253,8 @@ def tab4_common_names():
             HandCountedItems.item_name
         ).all()
 
-        logger.debug(f"Hand-counted items as common names for contract {contract_number}: {[(name, count) for name, count in hand_counted_items_query]}")
-        current_app.logger.debug(f"Hand-counted items as common names for contract {contract_number}: {[(name, count) for name, count in hand_counted_items_query]}")
+        logger.info(f"Hand-counted items as common names for contract {contract_number}: {[(name, count) for name, count in hand_counted_items_query]}")
+        current_app.logger.info(f"Hand-counted items as common names for contract {contract_number}: {[(name, count) for name, count in hand_counted_items_query]}")
 
         # Combine common names from id_item_master and hand_counted_items
         common_names = {}
@@ -438,8 +438,8 @@ def tab4_data():
                     'last_scanned_date': last_scanned_date
                 })
 
-        logger.debug(f"Items for contract {contract_number}, common_name {common_name}: {len(items_data)} items")
-        current_app.logger.debug(f"Items for contract {contract_number}, common_name {common_name}: {len(items_data)} items")
+        logger.info(f"Items for contract {contract_number}, common_name {common_name}: {len(items_data)} items")
+        current_app.logger.info(f"Items for contract {contract_number}, common_name {common_name}: {len(items_data)} items")
 
         session.close()
         return jsonify({
@@ -541,7 +541,7 @@ def remove_hand_counted_item():
     data = request.get_json()
     contract_number = data.get('contract_number')
     item_name = data.get('item_name')
-    quantity = data.get('quantity')
+    quantity = int(data.get('quantity'))  # Ensure quantity is an integer
     action = data.get('action')
     employee_name = data.get('employee_name')
 
@@ -555,27 +555,59 @@ def remove_hand_counted_item():
 
     try:
         session = db.session()
+
+        # Calculate the current total quantity of "Added" items for this contract_number and item_name
+        added_quantity = session.query(
+            func.sum(HandCountedItems.quantity)
+        ).filter(
+            HandCountedItems.contract_number == contract_number,
+            HandCountedItems.item_name == item_name,
+            HandCountedItems.action == 'Added'
+        ).scalar() or 0
+
+        # Calculate the current total quantity of "Removed" items
+        removed_quantity = session.query(
+            func.sum(HandCountedItems.quantity)
+        ).filter(
+            HandCountedItems.contract_number == contract_number,
+            HandCountedItems.item_name == item_name,
+            HandCountedItems.action == 'Removed'
+        ).scalar() or 0
+
+        # Calculate the net quantity (Added - Removed)
+        current_quantity = added_quantity - removed_quantity
+        logger.info(f"Current quantity for {contract_number}/{item_name}: Added={added_quantity}, Removed={removed_quantity}, Net={current_quantity}")
+
+        # Calculate how much we can remove
+        quantity_to_remove = min(quantity, max(current_quantity, 0))
+        if quantity_to_remove <= 0:
+            session.close()
+            logger.info(f"No quantity to remove for contract {contract_number}, item {item_name}: current_quantity={current_quantity}")
+            current_app.logger.info(f"No quantity to remove for contract {contract_number}, item {item_name}: current_quantity={current_quantity}")
+            return jsonify({'message': 'No items to remove (quantity already at 0)'})
+
+        # Log the removal as a new entry with action="Removed"
         hand_counted_item = HandCountedItems(
             contract_number=contract_number,
             item_name=item_name,
-            quantity=quantity,
-            action=action,
+            quantity=quantity_to_remove,
+            action='Removed',
             user=employee_name,
             timestamp=datetime.now()
         )
         session.add(hand_counted_item)
         session.commit()
         session.close()
-        logger.info(f"Successfully removed hand-counted item for contract {contract_number}")
-        current_app.logger.info(f"Successfully removed hand-counted item for contract {contract_number}")
-        return jsonify({'message': 'Item removed successfully'})
+        logger.info(f"Successfully removed {quantity_to_remove} hand-counted items for contract {contract_number}, item {item_name}")
+        current_app.logger.info(f"Successfully removed {quantity_to_remove} hand-counted items for contract {contract_number}, item {item_name}")
+        return jsonify({'message': f'Successfully removed {quantity_to_remove} items'})
     except Exception as e:
         logger.error(f"Error removing hand-counted item: {str(e)}")
         current_app.logger.error(f"Error removing hand-counted item: {str(e)}")
         if 'session' in locals():
             session.rollback()
             session.close()
-        return jsonify({'error': 'Failed to add item'}), 500
+        return jsonify({'error': 'Failed to remove item'}), 500
 
 @tab4_bp.route('/tab/4/full_items_by_rental_class')
 def full_items_by_rental_class():

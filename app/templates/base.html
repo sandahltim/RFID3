@@ -26,6 +26,7 @@
     <!-- Bootstrap JS -->
     <script src="{{ url_for('static', filename='lib/bootstrap/bootstrap.bundle.min.js') }}"></script>
     {% block head %}{% endblock %}
+    {% block extra_head %}{% endblock %}
 </head>
 <body>
     <!-- Navigation Bar -->
@@ -61,9 +62,26 @@
         </div>
     </nav>
 
+    <!-- Top-Level Filter -->
+    <div class="container mt-3">
+        <div class="row mb-3 filter-sort-controls">
+            <div class="col">
+                <input type="text" class="form-control" placeholder="Filter by Common Name" id="commonNameFilter">
+            </div>
+            <div class="col">
+                <input type="text" class="form-control" placeholder="Filter by Contract Number" id="contractNumberFilter">
+            </div>
+            <div class="col">
+                <button class="btn btn-primary" onclick="applyGlobalFilter()">Apply</button>
+                <button class="btn btn-secondary" onclick="clearGlobalFilter()">Refresh</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Main Content -->
     <div class="container">
         {% block content %}{% endblock %}
     </div>
-<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'93706b5c6c1e7bae',t:'MTc0NTc3ODkyMy4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'93706b5c6c1e7bae',t:'MTc0NTc3ODkyMy4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'93725012298ab0cd',t:'MTc0NTc5ODc3Ni4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script>
+</body>
 </html>
