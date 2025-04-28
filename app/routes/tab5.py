@@ -4,7 +4,7 @@ from ..models.db_models import ItemMaster, Transaction, RentalClassMapping, User
 from ..services.api_client import APIClient
 from sqlalchemy import func, desc, or_, asc, text
 from time import time
-from datetime import datetime
+from datetime import datetime, timedelta
 import logging
 import sys
 from urllib.parse import unquote
@@ -47,7 +47,7 @@ if not any(isinstance(h, logging.StreamHandler) for h in root_logger.handlers):
 tab5_bp = Blueprint('tab5', __name__)
 
 # Version marker
-logger.info("Deployed tab5.py version: 2025-04-26-v21")
+logger.info("Deployed tab5.py version: 2025-04-27-v22")
 
 def get_category_data(session, filter_query='', sort='', status_filter='', bin_filter=''):
     # Check if data is in cache
@@ -720,6 +720,53 @@ def update_status():
         logger.error(f"Error updating status for tag {tag_id}: {str(e)}")
         session.close()
         return jsonify({'error': str(e)}), 500
+
+@tab5_bp.route('/tab/5/update_resale_pack_to_sold', methods=['POST'])
+def update_resale_pack_to_sold():
+    """
+    Update items in ItemMaster with bin_location 'resale' or 'pack', status 'On Rent' or 'Delivered',
+    and date_last_scanned more than 4 days ago to status 'Sold' via API PATCH.
+    """
+    try:
+        session = db.session()
+        current_time = datetime.now()
+        four_days_ago = current_time - timedelta(days=4)
+
+        # Query items matching the criteria
+        items_to_update = session.query(ItemMaster).filter(
+            func.lower(func.trim(func.replace(func.coalesce(ItemMaster.bin_location, ''), '\x00', ''))).in_(['resale', 'pack']),
+            ItemMaster.status.in_(['On Rent', 'Delivered']),
+            ItemMaster.date_last_scanned < four_days_ago
+        ).all()
+
+        if not items_to_update:
+            session.close()
+            return jsonify({'status': 'success', 'message': 'No items found to update'})
+
+        api_client = APIClient()
+        updated_items = 0
+
+        for item in items_to_update:
+            try:
+                # Update status to 'Sold' via API
+                api_client.update_status(item.tag_id, 'Sold')
+                # Update local database
+                item.status = 'Sold'
+                item.date_last_scanned = current_time
+                updated_items += 1
+            except Exception as e:
+                logger.error(f"Failed to update tag_id {item.tag_id}: {str(e)}")
+                continue
+
+        session.commit()
+        session.close()
+        logger.info(f"Updated {updated_items} items from resale/pack to Sold status")
+        return jsonify({'status': 'success', 'message': f'Updated {updated_items} items to Sold status'})
+    except Exception as e:
+        session.rollback()
+        logger.error(f"Error updating resale/pack items to Sold: {str(e)}")
+        session.close()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
 
 @tab5_bp.route('/tab/5/export_sold_burst_csv')
 def export_sold_burst_csv():
