@@ -36,7 +36,7 @@ logger.addHandler(main_file_handler)
 tab4_bp = Blueprint('tab4', __name__)
 
 # Version marker
-logger.info("Deployed tab4.py version: 2025-04-28-v29")
+logger.info("Deployed tab4.py version: 2025-04-28-v30")
 
 @tab4_bp.route('/tab/4')
 def tab4_view():
@@ -103,19 +103,41 @@ def tab4_view():
             }
         logger.info(f"Latest transactions for ItemMaster contracts: {latest_transactions}")
 
-        # Step 4: Fetch hand-counted items for contracts starting with 'L'
+        # Step 4: Fetch hand-counted items for contracts starting with 'L' (net quantity: Added - Removed)
         logger.info("Fetching hand-counted items for contracts starting with 'L'")
-        hand_counted_contracts = session.query(
+        # Subquery for "Added" quantities
+        added_quantities = session.query(
             HandCountedItems.contract_number,
-            func.sum(HandCountedItems.quantity).label('hand_counted_items_total')
+            func.sum(HandCountedItems.quantity).label('added_quantity')
         ).filter(
             HandCountedItems.contract_number != None,
             func.upper(HandCountedItems.contract_number).like('L%'),
             HandCountedItems.action == 'Added'
         ).group_by(
             HandCountedItems.contract_number
+        ).subquery()
+
+        # Subquery for "Removed" quantities
+        removed_quantities = session.query(
+            HandCountedItems.contract_number,
+            func.sum(HandCountedItems.quantity).label('removed_quantity')
+        ).filter(
+            HandCountedItems.contract_number != None,
+            func.upper(HandCountedItems.contract_number).like('L%'),
+            HandCountedItems.action == 'Removed'
+        ).group_by(
+            HandCountedItems.contract_number
+        ).subquery()
+
+        # Join the subqueries to calculate net quantity
+        hand_counted_contracts = session.query(
+            added_quantities.c.contract_number,
+            (func.coalesce(added_quantities.c.added_quantity, 0) - func.coalesce(removed_quantities.c.removed_quantity, 0)).label('hand_counted_items_total')
+        ).outerjoin(
+            removed_quantities,
+            added_quantities.c.contract_number == removed_quantities.c.contract_number
         ).having(
-            func.sum(HandCountedItems.quantity) > 0
+            (func.coalesce(added_quantities.c.added_quantity, 0) - func.coalesce(removed_quantities.c.removed_quantity, 0)) > 0
         ).all()
 
         logger.info(f"Hand-counted contracts: {[(c.contract_number, c.hand_counted_items_total) for c in hand_counted_contracts]}")
@@ -186,7 +208,7 @@ def tab4_view():
         logger.info(f"Fetched {len(contracts)} contracts for tab4: {[c['contract_number'] for c in contracts]}")
         current_app.logger.info(f"Fetched {len(contracts)} contracts for tab4: {[c['contract_number'] for c in contracts]}")
         session.close()
-        return render_template('tab4.html', contracts=contracts, cache_bust=int(time.time()))  # Use time.time() explicitly
+        return render_template('tab4.html', contracts=contracts, cache_bust=int(time.time()))
     except Exception as e:
         logger.error(f"Error rendering Tab 4: {str(e)}", exc_info=True)
         current_app.logger.error(f"Error rendering Tab 4: {str(e)}", exc_info=True)
@@ -287,6 +309,35 @@ def contract_items_count():
         return jsonify({'total_items': total_items})
     except Exception as e:
         logger.error(f"Error calculating items on contract for {contract_number}: {str(e)}", exc_info=True)
+        session.close()
+        return jsonify({'error': str(e)}), 500
+
+@tab4_bp.route('/tab/4/hand_counted_entries', methods=['GET'])
+def hand_counted_entries():
+    contract_number = request.args.get('contract_number')
+    session = db.session()
+    try:
+        # Count hand-counted items (net quantity: Added - Removed)
+        hand_counted_added = session.query(
+            func.sum(HandCountedItems.quantity)
+        ).filter(
+            HandCountedItems.contract_number == contract_number,
+            HandCountedItems.action == 'Added'
+        ).scalar() or 0
+
+        hand_counted_removed = session.query(
+            func.sum(HandCountedItems.quantity)
+        ).filter(
+            HandCountedItems.contract_number == contract_number,
+            HandCountedItems.action == 'Removed'
+        ).scalar() or 0
+
+        hand_counted_total = max(hand_counted_added - hand_counted_removed, 0)
+
+        session.close()
+        return jsonify({'hand_counted_entries': hand_counted_total})
+    except Exception as e:
+        logger.error(f"Error calculating hand-counted entries for {contract_number}: {str(e)}", exc_info=True)
         session.close()
         return jsonify({'error': str(e)}), 500
 
