@@ -1,0 +1,10 @@
+{% for item in hand_counted_items %}
+<tr>
+    <td>{{ item.contract_number }}</td>
+    <td>{{ item.item_name }}</td>
+    <td>{{ item.quantity }}</td>
+    <td>{{ item.action }}</td>
+    <td>{{ item.timestamp }}</td>
+    <td>{{ item.user }}</td>
+</tr>
+{% endfor %}
