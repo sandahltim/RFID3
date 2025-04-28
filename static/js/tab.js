@@ -2,17 +2,7 @@ console.log('tab.js loaded, cachedTabNum:', window.cachedTabNum);
 
 // Note: Common function - will be moved to common.js during split
 function formatDateTime(dateTimeStr) {
-    if (!dateTimeStr) return 'N/A';
-    const date = new Date(dateTimeStr);
-    return date.toLocaleString('en-US', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        hour12: true
-    });
+    return formatDate(dateTimeStr); // Use formatDate from common.js for consistency
 }
 
 // Note: Common function - will be moved to common.js during split

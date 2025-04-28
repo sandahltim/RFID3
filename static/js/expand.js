@@ -1,4 +1,4 @@
-console.log('expand.js version: 2025-04-27-v77 loaded - confirming script load');
+console.log('expand.js version: 2025-04-27-v78 loaded - confirming script load');
 
 // Note: Common function - will be moved to common.js during split
 function showLoading(key) {
@@ -137,6 +137,24 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    // Format timestamps in the Hand-Counted Items table after HTMX load (Tab 4)
+    if (window.cachedTabNum === 4) {
+        document.body.addEventListener('htmx:afterSwap', function(event) {
+            const target = event.target;
+            if (target.id === 'hand-counted-items') {
+                const rows = target.querySelectorAll('tr');
+                rows.forEach(row => {
+                    const timestampCell = row.querySelector('td:nth-child(5)'); // Timestamp column
+                    if (timestampCell) {
+                        const rawDate = timestampCell.textContent.trim();
+                        const formattedDate = formatDate(rawDate);
+                        timestampCell.textContent = formattedDate;
+                    }
+                });
+            }
+        });
+    }
+
     // Define expandCategory for Tabs 2 and 4 (load common names directly under contract)
     window.expandCategory = function(category, targetId, contractNumber, page = 1) {
         console.log('expandCategory called with', { category, targetId, contractNumber, page });
@@ -190,6 +208,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 commonNames.forEach(common => {
                     const commonId = `${contractNumber}-${common.name.replace(/[^a-zA-Z0-9]/g, '_')}`;
                     const escapedCommonName = common.name.replace(/'/g, "\\'").replace(/"/g, '\\"');
+                    const formattedScanDate = formatDate(common.scan_date); // Format the scan date
                     html += `
                         <tr>
                             <td class="expandable-cell" onclick="expandItems('${contractNumber}', '${escapedCommonName}', 'items-${commonId}')">${common.name}</td>
@@ -224,7 +243,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         <div class="pagination-controls mt-2">
                             <button class="btn btn-sm btn-secondary" onclick="window.expandCategory('${category}', '${targetId}', '${contractNumber}', ${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''}>Previous</button>
                             <span class="mx-2">Page ${currentPage} of ${totalPages}</span>
-                            <button class="btn btn-sm btn-secondary" onclick="window.expandCategory('${category}', '${targetId}', '${contractNumber}', ${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''}>Next</button>
+                            <button class="btn btn-sm btn-secondary" onclick="window.expandCategory('${contractNumber}', '${targetId}', '${contractNumber}', ${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''}>Next</button>
                         </div>
                     `;
                 }
@@ -304,6 +323,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 `;
 
                 items.forEach(item => {
+                    const formattedScanDate = formatDate(item.last_scanned_date); // Format the scan date
                     html += `
                         <tr>
                             <td>${item.tag_id}</td>
@@ -311,7 +331,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             <td>${item.bin_location || 'N/A'}</td>
                             <td>${item.status}</td>
                             <td>${item.last_contract_num || 'N/A'}</td>
-                            <td>${item.last_scanned_date || 'N/A'}</td>
+                            <td>${formattedScanDate}</td>
                         </tr>
                     `;
                 });
@@ -514,6 +534,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 `;
 
                 items.forEach(item => {
+                    const formattedScanDate = formatDate(item.last_scanned_date); // Format the scan date
                     html += `
                         <tr>
                             <td>${item.tag_id}</td>
@@ -521,7 +542,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             <td>${item.bin_location || 'N/A'}</td>
                             <td>${item.status}</td>
                             <td>${item.last_contract_num || 'N/A'}</td>
-                            <td>${item.last_scanned_date || 'N/A'}</td>
+                            <td>${formattedScanDate}</td>
                         </tr>
                     `;
                 });
