@@ -1,47 +1,54 @@
 {% extends "base.html" %}
 
+{% block head %}
+{{ super() }}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/tab2_4.css') }}">
+{% endblock %}
+
 {% block content %}
 <div class="mt-0"> <!-- Removed mt-4 to reduce gap -->
     <h2>Laundry Contracts</h2>
     <!-- Table for displaying contracts -->
-    <table class="category-table" id="category-table">
-        <thead id="category-table-header">
-            <tr>
-                <th>Contract Number <span class="sort-arrow"></span></th>
-                <th>Customer Name <span class="sort-arrow"></span></th>
-                <th>Items on Contract <span class="sort-arrow"></span></th>
-                <th>Total Items in Inventory <span class="sort-arrow"></span></th>
-                <th>Hand-Counted Entries <span class="sort-arrow"></span></th>
-                <th>Last Scanned Date <span class="sort-arrow"></span></th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody id="category-rows">
-            {% for contract in contracts %}
-            <tr>
-                <td class="expandable-cell" onclick="window.expandCategory('{{ contract.contract_number | urlencode | replace('\'', '\\\'') | replace('"', '\\"') }}', 'common-{{ contract.contract_number }}', '{{ contract.contract_number }}')">
-                    {{ contract.contract_number }}
-                </td>
-                <td>{{ contract.client_name }}</td>
-                <td id="items-on-contract-{{ contract.contract_number }}">{{ contract.items_on_contract }}</td>
-                <td>{{ contract.total_items_inventory }}</td>
-                <td id="hand-counted-entries-{{ contract.contract_number }}">{{ contract.hand_counted_items }}</td>
-                <td class="date-last-scanned">{{ contract.scan_date }}</td>
-                <td>
-                    <button class="btn btn-sm btn-secondary expand-btn" data-contract-number="{{ contract.contract_number }}" data-target-id="common-{{ contract.contract_number }}">Expand</button>
-                    <button class="btn btn-sm btn-secondary collapse-btn" data-collapse-target="common-{{ contract.contract_number }}" style="display:none;">Collapse</button>
-                    <button class="btn btn-sm btn-info print-btn" data-print-level="Contract" data-print-id="common-{{ contract.contract_number }}" data-contract-number="{{ contract.contract_number }}">Print</button>
-                    <div id="loading-{{ contract.contract_number }}" style="display:none;" class="loading">Loading...</div>
-                </td>
-            </tr>
-            <tr>
-                <td colspan="7">
-                    <div id="common-{{ contract.contract_number }}" class="expandable collapsed"></div>
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+    <div class="category-table-wrapper">
+        <table class="category-table" id="category-table">
+            <thead id="category-table-header">
+                <tr>
+                    <th>Contract Number <span class="sort-arrow"></span></th>
+                    <th>Customer Name <span class="sort-arrow"></span></th>
+                    <th>Items on Contract <span class="sort-arrow"></span></th>
+                    <th>Total Items in Inventory <span class="sort-arrow"></span></th>
+                    <th>Hand-Counted Entries <span class="sort-arrow"></span></th>
+                    <th>Last Scanned Date <span class="sort-arrow"></span></th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="category-rows">
+                {% for contract in contracts %}
+                <tr>
+                    <td class="expandable-cell" onclick="window.expandCategory('{{ contract.contract_number | urlencode | replace('\'', '\\\'') | replace('"', '\\"') }}', 'common-{{ contract.contract_number }}', '{{ contract.contract_number }}')">
+                        {{ contract.contract_number }}
+                    </td>
+                    <td>{{ contract.client_name }}</td>
+                    <td id="items-on-contract-{{ contract.contract_number }}">{{ contract.items_on_contract }}</td>
+                    <td>{{ contract.total_items_inventory }}</td>
+                    <td id="hand-counted-entries-{{ contract.contract_number }}">{{ contract.hand_counted_items }}</td>
+                    <td class="date-last-scanned">{{ contract.scan_date }}</td>
+                    <td>
+                        <button class="btn btn-sm btn-secondary expand-btn" data-contract-number="{{ contract.contract_number }}" data-target-id="common-{{ contract.contract_number }}">Expand</button>
+                        <button class="btn btn-sm btn-secondary collapse-btn" data-collapse-target="common-{{ contract.contract_number }}" style="display:none;">Collapse</button>
+                        <button class="btn btn-sm btn-info print-btn" data-print-level="Contract" data-print-id="common-{{ contract.contract_number }}" data-contract-number="{{ contract.contract_number }}">Print</button>
+                        <div id="loading-{{ contract.contract_number }}" style="display:none;" class="loading">Loading...</div>
+                    </td>
+                </tr>
+                <tr>
+                    <td colspan="7">
+                        <div id="common-{{ contract.contract_number }}" class="expandable collapsed"></div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
 
     <!-- Hand-Counted Items Section (always visible) -->
     <h4>Hand-Counted Items</h4>
