@@ -6,6 +6,21 @@
 <style>
     .loading { color: #888; font-style: italic; }
     .table-bordered th, .table-bordered td { border: 1px solid #dee2e6; }
+    .scannable-items-section { 
+        margin-top: 10px; 
+        padding-left: 240px; 
+    }
+    .scannable-items-section h3 { 
+        font-weight: bold; 
+        margin-bottom: 10px; 
+    }
+    .scannable-items-section ul { 
+        list-style-type: none; 
+        padding-left: 0; 
+    }
+    .scannable-items-section li { 
+        margin-bottom: 5px; 
+    }
 </style>
 <script>
     function triggerFullRefresh() {
@@ -73,6 +88,24 @@
 {% if error %}
     <div class="alert alert-danger">{{ error }}</div>
 {% else %}
+    <!-- Scannable Items Section at the Top -->
+    <div class="row">
+        <div class="col-md-12 scannable-items-section">
+            <h3><strong>Scannable Items</strong></h3>
+            <ul>
+                <li><strong>All Linens (except Skirts, Spandex, Napkins(Scan Out), Runners, and Sashes are hand entered)</strong></li>
+                <li><strong>All Concession Machines and Resale - No Sterno</strong></li>
+                <li><strong>All AV and Sound</strong></li>
+                <li><strong>All Tent Tops</strong></li>
+                <li><strong>Garden Chairs and Dishes/Silverware Packs - (Coming Soon)</strong></li>
+                <li><strong>Fountains and Bev Dispens</strong></li>
+                <li><strong>Cocktail Table Tops & Legs</strong></li>
+                <li><strong>Carpet Runners</strong></li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Existing Content Below -->
     <div class="row mb-3">
         <div class="col-md-12">
             <button id="full-refresh-btn" class="btn btn-primary" onclick="triggerFullRefresh()">Full Refresh</button>
