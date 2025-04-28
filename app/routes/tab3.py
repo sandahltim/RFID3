@@ -29,7 +29,7 @@ logger.addHandler(console_handler)
 tab3_bp = Blueprint('tab3', __name__)
 
 # Version marker
-logger.info("Deployed tab3.py version: 2025-04-27-v3")
+logger.info("Deployed tab3.py version: 2025-04-27-v4")
 
 @tab3_bp.route('/tab/3')
 def tab3_view():
@@ -87,7 +87,7 @@ def tab3_view():
             Transaction.id.desc()
         ).distinct(Transaction.tag_id).subquery()
 
-        # Identify items in service, excluding 'Sold' status
+        # Query items with status 'Repair'
         items_in_service_query = session.query(
             ItemMaster,
             latest_transaction_subquery.c.location_of_repair,
@@ -108,11 +108,7 @@ def tab3_view():
             latest_transaction_subquery,
             ItemMaster.tag_id == latest_transaction_subquery.c.tag_id
         ).filter(
-            ItemMaster.status != 'Sold',  # Exclude 'Sold' items
-            or_(
-                ItemMaster.status.notin_(['Ready to Rent', 'On Rent', 'Delivered']),
-                (latest_transaction_subquery.c.service_required == True)
-            )
+            ItemMaster.status == 'Repair'  # Only include items with status 'Repair'
         ).all()
 
         # Categorize items by crew
@@ -146,6 +142,7 @@ def tab3_view():
                 'status': item.status,
                 'bin_location': item.bin_location,
                 'last_contract_num': item.last_contract_num,
+                'date_last_scanned': item.date_last_scanned.isoformat() if item.date_last_scanned else 'N/A',  # Include date_last_scanned
                 'location_of_repair': location_of_repair or 'N/A',
                 'repair_types': repair_types if repair_types else ['Unknown']
             }
@@ -158,10 +155,10 @@ def tab3_view():
             else:
                 maintenance_crew_items.append(repair_details)
 
-        # Sort items by tag_id for consistency
-        tent_crew_items.sort(key=lambda x: x['tag_id'])
-        laundry_crew_items.sort(key=lambda x: x['tag_id'])
-        maintenance_crew_items.sort(key=lambda x: x['tag_id'])
+        # Sort items
+        tent_crew_items.sort(key=lambda x: x['tag_id'])  # Sort by tag_id
+        laundry_crew_items.sort(key=lambda x: x['common_name'].lower())  # Sort alphabetically by common_name
+        maintenance_crew_items.sort(key=lambda x: x['tag_id'])  # Sort by tag_id
 
         logger.info(f"Fetched {len(tent_crew_items)} items for Tent Crew, {len(laundry_crew_items)} for Laundry Crew, {len(maintenance_crew_items)} for Maintenance Crew")
         current_app.logger.info(f"Fetched {len(tent_crew_items)} items for Tent Crew, {len(laundry_crew_items)} for Laundry Crew, {len(maintenance_crew_items)} for Maintenance Crew")
