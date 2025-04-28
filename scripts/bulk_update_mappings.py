@@ -9,6 +9,7 @@ sys.path.append(project_dir)
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.exc import IntegrityError
 from app.models.db_models import UserRentalClassMapping
 from config import DB_CONFIG
 import logging
@@ -54,10 +55,9 @@ def bulk_update_mappings():
             logger.error(f"CSV file not found at: {csv_file_path}")
             raise FileNotFoundError(f"CSV file not found at: {csv_file_path}")
 
-        # Read the CSV file
-        mappings = []
+        # Read the CSV file and deduplicate mappings
+        mappings_dict = {}
         row_count = 0
-        valid_row_count = 0
         with open(csv_file_path, 'r', encoding='utf-8') as csvfile:
             reader = csv.DictReader(csvfile)
             logger.info("Starting to read CSV file")
@@ -80,24 +80,30 @@ def bulk_update_mappings():
                         logger.debug(f"Skipping row {row_count} with missing data: rental_class_id={rental_class_id}, category={category}, subcategory={subcategory}")
                         continue
 
-                    mappings.append({
+                    # Deduplicate: Keep the first occurrence of rental_class_id
+                    if rental_class_id in mappings_dict:
+                        logger.warning(f"Duplicate rental_class_id found at row {row_count}: {rental_class_id}. Keeping the first occurrence.")
+                        continue
+
+                    mappings_dict[rental_class_id] = {
                         'rental_class_id': rental_class_id,
                         'category': category,
                         'subcategory': subcategory
-                    })
-                    valid_row_count += 1
-                    logger.debug(f"Processed valid row {row_count}: {mappings[-1]}")
+                    }
+                    logger.debug(f"Processed valid row {row_count}: {mappings_dict[rental_class_id]}")
                 except Exception as row_error:
                     logger.error(f"Error processing row {row_count}: {str(row_error)}", exc_info=True)
                     continue
 
-        logger.info(f"Processed {row_count} total rows from CSV, {valid_row_count} valid mappings found")
+        mappings = list(mappings_dict.values())
+        logger.info(f"Processed {row_count} total rows from CSV, {len(mappings)} unique mappings found")
 
         # Clear existing user mappings
         deleted_count = session.query(UserRentalClassMapping).delete()
         logger.info(f"Deleted {deleted_count} existing user mappings")
 
-        # Insert new user mappings
+        # Insert new user mappings one at a time to handle errors gracefully
+        inserted_count = 0
         for mapping in mappings:
             try:
                 user_mapping = UserRentalClassMapping(
@@ -108,14 +114,19 @@ def bulk_update_mappings():
                     updated_at=datetime.utcnow()
                 )
                 session.add(user_mapping)
-                logger.debug(f"Added mapping: {mapping}")
+                session.commit()  # Commit each insert individually
+                inserted_count += 1
+                logger.debug(f"Inserted mapping: {mapping}")
+            except IntegrityError as integrity_error:
+                logger.error(f"Integrity error for mapping {mapping}: {str(integrity_error)}")
+                session.rollback()
+                continue
             except Exception as insert_error:
                 logger.error(f"Error inserting mapping {mapping}: {str(insert_error)}", exc_info=True)
+                session.rollback()
                 continue
 
-        # Commit the transaction
-        session.commit()
-        logger.info(f"Successfully updated {len(mappings)} mappings in user_rental_class_mappings")
+        logger.info(f"Successfully inserted {inserted_count} mappings into user_rental_class_mappings")
 
     except Exception as e:
         logger.error(f"Error during bulk update: {str(e)}", exc_info=True)
