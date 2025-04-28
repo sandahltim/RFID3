@@ -5,6 +5,7 @@ from sqlalchemy import func, desc, or_
 from datetime import datetime
 import logging
 import sys
+import time  # Ensure the time module is imported
 
 # Configure logging for Tab 4
 logger = logging.getLogger('tab4')
@@ -35,7 +36,7 @@ logger.addHandler(main_file_handler)
 tab4_bp = Blueprint('tab4', __name__)
 
 # Version marker
-logger.info("Deployed tab4.py version: 2025-04-27-v27")
+logger.info("Deployed tab4.py version: 2025-04-28-v28")
 
 @tab4_bp.route('/tab/4')
 def tab4_view():
@@ -185,13 +186,13 @@ def tab4_view():
         logger.info(f"Fetched {len(contracts)} contracts for tab4: {[c['contract_number'] for c in contracts]}")
         current_app.logger.info(f"Fetched {len(contracts)} contracts for tab4: {[c['contract_number'] for c in contracts]}")
         session.close()
-        return render_template('tab4.html', contracts=contracts, cache_bust=int(time()))
+        return render_template('tab4.html', contracts=contracts, cache_bust=int(time.time()))  # Use time.time() explicitly
     except Exception as e:
         logger.error(f"Error rendering Tab 4: {str(e)}", exc_info=True)
         current_app.logger.error(f"Error rendering Tab 4: {str(e)}", exc_info=True)
         if 'session' in locals():
             session.close()
-        return render_template('tab4.html', contracts=[], cache_bust=int(time()))
+        return render_template('tab4.html', contracts=[], cache_bust=int(time.time()))
 
 @tab4_bp.route('/tab/4/hand_counted_contracts', methods=['GET'])
 def hand_counted_contracts():
