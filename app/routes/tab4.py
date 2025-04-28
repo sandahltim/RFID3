@@ -9,7 +9,7 @@ import sys
 
 # Configure logging for Tab 4
 logger = logging.getLogger('tab4')
-logger.setLevel(logging.INFO)  # Changed from DEBUG to INFO to reduce verbosity
+logger.setLevel(logging.INFO)  # Already set to INFO
 
 # Remove existing handlers to avoid duplicates
 logger.handlers = []
@@ -36,7 +36,7 @@ logger.addHandler(main_file_handler)
 tab4_bp = Blueprint('tab4', __name__)
 
 # Version marker
-logger.info("Deployed tab4.py version: 2025-04-27-v24")
+logger.info("Deployed tab4.py version: 2025-04-27-v25")
 
 @tab4_bp.route('/tab/4')
 def tab4_view():
@@ -584,7 +584,7 @@ def remove_hand_counted_item():
             session.close()
             logger.info(f"No quantity to remove for contract {contract_number}, item {item_name}: current_quantity={current_quantity}")
             current_app.logger.info(f"No quantity to remove for contract {contract_number}, item {item_name}: current_quantity={current_quantity}")
-            return jsonify({'message': 'No items to remove (quantity already at 0)'})
+            return jsonify({'message': `Cannot remove ${quantity} items from ${contract_number}/${item_name}. Quantity already at 0.`})
 
         # Log the removal as a new entry with action="Removed"
         hand_counted_item = HandCountedItems(
@@ -600,7 +600,7 @@ def remove_hand_counted_item():
         session.close()
         logger.info(f"Successfully removed {quantity_to_remove} hand-counted items for contract {contract_number}, item {item_name}")
         current_app.logger.info(f"Successfully removed {quantity_to_remove} hand-counted items for contract {contract_number}, item {item_name}")
-        return jsonify({'message': f'Successfully removed {quantity_to_remove} items'})
+        return jsonify({'message': `Successfully removed ${quantity_to_remove} items`})
     except Exception as e:
         logger.error(f"Error removing hand-counted item: {str(e)}")
         current_app.logger.error(f"Error removing hand-counted item: {str(e)}")
