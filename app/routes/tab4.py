@@ -36,7 +36,7 @@ logger.addHandler(main_file_handler)
 tab4_bp = Blueprint('tab4', __name__)
 
 # Version marker
-logger.info("Deployed tab4.py version: 2025-04-28-v30")
+logger.info("Deployed tab4.py version: 2025-04-28-v31")
 
 @tab4_bp.route('/tab/4')
 def tab4_view():
@@ -103,44 +103,54 @@ def tab4_view():
             }
         logger.info(f"Latest transactions for ItemMaster contracts: {latest_transactions}")
 
-        # Step 4: Fetch hand-counted items for contracts starting with 'L' (net quantity: Added - Removed)
+        # Step 4: Fetch hand-counted items for contracts starting with 'L'
         logger.info("Fetching hand-counted items for contracts starting with 'L'")
-        # Subquery for "Added" quantities
+        # Fetch all contracts starting with 'L' from HandCountedItems
+        hand_counted_contract_numbers = session.query(
+            HandCountedItems.contract_number
+        ).filter(
+            HandCountedItems.contract_number != None,
+            func.upper(HandCountedItems.contract_number).like('L%')
+        ).distinct().all()
+
+        hand_counted_contract_numbers = [c.contract_number for c in hand_counted_contract_numbers]
+
+        # Fetch "Added" quantities for these contracts
         added_quantities = session.query(
             HandCountedItems.contract_number,
             func.sum(HandCountedItems.quantity).label('added_quantity')
         ).filter(
-            HandCountedItems.contract_number != None,
-            func.upper(HandCountedItems.contract_number).like('L%'),
+            HandCountedItems.contract_number.in_(hand_counted_contract_numbers),
             HandCountedItems.action == 'Added'
         ).group_by(
             HandCountedItems.contract_number
-        ).subquery()
+        ).all()
 
-        # Subquery for "Removed" quantities
+        added_quantities_dict = {item.contract_number: item.added_quantity for item in added_quantities}
+
+        # Fetch "Removed" quantities for these contracts
         removed_quantities = session.query(
             HandCountedItems.contract_number,
             func.sum(HandCountedItems.quantity).label('removed_quantity')
         ).filter(
-            HandCountedItems.contract_number != None,
-            func.upper(HandCountedItems.contract_number).like('L%'),
+            HandCountedItems.contract_number.in_(hand_counted_contract_numbers),
             HandCountedItems.action == 'Removed'
         ).group_by(
             HandCountedItems.contract_number
-        ).subquery()
-
-        # Join the subqueries to calculate net quantity
-        hand_counted_contracts = session.query(
-            added_quantities.c.contract_number,
-            (func.coalesce(added_quantities.c.added_quantity, 0) - func.coalesce(removed_quantities.c.removed_quantity, 0)).label('hand_counted_items_total')
-        ).outerjoin(
-            removed_quantities,
-            added_quantities.c.contract_number == removed_quantities.c.contract_number
-        ).having(
-            (func.coalesce(added_quantities.c.added_quantity, 0) - func.coalesce(removed_quantities.c.removed_quantity, 0)) > 0
         ).all()
 
-        logger.info(f"Hand-counted contracts: {[(c.contract_number, c.hand_counted_items_total) for c in hand_counted_contracts]}")
+        removed_quantities_dict = {item.contract_number: item.removed_quantity for item in removed_quantities}
+
+        # Calculate net hand-counted quantities
+        hand_counted_contracts = []
+        for contract_number in hand_counted_contract_numbers:
+            added_qty = added_quantities_dict.get(contract_number, 0)
+            removed_qty = removed_quantities_dict.get(contract_number, 0)
+            net_qty = added_qty - removed_qty
+            if net_qty > 0:
+                hand_counted_contracts.append((contract_number, net_qty))
+
+        logger.info(f"Hand-counted contracts: {hand_counted_contracts}")
 
         # Step 5: Combine ItemMaster and HandCountedItems data
         contracts_dict = {}
@@ -159,9 +169,8 @@ def tab4_view():
             }
 
         # Add or update with HandCountedItems
-        for hc_contract in hand_counted_contracts:
-            contract_number = hc_contract.contract_number
-            hand_counted_total = hc_contract.hand_counted_items_total or 0
+        for contract_number, hand_counted_total in hand_counted_contracts:
+            hand_counted_total = hand_counted_total or 0
 
             if contract_number in contracts_dict:
                 # Contract already exists from ItemMaster, update hand-counted items
