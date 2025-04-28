@@ -29,7 +29,7 @@ logger.addHandler(console_handler)
 tab3_bp = Blueprint('tab3', __name__)
 
 # Version marker
-logger.info("Deployed tab3.py version: 2025-04-27-v2")
+logger.info("Deployed tab3.py version: 2025-04-27-v3")
 
 @tab3_bp.route('/tab/3')
 def tab3_view():
@@ -50,10 +50,18 @@ def tab3_view():
         for um in user_mappings:
             mappings_dict[um.rental_class_id] = {'category': um.category, 'subcategory': um.subcategory}
 
-        # Subquery to get the most recent transaction per tag_id
-        subquery = session.query(
+        # Subquery to get the most recent transaction per tag_id, using id to break ties
+        max_scan_date_subquery = session.query(
+            Transaction.tag_id,
+            func.max(Transaction.scan_date).label('max_scan_date')
+        ).group_by(
+            Transaction.tag_id
+        ).subquery()
+
+        latest_transaction_subquery = session.query(
             Transaction.tag_id,
             Transaction.scan_date,
+            Transaction.id,
             Transaction.service_required,
             Transaction.location_of_repair,
             Transaction.dirty_or_mud,
@@ -69,40 +77,43 @@ def tab3_view():
             Transaction.buckle,
             Transaction.wet,
             Transaction.other
-        ).filter(
-            Transaction.scan_date == session.query(func.max(Transaction.scan_date))
-                .filter(Transaction.tag_id == Transaction.tag_id)
-                .correlate(Transaction)
-                .scalar_subquery()
-        ).subquery()
+        ).join(
+            max_scan_date_subquery,
+            (Transaction.tag_id == max_scan_date_subquery.c.tag_id) &
+            (Transaction.scan_date == max_scan_date_subquery.c.max_scan_date)
+        ).order_by(
+            Transaction.tag_id,
+            Transaction.scan_date.desc(),
+            Transaction.id.desc()
+        ).distinct(Transaction.tag_id).subquery()
 
         # Identify items in service, excluding 'Sold' status
         items_in_service_query = session.query(
             ItemMaster,
-            subquery.c.location_of_repair,
-            subquery.c.dirty_or_mud,
-            subquery.c.leaves,
-            subquery.c.oil,
-            subquery.c.mold,
-            subquery.c.stain,
-            subquery.c.oxidation,
-            subquery.c.rip_or_tear,
-            subquery.c.sewing_repair_needed,
-            subquery.c.grommet,
-            subquery.c.rope,
-            subquery.c.buckle,
-            subquery.c.wet,
-            subquery.c.other
+            latest_transaction_subquery.c.location_of_repair,
+            latest_transaction_subquery.c.dirty_or_mud,
+            latest_transaction_subquery.c.leaves,
+            latest_transaction_subquery.c.oil,
+            latest_transaction_subquery.c.mold,
+            latest_transaction_subquery.c.stain,
+            latest_transaction_subquery.c.oxidation,
+            latest_transaction_subquery.c.rip_or_tear,
+            latest_transaction_subquery.c.sewing_repair_needed,
+            latest_transaction_subquery.c.grommet,
+            latest_transaction_subquery.c.rope,
+            latest_transaction_subquery.c.buckle,
+            latest_transaction_subquery.c.wet,
+            latest_transaction_subquery.c.other
         ).outerjoin(
-            subquery,
-            ItemMaster.tag_id == subquery.c.tag_id
+            latest_transaction_subquery,
+            ItemMaster.tag_id == latest_transaction_subquery.c.tag_id
         ).filter(
             ItemMaster.status != 'Sold',  # Exclude 'Sold' items
             or_(
                 ItemMaster.status.notin_(['Ready to Rent', 'On Rent', 'Delivered']),
-                (subquery.c.service_required == True)
+                (latest_transaction_subquery.c.service_required == True)
             )
-        ).distinct(ItemMaster.tag_id).all()
+        ).all()
 
         # Categorize items by crew
         tent_crew_items = []
