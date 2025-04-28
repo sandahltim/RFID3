@@ -25,7 +25,7 @@
                 <td>{{ contract.client_name }}</td>
                 <td id="items-on-contract-{{ contract.contract_number }}">{{ contract.items_on_contract }}</td>
                 <td>{{ contract.total_items_inventory }}</td>
-                <td>{{ contract.hand_counted_items }}</td>
+                <td id="hand-counted-entries-{{ contract.contract_number }}">{{ contract.hand_counted_items }}</td>
                 <td class="date-last-scanned">{{ contract.scan_date }}</td>
                 <td>
                     <button class="btn btn-sm btn-secondary expand-btn" data-contract-number="{{ contract.contract_number }}" data-target-id="common-{{ contract.contract_number }}">Expand</button>
@@ -275,8 +275,8 @@ function addHandCountedItem() {
             employeeInput.value = '';
             // Refresh the hand-counted items table
             filterHandCountedItems();
-            // Update the Items on Contract count
-            updateItemsOnContract(contractNumber);
+            // Update the Items on Contract and Hand-Counted Entries counts
+            updateContractCounts(contractNumber);
         }
     })
     .catch(error => {
@@ -336,8 +336,8 @@ function removeHandCountedItem() {
             employeeInput.value = '';
             // Refresh the hand-counted items table
             filterHandCountedItems();
-            // Update the Items on Contract count
-            updateItemsOnContract(contractNumber);
+            // Update the Items on Contract and Hand-Counted Entries counts
+            updateContractCounts(contractNumber);
         }
     })
     .catch(error => {
@@ -346,8 +346,9 @@ function removeHandCountedItem() {
     });
 }
 
-// Update the Items on Contract count dynamically
-function updateItemsOnContract(contractNumber) {
+// Update the Items on Contract and Hand-Counted Entries counts dynamically
+function updateContractCounts(contractNumber) {
+    // Update Items on Contract
     fetch(`/tab/4/contract_items_count?contract_number=${encodeURIComponent(contractNumber)}`)
         .then(response => response.json())
         .then(data => {
@@ -359,6 +360,20 @@ function updateItemsOnContract(contractNumber) {
         })
         .catch(error => {
             console.error('Error updating Items on Contract count:', error);
+        });
+
+    // Update Hand-Counted Entries
+    fetch(`/tab/4/hand_counted_entries?contract_number=${encodeURIComponent(contractNumber)}`)
+        .then(response => response.json())
+        .then(data => {
+            const handCountedElement = document.getElementById(`hand-counted-entries-${contractNumber}`);
+            if (handCountedElement) {
+                const newHandCountedCount = data.hand_counted_entries || 0;
+                handCountedElement.textContent = newHandCountedCount;
+            }
+        })
+        .catch(error => {
+            console.error('Error updating Hand-Counted Entries count:', error);
         });
 }
 
