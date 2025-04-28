@@ -36,7 +36,7 @@ logger.addHandler(main_file_handler)
 tab4_bp = Blueprint('tab4', __name__)
 
 # Version marker
-logger.info("Deployed tab4.py version: 2025-04-28-v31")
+logger.info("Deployed tab4.py version: 2025-04-28-v32")
 
 @tab4_bp.route('/tab/4')
 def tab4_view():
@@ -399,9 +399,10 @@ def tab4_common_names():
         current_app.logger.info(f"Common names from id_item_master for contract {contract_number}: {[(name, count) for name, count in common_names_all]}")
 
         # Fetch hand-counted items to include as "common names"
-        hand_counted_items_query = session.query(
+        # Fetch "Added" quantities
+        hand_counted_added = session.query(
             HandCountedItems.item_name.label('common_name'),
-            func.sum(HandCountedItems.quantity).label('on_contracts')
+            func.sum(HandCountedItems.quantity).label('added_quantity')
         ).filter(
             HandCountedItems.contract_number == contract_number,
             HandCountedItems.action == 'Added'
@@ -409,8 +410,30 @@ def tab4_common_names():
             HandCountedItems.item_name
         ).all()
 
-        logger.info(f"Hand-counted items as common names for contract {contract_number}: {[(name, count) for name, count in hand_counted_items_query]}")
-        current_app.logger.info(f"Hand-counted items as common names for contract {contract_number}: {[(name, count) for name, count in hand_counted_items_query]}")
+        # Fetch "Removed" quantities
+        hand_counted_removed = session.query(
+            HandCountedItems.item_name.label('common_name'),
+            func.sum(HandCountedItems.quantity).label('removed_quantity')
+        ).filter(
+            HandCountedItems.contract_number == contract_number,
+            HandCountedItems.action == 'Removed'
+        ).group_by(
+            HandCountedItems.item_name
+        ).all()
+
+        # Create a dictionary of removed quantities
+        removed_dict = {item.common_name: item.removed_quantity for item in hand_counted_removed}
+
+        # Calculate net quantities for hand-counted items
+        hand_counted_items = []
+        for item in hand_counted_added:
+            removed_qty = removed_dict.get(item.common_name, 0)
+            net_qty = item.added_quantity - removed_qty
+            if net_qty > 0:
+                hand_counted_items.append((item.common_name, net_qty))
+
+        logger.info(f"Hand-counted items as common names for contract {contract_number}: {hand_counted_items}")
+        current_app.logger.info(f"Hand-counted items as common names for contract {contract_number}: {hand_counted_items}")
 
         # Combine common names from id_item_master and hand_counted_items
         common_names = {}
@@ -427,7 +450,7 @@ def tab4_common_names():
                 'is_hand_counted': False
             }
 
-        for name, on_contracts in hand_counted_items_query:
+        for name, on_contracts in hand_counted_items:
             if not name:
                 continue
             if name in common_names:

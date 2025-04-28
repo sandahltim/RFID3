@@ -256,7 +256,12 @@ function addHandCountedItem() {
             employee_name: employeeName
         })
     })
-    .then(response => response.json())
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('Network response was not ok');
+        }
+        return response.json();
+    })
     .then(data => {
         if (data.error) {
             alert('Error: ' + data.error);
@@ -275,13 +280,17 @@ function addHandCountedItem() {
             employeeInput.value = '';
             // Refresh the hand-counted items table
             filterHandCountedItems();
-            // Update the Items on Contract and Hand-Counted Entries counts
+            // Update the contract counts and common names list
             updateContractCounts(contractNumber);
+            refreshCommonNames(contractNumber);
         }
     })
     .catch(error => {
         console.error('Error adding hand-counted item:', error);
         alert('Failed to add item. Please try again.');
+        // Still attempt to update counts and common names in case of partial success
+        updateContractCounts(contractNumber);
+        refreshCommonNames(contractNumber);
     });
 }
 
@@ -317,7 +326,12 @@ function removeHandCountedItem() {
             employee_name: employeeName
         })
     })
-    .then(response => response.json())
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('Network response was not ok');
+        }
+        return response.json();
+    })
     .then(data => {
         if (data.error) {
             alert('Error: ' + data.error);
@@ -336,26 +350,40 @@ function removeHandCountedItem() {
             employeeInput.value = '';
             // Refresh the hand-counted items table
             filterHandCountedItems();
-            // Update the Items on Contract and Hand-Counted Entries counts
+            // Update the contract counts and common names list
             updateContractCounts(contractNumber);
+            refreshCommonNames(contractNumber);
         }
     })
     .catch(error => {
         console.error('Error removing hand-counted item:', error);
         alert('Failed to remove item. Please try again.');
+        // Still attempt to update counts and common names in case of partial success
+        updateContractCounts(contractNumber);
+        refreshCommonNames(contractNumber);
     });
 }
 
 // Update the Items on Contract and Hand-Counted Entries counts dynamically
 function updateContractCounts(contractNumber) {
+    console.log(`Updating contract counts for contract: ${contractNumber}`);
+
     // Update Items on Contract
     fetch(`/tab/4/contract_items_count?contract_number=${encodeURIComponent(contractNumber)}`)
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Failed to fetch Items on Contract');
+            }
+            return response.json();
+        })
         .then(data => {
             const currentCountElement = document.getElementById(`items-on-contract-${contractNumber}`);
             if (currentCountElement) {
                 const newCount = data.total_items || 0;
                 currentCountElement.textContent = newCount;
+                console.log(`Updated Items on Contract for ${contractNumber} to ${newCount}`);
+            } else {
+                console.warn(`Items on Contract element not found for ${contractNumber}`);
             }
         })
         .catch(error => {
@@ -364,17 +392,41 @@ function updateContractCounts(contractNumber) {
 
     // Update Hand-Counted Entries
     fetch(`/tab/4/hand_counted_entries?contract_number=${encodeURIComponent(contractNumber)}`)
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Failed to fetch Hand-Counted Entries');
+            }
+            return response.json();
+        })
         .then(data => {
             const handCountedElement = document.getElementById(`hand-counted-entries-${contractNumber}`);
             if (handCountedElement) {
                 const newHandCountedCount = data.hand_counted_entries || 0;
                 handCountedElement.textContent = newHandCountedCount;
+                console.log(`Updated Hand-Counted Entries for ${contractNumber} to ${newHandCountedCount}`);
+            } else {
+                console.warn(`Hand-Counted Entries element not found for ${contractNumber}`);
             }
         })
         .catch(error => {
             console.error('Error updating Hand-Counted Entries count:', error);
         });
+}
+
+// Refresh the common names list for a contract if it's expanded
+function refreshCommonNames(contractNumber) {
+    console.log(`Refreshing common names for contract: ${contractNumber}`);
+    const commonDiv = document.getElementById(`common-${contractNumber}`);
+    if (commonDiv && !commonDiv.classList.contains('collapsed')) {
+        console.log(`Common names section for ${contractNumber} is expanded, refreshing...`);
+        window.expandCategory(
+            encodeURIComponent(contractNumber),
+            `common-${contractNumber}`,
+            contractNumber
+        );
+    } else {
+        console.log(`Common names section for ${contractNumber} is not expanded, skipping refresh.`);
+    }
 }
 
 // Format timestamps in the Hand-Counted Items table after HTMX load
