@@ -1,4 +1,4 @@
-console.log('common.js version: 2025-04-27-v2 loaded - confirming script load');
+console.log('common.js version: 2025-04-27-v3 loaded - confirming script load');
 
 // Global filter state
 let globalFilter = {
@@ -13,10 +13,7 @@ document.addEventListener('DOMContentLoaded', function() {
         globalFilter = JSON.parse(savedFilter);
         document.getElementById('commonNameFilter').value = globalFilter.commonName || '';
         document.getElementById('contractNumberFilter').value = globalFilter.contractNumber || '';
-        applyGlobalFilter(); // Apply the saved filter on page load
-    } else {
-        // Ensure all data is shown by default
-        applyFilterToAllLevels();
+        // Defer applying the filter until subcategory dropdowns are populated (handled in tab1.html and tab5.html)
     }
 });
 
@@ -64,16 +61,27 @@ function applyFilterToAllLevels() {
         subcatSelects.forEach(select => {
             const options = select.querySelectorAll('option:not([value=""])');
             let visibleOptions = 0;
-            options.forEach(option => {
-                let showOption = true;
-                const subcatValue = option.textContent.toLowerCase();
-                if (globalFilter.commonName && !subcatValue.includes(globalFilter.commonName)) {
-                    showOption = false;
-                }
-                option.style.display = showOption ? '' : 'none';
-                if (showOption) visibleOptions++;
-            });
-            // If no options are visible, hide the parent row
+
+            // If no filter is applied, show all options and rows
+            if (!globalFilter.commonName && !globalFilter.contractNumber) {
+                options.forEach(option => {
+                    option.style.display = '';
+                    visibleOptions++;
+                });
+            } else {
+                // Apply common name filter to subcategory options
+                options.forEach(option => {
+                    let showOption = true;
+                    const subcatValue = option.textContent.toLowerCase();
+                    if (globalFilter.commonName && !subcatValue.includes(globalFilter.commonName)) {
+                        showOption = false;
+                    }
+                    option.style.display = showOption ? '' : 'none';
+                    if (showOption) visibleOptions++;
+                });
+            }
+
+            // Show or hide the parent row based on visible options
             const parentRow = select.closest('tr');
             if (parentRow) {
                 parentRow.style.display = visibleOptions > 0 ? '' : 'none';

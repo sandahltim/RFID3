@@ -10,7 +10,7 @@
 {% endblock %}
 
 {% block content %}
-<div class="mt-0"> <!-- Removed mt-4 to reduce gap -->
+<div class="mt-0">
     <!-- Page title for Tab 5 -->
     <h2>Resale/Rental Packs</h2>
     <!-- Table for displaying categories -->
@@ -61,17 +61,17 @@ function refreshTab() {
     window.location.reload();
 }
 
-// Populate subcategory dropdowns on page load
+// Populate subcategory dropdowns on page load and apply filter afterward
 document.addEventListener('DOMContentLoaded', function() {
     const selects = document.querySelectorAll('.subcategory-select');
-    selects.forEach(select => {
+    const promises = Array.from(selects).map(select => {
         const category = select.getAttribute('data-category');
         const catId = select.closest('tr').nextElementSibling.querySelector('.common-level').id.split('-')[1];
         const loadingDiv = document.getElementById(`loading-subcat-${catId}`);
         if (loadingDiv) {
             loadingDiv.style.display = 'block';
         }
-        fetch(`/tab/5/subcat_data?category=${category}`)
+        return fetch(`/tab/5/subcat_data?category=${category}`)
             .then(response => response.json())
             .then(data => {
                 data.subcategories.forEach(subcat => {
@@ -87,6 +87,11 @@ document.addEventListener('DOMContentLoaded', function() {
                     loadingDiv.style.display = 'none';
                 }
             });
+    });
+
+    // Apply the global filter after all subcategory dropdowns are populated
+    Promise.all(promises).then(() => {
+        applyFilterToAllLevels();
     });
 });
 </script>
