@@ -1,4 +1,4 @@
-console.log('tab1_5.js version: 2025-04-27-v21 loaded');
+console.log('tab1_5.js version: 2025-04-27-v22 loaded');
 
 // Note: Common function for Tabs 1 and 5
 function showLoading(targetId) {
@@ -427,7 +427,7 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                 `;
 
                 data.items.forEach(item => {
-                    const lastScanned = item.last_scanned_date ? new Date(item.last_scanned_date).toLocaleString() : 'N/A';
+                    const lastScanned = formatDate(item.last_scanned_date); // Use formatDate from common.js
                     if (window.cachedTabNum == 5) {
                         const currentStatus = item.status || 'N/A';
                         const canSetReadyToRent = currentStatus === 'On Rent' || currentStatus === 'Delivered' || currentStatus === 'Sold';
@@ -685,6 +685,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const expandBtn = event.target.closest('.expand-btn');
         if (expandBtn) {
             event.stopPropagation();
+            console.log('Expand button clicked:', expandBtn);
             const category = expandBtn.getAttribute('data-category');
             const subcategory = expandBtn.getAttribute('data-subcategory');
             const commonName = expandBtn.getAttribute('data-common-name');
