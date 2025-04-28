@@ -8,6 +8,7 @@ test_rfidpi/ RFID2restore
 │   │   ├── tab2.py
 │   │   ├── tab4.py
 │   │   ├── tab4.py
+│   │   ├── tab5.py
 │   │   ├── categories.py
 │   │   └── health.py
 │   ├── services/
@@ -25,6 +26,8 @@ test_rfidpi/ RFID2restore
 │   │   ├── tab2.html
 │   │   ├── tab3.html
 │   │   ├── tab4.html
+│   │   ├── tab5.html
+│   │   ├── _hand_counted_item.html.html
 │   │   └── tab.html
 ├── static/
 │   └── css/
