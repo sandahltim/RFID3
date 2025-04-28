@@ -1,4 +1,4 @@
-console.log('common.js version: 2025-04-27-v1 loaded - confirming script load');
+console.log('common.js version: 2025-04-27-v2 loaded - confirming script load');
 
 // Global filter state
 let globalFilter = {
@@ -57,10 +57,55 @@ window.clearGlobalFilter = function() {
 
 // Apply filter to all levels (category, common names, items)
 function applyFilterToAllLevels() {
-    // Apply to category table (top level)
-    const categoryTable = document.getElementById('category-table');
-    if (categoryTable) {
-        applyFilterToTable(categoryTable);
+    // Skip filtering the category table for Tabs 1 and 5, as it doesn't contain common names directly
+    if (window.cachedTabNum === 1 || window.cachedTabNum === 5) {
+        // Apply filter to subcategory dropdowns
+        const subcatSelects = document.querySelectorAll('.subcategory-select');
+        subcatSelects.forEach(select => {
+            const options = select.querySelectorAll('option:not([value=""])');
+            let visibleOptions = 0;
+            options.forEach(option => {
+                let showOption = true;
+                const subcatValue = option.textContent.toLowerCase();
+                if (globalFilter.commonName && !subcatValue.includes(globalFilter.commonName)) {
+                    showOption = false;
+                }
+                option.style.display = showOption ? '' : 'none';
+                if (showOption) visibleOptions++;
+            });
+            // If no options are visible, hide the parent row
+            const parentRow = select.closest('tr');
+            if (parentRow) {
+                parentRow.style.display = visibleOptions > 0 ? '' : 'none';
+                const expandableRow = parentRow.nextElementSibling;
+                if (expandableRow && expandableRow.classList.contains('expandable')) {
+                    expandableRow.style.display = visibleOptions > 0 ? '' : 'none';
+                }
+            }
+        });
+
+        // Update category table row count
+        const categoryTable = document.getElementById('category-table');
+        if (categoryTable) {
+            const rows = categoryTable.querySelectorAll('tbody tr:not(.expandable)');
+            const visibleRows = Array.from(rows).filter(row => row.style.display !== 'none').length;
+            let rowCountDiv = categoryTable.nextElementSibling;
+            while (rowCountDiv && !rowCountDiv.classList.contains('row-count') && !rowCountDiv.classList.contains('pagination-controls')) {
+                rowCountDiv = rowCountDiv.nextElementSibling;
+            }
+            if (!rowCountDiv || !rowCountDiv.classList.contains('row-count')) {
+                rowCountDiv = document.createElement('div');
+                rowCountDiv.className = 'row-count mt-2';
+                categoryTable.insertAdjacentElement('afterend', rowCountDiv);
+            }
+            rowCountDiv.textContent = `Showing ${visibleRows} of ${rows.length} rows`;
+        }
+    } else {
+        // Apply to category table (top level) for Tabs 2 and 4
+        const categoryTable = document.getElementById('category-table');
+        if (categoryTable) {
+            applyFilterToTable(categoryTable);
+        }
     }
 
     // Apply to all expanded common name tables
@@ -73,20 +118,6 @@ function applyFilterToAllLevels() {
     const itemTables = document.querySelectorAll('.item-table');
     itemTables.forEach(table => {
         applyFilterToTable(table);
-    });
-
-    // Apply to subcategory selects (Tabs 1 and 5)
-    const subcatSelects = document.querySelectorAll('.subcategory-select');
-    subcatSelects.forEach(select => {
-        const options = select.querySelectorAll('option:not([value=""])');
-        options.forEach(option => {
-            let showOption = true;
-            const subcatValue = option.textContent.toLowerCase();
-            if (globalFilter.commonName && !subcatValue.includes(globalFilter.commonName)) {
-                showOption = false;
-            }
-            option.style.display = showOption ? '' : 'none';
-        });
     });
 }
 
