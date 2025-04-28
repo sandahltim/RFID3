@@ -17,7 +17,7 @@ logger.handlers = []
 # File handler for tab4.log
 tab4_file_handler = logging.FileHandler('/home/tim/test_rfidpi/logs/tab4.log')
 tab4_file_handler.setLevel(logging.INFO)
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(message)s')
 tab4_file_handler.setFormatter(formatter)
 logger.addHandler(tab4_file_handler)
 
@@ -36,7 +36,7 @@ logger.addHandler(main_file_handler)
 tab4_bp = Blueprint('tab4', __name__)
 
 # Version marker
-logger.info("Deployed tab4.py version: 2025-04-28-v32")
+logger.info("Deployed tab4.py version: 2025-04-28-v33")
 
 @tab4_bp.route('/tab/4')
 def tab4_view():
@@ -229,12 +229,52 @@ def tab4_view():
 def hand_counted_contracts():
     session = db.session()
     try:
-        contracts = session.query(HandCountedItems.contract_number).filter(
+        # Fetch all contracts starting with 'L' from HandCountedItems
+        contracts = session.query(
+            HandCountedItems.contract_number
+        ).filter(
             HandCountedItems.contract_number.ilike('L%')
         ).distinct().all()
+
         contract_list = [contract.contract_number for contract in contracts]
+
+        # Fetch "Added" quantities for these contracts
+        added_quantities = session.query(
+            HandCountedItems.contract_number,
+            func.sum(HandCountedItems.quantity).label('added_quantity')
+        ).filter(
+            HandCountedItems.contract_number.in_(contract_list),
+            HandCountedItems.action == 'Added'
+        ).group_by(
+            HandCountedItems.contract_number
+        ).all()
+
+        added_quantities_dict = {item.contract_number: item.added_quantity for item in added_quantities}
+
+        # Fetch "Removed" quantities for these contracts
+        removed_quantities = session.query(
+            HandCountedItems.contract_number,
+            func.sum(HandCountedItems.quantity).label('removed_quantity')
+        ).filter(
+            HandCountedItems.contract_number.in_(contract_list),
+            HandCountedItems.action == 'Removed'
+        ).group_by(
+            HandCountedItems.contract_number
+        ).all()
+
+        removed_quantities_dict = {item.contract_number: item.removed_quantity for item in removed_quantities}
+
+        # Calculate net quantities and filter contracts with net quantity > 0
+        filtered_contracts = []
+        for contract_number in contract_list:
+            added_qty = added_quantities_dict.get(contract_number, 0)
+            removed_qty = removed_quantities_dict.get(contract_number, 0)
+            net_qty = added_qty - removed_qty
+            if net_qty > 0:
+                filtered_contracts.append(contract_number)
+
         session.close()
-        return jsonify({'contracts': contract_list})
+        return jsonify({'contracts': filtered_contracts})
     except Exception as e:
         logger.error(f"Error fetching hand-counted contracts: {str(e)}", exc_info=True)
         session.close()
@@ -644,7 +684,8 @@ def tab4_hand_counted_items():
         query = session.query(HandCountedItems).order_by(HandCountedItems.timestamp.desc())
         if contract_number:
             query = query.filter(HandCountedItems.contract_number == contract_number)
-        items = query.all()
+        # Limit to the last 10 entries
+        items = query.limit(10).all()
         session.close()
         logger.info(f"Found {len(items)} hand-counted items for contract {contract_number}")
         current_app.logger.info(f"Found {len(items)} hand-counted items for contract {contract_number}")
