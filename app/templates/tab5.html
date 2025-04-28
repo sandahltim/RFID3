@@ -14,7 +14,9 @@
     <!-- Page title for Tab 5 -->
     <h2>Resale/Rental Packs</h2>
     <!-- Button to update resale/pack items to Sold -->
-    <button class="btn btn-primary mb-2" onclick="updateResalePackToSold()">Update Resale/Pack to Sold</button>
+    <button class="btn btn-primary mb-2 me-2" onclick="updateResalePackToSold()">Update Resale/Pack to Sold</button>
+    <!-- Button to export CSV -->
+    <button class="btn btn-primary mb-2" onclick="exportSoldItemsCSV()">Export Sold Items CSV</button>
     <!-- Table for displaying categories -->
     <table class="table table-bordered category-table" id="category-table">
         <thead>
@@ -57,7 +59,7 @@
     </table>
 </div>
 
-<!-- JavaScript for refreshing the table and handling the update -->
+<!-- JavaScript for refreshing the table and handling updates -->
 <script>
 function refreshTab() {
     window.location.reload();
@@ -85,6 +87,10 @@ function updateResalePackToSold() {
             alert('Failed to update items: ' + error.message);
         });
     }
+}
+
+function exportSoldItemsCSV() {
+    window.location.href = '/tab/5/export_sold_items_csv';
 }
 
 // Populate subcategory dropdowns on page load and apply filter afterward
@@ -119,6 +125,87 @@ document.addEventListener('DOMContentLoaded', function() {
     Promise.all(promises).then(() => {
         applyFilterToAllLevels();
     });
+
+    // Add bulk update controls after the items table is loaded
+    document.body.addEventListener('htmx:afterSwap', function(event) {
+        const target = event.target;
+        if (target.classList.contains('item-level')) {
+            const wrapper = target.closest('.item-level-wrapper');
+            if (wrapper && !wrapper.querySelector('.bulk-update-controls')) {
+                const bulkControls = document.createElement('div');
+                bulkControls.className = 'bulk-update-controls';
+                bulkControls.innerHTML = `
+                    <select id="bulk-bin-location" class="form-control">
+                        <option value="">Select Bin Location...</option>
+                        <option value="resale">Resale</option>
+                        <option value="sold">Sold</option>
+                        <option value="pack">Pack</option>
+                        <option value="burst">Burst</option>
+                    </select>
+                    <select id="bulk-status" class="form-control">
+                        <option value="">Select Status...</option>
+                        <option value="Ready to Rent">Ready to Rent</option>
+                        <option value="Sold">Sold</option>
+                    </select>
+                    <button class="btn btn-primary" onclick="bulkUpdateItems()">Update Selected</button>
+                `;
+                wrapper.appendChild(bulkControls);
+            }
+        }
+    });
 });
+
+function bulkUpdateItems() {
+    const selectedItems = document.querySelectorAll('.item-select:checked');
+    const tagIds = Array.from(selectedItems).map(checkbox => checkbox.getAttribute('data-tag-id'));
+    const newBinLocation = document.getElementById('bulk-bin-location').value;
+    const newStatus = document.getElementById('bulk-status').value;
+
+    if (tagIds.length === 0) {
+        alert('Please select at least one item to update.');
+        return;
+    }
+
+    if (!newBinLocation && !newStatus) {
+        alert('Please select a new bin location or status to update.');
+        return;
+    }
+
+    const payload = {
+        tag_ids: tagIds,
+        bin_location: newBinLocation || undefined,
+        status: newStatus || undefined
+    };
+
+    fetch('/tab/5/bulk_update_items', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            alert('Error: ' + data.error);
+        } else {
+            alert(data.message);
+            // Refresh the items table by re-expanding the common name section
+            const wrapper = document.querySelector('.item-level-wrapper');
+            if (wrapper) {
+                const commonNameDiv = wrapper.closest('.common-level');
+                const category = commonNameDiv.id.split('-')[1];
+                const subcategorySelect = document.querySelector(`select[data-category="${category}"]`);
+                if (subcategorySelect) {
+                    loadCommonNames(subcategorySelect);
+                }
+            }
+        }
+    })
+    .catch(error => {
+        console.error('Error during bulk update:', error);
+        alert('Failed to update items: ' + error.message);
+    });
+}
 </script>
 {% endblock %}
