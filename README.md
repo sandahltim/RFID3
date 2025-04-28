@@ -32,6 +32,7 @@ test_rfidpi/ RFID2restore
 ├── static/
 │   └── css/
 │   │   ├── tab1_5.css
+│   │   ├── tab2_4.css
 │   │   └── style.css
 │   └── js/
 │   │   ├── tab.js
