@@ -13,6 +13,8 @@
 <div class="mt-0">
     <!-- Page title for Tab 5 -->
     <h2>Resale/Rental Packs</h2>
+    <!-- Button to update resale/pack items to Sold -->
+    <button class="btn btn-primary mb-2" onclick="updateResalePackToSold()">Update Resale/Pack to Sold</button>
     <!-- Table for displaying categories -->
     <table class="table table-bordered category-table" id="category-table">
         <thead>
@@ -55,10 +57,34 @@
     </table>
 </div>
 
-<!-- JavaScript for refreshing the table -->
+<!-- JavaScript for refreshing the table and handling the update -->
 <script>
 function refreshTab() {
     window.location.reload();
+}
+
+function updateResalePackToSold() {
+    if (confirm('Are you sure you want to update all items with bin_location "resale" or "pack", status "On Rent" or "Delivered", and last scanned more than 4 days ago to status "Sold"?')) {
+        fetch('/tab/5/update_resale_pack_to_sold', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                alert(data.message);
+                refreshTab(); // Refresh the table to reflect changes
+            } else {
+                alert('Error: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error updating items:', error);
+            alert('Failed to update items: ' + error.message);
+        });
+    }
 }
 
 // Populate subcategory dropdowns on page load and apply filter afterward
