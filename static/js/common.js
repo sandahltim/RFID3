@@ -1,4 +1,4 @@
-console.log('common.js version: 2025-04-27-v3 loaded - confirming script load');
+console.log('common.js version: 2025-04-27-v4 loaded - confirming script load');
 
 // Global filter state
 let globalFilter = {
@@ -56,58 +56,120 @@ window.clearGlobalFilter = function() {
 function applyFilterToAllLevels() {
     // Skip filtering the category table for Tabs 1 and 5, as it doesn't contain common names directly
     if (window.cachedTabNum === 1 || window.cachedTabNum === 5) {
-        // Apply filter to subcategory dropdowns
-        const subcatSelects = document.querySelectorAll('.subcategory-select');
-        subcatSelects.forEach(select => {
-            const options = select.querySelectorAll('option:not([value=""])');
+        const categoryTable = document.getElementById('category-table');
+        if (!categoryTable) return;
+
+        const rows = categoryTable.querySelectorAll('tbody tr:not(.expandable)');
+        let visibleRows = 0;
+
+        rows.forEach(row => {
+            let showRow = true;
+
+            // Check the subcategory dropdown options
+            const subcatSelect = row.querySelector('.subcategory-select');
+            const options = subcatSelect ? subcatSelect.querySelectorAll('option:not([value=""])') : [];
             let visibleOptions = 0;
 
-            // If no filter is applied, show all options and rows
-            if (!globalFilter.commonName && !globalFilter.contractNumber) {
+            if (globalFilter.commonName) {
+                options.forEach(option => {
+                    const subcatValue = option.textContent.toLowerCase();
+                    const matchesFilter = subcatValue.includes(globalFilter.commonName);
+                    option.style.display = matchesFilter ? '' : 'none';
+                    if (matchesFilter) visibleOptions++;
+                });
+            } else {
                 options.forEach(option => {
                     option.style.display = '';
                     visibleOptions++;
                 });
-            } else {
-                // Apply common name filter to subcategory options
-                options.forEach(option => {
-                    let showOption = true;
-                    const subcatValue = option.textContent.toLowerCase();
-                    if (globalFilter.commonName && !subcatValue.includes(globalFilter.commonName)) {
-                        showOption = false;
-                    }
-                    option.style.display = showOption ? '' : 'none';
-                    if (showOption) visibleOptions++;
-                });
             }
 
-            // Show or hide the parent row based on visible options
-            const parentRow = select.closest('tr');
-            if (parentRow) {
-                parentRow.style.display = visibleOptions > 0 ? '' : 'none';
-                const expandableRow = parentRow.nextElementSibling;
-                if (expandableRow && expandableRow.classList.contains('expandable')) {
-                    expandableRow.style.display = visibleOptions > 0 ? '' : 'none';
+            // Check if the expanded common name table contains matching items
+            const expandableRow = row.nextElementSibling;
+            let hasMatchingCommonNames = false;
+            if (expandableRow && expandableRow.classList.contains('expandable')) {
+                const commonTable = expandableRow.querySelector('.common-table');
+                if (commonTable) {
+                    const commonRows = commonTable.querySelectorAll('tbody tr:not(.expandable)');
+                    commonRows.forEach(commonRow => {
+                        let showCommonRow = true;
+                        const commonNameCell = commonRow.querySelector('td:nth-child(1)'); // Common Name column
+                        if (globalFilter.commonName) {
+                            const commonNameValue = commonNameCell ? commonNameCell.textContent.toLowerCase() : '';
+                            if (!commonNameValue.includes(globalFilter.commonName)) {
+                                showCommonRow = false;
+                            }
+                        }
+                        commonRow.style.display = showCommonRow ? '' : 'none';
+                        const commonExpandableRow = commonRow.nextElementSibling;
+                        if (commonExpandableRow && commonExpandableRow.classList.contains('expandable')) {
+                            commonExpandableRow.style.display = showCommonRow ? '' : 'none';
+                            // Check expanded item tables
+                            const itemTable = commonExpandableRow.querySelector('.item-table');
+                            if (itemTable) {
+                                const itemRows = itemTable.querySelectorAll('tbody tr');
+                                let visibleItemRows = 0;
+                                itemRows.forEach(itemRow => {
+                                    let showItemRow = true;
+                                    const itemCommonNameCell = itemRow.querySelector('td:nth-child(2)'); // Common Name column in item table
+                                    if (globalFilter.commonName) {
+                                        const itemCommonNameValue = itemCommonNameCell ? itemCommonNameCell.textContent.toLowerCase() : '';
+                                        if (!itemCommonNameValue.includes(globalFilter.commonName)) {
+                                            showItemRow = false;
+                                        }
+                                    }
+                                    itemRow.style.display = showItemRow ? '' : 'none';
+                                    if (showItemRow) visibleItemRows++;
+                                });
+                                if (visibleItemRows > 0) hasMatchingCommonNames = true;
+                                // Update item table row count
+                                let itemRowCountDiv = itemTable.nextElementSibling;
+                                if (itemRowCountDiv && !itemRowCountDiv.classList.contains('row-count')) {
+                                    itemRowCountDiv = document.createElement('div');
+                                    itemRowCountDiv.className = 'row-count mt-2';
+                                    itemTable.insertAdjacentElement('afterend', itemRowCountDiv);
+                                }
+                                if (itemRowCountDiv) {
+                                    itemRowCountDiv.textContent = `Showing ${visibleItemRows} of ${itemRows.length} rows`;
+                                }
+                            }
+                        }
+                        if (showCommonRow) hasMatchingCommonNames = true;
+                    });
+                    // Update common table row count
+                    const visibleCommonRows = Array.from(commonRows).filter(r => r.style.display !== 'none').length;
+                    let commonRowCountDiv = commonTable.nextElementSibling;
+                    if (commonRowCountDiv && !commonRowCountDiv.classList.contains('row-count')) {
+                        commonRowCountDiv = document.createElement('div');
+                        commonRowCountDiv.className = 'row-count mt-2';
+                        commonTable.insertAdjacentElement('afterend', commonRowCountDiv);
+                    }
+                    if (commonRowCountDiv) {
+                        commonRowCountDiv.textContent = `Showing ${visibleCommonRows} of ${commonRows.length} rows`;
+                    }
                 }
             }
+
+            // Show the category row if there are visible subcategory options or matching common names
+            if (globalFilter.commonName) {
+                showRow = visibleOptions > 0 || hasMatchingCommonNames;
+            }
+
+            row.style.display = showRow ? '' : 'none';
+            if (expandableRow) {
+                expandableRow.style.display = showRow ? '' : 'none';
+            }
+            if (showRow) visibleRows++;
         });
 
         // Update category table row count
-        const categoryTable = document.getElementById('category-table');
-        if (categoryTable) {
-            const rows = categoryTable.querySelectorAll('tbody tr:not(.expandable)');
-            const visibleRows = Array.from(rows).filter(row => row.style.display !== 'none').length;
-            let rowCountDiv = categoryTable.nextElementSibling;
-            while (rowCountDiv && !rowCountDiv.classList.contains('row-count') && !rowCountDiv.classList.contains('pagination-controls')) {
-                rowCountDiv = rowCountDiv.nextElementSibling;
-            }
-            if (!rowCountDiv || !rowCountDiv.classList.contains('row-count')) {
-                rowCountDiv = document.createElement('div');
-                rowCountDiv.className = 'row-count mt-2';
-                categoryTable.insertAdjacentElement('afterend', rowCountDiv);
-            }
-            rowCountDiv.textContent = `Showing ${visibleRows} of ${rows.length} rows`;
+        let rowCountDiv = document.querySelector('.row-count');
+        if (!rowCountDiv) {
+            rowCountDiv = document.createElement('div');
+            rowCountDiv.className = 'row-count mt-2';
+            categoryTable.insertAdjacentElement('afterend', rowCountDiv);
         }
+        rowCountDiv.textContent = `Showing ${visibleRows} of ${rows.length} rows`;
     } else {
         // Apply to category table (top level) for Tabs 2 and 4
         const categoryTable = document.getElementById('category-table');
@@ -116,20 +178,20 @@ function applyFilterToAllLevels() {
         }
     }
 
-    // Apply to all expanded common name tables
+    // Apply to all expanded common name tables (for Tabs 2 and 4)
     const commonTables = document.querySelectorAll('.common-table');
     commonTables.forEach(table => {
         applyFilterToTable(table);
     });
 
-    // Apply to all expanded item tables
+    // Apply to all expanded item tables (for Tabs 2 and 4)
     const itemTables = document.querySelectorAll('.item-table');
     itemTables.forEach(table => {
         applyFilterToTable(table);
     });
 }
 
-// Apply filter to a specific table
+// Apply filter to a specific table (used for Tabs 2 and 4)
 function applyFilterToTable(table) {
     const rows = table.querySelectorAll('tbody tr:not(.expandable)');
     let visibleRows = 0;
