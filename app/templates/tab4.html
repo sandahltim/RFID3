@@ -1,24 +1,8 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="container mt-4">
+<div class="mt-0"> <!-- Removed mt-4 to reduce gap -->
     <h2>Laundry Contracts</h2>
-    <!-- Filter and search row -->
-    <div class="filter-sort-controls">
-        <input type="text" class="form-control" placeholder="Search contract number, customer name, etc." id="searchInput">
-        <select class="form-control" id="statusFilter">
-            <option value="">All Statuses</option>
-            <option value="On Rent">On Rent</option>
-            <option value="Delivered">Delivered</option>
-        </select>
-        <select class="form-control" id="binFilter">
-            <option value="">All Bin Locations</option>
-            {% for bin in ['resale', 'sold', 'pack', 'burst'] %}
-            <option value="{{ bin }}">{{ bin }}</option>
-            {% endfor %}
-        </select>
-        <button class="btn btn-primary" onclick="refreshTab()">Refresh</button>
-    </div>
     <!-- Table for displaying contracts -->
     <table class="category-table" id="category-table">
         <thead id="category-table-header">
@@ -31,15 +15,6 @@
                 <th>Last Scanned Date <span class="sort-arrow"></span></th>
                 <th>Actions</th>
             </tr>
-            <tr class="filter-row">
-                <th><input type="text" class="form-control form-control-sm" placeholder="Filter..." data-column="contract_number"></th>
-                <th><input type="text" class="form-control form-control-sm" placeholder="Filter..." data-column="client_name"></th>
-                <th><input type="text" class="form-control form-control-sm" placeholder="Filter..." data-column="items_on_contract"></th>
-                <th><input type="text" class="form-control form-control-sm" placeholder="Filter..." data-column="total_items_inventory"></th>
-                <th><input type="text" class="form-control form-control-sm" placeholder="Filter..." data-column="hand_counted_items"></th>
-                <th><input type="text" class="form-control form-control-sm" placeholder="Filter..." data-column="scan_date"></th>
-                <th><button class="btn btn-sm btn-secondary clear-filters">Clear Filters</button></th>
-            </tr>
         </thead>
         <tbody id="category-rows">
             {% for contract in contracts %}
@@ -48,7 +23,7 @@
                     {{ contract.contract_number }}
                 </td>
                 <td>{{ contract.client_name }}</td>
-                <td>{{ contract.items_on_contract }}</td>
+                <td id="items-on-contract-{{ contract.contract_number }}">{{ contract.items_on_contract }}</td>
                 <td>{{ contract.total_items_inventory }}</td>
                 <td>{{ contract.hand_counted_items }}</td>
                 <td>{{ contract.scan_date }}</td>
@@ -208,6 +183,14 @@ function removeHandCountedItem() {
             alert('Error: ' + data.error);
         } else {
             alert(data.message);
+            // Update the "Items on Contract" count dynamically
+            const currentCountElement = document.getElementById(`items-on-contract-${contractNumber}`);
+            if (currentCountElement) {
+                const currentCount = parseInt(currentCountElement.textContent) || 0;
+                const removedQuantity = parseInt(data.message.match(/\d+/)[0]) || 0;
+                const newCount = Math.max(currentCount - removedQuantity, 0);
+                currentCountElement.textContent = newCount;
+            }
             // Clear the form
             document.getElementById('hand-counted-contract-number').value = '';
             document.getElementById('hand-counted-item-name').value = '';
@@ -215,8 +198,8 @@ function removeHandCountedItem() {
             document.getElementById('hand-counted-employee').value = '';
             // Refresh the hand-counted items table
             filterHandCountedItems();
-            // Refresh the entire page to update the contracts table
-            setTimeout(() => refreshTab(), 500);
+            // No need for full page refresh since we updated the count dynamically
+            // setTimeout(() => refreshTab(), 500);
         }
     })
     .catch(error => {
@@ -224,35 +207,5 @@ function removeHandCountedItem() {
         alert('Failed to remove item. Please try again.');
     });
 }
-
-// Apply filters to the contract table based on user input (mirroring tab2.html)
-document.addEventListener('input', function() {
-    const searchInput = document.getElementById('searchInput').value.toLowerCase();
-    const statusFilter = document.getElementById('statusFilter').value.toLowerCase();
-    const binFilter = document.getElementById('binFilter').value.toLowerCase();
-
-    const rows = document.querySelectorAll('#category-rows > tr:not([style*="display: none"]):not(.expandable)');
-    rows.forEach(row => {
-        const contractNumber = row.cells[0].textContent.toLowerCase();
-        const clientName = row.cells[1].textContent.toLowerCase();
-        const matchesSearch = contractNumber.includes(searchInput) || clientName.includes(searchInput);
-
-        if (matchesSearch) {
-            row.style.display = '';
-            // Show the expandable row as well
-            const expandableRow = row.nextElementSibling;
-            if (expandableRow) {
-                expandableRow.style.display = '';
-            }
-        } else {
-            row.style.display = 'none';
-            // Hide the expandable row
-            const expandableRow = row.nextElementSibling;
-            if (expandableRow) {
-                expandableRow.style.display = 'none';
-            }
-        }
-    });
-});
 </script>
 {% endblock %}

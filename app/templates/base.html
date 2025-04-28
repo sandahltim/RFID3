@@ -20,6 +20,7 @@
             console.log('base.html: window.cachedTabNum set to', window.cachedTabNum);
         })();
     </script>
+    <script src="{{ url_for('static', filename='js/common.js') }}?v={{ cache_bust }}-20250427-v1"></script>
     <script src="{{ url_for('static', filename='js/tab.js') }}?v={{ cache_bust }}-20250427-v4"></script>
     <script src="{{ url_for('static', filename='js/expand.js') }}?v={{ cache_bust }}-20250427-v4"></script>
     <script src="{{ url_for('static', filename='js/tab1_5.js') }}?v={{ cache_bust }}-20250427-v4"></script>
@@ -62,9 +63,10 @@
         </div>
     </nav>
 
-    <!-- Top-Level Filter -->
+    <!-- Main Container -->
     <div class="container mt-3">
-        <div class="row mb-3 filter-sort-controls">
+        <!-- Top-Level Filter -->
+        <div class="row mb-2 filter-sort-controls">
             <div class="col">
                 <input type="text" class="form-control" placeholder="Filter by Common Name" id="commonNameFilter">
             </div>
@@ -76,12 +78,10 @@
                 <button class="btn btn-secondary" onclick="clearGlobalFilter()">Refresh</button>
             </div>
         </div>
-    </div>
 
-    <!-- Main Content -->
-    <div class="container">
+        <!-- Main Content -->
         {% block content %}{% endblock %}
     </div>
 <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'93706b5c6c1e7bae',t:'MTc0NTc3ODkyMy4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'93725012298ab0cd',t:'MTc0NTc5ODc3Ni4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script>
-</body>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'93725ef3288212c6',t:'MTc0NTc5OTM4Ni4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>

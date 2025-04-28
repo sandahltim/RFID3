@@ -2,34 +2,9 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="container mt-4">
+<div class="mt-0"> <!-- Removed mt-4 to reduce gap -->
     <!-- Page title for Tab 1 -->
     <h2>Rental Inventory</h2>
-    <!-- Filter and search row -->
-    <div class="filter-sort-controls">
-        <input type="text" id="category-filter" placeholder="Filter categories..." hx-post="/tab/1/filter" hx-target="#category-rows" hx-swap="innerHTML" hx-trigger="input delay:500ms">
-        <select id="category-sort" hx-post="/tab/1/filter" hx-target="#category-rows" hx-swap="innerHTML" hx-trigger="change">
-            <option value="">Sort By...</option>
-            <option value="category_asc">Category (A-Z)</option>
-            <option value="category_desc">Category (Z-A)</option>
-            <option value="total_items_asc">Total Items (Low to High)</option>
-            <option value="total_items_desc">Total Items (High to Low)</option>
-        </select>
-        <select id="statusFilter" hx-post="/tab/1/filter" hx-target="#category-rows" hx-swap="innerHTML" hx-trigger="change">
-            <option value="">All Statuses</option>
-            <option value="On Rent">On Rent</option>
-            <option value="Delivered">Delivered</option>
-            <option value="Ready to Rent">Ready to Rent</option>
-        </select>
-        <select id="binFilter" hx-post="/tab/1/filter" hx-target="#category-rows" hx-swap="innerHTML" hx-trigger="change">
-            <option value="">All Bin Locations</option>
-            <option value="resale">resale</option>
-            <option value="sold">sold</option>
-            <option value="pack">pack</option>
-            <option value="burst">burst</option>
-        </select>
-        <button class="btn btn-primary" onclick="refreshTab()">Refresh</button>
-    </div>
     <!-- Table for displaying categories -->
     <table class="table table-bordered category-table" id="category-table">
         <thead>

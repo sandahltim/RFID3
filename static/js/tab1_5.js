@@ -1,4 +1,4 @@
-console.log('tab1_5.js version: 2025-04-26-v20 loaded');
+console.log('tab1_5.js version: 2025-04-27-v21 loaded');
 
 // Note: Common function for Tabs 1 and 5
 function showLoading(targetId) {
@@ -91,14 +91,6 @@ function loadCommonNames(selectElement, page = 1) {
     container.innerHTML = ''; // Clear previous content
 
     let url = `/tab/${window.cachedTabNum}/common_names?category=${encodeURIComponent(category)}&subcategory=${encodeURIComponent(subcategory)}&page=${page}`;
-    const commonFilter = document.getElementById(`common-filter-${targetId}`)?.value || '';
-    const commonSort = document.getElementById(`common-sort-${targetId}`)?.value || '';
-    const statusFilter = document.getElementById('statusFilter')?.value || '';
-    const binFilter = document.getElementById('binFilter')?.value || '';
-    if (commonFilter) url += `&filter=${encodeURIComponent(commonFilter)}`;
-    if (commonSort) url += `&sort=${encodeURIComponent(commonSort)}`;
-    if (statusFilter) url += `&statusFilter=${encodeURIComponent(statusFilter)}`;
-    if (binFilter) url += `&binFilter=${encodeURIComponent(binFilter)}`;
 
     fetch(url)
         .then(response => {
@@ -124,39 +116,6 @@ function loadCommonNames(selectElement, page = 1) {
                 categoryRow.cells[5].textContent = itemsAvailable;
 
                 html += `
-                    <div class="filter-sort-controls">
-                        <input type="text" id="common-filter-${targetId}" placeholder="Filter common names..." value="${commonFilter}" oninput="loadCommonNames(this.closest('.common-level').previousElementSibling.querySelector('.subcategory-select'))">
-                        <select id="common-sort-${targetId}" onchange="loadCommonNames(this.closest('.common-level').previousElementSibling.querySelector('.subcategory-select'))">
-                            <option value="">Sort By...</option>
-                            <option value="name_asc" ${commonSort === 'name_asc' ? 'selected' : ''}>Name (A-Z)</option>
-                            <option value="name_desc" ${commonSort === 'name_desc' ? 'selected' : ''}>Name (Z-A)</option>
-                            <option value="total_items_asc" ${commonSort === 'total_items_asc' ? 'selected' : ''}>Total Items (Low to High)</option>
-                            <option value="total_items_desc" ${commonSort === 'total_items_desc' ? 'selected' : ''}>Total Items (High to Low)</option>
-                        </select>
-                `;
-
-                if (window.cachedTabNum == 5) {
-                    html += `
-                        <div class="bulk-update-controls">
-                            <select id="bulk-bin-location-${targetId}" onchange="updateBulkField('${targetId}', 'bin_location')">
-                                <option value="">Update Bin Location...</option>
-                                <option value="resale">resale</option>
-                                <option value="sold">sold</option>
-                                <option value="pack">pack</option>
-                                <option value="burst">burst</option>
-                            </select>
-                            <select id="bulk-status-${targetId}" onchange="updateBulkField('${targetId}', 'status')">
-                                <option value="">Update Status...</option>
-                                <option value="Ready to Rent">Ready to Rent</option>
-                                <option value="Sold">Sold</option>
-                            </select>
-                            <button class="btn btn-sm btn-primary" onclick="bulkUpdateCommonName('${category}', '${subcategory}', '${targetId}', '${targetId}')">Bulk Update</button>
-                        </div>
-                    `;
-                }
-
-                html += `
-                    </div>
                     <table class="common-table" id="common-table-${targetId}">
                         <thead>
                             <tr>
@@ -221,6 +180,9 @@ function loadCommonNames(selectElement, page = 1) {
             container.classList.add('expanded');
             container.style.display = 'block';
             container.style.opacity = '1';
+
+            // Apply global filter to the newly loaded table
+            applyFilterToAllLevels();
         })
         .catch(error => {
             console.error('Common names fetch error:', error);
@@ -432,14 +394,6 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
     showLoading(key);
 
     let url = `/tab/${window.cachedTabNum}/data?common_name=${encodeURIComponent(commonName)}&page=${page}&subcategory=${encodeURIComponent(subcategory)}&category=${encodeURIComponent(category)}`;
-    const itemFilter = document.getElementById(`item-filter-${key}`)?.value || '';
-    const itemSort = document.getElementById(`item-sort-${key}`)?.value || '';
-    const statusFilter = document.getElementById('statusFilter')?.value || '';
-    const binFilter = document.getElementById('binFilter')?.value || '';
-    if (itemFilter) url += `&filter=${encodeURIComponent(itemFilter)}`;
-    if (itemSort) url += `&sort=${encodeURIComponent(itemSort)}`;
-    if (statusFilter) url += `&statusFilter=${encodeURIComponent(statusFilter)}`;
-    if (binFilter) url += `&binFilter=${encodeURIComponent(binFilter)}`;
 
     fetch(url)
         .then(response => {
@@ -463,39 +417,6 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
 
                 html += `
                     <div class="item-level-wrapper">
-                        <div class="filter-sort-controls">
-                            <input type="text" id="item-filter-${key}" placeholder="Filter items..." value="${itemFilter}" oninput="loadItems('${category}', '${subcategory}', '${commonName}', '${targetId}', 1)">
-                            <select id="item-sort-${key}" onchange="loadItems('${category}', '${subcategory}', '${commonName}', '${targetId}', 1)">
-                                <option value="">Sort By...</option>
-                                <option value="tag_id_asc" ${itemSort === 'tag_id_asc' ? 'selected' : ''}>Tag ID (A-Z)</option>
-                                <option value="tag_id_desc" ${itemSort === 'tag_id_desc' ? 'selected' : ''}>Tag ID (Z-A)</option>
-                                <option value="last_scanned_date_desc" ${itemSort === 'last_scanned_date_desc' ? 'selected' : ''}>Last Scanned (Newest)</option>
-                                <option value="last_scanned_date_asc" ${itemSort === 'last_scanned_date_asc' ? 'selected' : ''}>Last Scanned (Oldest)</option>
-                            </select>
-                `;
-
-                if (window.cachedTabNum == 5) {
-                    html += `
-                        <div class="bulk-update-controls">
-                            <select id="bulk-item-bin-location-${key}" onchange="updateBulkField('${key}', 'item-bin-location')">
-                                <option value="">Update Bin Location...</option>
-                                <option value="resale">resale</option>
-                                <option value="sold">sold</option>
-                                <option value="pack">pack</option>
-                                <option value="burst">burst</option>
-                            </select>
-                            <select id="bulk-item-status-${key}" onchange="updateBulkField('${key}', 'item-status')">
-                                <option value="">Update Status...</option>
-                                <option value="Ready to Rent">Ready to Rent</option>
-                                <option value="Sold">Sold</option>
-                            </select>
-                            <button class="btn btn-sm btn-primary" onclick="bulkUpdateSelectedItems('${key}')">Bulk Update Selected</button>
-                        </div>
-                    `;
-                }
-
-                html += `
-                        </div>
                         <table class="item-table" id="item-table-${key}">
                             <thead>
                                 <tr>
@@ -617,6 +538,9 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
             }
 
             sessionStorage.setItem(`expanded_items_${targetId}`, JSON.stringify({ category, subcategory, commonName, page }));
+
+            // Apply global filter to the newly loaded table
+            applyFilterToAllLevels();
         })
         .catch(error => {
             console.error('Items fetch error:', error);
