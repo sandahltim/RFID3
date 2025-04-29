@@ -1,4 +1,4 @@
-console.log('expand.js version: 2025-04-27-v78 loaded - confirming script load');
+console.log('expand.js version: 2025-04-29-v79 loaded - confirming script load');
 
 // Note: Common function - will be moved to common.js during split
 function showLoading(key) {
@@ -165,8 +165,8 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        // Check if already expanded
-        if (targetElement.classList.contains('expanded')) {
+        // Only collapse if the section is expanded and we're not paginating
+        if (targetElement.classList.contains('expanded') && page === 1) {
             console.log(`Section ${targetId} is already expanded, collapsing instead`);
             collapseSection(targetId);
             return;
@@ -176,9 +176,17 @@ document.addEventListener('DOMContentLoaded', function() {
         showLoading(contractNumber);
 
         // Fetch common names for the contract
-        fetch(`/tab/${window.cachedTabNum}/common_names?contract_number=${encodeURIComponent(contractNumber)}&page=${page}`)
-            .then(response => response.json())
+        let url = `/tab/${window.cachedTabNum}/common_names?contract_number=${encodeURIComponent(contractNumber)}&page=${page}`;
+        fetch(url)
+            .then(response => {
+                console.log(`Fetch response status for ${url}: ${response.status}`);
+                if (!response.ok) {
+                    throw new Error(`Common names fetch failed with status ${response.status}`);
+                }
+                return response.json();
+            })
             .then(data => {
+                console.log('Common names data received:', data);
                 if (data.error) {
                     console.error('Error fetching common names:', data.error);
                     targetElement.innerHTML = `<p>Error: ${data.error}</p>`;
@@ -208,17 +216,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 commonNames.forEach(common => {
                     const commonId = `${contractNumber}-${common.name.replace(/[^a-zA-Z0-9]/g, '_')}`;
                     const escapedCommonName = common.name.replace(/'/g, "\\'").replace(/"/g, '\\"');
-                    const formattedScanDate = formatDate(common.scan_date); // Format the scan date
                     html += `
                         <tr>
                             <td class="expandable-cell" onclick="expandItems('${contractNumber}', '${escapedCommonName}', 'items-${commonId}')">${common.name}</td>
                             <td>${common.on_contracts}</td>
                             <td>${common.is_hand_counted ? 'N/A' : common.total_items_inventory}</td>
                             <td>
-                                <button class="btn btn-sm btn-secondary expand-btn" data-common-name="${common.name}" data-target-id="items-${commonId}" data-contract-number="${contractNumber}">Expand</button>
+                                <button class="btn btn-sm btn-secondary expand-btn" data-common-name="${escapedCommonName}" data-target-id="items-${commonId}" data-contract-number="${contractNumber}">Expand</button>
                                 <button class="btn btn-sm btn-secondary collapse-btn" data-collapse-target="items-${commonId}" style="display:none;">Collapse</button>
-                                <button class="btn btn-sm btn-info print-btn" data-print-level="Common Name" data-print-id="items-${commonId}" data-common-name="${common.name}" data-category="${contractNumber}">Print</button>
-                                <button class="btn btn-sm btn-info print-full-btn" data-common-name="${common.name}" data-category="${contractNumber}">Print Full List</button>
+                                <button class="btn btn-sm btn-info print-btn" data-print-level="Common Name" data-print-id="items-${commonId}" data-common-name="${escapedCommonName}" data-category="${contractNumber}">Print</button>
+                                <button class="btn btn-sm btn-info print-full-btn" data-common-name="${escapedCommonName}" data-category="${contractNumber}">Print Full List</button>
                                 <div id="loading-${commonId}" style="display:none;" class="loading">Loading...</div>
                             </td>
                         </tr>
@@ -239,11 +246,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Add pagination controls if needed
                 if (totalCommonNames > perPage) {
                     const totalPages = Math.ceil(totalCommonNames / perPage);
+                    const escapedCategory = category.replace(/'/g, "\\'").replace(/"/g, '\\"');
                     html += `
                         <div class="pagination-controls mt-2">
-                            <button class="btn btn-sm btn-secondary" onclick="window.expandCategory('${category}', '${targetId}', '${contractNumber}', ${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''}>Previous</button>
+                            <button class="btn btn-sm btn-secondary" onclick="window.expandCategory('${escapedCategory}', '${targetId}', '${contractNumber}', ${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''}>Previous</button>
                             <span class="mx-2">Page ${currentPage} of ${totalPages}</span>
-                            <button class="btn btn-sm btn-secondary" onclick="window.expandCategory('${contractNumber}', '${targetId}', '${contractNumber}', ${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''}>Next</button>
+                            <button class="btn btn-sm btn-secondary" onclick="window.expandCategory('${escapedCategory}', '${targetId}', '${contractNumber}', ${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''}>Next</button>
                         </div>
                     `;
                 }
@@ -279,8 +287,8 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        // Check if already expanded
-        if (targetElement.classList.contains('expanded')) {
+        // Only collapse if the section is expanded and we're not paginating
+        if (targetElement.classList.contains('expanded') && page === 1) {
             console.log(`Section ${targetId} is already expanded, collapsing instead`);
             collapseSection(targetId);
             return;
@@ -291,9 +299,17 @@ document.addEventListener('DOMContentLoaded', function() {
         showLoading(commonId);
 
         // Fetch items for the common name
-        fetch(`/tab/${window.cachedTabNum}/data?contract_number=${encodeURIComponent(contractNumber)}&common_name=${encodeURIComponent(commonName)}&page=${page}`)
-            .then(response => response.json())
+        let url = `/tab/${window.cachedTabNum}/data?contract_number=${encodeURIComponent(contractNumber)}&common_name=${encodeURIComponent(commonName)}&page=${page}`;
+        fetch(url)
+            .then(response => {
+                console.log(`Fetch response status for ${url}: ${response.status}`);
+                if (!response.ok) {
+                    throw new Error(`Items fetch failed with status ${response.status}`);
+                }
+                return response.json();
+            })
             .then(data => {
+                console.log('Items data received:', data);
                 if (data.error) {
                     console.error('Error fetching items:', data.error);
                     targetElement.innerHTML = `<p>Error: ${data.error}</p>`;
@@ -323,7 +339,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 `;
 
                 items.forEach(item => {
-                    const formattedScanDate = formatDate(item.last_scanned_date); // Format the scan date
+                    const formattedScanDate = formatDate(item.last_scanned_date);
                     html += `
                         <tr>
                             <td>${item.tag_id}</td>
@@ -403,9 +419,17 @@ document.addEventListener('DOMContentLoaded', function() {
         });
 
         // Fetch sorted data
-        fetch(`/tab/${window.cachedTabNum}/common_names?contract_number=${encodeURIComponent(contractNumber)}&sort=${column}_${direction}`)
-            .then(response => response.json())
+        let url = `/tab/${window.cachedTabNum}/common_names?contract_number=${encodeURIComponent(contractNumber)}&sort=${column}_${direction}`;
+        fetch(url)
+            .then(response => {
+                console.log(`Fetch response status for ${url}: ${response.status}`);
+                if (!response.ok) {
+                    throw new Error(`Common names sort fetch failed with status ${response.status}`);
+                }
+                return response.json();
+            })
             .then(data => {
+                console.log('Sorted common names data received:', data);
                 const targetElement = document.getElementById(targetId);
                 if (!targetElement) return;
 
@@ -437,10 +461,10 @@ document.addEventListener('DOMContentLoaded', function() {
                             <td>${common.on_contracts}</td>
                             <td>${common.is_hand_counted ? 'N/A' : common.total_items_inventory}</td>
                             <td>
-                                <button class="btn btn-sm btn-secondary expand-btn" data-common-name="${common.name}" data-target-id="items-${commonId}" data-contract-number="${contractNumber}">Expand</button>
+                                <button class="btn btn-sm btn-secondary expand-btn" data-common-name="${escapedCommonName}" data-target-id="items-${commonId}" data-contract-number="${contractNumber}">Expand</button>
                                 <button class="btn btn-sm btn-secondary collapse-btn" data-collapse-target="items-${commonId}" style="display:none;">Collapse</button>
-                                <button class="btn btn-sm btn-info print-btn" data-print-level="Common Name" data-print-id="items-${commonId}" data-common-name="${common.name}" data-category="${contractNumber}">Print</button>
-                                <button class="btn btn-sm btn-info print-full-btn" data-common-name="${common.name}" data-category="${contractNumber}">Print Full List</button>
+                                <button class="btn btn-sm btn-info print-btn" data-print-level="Common Name" data-print-id="items-${commonId}" data-common-name="${escapedCommonName}" data-category="${contractNumber}">Print</button>
+                                <button class="btn btn-sm btn-info print-full-btn" data-common-name="${escapedCommonName}" data-category="${contractNumber}">Print Full List</button>
                                 <div id="loading-${commonId}" style="display:none;" class="loading">Loading...</div>
                             </td>
                         </tr>
@@ -506,9 +530,17 @@ document.addEventListener('DOMContentLoaded', function() {
         });
 
         // Fetch sorted data
-        fetch(`/tab/${window.cachedTabNum}/data?contract_number=${encodeURIComponent(contractNumber)}&common_name=${encodeURIComponent(commonName)}&sort=${column}_${direction}`)
-            .then(response => response.json())
+        let url = `/tab/${window.cachedTabNum}/data?contract_number=${encodeURIComponent(contractNumber)}&common_name=${encodeURIComponent(commonName)}&sort=${column}_${direction}`;
+        fetch(url)
+            .then(response => {
+                console.log(`Fetch response status for ${url}: ${response.status}`);
+                if (!response.ok) {
+                    throw new Error(`Items sort fetch failed with status ${response.status}`);
+                }
+                return response.json();
+            })
             .then(data => {
+                console.log('Sorted items data received:', data);
                 const targetElement = document.getElementById(targetId);
                 if (!targetElement) return;
 
@@ -534,7 +566,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 `;
 
                 items.forEach(item => {
-                    const formattedScanDate = formatDate(item.last_scanned_date); // Format the scan date
+                    const formattedScanDate = formatDate(item.last_scanned_date);
                     html += `
                         <tr>
                             <td>${item.tag_id}</td>

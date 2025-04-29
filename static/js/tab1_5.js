@@ -1,4 +1,4 @@
-console.log('tab1_5.js version: 2025-04-27-v22 loaded');
+console.log('tab1_5.js version: 2025-04-29-v23 loaded');
 
 // Note: Common function for Tabs 1 and 5
 function showLoading(targetId) {
@@ -55,9 +55,15 @@ function loadCommonNames(selectElement, page = 1) {
     const targetId = selectElement.closest('tr').nextElementSibling.querySelector('.common-level').id;
     const categoryRow = selectElement.closest('tr');
 
-    if (!subcategory) {
+    const targetElement = document.getElementById(targetId);
+    if (!targetElement) {
+        console.error(`Target element with ID ${targetId} not found`);
+        return;
+    }
+
+    // Collapse only if no subcategory is selected and not paginating
+    if (!subcategory && page === 1) {
         collapseSection(targetId);
-        // Reset category row data to original totals
         fetch(`/tab/${window.cachedTabNum}/subcat_data?category=${encodeURIComponent(category)}`)
             .then(response => response.json())
             .then(data => {
@@ -81,26 +87,21 @@ function loadCommonNames(selectElement, page = 1) {
         return;
     }
 
-    const container = document.getElementById(targetId);
-    if (!container) {
-        console.error(`Container with ID ${targetId} not found`);
-        return;
-    }
-
     showLoading(targetId);
-    container.innerHTML = ''; // Clear previous content
+    targetElement.innerHTML = ''; // Clear previous content
 
     let url = `/tab/${window.cachedTabNum}/common_names?category=${encodeURIComponent(category)}&subcategory=${encodeURIComponent(subcategory)}&page=${page}`;
 
     fetch(url)
         .then(response => {
+            console.log(`Fetch response status for ${url}: ${response.status}`);
             if (!response.ok) {
                 throw new Error(`Common names fetch failed with status ${response.status}`);
             }
             return response.json();
         })
         .then(data => {
-            console.log('Common names data received:', data); // Debug log
+            console.log('Common names data received:', data);
             let html = '';
             if (data.common_names && data.common_names.length > 0) {
                 // Calculate subcategory totals
@@ -132,6 +133,7 @@ function loadCommonNames(selectElement, page = 1) {
 
                 data.common_names.forEach(item => {
                     const rowId = `${targetId}_${item.name.replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '')}`;
+                    const escapedName = item.name.replace(/'/g, "\\'").replace(/"/g, '\\"');
                     html += `
                         <tr>
                             <td>${item.name}</td>
@@ -141,10 +143,10 @@ function loadCommonNames(selectElement, page = 1) {
                             <td>${item.items_available}</td>
                             <td>
                                 <div class="btn-group">
-                                    <button class="btn btn-sm btn-secondary expand-btn" data-category="${category}" data-subcategory="${subcategory}" data-common-name="${item.name}" data-target-id="items-${rowId}">Expand Items</button>
+                                    <button class="btn btn-sm btn-secondary expand-btn" data-category="${category}" data-subcategory="${subcategory}" data-common-name="${escapedName}" data-target-id="items-${rowId}">Expand Items</button>
                                     <button class="btn btn-sm btn-secondary collapse-btn" style="display:none;" data-collapse-target="items-${rowId}">Collapse</button>
-                                    <button class="btn btn-sm btn-info print-btn" data-print-level="Common Name" data-print-id="common-table-${targetId}" data-common-name="${item.name}" data-category="${category}" data-subcategory="${subcategory}">Print Aggregate</button>
-                                    <button class="btn btn-sm btn-info print-full-btn" data-common-name="${item.name}" data-category="${category}" data-subcategory="${subcategory}">Print Full List</button>
+                                    <button class="btn btn-sm btn-info print-btn" data-print-level="Common Name" data-print-id="common-table-${targetId}" data-common-name="${escapedName}" data-category="${category}" data-subcategory="${subcategory}">Print Aggregate</button>
+                                    <button class="btn btn-sm btn-info print-full-btn" data-common-name="${escapedName}" data-category="${category}" data-subcategory="${subcategory}">Print Full List</button>
                                 </div>
                             </td>
                         </tr>
@@ -165,9 +167,9 @@ function loadCommonNames(selectElement, page = 1) {
                     const totalPages = Math.ceil(data.total_common_names / data.per_page);
                     html += `
                         <div class="pagination-controls">
-                            <button class="btn btn-sm btn-secondary" onclick="loadCommonNames(this.closest('.common-level').previousElementSibling.querySelector('.subcategory-select'), ${data.page - 1})" ${data.page === 1 ? 'disabled' : ''}>Previous</button>
+                            <button class="btn btn-sm btn-secondary" onclick="loadCommonNames(document.querySelector('#${targetId}').closest('tr').previousElementSibling.querySelector('.subcategory-select'), ${data.page - 1})" ${data.page === 1 ? 'disabled' : ''}>Previous</button>
                             <span>Page ${data.page} of ${totalPages}</span>
-                            <button class="btn btn-sm btn-secondary" onclick="loadCommonNames(this.closest('.common-level').previousElementSibling.querySelector('.subcategory-select'), ${data.page + 1})" ${data.page === totalPages ? 'disabled' : ''}>Next</button>
+                            <button class="btn btn-sm btn-secondary" onclick="loadCommonNames(document.querySelector('#${targetId}').closest('tr').previousElementSibling.querySelector('.subcategory-select'), ${data.page + 1})" ${data.page === totalPages ? 'disabled' : ''}>Next</button>
                         </div>
                     `;
                 }
@@ -175,22 +177,22 @@ function loadCommonNames(selectElement, page = 1) {
                 html = `<p>No common names found for this subcategory.</p>`;
             }
 
-            container.innerHTML = html;
-            container.classList.remove('collapsed');
-            container.classList.add('expanded');
-            container.style.display = 'block';
-            container.style.opacity = '1';
+            targetElement.innerHTML = html;
+            targetElement.classList.remove('collapsed');
+            targetElement.classList.add('expanded');
+            targetElement.style.display = 'block';
+            targetElement.style.opacity = '1';
 
             // Apply global filter to the newly loaded table
             applyFilterToAllLevels();
         })
         .catch(error => {
             console.error('Common names fetch error:', error);
-            container.innerHTML = `<p>Error loading common names: ${error.message}</p>`;
-            container.classList.remove('collapsed');
-            container.classList.add('expanded');
-            container.style.display = 'block';
-            container.style.opacity = '1';
+            targetElement.innerHTML = `<p>Error loading common names: ${error.message}</p>`;
+            targetElement.classList.remove('collapsed');
+            targetElement.classList.add('expanded');
+            targetElement.style.display = 'block';
+            targetElement.style.opacity = '1';
         })
         .finally(() => {
             hideLoading(targetId);
@@ -397,13 +399,14 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
 
     fetch(url)
         .then(response => {
+            console.log(`Fetch response status for ${url}: ${response.status}`);
             if (!response.ok) {
                 throw new Error(`Items fetch failed with status ${response.status}`);
             }
             return response.json();
         })
         .then(data => {
-            console.log('Items data received:', data); // Debug log
+            console.log('Items data received:', data);
             let html = '';
             if (data.items && data.items.length > 0) {
                 let headers = [];
@@ -427,7 +430,7 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                 `;
 
                 data.items.forEach(item => {
-                    const lastScanned = formatDate(item.last_scanned_date); // Use formatDate from common.js
+                    const lastScanned = formatDate(item.last_scanned_date);
                     if (window.cachedTabNum == 5) {
                         const currentStatus = item.status || 'N/A';
                         const canSetReadyToRent = currentStatus === 'On Rent' || currentStatus === 'Delivered' || currentStatus === 'Sold';
@@ -477,8 +480,8 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                                 <div id="dropdown-bin-location-${item.tag_id}" class="dropdown-menu">
                                     <a class="dropdown-item" href="#" onclick="selectOption(event, this, 'bin-location', '${item.tag_id}', 'resale')">resale</a>
                                     <a class="dropdown-item" href="#" onclick="selectOption(event, this, 'bin-location', '${item.tag_id}', 'sold')">sold</a>
-                                    <a class="dropdown-item" href="#" onclick="selectOption(event, this, 'bin-location', '${item.tag_id}', 'pack')">pack</a>
-                                    <a class="dropdown-item" href="#" onclick="selectOption(event, this, 'bin-location', '${item.tag_id}', 'burst')">burst</a>
+                                    <a class="dropdown-item" href="#" onclick="selectOption(event, 'bin-location', '${item.tag_id}', 'pack')">pack</a>
+                                    <a class="dropdown-item" href="#" onclick="selectOption(event, 'bin-location', '${item.tag_id}', 'burst')">burst</a>
                                 </div>
                                 <div id="dropdown-status-${item.tag_id}" class="dropdown-menu">
                                     <a class="dropdown-item" href="#" onclick="selectOption(event, this, 'status', '${item.tag_id}', 'Ready to Rent')" ${item.status !== 'On Rent' && item.status !== 'Delivered' ? 'style="pointer-events: none; color: #ccc;"' : ''}>Ready to Rent</a>
@@ -507,11 +510,12 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                 // Add pagination for items if total_items exceeds per_page
                 if (data.total_items > data.per_page) {
                     const totalPages = Math.ceil(data.total_items / data.per_page);
+                    const escapedCommonName = commonName.replace(/'/g, "\\'").replace(/"/g, '\\"');
                     html += `
                         <div class="pagination-controls">
-                            <button class="btn btn-sm btn-secondary" onclick="loadItems('${category}', '${subcategory}', '${commonName}', '${targetId}', ${data.page - 1})" ${data.page === 1 ? 'disabled' : ''}>Previous</button>
+                            <button class="btn btn-sm btn-secondary" onclick="loadItems('${category}', '${subcategory}', '${escapedCommonName}', '${targetId}', ${data.page - 1})" ${data.page === 1 ? 'disabled' : ''}>Previous</button>
                             <span>Page ${data.page} of ${totalPages}</span>
-                            <button class="btn btn-sm btn-secondary" onclick="loadItems('${category}', '${subcategory}', '${commonName}', '${targetId}', ${data.page + 1})" ${data.page === totalPages ? 'disabled' : ''}>Next</button>
+                            <button class="btn btn-sm btn-secondary" onclick="loadItems('${category}', '${subcategory}', '${escapedCommonName}', '${targetId}', ${data.page + 1})" ${data.page === totalPages ? 'disabled' : ''}>Next</button>
                         </div>
                     `;
                 }
