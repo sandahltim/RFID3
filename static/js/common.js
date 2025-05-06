@@ -1,4 +1,4 @@
-console.log('common.js version: 2025-04-27-v6 loaded - confirming script load');
+console.log('common.js version: 2025-04-27-v7 loaded - confirming script load');
 
 // Function to format ISO date strings into "Thurs, Aug 21 2025 4:55 pm"
 function formatDate(isoDateString) {
@@ -46,6 +46,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Apply global filter function
 window.applyGlobalFilter = function() {
+    // Skip global filter for Tab 3
+    if (window.cachedTabNum === 3) {
+        console.log('Skipping global filter application for Tab 3');
+        return;
+    }
+
     const commonName = document.getElementById('commonNameFilter').value.toLowerCase().trim();
     const contractNumber = document.getElementById('contractNumberFilter').value.toLowerCase().trim();
 
@@ -81,6 +87,12 @@ window.clearGlobalFilter = function() {
 
 // Apply filter to all levels (category, common names, items)
 function applyFilterToAllLevels() {
+    // Skip filtering for Tab 3
+    if (window.cachedTabNum === 3) {
+        console.log('Skipping applyFilterToAllLevels for Tab 3');
+        return;
+    }
+
     // Skip filtering the category table for Tabs 1 and 5, as it doesn't contain common names directly
     if (window.cachedTabNum === 1 || window.cachedTabNum === 5) {
         const categoryTable = document.getElementById('category-table');
