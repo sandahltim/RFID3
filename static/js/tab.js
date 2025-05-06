@@ -111,6 +111,43 @@ async function printTable(level, id, commonName = null, category = null, subcate
                 `).join('')}
             </tbody>
         `;
+    } else if (level === 'Contract' && tabNum === 4) {
+        // Special handling for Tab 4: Fetch all common names without pagination
+        const url = `/tab/4/common_names?contract_number=${encodeURIComponent(contractNumber)}&all=true`;
+        try {
+            const response = await fetch(url);
+            if (!response.ok) {
+                throw new Error(`Failed to fetch all common names: ${response.status}`);
+            }
+            const data = await response.json();
+            const commonNames = data.common_names || [];
+
+            tableWrapper = document.createElement('table');
+            tableWrapper.className = 'table table-bordered';
+            tableWrapper.innerHTML = `
+                <thead>
+                    <tr>
+                        <th>Common Name</th>
+                        <th>Items on Contract</th>
+                        <th>Total Items in Inventory</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${commonNames.map(common => `
+                        <tr>
+                            <td>${common.name}</td>
+                            <td>${common.on_contracts}</td>
+                            <td>${common.is_hand_counted ? 'N/A' : common.total_items_inventory}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            `;
+        } catch (error) {
+            console.error('Error fetching all common names for print:', error);
+            tableWrapper = document.createElement('table');
+            tableWrapper.className = 'table table-bordered';
+            tableWrapper.innerHTML = `<tr><td colspan="3">Error loading common names: ${error.message}</td></tr>`;
+        }
     } else {
         printElement = element.cloneNode(true);
 

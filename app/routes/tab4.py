@@ -36,7 +36,7 @@ logger.addHandler(main_file_handler)
 tab4_bp = Blueprint('tab4', __name__)
 
 # Version marker
-logger.info("Deployed tab4.py version: 2025-04-28-v33")
+logger.info("Deployed tab4.py version: 2025-05-06-v34")
 
 @tab4_bp.route('/tab/4')
 def tab4_view():
@@ -396,9 +396,10 @@ def tab4_common_names():
     page = int(request.args.get('page', 1))
     per_page = 10
     sort = request.args.get('sort', '')
+    fetch_all = request.args.get('all', 'false').lower() == 'true'
 
-    logger.info(f"Fetching common names for contract_number={contract_number}, page={page}, sort={sort}")
-    current_app.logger.info(f"Fetching common names for contract_number={contract_number}, page={page}, sort={sort}")
+    logger.info(f"Fetching common names for contract_number={contract_number}, page={page}, sort={sort}, fetch_all={fetch_all}")
+    current_app.logger.info(f"Fetching common names for contract_number={contract_number}, page={page}, sort={sort}, fetch_all={fetch_all}")
 
     if not contract_number:
         logger.error("Missing required parameter: contract_number is required")
@@ -528,11 +529,17 @@ def tab4_common_names():
                 reverse=(sort_direction == 'desc')
             )
 
-        # Paginate common names
-        total_common_names = len(common_names_list)
-        start = (page - 1) * per_page
-        end = start + per_page
-        paginated_common_names = common_names_list[start:end]
+        # Handle pagination or fetch all
+        if fetch_all:
+            paginated_common_names = common_names_list
+            total_common_names = len(common_names_list)
+            page = 1
+            per_page = total_common_names
+        else:
+            total_common_names = len(common_names_list)
+            start = (page - 1) * per_page
+            end = start + per_page
+            paginated_common_names = common_names_list[start:end]
 
         session.close()
         logger.info(f"Returning {len(paginated_common_names)} common names for contract {contract_number}")
