@@ -30,7 +30,7 @@ logger.addHandler(console_handler)
 tab3_bp = Blueprint('tab3', __name__)
 
 # Version marker
-logger.info("Deployed tab3.py version: 2025-05-06-v8")
+logger.info("Deployed tab3.py version: 2025-05-06-v9")
 
 @tab3_bp.route('/tab/3')
 def tab3_view():
@@ -39,6 +39,10 @@ def tab3_view():
         session = db.session()
         logger.info("Starting new session for tab3")
         current_app.logger.info("Starting new session for tab3")
+
+        # Test database connection
+        session.execute(text("SELECT 1"))
+        logger.info("Database connection test successful")
 
         # Query parameters for filtering and sorting
         common_name_filter = request.args.get('common_name', '').lower()
@@ -53,6 +57,10 @@ def tab3_view():
         for um in user_mappings:
             mappings_dict[str(um.rental_class_id).strip().upper()] = {'category': um.category, 'subcategory': um.subcategory}
         logger.info(f"Fetched {len(mappings_dict)} rental class mappings: {list(mappings_dict.keys())}")
+        # Log specific mappings for our items
+        for rcn in ['63327', '62668', '61931']:
+            mapping = mappings_dict.get(rcn, {})
+            logger.info(f"Mapping for rental_class_num {rcn}: {mapping}")
 
         # Raw SQL query to fetch items with service-related statuses
         sql_query = """
@@ -81,6 +89,9 @@ def tab3_view():
 
         logger.info(f"Executing raw SQL query: {sql_query} with params: {params}")
         result = session.execute(text(sql_query), params)
+        rows = result.fetchall()
+        logger.info(f"Raw query returned {len(rows)} rows")
+
         items_in_service = [
             {
                 'tag_id': row[0],
@@ -91,9 +102,9 @@ def tab3_view():
                 'date_last_scanned': row[5].isoformat() if row[5] else 'N/A',
                 'rental_class_num': str(row[6]).strip().upper() if row[6] else None
             }
-            for row in result.fetchall()
+            for row in rows
         ]
-        logger.info(f"Query fetched {len(items_in_service)} items: {[item['tag_id'] + ': ' + item['status'] + ', rental_class_num=' + (item['rental_class_num'] or 'None') for item in items_in_service]}")
+        logger.info(f"Processed {len(items_in_service)} items: {[item['tag_id'] + ': ' + item['status'] + ', rental_class_num=' + (item['rental_class_num'] or 'None') for item in items_in_service]}")
 
         # Fetch repair details for items with transactions
         tag_ids = [item['tag_id'] for item in items_in_service]
@@ -156,6 +167,7 @@ def tab3_view():
         for item in items_in_service:
             rental_class_num = item['rental_class_num']
             category = mappings_dict.get(rental_class_num, {}).get('category', 'Miscellaneous')
+            logger.info(f"Item {item['tag_id']}: rental_class_num={rental_class_num}, mapped to category={category}")
 
             if category not in crew_items:
                 crew_items[category] = []
@@ -178,9 +190,10 @@ def tab3_view():
             {'name': category, 'items': items}
             for category, items in sorted(crew_items.items(), key=lambda x: x[0].lower())
         ]
-
+        logger.info(f"Final crews structure: {[{c['name']: len(c['items'])} for c in crews]}")
         logger.info(f"Fetched {sum(len(c['items']) for c in crews)} total items across {len(crews)} crews")
         current_app.logger.info(f"Fetched {sum(len(c['items']) for c in crews)} total items across {len(crews)} crews")
+
         session.commit()
         session.close()
         return render_template(
