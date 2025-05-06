@@ -30,7 +30,7 @@ logger.addHandler(console_handler)
 tab3_bp = Blueprint('tab3', __name__)
 
 # Version marker
-logger.info("Deployed tab3.py version: 2025-05-06-v10")
+logger.info("Deployed tab3.py version: 2025-05-06-v11")
 
 @tab3_bp.route('/tab/3')
 def tab3_view():
@@ -185,14 +185,14 @@ def tab3_view():
                 'repair_types': t_data['repair_types']
             })
 
-        # Convert to list of crews for template
+        # Convert to list of crews for template, using 'item_list' instead of 'items' to avoid conflict with dict.items()
         crews = [
-            {'name': category, 'items': items}
-            for category, items in sorted(crew_items.items(), key=lambda x: x[0].lower())
+            {'name': category, 'item_list': item_list}
+            for category, item_list in sorted(crew_items.items(), key=lambda x: x[0].lower())
         ]
-        logger.info(f"Final crews structure: {[{c['name']: len(c['items'])} for c in crews]}")
-        logger.info(f"Fetched {sum(len(c['items']) for c in crews)} total items across {len(crews)} crews")
-        current_app.logger.info(f"Fetched {sum(len(c['items']) for c in crews)} total items across {len(crews)} crews")
+        logger.info(f"Final crews structure: {[{c['name']: len(c['item_list'])} for c in crews]}")
+        logger.info(f"Fetched {sum(len(c['item_list']) for c in crews)} total items across {len(crews)} crews")
+        current_app.logger.info(f"Fetched {sum(len(c['item_list']) for c in crews)} total items across {len(crews)} crews")
 
         session.commit()
         session.close()
