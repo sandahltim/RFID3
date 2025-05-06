@@ -2,7 +2,7 @@ from flask import Blueprint, render_template, request, jsonify, current_app
 from .. import db
 from ..models.db_models import ItemMaster, Transaction, RentalClassMapping, UserRentalClassMapping
 from ..services.api_client import APIClient
-from sqlalchemy import func, desc, asc, or_
+from sqlalchemy import text, desc, asc
 from datetime import datetime
 import logging
 import sys
@@ -30,10 +30,11 @@ logger.addHandler(console_handler)
 tab3_bp = Blueprint('tab3', __name__)
 
 # Version marker
-logger.info("Deployed tab3.py version: 2025-05-06-v7")
+logger.info("Deployed tab3.py version: 2025-05-06-v8")
 
 @tab3_bp.route('/tab/3')
 def tab3_view():
+    session = None
     try:
         session = db.session()
         logger.info("Starting new session for tab3")
@@ -48,53 +49,54 @@ def tab3_view():
         base_mappings = session.query(RentalClassMapping).all()
         user_mappings = session.query(UserRentalClassMapping).all()
 
-        mappings_dict = {m.rental_class_id: {'category': m.category, 'subcategory': m.subcategory} for m in base_mappings}
+        mappings_dict = {str(m.rental_class_id).strip().upper(): {'category': m.category, 'subcategory': m.subcategory} for m in base_mappings}
         for um in user_mappings:
-            mappings_dict[um.rental_class_id] = {'category': um.category, 'subcategory': um.subcategory}
+            mappings_dict[str(um.rental_class_id).strip().upper()] = {'category': um.category, 'subcategory': um.subcategory}
         logger.info(f"Fetched {len(mappings_dict)} rental class mappings: {list(mappings_dict.keys())}")
 
-        # Query items with service-related statuses, case-insensitive
-        items_query = session.query(ItemMaster).filter(
-            func.lower(func.trim(func.replace(func.coalesce(ItemMaster.status, ''), '\x00', ''))).in_(
-                ['repair', 'needs to be inspected', 'staged', 'wash', 'wet']
-            ),
-            func.lower(func.trim(func.replace(func.coalesce(ItemMaster.status, ''), '\x00', ''))) != 'sold'
-        )
-
-        # Apply filters
+        # Raw SQL query to fetch items with service-related statuses
+        sql_query = """
+            SELECT tag_id, common_name, status, bin_location, last_contract_num, date_last_scanned, rental_class_num
+            FROM id_item_master
+            WHERE LOWER(TRIM(REPLACE(COALESCE(status, ''), '\0', ''))) IN ('repair', 'needs to be inspected', 'staged', 'wash', 'wet')
+            AND LOWER(TRIM(REPLACE(COALESCE(status, ''), '\0', ''))) != 'sold'
+        """
+        params = {}
         if common_name_filter:
-            items_query = items_query.filter(
-                func.lower(ItemMaster.common_name).like(f'%{common_name_filter}%')
-            )
+            sql_query += " AND LOWER(common_name) LIKE :common_name_filter"
+            params['common_name_filter'] = f'%{common_name_filter}%'
         if date_filter:
             try:
                 date = datetime.strptime(date_filter, '%Y-%m-%d')
-                items_query = items_query.filter(
-                    func.date(ItemMaster.date_last_scanned) == date
-                )
+                sql_query += " AND DATE(date_last_scanned) = :date_filter"
+                params['date_filter'] = date
             except ValueError:
                 logger.warning(f"Invalid date format for date_last_scanned filter: {date_filter}")
 
         # Apply sorting
         if sort == 'date_last_scanned_asc':
-            items_query = items_query.order_by(
-                asc(ItemMaster.date_last_scanned), asc(func.lower(ItemMaster.common_name))
-            )
-        elif sort == 'date_last_scanned_desc':
-            items_query = items_query.order_by(
-                desc(ItemMaster.date_last_scanned), asc(func.lower(ItemMaster.common_name))
-            )
-        else:
-            # Default sorting
-            items_query = items_query.order_by(
-                desc(ItemMaster.date_last_scanned), asc(func.lower(ItemMaster.common_name))
-            )
+            sql_query += " ORDER BY date_last_scanned ASC, LOWER(common_name) ASC"
+        else:  # Default to date_last_scanned_desc
+            sql_query += " ORDER BY date_last_scanned DESC, LOWER(common_name) ASC"
 
-        items_in_service = items_query.all()
-        logger.info(f"Query fetched {len(items_in_service)} items: {[item.tag_id + ': ' + item.status + ', rental_class_num=' + (item.rental_class_num or 'None') for item in items_in_service]}")
+        logger.info(f"Executing raw SQL query: {sql_query} with params: {params}")
+        result = session.execute(text(sql_query), params)
+        items_in_service = [
+            {
+                'tag_id': row[0],
+                'common_name': row[1],
+                'status': row[2],
+                'bin_location': row[3] or 'N/A',
+                'last_contract_num': row[4] or 'N/A',
+                'date_last_scanned': row[5].isoformat() if row[5] else 'N/A',
+                'rental_class_num': str(row[6]).strip().upper() if row[6] else None
+            }
+            for row in result.fetchall()
+        ]
+        logger.info(f"Query fetched {len(items_in_service)} items: {[item['tag_id'] + ': ' + item['status'] + ', rental_class_num=' + (item['rental_class_num'] or 'None') for item in items_in_service]}")
 
         # Fetch repair details for items with transactions
-        tag_ids = [item.tag_id for item in items_in_service]
+        tag_ids = [item['tag_id'] for item in items_in_service]
         transaction_data = {}
         if tag_ids:
             max_scan_date_subquery = session.query(
@@ -152,21 +154,21 @@ def tab3_view():
         # Group items by category
         crew_items = {}
         for item in items_in_service:
-            rental_class_num = str(item.rental_class_num).strip().upper() if item.rental_class_num else None
+            rental_class_num = item['rental_class_num']
             category = mappings_dict.get(rental_class_num, {}).get('category', 'Miscellaneous')
 
             if category not in crew_items:
                 crew_items[category] = []
 
-            t_data = transaction_data.get(item.tag_id, {'location_of_repair': 'N/A', 'repair_types': ['None']})
+            t_data = transaction_data.get(item['tag_id'], {'location_of_repair': 'N/A', 'repair_types': ['None']})
 
             crew_items[category].append({
-                'tag_id': item.tag_id,
-                'common_name': item.common_name,
-                'status': item.status,
-                'bin_location': item.bin_location or 'N/A',
-                'last_contract_num': item.last_contract_num or 'N/A',
-                'date_last_scanned': item.date_last_scanned.isoformat() if item.date_last_scanned else 'N/A',
+                'tag_id': item['tag_id'],
+                'common_name': item['common_name'],
+                'status': item['status'],
+                'bin_location': item['bin_location'],
+                'last_contract_num': item['last_contract_num'],
+                'date_last_scanned': item['date_last_scanned'],
                 'location_of_repair': t_data['location_of_repair'],
                 'repair_types': t_data['repair_types']
             })
@@ -179,6 +181,7 @@ def tab3_view():
 
         logger.info(f"Fetched {sum(len(c['items']) for c in crews)} total items across {len(crews)} crews")
         current_app.logger.info(f"Fetched {sum(len(c['items']) for c in crews)} total items across {len(crews)} crews")
+        session.commit()
         session.close()
         return render_template(
             'tab3.html',
@@ -191,7 +194,8 @@ def tab3_view():
     except Exception as e:
         logger.error(f"Error rendering Tab 3: {str(e)}", exc_info=True)
         current_app.logger.error(f"Error rendering Tab 3: {str(e)}", exc_info=True)
-        if 'session' in locals():
+        if session:
+            session.rollback()
             session.close()
         return render_template(
             'tab3.html',
@@ -204,7 +208,9 @@ def tab3_view():
 
 @tab3_bp.route('/tab/3/update_status', methods=['POST'])
 def update_status():
+    session = None
     try:
+        session = db.session()
         data = request.get_json()
         tag_id = data.get('tag_id')
         new_status = data.get('status')
@@ -216,7 +222,6 @@ def update_status():
         if new_status not in valid_statuses:
             return jsonify({'error': f'Status must be one of {", ".join(valid_statuses)}'}), 400
 
-        session = db.session()
         item = session.query(ItemMaster).filter_by(tag_id=tag_id).first()
         if not item:
             session.close()
@@ -241,7 +246,8 @@ def update_status():
         logger.info(f"Updated status for tag_id {tag_id} to {new_status} and date_last_scanned to {current_time}")
         return jsonify({'message': 'Status updated successfully'})
     except Exception as e:
-        session.rollback()
+        if session:
+            session.rollback()
+            session.close()
         logger.error(f"Error updating status for tag {tag_id}: {str(e)}")
-        session.close()
         return jsonify({'error': str(e)}), 500
