@@ -30,7 +30,7 @@ logger.addHandler(console_handler)
 tab3_bp = Blueprint('tab3', __name__)
 
 # Version marker
-logger.info("Deployed tab3.py version: 2025-05-06-v6")
+logger.info("Deployed tab3.py version: 2025-05-06-v7")
 
 @tab3_bp.route('/tab/3')
 def tab3_view():
@@ -51,65 +51,10 @@ def tab3_view():
         mappings_dict = {m.rental_class_id: {'category': m.category, 'subcategory': m.subcategory} for m in base_mappings}
         for um in user_mappings:
             mappings_dict[um.rental_class_id] = {'category': um.category, 'subcategory': um.subcategory}
-
-        # Subquery to get the most recent transaction per tag_id
-        max_scan_date_subquery = session.query(
-            Transaction.tag_id,
-            func.max(Transaction.scan_date).label('max_scan_date')
-        ).group_by(
-            Transaction.tag_id
-        ).subquery()
-
-        latest_transaction_subquery = session.query(
-            Transaction.tag_id,
-            Transaction.scan_date,
-            Transaction.id,
-            Transaction.service_required,
-            Transaction.location_of_repair,
-            Transaction.dirty_or_mud,
-            Transaction.leaves,
-            Transaction.oil,
-            Transaction.mold,
-            Transaction.stain,
-            Transaction.oxidation,
-            Transaction.rip_or_tear,
-            Transaction.sewing_repair_needed,
-            Transaction.grommet,
-            Transaction.rope,
-            Transaction.buckle,
-            Transaction.wet,
-            Transaction.other
-        ).join(
-            max_scan_date_subquery,
-            (Transaction.tag_id == max_scan_date_subquery.c.tag_id) &
-            (Transaction.scan_date == max_scan_date_subquery.c.max_scan_date)
-        ).order_by(
-            Transaction.tag_id,
-            Transaction.scan_date.desc(),
-            Transaction.id.desc()
-        ).distinct(Transaction.tag_id).subquery()
+        logger.info(f"Fetched {len(mappings_dict)} rental class mappings: {list(mappings_dict.keys())}")
 
         # Query items with service-related statuses, case-insensitive
-        items_query = session.query(
-            ItemMaster,
-            latest_transaction_subquery.c.location_of_repair,
-            latest_transaction_subquery.c.dirty_or_mud,
-            latest_transaction_subquery.c.leaves,
-            latest_transaction_subquery.c.oil,
-            latest_transaction_subquery.c.mold,
-            latest_transaction_subquery.c.stain,
-            latest_transaction_subquery.c.oxidation,
-            latest_transaction_subquery.c.rip_or_tear,
-            latest_transaction_subquery.c.sewing_repair_needed,
-            latest_transaction_subquery.c.grommet,
-            latest_transaction_subquery.c.rope,
-            latest_transaction_subquery.c.buckle,
-            latest_transaction_subquery.c.wet,
-            latest_transaction_subquery.c.other
-        ).outerjoin(
-            latest_transaction_subquery,
-            ItemMaster.tag_id == latest_transaction_subquery.c.tag_id
-        ).filter(
+        items_query = session.query(ItemMaster).filter(
             func.lower(func.trim(func.replace(func.coalesce(ItemMaster.status, ''), '\x00', ''))).in_(
                 ['repair', 'needs to be inspected', 'staged', 'wash', 'wet']
             ),
@@ -146,32 +91,74 @@ def tab3_view():
             )
 
         items_in_service = items_query.all()
-        logger.info(f"Query fetched {len(items_in_service)} items for Tab 3")
+        logger.info(f"Query fetched {len(items_in_service)} items: {[item.tag_id + ': ' + item.status + ', rental_class_num=' + (item.rental_class_num or 'None') for item in items_in_service]}")
+
+        # Fetch repair details for items with transactions
+        tag_ids = [item.tag_id for item in items_in_service]
+        transaction_data = {}
+        if tag_ids:
+            max_scan_date_subquery = session.query(
+                Transaction.tag_id,
+                func.max(Transaction.scan_date).label('max_scan_date')
+            ).filter(
+                Transaction.tag_id.in_(tag_ids)
+            ).group_by(
+                Transaction.tag_id
+            ).subquery()
+
+            transactions = session.query(
+                Transaction.tag_id,
+                Transaction.location_of_repair,
+                Transaction.dirty_or_mud,
+                Transaction.leaves,
+                Transaction.oil,
+                Transaction.mold,
+                Transaction.stain,
+                Transaction.oxidation,
+                Transaction.rip_or_tear,
+                Transaction.sewing_repair_needed,
+                Transaction.grommet,
+                Transaction.rope,
+                Transaction.buckle,
+                Transaction.wet,
+                Transaction.other
+            ).join(
+                max_scan_date_subquery,
+                (Transaction.tag_id == max_scan_date_subquery.c.tag_id) &
+                (Transaction.scan_date == max_scan_date_subquery.c.max_scan_date)
+            ).all()
+
+            for t in transactions:
+                repair_types = []
+                if t.dirty_or_mud: repair_types.append("Dirty/Mud")
+                if t.leaves: repair_types.append("Leaves")
+                if t.oil: repair_types.append("Oil")
+                if t.mold: repair_types.append("Mold")
+                if t.stain: repair_types.append("Stain")
+                if t.oxidation: repair_types.append("Oxidation")
+                if t.rip_or_tear: repair_types.append("Rip/Tear")
+                if t.sewing_repair_needed: repair_types.append("Sewing Repair Needed")
+                if t.grommet: repair_types.append("Grommet")
+                if t.rope: repair_types.append("Rope")
+                if t.buckle: repair_types.append("Buckle")
+                if t.wet: repair_types.append("Wet")
+                if t.other: repair_types.append(f"Other: {t.other}")
+
+                transaction_data[t.tag_id] = {
+                    'location_of_repair': t.location_of_repair or 'N/A',
+                    'repair_types': repair_types if repair_types else ['None']
+                }
 
         # Group items by category
         crew_items = {}
-        for item, location_of_repair, dirty_or_mud, leaves, oil, mold, stain, oxidation, rip_or_tear, sewing_repair_needed, grommet, rope, buckle, wet, other in items_in_service:
+        for item in items_in_service:
             rental_class_num = str(item.rental_class_num).strip().upper() if item.rental_class_num else None
             category = mappings_dict.get(rental_class_num, {}).get('category', 'Miscellaneous')
 
             if category not in crew_items:
                 crew_items[category] = []
 
-            # Determine repair types
-            repair_types = []
-            if dirty_or_mud: repair_types.append("Dirty/Mud")
-            if leaves: repair_types.append("Leaves")
-            if oil: repair_types.append("Oil")
-            if mold: repair_types.append("Mold")
-            if stain: repair_types.append("Stain")
-            if oxidation: repair_types.append("Oxidation")
-            if rip_or_tear: repair_types.append("Rip/Tear")
-            if sewing_repair_needed: repair_types.append("Sewing Repair Needed")
-            if grommet: repair_types.append("Grommet")
-            if rope: repair_types.append("Rope")
-            if buckle: repair_types.append("Buckle")
-            if wet: repair_types.append("Wet")
-            if other: repair_types.append(f"Other: {other}")
+            t_data = transaction_data.get(item.tag_id, {'location_of_repair': 'N/A', 'repair_types': ['None']})
 
             crew_items[category].append({
                 'tag_id': item.tag_id,
@@ -180,8 +167,8 @@ def tab3_view():
                 'bin_location': item.bin_location or 'N/A',
                 'last_contract_num': item.last_contract_num or 'N/A',
                 'date_last_scanned': item.date_last_scanned.isoformat() if item.date_last_scanned else 'N/A',
-                'location_of_repair': location_of_repair or 'N/A',
-                'repair_types': repair_types if repair_types else ['None']
+                'location_of_repair': t_data['location_of_repair'],
+                'repair_types': t_data['repair_types']
             })
 
         # Convert to list of crews for template
