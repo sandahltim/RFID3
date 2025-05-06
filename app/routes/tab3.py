@@ -2,7 +2,7 @@ from flask import Blueprint, render_template, request, jsonify, current_app
 from .. import db
 from ..models.db_models import ItemMaster, Transaction, RentalClassMapping, UserRentalClassMapping
 from ..services.api_client import APIClient
-from sqlalchemy import text, desc, asc
+from sqlalchemy import text, func, desc, asc
 from datetime import datetime
 import logging
 import sys
@@ -30,7 +30,7 @@ logger.addHandler(console_handler)
 tab3_bp = Blueprint('tab3', __name__)
 
 # Version marker
-logger.info("Deployed tab3.py version: 2025-05-06-v9")
+logger.info("Deployed tab3.py version: 2025-05-06-v10")
 
 @tab3_bp.route('/tab/3')
 def tab3_view():
