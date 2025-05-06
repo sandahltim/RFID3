@@ -1,15 +1,42 @@
+<!DOCTYPE html>
 {% extends "base.html" %}
 
 {% block title %}Service Dashboard - RFID Dashboard{% endblock %}
 
+{% block head %}
+{{ super() }}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+{% endblock %}
+
 {% block content %}
-<div class="container mt-4">
-    <h2>Service Dashboard (Tab 3)</h2>
+<div class="container mt-0">
+    <h2>Service Dashboard</h2>
 
-    <!-- Tent Crew Section -->
-    <h3>Tent Crew Items</h3>
-    {% if tent_crew_items %}
-        <table class="table table-bordered">
+    <!-- Filter and Sort Controls -->
+    <div class="row mb-3 filter-sort-controls">
+        <div class="col-md-3">
+            <input type="text" class="form-control" id="commonNameFilter" placeholder="Filter by Common Name" value="{{ common_name_filter }}">
+        </div>
+        <div class="col-md-3">
+            <input type="date" class="form-control" id="dateFilter" placeholder="Filter by Last Scanned Date" value="{{ date_filter }}">
+        </div>
+        <div class="col-md-3">
+            <select class="form-control" id="sortSelect">
+                <option value="date_last_scanned_desc" {% if sort == 'date_last_scanned_desc' %}selected{% endif %}>Last Scanned (Newest First)</option>
+                <option value="date_last_scanned_asc" {% if sort == 'date_last_scanned_asc' %}selected{% endif %}>Last Scanned (Oldest First)</option>
+            </select>
+        </div>
+        <div class="col-md-3">
+            <button class="btn btn-primary" onclick="applyTab3Filter()">Apply</button>
+            <button class="btn btn-secondary" onclick="clearTab3Filter()">Clear</button>
+        </div>
+    </div>
+
+    <!-- Dynamic Crew Sections -->
+    {% for crew in crews %}
+    <h3>{{ crew.name }} Items</h3>
+    {% if crew.items %}
+        <table class="table table-bordered crew-table" id="crew-table-{{ crew.name | lower | replace(' ', '-') }}">
             <thead>
                 <tr>
                     <th>Tag ID</th>
@@ -20,116 +47,125 @@
                     <th>Last Scanned Date</th>
                     <th>Location of Repair</th>
                     <th>Repair Types</th>
+                    <th>Actions</th>
                 </tr>
             </thead>
-            <tbody id="tent-crew-items">
-                {% for item in tent_crew_items %}
+            <tbody>
+                {% for item in crew.items %}
                     <tr>
                         <td>{{ item.tag_id }}</td>
                         <td>{{ item.common_name }}</td>
-                        <td>{{ item.status }}</td>
+                        <td>
+                            <select id="status-{{ item.tag_id }}" onchange="updateStatusVisibility('{{ item.tag_id }}')">
+                                <option value="{{ item.status }}" selected>{{ item.status }}</option>
+                                <option value="Ready to Rent">Ready to Rent</option>
+                                <option value="Sold">Sold</option>
+                                <option value="Repair">Repair</option>
+                                <option value="Needs to be Inspected">Needs to be Inspected</option>
+                                <option value="Staged">Staged</option>
+                                <option value="Wash">Wash</option>
+                                <option value="Wet">Wet</option>
+                            </select>
+                        </td>
                         <td>{{ item.bin_location }}</td>
                         <td>{{ item.last_contract_num }}</td>
                         <td class="date-last-scanned">{{ item.date_last_scanned }}</td>
                         <td>{{ item.location_of_repair }}</td>
                         <td>{{ item.repair_types | join(', ') }}</td>
+                        <td>
+                            <button class="btn btn-sm btn-primary save-btn" onclick="updateItemStatus('{{ item.tag_id }}')">Save</button>
+                        </td>
                     </tr>
                 {% endfor %}
             </tbody>
         </table>
     {% else %}
-        <p>No items currently in service for the Tent Crew.</p>
+        <p>No items currently in service for {{ crew.name }}.</p>
     {% endif %}
-
-    <!-- Laundry Crew Section -->
-    <h3>Laundry Crew Items</h3>
-    {% if laundry_crew_items %}
-        <table class="table table-bordered">
-            <thead>
-                <tr>
-                    <th>Tag ID</th>
-                    <th>Common Name</th>
-                    <th>Status</th>
-                    <th>Bin Location</th>
-                    <th>Last Contract</th>
-                    <th>Last Scanned Date</th>
-                    <th>Location of Repair</th>
-                    <th>Repair Types</th>
-                </tr>
-            </thead>
-            <tbody id="laundry-crew-items">
-                {% for item in laundry_crew_items %}
-                    <tr>
-                        <td>{{ item.tag_id }}</td>
-                        <td>{{ item.common_name }}</td>
-                        <td>{{ item.status }}</td>
-                        <td>{{ item.bin_location }}</td>
-                        <td>{{ item.last_contract_num }}</td>
-                        <td class="date-last-scanned">{{ item.date_last_scanned }}</td>
-                        <td>{{ item.location_of_repair }}</td>
-                        <td>{{ item.repair_types | join(', ') }}</td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    {% else %}
-        <p>No items currently in service for the Laundry Crew.</p>
-    {% endif %}
-
-    <!-- Maintenance Crew Section -->
-    <h3>Maintenance Crew Items</h3>
-    {% if maintenance_crew_items %}
-        <table class="table table-bordered">
-            <thead>
-                <tr>
-                    <th>Tag ID</th>
-                    <th>Common Name</th>
-                    <th>Status</th>
-                    <th>Bin Location</th>
-                    <th>Last Contract</th>
-                    <th>Last Scanned Date</th>
-                    <th>Location of Repair</th>
-                    <th>Repair Types</th>
-                </tr>
-            </thead>
-            <tbody id="maintenance-crew-items">
-                {% for item in maintenance_crew_items %}
-                    <tr>
-                        <td>{{ item.tag_id }}</td>
-                        <td>{{ item.common_name }}</td>
-                        <td>{{ item.status }}</td>
-                        <td>{{ item.bin_location }}</td>
-                        <td>{{ item.last_contract_num }}</td>
-                        <td class="date-last-scanned">{{ item.date_last_scanned }}</td>
-                        <td>{{ item.location_of_repair }}</td>
-                        <td>{{ item.repair_types | join(', ') }}</td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    {% else %}
-        <p>No items currently in service for the Maintenance Crew.</p>
-    {% endif %}
+    {% endfor %}
 </div>
 
 <script>
-// Format dates in all tables on page load
+// Format dates on page load
 document.addEventListener('DOMContentLoaded', function() {
-    const sections = ['tent-crew-items', 'laundry-crew-items', 'maintenance-crew-items'];
-    sections.forEach(sectionId => {
-        const tbody = document.getElementById(sectionId);
-        if (tbody) {
-            const rows = tbody.querySelectorAll('tr');
-            rows.forEach(row => {
-                const dateCell = row.querySelector('.date-last-scanned');
-                if (dateCell) {
-                    const rawDate = dateCell.textContent.trim();
-                    const formattedDate = formatDate(rawDate); // Use formatDate from common.js
-                    dateCell.textContent = formattedDate;
-                }
-            });
-        }
+    document.querySelectorAll('.crew-table').forEach(table => {
+        const rows = table.querySelectorAll('tbody tr');
+        rows.forEach(row => {
+            const dateCell = row.querySelector('.date-last-scanned');
+            if (dateCell) {
+                const rawDate = dateCell.textContent.trim();
+                const formattedDate = formatDate(rawDate);
+                dateCell.textContent = formattedDate;
+            }
+        });
     });
 });
+
+// Apply filter and sort
+function applyTab3Filter() {
+    const commonName = document.getElementById('commonNameFilter').value.toLowerCase().trim();
+    const dateFilter = document.getElementById('dateFilter').value;
+    const sort = document.getElementById('sortSelect').value;
+
+    window.location.href = `/tab/3?common_name=${encodeURIComponent(commonName)}&date_last_scanned=${encodeURIComponent(dateFilter)}&sort=${encodeURIComponent(sort)}`;
+}
+
+// Clear filter and sort
+function clearTab3Filter() {
+    window.location.href = '/tab/3';
+}
+
+// Update status dropdown visibility (disable invalid options)
+function updateStatusVisibility(tagId) {
+    const select = document.getElementById(`status-${tagId}`);
+    const currentStatus = select.options[0].value; // Original status
+    const newStatus = select.value;
+
+    // Disable On Rent and Delivered
+    Array.from(select.options).forEach(option => {
+        if (option.value === 'On Rent' || option.value === 'Delivered') {
+            option.disabled = true;
+        }
+        // Ready to Rent is only allowed from On Rent, Delivered, or Sold
+        if (option.value === 'Ready to Rent') {
+            option.disabled = !['On Rent', 'Delivered', 'Sold'].includes(currentStatus);
+        }
+    });
+}
+
+// Update item status
+function updateItemStatus(tagId) {
+    const status = document.getElementById(`status-${tagId}`).value;
+
+    if (!status) {
+        alert('Please select a status to update.');
+        return;
+    }
+
+    fetch('/tab/3/update_status', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            tag_id: tagId,
+            status: status
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            alert('Error: ' + data.error);
+        } else {
+            alert(data.message);
+            // Refresh the page to reflect changes
+            applyTab3Filter();
+        }
+    })
+    .catch(error => {
+        console.error('Error updating status:', error);
+        alert('Failed to update status: ' + error.message);
+    });
+}
 </script>
 {% endblock %}
