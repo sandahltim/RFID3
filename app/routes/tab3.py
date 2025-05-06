@@ -30,7 +30,7 @@ logger.addHandler(console_handler)
 tab3_bp = Blueprint('tab3', __name__)
 
 # Version marker
-logger.info("Deployed tab3.py version: 2025-05-06-v5")
+logger.info("Deployed tab3.py version: 2025-05-06-v6")
 
 @tab3_bp.route('/tab/3')
 def tab3_view():
@@ -89,7 +89,7 @@ def tab3_view():
             Transaction.id.desc()
         ).distinct(Transaction.tag_id).subquery()
 
-        # Query items with service-related statuses
+        # Query items with service-related statuses, case-insensitive
         items_query = session.query(
             ItemMaster,
             latest_transaction_subquery.c.location_of_repair,
@@ -110,8 +110,10 @@ def tab3_view():
             latest_transaction_subquery,
             ItemMaster.tag_id == latest_transaction_subquery.c.tag_id
         ).filter(
-            ItemMaster.status.in_(['Repair', 'Needs to be Inspected', 'Staged', 'Wash', 'Wet']),
-            ItemMaster.status != 'Sold'  # Explicitly exclude Sold
+            func.lower(func.trim(func.replace(func.coalesce(ItemMaster.status, ''), '\x00', ''))).in_(
+                ['repair', 'needs to be inspected', 'staged', 'wash', 'wet']
+            ),
+            func.lower(func.trim(func.replace(func.coalesce(ItemMaster.status, ''), '\x00', ''))) != 'sold'
         )
 
         # Apply filters
@@ -144,6 +146,7 @@ def tab3_view():
             )
 
         items_in_service = items_query.all()
+        logger.info(f"Query fetched {len(items_in_service)} items for Tab 3")
 
         # Group items by category
         crew_items = {}
