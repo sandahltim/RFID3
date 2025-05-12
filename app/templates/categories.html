@@ -226,21 +226,36 @@
     document.getElementById('mappings-table').innerHTML = '';
 
     fetch('/categories/mapping')
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`Failed to fetch mappings: HTTP status ${response.status}`);
+            }
+            return response.json();
+        })
         .then(data => {
             console.log('Loaded mappings:', data);
+            if (data.error) {
+                console.error('Server returned an error:', data.error);
+                alert('Failed to load mappings: ' + data.error);
+                return;
+            }
+            if (!Array.isArray(data)) {
+                console.error('Expected an array of mappings, but received:', data);
+                alert('Failed to load mappings: Invalid data format');
+                return;
+            }
             data.forEach(mapping => addMappingRow(mapping));
         })
         .catch(error => {
             console.error('Error loading mappings:', error);
-            alert('Failed to load mappings');
+            alert('Failed to load mappings: ' + error.message);
         });
 
     document.addEventListener('DOMContentLoaded', () => {
-        if (typeof window.applyFilters === 'function') {
-            window.applyFilters();
+        if (typeof window.applyGlobalFilter === 'function') {
+            window.applyGlobalFilter();
         } else {
-            console.warn('applyFilters function is not available after DOM load');
+            console.warn('applyGlobalFilter function is not available after DOM load');
         }
     });
 </script>

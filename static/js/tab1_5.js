@@ -1,4 +1,4 @@
-console.log('tab1_5.js version: 2025-04-29-v23 loaded');
+console.log('tab1_5.js version: 2025-05-07-v24 loaded');
 
 // Note: Common function for Tabs 1 and 5
 function showLoading(targetId) {
@@ -10,6 +10,8 @@ function showLoading(targetId) {
     const container = document.getElementById(targetId);
     if (container) {
         container.appendChild(loadingDiv);
+    } else {
+        console.warn(`Container with ID ${targetId} not found for showing loading indicator`);
     }
 }
 
@@ -18,6 +20,8 @@ function hideLoading(targetId) {
     const loadingDiv = document.getElementById(`loading-${targetId}`);
     if (loadingDiv) {
         loadingDiv.remove();
+    } else {
+        console.warn(`Loading indicator with ID loading-${targetId} not found`);
     }
 }
 
@@ -45,6 +49,8 @@ function collapseSection(targetId) {
         }
 
         sessionStorage.removeItem(`expanded_${targetId}`);
+    } else {
+        console.error(`Section with ID ${targetId} not found for collapsing`);
     }
 }
 
@@ -52,7 +58,7 @@ function collapseSection(targetId) {
 function loadCommonNames(selectElement, page = 1) {
     const subcategory = selectElement.value;
     const category = selectElement.getAttribute('data-category');
-    const targetId = selectElement.closest('tr').nextElementSibling.querySelector('.common-level').id;
+    const targetId = selectElement.closest('tr').nextElementSibling.querySelector('.common-level')?.id;
     const categoryRow = selectElement.closest('tr');
 
     const targetElement = document.getElementById(targetId);
@@ -71,10 +77,10 @@ function loadCommonNames(selectElement, page = 1) {
                 const itemsOnContracts = data.subcategories.reduce((sum, subcat) => sum + subcat.items_on_contracts, 0);
                 const itemsInService = data.subcategories.reduce((sum, subcat) => sum + subcat.items_in_service, 0);
                 const itemsAvailable = data.subcategories.reduce((sum, subcat) => sum + subcat.items_available, 0);
-                categoryRow.cells[2].textContent = totalItems;
-                categoryRow.cells[3].textContent = itemsOnContracts;
-                categoryRow.cells[4].textContent = itemsInService;
-                categoryRow.cells[5].textContent = itemsAvailable;
+                categoryRow.cells[1].textContent = totalItems;
+                categoryRow.cells[2].textContent = itemsOnContracts;
+                categoryRow.cells[3].textContent = itemsInService;
+                categoryRow.cells[4].textContent = itemsAvailable;
             })
             .catch(error => console.error('Error resetting category totals:', error));
         return;
@@ -111,10 +117,10 @@ function loadCommonNames(selectElement, page = 1) {
                 const itemsAvailable = data.common_names.reduce((sum, item) => sum + item.items_available, 0);
 
                 // Update category row with subcategory totals
-                categoryRow.cells[2].textContent = totalItems;
-                categoryRow.cells[3].textContent = itemsOnContracts;
-                categoryRow.cells[4].textContent = itemsInService;
-                categoryRow.cells[5].textContent = itemsAvailable;
+                categoryRow.cells[1].textContent = totalItems;
+                categoryRow.cells[2].textContent = itemsOnContracts;
+                categoryRow.cells[3].textContent = itemsInService;
+                categoryRow.cells[4].textContent = itemsAvailable;
 
                 html += `
                     <table class="common-table" id="common-table-${targetId}">
@@ -143,10 +149,24 @@ function loadCommonNames(selectElement, page = 1) {
                             <td>${item.items_available}</td>
                             <td>
                                 <div class="btn-group">
-                                    <button class="btn btn-sm btn-secondary expand-btn" data-category="${category}" data-subcategory="${subcategory}" data-common-name="${escapedName}" data-target-id="items-${rowId}">Expand Items</button>
-                                    <button class="btn btn-sm btn-secondary collapse-btn" style="display:none;" data-collapse-target="items-${rowId}">Collapse</button>
-                                    <button class="btn btn-sm btn-info print-btn" data-print-level="Common Name" data-print-id="common-table-${targetId}" data-common-name="${escapedName}" data-category="${category}" data-subcategory="${subcategory}">Print Aggregate</button>
-                                    <button class="btn btn-sm btn-info print-full-btn" data-common-name="${escapedName}" data-category="${category}" data-subcategory="${subcategory}">Print Full List</button>
+                                    <button class="btn btn-sm btn-secondary expand-btn" 
+                                            data-category="${category}" 
+                                            data-subcategory="${subcategory}" 
+                                            data-common-name="${escapedName}" 
+                                            data-target-id="items-${rowId}">Expand Items</button>
+                                    <button class="btn btn-sm btn-secondary collapse-btn" 
+                                            style="display:none;" 
+                                            data-collapse-target="items-${rowId}">Collapse</button>
+                                    <button class="btn btn-sm btn-info print-btn" 
+                                            data-print-level="Common Name" 
+                                            data-print-id="common-table-${targetId}" 
+                                            data-common-name="${escapedName}" 
+                                            data-category="${category}" 
+                                            data-subcategory="${subcategory}">Print Aggregate</button>
+                                    <button class="btn btn-sm btn-info print-full-btn" 
+                                            data-common-name="${escapedName}" 
+                                            data-category="${category}" 
+                                            data-subcategory="${subcategory}">Print Full List</button>
                                 </div>
                             </td>
                         </tr>
@@ -167,9 +187,13 @@ function loadCommonNames(selectElement, page = 1) {
                     const totalPages = Math.ceil(data.total_common_names / data.per_page);
                     html += `
                         <div class="pagination-controls">
-                            <button class="btn btn-sm btn-secondary" onclick="loadCommonNames(document.querySelector('#${targetId}').closest('tr').previousElementSibling.querySelector('.subcategory-select'), ${data.page - 1})" ${data.page === 1 ? 'disabled' : ''}>Previous</button>
+                            <button class="btn btn-sm btn-secondary" 
+                                    onclick="loadCommonNames(document.querySelector('#${targetId}').closest('tr').previousElementSibling.querySelector('.subcategory-select'), ${data.page - 1})" 
+                                    ${data.page === 1 ? 'disabled' : ''}>Previous</button>
                             <span>Page ${data.page} of ${totalPages}</span>
-                            <button class="btn btn-sm btn-secondary" onclick="loadCommonNames(document.querySelector('#${targetId}').closest('tr').previousElementSibling.querySelector('.subcategory-select'), ${data.page + 1})" ${data.page === totalPages ? 'disabled' : ''}>Next</button>
+                            <button class="btn btn-sm btn-secondary" 
+                                    onclick="loadCommonNames(document.querySelector('#${targetId}').closest('tr').previousElementSibling.querySelector('.subcategory-select'), ${data.page + 1})" 
+                                    ${data.page === totalPages ? 'disabled' : ''}>Next</button>
                         </div>
                     `;
                 }
@@ -184,7 +208,11 @@ function loadCommonNames(selectElement, page = 1) {
             targetElement.style.opacity = '1';
 
             // Apply global filter to the newly loaded table
-            applyFilterToAllLevels();
+            if (typeof applyFilterToAllLevels === 'function') {
+                applyFilterToAllLevels();
+            } else {
+                console.warn('applyFilterToAllLevels function is not available');
+            }
         })
         .catch(error => {
             console.error('Common names fetch error:', error);
@@ -201,11 +229,21 @@ function loadCommonNames(selectElement, page = 1) {
 
 // Note: Tab 5 specific - Bulk update for all items under a common name
 function bulkUpdateCommonName(category, subcategory, targetId, key) {
-    const binLocation = document.getElementById(`bulk-bin-location-${key}`).value;
-    const status = document.getElementById(`bulk-status-${key}`).value;
+    const binLocation = document.getElementById(`bulk-bin-location-${key}`)?.value;
+    const status = document.getElementById(`bulk-status-${key}`)?.value;
 
     if (!binLocation && !status) {
         alert('Please select a Bin Location or Status to update.');
+        return;
+    }
+
+    const commonTable = document.getElementById(`common-table-${key}`);
+    const commonNameCell = commonTable?.querySelector('tbody tr td:first-child');
+    const commonName = commonNameCell ? commonNameCell.textContent : null;
+
+    if (!commonName) {
+        console.error('Common name not found for bulk update');
+        alert('Error: Common name not found for bulk update.');
         return;
     }
 
@@ -217,7 +255,7 @@ function bulkUpdateCommonName(category, subcategory, targetId, key) {
         body: JSON.stringify({
             category: category,
             subcategory: subcategory,
-            common_name: document.querySelector(`#common-table-${key} tbody tr td:first-child`).textContent,
+            common_name: commonName,
             bin_location: binLocation || undefined,
             status: status || undefined
         })
@@ -230,7 +268,7 @@ function bulkUpdateCommonName(category, subcategory, targetId, key) {
         } else {
             console.log('Bulk update successful:', data);
             alert('Bulk update successful!');
-            loadItems(category, subcategory, document.querySelector(`#common-table-${key} tbody tr td:first-child`).textContent, targetId);
+            loadItems(category, subcategory, commonName, targetId);
         }
     })
     .catch(error => {
@@ -241,7 +279,14 @@ function bulkUpdateCommonName(category, subcategory, targetId, key) {
 
 // Note: Tab 5 specific - Bulk update for selected items
 function bulkUpdateSelectedItems(key) {
-    const selectedItems = Array.from(document.querySelectorAll(`#item-table-${key} tbody input[type="checkbox"]:checked`))
+    const itemTable = document.getElementById(`item-table-${key}`);
+    if (!itemTable) {
+        console.error(`Item table with ID item-table-${key} not found`);
+        alert('Error: Item table not found for bulk update.');
+        return;
+    }
+
+    const selectedItems = Array.from(itemTable.querySelectorAll('tbody input[type="checkbox"]:checked'))
         .map(checkbox => checkbox.value);
 
     if (selectedItems.length === 0) {
@@ -249,8 +294,8 @@ function bulkUpdateSelectedItems(key) {
         return;
     }
 
-    const binLocation = document.getElementById(`bulk-item-bin-location-${key}`).value;
-    const status = document.getElementById(`bulk-item-status-${key}`).value;
+    const binLocation = document.getElementById(`bulk-item-bin-location-${key}`)?.value;
+    const status = document.getElementById(`bulk-item-status-${key}`)?.value;
 
     if (!binLocation && !status) {
         alert('Please select a Bin Location or Status to update.');
@@ -276,11 +321,16 @@ function bulkUpdateSelectedItems(key) {
         } else {
             console.log('Bulk update successful:', data);
             alert('Bulk update successful!');
-            const category = document.querySelector(`#item-table-${key}`).closest('.common-level').querySelector('button[data-category]').getAttribute('data-category');
-            const subcategory = document.querySelector(`#item-table-${key}`).closest('.common-level').querySelector('button[data-subcategory]').getAttribute('data-subcategory');
-            const commonName = document.querySelector(`#common-table-${key} tbody tr td:first-child`).textContent;
-            const targetId = document.querySelector(`#item-table-${key}`).closest('.expandable').id;
-            loadItems(category, subcategory, commonName, targetId);
+            const category = document.querySelector(`#item-table-${key}`).closest('.common-level').querySelector('button[data-category]')?.getAttribute('data-category');
+            const subcategory = document.querySelector(`#item-table-${key}`).closest('.common-level').querySelector('button[data-subcategory]')?.getAttribute('data-subcategory');
+            const commonName = document.querySelector(`#common-table-${key} tbody tr td:first-child`)?.textContent;
+            const targetId = document.querySelector(`#item-table-${key}`).closest('.expandable')?.id;
+            if (category && subcategory && commonName && targetId) {
+                loadItems(category, subcategory, commonName, targetId);
+            } else {
+                console.warn('Missing parameters for reloading items after bulk update:', { category, subcategory, commonName, targetId });
+                window.location.reload();
+            }
         }
     })
     .catch(error => {
@@ -303,8 +353,8 @@ function updateBulkField(key, field) {
 
 // Note: Tab 5 specific - Update individual item
 function updateItem(tagId, key, category, subcategory, commonName, targetId) {
-    const binLocation = document.getElementById(`bin-location-${tagId}`).value;
-    const status = document.getElementById(`status-${tagId}`).value;
+    const binLocation = document.getElementById(`bin-location-${tagId}`)?.value;
+    const status = document.getElementById(`status-${tagId}`)?.value;
 
     if (!binLocation && !status) {
         alert('Please select a Bin Location or Status to update.');
@@ -462,7 +512,8 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                                 <td>${item.quality || 'N/A'}</td>
                                 <td>${item.notes || 'N/A'}</td>
                                 <td>
-                                    <button class="btn btn-sm btn-primary save-btn" onclick="updateItem('${item.tag_id}', '${key}', '${category}', '${subcategory}', '${item.common_name}', '${targetId}')">Save</button>
+                                    <button class="btn btn-sm btn-primary save-btn" 
+                                            onclick="updateItem('${item.tag_id}', '${key}', '${category}', '${subcategory}', '${item.common_name}', '${targetId}')">Save</button>
                                 </td>
                             </tr>
                         `;
@@ -480,8 +531,8 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                                 <div id="dropdown-bin-location-${item.tag_id}" class="dropdown-menu">
                                     <a class="dropdown-item" href="#" onclick="selectOption(event, this, 'bin-location', '${item.tag_id}', 'resale')">resale</a>
                                     <a class="dropdown-item" href="#" onclick="selectOption(event, this, 'bin-location', '${item.tag_id}', 'sold')">sold</a>
-                                    <a class="dropdown-item" href="#" onclick="selectOption(event, 'bin-location', '${item.tag_id}', 'pack')">pack</a>
-                                    <a class="dropdown-item" href="#" onclick="selectOption(event, 'bin-location', '${item.tag_id}', 'burst')">burst</a>
+                                    <a class="dropdown-item" href="#" onclick="selectOption(event, this, 'bin-location', '${item.tag_id}', 'pack')">pack</a>
+                                    <a class="dropdown-item" href="#" onclick="selectOption(event, this, 'bin-location', '${item.tag_id}', 'burst')">burst</a>
                                 </div>
                                 <div id="dropdown-status-${item.tag_id}" class="dropdown-menu">
                                     <a class="dropdown-item" href="#" onclick="selectOption(event, this, 'status', '${item.tag_id}', 'Ready to Rent')" ${item.status !== 'On Rent' && item.status !== 'Delivered' ? 'style="pointer-events: none; color: #ccc;"' : ''}>Ready to Rent</a>
@@ -513,9 +564,61 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                     const escapedCommonName = commonName.replace(/'/g, "\\'").replace(/"/g, '\\"');
                     html += `
                         <div class="pagination-controls">
-                            <button class="btn btn-sm btn-secondary" onclick="loadItems('${category}', '${subcategory}', '${escapedCommonName}', '${targetId}', ${data.page - 1})" ${data.page === 1 ? 'disabled' : ''}>Previous</button>
+                            <button class="btn btn-sm btn-secondary" 
+                                    onclick="loadItems('${category}', '${subcategory}', '${escapedCommonName}', '${targetId}', ${data.page - 1})" 
+                                    ${data.page === 1 ? 'disabled' : ''}>Previous</button>
                             <span>Page ${data.page} of ${totalPages}</span>
-                            <button class="btn btn-sm btn-secondary" onclick="loadItems('${category}', '${subcategory}', '${escapedCommonName}', '${targetId}', ${data.page + 1})" ${data.page === totalPages ? 'disabled' : ''}>Next</button>
+                            <button class="btn btn-sm btn-secondary" 
+                                    onclick="loadItems('${category}', '${subcategory}', '${escapedCommonName}', '${targetId}', ${data.page + 1})" 
+                                    ${data.page === totalPages ? 'disabled' : ''}>Next</button>
+                        </div>
+                    `;
+                }
+
+                // Add bulk update controls for Tab 5
+                if (window.cachedTabNum == 5) {
+                    html += `
+                        <div class="bulk-update-controls mt-3">
+                            <h5>Bulk Update All Items</h5>
+                            <div class="form-group">
+                                <label for="bulk-bin-location-${key}">Bin Location:</label>
+                                <select id="bulk-bin-location-${key}" onchange="updateBulkField('${key}', 'bin_location')">
+                                    <option value="">Select Bin Location</option>
+                                    <option value="resale">resale</option>
+                                    <option value="sold">sold</option>
+                                    <option value="pack">pack</option>
+                                    <option value="burst">burst</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="bulk-status-${key}">Status:</label>
+                                <select id="bulk-status-${key}" onchange="updateBulkField('${key}', 'status')">
+                                    <option value="">Select Status</option>
+                                    <option value="Ready to Rent">Ready to Rent</option>
+                                    <option value="Sold">Sold</option>
+                                </select>
+                            </div>
+                            <button class="btn btn-primary" onclick="bulkUpdateCommonName('${category}', '${subcategory}', '${targetId}', '${key}')">Update All</button>
+                            <h5 class="mt-3">Bulk Update Selected Items</h5>
+                            <div class="form-group">
+                                <label for="bulk-item-bin-location-${key}">Bin Location:</label>
+                                <select id="bulk-item-bin-location-${key}">
+                                    <option value="">Select Bin Location</option>
+                                    <option value="resale">resale</option>
+                                    <option value="sold">sold</option>
+                                    <option value="pack">pack</option>
+                                    <option value="burst">burst</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="bulk-item-status-${key}">Status:</label>
+                                <select id="bulk-item-status-${key}">
+                                    <option value="">Select Status</option>
+                                    <option value="Ready to Rent">Ready to Rent</option>
+                                    <option value="Sold">Sold</option>
+                                </select>
+                            </div>
+                            <button class="btn btn-primary" onclick="bulkUpdateSelectedItems('${key}')">Update Selected</button>
                         </div>
                     `;
                 }
@@ -544,7 +647,11 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
             sessionStorage.setItem(`expanded_items_${targetId}`, JSON.stringify({ category, subcategory, commonName, page }));
 
             // Apply global filter to the newly loaded table
-            applyFilterToAllLevels();
+            if (typeof applyFilterToAllLevels === 'function') {
+                applyFilterToAllLevels();
+            } else {
+                console.warn('applyFilterToAllLevels function is not available');
+            }
         })
         .catch(error => {
             console.error('Items fetch error:', error);
@@ -659,9 +766,9 @@ function saveChanges(tagId) {
                 alert('Status updated successfully!');
                 const itemsContainer = document.getElementById(`items-${tagId.split('-')[0]}`);
                 if (itemsContainer) {
-                    const category = itemsContainer.closest('.common-level').querySelector('button[data-category]').getAttribute('data-category');
-                    const subcategory = itemsContainer.closest('.common-level').querySelector('button[data-subcategory]').getAttribute('data-subcategory');
-                    const commonName = itemsContainer.closest('tr').querySelector('td:first-child').textContent;
+                    const category = itemsContainer.closest('.common-level').querySelector('button[data-category]')?.getAttribute('data-category');
+                    const subcategory = itemsContainer.closest('.common-level').querySelector('button[data-subcategory]')?.getAttribute('data-subcategory');
+                    const commonName = itemsContainer.closest('tr').querySelector('td:first-child')?.textContent;
                     loadItems(category, subcategory, commonName, `items-${tagId.split('-')[0]}`);
                 }
             }
