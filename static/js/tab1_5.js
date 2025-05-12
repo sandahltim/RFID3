@@ -1,4 +1,4 @@
-console.log('tab1_5.js version: 2025-05-07-v39 loaded');
+console.log('tab1_5.js version: 2025-05-07-v40 loaded');
 
 // Note: Ensure formatDate is available (defined in common.js)
 if (typeof formatDate !== 'function') {
@@ -228,7 +228,7 @@ function loadCommonNames(selectElement, page = 1) {
                     tableBody.appendChild(paginationRow);
                 }
 
-                // Add 'loaded' class with a slight delay to ensure rendering stability
+                // Add 'loaded' class with an increased delay to ensure rendering stability
                 const commonTable = document.getElementById(`common-table-${targetId}`);
                 if (commonTable) {
                     setTimeout(() => {
@@ -239,7 +239,7 @@ function loadCommonNames(selectElement, page = 1) {
                             computedDisplay: window.getComputedStyle(commonTable).display,
                             height: window.getComputedStyle(commonTable).height
                         });
-                    }, 50); // Small delay to allow DOM stabilization
+                    }, 100); // Increased delay to 100ms
                 }
             } else {
                 const noDataRow = document.createElement('tr');
@@ -279,7 +279,7 @@ function loadCommonNames(selectElement, page = 1) {
                 if (loadingDiv) {
                     loadingDiv.style.display = 'none';
                 }
-            }, 500); // Increased delay to ensure smooth transition
+            }, 700); // Match the transition duration (0.7s)
         });
 }
 
@@ -767,7 +767,7 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
             container.style.opacity = '1';
             container.style.visibility = 'visible';
 
-            // Add 'loaded' class with a slight delay to ensure rendering stability
+            // Add 'loaded' class with an increased delay to ensure rendering stability
             const itemTable = document.getElementById(`item-table-${key}`);
             if (itemTable) {
                 setTimeout(() => {
@@ -778,7 +778,7 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                         computedDisplay: window.getComputedStyle(itemTable).display,
                         height: window.getComputedStyle(itemTable).height
                     });
-                }, 50); // Small delay to allow DOM stabilization
+                }, 100); // Increased delay to 100ms
             }
 
             console.log('Container styles after update:', {
@@ -812,7 +812,7 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                 if (loadingSuccess) {
                     hideLoadingTab1_5(key);
                 }
-            }, 500); // Increased delay to ensure smooth transition
+            }, 700); // Match the transition duration (0.7s)
         });
 }
 
