@@ -1,4 +1,4 @@
-console.log('common.js version: 2025-05-07-v9 loaded - confirming script load');
+console.log('common.js version: 2025-05-07-v10 loaded - confirming script load');
 
 // Function to format ISO date strings into "Thurs, Aug 21 2025 4:55 pm"
 function formatDate(isoDateString) {
@@ -158,7 +158,7 @@ function applyFilterToAllLevels() {
                         // Check expanded item tables if they exist
                         const commonExpandableRow = commonRow.nextElementSibling;
                         let visibleItemRows = 0;
-                        if (commonExpandableRow && commonExpandableRow.classList.contains('expandable')) {
+                        if (commonExpandableRow && commonExpandableRow.classList.contains('expandable') && commonExpandableRow.classList.contains('expanded')) {
                             const itemTable = commonExpandableRow.querySelector('.item-table');
                             if (itemTable) {
                                 const itemRows = itemTable.querySelectorAll('tbody tr') || [];
@@ -265,117 +265,16 @@ function applyFilterToAllLevels() {
                             categoryCollapseBtn.style.display = 'none';
                         }
                     }
-                } else {
-                    // If no common names are loaded, check subcategory items directly
-                    options.forEach(option => {
-                        const subcatValue = option.textContent.toLowerCase();
-                        if (subcatValue === selectedValue) {
-                            // Fetch common names and items to check for matches
-                            fetch(`/tab/${window.cachedTabNum}/common_names?category=${encodeURIComponent(categoryValue)}&subcategory=${encodeURIComponent(subcatValue)}`)
-                                .then(response => response.json())
-                                .then(data => {
-                                    const commonNames = data.common_names || [];
-                                    let hasMatches = false;
-
-                                    commonNames.forEach(common => {
-                                        const commonNameValue = common.name.toLowerCase();
-                                        if (globalFilter.commonName && commonNameValue.includes(globalFilter.commonName)) {
-                                            hasMatches = true;
-                                            return;
-                                        }
-
-                                        // Fetch items for this common name
-                                        fetch(`/tab/${window.cachedTabNum}/data?category=${encodeURIComponent(categoryValue)}&subcategory=${encodeURIComponent(subcatValue)}&common_name=${encodeURIComponent(common.name)}`)
-                                            .then(itemResponse => itemResponse.json())
-                                            .then(itemData => {
-                                                const items = itemData.items || [];
-                                                items.forEach(item => {
-                                                    const itemCommonNameValue = item.common_name.toLowerCase();
-                                                    const itemContractValue = item.last_contract_num ? item.last_contract_num.toLowerCase() : '';
-                                                    if (globalFilter.commonName && itemCommonNameValue.includes(globalFilter.commonName)) {
-                                                        hasMatches = true;
-                                                    }
-                                                    if (globalFilter.contractNumber && itemContractValue.includes(globalFilter.contractNumber)) {
-                                                        hasMatches = true;
-                                                    }
-                                                });
-
-                                                if (hasMatches) {
-                                                    visibleSubcategories++;
-                                                    showCategoryRow = true;
-                                                    option.style.display = '';
-                                                    subcatSelect.value = subcatValue; // Select this subcategory
-                                                    if (typeof loadCommonNames === 'function') {
-                                                        loadCommonNames(subcatSelect); // Load common names to display matches
-                                                    }
-                                                }
-                                            })
-                                            .catch(error => console.error('Error fetching items for filtering:', error));
-                                    });
-                                })
-                                .catch(error => console.error('Error fetching common names for filtering:', error));
-                        }
-                    });
                 }
             } else {
-                // If no subcategory is selected, check all subcategories
-                options.forEach(option => {
-                    let showOption = false;
-                    const subcatValue = option.textContent.toLowerCase();
-                    if (globalFilter.commonName) {
-                        if (subcatValue.includes(globalFilter.commonName)) {
-                            showOption = true;
-                        }
+                // If no subcategory is selected, only apply category-level filter
+                if (globalFilter.commonName) {
+                    if (categoryValue.includes(globalFilter.commonName)) {
+                        showCategoryRow = true;
                     }
-
-                    // Fetch common names and items to check for matches
-                    fetch(`/tab/${window.cachedTabNum}/common_names?category=${encodeURIComponent(categoryValue)}&subcategory=${encodeURIComponent(subcatValue)}`)
-                        .then(response => response.json())
-                        .then(data => {
-                            const commonNames = data.common_names || [];
-                            let hasMatches = false;
-
-                            commonNames.forEach(common => {
-                                const commonNameValue = common.name.toLowerCase();
-                                if (globalFilter.commonName && commonNameValue.includes(globalFilter.commonName)) {
-                                    hasMatches = true;
-                                    return;
-                                }
-
-                                // Fetch items for this common name
-                                fetch(`/tab/${window.cachedTabNum}/data?category=${encodeURIComponent(categoryValue)}&subcategory=${encodeURIComponent(subcatValue)}&common_name=${encodeURIComponent(common.name)}`)
-                                    .then(itemResponse => itemResponse.json())
-                                    .then(itemData => {
-                                        const items = itemData.items || [];
-                                        items.forEach(item => {
-                                            const itemCommonNameValue = item.common_name.toLowerCase();
-                                            const itemContractValue = item.last_contract_num ? item.last_contract_num.toLowerCase() : '';
-                                            if (globalFilter.commonName && itemCommonNameValue.includes(globalFilter.commonName)) {
-                                                hasMatches = true;
-                                            }
-                                            if (globalFilter.contractNumber && itemContractValue.includes(globalFilter.contractNumber)) {
-                                                hasMatches = true;
-                                            }
-                                        });
-
-                                        if (hasMatches) {
-                                            showOption = true;
-                                            visibleSubcategories++;
-                                            showCategoryRow = true;
-                                        }
-                                        option.style.display = showOption ? '' : 'none';
-                                        if (showOption && visibleSubcategories === 1 && !subcatSelect.value) {
-                                            subcatSelect.value = subcatValue; // Select the first matching subcategory
-                                            if (typeof loadCommonNames === 'function') {
-                                                loadCommonNames(subcatSelect); // Load common names to display matches
-                                            }
-                                        }
-                                    })
-                                    .catch(error => console.error('Error fetching items for filtering:', error));
-                            });
-                        })
-                        .catch(error => console.error('Error fetching common names for filtering:', error));
-                });
+                } else {
+                    showCategoryRow = true;
+                }
             }
 
             // Show category row if there are visible subcategories or matching items
@@ -467,7 +366,7 @@ function applyFilterToAllLevels() {
                         // Check expanded item tables
                         const commonExpandableRow = commonRow.nextElementSibling;
                         let visibleItemRows = 0;
-                        if (commonExpandableRow && commonExpandableRow.classList.contains('expandable')) {
+                        if (commonExpandableRow && commonExpandableRow.classList.contains('expandable') && commonExpandableRow.classList.contains('expanded')) {
                             const itemTable = commonExpandableRow.querySelector('.item-table');
                             if (itemTable) {
                                 const itemRows = itemTable.querySelectorAll('tbody tr') || [];
@@ -570,47 +469,6 @@ function applyFilterToAllLevels() {
                             categoryCollapseBtn.style.display = 'none';
                         }
                     }
-                } else {
-                    // If not expanded, fetch common names and items to check for matches
-                    fetch(`/tab/${window.cachedTabNum}/common_names?contract_number=${encodeURIComponent(contractValue)}`)
-                        .then(response => response.json())
-                        .then(data => {
-                            const commonNames = data.common_names || [];
-                            let hasMatches = false;
-
-                            commonNames.forEach(common => {
-                                const commonNameValue = common.name.toLowerCase();
-                                if (globalFilter.commonName && commonNameValue.includes(globalFilter.commonName)) {
-                                    hasMatches = true;
-                                    return;
-                                }
-
-                                fetch(`/tab/${window.cachedTabNum}/data?contract_number=${encodeURIComponent(contractValue)}&common_name=${encodeURIComponent(common.name)}`)
-                                    .then(itemResponse => itemResponse.json())
-                                    .then(itemData => {
-                                        const items = itemData.items || [];
-                                        items.forEach(item => {
-                                            const itemCommonNameValue = item.common_name.toLowerCase();
-                                            const itemContractValue = item.last_contract_num ? item.last_contract_num.toLowerCase() : '';
-                                            if (globalFilter.commonName && itemCommonNameValue.includes(globalFilter.commonName)) {
-                                                hasMatches = true;
-                                            }
-                                            if (globalFilter.contractNumber && itemContractValue.includes(globalFilter.contractNumber)) {
-                                                hasMatches = true;
-                                            }
-                                        });
-
-                                        if (hasMatches) {
-                                            showCategoryRow = true;
-                                            if (typeof window.expandCategory === 'function') {
-                                                window.expandCategory(contractValue, `subcat-${contractValue}`, contractValue);
-                                            }
-                                        }
-                                    })
-                                    .catch(error => console.error('Error fetching items for filtering:', error));
-                            });
-                        })
-                        .catch(error => console.error('Error fetching common names for filtering:', error));
                 }
             }
 
@@ -697,7 +555,7 @@ function applyFilterToTable(table) {
             // Check child tables (common names or items)
             let hasMatchingChildren = false;
             const expandableRow = row.nextElementSibling;
-            if (expandableRow && expandableRow.classList.contains('expandable')) {
+            if (expandableRow && expandableRow.classList.contains('expandable') && expandableRow.classList.contains('expanded')) {
                 const childTable = expandableRow.querySelector('.common-table, .item-table');
                 if (childTable) {
                     const childRows = childTable.querySelectorAll('tbody tr:not(.expandable)') || [];
