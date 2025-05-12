@@ -1,4 +1,4 @@
-console.log('tab1_5.js version: 2025-05-07-v34 loaded');
+console.log('tab1_5.js version: 2025-05-07-v36 loaded');
 
 // Note: Ensure formatDate is available (defined in common.js)
 if (typeof formatDate !== 'function') {
@@ -103,25 +103,11 @@ function loadCommonNames(selectElement, page = 1) {
         .then(data => {
             console.log('Common names data received:', data);
 
-            // Remove any existing common name rows for this category
-            collapseSection(categoryRow, targetId);
-
-            if (data.common_names && data.common_names.length > 0) {
-                // Calculate subcategory totals
-                const totalItems = data.common_names.reduce((sum, item) => sum + (item.total_items || 0), 0);
-                const itemsOnContracts = data.common_names.reduce((sum, item) => sum + (item.items_on_contracts || 0), 0);
-                const itemsInService = data.common_names.reduce((sum, item) => sum + (item.items_in_service || 0), 0);
-                const itemsAvailable = data.common_names.reduce((sum, item) => sum + (item.items_available || 0), 0);
-
-                // Update category row with subcategory totals
-                console.log('Updating category row with totals:', { totalItems, itemsOnContracts, itemsInService, itemsAvailable });
-                categoryRow.cells[2].textContent = totalItems || '0';
-                categoryRow.cells[3].textContent = itemsOnContracts || '0';
-                categoryRow.cells[4].textContent = itemsInService || '0';
-                categoryRow.cells[5].textContent = itemsAvailable || '0';
-
+            // Check if the table already exists
+            let headerRow = categoryRow.parentNode.querySelector(`tr.common-name-row[data-target-id="${targetId}"] .common-table`);
+            if (!headerRow) {
                 // Create a new row for the common name table header
-                const headerRow = document.createElement('tr');
+                headerRow = document.createElement('tr');
                 headerRow.className = 'common-name-row';
                 headerRow.setAttribute('data-target-id', targetId);
                 headerRow.innerHTML = `
@@ -142,9 +128,27 @@ function loadCommonNames(selectElement, page = 1) {
                     </td>
                 `;
                 tbody.insertBefore(headerRow, categoryRow.nextSibling);
+            }
+
+            // Update the table body in place
+            const tableBody = headerRow.querySelector('tbody');
+            tableBody.innerHTML = ''; // Clear existing rows without removing the table
+
+            if (data.common_names && data.common_names.length > 0) {
+                // Calculate subcategory totals
+                const totalItems = data.common_names.reduce((sum, item) => sum + (item.total_items || 0), 0);
+                const itemsOnContracts = data.common_names.reduce((sum, item) => sum + (item.items_on_contracts || 0), 0);
+                const itemsInService = data.common_names.reduce((sum, item) => sum + (item.items_in_service || 0), 0);
+                const itemsAvailable = data.common_names.reduce((sum, item) => sum + (item.items_available || 0), 0);
+
+                // Update category row with subcategory totals
+                console.log('Updating category row with totals:', { totalItems, itemsOnContracts, itemsInService, itemsAvailable });
+                categoryRow.cells[2].textContent = totalItems || '0';
+                categoryRow.cells[3].textContent = itemsOnContracts || '0';
+                categoryRow.cells[4].textContent = itemsInService || '0';
+                categoryRow.cells[5].textContent = itemsAvailable || '0';
 
                 // Populate the table body with common name rows
-                const tableBody = headerRow.querySelector('tbody');
                 data.common_names.forEach(item => {
                     const rowId = `${targetId}_${item.name.replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '')}`;
                     const escapedName = item.name.replace(/'/g, "\\'").replace(/"/g, '\\"');
@@ -214,9 +218,10 @@ function loadCommonNames(selectElement, page = 1) {
                     tableBody.appendChild(paginationRow);
                 }
 
-                // Debug the common table's styles
+                // Add 'loaded' class to trigger transition
                 const commonTable = document.getElementById(`common-table-${targetId}`);
                 if (commonTable) {
+                    commonTable.classList.add('loaded');
                     console.log('Common table styles:', {
                         display: commonTable.style.display,
                         visibility: window.getComputedStyle(commonTable).visibility,
@@ -233,7 +238,7 @@ function loadCommonNames(selectElement, page = 1) {
                         <p>No common names found for this subcategory.</p>
                     </td>
                 `;
-                tbody.insertBefore(noDataRow, categoryRow.nextSibling);
+                tableBody.appendChild(noDataRow);
             }
 
             // Apply global filter to the newly loaded table
@@ -677,8 +682,10 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
             container.style.opacity = '1';
             container.style.visibility = 'visible';
 
+            // Add 'loaded' class to trigger transition for item table
             const itemTable = document.getElementById(`item-table-${key}`);
             if (itemTable) {
+                itemTable.classList.add('loaded');
                 console.log('Item table styles:', {
                     display: itemTable.style.display,
                     visibility: window.getComputedStyle(itemTable).visibility,

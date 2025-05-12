@@ -1,4 +1,4 @@
-console.log('common.js version: 2025-05-07-v10 loaded - confirming script load');
+console.log('common.js version: 2025-05-07-v11 loaded - confirming script load');
 
 // Function to format ISO date strings into "Thurs, Aug 21 2025 4:55 pm"
 function formatDate(isoDateString) {
@@ -107,7 +107,7 @@ function applyFilterToAllLevels() {
             return;
         }
 
-        const categoryRows = categoryTable.querySelectorAll('tbody tr:not(.expandable)') || [];
+        const categoryRows = categoryTable.querySelectorAll('.category-row') || [];
         if (!categoryRows.length) {
             console.warn('No category rows found in table, skipping filter application');
             return;
@@ -116,13 +116,10 @@ function applyFilterToAllLevels() {
         let visibleCategoryRows = 0;
 
         categoryRows.forEach(categoryRow => {
-            let showCategoryRow = false;
+            let showCategoryRow = true;
             const categoryCell = categoryRow.querySelector('td:nth-child(1)'); // Category column
             const categoryValue = categoryCell ? categoryCell.textContent.toLowerCase() : '';
             const subcatSelect = categoryRow.querySelector('.subcategory-select');
-            const expandableRow = categoryRow.nextElementSibling;
-            const commonLevelDiv = expandableRow ? expandableRow.querySelector('.common-level') : null;
-            let visibleSubcategories = 0;
             let hasMatchingItems = false;
 
             // Filter subcategory dropdown options and check for matching items
@@ -132,97 +129,105 @@ function applyFilterToAllLevels() {
 
             // If a subcategory is selected, we need to check its common names and items
             if (selectedValue) {
-                if (!commonLevelDiv) {
-                    console.warn(`Common level div not found for category ${categoryValue}`);
+                const commonTables = categoryRow.parentNode.querySelectorAll(`.common-name-row[data-target-id^="common-${categoryValue.toLowerCase().replace(/[^a-z0-9]/g, '_')}"] .common-table`);
+                if (!commonTables.length) {
+                    console.warn(`Common tables not found for category ${categoryValue}`);
                     return;
                 }
-                const commonTable = commonLevelDiv.querySelector('.common-table');
-                if (commonTable) {
-                    const commonRows = commonTable.querySelectorAll('tbody tr:not(.expandable)') || [];
+
+                let visibleSubcategories = 0;
+                commonTables.forEach(commonTable => {
+                    const commonRows = commonTable.querySelectorAll('tbody tr:not(.common-name-row)') || [];
                     let visibleCommonRows = 0;
 
-                    commonRows.forEach(commonRow => {
-                        let showCommonRow = false;
+                    commonRows.forEach((commonRow, index) => {
+                        // Skip every other row (the expandable items row)
+                        if (index % 2 !== 0) return;
+
+                        let showCommonRow = true;
                         const commonNameCell = commonRow.querySelector('td:nth-child(1)'); // Common Name column
                         const commonNameValue = commonNameCell ? commonNameCell.textContent.toLowerCase() : '';
 
                         // Check if the common name matches the filter
-                        if (globalFilter.commonName) {
-                            if (commonNameValue.includes(globalFilter.commonName)) {
-                                showCommonRow = true;
-                            }
-                        } else {
-                            showCommonRow = true; // Show all if no common name filter
+                        if (globalFilter.commonName && !commonNameValue.includes(globalFilter.commonName)) {
+                            showCommonRow = false;
                         }
 
                         // Check expanded item tables if they exist
                         const commonExpandableRow = commonRow.nextElementSibling;
                         let visibleItemRows = 0;
-                        if (commonExpandableRow && commonExpandableRow.classList.contains('expandable') && commonExpandableRow.classList.contains('expanded')) {
-                            const itemTable = commonExpandableRow.querySelector('.item-table');
-                            if (itemTable) {
-                                const itemRows = itemTable.querySelectorAll('tbody tr') || [];
-                                itemRows.forEach(itemRow => {
-                                    let showItemRow = true;
-                                    const itemCommonNameCell = itemRow.querySelector('td:nth-child(2)'); // Common Name column in item table
-                                    const itemContractCell = itemRow.querySelector('td:nth-child(5)'); // Last Contract column in item table
-                                    const itemCommonNameValue = itemCommonNameCell ? itemCommonNameCell.textContent.toLowerCase() : '';
-                                    const itemContractValue = itemContractCell ? itemContractCell.textContent.toLowerCase() : '';
+                        if (commonExpandableRow && commonExpandableRow.classList.contains('common-name-row')) {
+                            const itemsDiv = commonExpandableRow.querySelector('.expandable');
+                            if (itemsDiv && itemsDiv.classList.contains('expanded')) {
+                                const itemTable = itemsDiv.querySelector('.item-table');
+                                if (itemTable) {
+                                    const itemRows = itemTable.querySelectorAll('tbody tr') || [];
+                                    itemRows.forEach(itemRow => {
+                                        let showItemRow = true;
+                                        const colOffset = window.cachedTabNum == 5 ? 1 : 0; // Adjust for "Select" column in Tab 5
+                                        const itemCommonNameCell = itemRow.querySelector(`td:nth-child(${2 + colOffset})`); // Common Name column
+                                        const itemContractCell = itemRow.querySelector(`td:nth-child(${5 + colOffset})`); // Last Contract column
+                                        const itemCommonNameValue = itemCommonNameCell ? itemCommonNameCell.textContent.toLowerCase() : '';
+                                        const itemContractValue = itemContractCell ? itemContractCell.textContent.toLowerCase() : '';
 
-                                    if (globalFilter.commonName && !itemCommonNameValue.includes(globalFilter.commonName)) {
-                                        showItemRow = false;
+                                        if (globalFilter.commonName && !itemCommonNameValue.includes(globalFilter.commonName)) {
+                                            showItemRow = false;
+                                        }
+                                        if (globalFilter.contractNumber && !itemContractValue.includes(globalFilter.contractNumber)) {
+                                            showItemRow = false;
+                                        }
+
+                                        itemRow.style.display = showItemRow ? '' : 'none';
+                                        if (showItemRow) {
+                                            visibleItemRows++;
+                                            showCommonRow = true; // If any item matches, show the common name row
+                                            hasMatchingItems = true;
+                                        }
+                                    });
+
+                                    // Update item table row count
+                                    let itemRowCountDiv = itemTable.nextElementSibling;
+                                    if (itemRowCountDiv && !itemRowCountDiv.classList.contains('row-count')) {
+                                        itemRowCountDiv = document.createElement('div');
+                                        itemRowCountDiv.className = 'row-count mt-2';
+                                        itemTable.insertAdjacentElement('afterend', itemRowCountDiv);
                                     }
-                                    if (globalFilter.contractNumber && !itemContractValue.includes(globalFilter.contractNumber)) {
-                                        showItemRow = false;
+                                    if (itemRowCountDiv) {
+                                        itemRowCountDiv.textContent = `Showing ${visibleItemRows} of ${itemRows.length} rows`;
                                     }
 
-                                    itemRow.style.display = showItemRow ? '' : 'none';
-                                    if (showItemRow) {
-                                        visibleItemRows++;
-                                        showCommonRow = true; // If any item matches, show the common name row
-                                        hasMatchingItems = true;
-                                    }
-                                });
-
-                                // Update item table row count
-                                let itemRowCountDiv = itemTable.nextElementSibling;
-                                if (itemRowCountDiv && !itemRowCountDiv.classList.contains('row-count')) {
-                                    itemRowCountDiv = document.createElement('div');
-                                    itemRowCountDiv.className = 'row-count mt-2';
-                                    itemTable.insertAdjacentElement('afterend', itemRowCountDiv);
-                                }
-                                if (itemRowCountDiv) {
-                                    itemRowCountDiv.textContent = `Showing ${visibleItemRows} of ${itemRows.length} rows`;
-                                }
-
-                                // Expand the item section if there are matching items
-                                if (visibleItemRows > 0) {
-                                    commonExpandableRow.classList.remove('collapsed');
-                                    commonExpandableRow.classList.add('expanded');
-                                    commonExpandableRow.style.display = 'block';
-                                    commonExpandableRow.style.opacity = '1';
-                                    const expandBtn = commonRow.querySelector('.expand-btn');
-                                    const collapseBtn = commonRow.querySelector('.collapse-btn');
-                                    if (expandBtn && collapseBtn) {
-                                        expandBtn.style.display = 'none';
-                                        collapseBtn.style.display = 'inline-block';
-                                    }
-                                } else {
-                                    commonExpandableRow.classList.remove('expanded');
-                                    commonExpandableRow.classList.add('collapsed');
-                                    commonExpandableRow.style.display = 'none';
-                                    commonExpandableRow.style.opacity = '0';
-                                    const expandBtn = commonRow.querySelector('.expand-btn');
-                                    const collapseBtn = commonRow.querySelector('.collapse-btn');
-                                    if (expandBtn && collapseBtn) {
-                                        expandBtn.style.display = 'inline-block';
-                                        collapseBtn.style.display = 'none';
+                                    // Expand the item section if there are matching items
+                                    if (visibleItemRows > 0) {
+                                        itemsDiv.classList.remove('collapsed');
+                                        itemsDiv.classList.add('expanded');
+                                        itemsDiv.style.display = 'block';
+                                        itemsDiv.style.opacity = '1';
+                                        const expandBtn = commonRow.querySelector('.expand-btn');
+                                        const collapseBtn = commonRow.querySelector('.collapse-btn');
+                                        if (expandBtn && collapseBtn) {
+                                            expandBtn.style.display = 'none';
+                                            collapseBtn.style.display = 'inline-block';
+                                        }
+                                    } else {
+                                        itemsDiv.classList.remove('expanded');
+                                        itemsDiv.classList.add('collapsed');
+                                        itemsDiv.style.display = 'none';
+                                        itemsDiv.style.opacity = '0';
+                                        const expandBtn = commonRow.querySelector('.expand-btn');
+                                        const collapseBtn = commonRow.querySelector('.collapse-btn');
+                                        if (expandBtn && collapseBtn) {
+                                            expandBtn.style.display = 'inline-block';
+                                            collapseBtn.style.display = 'none';
+                                        }
                                     }
                                 }
                             }
                         }
 
                         commonRow.style.display = showCommonRow ? '' : 'none';
+                        if (commonExpandableRow) {
+                            commonExpandableRow.style.display = showCommonRow ? '' : 'none';
+                        }
                         if (showCommonRow) visibleCommonRows++;
                     });
 
@@ -234,38 +239,15 @@ function applyFilterToAllLevels() {
                         commonTable.insertAdjacentElement('afterend', commonRowCountDiv);
                     }
                     if (commonRowCountDiv) {
-                        commonRowCountDiv.textContent = `Showing ${visibleCommonRows} of ${commonRows.length} rows`;
+                        commonRowCountDiv.textContent = `Showing ${visibleCommonRows} of ${commonRows.length / 2} rows`; // Divide by 2 due to interleaved expandable rows
                     }
 
                     // Show the subcategory if there are matching common names or items
                     if (visibleCommonRows > 0 || hasMatchingItems) {
                         visibleSubcategories++;
                         showCategoryRow = true;
-
-                        // Expand the common names section
-                        commonLevelDiv.classList.remove('collapsed');
-                        commonLevelDiv.classList.add('expanded');
-                        commonLevelDiv.style.display = 'block';
-                        commonLevelDiv.style.opacity = '1';
-                        const categoryExpandBtn = categoryRow.querySelector('.expand-btn');
-                        const categoryCollapseBtn = categoryRow.querySelector('.collapse-btn');
-                        if (categoryExpandBtn && categoryCollapseBtn) {
-                            categoryExpandBtn.style.display = 'none';
-                            categoryCollapseBtn.style.display = 'inline-block';
-                        }
-                    } else {
-                        commonLevelDiv.classList.remove('expanded');
-                        commonLevelDiv.classList.add('collapsed');
-                        commonLevelDiv.style.display = 'none';
-                        commonLevelDiv.style.opacity = '0';
-                        const categoryExpandBtn = categoryRow.querySelector('.expand-btn');
-                        const categoryCollapseBtn = categoryRow.querySelector('.collapse-btn');
-                        if (categoryExpandBtn && categoryCollapseBtn) {
-                            categoryExpandBtn.style.display = 'inline-block';
-                            categoryCollapseBtn.style.display = 'none';
-                        }
                     }
-                }
+                });
             } else {
                 // If no subcategory is selected, only apply category-level filter
                 if (globalFilter.commonName) {
@@ -281,25 +263,17 @@ function applyFilterToAllLevels() {
             if (!globalFilter.commonName && !globalFilter.contractNumber) {
                 showCategoryRow = true;
                 options.forEach(option => option.style.display = '');
-                if (commonLevelDiv) {
-                    commonLevelDiv.classList.remove('expanded');
-                    commonLevelDiv.classList.add('collapsed');
-                    commonLevelDiv.style.display = 'none';
-                    commonLevelDiv.style.opacity = '0';
-                    const categoryExpandBtn = categoryRow.querySelector('.expand-btn');
-                    const categoryCollapseBtn = categoryRow.querySelector('.collapse-btn');
-                    if (categoryExpandBtn && categoryCollapseBtn) {
-                        categoryExpandBtn.style.display = 'inline-block';
-                        categoryCollapseBtn.style.display = 'none';
-                    }
-                }
             }
 
             categoryRow.style.display = showCategoryRow ? '' : 'none';
-            if (expandableRow) {
-                expandableRow.style.display = showCategoryRow ? '' : 'none';
+            if (showCategoryRow) {
+                visibleCategoryRows++;
+                // Ensure common-name-rows are visible if the category row is visible
+                const relatedRows = categoryRow.parentNode.querySelectorAll(`.common-name-row[data-target-id^="common-${categoryValue.toLowerCase().replace(/[^a-z0-9]/g, '_')}"]`);
+                relatedRows.forEach(row => {
+                    row.style.display = showCategoryRow ? '' : 'none';
+                });
             }
-            if (showCategoryRow) visibleCategoryRows++;
         });
 
         // Update category table row count
@@ -466,7 +440,7 @@ function applyFilterToAllLevels() {
                         const categoryCollapseBtn = categoryRow.querySelector('.collapse-btn');
                         if (categoryExpandBtn && categoryCollapseBtn) {
                             categoryExpandBtn.style.display = 'inline-block';
-                            categoryCollapseBtn.style.display = 'none';
+                            collapseBtn.style.display = 'none';
                         }
                     }
                 }

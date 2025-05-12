@@ -19,6 +19,19 @@
     visibility: visible !important;
     margin: 0 !important;
     table-layout: fixed;
+    opacity: 0; /* Start with opacity 0 for transition */
+    transition: opacity 0.3s ease; /* Smooth transition for opacity */
+}
+
+.common-table.loaded {
+    opacity: 1; /* Fade in when loaded */
+}
+
+.common-table th,
+.common-table td {
+    color: #000000 !important; /* Explicitly set font color to black */
+    font-family: 'Roboto', sans-serif !important; /* Match parent table font */
+    font-weight: 500; /* Slightly bolder for readability */
 }
 
 .item-level-wrapper {
@@ -44,6 +57,26 @@
     min-width: 1200px;
     display: table !important;
     visibility: visible !important;
+}
+
+.item-table {
+    width: 100%;
+    border-collapse: collapse;
+    display: table !important;
+    visibility: visible !important;
+    opacity: 0; /* Start with opacity 0 for transition */
+    transition: opacity 0.3s ease; /* Smooth transition for opacity */
+}
+
+.item-table.loaded {
+    opacity: 1; /* Fade in when loaded */
+}
+
+.item-table th,
+.item-table td {
+    color: #000000 !important; /* Explicitly set font color to black */
+    font-family: 'Roboto', sans-serif !important; /* Match parent table font */
+    font-weight: 500; /* Slightly bolder for readability */
 }
 
 /* Table styling */
@@ -313,8 +346,10 @@
 /* Loading indicator */
 .loading-indicator {
     font-style: italic;
-    color: #666;
+    font-weight: bold;
+    color: #DC3545; /* Match --bte-accent-red */
     text-align: center;
     padding: 10px;
+    font-size: 1.1rem;
     display: none;
 }
