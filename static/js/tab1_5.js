@@ -1,4 +1,4 @@
-console.log('tab1_5.js version: 2025-05-07-v28 loaded');
+console.log('tab1_5.js version: 2025-05-07-v29 loaded');
 
 // Note: Ensure formatDate is available (defined in common.js)
 if (typeof formatDate !== 'function') {
@@ -9,10 +9,10 @@ if (typeof formatDate !== 'function') {
 }
 
 // Note: Common function for Tabs 1 and 5
-function showLoading(targetId) {
+function showLoadingTab1_5(targetId) {
     const container = document.getElementById(targetId);
     if (!container) {
-        console.warn(`Container with ID ${targetId} not found for showing loading indicator`);
+        console.warn(`Container with ID ${targetId} not found for showing loading indicator (tab1_5.js)`);
         return false; // Indicate failure to create loading indicator
     }
 
@@ -26,7 +26,7 @@ function showLoading(targetId) {
 }
 
 // Note: Common function for Tabs 1 and 5
-function hideLoading(targetId) {
+function hideLoadingTab1_5(targetId) {
     const loadingDiv = document.getElementById(`loading-${targetId}`);
     if (loadingDiv) {
         loadingDiv.remove();
@@ -102,7 +102,7 @@ function loadCommonNames(selectElement, page = 1) {
         return;
     }
 
-    const loadingSuccess = showLoading(targetId);
+    const loadingSuccess = showLoadingTab1_5(targetId);
     targetElement.innerHTML = ''; // Clear previous content
 
     let url = `/tab/${window.cachedTabNum}/common_names?category=${encodeURIComponent(category)}&subcategory=${encodeURIComponent(subcategory)}&page=${page}`;
@@ -233,7 +233,7 @@ function loadCommonNames(selectElement, page = 1) {
         })
         .finally(() => {
             if (loadingSuccess) {
-                hideLoading(targetId);
+                hideLoadingTab1_5(targetId);
             }
         });
 }
@@ -454,7 +454,7 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
     container.classList.add('loading');
 
     const key = targetId;
-    const loadingSuccess = showLoading(key);
+    const loadingSuccess = showLoadingTab1_5(key);
     container.innerHTML = ''; // Clear previous content
 
     let url = `/tab/${window.cachedTabNum}/data?common_name=${encodeURIComponent(commonName)}&page=${page}&subcategory=${encodeURIComponent(subcategory)}&category=${encodeURIComponent(category)}`;
@@ -676,7 +676,7 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
         })
         .finally(() => {
             if (loadingSuccess) {
-                hideLoading(key);
+                hideLoadingTab1_5(key);
             }
         });
 }
