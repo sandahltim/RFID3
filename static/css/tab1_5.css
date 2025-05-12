@@ -175,23 +175,32 @@
     padding: 5px;
 }
 
-/* Smooth transition for expanding/collapsing */
+/* Simplify expandable styles */
 .expandable {
-    transition: max-height 0.3s ease, opacity 0.3s ease;
-    overflow: hidden;
+    display: none;
 }
 
 .expandable.collapsed {
-    max-height: 0;
-    opacity: 0;
     display: none;
+    opacity: 0;
 }
 
 .expandable.expanded {
     display: block !important;
-    visibility: visible !important;
     opacity: 1;
-    max-height: none;
+    visibility: visible !important;
+}
+
+/* Ensure parent rows and cells are visible */
+.category-row,
+.expandable-row {
+    display: table-row !important;
+    visibility: visible !important;
+}
+
+.expandable-row td {
+    display: table-cell !important;
+    visibility: visible !important;
 }
 
 /* Bulk update controls for Tab 5 */
