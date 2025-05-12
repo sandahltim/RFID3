@@ -1,4 +1,4 @@
-console.log('tab1_5.js version: 2025-05-07-v29 loaded');
+console.log('tab1_5.js version: 2025-05-07-v30 loaded');
 
 // Note: Ensure formatDate is available (defined in common.js)
 if (typeof formatDate !== 'function') {
@@ -824,16 +824,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Handle "Expand Items" for common names
                 console.log('Triggering loadItems for common name:', commonName);
                 loadItems(category, subcategory, commonName, targetId);
-            } else if (category && targetId) {
-                // Handle "Expand" for categories (subcategory selection)
-                console.log('Triggering window.expandCategory for category:', category);
-                if (typeof window.expandCategory === 'function') {
-                    window.expandCategory(category, targetId);
-                } else {
-                    console.error('window.expandCategory is not defined');
-                }
             } else {
-                console.error('Missing required attributes for expand button:', expandBtn);
+                console.error('Missing required attributes for expand button (expected at common name level):', expandBtn);
             }
             return;
         }
@@ -845,6 +837,16 @@ document.addEventListener('DOMContentLoaded', function() {
             const targetId = collapseBtn.getAttribute('data-collapse-target');
             console.log('Collapse button clicked for targetId:', targetId);
             collapseSection(targetId);
+            return;
+        }
+
+        const saveBtn = event.target.closest('.save-btn');
+        if (saveBtn && window.cachedTabNum === 1) {
+            event.preventDefault();
+            event.stopPropagation();
+            const tagId = saveBtn.closest('tr').getAttribute('data-item-id');
+            console.log('Save button clicked for tagId:', tagId);
+            saveChanges(tagId);
             return;
         }
     }

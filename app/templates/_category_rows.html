@@ -12,12 +12,6 @@
     <td>{{ category.items_in_service }}</td>
     <td>{{ category.items_available }}</td>
     <td>
-        <button class="btn btn-sm btn-secondary expand-btn" 
-                data-category="{{ category.category | urlencode | replace('\'', '\\\'') | replace('\"', '\\\"') }}" 
-                data-target-id="common-{{ category.cat_id }}">Expand</button>
-        <button class="btn btn-sm btn-secondary collapse-btn" 
-                style="display:none;" 
-                data-collapse-target="common-{{ category.cat_id }}">Collapse</button>
         <button class="btn btn-sm btn-info print-btn" 
                 data-print-level="Category" 
                 data-print-id="category-table">Print</button>
