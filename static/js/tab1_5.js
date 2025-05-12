@@ -1,4 +1,4 @@
-console.log('tab1_5.js version: 2025-05-07-v37 loaded');
+console.log('tab1_5.js version: 2025-05-07-v39 loaded');
 
 // Note: Ensure formatDate is available (defined in common.js)
 if (typeof formatDate !== 'function') {
@@ -106,24 +106,34 @@ function loadCommonNames(selectElement, page = 1) {
             // Check if the table already exists
             let headerRow = categoryRow.parentNode.querySelector(`tr.common-name-row[data-target-id="${targetId}"] .common-table`);
             if (!headerRow) {
-                // Create a new row for the common name table header
+                // Create a new row for the common name table header with inline styles and placeholder rows
                 headerRow = document.createElement('tr');
                 headerRow.className = 'common-name-row';
                 headerRow.setAttribute('data-target-id', targetId);
                 headerRow.innerHTML = `
                     <td colspan="7">
-                        <table class="common-table" id="common-table-${targetId}">
+                        <table class="common-table" id="common-table-${targetId}" style="color: #000000;">
                             <thead>
                                 <tr>
-                                    <th>Common Name</th>
-                                    <th>Total Items</th>
-                                    <th>Items on Contracts</th>
-                                    <th>Items in Service</th>
-                                    <th>Items Available</th>
-                                    <th>Actions</th>
+                                    <th style="color: #000000;">Common Name</th>
+                                    <th style="color: #000000;">Total Items</th>
+                                    <th style="color: #000000;">Items on Contracts</th>
+                                    <th style="color: #000000;">Items in Service</th>
+                                    <th style="color: #000000;">Items Available</th>
+                                    <th style="color: #000000;">Actions</th>
                                 </tr>
                             </thead>
-                            <tbody></tbody>
+                            <tbody>
+                                <!-- Placeholder rows to maintain layout -->
+                                <tr>
+                                    <td style="color: #000000;">Loading...</td>
+                                    <td style="color: #000000;">-</td>
+                                    <td style="color: #000000;">-</td>
+                                    <td style="color: #000000;">-</td>
+                                    <td style="color: #000000;">-</td>
+                                    <td>-</td>
+                                </tr>
+                            </tbody>
                         </table>
                     </td>
                 `;
@@ -154,11 +164,11 @@ function loadCommonNames(selectElement, page = 1) {
                     const escapedName = item.name.replace(/'/g, "\\'").replace(/"/g, '\\"');
                     const commonRow = document.createElement('tr');
                     commonRow.innerHTML = `
-                        <td>${item.name}</td>
-                        <td>${item.total_items || '0'}</td>
-                        <td>${item.items_on_contracts || '0'}</td>
-                        <td>${item.items_in_service || '0'}</td>
-                        <td>${item.items_available || '0'}</td>
+                        <td style="color: #000000;">${item.name}</td>
+                        <td style="color: #000000;">${item.total_items || '0'}</td>
+                        <td style="color: #000000;">${item.items_on_contracts || '0'}</td>
+                        <td style="color: #000000;">${item.items_in_service || '0'}</td>
+                        <td style="color: #000000;">${item.items_available || '0'}</td>
                         <td>
                             <div class="btn-group">
                                 <button class="btn btn-sm btn-secondary expand-btn" 
@@ -269,7 +279,7 @@ function loadCommonNames(selectElement, page = 1) {
                 if (loadingDiv) {
                     loadingDiv.style.display = 'none';
                 }
-            }, 300); // Ensure loading indicator stays until transition completes
+            }, 500); // Increased delay to ensure smooth transition
         });
 }
 
@@ -492,7 +502,78 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
 
     const key = targetId;
     const loadingSuccess = showLoadingTab1_5(key);
-    container.innerHTML = ''; // Clear previous content
+
+    // Predefine the table structure with placeholder rows to minimize layout shifts
+    container.innerHTML = `
+        <div class="item-level-wrapper">
+            <table class="item-table" id="item-table-${key}" style="color: #000000;">
+                <thead>
+                    <tr>
+                        ${window.cachedTabNum == 5 ? `
+                            <th style="color: #000000;">Select</th>
+                            <th style="color: #000000;">Tag ID</th>
+                            <th style="color: #000000;">Common Name</th>
+                            <th style="color: #000000;">Bin Location</th>
+                            <th style="color: #000000;">Status</th>
+                            <th style="color: #000000;">Last Contract</th>
+                            <th style="color: #000000;">Last Scanned Date</th>
+                            <th style="color: #000000;">Quality</th>
+                            <th style="color: #000000;">Notes</th>
+                            <th style="color: #000000;">Actions</th>
+                        ` : window.cachedTabNum == 1 ? `
+                            <th style="color: #000000;">Tag ID</th>
+                            <th style="color: #000000;">Common Name</th>
+                            <th style="color: #000000;">Bin Location</th>
+                            <th style="color: #000000;">Status</th>
+                            <th style="color: #000000;">Last Contract</th>
+                            <th style="color: #000000;">Last Scanned Date</th>
+                            <th style="color: #000000;">Quality</th>
+                            <th style="color: #000000;">Notes</th>
+                        ` : `
+                            <th style="color: #000000;">Tag ID</th>
+                            <th style="color: #000000;">Common Name</th>
+                            <th style="color: #000000;">Bin Location</th>
+                            <th style="color: #000000;">Status</th>
+                            <th style="color: #000000;">Last Contract</th>
+                            <th style="color: #000000;">Last Scanned Date</th>
+                        `}
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        ${window.cachedTabNum == 5 ? `
+                            <td>-</td>
+                            <td style="color: #000000;">Loading...</td>
+                            <td style="color: #000000;">-</td>
+                            <td>-</td>
+                            <td>-</td>
+                            <td style="color: #000000;">-</td>
+                            <td style="color: #000000;">-</td>
+                            <td style="color: #000000;">-</td>
+                            <td style="color: #000000;">-</td>
+                            <td>-</td>
+                        ` : window.cachedTabNum == 1 ? `
+                            <td style="color: #000000;">Loading...</td>
+                            <td style="color: #000000;">-</td>
+                            <td>-</td>
+                            <td>-</td>
+                            <td style="color: #000000;">-</td>
+                            <td style="color: #000000;">-</td>
+                            <td style="color: #000000;">-</td>
+                            <td style="color: #000000;">-</td>
+                        ` : `
+                            <td style="color: #000000;">Loading...</td>
+                            <td style="color: #000000;">-</td>
+                            <td style="color: #000000;">-</td>
+                            <td style="color: #000000;">-</td>
+                            <td style="color: #000000;">-</td>
+                            <td style="color: #000000;">-</td>
+                        `}
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    `;
 
     let url = `/tab/${window.cachedTabNum}/data?common_name=${encodeURIComponent(commonName)}&page=${page}&subcategory=${encodeURIComponent(subcategory)}&category=${encodeURIComponent(category)}`;
 
@@ -519,10 +600,10 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
 
                 html += `
                     <div class="item-level-wrapper">
-                        <table class="item-table" id="item-table-${key}">
+                        <table class="item-table" id="item-table-${key}" style="color: #000000;">
                             <thead>
                                 <tr>
-                                    ${headers.map(header => `<th>${header}</th>`).join('')}
+                                    ${headers.map(header => `<th style="color: #000000;">${header}</th>`).join('')}
                                 </tr>
                             </thead>
                             <tbody>
@@ -536,8 +617,8 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                         html += `
                             <tr data-item-id="${item.tag_id}">
                                 <td><input type="checkbox" value="${item.tag_id}" class="item-select"></td>
-                                <td>${item.tag_id}</td>
-                                <td>${item.common_name}</td>
+                                <td style="color: #000000;">${item.tag_id}</td>
+                                <td style="color: #000000;">${item.common_name}</td>
                                 <td>
                                     <select id="bin-location-${item.tag_id}">
                                         <option value="" ${!item.bin_location ? 'selected' : ''}>Select Bin Location</option>
@@ -556,10 +637,10 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                                         <option value="Delivered" disabled>Delivered</option>
                                     </select>
                                 </td>
-                                <td>${item.last_contract_num || 'N/A'}</td>
-                                <td>${lastScanned}</td>
-                                <td>${item.quality || 'N/A'}</td>
-                                <td>${item.notes || 'N/A'}</td>
+                                <td style="color: #000000;">${item.last_contract_num || 'N/A'}</td>
+                                <td style="color: #000000;">${lastScanned}</td>
+                                <td style="color: #000000;">${item.quality || 'N/A'}</td>
+                                <td style="color: #000000;">${item.notes || 'N/A'}</td>
                                 <td>
                                     <button class="btn btn-sm btn-primary save-btn" 
                                             onclick="updateItem('${item.tag_id}', '${key}', '${category}', '${subcategory}', '${item.common_name}', '${targetId}')">Save</button>
@@ -569,14 +650,14 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                     } else if (window.cachedTabNum == 1) {
                         html += `
                             <tr data-item-id="${item.tag_id}">
-                                <td>${item.tag_id}</td>
-                                <td>${item.common_name}</td>
+                                <td style="color: #000000;">${item.tag_id}</td>
+                                <td style="color: #000000;">${item.common_name}</td>
                                 <td class="editable" onclick="showDropdown(event, this, 'bin-location', '${item.tag_id}', '${item.bin_location || ''}')">${item.bin_location || 'N/A'}</td>
                                 <td class="editable" onclick="showDropdown(event, this, 'status', '${item.tag_id}', '${item.status}')">${item.status}</td>
-                                <td>${item.last_contract_num || 'N/A'}</td>
-                                <td>${lastScanned}</td>
-                                <td>${item.quality || 'N/A'}</td>
-                                <td>${item.notes || 'N/A'}</td>
+                                <td style="color: #000000;">${item.last_contract_num || 'N/A'}</td>
+                                <td style="color: #000000;">${lastScanned}</td>
+                                <td style="color: #000000;">${item.quality || 'N/A'}</td>
+                                <td style="color: #000000;">${item.notes || 'N/A'}</td>
                                 <div id="dropdown-bin-location-${item.tag_id}" class="dropdown-menu">
                                     <a class="dropdown-item" href="#" onclick="selectOption(event, this, 'bin-location', '${item.tag_id}', 'resale')">resale</a>
                                     <a class="dropdown-item" href="#" onclick="selectOption(event, this, 'bin-location', '${item.tag_id}', 'sold')">sold</a>
@@ -591,12 +672,12 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                     } else {
                         html += `
                             <tr>
-                                <td>${item.tag_id}</td>
-                                <td>${item.common_name}</td>
-                                <td>${item.bin_location || 'N/A'}</td>
-                                <td>${item.status}</td>
-                                <td>${item.last_contract_num || 'N/A'}</td>
-                                <td>${lastScanned}</td>
+                                <td style="color: #000000;">${item.tag_id}</td>
+                                <td style="color: #000000;">${item.common_name}</td>
+                                <td style="color: #000000;">${item.bin_location || 'N/A'}</td>
+                                <td style="color: #000000;">${item.status}</td>
+                                <td style="color: #000000;">${item.last_contract_num || 'N/A'}</td>
+                                <td style="color: #000000;">${lastScanned}</td>
                             </tr>
                         `;
                     }
@@ -731,7 +812,7 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                 if (loadingSuccess) {
                     hideLoadingTab1_5(key);
                 }
-            }, 300); // Ensure loading indicator stays until transition completes
+            }, 500); // Increased delay to ensure smooth transition
         });
 }
 

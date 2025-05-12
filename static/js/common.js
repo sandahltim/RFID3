@@ -1,4 +1,4 @@
-console.log('common.js version: 2025-05-07-v11 loaded - confirming script load');
+console.log('common.js version: 2025-05-07-v12 loaded - confirming script load');
 
 // Function to format ISO date strings into "Thurs, Aug 21 2025 4:55 pm"
 function formatDate(isoDateString) {
@@ -119,6 +119,8 @@ function applyFilterToAllLevels() {
             let showCategoryRow = true;
             const categoryCell = categoryRow.querySelector('td:nth-child(1)'); // Category column
             const categoryValue = categoryCell ? categoryCell.textContent.toLowerCase() : '';
+            // Normalize categoryValue to match targetId format in tab1_5.js
+            const normalizedCategoryValue = categoryValue.toLowerCase().replace(/[^a-z0-9]/g, '_');
             const subcatSelect = categoryRow.querySelector('.subcategory-select');
             let hasMatchingItems = false;
 
@@ -129,9 +131,9 @@ function applyFilterToAllLevels() {
 
             // If a subcategory is selected, we need to check its common names and items
             if (selectedValue) {
-                const commonTables = categoryRow.parentNode.querySelectorAll(`.common-name-row[data-target-id^="common-${categoryValue.toLowerCase().replace(/[^a-z0-9]/g, '_')}"] .common-table`);
+                const commonTables = categoryRow.parentNode.querySelectorAll(`.common-name-row[data-target-id^="common-${normalizedCategoryValue}"] .common-table`);
                 if (!commonTables.length) {
-                    console.warn(`Common tables not found for category ${categoryValue}`);
+                    console.warn(`Common tables not found for category ${categoryValue} (normalized: ${normalizedCategoryValue})`);
                     return;
                 }
 
@@ -269,7 +271,7 @@ function applyFilterToAllLevels() {
             if (showCategoryRow) {
                 visibleCategoryRows++;
                 // Ensure common-name-rows are visible if the category row is visible
-                const relatedRows = categoryRow.parentNode.querySelectorAll(`.common-name-row[data-target-id^="common-${categoryValue.toLowerCase().replace(/[^a-z0-9]/g, '_')}"]`);
+                const relatedRows = categoryRow.parentNode.querySelectorAll(`.common-name-row[data-target-id^="common-${normalizedCategoryValue}"]`);
                 relatedRows.forEach(row => {
                     row.style.display = showCategoryRow ? '' : 'none';
                 });
@@ -440,7 +442,7 @@ function applyFilterToAllLevels() {
                         const categoryCollapseBtn = categoryRow.querySelector('.collapse-btn');
                         if (categoryExpandBtn && categoryCollapseBtn) {
                             categoryExpandBtn.style.display = 'inline-block';
-                            collapseBtn.style.display = 'none';
+                            categoryCollapseBtn.style.display = 'none';
                         }
                     }
                 }
