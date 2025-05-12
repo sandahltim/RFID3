@@ -1,4 +1,4 @@
-console.log('tab1_5.js version: 2025-05-07-v32 loaded');
+console.log('tab1_5.js version: 2025-05-07-v33 loaded');
 
 // Note: Ensure formatDate is available (defined in common.js)
 if (typeof formatDate !== 'function') {
@@ -132,19 +132,21 @@ function loadCommonNames(selectElement, page = 1) {
                 categoryRow.cells[4].textContent = itemsInService || '0';
                 categoryRow.cells[5].textContent = itemsAvailable || '0';
 
+                // Wrap the table in a div to ensure proper table layout
                 html += `
-                    <table class="common-table" id="common-table-${targetId}">
-                        <thead>
-                            <tr>
-                                <th>Common Name</th>
-                                <th>Total Items</th>
-                                <th>Items on Contracts</th>
-                                <th>Items in Service</th>
-                                <th>Items Available</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
+                    <div class="common-table-wrapper">
+                        <table class="common-table" id="common-table-${targetId}">
+                            <thead>
+                                <tr>
+                                    <th>Common Name</th>
+                                    <th>Total Items</th>
+                                    <th>Items on Contracts</th>
+                                    <th>Items in Service</th>
+                                    <th>Items Available</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
                 `;
 
                 data.common_names.forEach(item => {
@@ -189,8 +191,9 @@ function loadCommonNames(selectElement, page = 1) {
                 });
 
                 html += `
-                        </tbody>
-                    </table>
+                            </tbody>
+                        </table>
+                    </div>
                 `;
 
                 if (data.total_common_names > data.per_page) {
@@ -243,12 +246,25 @@ function loadCommonNames(selectElement, page = 1) {
             targetElement.style.display = 'block';
             targetElement.style.opacity = '1';
             targetElement.style.visibility = 'visible';
+
+            // Debug the common table's styles
+            const commonTable = document.getElementById(`common-table-${targetId}`);
+            if (commonTable) {
+                console.log('Common table styles:', {
+                    display: commonTable.style.display,
+                    visibility: window.getComputedStyle(commonTable).visibility,
+                    computedDisplay: window.getComputedStyle(commonTable).display,
+                    height: window.getComputedStyle(commonTable).height
+                });
+            }
+
             console.log('Target element styles after update:', {
                 classList: targetElement.classList.toString(),
                 display: targetElement.style.display,
                 opacity: targetElement.style.opacity,
                 visibility: window.getComputedStyle(targetElement).visibility,
-                computedDisplay: window.getComputedStyle(targetElement).display
+                computedDisplay: window.getComputedStyle(targetElement).display,
+                height: window.getComputedStyle(targetElement).height
             });
 
             // Apply global filter to the newly loaded table
@@ -685,14 +701,24 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
             container.style.opacity = '1';
             container.style.visibility = 'visible';
 
-            const expandBtn = document.querySelector(`button.expand-btn[data-target-id="${targetId}"]`);
-            const collapseBtn = expandBtn ? expandBtn.nextElementSibling : null;
-            if (expandBtn && collapseBtn) {
-                expandBtn.style.display = 'none';
-                collapseBtn.style.display = 'inline-block';
+            const itemTable = document.getElementById(`item-table-${key}`);
+            if (itemTable) {
+                console.log('Item table styles:', {
+                    display: itemTable.style.display,
+                    visibility: window.getComputedStyle(itemTable).visibility,
+                    computedDisplay: window.getComputedStyle(itemTable).display,
+                    height: window.getComputedStyle(itemTable).height
+                });
             }
 
-            sessionStorage.setItem(`expanded_items_${targetId}`, JSON.stringify({ category, subcategory, commonName, page }));
+            console.log('Container styles after update:', {
+                classList: container.classList.toString(),
+                display: container.style.display,
+                opacity: container.style.opacity,
+                visibility: window.getComputedStyle(container).visibility,
+                computedDisplay: window.getComputedStyle(container).display,
+                height: window.getComputedStyle(container).height
+            });
 
             // Apply global filter to the newly loaded table
             if (typeof applyFilterToAllLevels === 'function') {

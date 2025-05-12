@@ -12,12 +12,16 @@
     visibility: visible !important;
     z-index: 1;
     position: relative;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .common-table-wrapper {
     overflow-y: auto; /* Enable vertical scrolling */
     max-height: 600px; /* Set a max height to trigger scrolling */
     width: 100%;
+    display: table !important; /* Ensure table layout */
+    visibility: visible !important;
 }
 
 .item-level-wrapper {
