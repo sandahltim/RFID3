@@ -44,11 +44,14 @@ if not any(isinstance(h, logging.StreamHandler) for h in root_logger.handlers):
 categories_bp = Blueprint('categories', __name__)
 
 # Version check to ensure correct deployment
-logger.info("Deployed categories.py version: 2025-05-07-v19")
+logger.info("Deployed categories.py version: 2025-05-07-v20")
 
 def build_common_name_dict(seed_data):
     """Build a dictionary mapping rental_class_id to common_name from seed_data."""
     common_name_dict = {}
+    if not seed_data:
+        logger.warning("Seed data is empty or None")
+        return common_name_dict
     for item in seed_data:
         try:
             rental_class_id = item.get('rental_class_id')
@@ -56,9 +59,12 @@ def build_common_name_dict(seed_data):
             if rental_class_id and common_name:
                 normalized_key = str(rental_class_id).strip()
                 common_name_dict[normalized_key] = common_name
+            else:
+                logger.debug(f"Skipping item due to missing rental_class_id or common_name: {item}")
         except Exception as comp_error:
             logger.error(f"Error processing item for common_name_dict: {str(comp_error)}", exc_info=True)
             current_app.logger.error(f"Error processing item for common_name_dict: {str(comp_error)}", exc_info=True)
+    logger.info(f"Built common_name_dict with {len(common_name_dict)} entries")
     return common_name_dict
 
 @categories_bp.route('/categories')
@@ -69,8 +75,10 @@ def manage_categories():
         current_app.logger.info("Starting new session for manage_categories")
 
         # Fetch all rental class mappings from both tables
+        logger.debug("Fetching rental class mappings")
         base_mappings = session.query(RentalClassMapping).all()
         user_mappings = session.query(UserRentalClassMapping).all()
+        logger.debug(f"Fetched {len(base_mappings)} base mappings and {len(user_mappings)} user mappings")
 
         # Merge mappings, prioritizing user mappings
         mappings_dict = {
@@ -86,16 +94,20 @@ def manage_categories():
                 'subcategory': um.subcategory,
                 'short_common_name': um.short_common_name
             }
+        logger.debug(f"Merged mappings into dictionary with {len(mappings_dict)} entries")
 
         # Fetch seed data from cache or API
         cache_key = 'seed_rental_classes'
+        logger.debug(f"Checking cache for key: {cache_key}")
         seed_data = cache.get(cache_key)
         if seed_data is None:
+            logger.info("Seed data not found in cache, fetching from API")
             try:
                 api_client = APIClient()
                 seed_data = api_client.get_seed_data()
                 if isinstance(seed_data, dict) and 'data' in seed_data:
                     seed_data = seed_data['data']
+                logger.debug(f"Fetched seed data from API: {len(seed_data)} records")
             except Exception as api_error:
                 logger.error(f"Failed to fetch seed data from API: {str(api_error)}", exc_info=True)
                 current_app.logger.error(f"Failed to fetch seed data from API: {str(api_error)}", exc_info=True)
@@ -121,13 +133,18 @@ def manage_categories():
                 'common_name': common_name,
                 'short_common_name': mapping['short_common_name'] or 'N/A'
             })
+        logger.debug(f"Built categories list with {len(categories)} entries")
 
         # Cache the seed_data after lookup
         if seed_data:
-            seed_data_copy = copy.deepcopy(seed_data)
-            cache.set(cache_key, seed_data_copy, ex=3600)  # Cache for 1 hour, using 'ex' instead of 'timeout'
-            logger.info("Fetched seed data from API and cached")
-            current_app.logger.info("Fetched seed data from API and cached")
+            try:
+                seed_data_copy = copy.deepcopy(seed_data)
+                cache.set(cache_key, seed_data_copy, ex=3600)  # Cache for 1 hour
+                logger.info("Fetched seed data from API and cached")
+                current_app.logger.info("Fetched seed data from API and cached")
+            except Exception as cache_error:
+                logger.error(f"Error caching seed data: {str(cache_error)}", exc_info=True)
+                current_app.logger.error(f"Error caching seed data: {str(cache_error)}", exc_info=True)
 
         categories.sort(key=lambda x: (x['category'], x['subcategory'], x['rental_class_id']))
         logger.info(f"Fetched {len(categories)} category mappings")
@@ -150,8 +167,11 @@ def get_mappings():
         current_app.logger.info("Fetching rental class mappings for API")
 
         # Fetch all rental class mappings
+        logger.debug("Querying rental_class_mappings")
         base_mappings = session.query(RentalClassMapping).all()
+        logger.debug("Querying user_rental_class_mappings")
         user_mappings = session.query(UserRentalClassMapping).all()
+        logger.debug(f"Fetched {len(base_mappings)} base mappings and {len(user_mappings)} user mappings")
 
         # Merge mappings, prioritizing user mappings
         mappings_dict = {
@@ -167,17 +187,22 @@ def get_mappings():
                 'subcategory': um.subcategory,
                 'short_common_name': um.short_common_name
             }
+        logger.debug(f"Merged mappings into dictionary with {len(mappings_dict)} entries")
 
         # Fetch seed data from cache or API
         cache_key = 'seed_rental_classes'
+        logger.debug(f"Deleting cache key {cache_key} to force fresh API call")
         cache.delete(cache_key)  # Force a fresh API call
+        logger.debug(f"Checking cache for key: {cache_key}")
         seed_data = cache.get(cache_key)
         if seed_data is None:
+            logger.info("Seed data not found in cache, fetching from API")
             try:
                 api_client = APIClient()
                 seed_data = api_client.get_seed_data()
                 if isinstance(seed_data, dict) and 'data' in seed_data:
                     seed_data = seed_data['data']
+                logger.debug(f"Fetched seed data from API: {len(seed_data)} records")
             except Exception as api_error:
                 logger.error(f"Failed to fetch seed data from API: {str(api_error)}", exc_info=True)
                 current_app.logger.error(f"Failed to fetch seed data from API: {str(api_error)}", exc_info=True)
@@ -203,23 +228,29 @@ def get_mappings():
                 'common_name': common_name,
                 'short_common_name': mapping['short_common_name'] or 'N/A'
             })
+        logger.debug(f"Built categories list with {len(categories)} entries")
 
         # Cache the seed_data after lookup
         if seed_data:
-            seed_data_copy = copy.deepcopy(seed_data)
-            cache.set(cache_key, seed_data_copy, ex=3600)  # Cache for 1 hour, using 'ex' instead of 'timeout'
-            logger.info("Fetched seed data from API and cached")
-            current_app.logger.info("Fetched seed data from API and cached")
+            try:
+                seed_data_copy = copy.deepcopy(seed_data)
+                cache.set(cache_key, seed_data_copy, ex=3600)  # Cache for 1 hour
+                logger.info("Fetched seed data from API and cached")
+                current_app.logger.info("Fetched seed data from API and cached")
+            except Exception as cache_error:
+                logger.error(f"Error caching seed data: {str(cache_error)}", exc_info=True)
+                current_app.logger.error(f"Error caching seed data: {str(cache_error)}", exc_info=True)
 
         categories.sort(key=lambda x: (x['category'], x['subcategory'], x['rental_class_id']))
+        logger.info(f"Returning {len(categories)} category mappings")
         session.close()
         return jsonify(categories)
     except Exception as e:
-        logger.error(f"Error fetching mappings: {str(e)}")
-        current_app.logger.error(f"Error fetching mappings: {str(e)}")
+        logger.error(f"Error fetching mappings: {str(e)}", exc_info=True)
+        current_app.logger.error(f"Error fetching mappings: {str(e)}", exc_info=True)
         if 'session' in locals():
             session.close()
-        return jsonify({'error': 'Failed to fetch mappings'}), 500
+        return jsonify({'error': f'Failed to fetch mappings: {str(e)}'}), 500
 
 @categories_bp.route('/categories/update', methods=['POST'])
 def update_mappings():
@@ -239,6 +270,7 @@ def update_mappings():
             return jsonify({'error': 'Invalid data format, expected a list'}), 400
 
         # Clear existing user mappings
+        logger.debug("Deleting existing user mappings")
         deleted_count = session.query(UserRentalClassMapping).delete()
         logger.info(f"Deleted {deleted_count} existing user mappings")
         current_app.logger.info(f"Deleted {deleted_count} existing user mappings")

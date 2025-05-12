@@ -1,4 +1,4 @@
-console.log('common.js version: 2025-05-07-v8 loaded - confirming script load');
+console.log('common.js version: 2025-05-07-v9 loaded - confirming script load');
 
 // Function to format ISO date strings into "Thurs, Aug 21 2025 4:55 pm"
 function formatDate(isoDateString) {
@@ -38,8 +38,10 @@ document.addEventListener('DOMContentLoaded', function() {
     const savedFilter = sessionStorage.getItem('globalFilter');
     if (savedFilter) {
         globalFilter = JSON.parse(savedFilter);
-        document.getElementById('commonNameFilter').value = globalFilter.commonName || '';
-        document.getElementById('contractNumberFilter').value = globalFilter.contractNumber || '';
+        const commonNameInput = document.getElementById('commonNameFilter');
+        const contractNumberInput = document.getElementById('contractNumberFilter');
+        if (commonNameInput) commonNameInput.value = globalFilter.commonName || '';
+        if (contractNumberInput) contractNumberInput.value = globalFilter.contractNumber || '';
         // Defer applying the filter until subcategory dropdowns are populated (handled in tab1.html and tab5.html)
     }
 });
@@ -52,8 +54,10 @@ window.applyGlobalFilter = function() {
         return;
     }
 
-    const commonName = document.getElementById('commonNameFilter').value.toLowerCase().trim();
-    const contractNumber = document.getElementById('contractNumberFilter').value.toLowerCase().trim();
+    const commonNameInput = document.getElementById('commonNameFilter');
+    const contractNumberInput = document.getElementById('contractNumberFilter');
+    const commonName = commonNameInput ? commonNameInput.value.toLowerCase().trim() : '';
+    const contractNumber = contractNumberInput ? contractNumberInput.value.toLowerCase().trim() : '';
 
     globalFilter = {
         commonName: commonName,
@@ -78,8 +82,10 @@ window.clearGlobalFilter = function() {
     sessionStorage.removeItem('globalFilter');
 
     // Clear input fields
-    document.getElementById('commonNameFilter').value = '';
-    document.getElementById('contractNumberFilter').value = '';
+    const commonNameInput = document.getElementById('commonNameFilter');
+    const contractNumberInput = document.getElementById('contractNumberFilter');
+    if (commonNameInput) commonNameInput.value = '';
+    if (contractNumberInput) contractNumberInput.value = '';
 
     // Refresh the page to clear filters
     window.location.reload();
@@ -96,9 +102,17 @@ function applyFilterToAllLevels() {
     // For Tabs 1 and 5 (handled by tab1_5.js)
     if (window.cachedTabNum === 1 || window.cachedTabNum === 5) {
         const categoryTable = document.getElementById('category-table');
-        if (!categoryTable) return;
+        if (!categoryTable) {
+            console.warn('Category table not found, skipping filter application');
+            return;
+        }
 
-        const categoryRows = categoryTable.querySelectorAll('tbody tr:not(.expandable)');
+        const categoryRows = categoryTable.querySelectorAll('tbody tr:not(.expandable)') || [];
+        if (!categoryRows.length) {
+            console.warn('No category rows found in table, skipping filter application');
+            return;
+        }
+
         let visibleCategoryRows = 0;
 
         categoryRows.forEach(categoryRow => {
@@ -107,7 +121,7 @@ function applyFilterToAllLevels() {
             const categoryValue = categoryCell ? categoryCell.textContent.toLowerCase() : '';
             const subcatSelect = categoryRow.querySelector('.subcategory-select');
             const expandableRow = categoryRow.nextElementSibling;
-            const commonLevelDiv = expandableRow.querySelector('.common-level');
+            const commonLevelDiv = expandableRow ? expandableRow.querySelector('.common-level') : null;
             let visibleSubcategories = 0;
             let hasMatchingItems = false;
 
@@ -118,9 +132,13 @@ function applyFilterToAllLevels() {
 
             // If a subcategory is selected, we need to check its common names and items
             if (selectedValue) {
+                if (!commonLevelDiv) {
+                    console.warn(`Common level div not found for category ${categoryValue}`);
+                    return;
+                }
                 const commonTable = commonLevelDiv.querySelector('.common-table');
                 if (commonTable) {
-                    const commonRows = commonTable.querySelectorAll('tbody tr:not(.expandable)');
+                    const commonRows = commonTable.querySelectorAll('tbody tr:not(.expandable)') || [];
                     let visibleCommonRows = 0;
 
                     commonRows.forEach(commonRow => {
@@ -143,7 +161,7 @@ function applyFilterToAllLevels() {
                         if (commonExpandableRow && commonExpandableRow.classList.contains('expandable')) {
                             const itemTable = commonExpandableRow.querySelector('.item-table');
                             if (itemTable) {
-                                const itemRows = itemTable.querySelectorAll('tbody tr');
+                                const itemRows = itemTable.querySelectorAll('tbody tr') || [];
                                 itemRows.forEach(itemRow => {
                                     let showItemRow = true;
                                     const itemCommonNameCell = itemRow.querySelector('td:nth-child(2)'); // Common Name column in item table
@@ -287,7 +305,9 @@ function applyFilterToAllLevels() {
                                                     showCategoryRow = true;
                                                     option.style.display = '';
                                                     subcatSelect.value = subcatValue; // Select this subcategory
-                                                    loadCommonNames(subcatSelect); // Load common names to display matches
+                                                    if (typeof loadCommonNames === 'function') {
+                                                        loadCommonNames(subcatSelect); // Load common names to display matches
+                                                    }
                                                 }
                                             })
                                             .catch(error => console.error('Error fetching items for filtering:', error));
@@ -346,7 +366,9 @@ function applyFilterToAllLevels() {
                                         option.style.display = showOption ? '' : 'none';
                                         if (showOption && visibleSubcategories === 1 && !subcatSelect.value) {
                                             subcatSelect.value = subcatValue; // Select the first matching subcategory
-                                            loadCommonNames(subcatSelect); // Load common names to display matches
+                                            if (typeof loadCommonNames === 'function') {
+                                                loadCommonNames(subcatSelect); // Load common names to display matches
+                                            }
                                         }
                                     })
                                     .catch(error => console.error('Error fetching items for filtering:', error));
@@ -375,7 +397,9 @@ function applyFilterToAllLevels() {
             }
 
             categoryRow.style.display = showCategoryRow ? '' : 'none';
-            expandableRow.style.display = showCategoryRow ? '' : 'none';
+            if (expandableRow) {
+                expandableRow.style.display = showCategoryRow ? '' : 'none';
+            }
             if (showCategoryRow) visibleCategoryRows++;
         });
 
@@ -390,9 +414,17 @@ function applyFilterToAllLevels() {
     } else {
         // For Tabs 2 and 4 (handled by expand.js)
         const categoryTable = document.getElementById('category-table');
-        if (!categoryTable) return;
+        if (!categoryTable) {
+            console.warn('Category table not found, skipping filter application');
+            return;
+        }
 
-        const categoryRows = categoryTable.querySelectorAll('tbody tr:not(.expandable)');
+        const categoryRows = categoryTable.querySelectorAll('tbody tr:not(.expandable)') || [];
+        if (!categoryRows.length) {
+            console.warn('No category rows found in table, skipping filter application');
+            return;
+        }
+
         let visibleCategoryRows = 0;
 
         categoryRows.forEach(categoryRow => {
@@ -400,7 +432,7 @@ function applyFilterToAllLevels() {
             const contractCell = categoryRow.querySelector('td:nth-child(1)'); // Contract Number column
             const contractValue = contractCell ? contractCell.textContent.toLowerCase() : '';
             const expandableRow = categoryRow.nextElementSibling;
-            const subcatDiv = expandableRow.querySelector('.expandable');
+            const subcatDiv = expandableRow ? expandableRow.querySelector('.expandable') : null;
 
             // Check if the contract number matches the filter
             if (globalFilter.contractNumber) {
@@ -416,7 +448,7 @@ function applyFilterToAllLevels() {
             if (subcatDiv && subcatDiv.classList.contains('expanded')) {
                 const commonTable = subcatDiv.querySelector('.common-table');
                 if (commonTable) {
-                    const commonRows = commonTable.querySelectorAll('tbody tr:not(.expandable)');
+                    const commonRows = commonTable.querySelectorAll('tbody tr:not(.expandable)') || [];
                     let visibleCommonRows = 0;
 
                     commonRows.forEach(commonRow => {
@@ -438,7 +470,7 @@ function applyFilterToAllLevels() {
                         if (commonExpandableRow && commonExpandableRow.classList.contains('expandable')) {
                             const itemTable = commonExpandableRow.querySelector('.item-table');
                             if (itemTable) {
-                                const itemRows = itemTable.querySelectorAll('tbody tr');
+                                const itemRows = itemTable.querySelectorAll('tbody tr') || [];
                                 itemRows.forEach(itemRow => {
                                     let showItemRow = true;
                                     const itemCommonNameCell = itemRow.querySelector('td:nth-child(2)'); // Common Name column
@@ -570,7 +602,9 @@ function applyFilterToAllLevels() {
 
                                         if (hasMatches) {
                                             showCategoryRow = true;
-                                            window.expandCategory(contractValue, `subcat-${contractValue}`, contractValue);
+                                            if (typeof window.expandCategory === 'function') {
+                                                window.expandCategory(contractValue, `subcat-${contractValue}`, contractValue);
+                                            }
                                         }
                                     })
                                     .catch(error => console.error('Error fetching items for filtering:', error));
@@ -597,7 +631,9 @@ function applyFilterToAllLevels() {
             }
 
             categoryRow.style.display = showCategoryRow ? '' : 'none';
-            expandableRow.style.display = showCategoryRow ? '' : 'none';
+            if (expandableRow) {
+                expandableRow.style.display = showCategoryRow ? '' : 'none';
+            }
             if (showCategoryRow) visibleCategoryRows++;
         });
 
@@ -614,7 +650,17 @@ function applyFilterToAllLevels() {
 
 // Apply filter to a specific table (used for Tabs 2 and 4)
 function applyFilterToTable(table) {
-    const rows = table.querySelectorAll('tbody tr:not(.expandable)');
+    if (!table) {
+        console.warn('Table element is null, skipping applyFilterToTable');
+        return;
+    }
+
+    const rows = table.querySelectorAll('tbody tr:not(.expandable)') || [];
+    if (!rows.length) {
+        console.warn('No rows found in table, skipping applyFilterToTable');
+        return;
+    }
+
     let visibleRows = 0;
 
     // If no filter criteria are set, show all rows
@@ -654,7 +700,7 @@ function applyFilterToTable(table) {
             if (expandableRow && expandableRow.classList.contains('expandable')) {
                 const childTable = expandableRow.querySelector('.common-table, .item-table');
                 if (childTable) {
-                    const childRows = childTable.querySelectorAll('tbody tr:not(.expandable)');
+                    const childRows = childTable.querySelectorAll('tbody tr:not(.expandable)') || [];
                     childRows.forEach(childRow => {
                         let showChildRow = true;
                         const childContractCell = childRow.querySelector('td:nth-child(1)'); // Contract Number or Category
