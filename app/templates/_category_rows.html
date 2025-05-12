@@ -1,5 +1,5 @@
 {% for category in categories %}
-<tr>
+<tr class="category-row">
     <td>{{ category.category }}</td>
     <td>
         <select class="subcategory-select form-control" data-category="{{ category.category | urlencode | replace('\'', '\\\'') | replace('\"', '\\\"') }}" onchange="loadCommonNames(this)">
@@ -18,7 +18,7 @@
         <div id="loading-{{ category.cat_id }}" style="display:none;" class="loading">Loading...</div>
     </td>
 </tr>
-<tr>
+<tr class="expandable-row expanded">
     <td colspan="7">
         <div id="common-{{ category.cat_id }}" class="expandable collapsed common-level"></div>
     </td>

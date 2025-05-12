@@ -1,4 +1,4 @@
-console.log('tab1_5.js version: 2025-05-07-v30 loaded');
+console.log('tab1_5.js version: 2025-05-07-v32 loaded');
 
 // Note: Ensure formatDate is available (defined in common.js)
 if (typeof formatDate !== 'function') {
@@ -82,14 +82,14 @@ function loadCommonNames(selectElement, page = 1) {
         fetch(`/tab/${window.cachedTabNum}/subcat_data?category=${encodeURIComponent(category)}`)
             .then(response => response.json())
             .then(data => {
-                const totalItems = data.subcategories.reduce((sum, subcat) => sum + subcat.total_items, 0);
-                const itemsOnContracts = data.subcategories.reduce((sum, subcat) => sum + subcat.items_on_contracts, 0);
-                const itemsInService = data.subcategories.reduce((sum, subcat) => sum + subcat.items_in_service, 0);
-                const itemsAvailable = data.subcategories.reduce((sum, subcat) => sum + subcat.items_available, 0);
-                categoryRow.cells[2].textContent = totalItems; // Adjust index based on table structure
-                categoryRow.cells[3].textContent = itemsOnContracts;
-                categoryRow.cells[4].textContent = itemsInService;
-                categoryRow.cells[5].textContent = itemsAvailable;
+                const totalItems = data.subcategories.reduce((sum, subcat) => sum + (subcat.total_items || 0), 0);
+                const itemsOnContracts = data.subcategories.reduce((sum, subcat) => sum + (subcat.items_on_contracts || 0), 0);
+                const itemsInService = data.subcategories.reduce((sum, subcat) => sum + (subcat.items_in_service || 0), 0);
+                const itemsAvailable = data.subcategories.reduce((sum, subcat) => sum + (subcat.items_available || 0), 0);
+                categoryRow.cells[2].textContent = totalItems || '0';
+                categoryRow.cells[3].textContent = itemsOnContracts || '0';
+                categoryRow.cells[4].textContent = itemsInService || '0';
+                categoryRow.cells[5].textContent = itemsAvailable || '0';
             })
             .catch(error => console.error('Error resetting category totals:', error));
         return;
@@ -120,16 +120,17 @@ function loadCommonNames(selectElement, page = 1) {
             let html = '';
             if (data.common_names && data.common_names.length > 0) {
                 // Calculate subcategory totals
-                const totalItems = data.common_names.reduce((sum, item) => sum + item.total_items, 0);
-                const itemsOnContracts = data.common_names.reduce((sum, item) => sum + item.items_on_contracts, 0);
-                const itemsInService = data.common_names.reduce((sum, item) => sum + item.items_in_service, 0);
-                const itemsAvailable = data.common_names.reduce((sum, item) => sum + item.items_available, 0);
+                const totalItems = data.common_names.reduce((sum, item) => sum + (item.total_items || 0), 0);
+                const itemsOnContracts = data.common_names.reduce((sum, item) => sum + (item.items_on_contracts || 0), 0);
+                const itemsInService = data.common_names.reduce((sum, item) => sum + (item.items_in_service || 0), 0);
+                const itemsAvailable = data.common_names.reduce((sum, item) => sum + (item.items_available || 0), 0);
 
                 // Update category row with subcategory totals
-                categoryRow.cells[2].textContent = totalItems;
-                categoryRow.cells[3].textContent = itemsOnContracts;
-                categoryRow.cells[4].textContent = itemsInService;
-                categoryRow.cells[5].textContent = itemsAvailable;
+                console.log('Updating category row with totals:', { totalItems, itemsOnContracts, itemsInService, itemsAvailable });
+                categoryRow.cells[2].textContent = totalItems || '0';
+                categoryRow.cells[3].textContent = itemsOnContracts || '0';
+                categoryRow.cells[4].textContent = itemsInService || '0';
+                categoryRow.cells[5].textContent = itemsAvailable || '0';
 
                 html += `
                     <table class="common-table" id="common-table-${targetId}">
@@ -152,10 +153,10 @@ function loadCommonNames(selectElement, page = 1) {
                     html += `
                         <tr>
                             <td>${item.name}</td>
-                            <td>${item.total_items}</td>
-                            <td>${item.items_on_contracts}</td>
-                            <td>${item.items_in_service}</td>
-                            <td>${item.items_available}</td>
+                            <td>${item.total_items || '0'}</td>
+                            <td>${item.items_on_contracts || '0'}</td>
+                            <td>${item.items_in_service || '0'}</td>
+                            <td>${item.items_available || '0'}</td>
                             <td>
                                 <div class="btn-group">
                                     <button class="btn btn-sm btn-secondary expand-btn" 
@@ -210,11 +211,45 @@ function loadCommonNames(selectElement, page = 1) {
                 html = `<p>No common names found for this subcategory.</p>`;
             }
 
+            console.log('Generated HTML for common names:', html);
             targetElement.innerHTML = html;
+            console.log('Applied HTML to targetElement, checking styles...');
+
+            // Ensure the parent <tr> and <td> are visible
+            const parentTd = targetElement.closest('td');
+            const parentTr = parentTd ? parentTd.closest('tr') : null;
+            if (parentTd) {
+                parentTd.style.display = 'table-cell';
+                parentTd.style.visibility = 'visible';
+                console.log('Parent <td> styles:', {
+                    display: parentTd.style.display,
+                    visibility: window.getComputedStyle(parentTd).visibility,
+                    computedDisplay: window.getComputedStyle(parentTd).display
+                });
+            }
+            if (parentTr) {
+                parentTr.style.display = 'table-row';
+                parentTr.style.visibility = 'visible';
+                console.log('Parent <tr> styles:', {
+                    display: parentTr.style.display,
+                    visibility: window.getComputedStyle(parentTr).visibility,
+                    computedDisplay: window.getComputedStyle(parentTr).display
+                });
+            }
+
+            // Apply styles to make the common-level div visible
             targetElement.classList.remove('collapsed');
             targetElement.classList.add('expanded');
             targetElement.style.display = 'block';
             targetElement.style.opacity = '1';
+            targetElement.style.visibility = 'visible';
+            console.log('Target element styles after update:', {
+                classList: targetElement.classList.toString(),
+                display: targetElement.style.display,
+                opacity: targetElement.style.opacity,
+                visibility: window.getComputedStyle(targetElement).visibility,
+                computedDisplay: window.getComputedStyle(targetElement).display
+            });
 
             // Apply global filter to the newly loaded table
             if (typeof applyFilterToAllLevels === 'function') {
@@ -230,6 +265,7 @@ function loadCommonNames(selectElement, page = 1) {
             targetElement.classList.add('expanded');
             targetElement.style.display = 'block';
             targetElement.style.opacity = '1';
+            targetElement.style.visibility = 'visible';
         })
         .finally(() => {
             if (loadingSuccess) {
@@ -647,7 +683,7 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
             container.classList.add('expanded');
             container.style.display = 'block';
             container.style.opacity = '1';
-            container.classList.remove('loading');
+            container.style.visibility = 'visible';
 
             const expandBtn = document.querySelector(`button.expand-btn[data-target-id="${targetId}"]`);
             const collapseBtn = expandBtn ? expandBtn.nextElementSibling : null;
@@ -672,6 +708,7 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
             container.classList.add('expanded');
             container.style.display = 'block';
             container.style.opacity = '1';
+            container.style.visibility = 'visible';
             container.classList.remove('loading');
         })
         .finally(() => {
