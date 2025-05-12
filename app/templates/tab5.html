@@ -89,7 +89,7 @@ function exportSoldItemsCSV() {
 
 function bulkUpdateItems() {
     const selectedItems = document.querySelectorAll('.item-select:checked');
-    const tagIds = Array.from(selectedItems).map(checkbox => checkbox.value); // Use value instead of data-tag-id
+    const tagIds = Array.from(selectedItems).map(checkbox => checkbox.value);
     const newBinLocation = document.getElementById('bulk-bin-location').value;
     const newStatus = document.getElementById('bulk-status').value;
 
