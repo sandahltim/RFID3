@@ -19,30 +19,7 @@
             </tr>
         </thead>
         <tbody id="category-rows">
-            {% for category in categories %}
-            <tr>
-                <td>{{ category.category }}</td>
-                <td>
-                    <select class="subcategory-select" data-category="{{ category.category | urlencode | replace('\'', '\\\'') | replace('\"', '\\\"') }}" onchange="loadCommonNames(this)">
-                        <option value="">Select Subcategory...</option>
-                        <!-- Subcategories will be populated dynamically via JavaScript -->
-                    </select>
-                    <div id="loading-subcat-{{ category.cat_id }}" class="loading-indicator" style="display: none;">Loading...</div>
-                </td>
-                <td>{{ category.total_items }}</td>
-                <td>{{ category.items_on_contracts }}</td>
-                <td>{{ category.items_in_service }}</td>
-                <td>{{ category.items_available }}</td>
-                <td>
-                    <button class="btn btn-sm btn-info print-btn" data-print-level="Category" data-print-id="category-table">Print Category</button>
-                </td>
-            </tr>
-            <tr>
-                <td colspan="7">
-                    <div id="common-{{ category.cat_id }}" class="common-level expandable collapsed"></div>
-                </td>
-            </tr>
-            {% endfor %}
+            {% include '_category_rows.html' %}
         </tbody>
     </table>
 </div>
@@ -83,7 +60,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Apply the global filter after all subcategory dropdowns are populated
     Promise.all(promises).then(() => {
-        applyFilterToAllLevels();
+        if (typeof applyFilterToAllLevels === 'function') {
+            applyFilterToAllLevels();
+        } else {
+            console.warn('applyFilterToAllLevels function is not available');
+        }
     });
 });
 </script>

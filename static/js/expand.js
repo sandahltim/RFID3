@@ -1,10 +1,10 @@
-console.log('expand.js version: 2025-05-07-v81 loaded - confirming script load');
+console.log('expand.js version: 2025-05-07-v82 loaded - confirming script load');
 
 // Note: Common function - will be moved to common.js during split
-function showLoading(targetId) {
+function showLoadingExpand(targetId) {
     const container = document.getElementById(targetId);
     if (!container) {
-        console.warn(`Container with ID ${targetId} not found for showing loading indicator`);
+        console.warn(`Container with ID ${targetId} not found for showing loading indicator (expand.js)`);
         return false;
     }
 
@@ -18,7 +18,7 @@ function showLoading(targetId) {
 }
 
 // Note: Common function - will be moved to common.js during split
-function hideLoading(targetId) {
+function hideLoadingExpand(targetId) {
     const loadingDiv = document.getElementById(`loading-${targetId}`);
     if (loadingDiv) {
         loadingDiv.remove();
@@ -67,7 +67,7 @@ window.expandCategory = function(category, targetId, contractNumber, page = 1) {
         return;
     }
 
-    const loadingSuccess = showLoading(targetId);
+    const loadingSuccess = showLoadingExpand(targetId);
 
     let url;
     if (window.cachedTabNum === 1 || window.cachedTabNum === 5) {
@@ -220,7 +220,7 @@ window.expandCategory = function(category, targetId, contractNumber, page = 1) {
         })
         .finally(() => {
             if (loadingSuccess) {
-                hideLoading(targetId);
+                hideLoadingExpand(targetId);
             }
         });
 };
@@ -360,7 +360,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         const commonId = targetId.replace('items-', '');
-        const loadingSuccess = showLoading(commonId);
+        const loadingSuccess = showLoadingExpand(commonId);
         targetElement.innerHTML = ''; // Clear previous content
 
         let url = `/tab/${window.cachedTabNum}/data?contract_number=${encodeURIComponent(contractNumber)}&common_name=${encodeURIComponent(commonName)}&page=${page}`;
@@ -459,7 +459,7 @@ document.addEventListener('DOMContentLoaded', function() {
             })
             .finally(() => {
                 if (loadingSuccess) {
-                    hideLoading(commonId);
+                    hideLoadingExpand(commonId);
                 }
             });
     };
