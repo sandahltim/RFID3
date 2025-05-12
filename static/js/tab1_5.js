@@ -1,4 +1,4 @@
-console.log('tab1_5.js version: 2025-05-07-v36 loaded');
+console.log('tab1_5.js version: 2025-05-07-v37 loaded');
 
 // Note: Ensure formatDate is available (defined in common.js)
 if (typeof formatDate !== 'function') {
@@ -218,16 +218,18 @@ function loadCommonNames(selectElement, page = 1) {
                     tableBody.appendChild(paginationRow);
                 }
 
-                // Add 'loaded' class to trigger transition
+                // Add 'loaded' class with a slight delay to ensure rendering stability
                 const commonTable = document.getElementById(`common-table-${targetId}`);
                 if (commonTable) {
-                    commonTable.classList.add('loaded');
-                    console.log('Common table styles:', {
-                        display: commonTable.style.display,
-                        visibility: window.getComputedStyle(commonTable).visibility,
-                        computedDisplay: window.getComputedStyle(commonTable).display,
-                        height: window.getComputedStyle(commonTable).height
-                    });
+                    setTimeout(() => {
+                        commonTable.classList.add('loaded');
+                        console.log('Common table styles:', {
+                            display: commonTable.style.display,
+                            visibility: window.getComputedStyle(commonTable).visibility,
+                            computedDisplay: window.getComputedStyle(commonTable).display,
+                            height: window.getComputedStyle(commonTable).height
+                        });
+                    }, 50); // Small delay to allow DOM stabilization
                 }
             } else {
                 const noDataRow = document.createElement('tr');
@@ -263,9 +265,11 @@ function loadCommonNames(selectElement, page = 1) {
             tbody.insertBefore(errorRow, categoryRow.nextSibling);
         })
         .finally(() => {
-            if (loadingDiv) {
-                loadingDiv.style.display = 'none';
-            }
+            setTimeout(() => {
+                if (loadingDiv) {
+                    loadingDiv.style.display = 'none';
+                }
+            }, 300); // Ensure loading indicator stays until transition completes
         });
 }
 
@@ -682,16 +686,18 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
             container.style.opacity = '1';
             container.style.visibility = 'visible';
 
-            // Add 'loaded' class to trigger transition for item table
+            // Add 'loaded' class with a slight delay to ensure rendering stability
             const itemTable = document.getElementById(`item-table-${key}`);
             if (itemTable) {
-                itemTable.classList.add('loaded');
-                console.log('Item table styles:', {
-                    display: itemTable.style.display,
-                    visibility: window.getComputedStyle(itemTable).visibility,
-                    computedDisplay: window.getComputedStyle(itemTable).display,
-                    height: window.getComputedStyle(itemTable).height
-                });
+                setTimeout(() => {
+                    itemTable.classList.add('loaded');
+                    console.log('Item table styles:', {
+                        display: itemTable.style.display,
+                        visibility: window.getComputedStyle(itemTable).visibility,
+                        computedDisplay: window.getComputedStyle(itemTable).display,
+                        height: window.getComputedStyle(itemTable).height
+                    });
+                }, 50); // Small delay to allow DOM stabilization
             }
 
             console.log('Container styles after update:', {
@@ -721,9 +727,11 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
             container.classList.remove('loading');
         })
         .finally(() => {
-            if (loadingSuccess) {
-                hideLoadingTab1_5(key);
-            }
+            setTimeout(() => {
+                if (loadingSuccess) {
+                    hideLoadingTab1_5(key);
+                }
+            }, 300); // Ensure loading indicator stays until transition completes
         });
 }
 
