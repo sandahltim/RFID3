@@ -1,18 +1,23 @@
 {% for category in categories %}
 <tr>
     <td>{{ category.category }}</td>
+    <td>
+        <select class="subcategory-select form-control" data-category="{{ category.category | urlencode | replace('\'', '\\\'') | replace('\"', '\\\"') }}" onchange="loadCommonNames(this)">
+            <option value="">Select a subcategory</option>
+        </select>
+        <div id="loading-subcat-{{ category.cat_id }}" class="loading-indicator" style="display: none;">Loading...</div>
+    </td>
     <td>{{ category.total_items }}</td>
     <td>{{ category.items_on_contracts }}</td>
     <td>{{ category.items_in_service }}</td>
     <td>{{ category.items_available }}</td>
     <td>
         <button class="btn btn-sm btn-secondary expand-btn" 
-                data-target-id="common-{{ category.cat_id }}"
-                onclick="window.expandCategory('{{ category.category | urlencode | replace('\'', '\\\'') | replace('\"', '\\\"') }}', 'common-{{ category.cat_id }}')">Expand</button>
+                data-category="{{ category.category | urlencode | replace('\'', '\\\'') | replace('\"', '\\\"') }}" 
+                data-target-id="common-{{ category.cat_id }}">Expand</button>
         <button class="btn btn-sm btn-secondary collapse-btn" 
                 style="display:none;" 
-                data-collapse-target="common-{{ category.cat_id }}"
-                onclick="collapseSection('common-{{ category.cat_id }}')">Collapse</button>
+                data-collapse-target="common-{{ category.cat_id }}">Collapse</button>
         <button class="btn btn-sm btn-info print-btn" 
                 data-print-level="Category" 
                 data-print-id="category-table">Print</button>
@@ -20,7 +25,7 @@
     </td>
 </tr>
 <tr>
-    <td colspan="6">
+    <td colspan="7">
         <div id="common-{{ category.cat_id }}" class="expandable collapsed common-level"></div>
     </td>
 </tr>

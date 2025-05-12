@@ -1,4 +1,12 @@
-console.log('tab1_5.js version: 2025-05-07-v26 loaded');
+console.log('tab1_5.js version: 2025-05-07-v28 loaded');
+
+// Note: Ensure formatDate is available (defined in common.js)
+if (typeof formatDate !== 'function') {
+    console.error('formatDate function is not defined. Ensure common.js is loaded.');
+    function formatDate(isoDateString) {
+        return 'N/A'; // Fallback
+    }
+}
 
 // Note: Common function for Tabs 1 and 5
 function showLoading(targetId) {
@@ -78,10 +86,10 @@ function loadCommonNames(selectElement, page = 1) {
                 const itemsOnContracts = data.subcategories.reduce((sum, subcat) => sum + subcat.items_on_contracts, 0);
                 const itemsInService = data.subcategories.reduce((sum, subcat) => sum + subcat.items_in_service, 0);
                 const itemsAvailable = data.subcategories.reduce((sum, subcat) => sum + subcat.items_available, 0);
-                categoryRow.cells[1].textContent = totalItems;
-                categoryRow.cells[2].textContent = itemsOnContracts;
-                categoryRow.cells[3].textContent = itemsInService;
-                categoryRow.cells[4].textContent = itemsAvailable;
+                categoryRow.cells[2].textContent = totalItems; // Adjust index based on table structure
+                categoryRow.cells[3].textContent = itemsOnContracts;
+                categoryRow.cells[4].textContent = itemsInService;
+                categoryRow.cells[5].textContent = itemsAvailable;
             })
             .catch(error => console.error('Error resetting category totals:', error));
         return;
@@ -118,10 +126,10 @@ function loadCommonNames(selectElement, page = 1) {
                 const itemsAvailable = data.common_names.reduce((sum, item) => sum + item.items_available, 0);
 
                 // Update category row with subcategory totals
-                categoryRow.cells[1].textContent = totalItems;
-                categoryRow.cells[2].textContent = itemsOnContracts;
-                categoryRow.cells[3].textContent = itemsInService;
-                categoryRow.cells[4].textContent = itemsAvailable;
+                categoryRow.cells[2].textContent = totalItems;
+                categoryRow.cells[3].textContent = itemsOnContracts;
+                categoryRow.cells[4].textContent = itemsInService;
+                categoryRow.cells[5].textContent = itemsAvailable;
 
                 html += `
                     <table class="common-table" id="common-table-${targetId}">
@@ -802,6 +810,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function handleClick(event) {
         const expandBtn = event.target.closest('.expand-btn');
         if (expandBtn) {
+            event.preventDefault();
             event.stopPropagation();
             console.log('Expand button clicked:', expandBtn);
             const category = expandBtn.getAttribute('data-category');
@@ -809,20 +818,32 @@ document.addEventListener('DOMContentLoaded', function() {
             const commonName = expandBtn.getAttribute('data-common-name');
             const targetId = expandBtn.getAttribute('data-target-id');
 
+            console.log('Expand button attributes:', { category, subcategory, commonName, targetId });
+
             if (commonName && targetId) {
                 // Handle "Expand Items" for common names
+                console.log('Triggering loadItems for common name:', commonName);
                 loadItems(category, subcategory, commonName, targetId);
             } else if (category && targetId) {
                 // Handle "Expand" for categories (subcategory selection)
-                window.expandCategory(category, targetId);
+                console.log('Triggering window.expandCategory for category:', category);
+                if (typeof window.expandCategory === 'function') {
+                    window.expandCategory(category, targetId);
+                } else {
+                    console.error('window.expandCategory is not defined');
+                }
+            } else {
+                console.error('Missing required attributes for expand button:', expandBtn);
             }
             return;
         }
 
         const collapseBtn = event.target.closest('.collapse-btn');
         if (collapseBtn) {
+            event.preventDefault();
             event.stopPropagation();
             const targetId = collapseBtn.getAttribute('data-collapse-target');
+            console.log('Collapse button clicked for targetId:', targetId);
             collapseSection(targetId);
             return;
         }
