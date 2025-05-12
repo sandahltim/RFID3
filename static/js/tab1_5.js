@@ -1,4 +1,4 @@
-console.log('tab1_5.js version: 2025-05-07-v33 loaded');
+console.log('tab1_5.js version: 2025-05-07-v34 loaded');
 
 // Note: Ensure formatDate is available (defined in common.js)
 if (typeof formatDate !== 'function') {
@@ -35,50 +35,31 @@ function hideLoadingTab1_5(targetId) {
 }
 
 // Note: Common function for Tabs 1 and 5
-function collapseSection(targetId) {
-    if (!targetId) {
-        console.error('collapseSection called with undefined or null targetId');
+function collapseSection(categoryRow, targetId) {
+    if (!targetId || !categoryRow) {
+        console.error('collapseSection called with undefined or null parameters', { targetId, categoryRow });
         return;
     }
     console.log('collapseSection called for targetId:', targetId);
-    const section = document.getElementById(targetId);
-    if (section) {
-        section.classList.remove('expanded');
-        section.classList.add('collapsed');
-        section.style.display = 'none';
-        section.style.opacity = '0';
 
-        const collapseBtn = document.querySelector(`button[data-collapse-target="${targetId}"]`);
-        const expandBtn = collapseBtn ? collapseBtn.previousElementSibling : null;
-        if (expandBtn && collapseBtn) {
-            expandBtn.style.display = 'inline-block';
-            collapseBtn.style.display = 'none';
-        } else {
-            console.warn('Could not find expand/collapse buttons for targetId:', targetId);
-        }
+    // Remove any existing common name rows associated with this category
+    const existingRows = categoryRow.parentNode.querySelectorAll(`tr.common-name-row[data-target-id="${targetId}"]`);
+    existingRows.forEach(row => row.remove());
 
-        sessionStorage.removeItem(`expanded_${targetId}`);
-    } else {
-        console.error(`Section with ID ${targetId} not found for collapsing`);
-    }
+    sessionStorage.removeItem(`expanded_${targetId}`);
 }
 
 // Note: Common function for Tabs 1 and 5
 function loadCommonNames(selectElement, page = 1) {
     const subcategory = selectElement.value;
     const category = selectElement.getAttribute('data-category');
-    const targetId = selectElement.closest('tr').nextElementSibling.querySelector('.common-level')?.id;
+    const targetId = `common-${category.toLowerCase().replace(/[^a-z0-9]/g, '_')}`; // Generate targetId consistently
     const categoryRow = selectElement.closest('tr');
+    const tbody = categoryRow.closest('tbody');
 
-    const targetElement = document.getElementById(targetId);
-    if (!targetElement) {
-        console.error(`Target element with ID ${targetId} not found`);
-        return;
-    }
-
-    // Collapse only if no subcategory is selected and not paginating
+    // Collapse if no subcategory is selected
     if (!subcategory && page === 1) {
-        collapseSection(targetId);
+        collapseSection(categoryRow, targetId);
         fetch(`/tab/${window.cachedTabNum}/subcat_data?category=${encodeURIComponent(category)}`)
             .then(response => response.json())
             .then(data => {
@@ -102,8 +83,12 @@ function loadCommonNames(selectElement, page = 1) {
         return;
     }
 
-    const loadingSuccess = showLoadingTab1_5(targetId);
-    targetElement.innerHTML = ''; // Clear previous content
+    // Show loading indicator in the subcategory cell
+    const loadingId = `loading-subcat-${targetId}`;
+    let loadingDiv = document.getElementById(loadingId);
+    if (loadingDiv) {
+        loadingDiv.style.display = 'block';
+    }
 
     let url = `/tab/${window.cachedTabNum}/common_names?category=${encodeURIComponent(category)}&subcategory=${encodeURIComponent(subcategory)}&page=${page}`;
 
@@ -117,7 +102,10 @@ function loadCommonNames(selectElement, page = 1) {
         })
         .then(data => {
             console.log('Common names data received:', data);
-            let html = '';
+
+            // Remove any existing common name rows for this category
+            collapseSection(categoryRow, targetId);
+
             if (data.common_names && data.common_names.length > 0) {
                 // Calculate subcategory totals
                 const totalItems = data.common_names.reduce((sum, item) => sum + (item.total_items || 0), 0);
@@ -132,9 +120,12 @@ function loadCommonNames(selectElement, page = 1) {
                 categoryRow.cells[4].textContent = itemsInService || '0';
                 categoryRow.cells[5].textContent = itemsAvailable || '0';
 
-                // Wrap the table in a div to ensure proper table layout
-                html += `
-                    <div class="common-table-wrapper">
+                // Create a new row for the common name table header
+                const headerRow = document.createElement('tr');
+                headerRow.className = 'common-name-row';
+                headerRow.setAttribute('data-target-id', targetId);
+                headerRow.innerHTML = `
+                    <td colspan="7">
                         <table class="common-table" id="common-table-${targetId}">
                             <thead>
                                 <tr>
@@ -146,126 +137,104 @@ function loadCommonNames(selectElement, page = 1) {
                                     <th>Actions</th>
                                 </tr>
                             </thead>
-                            <tbody>
+                            <tbody></tbody>
+                        </table>
+                    </td>
                 `;
+                tbody.insertBefore(headerRow, categoryRow.nextSibling);
 
+                // Populate the table body with common name rows
+                const tableBody = headerRow.querySelector('tbody');
                 data.common_names.forEach(item => {
                     const rowId = `${targetId}_${item.name.replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '')}`;
                     const escapedName = item.name.replace(/'/g, "\\'").replace(/"/g, '\\"');
-                    html += `
-                        <tr>
-                            <td>${item.name}</td>
-                            <td>${item.total_items || '0'}</td>
-                            <td>${item.items_on_contracts || '0'}</td>
-                            <td>${item.items_in_service || '0'}</td>
-                            <td>${item.items_available || '0'}</td>
-                            <td>
-                                <div class="btn-group">
-                                    <button class="btn btn-sm btn-secondary expand-btn" 
-                                            data-category="${category}" 
-                                            data-subcategory="${subcategory}" 
-                                            data-common-name="${escapedName}" 
-                                            data-target-id="items-${rowId}">Expand Items</button>
-                                    <button class="btn btn-sm btn-secondary collapse-btn" 
-                                            style="display:none;" 
-                                            data-collapse-target="items-${rowId}">Collapse</button>
-                                    <button class="btn btn-sm btn-info print-btn" 
-                                            data-print-level="Common Name" 
-                                            data-print-id="common-table-${targetId}" 
-                                            data-common-name="${escapedName}" 
-                                            data-category="${category}" 
-                                            data-subcategory="${subcategory}">Print Aggregate</button>
-                                    <button class="btn btn-sm btn-info print-full-btn" 
-                                            data-common-name="${escapedName}" 
-                                            data-category="${category}" 
-                                            data-subcategory="${subcategory}">Print Full List</button>
-                                </div>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td colspan="6">
-                                <div id="items-${rowId}" class="expandable collapsed"></div>
-                            </td>
-                        </tr>
+                    const commonRow = document.createElement('tr');
+                    commonRow.innerHTML = `
+                        <td>${item.name}</td>
+                        <td>${item.total_items || '0'}</td>
+                        <td>${item.items_on_contracts || '0'}</td>
+                        <td>${item.items_in_service || '0'}</td>
+                        <td>${item.items_available || '0'}</td>
+                        <td>
+                            <div class="btn-group">
+                                <button class="btn btn-sm btn-secondary expand-btn" 
+                                        data-category="${category}" 
+                                        data-subcategory="${subcategory}" 
+                                        data-common-name="${escapedName}" 
+                                        data-target-id="items-${rowId}">Expand Items</button>
+                                <button class="btn btn-sm btn-secondary collapse-btn" 
+                                        style="display:none;" 
+                                        data-collapse-target="items-${rowId}">Collapse</button>
+                                <button class="btn btn-sm btn-info print-btn" 
+                                        data-print-level="Common Name" 
+                                        data-print-id="common-table-${targetId}" 
+                                        data-common-name="${escapedName}" 
+                                        data-category="${category}" 
+                                        data-subcategory="${subcategory}">Print Aggregate</button>
+                                <button class="btn btn-sm btn-info print-full-btn" 
+                                        data-common-name="${escapedName}" 
+                                        data-category="${category}" 
+                                        data-subcategory="${subcategory}">Print Full List</button>
+                            </div>
+                        </td>
                     `;
+                    tableBody.appendChild(commonRow);
+
+                    // Add a row for the expandable items section
+                    const itemsRow = document.createElement('tr');
+                    itemsRow.className = 'common-name-row';
+                    itemsRow.setAttribute('data-target-id', targetId);
+                    itemsRow.innerHTML = `
+                        <td colspan="6">
+                            <div id="items-${rowId}" class="expandable collapsed"></div>
+                        </td>
+                    `;
+                    tableBody.appendChild(itemsRow);
                 });
 
-                html += `
-                            </tbody>
-                        </table>
-                    </div>
-                `;
-
+                // Add pagination if needed
                 if (data.total_common_names > data.per_page) {
                     const totalPages = Math.ceil(data.total_common_names / data.per_page);
-                    html += `
-                        <div class="pagination-controls">
-                            <button class="btn btn-sm btn-secondary" 
-                                    onclick="loadCommonNames(document.querySelector('#${targetId}').closest('tr').previousElementSibling.querySelector('.subcategory-select'), ${data.page - 1})" 
-                                    ${data.page === 1 ? 'disabled' : ''}>Previous</button>
-                            <span>Page ${data.page} of ${totalPages}</span>
-                            <button class="btn btn-sm btn-secondary" 
-                                    onclick="loadCommonNames(document.querySelector('#${targetId}').closest('tr').previousElementSibling.querySelector('.subcategory-select'), ${data.page + 1})" 
-                                    ${data.page === totalPages ? 'disabled' : ''}>Next</button>
-                        </div>
+                    const paginationRow = document.createElement('tr');
+                    paginationRow.className = 'common-name-row';
+                    paginationRow.setAttribute('data-target-id', targetId);
+                    paginationRow.innerHTML = `
+                        <td colspan="7">
+                            <div class="pagination-controls">
+                                <button class="btn btn-sm btn-secondary" 
+                                        onclick="loadCommonNames(document.querySelector('select[data-category=\"${category}\"]'), ${data.page - 1})" 
+                                        ${data.page === 1 ? 'disabled' : ''}>Previous</button>
+                                <span>Page ${data.page} of ${totalPages}</span>
+                                <button class="btn btn-sm btn-secondary" 
+                                        onclick="loadCommonNames(document.querySelector('select[data-category=\"${category}\"]'), ${data.page + 1})" 
+                                        ${data.page === totalPages ? 'disabled' : ''}>Next</button>
+                            </div>
+                        </td>
                     `;
+                    tableBody.appendChild(paginationRow);
+                }
+
+                // Debug the common table's styles
+                const commonTable = document.getElementById(`common-table-${targetId}`);
+                if (commonTable) {
+                    console.log('Common table styles:', {
+                        display: commonTable.style.display,
+                        visibility: window.getComputedStyle(commonTable).visibility,
+                        computedDisplay: window.getComputedStyle(commonTable).display,
+                        height: window.getComputedStyle(commonTable).height
+                    });
                 }
             } else {
-                html = `<p>No common names found for this subcategory.</p>`;
+                const noDataRow = document.createElement('tr');
+                noDataRow.className = 'common-name-row';
+                noDataRow.setAttribute('data-target-id', targetId);
+                noDataRow.innerHTML = `
+                    <td colspan="7">
+                        <p>No common names found for this subcategory.</p>
+                    </td>
+                `;
+                tbody.insertBefore(noDataRow, categoryRow.nextSibling);
             }
-
-            console.log('Generated HTML for common names:', html);
-            targetElement.innerHTML = html;
-            console.log('Applied HTML to targetElement, checking styles...');
-
-            // Ensure the parent <tr> and <td> are visible
-            const parentTd = targetElement.closest('td');
-            const parentTr = parentTd ? parentTd.closest('tr') : null;
-            if (parentTd) {
-                parentTd.style.display = 'table-cell';
-                parentTd.style.visibility = 'visible';
-                console.log('Parent <td> styles:', {
-                    display: parentTd.style.display,
-                    visibility: window.getComputedStyle(parentTd).visibility,
-                    computedDisplay: window.getComputedStyle(parentTd).display
-                });
-            }
-            if (parentTr) {
-                parentTr.style.display = 'table-row';
-                parentTr.style.visibility = 'visible';
-                console.log('Parent <tr> styles:', {
-                    display: parentTr.style.display,
-                    visibility: window.getComputedStyle(parentTr).visibility,
-                    computedDisplay: window.getComputedStyle(parentTr).display
-                });
-            }
-
-            // Apply styles to make the common-level div visible
-            targetElement.classList.remove('collapsed');
-            targetElement.classList.add('expanded');
-            targetElement.style.display = 'block';
-            targetElement.style.opacity = '1';
-            targetElement.style.visibility = 'visible';
-
-            // Debug the common table's styles
-            const commonTable = document.getElementById(`common-table-${targetId}`);
-            if (commonTable) {
-                console.log('Common table styles:', {
-                    display: commonTable.style.display,
-                    visibility: window.getComputedStyle(commonTable).visibility,
-                    computedDisplay: window.getComputedStyle(commonTable).display,
-                    height: window.getComputedStyle(commonTable).height
-                });
-            }
-
-            console.log('Target element styles after update:', {
-                classList: targetElement.classList.toString(),
-                display: targetElement.style.display,
-                opacity: targetElement.style.opacity,
-                visibility: window.getComputedStyle(targetElement).visibility,
-                computedDisplay: window.getComputedStyle(targetElement).display,
-                height: window.getComputedStyle(targetElement).height
-            });
 
             // Apply global filter to the newly loaded table
             if (typeof applyFilterToAllLevels === 'function') {
@@ -273,19 +242,24 @@ function loadCommonNames(selectElement, page = 1) {
             } else {
                 console.warn('applyFilterToAllLevels function is not available');
             }
+
+            sessionStorage.setItem(`expanded_${targetId}`, JSON.stringify({ category, subcategory, page }));
         })
         .catch(error => {
             console.error('Common names fetch error:', error);
-            targetElement.innerHTML = `<p>Error loading common names: ${error.message}</p>`;
-            targetElement.classList.remove('collapsed');
-            targetElement.classList.add('expanded');
-            targetElement.style.display = 'block';
-            targetElement.style.opacity = '1';
-            targetElement.style.visibility = 'visible';
+            const errorRow = document.createElement('tr');
+            errorRow.className = 'common-name-row';
+            errorRow.setAttribute('data-target-id', targetId);
+            errorRow.innerHTML = `
+                <td colspan="7">
+                    <p>Error loading common names: ${error.message}</p>
+                </td>
+            `;
+            tbody.insertBefore(errorRow, categoryRow.nextSibling);
         })
         .finally(() => {
-            if (loadingSuccess) {
-                hideLoadingTab1_5(targetId);
+            if (loadingDiv) {
+                loadingDiv.style.display = 'none';
             }
         });
 }
@@ -384,8 +358,10 @@ function bulkUpdateSelectedItems(key) {
         } else {
             console.log('Bulk update successful:', data);
             alert('Bulk update successful!');
-            const category = document.querySelector(`#item-table-${key}`).closest('.common-level').querySelector('button[data-category]')?.getAttribute('data-category');
-            const subcategory = document.querySelector(`#item-table-${key}`).closest('.common-level').querySelector('button[data-subcategory]')?.getAttribute('data-subcategory');
+            const category = document.querySelector(`#item-table-${key}`).closest('.common-level')?.querySelector('button[data-category]')?.getAttribute('data-category') || 
+                             document.querySelector(`#item-table-${key}`).closest('tr')?.previousElementSibling?.querySelector('button[data-category]')?.getAttribute('data-category');
+            const subcategory = document.querySelector(`#item-table-${key}`).closest('.common-level')?.querySelector('button[data-subcategory]')?.getAttribute('data-subcategory') ||
+                                document.querySelector(`#item-table-${key}`).closest('tr')?.previousElementSibling?.querySelector('button[data-subcategory]')?.getAttribute('data-subcategory');
             const commonName = document.querySelector(`#common-table-${key} tbody tr td:first-child`)?.textContent;
             const targetId = document.querySelector(`#item-table-${key}`).closest('.expandable')?.id;
             if (category && subcategory && commonName && targetId) {
@@ -843,9 +819,11 @@ function saveChanges(tagId) {
                 alert('Status updated successfully!');
                 const itemsContainer = document.getElementById(`items-${tagId.split('-')[0]}`);
                 if (itemsContainer) {
-                    const category = itemsContainer.closest('.common-level').querySelector('button[data-category]')?.getAttribute('data-category');
-                    const subcategory = itemsContainer.closest('.common-level').querySelector('button[data-subcategory]')?.getAttribute('data-subcategory');
-                    const commonName = itemsContainer.closest('tr').querySelector('td:first-child')?.textContent;
+                    const category = itemsContainer.closest('.common-level')?.querySelector('button[data-category]')?.getAttribute('data-category') || 
+                                     itemsContainer.closest('tr')?.previousElementSibling?.querySelector('button[data-category]')?.getAttribute('data-category');
+                    const subcategory = itemsContainer.closest('.common-level')?.querySelector('button[data-subcategory]')?.getAttribute('data-subcategory') ||
+                                        itemsContainer.closest('tr')?.previousElementSibling?.querySelector('button[data-subcategory]')?.getAttribute('data-subcategory');
+                    const commonName = itemsContainer.closest('tr')?.querySelector('td:first-child')?.textContent;
                     loadItems(category, subcategory, commonName, `items-${tagId.split('-')[0]}`);
                 }
             }
@@ -899,7 +877,22 @@ document.addEventListener('DOMContentLoaded', function() {
             event.stopPropagation();
             const targetId = collapseBtn.getAttribute('data-collapse-target');
             console.log('Collapse button clicked for targetId:', targetId);
-            collapseSection(targetId);
+
+            const container = document.getElementById(targetId);
+            if (container) {
+                container.classList.remove('expanded');
+                container.classList.add('collapsed');
+                container.style.display = 'none';
+                container.style.opacity = '0';
+
+                collapseBtn.style.display = 'none';
+                const expandBtn = collapseBtn.previousElementSibling;
+                if (expandBtn) {
+                    expandBtn.style.display = 'inline-block';
+                }
+
+                sessionStorage.removeItem(`expanded_items_${targetId}`);
+            }
             return;
         }
 
