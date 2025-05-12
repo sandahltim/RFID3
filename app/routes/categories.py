@@ -44,7 +44,7 @@ if not any(isinstance(h, logging.StreamHandler) for h in root_logger.handlers):
 categories_bp = Blueprint('categories', __name__)
 
 # Version check to ensure correct deployment
-logger.info("Deployed categories.py version: 2025-05-07-v20")
+logger.info("Deployed categories.py version: 2025-05-07-v21")
 
 def build_common_name_dict(seed_data):
     """Build a dictionary mapping rental_class_id to common_name from seed_data."""
@@ -76,8 +76,20 @@ def manage_categories():
 
         # Fetch all rental class mappings from both tables
         logger.debug("Fetching rental class mappings")
-        base_mappings = session.query(RentalClassMapping).all()
-        user_mappings = session.query(UserRentalClassMapping).all()
+        try:
+            base_mappings = session.query(RentalClassMapping).all()
+        except Exception as db_error:
+            logger.error(f"Failed to fetch base_mappings from RentalClassMapping: {str(db_error)}", exc_info=True)
+            current_app.logger.error(f"Failed to fetch base_mappings from RentalClassMapping: {str(db_error)}", exc_info=True)
+            base_mappings = []
+
+        try:
+            user_mappings = session.query(UserRentalClassMapping).all()
+        except Exception as db_error:
+            logger.error(f"Failed to fetch user_mappings from UserRentalClassMapping: {str(db_error)}", exc_info=True)
+            current_app.logger.error(f"Failed to fetch user_mappings from UserRentalClassMapping: {str(db_error)}", exc_info=True)
+            user_mappings = []
+
         logger.debug(f"Fetched {len(base_mappings)} base mappings and {len(user_mappings)} user mappings")
 
         # Merge mappings, prioritizing user mappings
@@ -168,9 +180,21 @@ def get_mappings():
 
         # Fetch all rental class mappings
         logger.debug("Querying rental_class_mappings")
-        base_mappings = session.query(RentalClassMapping).all()
+        try:
+            base_mappings = session.query(RentalClassMapping).all()
+        except Exception as db_error:
+            logger.error(f"Failed to fetch base_mappings from RentalClassMapping: {str(db_error)}", exc_info=True)
+            current_app.logger.error(f"Failed to fetch base_mappings from RentalClassMapping: {str(db_error)}", exc_info=True)
+            base_mappings = []
+
         logger.debug("Querying user_rental_class_mappings")
-        user_mappings = session.query(UserRentalClassMapping).all()
+        try:
+            user_mappings = session.query(UserRentalClassMapping).all()
+        except Exception as db_error:
+            logger.error(f"Failed to fetch user_mappings from UserRentalClassMapping: {str(db_error)}", exc_info=True)
+            current_app.logger.error(f"Failed to fetch user_mappings from UserRentalClassMapping: {str(db_error)}", exc_info=True)
+            user_mappings = []
+
         logger.debug(f"Fetched {len(base_mappings)} base mappings and {len(user_mappings)} user mappings")
 
         # Merge mappings, prioritizing user mappings
@@ -192,9 +216,20 @@ def get_mappings():
         # Fetch seed data from cache or API
         cache_key = 'seed_rental_classes'
         logger.debug(f"Deleting cache key {cache_key} to force fresh API call")
-        cache.delete(cache_key)  # Force a fresh API call
+        try:
+            cache.delete(cache_key)  # Force a fresh API call
+        except Exception as cache_error:
+            logger.error(f"Failed to delete cache key {cache_key}: {str(cache_error)}", exc_info=True)
+            current_app.logger.error(f"Failed to delete cache key {cache_key}: {str(cache_error)}", exc_info=True)
+
         logger.debug(f"Checking cache for key: {cache_key}")
-        seed_data = cache.get(cache_key)
+        try:
+            seed_data = cache.get(cache_key)
+        except Exception as cache_error:
+            logger.error(f"Failed to fetch cache for key {cache_key}: {str(cache_error)}", exc_info=True)
+            current_app.logger.error(f"Failed to fetch cache for key {cache_key}: {str(cache_error)}", exc_info=True)
+            seed_data = None
+
         if seed_data is None:
             logger.info("Seed data not found in cache, fetching from API")
             try:
