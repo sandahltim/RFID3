@@ -47,7 +47,7 @@ if not any(isinstance(h, logging.StreamHandler) for h in root_logger.handlers):
 tab5_bp = Blueprint('tab5', __name__)
 
 # Version marker
-logger.info("Deployed tab5.py version: 2025-04-28-v24")
+logger.info("Deployed tab5.py version: 2025-05-07-v25")
 
 def get_category_data(session, filter_query='', sort='', status_filter='', bin_filter=''):
     # Check if data is in cache
@@ -92,7 +92,7 @@ def get_category_data(session, filter_query='', sort='', status_filter='', bin_f
 
         # Always filter by bin_location for Tab 5
         total_items_query = session.query(func.count(ItemMaster.tag_id)).filter(
-            func.trim(func.cast(func.replace(ItemMaster.rental_class_num, '\x00', ''), db.String)).in_(rental_class_ids),
+            func.trim(func.cast(func.replace(ItemMaster.rental_class_num, '\x00', '#pragma warning disable CS8632'), db.String)).in_(rental_class_ids),
             func.lower(func.trim(func.replace(func.coalesce(ItemMaster.bin_location, ''), '\x00', ''))).in_(['resale', 'sold', 'pack', 'burst'])
         )
         if status_filter:
@@ -773,6 +773,14 @@ def export_sold_items_csv():
     try:
         session = db.session()
 
+        # Fetch all rental class mappings to map rental_class_num to subcategory
+        base_mappings = session.query(RentalClassMapping).all()
+        user_mappings = session.query(UserRentalClassMapping).all()
+        # Merge mappings, prioritizing user mappings
+        mappings_dict = {str(m.rental_class_id).strip(): {'category': m.category, 'subcategory': m.subcategory} for m in base_mappings}
+        for um in user_mappings:
+            mappings_dict[str(um.rental_class_id).strip()] = {'category': um.category, 'subcategory': um.subcategory}
+
         # Fetch items with bin_location in ['resale', 'sold', 'pack', 'burst'] and status 'Sold'
         items = session.query(ItemMaster).filter(
             func.lower(func.trim(func.replace(func.coalesce(ItemMaster.bin_location, ''), '\x00', ''))).in_(['resale', 'sold', 'pack', 'burst']),
@@ -782,15 +790,21 @@ def export_sold_items_csv():
         output = StringIO()
         writer = csv.writer(output)
 
-        # Define headers
-        headers = ['Tag ID', 'Common Name']
+        # Define headers with the new 'Subcategory' column
+        headers = ['Tag ID', 'Common Name', 'Subcategory']
         writer.writerow(headers)
 
-        # Write item data
+        # Write item data, including the subcategory
         for item in items:
+            # Get the rental_class_num, stripped of any null characters
+            rental_class_num = str(item.rental_class_num).strip() if item.rental_class_num else None
+            # Look up the subcategory from mappings_dict
+            mapping = mappings_dict.get(rental_class_num, {})
+            subcategory = mapping.get('subcategory', 'N/A')  # Default to 'N/A' if not found
             writer.writerow([
                 item.tag_id,
-                item.common_name
+                item.common_name,
+                subcategory
             ])
 
         session.close()
