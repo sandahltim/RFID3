@@ -44,7 +44,7 @@ if not any(isinstance(h, logging.StreamHandler) for h in root_logger.handlers):
 categories_bp = Blueprint('categories', __name__)
 
 # Version check to ensure correct deployment
-logger.info("Deployed categories.py version: 2025-05-07-v18")
+logger.info("Deployed categories.py version: 2025-05-07-v19")
 
 def build_common_name_dict(seed_data):
     """Build a dictionary mapping rental_class_id to common_name from seed_data."""
@@ -125,7 +125,7 @@ def manage_categories():
         # Cache the seed_data after lookup
         if seed_data:
             seed_data_copy = copy.deepcopy(seed_data)
-            cache.set(cache_key, seed_data_copy, timeout=3600)  # Cache for 1 hour
+            cache.set(cache_key, seed_data_copy, ex=3600)  # Cache for 1 hour, using 'ex' instead of 'timeout'
             logger.info("Fetched seed data from API and cached")
             current_app.logger.info("Fetched seed data from API and cached")
 
@@ -207,7 +207,7 @@ def get_mappings():
         # Cache the seed_data after lookup
         if seed_data:
             seed_data_copy = copy.deepcopy(seed_data)
-            cache.set(cache_key, seed_data_copy, timeout=3600)  # Cache for 1 hour
+            cache.set(cache_key, seed_data_copy, ex=3600)  # Cache for 1 hour, using 'ex' instead of 'timeout'
             logger.info("Fetched seed data from API and cached")
             current_app.logger.info("Fetched seed data from API and cached")
 
