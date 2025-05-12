@@ -1,4 +1,4 @@
-console.log('tab1_5.js version: 2025-05-07-v25 loaded');
+console.log('tab1_5.js version: 2025-05-07-v26 loaded');
 
 // Note: Common function for Tabs 1 and 5
 function showLoading(targetId) {
@@ -795,6 +795,7 @@ document.addEventListener('DOMContentLoaded', function() {
         return;
     }
 
+    // Remove any existing click event listeners to prevent duplicates
     document.removeEventListener('click', handleClick);
     document.addEventListener('click', handleClick);
 
@@ -809,7 +810,11 @@ document.addEventListener('DOMContentLoaded', function() {
             const targetId = expandBtn.getAttribute('data-target-id');
 
             if (commonName && targetId) {
+                // Handle "Expand Items" for common names
                 loadItems(category, subcategory, commonName, targetId);
+            } else if (category && targetId) {
+                // Handle "Expand" for categories (subcategory selection)
+                window.expandCategory(category, targetId);
             }
             return;
         }
