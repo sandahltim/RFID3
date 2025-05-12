@@ -35,7 +35,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const selects = document.querySelectorAll('.subcategory-select');
     const promises = Array.from(selects).map(select => {
         const category = select.getAttribute('data-category');
-        const catId = select.closest('tr').nextElementSibling.querySelector('.common-level').id.split('-')[1];
+        const catId = category.toLowerCase().replace(/[^a-z0-9]/g, '_'); // Use category name as identifier
         const loadingDiv = document.getElementById(`loading-subcat-${catId}`);
         if (loadingDiv) {
             loadingDiv.style.display = 'block';
