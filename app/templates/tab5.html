@@ -125,8 +125,8 @@ function bulkUpdateItems() {
             // Refresh the items table by re-expanding the common name section
             const wrapper = document.querySelector('.item-level-wrapper');
             if (wrapper) {
-                const commonNameDiv = wrapper.closest('.common-level');
-                const category = commonNameDiv.id.split('-')[1];
+                const category = wrapper.closest('tr')?.previousElementSibling?.querySelector('button[data-category]')?.getAttribute('data-category') ||
+                                 wrapper.closest('.common-level')?.querySelector('button[data-category]')?.getAttribute('data-category');
                 const subcategorySelect = document.querySelector(`select[data-category="${category}"]`);
                 if (subcategorySelect) {
                     loadCommonNames(subcategorySelect);
@@ -145,7 +145,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const selects = document.querySelectorAll('.subcategory-select');
     const promises = Array.from(selects).map(select => {
         const category = select.getAttribute('data-category');
-        const catId = select.closest('tr').nextElementSibling.querySelector('.common-level').id.split('-')[1];
+        const catId = category.toLowerCase().replace(/[^a-z0-9]/g, '_'); // Use category name as identifier
         const loadingDiv = document.getElementById(`loading-subcat-${catId}`);
         if (loadingDiv) {
             loadingDiv.style.display = 'block';
