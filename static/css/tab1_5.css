@@ -16,24 +16,35 @@
     width: 100%;
     border-collapse: collapse;
     display: table !important;
-    visibility: visible !important;
+    visibility: hidden; /* Start hidden to prevent flicker */
     margin: 0 !important;
     table-layout: fixed;
     opacity: 0; /* Start with opacity 0 for transition */
-    transition: opacity 0.3s ease; /* Smooth transition for opacity */
+    transition: opacity 0.5s ease, visibility 0.5s ease; /* Smoother transition */
     min-height: 200px; /* Prevent layout shift during loading */
 }
 
 .common-table.loaded {
     opacity: 1; /* Fade in when loaded */
+    visibility: visible !important; /* Ensure visibility */
+    transform: translateZ(0); /* Force GPU rendering to reduce flicker */
 }
 
-/* Increase specificity to override style.css */
-.table.common-table th,
-.table.common-table td {
+/* Highest specificity to override style.css */
+.table.table-bordered.common-table th,
+.table.table-bordered.common-table td {
     color: #000000 !important; /* Explicitly set font color to black */
     font-family: 'Roboto', sans-serif !important; /* Match parent table font */
     font-weight: 500 !important; /* Slightly bolder for readability */
+}
+
+/* Additional fallback for inherited styles */
+.common-table th,
+.common-table td,
+.common-table tr,
+.common-table tbody,
+.common-table thead {
+    color: #000000 !important; /* Fallback */
 }
 
 .item-level-wrapper {
@@ -65,22 +76,33 @@
     width: 100%;
     border-collapse: collapse;
     display: table !important;
-    visibility: visible !important;
+    visibility: hidden; /* Start hidden to prevent flicker */
     opacity: 0; /* Start with opacity 0 for transition */
-    transition: opacity 0.3s ease; /* Smooth transition for opacity */
+    transition: opacity 0.5s ease, visibility 0.5s ease; /* Smoother transition */
     min-height: 200px; /* Prevent layout shift during loading */
 }
 
 .item-table.loaded {
     opacity: 1; /* Fade in when loaded */
+    visibility: visible !important; /* Ensure visibility */
+    transform: translateZ(0); /* Force GPU rendering to reduce flicker */
 }
 
-/* Increase specificity to override style.css */
-.table.item-table th,
-.table.item-table td {
+/* Highest specificity to override style.css */
+.table.table-bordered.item-table th,
+.table.table-bordered.item-table td {
     color: #000000 !important; /* Explicitly set font color to black */
     font-family: 'Roboto', sans-serif !important; /* Match parent table font */
     font-weight: 500 !important; /* Slightly bolder for readability */
+}
+
+/* Additional fallback for inherited styles */
+.item-table th,
+.item-table td,
+.item-table tr,
+.item-table tbody,
+.item-table thead {
+    color: #000000 !important; /* Fallback */
 }
 
 /* Table styling */
