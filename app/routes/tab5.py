@@ -47,7 +47,7 @@ if not any(isinstance(h, logging.StreamHandler) for h in root_logger.handlers):
 tab5_bp = Blueprint('tab5', __name__)
 
 # Version marker
-logger.info("Deployed tab5.py version: 2025-05-07-v25")
+logger.info("Deployed tab5.py version: 2025-05-07-v26")
 
 def get_category_data(session, filter_query='', sort='', status_filter='', bin_filter=''):
     # Check if data is in cache
@@ -773,13 +773,13 @@ def export_sold_items_csv():
     try:
         session = db.session()
 
-        # Fetch all rental class mappings to map rental_class_num to subcategory
+        # Fetch all rental class mappings to map rental_class_num to subcategory and short_common_name
         base_mappings = session.query(RentalClassMapping).all()
         user_mappings = session.query(UserRentalClassMapping).all()
         # Merge mappings, prioritizing user mappings
-        mappings_dict = {str(m.rental_class_id).strip(): {'category': m.category, 'subcategory': m.subcategory} for m in base_mappings}
+        mappings_dict = {str(m.rental_class_id).strip(): {'category': m.category, 'subcategory': m.subcategory, 'short_common_name': m.short_common_name} for m in base_mappings}
         for um in user_mappings:
-            mappings_dict[str(um.rental_class_id).strip()] = {'category': um.category, 'subcategory': um.subcategory}
+            mappings_dict[str(um.rental_class_id).strip()] = {'category': um.category, 'subcategory': um.subcategory, 'short_common_name': um.short_common_name}
 
         # Fetch items with bin_location in ['resale', 'sold', 'pack', 'burst'] and status 'Sold'
         items = session.query(ItemMaster).filter(
@@ -790,21 +790,23 @@ def export_sold_items_csv():
         output = StringIO()
         writer = csv.writer(output)
 
-        # Define headers with the new 'Subcategory' column
-        headers = ['Tag ID', 'Common Name', 'Subcategory']
+        # Define headers with the new 'Subcategory' and 'Short Common Name' columns
+        headers = ['Tag ID', 'Common Name', 'Subcategory', 'Short Common Name']
         writer.writerow(headers)
 
-        # Write item data, including the subcategory
+        # Write item data, including the subcategory and short_common_name
         for item in items:
             # Get the rental_class_num, stripped of any null characters
             rental_class_num = str(item.rental_class_num).strip() if item.rental_class_num else None
-            # Look up the subcategory from mappings_dict
+            # Look up the subcategory and short_common_name from mappings_dict
             mapping = mappings_dict.get(rental_class_num, {})
             subcategory = mapping.get('subcategory', 'N/A')  # Default to 'N/A' if not found
+            short_common_name = mapping.get('short_common_name', 'N/A')  # Default to 'N/A' if not found
             writer.writerow([
                 item.tag_id,
                 item.common_name,
-                subcategory
+                subcategory,
+                short_common_name
             ])
 
         session.close()

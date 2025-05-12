@@ -4,6 +4,11 @@
 
 {% block content %}
 <h1>Manage Categories</h1>
+<!-- Sticky Save Button at the Top -->
+<div style="position: sticky; top: 0; background-color: white; padding: 10px 0; z-index: 1000; border-bottom: 1px solid #dee2e6;">
+    <button class="btn btn-success" onclick="confirmSaveMappings()">Save Mappings</button>
+</div>
+
 <div id="category-mappings">
     <table class="table table-bordered">
         <thead>
@@ -12,32 +17,38 @@
                 <th>Subcategory</th>
                 <th>Rental Class ID</th>
                 <th>Common Name</th>
+                <th>Short Common Name</th>
                 <th>Actions</th>
             </tr>
         </thead>
         <tbody id="mappings-table">
             {% for category in categories %}
-            <tr data-rental-class-id="{{ category.rental_class_id }}" data-original-category="{{ category.category }}" data-original-subcategory="{{ category.subcategory }}">
+            <tr data-rental-class-id="{{ category.rental_class_id }}" 
+                data-original-category="{{ category.category }}" 
+                data-original-subcategory="{{ category.subcategory }}" 
+                data-original-short-common-name="{{ category.short_common_name }}">
                 <td><input type="text" class="form-control category-input" value="{{ category.category }}"></td>
                 <td><input type="text" class="form-control subcategory-input" value="{{ category.subcategory }}"></td>
                 <td><input type="text" class="form-control rental-class-id-input" value="{{ category.rental_class_id }}"></td>
                 <td>{{ category.common_name }}</td>
+                <td><input type="text" class="form-control short-common-name-input" value="{{ category.short_common_name }}" maxlength="50"></td>
                 <td><button class="btn btn-danger" onclick="removeMappingRow(this)">Remove</button></td>
             </tr>
             {% endfor %}
         </tbody>
     </table>
     <button class="btn btn-primary" onclick="addMappingRow()">Add Mapping</button>
+    <!-- Keep the Save Button at the Bottom as Well -->
     <button class="btn btn-success" onclick="confirmSaveMappings()">Save Mappings</button>
 </div>
 
 <script>
     let mappings = [];
 
-    function addMappingRow(mapping = {category: '', subcategory: '', rental_class_id: '', common_name: 'N/A'}) {
+    function addMappingRow(mapping = {category: '', subcategory: '', rental_class_id: '', common_name: 'N/A', short_common_name: ''}) {
         const tableBody = document.getElementById('mappings-table');
         const existingRow = tableBody.querySelector(`tr[data-rental-class-id="${mapping.rental_class_id}"]`);
-        if (existingRow) {
+        if (existingRow && mapping.rental_class_id) {
             console.log(`Skipping duplicate rental_class_id: ${mapping.rental_class_id}`);
             return;
         }
@@ -46,11 +57,13 @@
         row.setAttribute('data-rental-class-id', mapping.rental_class_id);
         row.setAttribute('data-original-category', mapping.category);
         row.setAttribute('data-original-subcategory', mapping.subcategory);
+        row.setAttribute('data-original-short-common-name', mapping.short_common_name);
         row.innerHTML = `
             <td><input type="text" class="form-control category-input" value="${mapping.category}"></td>
             <td><input type="text" class="form-control subcategory-input" value="${mapping.subcategory}"></td>
             <td><input type="text" class="form-control rental-class-id-input" value="${mapping.rental_class_id}"></td>
             <td>${mapping.common_name}</td>
+            <td><input type="text" class="form-control short-common-name-input" value="${mapping.short_common_name}" maxlength="50"></td>
             <td><button class="btn btn-danger" onclick="removeMappingRow(this)">Remove</button></td>
         `;
         tableBody.appendChild(row);
@@ -103,16 +116,19 @@
 
             const categoryInput = row.querySelector('.category-input');
             const subcategoryInput = row.querySelector('.subcategory-input');
+            const shortCommonNameInput = row.querySelector('.short-common-name-input');
 
             const categoryValue = categoryInput ? categoryInput.value : '';
             const subcategoryValue = subcategoryInput ? subcategoryInput.value : '';
+            const shortCommonNameValue = shortCommonNameInput ? shortCommonNameInput.value : '';
 
-            console.log(`Row ${index} (rental_class_id=${rentalClassId}): raw category='${categoryValue}', raw subcategory='${subcategoryValue}'`);
+            console.log(`Row ${index} (rental_class_id=${rentalClassId}): raw category='${categoryValue}', raw subcategory='${subcategoryValue}', raw short_common_name='${shortCommonNameValue}'`);
 
             mappings.push({
                 category: categoryValue.trim(),
                 subcategory: subcategoryValue.trim(),
-                rental_class_id: rentalClassId
+                rental_class_id: rentalClassId,
+                short_common_name: shortCommonNameValue.trim()
             });
         });
 
@@ -154,14 +170,16 @@
 
             const originalCategory = (row.getAttribute('data-original-category') || '').trim();
             const originalSubcategory = (row.getAttribute('data-original-subcategory') || '').trim();
+            const originalShortCommonName = (row.getAttribute('data-original-short-common-name') || '').trim();
             const currentCategory = (mapping.category || '').trim();
             const currentSubcategory = (mapping.subcategory || '').trim();
+            const currentShortCommonName = (mapping.short_common_name || '').trim();
 
-            console.log(`Comparing rental_class_id=${mapping.rental_class_id}: originalCategory='${originalCategory}', currentCategory='${currentCategory}', originalSubcategory='${originalSubcategory}', currentSubcategory='${currentSubcategory}'`);
+            console.log(`Comparing rental_class_id=${mapping.rental_class_id}: originalCategory='${originalCategory}', currentCategory='${currentCategory}', originalSubcategory='${originalSubcategory}', currentSubcategory='${currentSubcategory}', originalShortCommonName='${originalShortCommonName}', currentShortCommonName='${currentShortCommonName}'`);
 
-            if (currentCategory !== originalCategory || currentSubcategory !== originalSubcategory) {
+            if (currentCategory !== originalCategory || currentSubcategory !== originalSubcategory || currentShortCommonName !== originalShortCommonName) {
                 changedMappings.push(mapping);
-                console.log(`Change detected for rental_class_id=${mapping.rental_class_id}:`, { originalCategory, currentCategory, originalSubcategory, currentSubcategory });
+                console.log(`Change detected for rental_class_id=${mapping.rental_class_id}:`, { originalCategory, currentCategory, originalSubcategory, currentSubcategory, originalShortCommonName, currentShortCommonName });
             }
         });
 

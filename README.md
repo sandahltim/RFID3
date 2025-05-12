@@ -310,7 +310,7 @@ LOG_FILE = os.path.join(BASE_DIR, 'logs', 'rfid_dashboard.log')
 #mariadbhash   *8226E019AE8D0D41243D07D91ABCD8E2F20358BC  root password    MySecureRootPass123
 
 
-### db_model.py
+### db_models.py
 from app import db  # Import db from app/__init__.py
 from datetime import datetime
 
@@ -413,6 +413,7 @@ class RentalClassMapping(db.Model):
     rental_class_id = db.Column(db.String(50), primary_key=True)
     category = db.Column(db.String(100), nullable=False)
     subcategory = db.Column(db.String(100), nullable=False)
+    short_common_name = db.Column(db.String(50))  # Added for short common name
 
 # Added on 2025-04-21 to track hand-counted items for contracts
 class HandCountedItems(db.Model):
@@ -433,9 +434,9 @@ class UserRentalClassMapping(db.Model):
     rental_class_id = db.Column(db.String(50), primary_key=True)
     category = db.Column(db.String(100), nullable=False)
     subcategory = db.Column(db.String(100), nullable=False)
+    short_common_name = db.Column(db.String(50))  # Added for short common name
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
-
 
 ###__init__.py
 import os
