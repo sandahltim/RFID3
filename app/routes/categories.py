@@ -44,7 +44,7 @@ if not any(isinstance(h, logging.StreamHandler) for h in root_logger.handlers):
 categories_bp = Blueprint('categories', __name__)
 
 # Version check to ensure correct deployment
-logger.info("Deployed categories.py version: 2025-04-25-v17")
+logger.info("Deployed categories.py version: 2025-05-07-v18")
 
 def build_common_name_dict(seed_data):
     """Build a dictionary mapping rental_class_id to common_name from seed_data."""
@@ -73,9 +73,19 @@ def manage_categories():
         user_mappings = session.query(UserRentalClassMapping).all()
 
         # Merge mappings, prioritizing user mappings
-        mappings_dict = {m.rental_class_id: {'category': m.category, 'subcategory': m.subcategory} for m in base_mappings}
+        mappings_dict = {
+            m.rental_class_id: {
+                'category': m.category,
+                'subcategory': m.subcategory,
+                'short_common_name': m.short_common_name
+            } for m in base_mappings
+        }
         for um in user_mappings:
-            mappings_dict[um.rental_class_id] = {'category': um.category, 'subcategory': um.subcategory}
+            mappings_dict[um.rental_class_id] = {
+                'category': um.category,
+                'subcategory': um.subcategory,
+                'short_common_name': um.short_common_name
+            }
 
         # Fetch seed data from cache or API
         cache_key = 'seed_rental_classes'
@@ -108,11 +118,12 @@ def manage_categories():
                 'category': mapping['category'],
                 'subcategory': mapping['subcategory'],
                 'rental_class_id': rental_class_id,
-                'common_name': common_name
+                'common_name': common_name,
+                'short_common_name': mapping['short_common_name'] or 'N/A'
             })
 
         # Cache the seed_data after lookup
-        if seed_data and 'seed_rental_class_ids' in locals():
+        if seed_data:
             seed_data_copy = copy.deepcopy(seed_data)
             cache.set(cache_key, seed_data_copy, timeout=3600)  # Cache for 1 hour
             logger.info("Fetched seed data from API and cached")
@@ -143,9 +154,19 @@ def get_mappings():
         user_mappings = session.query(UserRentalClassMapping).all()
 
         # Merge mappings, prioritizing user mappings
-        mappings_dict = {m.rental_class_id: {'category': m.category, 'subcategory': m.subcategory} for m in base_mappings}
+        mappings_dict = {
+            m.rental_class_id: {
+                'category': m.category,
+                'subcategory': m.subcategory,
+                'short_common_name': m.short_common_name
+            } for m in base_mappings
+        }
         for um in user_mappings:
-            mappings_dict[um.rental_class_id] = {'category': um.category, 'subcategory': um.subcategory}
+            mappings_dict[um.rental_class_id] = {
+                'category': um.category,
+                'subcategory': um.subcategory,
+                'short_common_name': um.short_common_name
+            }
 
         # Fetch seed data from cache or API
         cache_key = 'seed_rental_classes'
@@ -179,11 +200,12 @@ def get_mappings():
                 'category': mapping['category'],
                 'subcategory': mapping['subcategory'],
                 'rental_class_id': rental_class_id,
-                'common_name': common_name
+                'common_name': common_name,
+                'short_common_name': mapping['short_common_name'] or 'N/A'
             })
 
         # Cache the seed_data after lookup
-        if seed_data and 'seed_rental_class_ids' in locals():
+        if seed_data:
             seed_data_copy = copy.deepcopy(seed_data)
             cache.set(cache_key, seed_data_copy, timeout=3600)  # Cache for 1 hour
             logger.info("Fetched seed data from API and cached")
@@ -226,6 +248,7 @@ def update_mappings():
             rental_class_id = mapping.get('rental_class_id')
             category = mapping.get('category')
             subcategory = mapping.get('subcategory', '')
+            short_common_name = mapping.get('short_common_name', '')
 
             if not rental_class_id or not category:
                 logger.warning(f"Skipping invalid mapping due to missing rental_class_id or category: {mapping}")
@@ -235,7 +258,8 @@ def update_mappings():
             user_mapping = UserRentalClassMapping(
                 rental_class_id=rental_class_id,
                 category=category,
-                subcategory=subcategory or ''
+                subcategory=subcategory or '',
+                short_common_name=short_common_name or ''
             )
             session.add(user_mapping)
 

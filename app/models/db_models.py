@@ -100,6 +100,7 @@ class RentalClassMapping(db.Model):
     rental_class_id = db.Column(db.String(50), primary_key=True)
     category = db.Column(db.String(100), nullable=False)
     subcategory = db.Column(db.String(100), nullable=False)
+    short_common_name = db.Column(db.String(50))  # Added for short common name
 
 # Added on 2025-04-21 to track hand-counted items for contracts
 class HandCountedItems(db.Model):
@@ -120,5 +121,6 @@ class UserRentalClassMapping(db.Model):
     rental_class_id = db.Column(db.String(50), primary_key=True)
     category = db.Column(db.String(100), nullable=False)
     subcategory = db.Column(db.String(100), nullable=False)
+    short_common_name = db.Column(db.String(50))  # Added for short common name
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
