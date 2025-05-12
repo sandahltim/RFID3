@@ -1,18 +1,20 @@
-console.log('tab1_5.js version: 2025-05-07-v24 loaded');
+console.log('tab1_5.js version: 2025-05-07-v25 loaded');
 
 // Note: Common function for Tabs 1 and 5
 function showLoading(targetId) {
+    const container = document.getElementById(targetId);
+    if (!container) {
+        console.warn(`Container with ID ${targetId} not found for showing loading indicator`);
+        return false; // Indicate failure to create loading indicator
+    }
+
     const loadingDiv = document.createElement('div');
     loadingDiv.id = `loading-${targetId}`;
     loadingDiv.className = 'loading-indicator';
     loadingDiv.textContent = 'Loading...';
     loadingDiv.style.display = 'block';
-    const container = document.getElementById(targetId);
-    if (container) {
-        container.appendChild(loadingDiv);
-    } else {
-        console.warn(`Container with ID ${targetId} not found for showing loading indicator`);
-    }
+    container.appendChild(loadingDiv);
+    return true; // Indicate success
 }
 
 // Note: Common function for Tabs 1 and 5
@@ -20,9 +22,8 @@ function hideLoading(targetId) {
     const loadingDiv = document.getElementById(`loading-${targetId}`);
     if (loadingDiv) {
         loadingDiv.remove();
-    } else {
-        console.warn(`Loading indicator with ID loading-${targetId} not found`);
     }
+    // No warning if the loading indicator is not found
 }
 
 // Note: Common function for Tabs 1 and 5
@@ -93,7 +94,7 @@ function loadCommonNames(selectElement, page = 1) {
         return;
     }
 
-    showLoading(targetId);
+    const loadingSuccess = showLoading(targetId);
     targetElement.innerHTML = ''; // Clear previous content
 
     let url = `/tab/${window.cachedTabNum}/common_names?category=${encodeURIComponent(category)}&subcategory=${encodeURIComponent(subcategory)}&page=${page}`;
@@ -223,7 +224,9 @@ function loadCommonNames(selectElement, page = 1) {
             targetElement.style.opacity = '1';
         })
         .finally(() => {
-            hideLoading(targetId);
+            if (loadingSuccess) {
+                hideLoading(targetId);
+            }
         });
 }
 
@@ -443,7 +446,8 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
     container.classList.add('loading');
 
     const key = targetId;
-    showLoading(key);
+    const loadingSuccess = showLoading(key);
+    container.innerHTML = ''; // Clear previous content
 
     let url = `/tab/${window.cachedTabNum}/data?common_name=${encodeURIComponent(commonName)}&page=${page}&subcategory=${encodeURIComponent(subcategory)}&category=${encodeURIComponent(category)}`;
 
@@ -663,7 +667,9 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
             container.classList.remove('loading');
         })
         .finally(() => {
-            hideLoading(key);
+            if (loadingSuccess) {
+                hideLoading(key);
+            }
         });
 }
 
