@@ -27,10 +27,12 @@
     transform: translateZ(0); /* Force GPU rendering to reduce flicker */
 }
 
-/* Highest specificity to override style.css */
-.table.table-bordered.common-table th,
-.table.table-bordered.common-table td {
-    color: #000000 !important; /* Explicitly set font color to black */
+/* Highest specificity to override any conflicting styles */
+div.item-level-wrapper table.item-table th,
+div.item-level-wrapper table.item-table td,
+tr.common-name-row td table.common-table th,
+tr.common-name-row td table.common-table td {
+    color: #000000 !important; /* Force black text */
     font-family: 'Roboto', sans-serif !important; /* Match parent table font */
     font-weight: 500 !important; /* Slightly bolder for readability */
 }
@@ -40,7 +42,12 @@
 .common-table td,
 .common-table tr,
 .common-table tbody,
-.common-table thead {
+.common-table thead,
+.item-table th,
+.item-table td,
+.item-table tr,
+.item-table tbody,
+.item-table thead {
     color: #000000 !important; /* Fallback */
 }
 
@@ -80,23 +87,6 @@
 
 .item-table.loaded {
     transform: translateZ(0); /* Force GPU rendering to reduce flicker */
-}
-
-/* Highest specificity to override style.css */
-.table.table-bordered.item-table th,
-.table.table-bordered.item-table td {
-    color: #000000 !important; /* Explicitly set font color to black */
-    font-family: 'Roboto', sans-serif !important; /* Match parent table font */
-    font-weight: 500 !important; /* Slightly bolder for readability */
-}
-
-/* Additional fallback for inherited styles */
-.item-table th,
-.item-table td,
-.item-table tr,
-.item-table tbody,
-.item-table thead {
-    color: #000000 !important; /* Fallback */
 }
 
 /* Table styling */
