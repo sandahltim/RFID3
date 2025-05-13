@@ -1,4 +1,4 @@
-console.log('tab1_5.js version: 2025-05-07-v44 loaded');
+console.log('tab1_5.js version: 2025-05-07-v45 loaded');
 
 // Note: Ensure formatDate is available (defined in common.js)
 if (typeof formatDate !== 'function') {
@@ -1032,8 +1032,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Collapse the section
                 container.classList.remove('expanded');
                 container.classList.add('collapsed');
-                container.style.display = 'block'; // Keep block to avoid display transition
                 container.style.opacity = '0';
+                setTimeout(() => {
+                    container.style.display = 'none'; // Remove space after opacity transition
+                }, 700); // Match the transition duration (0.7s)
 
                 toggleBtn.textContent = 'Expand Items';
                 toggleBtn.setAttribute('data-expanded', 'false');
