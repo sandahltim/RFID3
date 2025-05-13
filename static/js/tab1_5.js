@@ -1,4 +1,4 @@
-console.log('tab1_5.js version: 2025-05-07-v43 loaded');
+console.log('tab1_5.js version: 2025-05-07-v44 loaded');
 
 // Note: Ensure formatDate is available (defined in common.js)
 if (typeof formatDate !== 'function') {
@@ -175,10 +175,8 @@ function loadCommonNames(selectElement, page = 1) {
                                         data-category="${category}" 
                                         data-subcategory="${subcategory}" 
                                         data-common-name="${escapedName}" 
-                                        data-target-id="items-${rowId}">Expand Items</button>
-                                <button class="btn btn-sm btn-secondary collapse-btn" 
-                                        style="display:none;" 
-                                        data-collapse-target="items-${rowId}">Collapse</button>
+                                        data-target-id="items-${rowId}" 
+                                        data-expanded="false">Expand Items</button>
                                 <button class="btn btn-sm btn-info print-btn" 
                                         data-print-level="Common Name" 
                                         data-print-id="common-table-${targetId}" 
@@ -803,16 +801,15 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                 tbody.innerHTML = `<tr><td colspan="${window.cachedTabNum == 5 ? 10 : window.cachedTabNum == 1 ? 8 : 6}">No items found for this common name.</td></tr>`;
             }
 
-            // Toggle Expand/Collapse buttons
-            const parentRow = container.closest('tr.common-name-row');
+            // Toggle Expand/Collapse button state
+            const parentRow = container.closest('tr.common-name-row').previousElementSibling;
             if (parentRow) {
-                const expandBtn = parentRow.querySelector(`.expand-btn[data-target-id="${targetId}"]`);
-                const collapseBtn = parentRow.querySelector(`.collapse-btn[data-collapse-target="${targetId}"]`);
-                if (expandBtn && collapseBtn) {
-                    expandBtn.style.display = 'none';
-                    collapseBtn.style.display = 'inline-block';
+                const toggleBtn = parentRow.querySelector(`.expand-btn[data-target-id="${targetId}"]`);
+                if (toggleBtn) {
+                    toggleBtn.textContent = 'Collapse';
+                    toggleBtn.setAttribute('data-expanded', 'true');
                 } else {
-                    console.warn('Expand/Collapse buttons not found for targetId:', targetId);
+                    console.warn('Toggle button not found for targetId:', targetId);
                 }
             } else {
                 console.warn('Parent row not found for targetId:', targetId);
@@ -1007,49 +1004,44 @@ document.addEventListener('DOMContentLoaded', function() {
     document.addEventListener('click', handleClick);
 
     function handleClick(event) {
-        const expandBtn = event.target.closest('.expand-btn');
-        if (expandBtn) {
+        const toggleBtn = event.target.closest('.expand-btn');
+        if (toggleBtn) {
             event.preventDefault();
             event.stopPropagation();
-            console.log('Expand button clicked:', expandBtn);
-            const category = expandBtn.getAttribute('data-category');
-            const subcategory = expandBtn.getAttribute('data-subcategory');
-            const commonName = expandBtn.getAttribute('data-common-name');
-            const targetId = expandBtn.getAttribute('data-target-id');
+            console.log('Toggle button clicked:', toggleBtn);
+            const category = toggleBtn.getAttribute('data-category');
+            const subcategory = toggleBtn.getAttribute('data-subcategory');
+            const commonName = toggleBtn.getAttribute('data-common-name');
+            const targetId = toggleBtn.getAttribute('data-target-id');
+            const isExpanded = toggleBtn.getAttribute('data-expanded') === 'true';
 
-            console.log('Expand button attributes:', { category, subcategory, commonName, targetId });
+            console.log('Toggle button attributes:', { category, subcategory, commonName, targetId, isExpanded });
 
-            if (commonName && targetId) {
-                // Handle "Expand Items" for common names
-                console.log('Triggering loadItems for common name:', commonName);
-                loadItems(category, subcategory, commonName, targetId);
-            } else {
-                console.error('Missing required attributes for expand button (expected at common name level):', expandBtn);
+            if (!commonName || !targetId) {
+                console.error('Missing required attributes for toggle button:', toggleBtn);
+                return;
             }
-            return;
-        }
-
-        const collapseBtn = event.target.closest('.collapse-btn');
-        if (collapseBtn) {
-            event.preventDefault();
-            event.stopPropagation();
-            const targetId = collapseBtn.getAttribute('data-collapse-target');
-            console.log('Collapse button clicked for targetId:', targetId);
 
             const container = document.getElementById(targetId);
-            if (container) {
+            if (!container) {
+                console.error(`Container with ID ${targetId} not found`);
+                return;
+            }
+
+            if (isExpanded) {
+                // Collapse the section
                 container.classList.remove('expanded');
                 container.classList.add('collapsed');
                 container.style.display = 'block'; // Keep block to avoid display transition
                 container.style.opacity = '0';
 
-                collapseBtn.style.display = 'none';
-                const expandBtn = collapseBtn.previousElementSibling;
-                if (expandBtn) {
-                    expandBtn.style.display = 'inline-block';
-                }
-
+                toggleBtn.textContent = 'Expand Items';
+                toggleBtn.setAttribute('data-expanded', 'false');
                 sessionStorage.removeItem(`expanded_items_${targetId}`);
+            } else {
+                // Expand the section
+                console.log('Triggering loadItems for common name:', commonName);
+                loadItems(category, subcategory, commonName, targetId);
             }
             return;
         }
