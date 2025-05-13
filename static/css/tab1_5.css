@@ -221,7 +221,6 @@ tr.common-name-row td table.common-table td {
 
 /* Simplify expandable styles */
 .expandable {
-    display: block; /* Always block to avoid display transition */
     opacity: 0; /* Start hidden */
     transition: opacity 0.7s ease; /* Smooth fade-in */
     min-height: 200px; /* Prevent collapse during loading */
@@ -230,10 +229,13 @@ tr.common-name-row td table.common-table td {
 
 .expandable.collapsed {
     opacity: 0;
+    display: none; /* Remove space when collapsed */
+    min-height: 0; /* Allow full collapse */
 }
 
 .expandable.expanded {
     opacity: 1;
+    display: block; /* Ensure visibility when expanded */
     visibility: visible !important;
 }
 
