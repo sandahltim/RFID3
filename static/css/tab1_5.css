@@ -19,13 +19,11 @@
     visibility: visible !important; /* Ensure always visible to prevent flicker */
     margin: 0 !important;
     table-layout: fixed;
-    opacity: 0; /* Start with opacity 0 for transition */
-    transition: opacity 0.7s ease; /* Smoother opacity transition only */
     min-height: 200px; /* Prevent layout shift during loading */
+    will-change: opacity; /* Optimize rendering */
 }
 
 .common-table.loaded {
-    opacity: 1; /* Fade in when loaded */
     transform: translateZ(0); /* Force GPU rendering to reduce flicker */
 }
 
@@ -76,13 +74,11 @@
     border-collapse: collapse;
     display: table !important;
     visibility: visible !important; /* Ensure always visible to prevent flicker */
-    opacity: 0; /* Start with opacity 0 for transition */
-    transition: opacity 0.7s ease; /* Smoother opacity transition only */
     min-height: 200px; /* Prevent layout shift during loading */
+    will-change: opacity; /* Optimize rendering */
 }
 
 .item-table.loaded {
-    opacity: 1; /* Fade in when loaded */
     transform: translateZ(0); /* Force GPU rendering to reduce flicker */
 }
 
@@ -235,17 +231,18 @@
 
 /* Simplify expandable styles */
 .expandable {
-    display: none;
+    display: block; /* Always block to avoid display transition */
+    opacity: 0; /* Start hidden */
+    transition: opacity 0.7s ease; /* Smooth fade-in */
     min-height: 200px; /* Prevent collapse during loading */
+    will-change: opacity; /* Optimize rendering */
 }
 
 .expandable.collapsed {
-    display: none;
     opacity: 0;
 }
 
 .expandable.expanded {
-    display: block !important;
     opacity: 1;
     visibility: visible !important;
 }
