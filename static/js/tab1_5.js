@@ -1,4 +1,4 @@
-console.log('tab1_5.js version: 2025-05-07-v40 loaded');
+console.log('tab1_5.js version: 2025-05-07-v42 loaded');
 
 // Note: Ensure formatDate is available (defined in common.js)
 if (typeof formatDate !== 'function') {
@@ -228,18 +228,15 @@ function loadCommonNames(selectElement, page = 1) {
                     tableBody.appendChild(paginationRow);
                 }
 
-                // Add 'loaded' class with an increased delay to ensure rendering stability
+                // Log table styles for debugging
                 const commonTable = document.getElementById(`common-table-${targetId}`);
                 if (commonTable) {
-                    setTimeout(() => {
-                        commonTable.classList.add('loaded');
-                        console.log('Common table styles:', {
-                            display: commonTable.style.display,
-                            visibility: window.getComputedStyle(commonTable).visibility,
-                            computedDisplay: window.getComputedStyle(commonTable).display,
-                            height: window.getComputedStyle(commonTable).height
-                        });
-                    }, 100); // Increased delay to 100ms
+                    console.log('Common table styles:', {
+                        display: commonTable.style.display,
+                        visibility: window.getComputedStyle(commonTable).visibility,
+                        computedDisplay: window.getComputedStyle(commonTable).display,
+                        height: window.getComputedStyle(commonTable).height
+                    });
                 }
             } else {
                 const noDataRow = document.createElement('tr');
@@ -503,77 +500,120 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
     const key = targetId;
     const loadingSuccess = showLoadingTab1_5(key);
 
-    // Predefine the table structure with placeholder rows to minimize layout shifts
-    container.innerHTML = `
-        <div class="item-level-wrapper">
-            <table class="item-table" id="item-table-${key}" style="color: #000000;">
-                <thead>
-                    <tr>
-                        ${window.cachedTabNum == 5 ? `
-                            <th style="color: #000000;">Select</th>
-                            <th style="color: #000000;">Tag ID</th>
-                            <th style="color: #000000;">Common Name</th>
-                            <th style="color: #000000;">Bin Location</th>
-                            <th style="color: #000000;">Status</th>
-                            <th style="color: #000000;">Last Contract</th>
-                            <th style="color: #000000;">Last Scanned Date</th>
-                            <th style="color: #000000;">Quality</th>
-                            <th style="color: #000000;">Notes</th>
-                            <th style="color: #000000;">Actions</th>
-                        ` : window.cachedTabNum == 1 ? `
-                            <th style="color: #000000;">Tag ID</th>
-                            <th style="color: #000000;">Common Name</th>
-                            <th style="color: #000000;">Bin Location</th>
-                            <th style="color: #000000;">Status</th>
-                            <th style="color: #000000;">Last Contract</th>
-                            <th style="color: #000000;">Last Scanned Date</th>
-                            <th style="color: #000000;">Quality</th>
-                            <th style="color: #000000;">Notes</th>
-                        ` : `
-                            <th style="color: #000000;">Tag ID</th>
-                            <th style="color: #000000;">Common Name</th>
-                            <th style="color: #000000;">Bin Location</th>
-                            <th style="color: #000000;">Status</th>
-                            <th style="color: #000000;">Last Contract</th>
-                            <th style="color: #000000;">Last Scanned Date</th>
-                        `}
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        ${window.cachedTabNum == 5 ? `
-                            <td>-</td>
-                            <td style="color: #000000;">Loading...</td>
-                            <td style="color: #000000;">-</td>
-                            <td>-</td>
-                            <td>-</td>
-                            <td style="color: #000000;">-</td>
-                            <td style="color: #000000;">-</td>
-                            <td style="color: #000000;">-</td>
-                            <td style="color: #000000;">-</td>
-                            <td>-</td>
-                        ` : window.cachedTabNum == 1 ? `
-                            <td style="color: #000000;">Loading...</td>
-                            <td style="color: #000000;">-</td>
-                            <td>-</td>
-                            <td>-</td>
-                            <td style="color: #000000;">-</td>
-                            <td style="color: #000000;">-</td>
-                            <td style="color: #000000;">-</td>
-                            <td style="color: #000000;">-</td>
-                        ` : `
-                            <td style="color: #000000;">Loading...</td>
-                            <td style="color: #000000;">-</td>
-                            <td style="color: #000000;">-</td>
-                            <td style="color: #000000;">-</td>
-                            <td style="color: #000000;">-</td>
-                            <td style="color: #000000;">-</td>
-                        `}
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-    `;
+    // Check if the table structure already exists
+    let itemTable = container.querySelector(`#item-table-${key}`);
+    let tbody, wrapper;
+    if (!itemTable) {
+        // Create the table structure if it doesn't exist
+        container.innerHTML = `
+            <div class="item-level-wrapper">
+                <table class="item-table" id="item-table-${key}" style="color: #000000;">
+                    <thead>
+                        <tr>
+                            ${window.cachedTabNum == 5 ? `
+                                <th style="color: #000000;">Select</th>
+                                <th style="color: #000000;">Tag ID</th>
+                                <th style="color: #000000;">Common Name</th>
+                                <th style="color: #000000;">Bin Location</th>
+                                <th style="color: #000000;">Status</th>
+                                <th style="color: #000000;">Last Contract</th>
+                                <th style="color: #000000;">Last Scanned Date</th>
+                                <th style="color: #000000;">Quality</th>
+                                <th style="color: #000000;">Notes</th>
+                                <th style="color: #000000;">Actions</th>
+                            ` : window.cachedTabNum == 1 ? `
+                                <th style="color: #000000;">Tag ID</th>
+                                <th style="color: #000000;">Common Name</th>
+                                <th style="color: #000000;">Bin Location</th>
+                                <th style="color: #000000;">Status</th>
+                                <th style="color: #000000;">Last Contract</th>
+                                <th style="color: #000000;">Last Scanned Date</th>
+                                <th style="color: #000000;">Quality</th>
+                                <th style="color: #000000;">Notes</th>
+                            ` : `
+                                <th style="color: #000000;">Tag ID</th>
+                                <th style="color: #000000;">Common Name</th>
+                                <th style="color: #000000;">Bin Location</th>
+                                <th style="color: #000000;">Status</th>
+                                <th style="color: #000000;">Last Contract</th>
+                                <th style="color: #000000;">Last Scanned Date</th>
+                            `}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            ${window.cachedTabNum == 5 ? `
+                                <td>-</td>
+                                <td style="color: #000000;">Loading...</td>
+                                <td style="color: #000000;">-</td>
+                                <td>-</td>
+                                <td>-</td>
+                                <td style="color: #000000;">-</td>
+                                <td style="color: #000000;">-</td>
+                                <td style="color: #000000;">-</td>
+                                <td style="color: #000000;">-</td>
+                                <td>-</td>
+                            ` : window.cachedTabNum == 1 ? `
+                                <td style="color: #000000;">Loading...</td>
+                                <td style="color: #000000;">-</td>
+                                <td>-</td>
+                                <td>-</td>
+                                <td style="color: #000000;">-</td>
+                                <td style="color: #000000;">-</td>
+                                <td style="color: #000000;">-</td>
+                                <td style="color: #000000;">-</td>
+                            ` : `
+                                <td style="color: #000000;">Loading...</td>
+                                <td style="color: #000000;">-</td>
+                                <td style="color: #000000;">-</td>
+                                <td style="color: #000000;">-</td>
+                                <td style="color: #000000;">-</td>
+                                <td style="color: #000000;">-</td>
+                            `}
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        `;
+        itemTable = container.querySelector(`#item-table-${key}`);
+        wrapper = container.querySelector('.item-level-wrapper');
+    } else {
+        // Table exists, just clear the tbody
+        tbody = itemTable.querySelector('tbody');
+        tbody.innerHTML = `
+            <tr>
+                ${window.cachedTabNum == 5 ? `
+                    <td>-</td>
+                    <td style="color: #000000;">Loading...</td>
+                    <td style="color: #000000;">-</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td style="color: #000000;">-</td>
+                    <td style="color: #000000;">-</td>
+                    <td style="color: #000000;">-</td>
+                    <td style="color: #000000;">-</td>
+                    <td>-</td>
+                ` : window.cachedTabNum == 1 ? `
+                    <td style="color: #000000;">Loading...</td>
+                    <td style="color: #000000;">-</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td style="color: #000000;">-</td>
+                    <td style="color: #000000;">-</td>
+                    <td style="color: #000000;">-</td>
+                    <td style="color: #000000;">-</td>
+                ` : `
+                    <td style="color: #000000;">Loading...</td>
+                    <td style="color: #000000;">-</td>
+                    <td style="color: #000000;">-</td>
+                    <td style="color: #000000;">-</td>
+                    <td style="color: #000000;">-</td>
+                    <td style="color: #000000;">-</td>
+                `}
+            </tr>
+        `;
+        wrapper = container.querySelector('.item-level-wrapper');
+    }
 
     let url = `/tab/${window.cachedTabNum}/data?common_name=${encodeURIComponent(commonName)}&page=${page}&subcategory=${encodeURIComponent(subcategory)}&category=${encodeURIComponent(category)}`;
 
@@ -587,199 +627,169 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
         })
         .then(data => {
             console.log('Items data received:', data);
-            let html = '';
+
+            // Update the tbody content
+            tbody = itemTable.querySelector('tbody');
+            tbody.innerHTML = ''; // Clear the loading row
+
             if (data.items && data.items.length > 0) {
-                let headers = [];
-                if (window.cachedTabNum == 5) {
-                    headers = ['Select', 'Tag ID', 'Common Name', 'Bin Location', 'Status', 'Last Contract', 'Last Scanned Date', 'Quality', 'Notes', 'Actions'];
-                } else if (window.cachedTabNum == 1) {
-                    headers = ['Tag ID', 'Common Name', 'Bin Location', 'Status', 'Last Contract', 'Last Scanned Date', 'Quality', 'Notes'];
-                } else {
-                    headers = ['Tag ID', 'Common Name', 'Bin Location', 'Status', 'Last Contract', 'Last Scanned Date'];
-                }
-
-                html += `
-                    <div class="item-level-wrapper">
-                        <table class="item-table" id="item-table-${key}" style="color: #000000;">
-                            <thead>
-                                <tr>
-                                    ${headers.map(header => `<th style="color: #000000;">${header}</th>`).join('')}
-                                </tr>
-                            </thead>
-                            <tbody>
-                `;
-
                 data.items.forEach(item => {
                     const lastScanned = formatDate(item.last_scanned_date);
                     if (window.cachedTabNum == 5) {
                         const currentStatus = item.status || 'N/A';
                         const canSetReadyToRent = currentStatus === 'On Rent' || currentStatus === 'Delivered' || currentStatus === 'Sold';
-                        html += `
-                            <tr data-item-id="${item.tag_id}">
-                                <td><input type="checkbox" value="${item.tag_id}" class="item-select"></td>
-                                <td style="color: #000000;">${item.tag_id}</td>
-                                <td style="color: #000000;">${item.common_name}</td>
-                                <td>
-                                    <select id="bin-location-${item.tag_id}">
-                                        <option value="" ${!item.bin_location ? 'selected' : ''}>Select Bin Location</option>
-                                        <option value="resale" ${item.bin_location === 'resale' ? 'selected' : ''}>resale</option>
-                                        <option value="sold" ${item.bin_location === 'sold' ? 'selected' : ''}>sold</option>
-                                        <option value="pack" ${item.bin_location === 'pack' ? 'selected' : ''}>pack</option>
-                                        <option value="burst" ${item.bin_location === 'burst' ? 'selected' : ''}>burst</option>
-                                    </select>
-                                </td>
-                                <td>
-                                    <select id="status-${item.tag_id}">
-                                        <option value="${currentStatus}" selected>${currentStatus}</option>
-                                        <option value="Ready to Rent" ${canSetReadyToRent ? '' : 'disabled'}>Ready to Rent</option>
-                                        <option value="Sold">Sold</option>
-                                        <option value="On Rent" disabled>On Rent</option>
-                                        <option value="Delivered" disabled>Delivered</option>
-                                    </select>
-                                </td>
-                                <td style="color: #000000;">${item.last_contract_num || 'N/A'}</td>
-                                <td style="color: #000000;">${lastScanned}</td>
-                                <td style="color: #000000;">${item.quality || 'N/A'}</td>
-                                <td style="color: #000000;">${item.notes || 'N/A'}</td>
-                                <td>
-                                    <button class="btn btn-sm btn-primary save-btn" 
-                                            onclick="updateItem('${item.tag_id}', '${key}', '${category}', '${subcategory}', '${item.common_name}', '${targetId}')">Save</button>
-                                </td>
-                            </tr>
+                        const row = document.createElement('tr');
+                        row.setAttribute('data-item-id', item.tag_id);
+                        row.innerHTML = `
+                            <td><input type="checkbox" value="${item.tag_id}" class="item-select"></td>
+                            <td style="color: #000000;">${item.tag_id}</td>
+                            <td style="color: #000000;">${item.common_name}</td>
+                            <td>
+                                <select id="bin-location-${item.tag_id}">
+                                    <option value="" ${!item.bin_location ? 'selected' : ''}>Select Bin Location</option>
+                                    <option value="resale" ${item.bin_location === 'resale' ? 'selected' : ''}>resale</option>
+                                    <option value="sold" ${item.bin_location === 'sold' ? 'selected' : ''}>sold</option>
+                                    <option value="pack" ${item.bin_location === 'pack' ? 'selected' : ''}>pack</option>
+                                    <option value="burst" ${item.bin_location === 'burst' ? 'selected' : ''}>burst</option>
+                                </select>
+                            </td>
+                            <td>
+                                <select id="status-${item.tag_id}">
+                                    <option value="${currentStatus}" selected>${currentStatus}</option>
+                                    <option value="Ready to Rent" ${canSetReadyToRent ? '' : 'disabled'}>Ready to Rent</option>
+                                    <option value="Sold">Sold</option>
+                                    <option value="On Rent" disabled>On Rent</option>
+                                    <option value="Delivered" disabled>Delivered</option>
+                                </select>
+                            </td>
+                            <td style="color: #000000;">${item.last_contract_num || 'N/A'}</td>
+                            <td style="color: #000000;">${lastScanned}</td>
+                            <td style="color: #000000;">${item.quality || 'N/A'}</td>
+                            <td style="color: #000000;">${item.notes || 'N/A'}</td>
+                            <td>
+                                <button class="btn btn-sm btn-primary save-btn" 
+                                        onclick="updateItem('${item.tag_id}', '${key}', '${category}', '${subcategory}', '${item.common_name}', '${targetId}')">Save</button>
+                            </td>
                         `;
+                        tbody.appendChild(row);
                     } else if (window.cachedTabNum == 1) {
-                        html += `
-                            <tr data-item-id="${item.tag_id}">
-                                <td style="color: #000000;">${item.tag_id}</td>
-                                <td style="color: #000000;">${item.common_name}</td>
-                                <td class="editable" onclick="showDropdown(event, this, 'bin-location', '${item.tag_id}', '${item.bin_location || ''}')">${item.bin_location || 'N/A'}</td>
-                                <td class="editable" onclick="showDropdown(event, this, 'status', '${item.tag_id}', '${item.status}')">${item.status}</td>
-                                <td style="color: #000000;">${item.last_contract_num || 'N/A'}</td>
-                                <td style="color: #000000;">${lastScanned}</td>
-                                <td style="color: #000000;">${item.quality || 'N/A'}</td>
-                                <td style="color: #000000;">${item.notes || 'N/A'}</td>
-                                <div id="dropdown-bin-location-${item.tag_id}" class="dropdown-menu">
-                                    <a class="dropdown-item" href="#" onclick="selectOption(event, this, 'bin-location', '${item.tag_id}', 'resale')">resale</a>
-                                    <a class="dropdown-item" href="#" onclick="selectOption(event, this, 'bin-location', '${item.tag_id}', 'sold')">sold</a>
-                                    <a class="dropdown-item" href="#" onclick="selectOption(event, this, 'bin-location', '${item.tag_id}', 'pack')">pack</a>
-                                    <a class="dropdown-item" href="#" onclick="selectOption(event, this, 'bin-location', '${item.tag_id}', 'burst')">burst</a>
-                                </div>
-                                <div id="dropdown-status-${item.tag_id}" class="dropdown-menu">
-                                    <a class="dropdown-item" href="#" onclick="selectOption(event, this, 'status', '${item.tag_id}', 'Ready to Rent')" ${item.status !== 'On Rent' && item.status !== 'Delivered' ? 'style="pointer-events: none; color: #ccc;"' : ''}>Ready to Rent</a>
-                                </div>
-                            </tr>
+                        const row = document.createElement('tr');
+                        row.setAttribute('data-item-id', item.tag_id);
+                        row.innerHTML = `
+                            <td style="color: #000000;">${item.tag_id}</td>
+                            <td style="color: #000000;">${item.common_name}</td>
+                            <td class="editable" onclick="showDropdown(event, this, 'bin-location', '${item.tag_id}', '${item.bin_location || ''}')">${item.bin_location || 'N/A'}</td>
+                            <td class="editable" onclick="showDropdown(event, this, 'status', '${item.tag_id}', '${item.status}')">${item.status}</td>
+                            <td style="color: #000000;">${item.last_contract_num || 'N/A'}</td>
+                            <td style="color: #000000;">${lastScanned}</td>
+                            <td style="color: #000000;">${item.quality || 'N/A'}</td>
+                            <td style="color: #000000;">${item.notes || 'N/A'}</td>
+                            <div id="dropdown-bin-location-${item.tag_id}" class="dropdown-menu">
+                                <a class="dropdown-item" href="#" onclick="selectOption(event, this, 'bin-location', '${item.tag_id}', 'resale')">resale</a>
+                                <a class="dropdown-item" href="#" onclick="selectOption(event, this, 'bin-location', '${item.tag_id}', 'sold')">sold</a>
+                                <a class="dropdown-item" href="#" onclick="selectOption(event, this, 'bin-location', '${item.tag_id}', 'pack')">pack</a>
+                                <a class="dropdown-item" href="#" onclick="selectOption(event, this, 'bin-location', '${item.tag_id}', 'burst')">burst</a>
+                            </div>
+                            <div id="dropdown-status-${item.tag_id}" class="dropdown-menu">
+                                <a class="dropdown-item" href="#" onclick="selectOption(event, this, 'status', '${item.tag_id}', 'Ready to Rent')" ${item.status !== 'On Rent' && item.status !== 'Delivered' ? 'style="pointer-events: none; color: #ccc;"' : ''}>Ready to Rent</a>
+                            </div>
                         `;
+                        tbody.appendChild(row);
                     } else {
-                        html += `
-                            <tr>
-                                <td style="color: #000000;">${item.tag_id}</td>
-                                <td style="color: #000000;">${item.common_name}</td>
-                                <td style="color: #000000;">${item.bin_location || 'N/A'}</td>
-                                <td style="color: #000000;">${item.status}</td>
-                                <td style="color: #000000;">${item.last_contract_num || 'N/A'}</td>
-                                <td style="color: #000000;">${lastScanned}</td>
-                            </tr>
+                        const row = document.createElement('tr');
+                        row.innerHTML = `
+                            <td style="color: #000000;">${item.tag_id}</td>
+                            <td style="color: #000000;">${item.common_name}</td>
+                            <td style="color: #000000;">${item.bin_location || 'N/A'}</td>
+                            <td style="color: #000000;">${item.status}</td>
+                            <td style="color: #000000;">${item.last_contract_num || 'N/A'}</td>
+                            <td style="color: #000000;">${lastScanned}</td>
                         `;
+                        tbody.appendChild(row);
                     }
                 });
 
-                html += `
-                            </tbody>
-                        </table>
-                `;
+                // Remove existing pagination and bulk update controls
+                let paginationControls = wrapper.querySelector('.pagination-controls');
+                let bulkControls = wrapper.querySelector('.bulk-update-controls');
+                if (paginationControls) paginationControls.remove();
+                if (bulkControls) bulkControls.remove();
 
                 // Add pagination for items if total_items exceeds per_page
                 if (data.total_items > data.per_page) {
                     const totalPages = Math.ceil(data.total_items / data.per_page);
                     const escapedCommonName = commonName.replace(/'/g, "\\'").replace(/"/g, '\\"');
-                    html += `
-                        <div class="pagination-controls">
-                            <button class="btn btn-sm btn-secondary" 
-                                    onclick="loadItems('${category}', '${subcategory}', '${escapedCommonName}', '${targetId}', ${data.page - 1})" 
-                                    ${data.page === 1 ? 'disabled' : ''}>Previous</button>
-                            <span>Page ${data.page} of ${totalPages}</span>
-                            <button class="btn btn-sm btn-secondary" 
-                                    onclick="loadItems('${category}', '${subcategory}', '${escapedCommonName}', '${targetId}', ${data.page + 1})" 
-                                    ${data.page === totalPages ? 'disabled' : ''}>Next</button>
-                        </div>
+                    const paginationDiv = document.createElement('div');
+                    paginationDiv.className = 'pagination-controls';
+                    paginationDiv.innerHTML = `
+                        <button class="btn btn-sm btn-secondary" 
+                                onclick="loadItems('${category}', '${subcategory}', '${escapedCommonName}', '${targetId}', ${data.page - 1})" 
+                                ${data.page === 1 ? 'disabled' : ''}>Previous</button>
+                        <span>Page ${data.page} of ${totalPages}</span>
+                        <button class="btn btn-sm btn-secondary" 
+                                onclick="loadItems('${category}', '${subcategory}', '${escapedCommonName}', '${targetId}', ${data.page + 1})" 
+                                ${data.page === totalPages ? 'disabled' : ''}>Next</button>
                     `;
+                    wrapper.appendChild(paginationDiv);
                 }
 
                 // Add bulk update controls for Tab 5
                 if (window.cachedTabNum == 5) {
-                    html += `
-                        <div class="bulk-update-controls mt-3">
-                            <h5>Bulk Update All Items</h5>
-                            <div class="form-group">
-                                <label for="bulk-bin-location-${key}">Bin Location:</label>
-                                <select id="bulk-bin-location-${key}" onchange="updateBulkField('${key}', 'bin_location')">
-                                    <option value="">Select Bin Location</option>
-                                    <option value="resale">resale</option>
-                                    <option value="sold">sold</option>
-                                    <option value="pack">pack</option>
-                                    <option value="burst">burst</option>
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <label for="bulk-status-${key}">Status:</label>
-                                <select id="bulk-status-${key}" onchange="updateBulkField('${key}', 'status')">
-                                    <option value="">Select Status</option>
-                                    <option value="Ready to Rent">Ready to Rent</option>
-                                    <option value="Sold">Sold</option>
-                                </select>
-                            </div>
-                            <button class="btn btn-primary" onclick="bulkUpdateCommonName('${category}', '${subcategory}', '${targetId}', '${key}')">Update All</button>
-                            <h5 class="mt-3">Bulk Update Selected Items</h5>
-                            <div class="form-group">
-                                <label for="bulk-item-bin-location-${key}">Bin Location:</label>
-                                <select id="bulk-item-bin-location-${key}">
-                                    <option value="">Select Bin Location</option>
-                                    <option value="resale">resale</option>
-                                    <option value="sold">sold</option>
-                                    <option value="pack">pack</option>
-                                    <option value="burst">burst</option>
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <label for="bulk-item-status-${key}">Status:</label>
-                                <select id="bulk-item-status-${key}">
-                                    <option value="">Select Status</option>
-                                    <option value="Ready to Rent">Ready to Rent</option>
-                                    <option value="Sold">Sold</option>
-                                </select>
-                            </div>
-                            <button class="btn btn-primary" onclick="bulkUpdateSelectedItems('${key}')">Update Selected</button>
+                    const bulkDiv = document.createElement('div');
+                    bulkDiv.className = 'bulk-update-controls mt-3';
+                    bulkDiv.innerHTML = `
+                        <h5>Bulk Update All Items</h5>
+                        <div class="form-group">
+                            <label for="bulk-bin-location-${key}">Bin Location:</label>
+                            <select id="bulk-bin-location-${key}" onchange="updateBulkField('${key}', 'bin_location')">
+                                <option value="">Select Bin Location</option>
+                                <option value="resale">resale</option>
+                                <option value="sold">sold</option>
+                                <option value="pack">pack</option>
+                                <option value="burst">burst</option>
+                            </select>
                         </div>
+                        <div class="form-group">
+                            <label for="bulk-status-${key}">Status:</label>
+                            <select id="bulk-status-${key}" onchange="updateBulkField('${key}', 'status')">
+                                <option value="">Select Status</option>
+                                <option value="Ready to Rent">Ready to Rent</option>
+                                <option value="Sold">Sold</option>
+                            </select>
+                        </div>
+                        <button class="btn btn-primary" onclick="bulkUpdateCommonName('${category}', '${subcategory}', '${targetId}', '${key}')">Update All</button>
+                        <h5 class="mt-3">Bulk Update Selected Items</h5>
+                        <div class="form-group">
+                            <label for="bulk-item-bin-location-${key}">Bin Location:</label>
+                            <select id="bulk-item-bin-location-${key}">
+                                <option value="">Select Bin Location</option>
+                                <option value="resale">resale</option>
+                                <option value="sold">sold</option>
+                                <option value="pack">pack</option>
+                                <option value="burst">burst</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="bulk-item-status-${key}">Status:</label>
+                            <select id="bulk-item-status-${key}">
+                                <option value="">Select Status</option>
+                                <option value="Ready to Rent">Ready to Rent</option>
+                                <option value="Sold">Sold</option>
+                            </select>
+                        </div>
+                        <button class="btn btn-primary" onclick="bulkUpdateSelectedItems('${key}')">Update Selected</button>
                     `;
+                    wrapper.appendChild(bulkDiv);
                 }
-
-                html += `
-                    </div>
-                `;
             } else {
-                html = `<div class="item-level-wrapper"><p>No items found for this common name.</p></div>`;
+                tbody.innerHTML = `<tr><td colspan="${window.cachedTabNum == 5 ? 10 : window.cachedTabNum == 1 ? 8 : 6}">No items found for this common name.</td></tr>`;
             }
 
-            container.innerHTML = html;
             container.classList.remove('collapsed');
             container.classList.add('expanded');
             container.style.display = 'block';
             container.style.opacity = '1';
             container.style.visibility = 'visible';
-
-            // Add 'loaded' class with an increased delay to ensure rendering stability
-            const itemTable = document.getElementById(`item-table-${key}`);
-            if (itemTable) {
-                setTimeout(() => {
-                    itemTable.classList.add('loaded');
-                    console.log('Item table styles:', {
-                        display: itemTable.style.display,
-                        visibility: window.getComputedStyle(itemTable).visibility,
-                        computedDisplay: window.getComputedStyle(itemTable).display,
-                        height: window.getComputedStyle(itemTable).height
-                    });
-                }, 100); // Increased delay to 100ms
-            }
 
             console.log('Container styles after update:', {
                 classList: container.classList.toString(),
@@ -790,6 +800,16 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                 height: window.getComputedStyle(container).height
             });
 
+            // Log item table styles for debugging
+            if (itemTable) {
+                console.log('Item table styles:', {
+                    display: itemTable.style.display,
+                    visibility: window.getComputedStyle(itemTable).visibility,
+                    computedDisplay: window.getComputedStyle(itemTable).display,
+                    height: window.getComputedStyle(itemTable).height
+                });
+            }
+
             // Apply global filter to the newly loaded table
             if (typeof applyFilterToAllLevels === 'function') {
                 applyFilterToAllLevels();
@@ -799,19 +819,19 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
         })
         .catch(error => {
             console.error('Items fetch error:', error);
-            container.innerHTML = `<div class="item-level-wrapper"><p>Error loading items: ${error.message}</p></div>`;
+            tbody.innerHTML = `<tr><td colspan="${window.cachedTabNum == 5 ? 10 : window.cachedTabNum == 1 ? 8 : 6}">Error loading items: ${error.message}</td></tr>`;
             container.classList.remove('collapsed');
             container.classList.add('expanded');
             container.style.display = 'block';
             container.style.opacity = '1';
             container.style.visibility = 'visible';
-            container.classList.remove('loading');
         })
         .finally(() => {
             setTimeout(() => {
                 if (loadingSuccess) {
                     hideLoadingTab1_5(key);
                 }
+                container.classList.remove('loading'); // Ensure loading class is removed
             }, 700); // Match the transition duration (0.7s)
         });
 }
@@ -978,7 +998,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (container) {
                 container.classList.remove('expanded');
                 container.classList.add('collapsed');
-                container.style.display = 'none';
+                container.style.display = 'block'; // Keep block to avoid display transition
                 container.style.opacity = '0';
 
                 collapseBtn.style.display = 'none';

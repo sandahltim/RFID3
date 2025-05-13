@@ -1,4 +1,4 @@
-console.log('common.js version: 2025-05-07-v14 loaded - confirming script load');
+console.log('common.js version: 2025-05-07-v15 loaded - confirming script load');
 
 // Function to format ISO date strings into "Thurs, Aug 21 2025 4:55 pm"
 function formatDate(isoDateString) {
@@ -119,8 +119,8 @@ function applyFilterToAllLevels() {
             let showCategoryRow = true;
             const categoryCell = categoryRow.querySelector('td:nth-child(1)'); // Category column
             const categoryValue = categoryCell ? categoryCell.textContent.toLowerCase() : '';
-            // Normalize categoryValue to match targetId format in tab1_5.js
-            const normalizedCategoryValue = categoryValue.toLowerCase().replace(/[^a-z0-9]/g, '_').replace(/_/g, '_20');
+            // Normalize categoryValue to match targetId format in tab1_5.js (e.g., "concession resale" -> "concession_20resale")
+            const normalizedCategoryValue = categoryValue.toLowerCase().replace(/\s+/g, '_20');
             const subcatSelect = categoryRow.querySelector('.subcategory-select');
             let hasMatchingItems = false;
 
@@ -213,7 +213,7 @@ function applyFilterToAllLevels() {
                                     } else {
                                         itemsDiv.classList.remove('expanded');
                                         itemsDiv.classList.add('collapsed');
-                                        itemsDiv.style.display = 'none';
+                                        itemsDiv.style.display = 'block';
                                         itemsDiv.style.opacity = '0';
                                         const expandBtn = commonRow.querySelector('.expand-btn');
                                         const collapseBtn = commonRow.querySelector('.collapse-btn');
@@ -394,7 +394,7 @@ function applyFilterToAllLevels() {
                                 } else {
                                     commonExpandableRow.classList.remove('expanded');
                                     commonExpandableRow.classList.add('collapsed');
-                                    commonExpandableRow.style.display = 'none';
+                                    commonExpandableRow.style.display = 'block';
                                     commonExpandableRow.style.opacity = '0';
                                     const expandBtn = commonRow.querySelector('.expand-btn');
                                     const collapseBtn = commonRow.querySelector('.collapse-btn');
@@ -436,7 +436,7 @@ function applyFilterToAllLevels() {
                     } else {
                         subcatDiv.classList.remove('expanded');
                         subcatDiv.classList.add('collapsed');
-                        subcatDiv.style.display = 'none';
+                        subcatDiv.style.display = 'block';
                         subcatDiv.style.opacity = '0';
                         const categoryExpandBtn = categoryRow.querySelector('.expand-btn');
                         const categoryCollapseBtn = categoryRow.querySelector('.collapse-btn');
@@ -453,7 +453,7 @@ function applyFilterToAllLevels() {
                 if (subcatDiv) {
                     subcatDiv.classList.remove('expanded');
                     subcatDiv.classList.add('collapsed');
-                    subcatDiv.style.display = 'none';
+                    subcatDiv.style.display = 'block';
                     subcatDiv.style.opacity = '0';
                     const categoryExpandBtn = categoryRow.querySelector('.expand-btn');
                     const categoryCollapseBtn = categoryRow.querySelector('.collapse-btn');
