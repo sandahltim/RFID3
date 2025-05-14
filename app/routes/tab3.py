@@ -36,7 +36,7 @@ SHARED_DIR = '/home/tim/test_rfidpi/shared'
 CSV_FILE_PATH = os.path.join(SHARED_DIR, 'rfid_tags.csv')
 
 # Version marker
-logger.info("Deployed tab3.py version: 2025-05-14-v15")
+logger.info("Deployed tab3.py version: 2025-05-14-v17")
 
 @tab3_bp.route('/tab/3')
 def tab3_view():
@@ -246,7 +246,7 @@ def get_pack_resale_common_names():
 def sync_to_pc():
     """
     Sync selected items to a CSV file for printing RFID tags.
-    Appends new entries to the existing CSV file.
+    Appends new entries to the existing CSV file, ensuring headers are always present.
     """
     session = None
     try:
@@ -286,16 +286,29 @@ def sync_to_pc():
                 'short_common_name': um.short_common_name if hasattr(um, 'short_common_name') else None
             }
 
-        # Read existing tag_ids from the CSV to avoid duplicates
+        # Read existing tag_ids from the CSV to avoid duplicates, and check for headers
         existing_tag_ids = set()
         new_tag_ids = set()
+        needs_header = not os.path.exists(CSV_FILE_PATH)
         if os.path.exists(CSV_FILE_PATH):
             try:
                 with open(CSV_FILE_PATH, 'r') as csvfile:
-                    reader = csv.DictReader(csvfile)
-                    for row in reader:
-                        if 'tag_id' in row:
-                            existing_tag_ids.add(row['tag_id'])
+                    first_line = csvfile.readline().strip()
+                    if not first_line:
+                        # File is empty, needs header
+                        needs_header = True
+                    else:
+                        # Check if the first line is a valid header
+                        csvfile.seek(0)
+                        reader = csv.DictReader(csvfile)
+                        required_fields = ['tag_id', 'common_name', 'subcategory', 'short_common_name', 'status', 'bin_location']
+                        if not all(field in reader.fieldnames for field in required_fields):
+                            logger.warning(f"CSV file exists but lacks valid headers. Rewriting with headers.")
+                            needs_header = True
+                        else:
+                            for row in reader:
+                                if 'tag_id' in row:
+                                    existing_tag_ids.add(row['tag_id'])
             except Exception as e:
                 logger.error(f"Error reading existing CSV file: {str(e)}", exc_info=True)
                 return jsonify({'error': f"Failed to read existing CSV file: {str(e)}"}), 500
@@ -354,13 +367,13 @@ def sync_to_pc():
                 'is_new': tag_id in new_tag_ids
             })
 
-        # Append to the existing CSV file
-        file_exists = os.path.exists(CSV_FILE_PATH)
+        # Append to the existing CSV file, ensuring headers are present
         with open(CSV_FILE_PATH, 'a', newline='') as csvfile:
             fieldnames = ['tag_id', 'common_name', 'subcategory', 'short_common_name', 'status', 'bin_location']
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-            if not file_exists:
+            if needs_header:
                 writer.writeheader()
+                logger.info("Wrote CSV header row")
             for item in synced_items:
                 writer.writerow({
                     'tag_id': item['tag_id'],
@@ -396,17 +409,37 @@ def update_synced_status():
             logger.info("No synced items found in CSV file")
             return jsonify({'error': 'No synced items found'}), 404
 
-        # Read tag_ids from the CSV file
+        # Check if the CSV file is empty
+        if os.path.getsize(CSV_FILE_PATH) == 0:
+            logger.info("CSV file is empty")
+            return jsonify({'error': 'No items found in CSV file'}), 404
+
+        # Read tag_ids from the CSV file with error handling
         items_to_update = []
-        with open(CSV_FILE_PATH, 'r') as csvfile:
-            reader = csv.DictReader(csvfile)
-            for row in reader:
-                items_to_update.append({
-                    'tag_id': row['tag_id'],
-                    'common_name': row['common_name'],
-                    'bin_location': row['bin_location'],
-                    'status': row['status']
-                })
+        try:
+            with open(CSV_FILE_PATH, 'r') as csvfile:
+                reader = csv.DictReader(csvfile)
+                # Verify required headers
+                required_fields = ['tag_id', 'common_name', 'bin_location', 'status']
+                if not all(field in reader.fieldnames for field in required_fields):
+                    missing = [field for field in required_fields if field not in reader.fieldnames]
+                    logger.error(f"CSV file missing required fields: {missing}")
+                    return jsonify({'error': f"CSV file missing required fields: {missing}"}), 400
+
+                for row in reader:
+                    try:
+                        items_to_update.append({
+                            'tag_id': row['tag_id'],
+                            'common_name': row['common_name'],
+                            'bin_location': row['bin_location'],
+                            'status': row['status']
+                        })
+                    except KeyError as ke:
+                        logger.error(f"Missing required field in CSV row: {ke}, row: {row}")
+                        return jsonify({'error': f"Missing required field in CSV row: {ke}"}), 400
+        except Exception as e:
+            logger.error(f"Error reading CSV file: {str(e)}", exc_info=True)
+            return jsonify({'error': f"Error reading CSV file: {str(e)}"}), 500
 
         if not items_to_update:
             logger.info("No items found in CSV file to update")
@@ -416,29 +449,41 @@ def update_synced_status():
         logger.info(f"Found {len(tag_ids)} items to update: {tag_ids}")
 
         # Fetch rental_class_num for each item from the database
-        items_in_db = session.query(ItemMaster.tag_id, ItemMaster.rental_class_num, ItemMaster.common_name, ItemMaster.bin_location)\
-            .filter(ItemMaster.tag_id.in_(tag_ids))\
-            .all()
-        item_dict = {item.tag_id: {
-            'rental_class_num': item.rental_class_num,
-            'common_name': item.common_name,
-            'bin_location': item.bin_location
-        } for item in items_in_db}
+        try:
+            items_in_db = session.query(ItemMaster.tag_id, ItemMaster.rental_class_num, ItemMaster.common_name, ItemMaster.bin_location)\
+                .filter(ItemMaster.tag_id.in_(tag_ids))\
+                .all()
+            item_dict = {item.tag_id: {
+                'rental_class_num': item.rental_class_num,
+                'common_name': item.common_name,
+                'bin_location': item.bin_location
+            } for item in items_in_db}
+            logger.debug(f"Fetched {len(item_dict)} items from ItemMaster for tag_ids: {list(item_dict.keys())}")
+        except Exception as e:
+            logger.error(f"Error querying ItemMaster for tag_ids: {str(e)}", exc_info=True)
+            return jsonify({'error': f"Error querying ItemMaster: {str(e)}"}), 500
 
         # Update status in the local database
-        updated_items = ItemMaster.query\
-            .filter(ItemMaster.tag_id.in_(tag_ids))\
-            .update({ItemMaster.status: 'Ready to Rent'}, synchronize_session='fetch')
+        try:
+            updated_items = ItemMaster.query\
+                .filter(ItemMaster.tag_id.in_(tag_ids))\
+                .update({ItemMaster.status: 'Ready to Rent'}, synchronize_session='fetch')
+            logger.info(f"Updated {updated_items} items in ItemMaster to 'Ready to Rent'")
+        except Exception as e:
+            logger.error(f"Error updating ItemMaster status: {str(e)}", exc_info=True)
+            return jsonify({'error': f"Error updating ItemMaster: {str(e)}"}), 500
 
         # Update each item via the API
         api_client = APIClient()
         for item in items_to_update:
             tag_id = item['tag_id']
             db_item = item_dict.get(tag_id, {})
+            logger.debug(f"Processing tag_id {tag_id}: db_item={db_item}")
             # Check if the tag_id exists in the API
             try:
                 params = {'filter[eq]': f"tag_id,eq,'{tag_id}'"}
                 existing_items = api_client._make_request("14223767938169344381", params)
+                logger.debug(f"API check for tag_id {tag_id}: found {len(existing_items)} items")
                 if existing_items:
                     # Update existing item via PATCH
                     api_client.update_status(tag_id, 'Ready to Rent')
@@ -457,13 +502,18 @@ def update_synced_status():
                     logger.info(f"Inserted new tag_id {tag_id} via API POST with data: {new_item}")
             except Exception as api_error:
                 logger.error(f"Error updating/inserting tag_id {tag_id} in API: {str(api_error)}", exc_info=True)
-                raise Exception(f"Failed to update/insert tag_id {tag_id} in API: {str(api_error)}")
+                return jsonify({'error': f"Failed to update/insert tag_id {tag_id} in API: {str(api_error)}"}), 500
 
         # Clear the CSV file by overwriting it with just the headers
-        with open(CSV_FILE_PATH, 'w', newline='') as csvfile:
-            fieldnames = ['tag_id', 'common_name', 'subcategory', 'short_common_name', 'status', 'bin_location']
-            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-            writer.writeheader()
+        try:
+            with open(CSV_FILE_PATH, 'w', newline='') as csvfile:
+                fieldnames = ['tag_id', 'common_name', 'subcategory', 'short_common_name', 'status', 'bin_location']
+                writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+                writer.writeheader()
+            logger.info("Cleared CSV file")
+        except Exception as e:
+            logger.error(f"Error clearing CSV file: {str(e)}", exc_info=True)
+            return jsonify({'error': f"Error clearing CSV file: {str(e)}"}), 500
 
         session.commit()
         logger.info(f"Updated status for {updated_items} items and cleared CSV file")

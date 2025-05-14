@@ -1,4 +1,4 @@
-console.log('expand.js version: 2025-05-07-v82 loaded - confirming script load');
+console.log('expand.js version: 2025-05-14-v83 loaded - confirming script load');
 
 // Note: Common function - will be moved to common.js during split
 function showLoadingExpand(targetId) {
@@ -241,9 +241,9 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log('expand.js: window.cachedTabNum already set:', window.cachedTabNum);
     }
 
-    // Skip if we're on Tab 1 or Tab 5, as they use tab1_5.js
-    if (window.cachedTabNum === 1 || window.cachedTabNum === 5) {
-        console.log('Tab 1 or Tab 5 detected, skipping expand.js event listeners');
+    // Skip if we're on Tab 1, Tab 3, or Tab 5
+    if (window.cachedTabNum === 1 || window.cachedTabNum === 3 || window.cachedTabNum === 5) {
+        console.log(`Tab ${window.cachedTabNum} detected, skipping expand.js event listeners`);
         return;
     }
 
@@ -270,7 +270,6 @@ document.addEventListener('DOMContentLoaded', function() {
     document.addEventListener('click', handleClick);
 
     function handleClick(event) {
-        console.log('handleClick triggered', event.target);
         const expandBtn = event.target.closest('.expand-btn');
         if (expandBtn) {
             event.stopPropagation();
@@ -484,7 +483,7 @@ document.addEventListener('DOMContentLoaded', function() {
             sortArrow.className = 'sort-arrow';
             if (!header.querySelector('.sort-arrow')) header.appendChild(sortArrow);
             if (header.textContent.trim().toLowerCase().replace(/\s+/g, '_') === column) {
-                sortArrow.textContent = direction === 'asc' ? '↑' : '↓';
+                sortArrow.textContent = direction === 'asc' ? 'â†‘' : 'â†“';
             } else {
                 sortArrow.textContent = '';
             }
@@ -597,7 +596,7 @@ document.addEventListener('DOMContentLoaded', function() {
             sortArrow.className = 'sort-arrow';
             if (!header.querySelector('.sort-arrow')) header.appendChild(sortArrow);
             if (header.textContent.trim().toLowerCase().replace(/\s+/g, '_') === column) {
-                sortArrow.textContent = direction === 'asc' ? '↑' : '↓';
+                sortArrow.textContent = direction === 'asc' ? 'â†‘' : 'â†“';
             } else {
                 sortArrow.textContent = '';
             }
