@@ -216,3 +216,15 @@ class APIClient:
         response = self._make_request(self.item_master_endpoint, method='PATCH', data=[update_data])
         logger.info(f"Updated status for tag_id {tag_id} to {status} and date_last_scanned to {current_time} via API")
         return response
+
+    def insert_item(self, item_data):
+        """
+        Insert a new item into the Item Master via the API using POST.
+        """
+        if not item_data or 'tag_id' not in item_data:
+            raise ValueError("item_data must contain a tag_id")
+
+        # Send the new item to the API using POST
+        response = self._make_request(self.item_master_endpoint, method='POST', data=[item_data])
+        logger.info(f"Inserted new item with tag_id {item_data['tag_id']} into API via POST")
+        return response
