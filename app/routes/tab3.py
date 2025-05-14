@@ -6,6 +6,8 @@ from sqlalchemy import text, func, desc, asc
 from datetime import datetime
 import logging
 import sys
+import csv
+import os
 
 # Configure logging
 logger = logging.getLogger('tab3')
@@ -29,8 +31,12 @@ logger.addHandler(console_handler)
 
 tab3_bp = Blueprint('tab3', __name__)
 
+# Directory for shared CSV files
+SHARED_DIR = '/home/tim/test_rfidpi/shared'
+CSV_FILE_PATH = os.path.join(SHARED_DIR, 'rfid_tags.csv')
+
 # Version marker
-logger.info("Deployed tab3.py version: 2025-05-06-v11")
+logger.info("Deployed tab3.py version: 2025-05-14-v12")
 
 @tab3_bp.route('/tab/3')
 def tab3_view():
@@ -218,6 +224,130 @@ def tab3_view():
             sort='date_last_scanned_desc',
             cache_bust=int(datetime.now().timestamp())
         )
+
+@tab3_bp.route('/tab/3/pack_resale_common_names', methods=['GET'])
+def get_pack_resale_common_names():
+    """
+    Fetch distinct common names for items with bin_location 'pack' or 'resale'.
+    """
+    try:
+        common_names = db.session.query(ItemMaster.common_name)\
+            .filter(ItemMaster.bin_location.in_(['pack', 'resale']))\
+            .distinct()\
+            .all()
+        common_names = [name[0] for name in common_names if name[0]]
+        return jsonify({'common_names': sorted(common_names)}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@tab3_bp.route('/tab/3/sync_to_pc', methods=['POST'])
+def sync_to_pc():
+    """
+    Sync selected items to a CSV file for printing RFID tags.
+    """
+    try:
+        data = request.get_json()
+        common_name = data.get('common_name')
+        quantity = data.get('quantity')
+
+        if not common_name or not isinstance(quantity, int) or quantity <= 0:
+            return jsonify({'error': 'Invalid common name or quantity'}), 400
+
+        # Query items matching the common name and bin location
+        items = db.session.query(ItemMaster)\
+            .filter(ItemMaster.common_name == common_name,
+                    ItemMaster.bin_location.in_(['pack', 'resale']))\
+            .order_by(ItemMaster.status.asc())\
+            .limit(quantity)\
+            .all()
+
+        if not items:
+            return jsonify({'error': 'No items found for the selected common name'}), 404
+
+        # Prepare data for CSV
+        synced_items = []
+        for item in items:
+            # Check if item can be reused (status = 'sold')
+            if item.status == 'Sold':
+                tag_id = item.tag_id
+            else:
+                # Generate a new tag_id (hexadecimal, 24 characters)
+                max_tag_id = db.session.query(db.func.max(ItemMaster.tag_id)).scalar()
+                if max_tag_id:
+                    max_num = int(max_tag_id, 16)
+                    new_num = max_num + 1
+                else:
+                    new_num = 1
+                tag_id = format(new_num, '024x')  # 24-character hex
+
+                # Update the item with the new tag_id
+                item.tag_id = tag_id
+                db.session.commit()
+
+            # Get subcategory and short_common_name from rental_class_mappings
+            mapping = db.session.query(RentalClassMapping)\
+                .filter(RentalClassMapping.rental_class_id == item.rental_class_num)\
+                .first()
+            subcategory = mapping.subcategory if mapping else 'Unknown'
+            short_common_name = mapping.short_common_name if mapping and mapping.short_common_name else item.common_name
+
+            synced_items.append({
+                'tag_id': tag_id,
+                'common_name': item.common_name,
+                'subcategory': subcategory,
+                'short_common_name': short_common_name,
+                'status': item.status,
+                'bin_location': item.bin_location
+            })
+
+        # Write to CSV
+        with open(CSV_FILE_PATH, 'w', newline='') as csvfile:
+            fieldnames = ['tag_id', 'common_name', 'subcategory', 'short_common_name', 'status', 'bin_location']
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            writer.writeheader()
+            for item in synced_items:
+                writer.writerow(item)
+
+        return jsonify({'synced_items': len(synced_items)}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@tab3_bp.route('/tab/3/update_synced_status', methods=['POST'])
+def update_synced_status():
+    """
+    Update the status of items in the CSV file to 'Ready to Rent'.
+    """
+    try:
+        if not os.path.exists(CSV_FILE_PATH):
+            return jsonify({'error': 'No synced items found'}), 404
+
+        # Read tag_ids from the CSV file
+        tag_ids = []
+        with open(CSV_FILE_PATH, 'r') as csvfile:
+            reader = csv.DictReader(csvfile)
+            for row in reader:
+                tag_ids.append(row['tag_id'])
+
+        if not tag_ids:
+            return jsonify({'error': 'No items found in CSV file'}), 404
+
+        # Update status in the database
+        updated_items = ItemMaster.query\
+            .filter(ItemMaster.tag_id.in_(tag_ids))\
+            .update({ItemMaster.status: 'Ready to Rent'}, synchronize_session='fetch')
+        
+        # Update each item via the API
+        api_client = APIClient()
+        for tag_id in tag_ids:
+            api_client.update_status(tag_id, 'Ready to Rent')
+
+        db.session.commit()
+
+        return jsonify({'updated_items': updated_items}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
 
 @tab3_bp.route('/tab/3/update_status', methods=['POST'])
 def update_status():

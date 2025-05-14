@@ -36,6 +36,7 @@ test_rfidpi/ RFID2restore
 │   │   └── style.css
 │   └── js/
 │   │   ├── tab.js
+│   │   ├── tab3.js
 │   │   ├── tab1_5.js
 │   │   ├── common.js
 │   │   └── expand.js
@@ -68,7 +69,7 @@ cat /home/tim/test_rfidpi/logs/app.log
 cat /home/tim/test_rfidpi/logs/sync.log
 
 source venv/bin/activate
-
+# rfid_samba_pass  samba shared server on pi
 ## CODE AS OF4/26/25
 ###run.py
 from app import create_app
