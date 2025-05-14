@@ -1,7 +1,7 @@
 import logging
 from datetime import datetime, timedelta
 from sqlalchemy.exc import SQLAlchemyError
-from app.models.db_models import ItemMaster, Transaction, RentalClassMapping, db
+from app.models.db_models import ItemMaster, Transaction, RentalClassMapping, SeedRentalClass, db
 from app.services.api_client import APIClient
 from flask import Blueprint, jsonify, current_app
 
@@ -114,30 +114,60 @@ def update_transactions(session, transactions):
             session.rollback()
             raise
 
+def update_seed_data(session, seed_data):
+    logger.info(f"Updating {len(seed_data)} items in seed_rental_classes")
+    for item in seed_data:
+        try:
+            rental_class_id = item.get('rental_class_id')
+            if not rental_class_id:
+                logger.warning(f"Skipping seed item with missing rental_class_id: {item}")
+                continue
+
+            db_seed = session.query(SeedRentalClass).filter_by(rental_class_id=rental_class_id).first()
+            if not db_seed:
+                db_seed = SeedRentalClass(rental_class_id=rental_class_id)
+
+            db_seed.common_name = item.get('common_name')
+            db_seed.bin_location = item.get('bin_location')
+
+            session.merge(db_seed)
+        except Exception as e:
+            logger.error(f"Error updating seed item {rental_class_id}: {str(e)}")
+            session.rollback()
+            raise
+
 def full_refresh():
     logger.info("Starting full refresh")
     session = db.session()
     try:
         deleted_items = session.query(ItemMaster).delete()
         deleted_transactions = session.query(Transaction).delete()
+        deleted_seed = session.query(SeedRentalClass).delete()
         logger.info(f"Deleted {deleted_items} items from id_item_master")
         logger.info(f"Deleted {deleted_transactions} transactions from id_transactions")
+        logger.info(f"Deleted {deleted_seed} items from seed_rental_classes")
 
         items = api_client.get_item_master()
         transactions = api_client.get_transactions()
+        seed_data = api_client.get_seed_data()
 
         logger.info(f"Fetched {len(items)} items from item master")
         logger.info(f"Fetched {len(transactions)} transactions")
+        logger.info(f"Fetched {len(seed_data)} items from seed data")
         logger.debug(f"Item master data sample: {items[:5] if items else 'No items'}")
-        logger.debug(f"Transactions data sample: {transactions[:5] if transactions else 'No transactions'}")
+        logger.debug(f"Transactions data sample: {transactions[:5] if items else 'No transactions'}")
+        logger.debug(f"Seed data sample: {seed_data[:5] if seed_data else 'No seed data'}")
 
         if not items:
             logger.warning("No items fetched from item master API. Check API endpoint or authentication.")
         if not transactions:
             logger.warning("No transactions fetched from transactions API. Check API endpoint or authentication.")
+        if not seed_data:
+            logger.warning("No seed data fetched from seed API. Check API endpoint or authentication.")
 
         update_item_master(session, items)
         update_transactions(session, transactions)
+        update_seed_data(session, seed_data)
 
         session.commit()
         logger.info("Clear API data and full refresh completed successfully")
@@ -168,8 +198,16 @@ def incremental_refresh():
         if not transactions:
             logger.warning("No transactions fetched from transactions API. Check API endpoint or authentication.")
 
+        logger.info(f"Fetching seed data with since_date: {since_date}")
+        seed_data = api_client.get_seed_data()
+        logger.info(f"Fetched {len(seed_data)} items from seed data")
+        logger.debug(f"Seed data sample: {seed_data[:5] if seed_data else 'No seed data'}")
+        if not seed_data:
+            logger.warning("No seed data fetched from seed API. Check API endpoint or authentication.")
+
         update_item_master(session, items)
         update_transactions(session, transactions)
+        update_seed_data(session, seed_data)
 
         session.commit()
         logger.info("Incremental refresh completed successfully")
