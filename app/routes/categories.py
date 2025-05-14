@@ -44,7 +44,7 @@ if not any(isinstance(h, logging.StreamHandler) for h in root_logger.handlers):
 categories_bp = Blueprint('categories', __name__)
 
 # Version check to ensure correct deployment
-logger.info("Deployed categories.py version: 2025-05-07-v21")
+logger.info("Deployed categories.py version: 2025-05-14-v22")
 
 def build_common_name_dict(seed_data):
     """Build a dictionary mapping rental_class_id to common_name from seed_data."""
@@ -56,9 +56,11 @@ def build_common_name_dict(seed_data):
         try:
             rental_class_id = item.get('rental_class_id')
             common_name = item.get('common_name')
+            bin_location = item.get('bin_location')
             if rental_class_id and common_name:
                 normalized_key = str(rental_class_id).strip()
                 common_name_dict[normalized_key] = common_name
+                logger.debug(f"Seed item - rental_class_id: {normalized_key}, common_name: {common_name}, bin_location: {bin_location}")
             else:
                 logger.debug(f"Skipping item due to missing rental_class_id or common_name: {item}")
         except Exception as comp_error:
