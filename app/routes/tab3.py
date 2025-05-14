@@ -36,7 +36,7 @@ SHARED_DIR = '/home/tim/test_rfidpi/shared'
 CSV_FILE_PATH = os.path.join(SHARED_DIR, 'rfid_tags.csv')
 
 # Version marker
-logger.info("Deployed tab3.py version: 2025-05-14-v12")
+logger.info("Deployed tab3.py version: 2025-05-14-v13")
 
 @tab3_bp.route('/tab/3')
 def tab3_view():
@@ -238,23 +238,28 @@ def get_pack_resale_common_names():
         common_names = [name[0] for name in common_names if name[0]]
         return jsonify({'common_names': sorted(common_names)}), 200
     except Exception as e:
+        logger.error(f"Error fetching pack/resale common names: {str(e)}", exc_info=True)
         return jsonify({'error': str(e)}), 500
 
 @tab3_bp.route('/tab/3/sync_to_pc', methods=['POST'])
 def sync_to_pc():
     """
     Sync selected items to a CSV file for printing RFID tags.
+    Appends new entries to the existing CSV file.
     """
+    session = None
     try:
+        session = db.session()
         data = request.get_json()
         common_name = data.get('common_name')
         quantity = data.get('quantity')
 
         if not common_name or not isinstance(quantity, int) or quantity <= 0:
+            logger.warning(f"Invalid input: common_name={common_name}, quantity={quantity}")
             return jsonify({'error': 'Invalid common name or quantity'}), 400
 
         # Query items matching the common name and bin location
-        items = db.session.query(ItemMaster)\
+        items = session.query(ItemMaster)\
             .filter(ItemMaster.common_name == common_name,
                     ItemMaster.bin_location.in_(['pack', 'resale']))\
             .order_by(ItemMaster.status.asc())\
@@ -262,7 +267,37 @@ def sync_to_pc():
             .all()
 
         if not items:
+            logger.info(f"No items found for common_name={common_name} and bin_location in ['pack', 'resale']")
             return jsonify({'error': 'No items found for the selected common name'}), 404
+
+        # Fetch all rental class mappings
+        base_mappings = session.query(RentalClassMapping).all()
+        user_mappings = session.query(UserRentalClassMapping).all()
+        mappings_dict = {str(m.rental_class_id).strip().upper(): {
+            'category': m.category,
+            'subcategory': m.subcategory,
+            'short_common_name': m.short_common_name if hasattr(m, 'short_common_name') else None
+        } for m in base_mappings}
+        for um in user_mappings:
+            mappings_dict[str(um.rental_class_id).strip().upper()] = {
+                'category': um.category,
+                'subcategory': um.subcategory,
+                'short_common_name': um.short_common_name if hasattr(um, 'short_common_name') else None
+            }
+
+        # Read existing tag_ids from the CSV to avoid duplicates
+        existing_tag_ids = set()
+        new_tag_ids = set()
+        if os.path.exists(CSV_FILE_PATH):
+            try:
+                with open(CSV_FILE_PATH, 'r') as csvfile:
+                    reader = csv.DictReader(csvfile)
+                    for row in reader:
+                        if 'tag_id' in row:
+                            existing_tag_ids.add(row['tag_id'])
+            except Exception as e:
+                logger.error(f"Error reading existing CSV file: {str(e)}", exc_info=True)
+                return jsonify({'error': f"Failed to read existing CSV file: {str(e)}"}), 500
 
         # Prepare data for CSV
         synced_items = []
@@ -272,24 +307,34 @@ def sync_to_pc():
                 tag_id = item.tag_id
             else:
                 # Generate a new tag_id (hexadecimal, 24 characters)
-                max_tag_id = db.session.query(db.func.max(ItemMaster.tag_id)).scalar()
+                max_tag_id = session.query(func.max(ItemMaster.tag_id)).scalar()
                 if max_tag_id:
-                    max_num = int(max_tag_id, 16)
+                    try:
+                        max_num = int(max_tag_id, 16)
+                    except ValueError:
+                        logger.warning(f"Invalid max_tag_id format: {max_tag_id}, starting from 1")
+                        max_num = 0
                     new_num = max_num + 1
                 else:
                     new_num = 1
-                tag_id = format(new_num, '024x')  # 24-character hex
 
+                # Ensure the new tag_id is unique
+                while True:
+                    tag_id = format(new_num, '024x')  # 24-character hex
+                    if tag_id not in existing_tag_ids and tag_id not in new_tag_ids:
+                        break
+                    new_num += 1
+
+                new_tag_ids.add(tag_id)
                 # Update the item with the new tag_id
                 item.tag_id = tag_id
-                db.session.commit()
+                session.commit()
+                logger.info(f"Assigned new tag_id {tag_id} to item with common_name={item.common_name}")
 
             # Get subcategory and short_common_name from rental_class_mappings
-            mapping = db.session.query(RentalClassMapping)\
-                .filter(RentalClassMapping.rental_class_id == item.rental_class_num)\
-                .first()
-            subcategory = mapping.subcategory if mapping else 'Unknown'
-            short_common_name = mapping.short_common_name if mapping and mapping.short_common_name else item.common_name
+            mapping = mappings_dict.get(str(item.rental_class_num).strip().upper() if item.rental_class_num else '', {})
+            subcategory = mapping.get('subcategory', 'Unknown')
+            short_common_name = mapping.get('short_common_name', item.common_name)
 
             synced_items.append({
                 'tag_id': tag_id,
@@ -297,57 +342,120 @@ def sync_to_pc():
                 'subcategory': subcategory,
                 'short_common_name': short_common_name,
                 'status': item.status,
-                'bin_location': item.bin_location
+                'bin_location': item.bin_location,
+                'is_new': tag_id in new_tag_ids
             })
 
-        # Write to CSV
-        with open(CSV_FILE_PATH, 'w', newline='') as csvfile:
+        # Append to the existing CSV file
+        file_exists = os.path.exists(CSV_FILE_PATH)
+        with open(CSV_FILE_PATH, 'a', newline='') as csvfile:
             fieldnames = ['tag_id', 'common_name', 'subcategory', 'short_common_name', 'status', 'bin_location']
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-            writer.writeheader()
+            if not file_exists:
+                writer.writeheader()
             for item in synced_items:
-                writer.writerow(item)
+                writer.writerow({
+                    'tag_id': item['tag_id'],
+                    'common_name': item['common_name'],
+                    'subcategory': item['subcategory'],
+                    'short_common_name': item['short_common_name'],
+                    'status': item['status'],
+                    'bin_location': item['bin_location']
+                })
 
+        session.commit()
+        logger.info(f"Successfully synced {len(synced_items)} items to CSV. New tag_ids: {new_tag_ids}")
         return jsonify({'synced_items': len(synced_items)}), 200
     except Exception as e:
-        db.session.rollback()
+        logger.error(f"Error in sync_to_pc: {str(e)}", exc_info=True)
+        if session:
+            session.rollback()
         return jsonify({'error': str(e)}), 500
+    finally:
+        if session:
+            session.close()
 
 @tab3_bp.route('/tab/3/update_synced_status', methods=['POST'])
 def update_synced_status():
     """
-    Update the status of items in the CSV file to 'Ready to Rent'.
+    Update the status of items in the CSV file to 'Ready to Rent' and clear the CSV file.
+    Inserts new tag_id entries into the API via POST and updates existing ones via PATCH.
     """
+    session = None
     try:
+        session = db.session()
         if not os.path.exists(CSV_FILE_PATH):
+            logger.info("No synced items found in CSV file")
             return jsonify({'error': 'No synced items found'}), 404
 
         # Read tag_ids from the CSV file
-        tag_ids = []
+        items_to_update = []
         with open(CSV_FILE_PATH, 'r') as csvfile:
             reader = csv.DictReader(csvfile)
             for row in reader:
-                tag_ids.append(row['tag_id'])
+                items_to_update.append({
+                    'tag_id': row['tag_id'],
+                    'common_name': row['common_name'],
+                    'bin_location': row['bin_location'],
+                    'status': row['status']
+                })
 
-        if not tag_ids:
+        if not items_to_update:
+            logger.info("No items found in CSV file to update")
             return jsonify({'error': 'No items found in CSV file'}), 404
 
-        # Update status in the database
+        tag_ids = [item['tag_id'] for item in items_to_update]
+        logger.info(f"Found {len(tag_ids)} items to update: {tag_ids}")
+
+        # Update status in the local database
         updated_items = ItemMaster.query\
             .filter(ItemMaster.tag_id.in_(tag_ids))\
             .update({ItemMaster.status: 'Ready to Rent'}, synchronize_session='fetch')
-        
+
         # Update each item via the API
         api_client = APIClient()
-        for tag_id in tag_ids:
-            api_client.update_status(tag_id, 'Ready to Rent')
+        for item in items_to_update:
+            tag_id = item['tag_id']
+            # Check if the tag_id exists in the API
+            try:
+                params = {'filter[eq]': f"tag_id,eq,'{tag_id}'"}
+                existing_items = api_client._make_request("14223767938169344381", params)
+                if existing_items:
+                    # Update existing item via PATCH
+                    api_client.update_status(tag_id, 'Ready to Rent')
+                    logger.info(f"Updated existing tag_id {tag_id} via API PATCH")
+                else:
+                    # Insert new item via POST
+                    new_item = {
+                        'tag_id': tag_id,
+                        'common_name': item['common_name'],
+                        'bin_location': item['bin_location'],
+                        'status': 'Ready to Rent',
+                        'date_last_scanned': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                    }
+                    api_client._make_request("14223767938169344381", method='POST', data=[new_item])
+                    logger.info(f"Inserted new tag_id {tag_id} via API POST")
+            except Exception as api_error:
+                logger.error(f"Error updating/inserting tag_id {tag_id} in API: {str(api_error)}", exc_info=True)
+                raise Exception(f"Failed to update/insert tag_id {tag_id} in API: {str(api_error)}")
 
-        db.session.commit()
+        # Clear the CSV file by overwriting it with just the headers
+        with open(CSV_FILE_PATH, 'w', newline='') as csvfile:
+            fieldnames = ['tag_id', 'common_name', 'subcategory', 'short_common_name', 'status', 'bin_location']
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            writer.writeheader()
 
+        session.commit()
+        logger.info(f"Updated status for {updated_items} items and cleared CSV file")
         return jsonify({'updated_items': updated_items}), 200
     except Exception as e:
-        db.session.rollback()
+        logger.error(f"Error in update_synced_status: {str(e)}", exc_info=True)
+        if session:
+            session.rollback()
         return jsonify({'error': str(e)}), 500
+    finally:
+        if session:
+            session.close()
 
 @tab3_bp.route('/tab/3/update_status', methods=['POST'])
 def update_status():
@@ -359,20 +467,24 @@ def update_status():
         new_status = data.get('status')
 
         if not tag_id or not new_status:
+            logger.warning(f"Invalid input in update_status: tag_id={tag_id}, new_status={new_status}")
             return jsonify({'error': 'Tag ID and status are required'}), 400
 
         valid_statuses = ['Ready to Rent', 'Sold', 'Repair', 'Needs to be Inspected', 'Staged', 'Wash', 'Wet']
         if new_status not in valid_statuses:
+            logger.warning(f"Invalid status value: {new_status}")
             return jsonify({'error': f'Status must be one of {", ".join(valid_statuses)}'}), 400
 
         item = session.query(ItemMaster).filter_by(tag_id=tag_id).first()
         if not item:
             session.close()
+            logger.info(f"Item not found for tag_id {tag_id}")
             return jsonify({'error': 'Item not found'}), 404
 
         # Prevent updating to On Rent or Delivered manually
         if new_status in ['On Rent', 'Delivered']:
             session.close()
+            logger.warning(f"Attempted manual update to restricted status {new_status} for tag_id {tag_id}")
             return jsonify({'error': 'Status cannot be updated to "On Rent" or "Delivered" manually'}), 400
 
         # Update local database
@@ -389,8 +501,8 @@ def update_status():
         logger.info(f"Updated status for tag_id {tag_id} to {new_status} and date_last_scanned to {current_time}")
         return jsonify({'message': 'Status updated successfully'})
     except Exception as e:
+        logger.error(f"Error updating status for tag {tag_id}: {str(e)}", exc_info=True)
         if session:
             session.rollback()
             session.close()
-        logger.error(f"Error updating status for tag {tag_id}: {str(e)}")
         return jsonify({'error': str(e)}), 500
