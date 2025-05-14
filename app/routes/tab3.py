@@ -36,7 +36,7 @@ SHARED_DIR = '/home/tim/test_rfidpi/shared'
 CSV_FILE_PATH = os.path.join(SHARED_DIR, 'rfid_tags.csv')
 
 # Version marker
-logger.info("Deployed tab3.py version: 2025-05-14-v13")
+logger.info("Deployed tab3.py version: 2025-05-14-v14")
 
 @tab3_bp.route('/tab/3')
 def tab3_view():
@@ -302,25 +302,31 @@ def sync_to_pc():
         # Prepare data for CSV
         synced_items = []
         for item in items:
-            # Check if item can be reused (status = 'sold')
-            if item.status == 'Sold':
+            # Reuse tag_id only if status is 'Sold' and common_name matches
+            if item.status == 'Sold' and item.common_name == common_name:
                 tag_id = item.tag_id
+                logger.info(f"Reusing tag_id {tag_id} for item with common_name={item.common_name} and status={item.status}")
             else:
-                # Generate a new tag_id (hexadecimal, 24 characters)
-                max_tag_id = session.query(func.max(ItemMaster.tag_id)).scalar()
-                if max_tag_id:
+                # Generate a new tag_id with "BTE" prefix (hex: 425445)
+                # Fetch the highest tag_id starting with "425445"
+                max_tag_id = session.query(func.max(ItemMaster.tag_id))\
+                    .filter(ItemMaster.tag_id.startswith('425445'))\
+                    .scalar()
+                
+                if max_tag_id and len(max_tag_id) == 24 and max_tag_id.startswith('425445'):
                     try:
-                        max_num = int(max_tag_id, 16)
+                        incremental_part = int(max_tag_id[6:], 16)  # Extract the part after "425445"
+                        new_num = incremental_part + 1
                     except ValueError:
-                        logger.warning(f"Invalid max_tag_id format: {max_tag_id}, starting from 1")
-                        max_num = 0
-                    new_num = max_num + 1
+                        logger.warning(f"Invalid incremental part in max_tag_id: {max_tag_id}, starting from 1")
+                        new_num = 1
                 else:
                     new_num = 1
 
                 # Ensure the new tag_id is unique
                 while True:
-                    tag_id = format(new_num, '024x')  # 24-character hex
+                    incremental_hex = format(new_num, '018x')  # 18 hex chars for the incremental part
+                    tag_id = f"425445{incremental_hex}"  # "BTE" in hex + 18 chars = 24 chars
                     if tag_id not in existing_tag_ids and tag_id not in new_tag_ids:
                         break
                     new_num += 1
@@ -343,6 +349,7 @@ def sync_to_pc():
                 'short_common_name': short_common_name,
                 'status': item.status,
                 'bin_location': item.bin_location,
+                'rental_class_num': item.rental_class_num,
                 'is_new': tag_id in new_tag_ids
             })
 
@@ -407,6 +414,16 @@ def update_synced_status():
         tag_ids = [item['tag_id'] for item in items_to_update]
         logger.info(f"Found {len(tag_ids)} items to update: {tag_ids}")
 
+        # Fetch rental_class_num for each item from the database
+        items_in_db = session.query(ItemMaster.tag_id, ItemMaster.rental_class_num, ItemMaster.common_name, ItemMaster.bin_location)\
+            .filter(ItemMaster.tag_id.in_(tag_ids))\
+            .all()
+        item_dict = {item.tag_id: {
+            'rental_class_num': item.rental_class_num,
+            'common_name': item.common_name,
+            'bin_location': item.bin_location
+        } for item in items_in_db}
+
         # Update status in the local database
         updated_items = ItemMaster.query\
             .filter(ItemMaster.tag_id.in_(tag_ids))\
@@ -416,6 +433,7 @@ def update_synced_status():
         api_client = APIClient()
         for item in items_to_update:
             tag_id = item['tag_id']
+            db_item = item_dict.get(tag_id, {})
             # Check if the tag_id exists in the API
             try:
                 params = {'filter[eq]': f"tag_id,eq,'{tag_id}'"}
@@ -428,13 +446,14 @@ def update_synced_status():
                     # Insert new item via POST
                     new_item = {
                         'tag_id': tag_id,
-                        'common_name': item['common_name'],
-                        'bin_location': item['bin_location'],
+                        'common_name': db_item.get('common_name', item['common_name']),
+                        'bin_location': db_item.get('bin_location', item['bin_location']),
                         'status': 'Ready to Rent',
-                        'date_last_scanned': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                        'date_last_scanned': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                        'rental_class_num': db_item.get('rental_class_num', '')
                     }
-                    api_client._make_request("14223767938169344381", method='POST', data=[new_item])
-                    logger.info(f"Inserted new tag_id {tag_id} via API POST")
+                    api_client.insert_item(new_item)
+                    logger.info(f"Inserted new tag_id {tag_id} via API POST with data: {new_item}")
             except Exception as api_error:
                 logger.error(f"Error updating/inserting tag_id {tag_id} in API: {str(api_error)}", exc_info=True)
                 raise Exception(f"Failed to update/insert tag_id {tag_id} in API: {str(api_error)}")
