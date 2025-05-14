@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, request, jsonify, current_app
 from .. import db
-from ..models.db_models import ItemMaster, Transaction, RentalClassMapping, UserRentalClassMapping
+from ..models.db_models import ItemMaster, Transaction, RentalClassMapping, UserRentalClassMapping, SeedRentalClass
 from ..services.api_client import APIClient
 from sqlalchemy import text, func, desc, asc
 from datetime import datetime
@@ -36,7 +36,7 @@ SHARED_DIR = '/home/tim/test_rfidpi/shared'
 CSV_FILE_PATH = os.path.join(SHARED_DIR, 'rfid_tags.csv')
 
 # Version marker
-logger.info("Deployed tab3.py version: 2025-05-14-v14")
+logger.info("Deployed tab3.py version: 2025-05-14-v15")
 
 @tab3_bp.route('/tab/3')
 def tab3_view():
@@ -228,17 +228,18 @@ def tab3_view():
 @tab3_bp.route('/tab/3/pack_resale_common_names', methods=['GET'])
 def get_pack_resale_common_names():
     """
-    Fetch distinct common names for items with bin_location 'pack' or 'resale'.
+    Fetch distinct common names for items with bin_location 'pack' or 'resale' from SeedRentalClass.
     """
     try:
-        common_names = db.session.query(ItemMaster.common_name)\
-            .filter(ItemMaster.bin_location.in_(['pack', 'resale']))\
+        common_names = db.session.query(SeedRentalClass.common_name)\
+            .filter(SeedRentalClass.bin_location.in_(['pack', 'resale']))\
             .distinct()\
             .all()
         common_names = [name[0] for name in common_names if name[0]]
+        logger.info(f"Fetched {len(common_names)} common names from SeedRentalClass for pack/resale: {common_names}")
         return jsonify({'common_names': sorted(common_names)}), 200
     except Exception as e:
-        logger.error(f"Error fetching pack/resale common names: {str(e)}", exc_info=True)
+        logger.error(f"Error fetching pack/resale common names from SeedRentalClass: {str(e)}", exc_info=True)
         return jsonify({'error': str(e)}), 500
 
 @tab3_bp.route('/tab/3/sync_to_pc', methods=['POST'])
