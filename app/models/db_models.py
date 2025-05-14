@@ -87,6 +87,7 @@ class SeedRentalClass(db.Model):
 
     rental_class_id = db.Column(db.String(50), primary_key=True)
     common_name = db.Column(db.String(255))
+    bin_location = db.Column(db.String(255))  # Added to match schema
 
 class RefreshState(db.Model):
     __tablename__ = 'refresh_state'
