@@ -31,25 +31,6 @@
     </div>
 </div>
 
-<!-- New Section for Printing RFID Tags -->
-<div class="print-tags-section mt-4">
-    <h4>Print RFID Tags</h4>
-    <div class="form-group">
-        <label for="commonNameSelect">Select Common Name (Pack/Resale):</label>
-        <select id="commonNameSelect" class="form-control">
-            <option value="">Select Common Name</option>
-            <!-- Populated by JS -->
-        </select>
-    </div>
-    <div class="form-group">
-        <label for="tagQuantity">Number of Tags to Print:</label>
-        <input type="number" id="tagQuantity" class="form-control" min="1" value="1">
-    </div>
-    <button id="syncToPcBtn" class="btn btn-primary mt-2">Sync to PC</button>
-    <button id="updateStatusBtn" class="btn btn-success mt-2" disabled>Update Status to Ready to Rent</button>
-    <div id="syncMessage" class="mt-2"></div>
-</div>
-
 {% for crew in crews %}
 <h3>{{ crew.name }} Items</h3>
 {% if crew.item_list %}
@@ -100,6 +81,25 @@
     <p>No items currently in service for {{ crew.name }}.</p>
 {% endif %}
 {% endfor %}
+
+<!-- New Section for Printing RFID Tags - Moved to Bottom -->
+<div class="print-tags-section mt-4">
+    <h4>Print RFID Tags</h4>
+    <div class="form-group">
+        <label for="commonNameSelect">Select Common Name (Pack/Resale):</label>
+        <select id="commonNameSelect" class="form-control">
+            <option value="">Select Common Name</option>
+            <!-- Populated by JS -->
+        </select>
+    </div>
+    <div class="form-group">
+        <label for="tagQuantity">Number of Tags to Print:</label>
+        <input type="number" id="tagQuantity" class="form-control" min="1" value="1">
+    </div>
+    <button id="syncToPcBtn" class="btn btn-primary mt-2">Sync to PC</button>
+    <button id="updateStatusBtn" class="btn btn-success mt-2" disabled>Update Status to Ready to Rent</button>
+    <div id="syncMessage" class="mt-2"></div>
+</div>
 
 <script src="/static/js/tab3.js?v={{ cache_bust }}"></script>
 {% endblock %}
