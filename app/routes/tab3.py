@@ -36,7 +36,7 @@ SHARED_DIR = '/home/tim/test_rfidpi/shared'
 CSV_FILE_PATH = os.path.join(SHARED_DIR, 'rfid_tags.csv')
 
 # Version marker
-logger.info("Deployed tab3.py version: 2025-05-15-v19")
+logger.info("Deployed tab3.py version: 2025-05-15-v20")
 
 @tab3_bp.route('/tab/3')
 def tab3_view():
@@ -300,7 +300,7 @@ def sync_to_pc():
                 max_tag_id = session.query(func.max(ItemMaster.tag_id))\
                     .filter(ItemMaster.tag_id.startswith('425445'))\
                     .scalar()
-
+                
                 if max_tag_id and len(max_tag_id) == 24 and max_tag_id.startswith('425445'):
                     try:
                         incremental_part = int(max_tag_id[6:], 16)  # Extract the part after "425445"
@@ -314,11 +314,16 @@ def sync_to_pc():
                 # Ensure the new tag_id is unique
                 existing_tag_ids = set(item.tag_id for item in items + new_items)
                 while True:
-                    incremental_hex = format(new_num, '018x')  # 18 hex chars for the incremental part
+                    incremental_hex = format(new_num, 'x').zfill(18)  # Ensure exactly 18 hex chars
                     tag_id = f"425445{incremental_hex}"  # "BTE" in hex + 18 chars = 24 chars
                     if tag_id not in existing_tag_ids:
                         break
                     new_num += 1
+
+                # Verify tag_id length
+                if len(tag_id) != 24:
+                    logger.error(f"Generated tag_id {tag_id} is not 24 characters long (length={len(tag_id)})")
+                    raise ValueError(f"Generated tag_id {tag_id} must be 24 characters long")
 
                 # Create a new ItemMaster entry
                 new_item = ItemMaster(
@@ -335,9 +340,17 @@ def sync_to_pc():
                 existing_tag_ids.add(tag_id)
                 logger.info(f"Created new ItemMaster entry: tag_id={tag_id}, common_name={common_name}, rental_class_num={rental_class_num}")
 
-            session.commit()
+            # Commit new ItemMaster entries
+            try:
+                session.commit()
+                logger.info(f"Successfully committed {len(new_items)} new ItemMaster entries")
+            except Exception as e:
+                logger.error(f"Failed to commit new ItemMaster entries: {str(e)}", exc_info=True)
+                session.rollback()
+                return jsonify({'error': f"Failed to commit new ItemMaster entries: {str(e)}"}), 500
+
             items.extend(new_items)
-            logger.info(f"Created {len(new_items)} new ItemMaster entries. Total items now: {len(items)}")
+            logger.info(f"Total items now: {len(items)}")
 
         # Fetch all rental class mappings
         base_mappings = session.query(RentalClassMapping).all()
@@ -358,9 +371,12 @@ def sync_to_pc():
         # Ensure the shared directory exists
         if not os.path.exists(SHARED_DIR):
             logger.info(f"Creating shared directory: {SHARED_DIR}")
-            os.makedirs(SHARED_DIR, mode=0o755)
-            # Set ownership to tim:tim
-            os.chown(SHARED_DIR, 1000, 1000)  # Assuming tim's UID and GID are 1000
+            try:
+                os.makedirs(SHARED_DIR, mode=0o755)
+                os.chown(SHARED_DIR, 1000, 1000)  # tim:tim
+            except Exception as e:
+                logger.error(f"Failed to create shared directory {SHARED_DIR}: {str(e)}", exc_info=True)
+                return jsonify({'error': f"Failed to create shared directory: {str(e)}"}), 500
 
         # Read existing tag_ids from the CSV to avoid duplicates, and check for headers
         existing_tag_ids = set()
@@ -439,14 +455,25 @@ def sync_to_pc():
                         'bin_location': item['bin_location']
                     })
             # Set permissions on the CSV file
-            os.chown(CSV_FILE_PATH, 1000, 1000)  # tim:tim
-            os.chmod(CSV_FILE_PATH, 0o644)  # rw-r--r--
+            try:
+                os.chown(CSV_FILE_PATH, 1000, 1000)  # tim:tim
+                os.chmod(CSV_FILE_PATH, 0o644)  # rw-r--r--
+            except Exception as e:
+                logger.error(f"Failed to set permissions on CSV file {CSV_FILE_PATH}: {str(e)}", exc_info=True)
+                return jsonify({'error': f"Failed to set permissions on CSV file: {str(e)}"}), 500
         except Exception as e:
             logger.error(f"Failed to write to CSV file {CSV_FILE_PATH}: {str(e)}", exc_info=True)
             return jsonify({'error': f"Failed to write to CSV file: {str(e)}"}), 500
 
-        session.commit()
-        logger.info(f"Successfully synced {len(synced_items)} items to CSV. New tag_ids: {new_tag_ids}")
+        # Final commit to ensure any remaining changes are saved
+        try:
+            session.commit()
+            logger.info(f"Successfully synced {len(synced_items)} items to CSV. New tag_ids: {new_tag_ids}")
+        except Exception as e:
+            logger.error(f"Failed to commit session after CSV write: {str(e)}", exc_info=True)
+            session.rollback()
+            return jsonify({'error': f"Failed to commit session: {str(e)}"}), 500
+
         return jsonify({'synced_items': len(synced_items)}), 200
     except Exception as e:
         logger.error(f"Error in sync_to_pc: {str(e)}", exc_info=True)
