@@ -36,18 +36,20 @@ SHARED_DIR = '/home/tim/test_rfidpi/shared'
 CSV_FILE_PATH = os.path.join(SHARED_DIR, 'rfid_tags.csv')
 
 # Version marker
-logger.info("Deployed tab3.py version: 2025-05-15-v22")
+logger.info("Deployed tab3.py version: 2025-05-15-v23")
 
 @tab3_bp.route('/tab/3')
 def tab3_view():
     session = None
     try:
         session = db.session()
+        print("DEBUG: Starting new session for tab3")
         logger.info("Starting new session for tab3")
         current_app.logger.info("Starting new session for tab3")
 
         # Test database connection
         session.execute(text("SELECT 1"))
+        print("DEBUG: Database connection test successful")
         logger.info("Database connection test successful")
 
         # Query parameters for filtering and sorting
@@ -62,10 +64,12 @@ def tab3_view():
         mappings_dict = {str(m.rental_class_id).strip().upper(): {'category': m.category, 'subcategory': m.subcategory} for m in base_mappings}
         for um in user_mappings:
             mappings_dict[str(um.rental_class_id).strip().upper()] = {'category': um.category, 'subcategory': um.subcategory}
+        print(f"DEBUG: Fetched {len(mappings_dict)} rental class mappings: {list(mappings_dict.keys())}")
         logger.info(f"Fetched {len(mappings_dict)} rental class mappings: {list(mappings_dict.keys())}")
         # Log specific mappings for our items
         for rcn in ['63327', '62668', '61931']:
             mapping = mappings_dict.get(rcn, {})
+            print(f"DEBUG: Mapping for rental_class_num {rcn}: {mapping}")
             logger.info(f"Mapping for rental_class_num {rcn}: {mapping}")
 
         # Raw SQL query to fetch items with service-related statuses
@@ -85,6 +89,7 @@ def tab3_view():
                 sql_query += " AND DATE(date_last_scanned) = :date_filter"
                 params['date_filter'] = date
             except ValueError:
+                print(f"DEBUG: Invalid date format for date_last_scanned filter: {date_filter}")
                 logger.warning(f"Invalid date format for date_last_scanned filter: {date_filter}")
 
         # Apply sorting
@@ -93,9 +98,11 @@ def tab3_view():
         else:  # Default to date_last_scanned_desc
             sql_query += " ORDER BY date_last_scanned DESC, LOWER(common_name) ASC"
 
+        print(f"DEBUG: Executing raw SQL query: {sql_query} with params: {params}")
         logger.info(f"Executing raw SQL query: {sql_query} with params: {params}")
         result = session.execute(text(sql_query), params)
         rows = result.fetchall()
+        print(f"DEBUG: Raw query returned {len(rows)} rows")
         logger.info(f"Raw query returned {len(rows)} rows")
 
         items_in_service = [
@@ -110,6 +117,7 @@ def tab3_view():
             }
             for row in rows
         ]
+        print(f"DEBUG: Processed {len(items_in_service)} items: {[item['tag_id'] + ': ' + item['status'] + ', rental_class_num=' + (item['rental_class_num'] or 'None') for item in items_in_service]}")
         logger.info(f"Processed {len(items_in_service)} items: {[item['tag_id'] + ': ' + item['status'] + ', rental_class_num=' + (item['rental_class_num'] or 'None') for item in items_in_service]}")
 
         # Fetch repair details for items with transactions
@@ -173,6 +181,7 @@ def tab3_view():
         for item in items_in_service:
             rental_class_num = item['rental_class_num']
             category = mappings_dict.get(rental_class_num, {}).get('category', 'Miscellaneous')
+            print(f"DEBUG: Item {item['tag_id']}: rental_class_num={rental_class_num}, mapped to category={category}")
             logger.info(f"Item {item['tag_id']}: rental_class_num={rental_class_num}, mapped to category={category}")
 
             if category not in crew_items:
@@ -196,7 +205,9 @@ def tab3_view():
             {'name': category, 'item_list': item_list}
             for category, item_list in sorted(crew_items.items(), key=lambda x: x[0].lower())
         ]
+        print(f"DEBUG: Final crews structure: {[{c['name']: len(c['item_list'])} for c in crews]}")
         logger.info(f"Final crews structure: {[{c['name']: len(c['item_list'])} for c in crews]}")
+        print(f"DEBUG: Fetched {sum(len(c['item_list']) for c in crews)} total items across {len(crews)} crews")
         logger.info(f"Fetched {sum(len(c['item_list']) for c in crews)} total items across {len(crews)} crews")
         current_app.logger.info(f"Fetched {sum(len(c['item_list']) for c in crews)} total items across {len(crews)} crews")
 
@@ -211,6 +222,7 @@ def tab3_view():
             cache_bust=int(datetime.now().timestamp())
         )
     except Exception as e:
+        print(f"DEBUG: Error rendering Tab 3: {str(e)}")
         logger.error(f"Error rendering Tab 3: {str(e)}", exc_info=True)
         current_app.logger.error(f"Error rendering Tab 3: {str(e)}", exc_info=True)
         if session:
@@ -236,9 +248,11 @@ def get_pack_resale_common_names():
             .distinct()\
             .all()
         common_names = [name[0] for name in common_names if name[0]]
+        print(f"DEBUG: Fetched {len(common_names)} common names from SeedRentalClass for pack/resale: {common_names}")
         logger.info(f"Fetched {len(common_names)} common names from SeedRentalClass for pack/resale: {common_names}")
         return jsonify({'common_names': sorted(common_names)}), 200
     except Exception as e:
+        print(f"DEBUG: Error fetching pack/resale common names from SeedRentalClass: {str(e)}")
         logger.error(f"Error fetching pack/resale common names from SeedRentalClass: {str(e)}", exc_info=True)
         return jsonify({'error': str(e)}), 500
 
@@ -248,6 +262,7 @@ def sync_to_pc():
     Sync selected items to a CSV file for printing RFID tags.
     Appends new entries to the existing CSV file, ensuring headers are always present.
     If no items exist in ItemMaster, create new entries based on SeedRentalClass.
+    Ensure new tag IDs are unique across ItemMaster, new items, and the CSV file.
     """
     session = None
     try:
@@ -277,6 +292,38 @@ def sync_to_pc():
             .all()
         print(f"DEBUG: Found {len(items)} items in ItemMaster for common_name={common_name} and bin_location in ['pack', 'resale']")
         logger.info(f"Found {len(items)} items in ItemMaster for common_name={common_name} and bin_location in ['pack', 'resale']")
+
+        # Read existing tag_ids from the CSV to ensure uniqueness
+        print("DEBUG: Reading existing tag_ids from CSV")
+        csv_tag_ids = set()
+        needs_header = not os.path.exists(CSV_FILE_PATH)
+        if os.path.exists(CSV_FILE_PATH):
+            try:
+                with open(CSV_FILE_PATH, 'r') as csvfile:
+                    first_line = csvfile.readline().strip()
+                    if not first_line:
+                        # File is empty, needs header
+                        needs_header = True
+                    else:
+                        # Check if the first line is a valid header
+                        csvfile.seek(0)
+                        reader = csv.DictReader(csvfile)
+                        required_fields = ['tag_id', 'common_name', 'subcategory', 'short_common_name', 'status', 'bin_location']
+                        if not all(field in reader.fieldnames for field in required_fields):
+                            print("DEBUG: CSV file exists but lacks valid headers. Rewriting with headers.")
+                            logger.warning(f"CSV file exists but lacks valid headers. Rewriting with headers.")
+                            needs_header = True
+                        else:
+                            for row in reader:
+                                if 'tag_id' in row:
+                                    csv_tag_ids.add(row['tag_id'])
+            except Exception as e:
+                print(f"DEBUG: Error reading existing CSV file: {str(e)}")
+                logger.error(f"Error reading existing CSV file: {str(e)}", exc_info=True)
+                return jsonify({'error': f"Failed to read existing CSV file: {str(e)}"}), 500
+
+        print(f"DEBUG: Existing tag_ids in CSV: {csv_tag_ids}")
+        logger.info(f"Existing tag_ids in CSV: {csv_tag_ids}")
 
         # If not enough items are found in ItemMaster, create new ones based on SeedRentalClass
         remaining_quantity = quantity - len(items)
@@ -321,14 +368,15 @@ def sync_to_pc():
                 else:
                     new_num = 1
 
-                # Ensure the new tag_id is unique
-                existing_tag_ids = set(item.tag_id for item in items + new_items)
+                # Ensure the new tag_id is unique across ItemMaster, new_items, and CSV
+                existing_tag_ids = set(item.tag_id for item in items + new_items).union(csv_tag_ids)
                 while True:
                     incremental_hex = format(new_num, 'x').zfill(18)  # Ensure exactly 18 hex chars
                     tag_id = f"425445{incremental_hex}"  # "BTE" in hex + 18 chars = 24 chars
                     if tag_id not in existing_tag_ids:
                         break
                     new_num += 1
+                    print(f"DEBUG: Tag ID {tag_id} already exists, incrementing to {new_num}")
 
                 # Verify tag_id length
                 if len(tag_id) != 24:
@@ -348,7 +396,6 @@ def sync_to_pc():
                 )
                 session.add(new_item)
                 new_items.append(new_item)
-                existing_tag_ids.add(tag_id)
                 print(f"DEBUG: Created new ItemMaster entry: tag_id={tag_id}, common_name={common_name}, rental_class_num={rental_class_num}")
                 logger.info(f"Created new ItemMaster entry: tag_id={tag_id}, common_name={common_name}, rental_class_num={rental_class_num}")
 
@@ -390,46 +437,7 @@ def sync_to_pc():
         if not os.path.exists(SHARED_DIR):
             print(f"DEBUG: Creating shared directory: {SHARED_DIR}")
             logger.info(f"Creating shared directory: {SHARED_DIR}")
-            try:
-                os.makedirs(SHARED_DIR, mode=0o755)
-                os.chown(SHARED_DIR, 1000, 1000)  # tim:tim
-            except Exception as e:
-                print(f"DEBUG: Failed to create shared directory {SHARED_DIR}: {str(e)}")
-                logger.error(f"Failed to create shared directory {SHARED_DIR}: {str(e)}", exc_info=True)
-                return jsonify({'error': f"Failed to create shared directory: {str(e)}"}), 500
-
-        # Read existing tag_ids from the CSV to avoid duplicates, and check for headers
-        print("DEBUG: Reading existing tag_ids from CSV")
-        existing_tag_ids = set()
-        new_tag_ids = set()
-        needs_header = not os.path.exists(CSV_FILE_PATH)
-        if os.path.exists(CSV_FILE_PATH):
-            try:
-                with open(CSV_FILE_PATH, 'r') as csvfile:
-                    first_line = csvfile.readline().strip()
-                    if not first_line:
-                        # File is empty, needs header
-                        needs_header = True
-                    else:
-                        # Check if the first line is a valid header
-                        csvfile.seek(0)
-                        reader = csv.DictReader(csvfile)
-                        required_fields = ['tag_id', 'common_name', 'subcategory', 'short_common_name', 'status', 'bin_location']
-                        if not all(field in reader.fieldnames for field in required_fields):
-                            print("DEBUG: CSV file exists but lacks valid headers. Rewriting with headers.")
-                            logger.warning(f"CSV file exists but lacks valid headers. Rewriting with headers.")
-                            needs_header = True
-                        else:
-                            for row in reader:
-                                if 'tag_id' in row:
-                                    existing_tag_ids.add(row['tag_id'])
-            except Exception as e:
-                print(f"DEBUG: Error reading existing CSV file: {str(e)}")
-                logger.error(f"Error reading existing CSV file: {str(e)}", exc_info=True)
-                return jsonify({'error': f"Failed to read existing CSV file: {str(e)}"}), 500
-
-        print(f"DEBUG: Existing tag_ids in CSV: {existing_tag_ids}")
-        logger.info(f"Existing tag_ids in CSV: {existing_tag_ids}")
+            os.makedirs(SHARED_DIR, mode=0o755)
 
         # Prepare data for CSV
         print("DEBUG: Preparing data for CSV")
