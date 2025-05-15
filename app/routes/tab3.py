@@ -36,7 +36,7 @@ SHARED_DIR = '/home/tim/test_rfidpi/shared'
 CSV_FILE_PATH = os.path.join(SHARED_DIR, 'rfid_tags.csv')
 
 # Version marker
-logger.info("Deployed tab3.py version: 2025-05-14-v17")
+logger.info("Deployed tab3.py version: 2025-05-15-v19")
 
 @tab3_bp.route('/tab/3')
 def tab3_view():
@@ -247,19 +247,24 @@ def sync_to_pc():
     """
     Sync selected items to a CSV file for printing RFID tags.
     Appends new entries to the existing CSV file, ensuring headers are always present.
+    If no items exist in ItemMaster, create new entries based on SeedRentalClass.
     """
     session = None
     try:
         session = db.session()
+        logger.info("Received request for /tab/3/sync_to_pc")
+
         data = request.get_json()
         common_name = data.get('common_name')
         quantity = data.get('quantity')
+
+        logger.info(f"Sync request data: common_name={common_name}, quantity={quantity}")
 
         if not common_name or not isinstance(quantity, int) or quantity <= 0:
             logger.warning(f"Invalid input: common_name={common_name}, quantity={quantity}")
             return jsonify({'error': 'Invalid common name or quantity'}), 400
 
-        # Query items matching the common name and bin location
+        # Query items matching the common name and bin location from ItemMaster
         items = session.query(ItemMaster)\
             .filter(ItemMaster.common_name == common_name,
                     ItemMaster.bin_location.in_(['pack', 'resale']))\
@@ -267,9 +272,72 @@ def sync_to_pc():
             .limit(quantity)\
             .all()
 
-        if not items:
-            logger.info(f"No items found for common_name={common_name} and bin_location in ['pack', 'resale']")
-            return jsonify({'error': 'No items found for the selected common name'}), 404
+        logger.info(f"Found {len(items)} items in ItemMaster for common_name={common_name} and bin_location in ['pack', 'resale']")
+
+        # If not enough items are found in ItemMaster, create new ones based on SeedRentalClass
+        remaining_quantity = quantity - len(items)
+        if remaining_quantity > 0:
+            logger.info(f"Not enough items found in ItemMaster. Need to create {remaining_quantity} new items for common_name={common_name}")
+
+            # Fetch rental_class_id and bin_location from SeedRentalClass for the common_name
+            seed_entry = session.query(SeedRentalClass)\
+                .filter(SeedRentalClass.common_name == common_name,
+                        SeedRentalClass.bin_location.in_(['pack', 'resale']))\
+                .first()
+
+            if not seed_entry:
+                logger.warning(f"No SeedRentalClass entry found for common_name={common_name} and bin_location in ['pack', 'resale']")
+                return jsonify({'error': f"No SeedRentalClass entry found for common name '{common_name}'"}), 404
+
+            rental_class_num = seed_entry.rental_class_id
+            bin_location = seed_entry.bin_location
+            logger.info(f"SeedRentalClass entry found: rental_class_id={rental_class_num}, bin_location={bin_location}")
+
+            # Generate new ItemMaster entries
+            new_items = []
+            for _ in range(remaining_quantity):
+                # Generate a new tag_id with "BTE" prefix (hex: 425445)
+                max_tag_id = session.query(func.max(ItemMaster.tag_id))\
+                    .filter(ItemMaster.tag_id.startswith('425445'))\
+                    .scalar()
+
+                if max_tag_id and len(max_tag_id) == 24 and max_tag_id.startswith('425445'):
+                    try:
+                        incremental_part = int(max_tag_id[6:], 16)  # Extract the part after "425445"
+                        new_num = incremental_part + 1
+                    except ValueError:
+                        logger.warning(f"Invalid incremental part in max_tag_id: {max_tag_id}, starting from 1")
+                        new_num = 1
+                else:
+                    new_num = 1
+
+                # Ensure the new tag_id is unique
+                existing_tag_ids = set(item.tag_id for item in items + new_items)
+                while True:
+                    incremental_hex = format(new_num, '018x')  # 18 hex chars for the incremental part
+                    tag_id = f"425445{incremental_hex}"  # "BTE" in hex + 18 chars = 24 chars
+                    if tag_id not in existing_tag_ids:
+                        break
+                    new_num += 1
+
+                # Create a new ItemMaster entry
+                new_item = ItemMaster(
+                    tag_id=tag_id,
+                    common_name=common_name,
+                    rental_class_num=rental_class_num,
+                    bin_location=bin_location,
+                    status='Ready to Rent',
+                    date_created=datetime.now(),
+                    date_updated=datetime.now()
+                )
+                session.add(new_item)
+                new_items.append(new_item)
+                existing_tag_ids.add(tag_id)
+                logger.info(f"Created new ItemMaster entry: tag_id={tag_id}, common_name={common_name}, rental_class_num={rental_class_num}")
+
+            session.commit()
+            items.extend(new_items)
+            logger.info(f"Created {len(new_items)} new ItemMaster entries. Total items now: {len(items)}")
 
         # Fetch all rental class mappings
         base_mappings = session.query(RentalClassMapping).all()
@@ -285,6 +353,14 @@ def sync_to_pc():
                 'subcategory': um.subcategory,
                 'short_common_name': um.short_common_name if hasattr(um, 'short_common_name') else None
             }
+        logger.info(f"Fetched {len(mappings_dict)} rental class mappings")
+
+        # Ensure the shared directory exists
+        if not os.path.exists(SHARED_DIR):
+            logger.info(f"Creating shared directory: {SHARED_DIR}")
+            os.makedirs(SHARED_DIR, mode=0o755)
+            # Set ownership to tim:tim
+            os.chown(SHARED_DIR, 1000, 1000)  # Assuming tim's UID and GID are 1000
 
         # Read existing tag_ids from the CSV to avoid duplicates, and check for headers
         existing_tag_ids = set()
@@ -313,6 +389,8 @@ def sync_to_pc():
                 logger.error(f"Error reading existing CSV file: {str(e)}", exc_info=True)
                 return jsonify({'error': f"Failed to read existing CSV file: {str(e)}"}), 500
 
+        logger.info(f"Existing tag_ids in CSV: {existing_tag_ids}")
+
         # Prepare data for CSV
         synced_items = []
         for item in items:
@@ -321,35 +399,11 @@ def sync_to_pc():
                 tag_id = item.tag_id
                 logger.info(f"Reusing tag_id {tag_id} for item with common_name={item.common_name} and status={item.status}")
             else:
-                # Generate a new tag_id with "BTE" prefix (hex: 425445)
-                # Fetch the highest tag_id starting with "425445"
-                max_tag_id = session.query(func.max(ItemMaster.tag_id))\
-                    .filter(ItemMaster.tag_id.startswith('425445'))\
-                    .scalar()
-                
-                if max_tag_id and len(max_tag_id) == 24 and max_tag_id.startswith('425445'):
-                    try:
-                        incremental_part = int(max_tag_id[6:], 16)  # Extract the part after "425445"
-                        new_num = incremental_part + 1
-                    except ValueError:
-                        logger.warning(f"Invalid incremental part in max_tag_id: {max_tag_id}, starting from 1")
-                        new_num = 1
-                else:
-                    new_num = 1
-
-                # Ensure the new tag_id is unique
-                while True:
-                    incremental_hex = format(new_num, '018x')  # 18 hex chars for the incremental part
-                    tag_id = f"425445{incremental_hex}"  # "BTE" in hex + 18 chars = 24 chars
-                    if tag_id not in existing_tag_ids and tag_id not in new_tag_ids:
-                        break
-                    new_num += 1
-
-                new_tag_ids.add(tag_id)
-                # Update the item with the new tag_id
-                item.tag_id = tag_id
-                session.commit()
-                logger.info(f"Assigned new tag_id {tag_id} to item with common_name={item.common_name}")
+                # Use the existing tag_id if already assigned (e.g., from new ItemMaster entry)
+                tag_id = item.tag_id
+                if tag_id.startswith('425445'):
+                    new_tag_ids.add(tag_id)
+                logger.info(f"Using tag_id {tag_id} for item with common_name={item.common_name}")
 
             # Get subcategory and short_common_name from rental_class_mappings
             mapping = mappings_dict.get(str(item.rental_class_num).strip().upper() if item.rental_class_num else '', {})
@@ -368,21 +422,28 @@ def sync_to_pc():
             })
 
         # Append to the existing CSV file, ensuring headers are present
-        with open(CSV_FILE_PATH, 'a', newline='') as csvfile:
-            fieldnames = ['tag_id', 'common_name', 'subcategory', 'short_common_name', 'status', 'bin_location']
-            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-            if needs_header:
-                writer.writeheader()
-                logger.info("Wrote CSV header row")
-            for item in synced_items:
-                writer.writerow({
-                    'tag_id': item['tag_id'],
-                    'common_name': item['common_name'],
-                    'subcategory': item['subcategory'],
-                    'short_common_name': item['short_common_name'],
-                    'status': item['status'],
-                    'bin_location': item['bin_location']
-                })
+        try:
+            with open(CSV_FILE_PATH, 'a', newline='') as csvfile:
+                fieldnames = ['tag_id', 'common_name', 'subcategory', 'short_common_name', 'status', 'bin_location']
+                writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+                if needs_header:
+                    writer.writeheader()
+                    logger.info("Wrote CSV header row")
+                for item in synced_items:
+                    writer.writerow({
+                        'tag_id': item['tag_id'],
+                        'common_name': item['common_name'],
+                        'subcategory': item['subcategory'],
+                        'short_common_name': item['short_common_name'],
+                        'status': item['status'],
+                        'bin_location': item['bin_location']
+                    })
+            # Set permissions on the CSV file
+            os.chown(CSV_FILE_PATH, 1000, 1000)  # tim:tim
+            os.chmod(CSV_FILE_PATH, 0o644)  # rw-r--r--
+        except Exception as e:
+            logger.error(f"Failed to write to CSV file {CSV_FILE_PATH}: {str(e)}", exc_info=True)
+            return jsonify({'error': f"Failed to write to CSV file: {str(e)}"}), 500
 
         session.commit()
         logger.info(f"Successfully synced {len(synced_items)} items to CSV. New tag_ids: {new_tag_ids}")
@@ -405,6 +466,8 @@ def update_synced_status():
     session = None
     try:
         session = db.session()
+        logger.info("Received request for /tab/3/update_synced_status")
+
         if not os.path.exists(CSV_FILE_PATH):
             logger.info("No synced items found in CSV file")
             return jsonify({'error': 'No synced items found'}), 404
