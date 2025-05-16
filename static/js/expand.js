@@ -1,4 +1,4 @@
-console.log('expand.js version: 2025-05-16-v87 loaded');
+console.log('expand.js version: 2025-05-16-v88 loaded');
 
 // Show loading indicator [REUSABLE]
 function showLoadingExpand(targetId) {
@@ -117,7 +117,7 @@ window.expandCategory = function(category, targetId, contractNumber, page = 1) {
                             <button class="btn btn-sm btn-secondary collapse-btn" data-collapse-target="items-${commonId}" style="display:none;">Collapse</button>
                             <button class="btn btn-sm btn-info print-btn" data-print-level="Common Name" data-print-id="items-${commonId}" data-common-name="${escapedCommonName}" data-category="${contractNumber}">Print</button>
                             <button class="btn btn-sm btn-info print-full-btn" data-common-name="${escapedCommonName}" data-category="${contractNumber}">Print Full List</button>
-                            <div id="loading-${commonId}" style="display:none;" class="loading">Loading...</div>
+                            <div id="loading-items-${commonId}" style="display:none;" class="loading-indicator">Loading...</div>
                         </td>
                     </tr>
                     <tr>
@@ -132,7 +132,7 @@ window.expandCategory = function(category, targetId, contractNumber, page = 1) {
 
             if (totalCommonNames > perPage) {
                 const totalPages = Math.ceil(totalCommonNames / perPage);
-                const escapedCategory = category.replace(/'/g, "\\'").replace(/"/g, '\\"');
+                const escapedCategory = category ? category.replace(/'/g, "\\'").replace(/"/g, '\\"') : '';
                 html += `
                     <div class="pagination-controls mt-2">
                         <button class="btn btn-sm btn-secondary" onclick="window.expandCategory('${escapedCategory}', '${targetId}', '${contractNumber}', ${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''}>Previous</button>
@@ -194,7 +194,7 @@ window.expandItems = function(contractNumber, commonName, targetId, page = 1) {
     }
 
     const commonId = targetId.replace('items-', '');
-    const loadingSuccess = showLoadingExpand(commonId);
+    const loadingSuccess = showLoadingExpand(`loading-items-${commonId}`); // Use the correct ID for the loading indicator
     targetElement.innerHTML = '';
 
     const url = `/tab/${window.cachedTabNum}/data?contract_number=${encodeURIComponent(contractNumber)}&common_name=${encodeURIComponent(commonName)}&page=${page}`;
@@ -298,7 +298,7 @@ window.expandItems = function(contractNumber, commonName, targetId, page = 1) {
             targetElement.style.visibility = 'visible';
         })
         .finally(() => {
-            if (loadingSuccess) hideLoadingExpand(commonId);
+            if (loadingSuccess) hideLoadingExpand(`loading-items-${commonId}`);
         });
 };
 
@@ -381,7 +381,7 @@ function sortCommonNames(contractNumber, column) {
                             <button class="btn btn-sm btn-secondary collapse-btn" data-collapse-target="items-${commonId}" style="display:none;">Collapse</button>
                             <button class="btn btn-sm btn-info print-btn" data-print-level="Common Name" data-print-id="items-${commonId}" data-common-name="${escapedCommonName}" data-category="${contractNumber}">Print</button>
                             <button class="btn btn-sm btn-info print-full-btn" data-common-name="${escapedCommonName}" data-category="${contractNumber}">Print Full List</button>
-                            <div id="loading-${commonId}" style="display:none;" class="loading">Loading...</div>
+                            <div id="loading-items-${commonId}" style="display:none;" class="loading-indicator">Loading...</div>
                         </td>
                     </tr>
                     <tr>
@@ -398,9 +398,9 @@ function sortCommonNames(contractNumber, column) {
                 const totalPages = Math.ceil(totalCommonNames / perPage);
                 html += `
                     <div class="pagination-controls mt-2">
-                        <button class="btn btn-sm btn-secondary" onclick="window.expandCategory('${contractNumber}', '${targetId}', '${contractNumber}', ${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''}>Previous</button>
+                        <button class="btn btn-sm btn-secondary" onclick="window.expandCategory('', '${targetId}', '${contractNumber}', ${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''}>Previous</button>
                         <span class="mx-2">Page ${currentPage} of ${totalPages}</span>
-                        <button class="btn btn-sm btn-secondary" onclick="window.expandCategory('${contractNumber}', '${targetId}', '${contractNumber}', ${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''}>Next</button>
+                        <button class="btn btn-sm btn-secondary" onclick="window.expandCategory('', '${targetId}', '${contractNumber}', ${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''}>Next</button>
                     </div>
                 `;
             }
