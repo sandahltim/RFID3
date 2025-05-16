@@ -4,15 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>RFID Dashboard</title>
-    <!-- Bootstrap CSS -->
     <link href="/static/lib/bootstrap/bootstrap.min.css" rel="stylesheet">
-    <!-- Custom CSS -->
     <link href="/static/css/style.css" rel="stylesheet">
-    <!-- HTMX -->
     <script src="/static/lib/htmx/htmx.min.js"></script>
-    <!-- Bootstrap JS -->
     <script src="/static/lib/bootstrap/bootstrap.bundle.min.js"></script>
-    <!-- Common JS -->
     <script src="/static/js/common.js"></script>
     {% block head %}{% endblock %}
     {% block extra_head %}{% endblock %}
@@ -57,7 +52,6 @@
     </div>
 
     <script>
-        // Set cachedTabNum based on the current URL
         let tabNum;
         const pathMatch = window.location.pathname.match(/\/tab\/(\d+)/);
         if (pathMatch) {
@@ -70,6 +64,17 @@
         window.cachedTabNum = tabNum;
         console.log('base.html: window.cachedTabNum set to', window.cachedTabNum);
     </script>
-    {% block scripts %}{% endblock %}
+    {% block scripts %}
+        {% if window.cachedTabNum == 1 or window.cachedTabNum == 5 %}
+            <link href="/static/css/tab1_5.css" rel="stylesheet">
+            <script src="/static/js/tab1_5.js"></script>
+        {% elif window.cachedTabNum == 2 or window.cachedTabNum == 4 %}
+            <link href="/static/css/tab2_4.css" rel="stylesheet">
+            <script src="/static/js/expand.js"></script>
+        {% elif window.cachedTabNum == 3 %}
+            <script src="/static/js/tab3.js"></script>
+        {% endif %}
+        <script src="/static/js/tab.js"></script>
+    {% endblock %}
 </body>
 </html>
