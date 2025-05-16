@@ -18,7 +18,7 @@
     display: table !important;
     visibility: visible !important; /* Ensure always visible to prevent flicker */
     margin: 0 !important;
-    table-layout: fixed;
+    table-layout: auto; /* Allow natural column sizing */
     min-height: 200px; /* Prevent layout shift during loading */
     will-change: opacity; /* Optimize rendering */
 }
@@ -57,9 +57,9 @@ tr.common-name-row td table.common-table td {
     padding: 1rem;
     border-left: 3px solid #dc3545;
     overflow-x: auto;
-    overflow-y: auto;
-    max-height: 1200px;
-    min-width: 100%;
+    overflow-y: visible; /* Allow content to expand vertically */
+    width: 100%; /* Full width */
+    min-width: 1200px; /* Ensure enough width for content */
     box-sizing: border-box;
     display: block !important;
     visibility: visible !important;
@@ -102,7 +102,7 @@ tr.common-name-row td table.common-table td {
 .category-table,
 .common-table,
 .item-table {
-    table-layout: fixed;
+    table-layout: auto; /* Allow columns to adjust naturally */
 }
 
 /* Ensure headers and cells are centered */
@@ -118,7 +118,8 @@ tr.common-name-row td table.common-table td {
     border: 1px solid #dee2e6;
     display: table-cell !important;
     visibility: visible !important;
-    white-space: nowrap;
+    white-space: normal; /* Allow wrapping to prevent truncation */
+    word-wrap: break-word;
 }
 
 /* Sticky headers */
@@ -126,7 +127,7 @@ tr.common-name-row td table.common-table td {
 .common-table thead th,
 .item-table thead th {
     position: sticky;
-    top: 56px;
+    top: 0; /* Align with top to avoid overlap */
     z-index: 11;
     background-color: #e9ecef;
     border-bottom: 2px solid #dee2e6;
@@ -257,6 +258,7 @@ tr.common-name-row td table.common-table td {
     margin-top: 10px;
     display: flex;
     gap: 10px;
+    flex-wrap: wrap; /* Allow wrapping to prevent overflow */
 }
 
 /* Editable cells for Tab 1 */
