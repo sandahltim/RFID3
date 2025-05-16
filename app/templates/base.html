@@ -6,9 +6,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>RFID Dashboard</title>
     <link href="/static/lib/bootstrap/bootstrap.min.css" rel="stylesheet">
-    <link href="/static/css/style.css" rel="stylesheet">
-    {% if request.path == '/tab/1' or request.path == '/tab/5' %}
-        <link href="/static/css/tab1_5.css" rel="stylesheet">
+    <link href="/static/css/common.css" rel="stylesheet">
+    {% if request.path == '/tab/1' %}
+        <link href="/static/css/tab1.css" rel="stylesheet">
+    {% elif request.path == '/tab/5' %}
+        <link href="/static/css/tab5.css" rel="stylesheet">
     {% elif request.path == '/tab/2' or request.path == '/tab/4' %}
         <link href="/static/css/tab2_4.css" rel="stylesheet">
     {% endif %}
@@ -41,15 +43,17 @@
     <script src="/static/lib/bootstrap/bootstrap.bundle.min.js"></script>
     <script src="/static/lib/htmx/htmx.min.js"></script>
     <script src="/static/js/common.js"></script>
+    <script src="/static/js/tab.js"></script>
     {% block scripts %}
-        {% if request.path == '/tab/1' or request.path == '/tab/5' %}
-            <script src="/static/js/tab1_5.js"></script>
+        {% if request.path == '/tab/1' %}
+            <script src="/static/js/tab1.js"></script>
+        {% elif request.path == '/tab/5' %}
+            <script src="/static/js/tab5.js"></script>
         {% elif request.path == '/tab/2' or request.path == '/tab/4' %}
             <script src="/static/js/expand.js"></script>
         {% elif request.path == '/tab/3' %}
             <script src="/static/js/tab3.js"></script>
         {% endif %}
-        <script src="/static/js/tab.js"></script>
     {% endblock %}
 </body>
 </html>

@@ -1,6 +1,6 @@
-/* Custom styles for RFID Dashboard - Broadway Tent and Event */
+/* Shared styles for RFID Dashboard - Broadway Tent and Event */
 
-/* Define Broadway Tent and Event colors */
+/* Define Broadway Tent and Event colors (from style.css) */
 :root {
     --bte-royal-blue: #003087;
     --bte-gold: #FFC107;
@@ -12,7 +12,7 @@
     --bte-accent-green: #28A745;
 }
 
-/* General container styling */
+/* General container styling (from style.css) */
 .container {
     padding-top: 40px;
     background: linear-gradient(180deg, var(--bte-light-gray) 0%, var(--bte-white) 100%);
@@ -20,7 +20,7 @@
     min-height: 100vh;
 }
 
-/* Navigation bar styling */
+/* Navigation bar styling (from style.css) */
 .navbar {
     background: linear-gradient(90deg, var(--bte-royal-blue) 0%, #0047AB 100%) !important;
     padding: 15px 20px;
@@ -41,7 +41,7 @@
     transform: translateY(-2px);
 }
 
-/* Headings */
+/* Headings (from style.css) */
 h2 {
     color: var(--bte-royal-blue);
     font-weight: 800;
@@ -56,7 +56,7 @@ h2 {
     border-radius: 8px;
 }
 
-/* Subheadings (e.g., Hand-Counted Items) */
+/* Subheadings (e.g., Hand-Counted Items) (from style.css) */
 h4 {
     color: var(--bte-royal-blue);
     font-weight: 700;
@@ -66,35 +66,38 @@ h4 {
     text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1);
 }
 
-/* Expandable sections */
+/* Expandable sections (from style.css) */
 .expandable {
-    display: none;
+    opacity: 0;
+    transition: opacity 0.7s ease;
+    min-height: 200px;
+    will-change: opacity;
 }
 
 .expandable.expanded {
+    opacity: 1;
     display: block;
+    visibility: visible !important;
 }
 
 .expandable.collapsed {
+    opacity: 0;
+    display: none;
+    min-height: 0;
+}
+
+/* Loading indicator (from tab1_5.css) */
+.loading-indicator {
+    font-style: italic;
+    font-weight: bold;
+    color: var(--bte-accent-red);
+    text-align: center;
+    padding: 10px;
+    font-size: 1.1rem;
     display: none;
 }
 
-/* Loading indicator */
-.loading {
-    color: var(--bte-accent-red);
-    font-style: italic;
-    margin-left: 10px;
-    font-size: 0.9rem;
-    animation: pulse 1.5s infinite;
-}
-
-@keyframes pulse {
-    0% { opacity: 1; }
-    50% { opacity: 0.5; }
-    100% { opacity: 1; }
-}
-
-/* Filter and sort controls */
+/* Filter and sort controls (from style.css) */
 .filter-sort-controls {
     display: flex;
     gap: 15px;
@@ -124,10 +127,10 @@ h4 {
     outline: none;
 }
 
-/* Pagination controls */
+/* Pagination controls (from tab1_5.css) */
 .pagination-controls {
     text-align: center;
-    margin-top: 20px;
+    margin-top: 10px;
     margin-bottom: 20px;
 }
 
@@ -154,7 +157,7 @@ h4 {
     cursor: not-allowed;
 }
 
-/* Filter row inputs */
+/* Filter row inputs (from style.css) */
 .filter-row input {
     width: 100%;
     box-sizing: border-box;
@@ -173,22 +176,7 @@ h4 {
     outline: none;
 }
 
-/* Subcategory and item level containers */
-.subcategory-container, .item-level-wrapper {
-    margin-top: 20px;
-    padding: 15px;
-    border-left: 4px solid var(--bte-gold);
-    background: var(--bte-white);
-    border-radius: 8px;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-    transition: transform 0.2s ease;
-}
-
-.subcategory-container:hover, .item-level-wrapper:hover {
-    transform: translateY(-2px);
-}
-
-/* Row count display */
+/* Row count display (from style.css) */
 .row-count {
     font-size: 1rem;
     color: var(--bte-dark-gray);
@@ -200,7 +188,7 @@ h4 {
     display: inline-block;
 }
 
-/* Ensure tables are responsive and styled */
+/* Ensure tables are styled (from style.css) */
 .table {
     width: 100%;
     margin-bottom: 2rem;
@@ -217,7 +205,7 @@ h4 {
 
 .table th,
 .table td {
-    padding: 10px 15px; /* Reduced padding */
+    padding: 10px 15px;
     vertical-align: middle;
     border: 1px solid var(--bte-medium-gray);
     transition: background-color 0.3s ease;
@@ -229,9 +217,9 @@ h4 {
     border-bottom: 2px solid var(--bte-gold);
     text-align: center;
     font-weight: 600;
-    font-size: 0.95rem; /* Reduced font size */
-    text-transform: none; /* Removed uppercase */
-    letter-spacing: normal; /* Removed letter spacing */
+    font-size: 0.95rem;
+    text-transform: none;
+    letter-spacing: normal;
 }
 
 .table tbody tr:nth-child(odd) {
@@ -239,13 +227,13 @@ h4 {
 }
 
 .table tbody tr:hover {
-    background-color: rgba(255, 193, 7, 0.3); /* Stronger gold hover effect */
+    background-color: rgba(255, 193, 7, 0.3);
 }
 
-/* Small buttons */
+/* Small buttons (from tab1_5.css) */
 .btn-sm {
-    padding: 10px 20px;
-    font-size: 1rem;
+    padding: 5px 10px;
+    font-size: 14px;
     line-height: 1.5;
     border-radius: 6px;
     margin-right: 8px;
@@ -313,37 +301,27 @@ h4 {
     color: var(--bte-dark-gray);
 }
 
-/* Filter inputs */
+/* Filter inputs (from style.css) */
 .filter-row input.form-control-sm {
     padding: 8px 12px;
     font-size: 1rem;
 }
 
-/* Expandable cell for first column */
-.expandable-cell {
-    cursor: pointer;
-    color: var(--bte-royal-blue);
-    font-weight: 600;
-    transition: color 0.3s ease, background-color 0.3s ease, transform 0.2s ease;
-    background-color: rgba(255, 193, 7, 0.1); /* Light gold background */
-    padding: 10px 15px;
-    border-radius: 4px;
+/* Button group (from tab1_5.css) */
+.btn-group {
+    display: flex;
+    gap: 5px;
+    justify-content: center;
 }
 
-.expandable-cell:hover {
-    color: var(--bte-gold);
-    background-color: rgba(255, 193, 7, 0.3);
-    transform: scale(1.02);
-}
-
-/* Print styles */
+/* Print styles (from style.css) */
 @media print {
     body {
         background-color: var(--bte-white);
         color: var(--bte-dark-gray);
         font-family: 'Roboto', sans-serif;
     }
-    .navbar, .btn, .pagination-controls, .filter-row, .loading, .row-count, .filter-sort-controls {
+    .navbar, .btn, .pagination-controls, .filter-row, .loading-indicator, .row-count, .filter-sort-controls {
         display: none !important;
     }
     .table {
@@ -354,22 +332,17 @@ h4 {
         background-color: var(--bte-white) !important;
         color: var(--bte-dark-gray) !important;
         border: 1px solid var(--bte-dark-gray) !important;
-        font-size: 8pt; /* Further reduced font size for print */
-        padding: 4px 8px; /* Reduced padding for print */
+        font-size: 8pt;
+        padding: 4px 8px;
     }
     .table th, .table td {
         border: 1px solid var(--bte-dark-gray) !important;
         color: var(--bte-dark-gray) !important;
-        padding: 4px 8px; /* Reduced padding for print */
-        font-size: 8pt; /* Reduced font size for print */
+        padding: 4px 8px;
+        font-size: 8pt;
     }
     .table tbody tr:nth-child(odd) {
         background-color: var(--bte-white) !important;
-    }
-    .subcategory-container, .item-level-wrapper {
-        border-left: none !important;
-        padding-left: 0 !important;
-        margin-left: 10px;
     }
     .print-header {
         margin-bottom: 30px;

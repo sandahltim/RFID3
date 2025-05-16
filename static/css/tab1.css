@@ -1,0 +1,269 @@
+/* Styles specific to Tab 1 */
+
+/* Style for common name table rows */
+.common-name-row {
+    background-color: #e9ecef;
+    border-left: 3px solid #28a745;
+    margin-left: 2rem;
+    padding: 1rem;
+    display: table-row !important;
+    visibility: visible !important;
+}
+
+.common-name-row td {
+    padding: 0 !important;
+    display: table-cell !important;
+    visibility: visible !important;
+}
+
+.common-table {
+    width: 100%;
+    border-collapse: collapse;
+    display: table !important;
+    visibility: visible !important;
+    margin: 0 !important;
+    table-layout: auto;
+    min-height: 200px;
+    will-change: opacity;
+}
+
+.common-table.loaded {
+    transform: translateZ(0);
+}
+
+/* Highest specificity to override any conflicting styles */
+div.item-level-wrapper table.item-table th,
+div.item-level-wrapper table.item-table td,
+tr.common-name-row td table.common-table th,
+tr.common-name-row td table.common-table td {
+    color: #000000 !important;
+    font-family: 'Roboto', sans-serif !important;
+    font-weight: 500 !important;
+}
+
+.item-level-wrapper {
+    margin-left: 2rem;
+    background-color: #dee2e6;
+    padding: 1rem;
+    border-left: 3px solid #dc3545;
+    overflow-x: auto;
+    overflow-y: visible;
+    width: 100%;
+    min-width: 1200px;
+    box-sizing: border-box;
+    display: block !important;
+    visibility: visible !important;
+    z-index: 1;
+    position: relative;
+    scrollbar-width: auto;
+    -ms-overflow-style: auto;
+}
+
+.item-level {
+    width: 100%;
+    min-width: 1200px;
+    display: table !important;
+    visibility: visible !important;
+}
+
+.item-table {
+    width: 100%;
+    border-collapse: collapse;
+    display: table !important;
+    visibility: visible !important;
+    min-height: 200px;
+    will-change: opacity;
+}
+
+.item-table.loaded {
+    transform: translateZ(0);
+}
+
+/* Table styling */
+.category-table,
+.common-table,
+.item-table {
+    width: 100%;
+    border-collapse: collapse;
+    display: table !important;
+    visibility: visible !important;
+    table-layout: auto;
+}
+
+/* Ensure headers and cells are centered */
+.category-table thead th,
+.common-table thead th,
+.item-table thead th,
+.category-table td,
+.common-table td,
+.item-table td {
+    text-align: center;
+    vertical-align: middle;
+    padding: 12px;
+    border: 1px solid #dee2e6;
+    display: table-cell !important;
+    visibility: visible !important;
+    white-space: normal;
+    word-wrap: break-word;
+}
+
+/* Sticky headers */
+.category-table thead th,
+.common-table thead th,
+.item-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 11;
+    background-color: #e9ecef;
+    border-bottom: 2px solid #dee2e6;
+}
+
+.category-table tbody,
+.common-table tbody,
+.item-table tbody {
+    display: table-row-group !important;
+    visibility: visible !important;
+    z-index: 5;
+    position: relative;
+}
+
+/* Column widths for category table */
+.category-table th:nth-child(1),
+.category-table td:nth-child(1) { width: 15%; }
+.category-table th:nth-child(2),
+.category-table td:nth-child(2) { width: 20%; }
+.category-table th:nth-child(3),
+.category-table td:nth-child(3) { width: 10%; }
+.category-table th:nth-child(4),
+.category-table td:nth-child(4) { width: 15%; }
+.category-table th:nth-child(5),
+.category-table td:nth-child(5) { width: 15%; }
+.category-table th:nth-child(6),
+.category-table td:nth-child(6) { width: 15%; }
+.category-table th:nth-child(7),
+.category-table td:nth-child(7) { width: 10%; }
+
+/* Column widths for common names table */
+.common-table th:nth-child(1),
+.common-table td:nth-child(1) { width: 30%; white-space: normal; word-wrap: break-word; }
+.common-table th:nth-child(2),
+.common-table td:nth-child(2) { width: 10%; }
+.common-table th:nth-child(3),
+.common-table td:nth-child(3) { width: 15%; }
+.common-table th:nth-child(4),
+.common-table td:nth-child(4) { width: 15%; }
+.common-table th:nth-child(5),
+.common-table td:nth-child(5) { width: 15%; }
+.common-table th:nth-child(6),
+.common-table td:nth-child(6) { width: 15%; }
+
+/* Column widths for items table (Tab 1) */
+.item-table th:nth-child(1),
+.item-table td:nth-child(1) { width: 10%; }
+.item-table th:nth-child(2),
+.item-table td:nth-child(2) { width: 20%; }
+.item-table th:nth-child(3),
+.item-table td:nth-child(3) { width: 15%; }
+.item-table th:nth-child(4),
+.item-table td:nth-child(4) { width: 15%; }
+.item-table th:nth-child(5),
+.item-table td:nth-child(5) { width: 15%; }
+.item-table th:nth-child(6),
+.item-table td:nth-child(6) { width: 15%; }
+.item-table th:nth-child(7),
+.item-table td:nth-child(7) { width: 10%; }
+.item-table th:nth-child(8),
+.item-table td:nth-child(8) { width: 15%; }
+
+/* Ensure dropdowns don't overflow columns */
+.subcategory-select,
+.item-table select {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 5px;
+}
+
+/* Ensure parent rows and cells are visible */
+.category-row {
+    display: table-row !important;
+    visibility: visible !important;
+}
+
+.category-row td {
+    display: table-cell !important;
+    visibility: visible !important;
+}
+
+/* Editable cells for Tab 1 */
+.editable {
+    cursor: pointer;
+    position: relative;
+}
+
+.editable:hover {
+    background-color: #e9ecef;
+}
+
+/* Style for dropdown menus (Tab 1) */
+.dropdown-menu {
+    display: none;
+    position: absolute;
+    z-index: 1000;
+    min-width: 150px;
+    background-color: #fff;
+    border: 1px solid #dee2e6;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.dropdown-menu.show {
+    display: block !important;
+}
+
+.dropdown-item {
+    padding: 0.25rem 1rem;
+    cursor: pointer;
+    display: block;
+    color: #333;
+}
+
+.dropdown-item:hover {
+    background-color: #f8f9fa;
+}
+
+.dropdown-item[disabled], .dropdown-item[style*="pointer-events: none"] {
+    color: #ccc;
+    cursor: not-allowed;
+}
+
+/* Responsive adjustments for Tab 1 */
+@media (max-width: 768px) {
+    .common-name-row,
+    .item-level-wrapper {
+        margin-left: 0.75rem;
+    }
+
+    .common-table th:nth-child(1),
+    .common-table td:nth-child(1) {
+        max-width: 180px;
+    }
+
+    .item-level-wrapper {
+        min-width: 100%;
+    }
+
+    .item-table {
+        min-width: 900px;
+    }
+
+    .item-table th,
+    .item-table td {
+        padding: 0.5rem;
+        font-size: 0.9rem;
+    }
+
+    .common-table th,
+    .common-table td {
+        padding: 0.5rem;
+        font-size: 0.9rem;
+    }
+}

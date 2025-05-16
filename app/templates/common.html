@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <h2>
+        {% if window.cachedTabNum == 1 %}
+            Rental Inventory
+        {% elif window.cachedTabNum == 2 %}
+            Open Contracts
+        {% elif window.cachedTabNum == 3 %}
+            Service
+        {% elif window.cachedTabNum == 4 %}
+            Laundry Contracts
+        {% elif window.cachedTabNum == 5 %}
+            Resale/Rental Packs
+        {% else %}
+            Tab {{ window.cachedTabNum }}
+        {% endif %}
+    </h2>
+
+    <table class="table table-bordered table-hover category-table" id="category-table">
+        <thead class="thead-dark">
+            <tr>
+                <th>Category</th>
+                <th>Subcategory</th>
+                <th>Total Items</th>
+                <th>Items on Contracts</th>
+                <th>Items in Service</th>
+                <th>Items Available</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% include '_category_rows.html' %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

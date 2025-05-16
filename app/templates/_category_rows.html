@@ -12,21 +12,23 @@
     <td>{{ category.items_in_service }}</td>
     <td>{{ category.items_available }}</td>
     <td>
-        <button class="btn btn-sm btn-secondary expand-btn" 
-                data-category="{{ category.category }}" 
-                data-target-id="common-{{ category.category | lower | replace(' ', '_20') }}">Expand</button>
-        <button class="btn btn-sm btn-secondary collapse-btn" 
-                data-collapse-target="common-{{ category.category | lower | replace(' ', '_20') }}" 
-                style="display:none;">Collapse</button>
-        <button class="btn btn-sm btn-info print-btn" 
-                data-print-level="Category" 
-                data-print-id="category-table">Print</button>
-        <div id="loading-{{ category.cat_id }}" style="display:none;" class="loading">Loading...</div>
+        <div class="btn-group">
+            <button class="btn btn-sm btn-secondary expand-btn" 
+                    data-category="{{ category.category }}" 
+                    data-target-id="common-{{ category.category | lower | replace(' ', '_') }}"
+                    data-expanded="false">Expand</button>
+            <button class="btn btn-sm btn-secondary collapse-btn" 
+                    data-collapse-target="common-{{ category.category | lower | replace(' ', '_') }}" 
+                    style="display:none;">Collapse</button>
+            <button class="btn btn-sm btn-info print-btn" 
+                    data-print-level="Category" 
+                    data-print-id="category-table">Print</button>
+        </div>
     </td>
 </tr>
 <tr>
     <td colspan="7">
-        <div id="common-{{ category.category | lower | replace(' ', '_20') }}" 
+        <div id="common-{{ category.category | lower | replace(' ', '_') }}" 
              class="expandable collapsed common-level" 
              style="display: none; opacity: 0; transition: opacity 0.7s ease-in-out;"></div>
     </td>
