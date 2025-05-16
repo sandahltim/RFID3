@@ -9,34 +9,34 @@ from urllib.parse import unquote
 
 # Configure logging
 logger = logging.getLogger('tab1')
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)  # Changed to INFO to reduce verbosity
 
 # Remove existing handlers to avoid duplicates
 logger.handlers = []
 
 # File handler for rfid_dashboard.log
 file_handler = logging.FileHandler('/home/tim/test_rfidpi/logs/rfid_dashboard.log')
-file_handler.setLevel(logging.DEBUG)
+file_handler.setLevel(logging.INFO)
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 file_handler.setFormatter(formatter)
 logger.addHandler(file_handler)
 
 # Console handler
 console_handler = logging.StreamHandler(sys.stdout)
-console_handler.setLevel(logging.DEBUG)
+console_handler.setLevel(logging.INFO)
 console_handler.setFormatter(formatter)
 logger.addHandler(console_handler)
 
 tab1_bp = Blueprint('tab1', __name__)
 
 # Version marker
-logger.info("Deployed tab1.py version: 2025-04-28-v16")
+logger.info("Deployed tab1.py version: 2025-05-16-v17")
 
 def get_category_data(session, filter_query='', sort='', status_filter='', bin_filter=''):
     # Fetch all rental class mappings from both tables
     base_mappings = session.query(RentalClassMapping).all()
     user_mappings = session.query(UserRentalClassMapping).all()
-    logger.debug(f"Fetched {len(base_mappings)} base mappings and {len(user_mappings)} user mappings")
+    logger.info(f"Fetched {len(base_mappings)} base mappings and {len(user_mappings)} user mappings")  # Reduced to INFO
 
     # Merge mappings, prioritizing user mappings
     mappings_dict = {m.rental_class_id: {'category': m.category, 'subcategory': m.subcategory} for m in base_mappings}
@@ -249,7 +249,6 @@ def tab1_subcat_data():
             subcategories[subcategory].append(rental_class_id)
 
         subcat_list = sorted(subcategories.keys())
-        logger.debug(f"Subcategories for {category}: {subcat_list}")
         if filter_query:
             subcat_list = [s for s in subcat_list if filter_query in s.lower()]
         if sort == 'subcategory_asc':
@@ -344,7 +343,6 @@ def tab1_subcat_data():
         elif sort == 'total_items_desc':
             subcategory_data.sort(key=lambda x: x['total_items'], reverse=True)
 
-        logger.debug(f"Returning subcategory data for {category}: {subcategory_data}")
         session.close()
         return jsonify({
             'subcategories': subcategory_data,
