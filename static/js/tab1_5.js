@@ -1,6 +1,6 @@
-console.log('tab1_5.js version: 2025-05-07-v45 loaded');
+console.log('tab1_5.js version: 2025-05-16-v47 loaded');
 
-// Note: Ensure formatDate is available (defined in common.js)
+// Note: Ensure formatDate is available (defined in common.js) [REUSABLE]
 if (typeof formatDate !== 'function') {
     console.error('formatDate function is not defined. Ensure common.js is loaded.');
     function formatDate(isoDateString) {
@@ -8,12 +8,12 @@ if (typeof formatDate !== 'function') {
     }
 }
 
-// Note: Common function for Tabs 1 and 5
+// Show loading indicator [REUSABLE]
 function showLoadingTab1_5(targetId) {
     const container = document.getElementById(targetId);
     if (!container) {
         console.warn(`Container with ID ${targetId} not found for showing loading indicator (tab1_5.js)`);
-        return false; // Indicate failure to create loading indicator
+        return false;
     }
 
     const loadingDiv = document.createElement('div');
@@ -22,19 +22,18 @@ function showLoadingTab1_5(targetId) {
     loadingDiv.textContent = 'Loading...';
     loadingDiv.style.display = 'block';
     container.appendChild(loadingDiv);
-    return true; // Indicate success
+    return true;
 }
 
-// Note: Common function for Tabs 1 and 5
+// Hide loading indicator [REUSABLE]
 function hideLoadingTab1_5(targetId) {
     const loadingDiv = document.getElementById(`loading-${targetId}`);
     if (loadingDiv) {
         loadingDiv.remove();
     }
-    // No warning if the loading indicator is not found
 }
 
-// Note: Common function for Tabs 1 and 5
+// Collapse section [REUSABLE]
 function collapseSection(categoryRow, targetId) {
     if (!targetId || !categoryRow) {
         console.error('collapseSection called with undefined or null parameters', { targetId, categoryRow });
@@ -42,26 +41,32 @@ function collapseSection(categoryRow, targetId) {
     }
     console.log('collapseSection called for targetId:', targetId);
 
-    // Remove any existing common name rows associated with this category
     const existingRows = categoryRow.parentNode.querySelectorAll(`tr.common-name-row[data-target-id="${targetId}"]`);
     existingRows.forEach(row => row.remove());
 
     sessionStorage.removeItem(`expanded_${targetId}`);
 }
 
-// Note: Common function for Tabs 1 and 5
+// Load common names [TAB 1/5 SPECIFIC]
 function loadCommonNames(selectElement, page = 1) {
     const subcategory = selectElement.value;
     const category = selectElement.getAttribute('data-category');
-    const targetId = `common-${category.toLowerCase().replace(/[^a-z0-9]/g, '_')}`; // Generate targetId consistently
+    const targetId = `common-${category.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
     const categoryRow = selectElement.closest('tr');
     const tbody = categoryRow.closest('tbody');
 
-    // Collapse if no subcategory is selected
+    console.log('loadCommonNames invoked with:', { subcategory, category, targetId, page });
+
     if (!subcategory && page === 1) {
+        console.log('No subcategory selected, collapsing section');
         collapseSection(categoryRow, targetId);
         fetch(`/tab/${window.cachedTabNum}/subcat_data?category=${encodeURIComponent(category)}`)
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`Subcategory fetch failed with status ${response.status}`);
+                }
+                return response.json();
+            })
             .then(data => {
                 const totalItems = data.subcategories.reduce((sum, subcat) => sum + (subcat.total_items || 0), 0);
                 const itemsOnContracts = data.subcategories.reduce((sum, subcat) => sum + (subcat.items_on_contracts || 0), 0);
@@ -71,19 +76,17 @@ function loadCommonNames(selectElement, page = 1) {
                 categoryRow.cells[3].textContent = itemsOnContracts || '0';
                 categoryRow.cells[4].textContent = itemsInService || '0';
                 categoryRow.cells[5].textContent = itemsAvailable || '0';
+                console.log('Category totals reset:', { totalItems, itemsOnContracts, itemsInService, itemsAvailable });
             })
             .catch(error => console.error('Error resetting category totals:', error));
         return;
     }
-
-    console.log('loadCommonNames called with', { category, subcategory, targetId, page });
 
     if (!category || !subcategory || !targetId) {
         console.error('Invalid parameters for loadCommonNames:', { category, subcategory, targetId });
         return;
     }
 
-    // Show loading indicator in the subcategory cell
     const loadingId = `loading-subcat-${targetId}`;
     let loadingDiv = document.getElementById(loadingId);
     if (loadingDiv) {
@@ -91,6 +94,7 @@ function loadCommonNames(selectElement, page = 1) {
     }
 
     let url = `/tab/${window.cachedTabNum}/common_names?category=${encodeURIComponent(category)}&subcategory=${encodeURIComponent(subcategory)}&page=${page}`;
+    console.log('Fetching common names from:', url);
 
     fetch(url)
         .then(response => {
@@ -103,10 +107,8 @@ function loadCommonNames(selectElement, page = 1) {
         .then(data => {
             console.log('Common names data received:', data);
 
-            // Check if the table already exists
             let headerRow = categoryRow.parentNode.querySelector(`tr.common-name-row[data-target-id="${targetId}"] .common-table`);
             if (!headerRow) {
-                // Create a new row for the common name table header with inline styles and placeholder rows
                 headerRow = document.createElement('tr');
                 headerRow.className = 'common-name-row';
                 headerRow.setAttribute('data-target-id', targetId);
@@ -124,7 +126,6 @@ function loadCommonNames(selectElement, page = 1) {
                                 </tr>
                             </thead>
                             <tbody style="min-height: 50px;">
-                                <!-- Placeholder rows to maintain layout -->
                                 <tr>
                                     <td style="color: #000000 !important;">Loading...</td>
                                     <td style="color: #000000 !important;">-</td>
@@ -140,25 +141,21 @@ function loadCommonNames(selectElement, page = 1) {
                 tbody.insertBefore(headerRow, categoryRow.nextSibling);
             }
 
-            // Update the table body in place
             const tableBody = headerRow.querySelector('tbody');
-            tableBody.innerHTML = ''; // Clear existing rows without removing the table
+            tableBody.innerHTML = '';
 
             if (data.common_names && data.common_names.length > 0) {
-                // Calculate subcategory totals
                 const totalItems = data.common_names.reduce((sum, item) => sum + (item.total_items || 0), 0);
                 const itemsOnContracts = data.common_names.reduce((sum, item) => sum + (item.items_on_contracts || 0), 0);
                 const itemsInService = data.common_names.reduce((sum, item) => sum + (item.items_in_service || 0), 0);
                 const itemsAvailable = data.common_names.reduce((sum, item) => sum + (item.items_available || 0), 0);
 
-                // Update category row with subcategory totals
                 console.log('Updating category row with totals:', { totalItems, itemsOnContracts, itemsInService, itemsAvailable });
                 categoryRow.cells[2].textContent = totalItems || '0';
                 categoryRow.cells[3].textContent = itemsOnContracts || '0';
                 categoryRow.cells[4].textContent = itemsInService || '0';
                 categoryRow.cells[5].textContent = itemsAvailable || '0';
 
-                // Populate the table body with common name rows
                 data.common_names.forEach(item => {
                     const rowId = `${targetId}_${item.name.replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '')}`;
                     const escapedName = item.name.replace(/'/g, "\\'").replace(/"/g, '\\"');
@@ -192,7 +189,6 @@ function loadCommonNames(selectElement, page = 1) {
                     `;
                     tableBody.appendChild(commonRow);
 
-                    // Add a row for the expandable items section
                     const itemsRow = document.createElement('tr');
                     itemsRow.className = 'common-name-row';
                     itemsRow.setAttribute('data-target-id', targetId);
@@ -204,7 +200,6 @@ function loadCommonNames(selectElement, page = 1) {
                     tableBody.appendChild(itemsRow);
                 });
 
-                // Add pagination if needed
                 if (data.total_common_names > data.per_page) {
                     const totalPages = Math.ceil(data.total_common_names / data.per_page);
                     const paginationRow = document.createElement('tr');
@@ -226,7 +221,6 @@ function loadCommonNames(selectElement, page = 1) {
                     tableBody.appendChild(paginationRow);
                 }
 
-                // Log table styles for debugging
                 const commonTable = document.getElementById(`common-table-${targetId}`);
                 if (commonTable) {
                     console.log('Common table styles:', {
@@ -248,7 +242,6 @@ function loadCommonNames(selectElement, page = 1) {
                 tableBody.appendChild(noDataRow);
             }
 
-            // Apply global filter to the newly loaded table
             if (typeof applyFilterToAllLevels === 'function') {
                 applyFilterToAllLevels();
             } else {
@@ -274,11 +267,11 @@ function loadCommonNames(selectElement, page = 1) {
                 if (loadingDiv) {
                     loadingDiv.style.display = 'none';
                 }
-            }, 700); // Match the transition duration (0.7s)
+            }, 700);
         });
 }
 
-// Note: Tab 5 specific - Bulk update for all items under a common name
+// Bulk update for all items under a common name [TAB 5 SPECIFIC]
 function bulkUpdateCommonName(category, subcategory, targetId, key) {
     const binLocation = document.getElementById(`bulk-bin-location-${key}`)?.value;
     const status = document.getElementById(`bulk-status-${key}`)?.value;
@@ -311,7 +304,12 @@ function bulkUpdateCommonName(category, subcategory, targetId, key) {
             status: status || undefined
         })
     })
-    .then(response => response.json())
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`Bulk update failed with status ${response.status}`);
+        }
+        return response.json();
+    })
     .then(data => {
         if (data.error) {
             console.error('Bulk update error:', data.error);
@@ -328,7 +326,7 @@ function bulkUpdateCommonName(category, subcategory, targetId, key) {
     });
 }
 
-// Note: Tab 5 specific - Bulk update for selected items
+// Bulk update for selected items [TAB 5 SPECIFIC]
 function bulkUpdateSelectedItems(key) {
     const itemTable = document.getElementById(`item-table-${key}`);
     if (!itemTable) {
@@ -364,7 +362,12 @@ function bulkUpdateSelectedItems(key) {
             status: status || undefined
         })
     })
-    .then(response => response.json())
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`Bulk update failed with status ${response.status}`);
+        }
+        return response.json();
+    })
     .then(data => {
         if (data.error) {
             console.error('Bulk update error:', data.error);
@@ -392,7 +395,7 @@ function bulkUpdateSelectedItems(key) {
     });
 }
 
-// Note: Tab 5 specific - Update dropdown visibility for bulk update
+// Update dropdown visibility for bulk update [TAB 5 SPECIFIC]
 function updateBulkField(key, field) {
     const select = document.getElementById(`bulk-${field}-${key}`);
     if (select && select.value) {
@@ -404,7 +407,7 @@ function updateBulkField(key, field) {
     }
 }
 
-// Note: Tab 5 specific - Update individual item
+// Update individual item [TAB 5 SPECIFIC]
 function updateItem(tagId, key, category, subcategory, commonName, targetId) {
     const binLocation = document.getElementById(`bin-location-${tagId}`)?.value;
     const status = document.getElementById(`status-${tagId}`)?.value;
@@ -416,7 +419,6 @@ function updateItem(tagId, key, category, subcategory, commonName, targetId) {
 
     const promises = [];
 
-    // Update bin location if provided
     if (binLocation) {
         promises.push(
             fetch('/tab/5/update_bin_location', {
@@ -429,7 +431,12 @@ function updateItem(tagId, key, category, subcategory, commonName, targetId) {
                     bin_location: binLocation
                 })
             })
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`Bin location update failed with status ${response.status}`);
+                }
+                return response.json();
+            })
             .then(data => {
                 if (data.error) {
                     throw new Error(`Failed to update bin location: ${data.error}`);
@@ -439,7 +446,6 @@ function updateItem(tagId, key, category, subcategory, commonName, targetId) {
         );
     }
 
-    // Update status if provided
     if (status) {
         promises.push(
             fetch('/tab/5/update_status', {
@@ -452,7 +458,12 @@ function updateItem(tagId, key, category, subcategory, commonName, targetId) {
                     status: status
                 })
             })
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`Status update failed with status ${response.status}`);
+                }
+                return response.json();
+            })
             .then(data => {
                 if (data.error) {
                     throw new Error(`Failed to update status: ${data.error}`);
@@ -474,7 +485,7 @@ function updateItem(tagId, key, category, subcategory, commonName, targetId) {
         });
 }
 
-// Note: Common function for Tabs 1 and 5
+// Load items [TAB 1/5 SPECIFIC]
 function loadItems(category, subcategory, commonName, targetId, page = 1) {
     console.log('loadItems called with', { category, subcategory, commonName, targetId, page });
 
@@ -498,11 +509,9 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
     const key = targetId;
     const loadingSuccess = showLoadingTab1_5(key);
 
-    // Check if the table structure already exists
     let itemTable = container.querySelector(`#item-table-${key}`);
     let tbody, wrapper;
     if (!itemTable) {
-        // Create the table structure if it doesn't exist
         container.innerHTML = `
             <div class="item-level-wrapper">
                 <table class="item-table" id="item-table-${key}" style="color: #000000 !important;">
@@ -576,7 +585,6 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
         itemTable = container.querySelector(`#item-table-${key}`);
         wrapper = container.querySelector('.item-level-wrapper');
 
-        // Debug the placeholder row's computed style
         const placeholderCell = itemTable.querySelector('tbody tr td:first-child');
         if (placeholderCell) {
             console.log('Placeholder cell computed style:', {
@@ -585,7 +593,6 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
             });
         }
     } else {
-        // Table exists, just clear the tbody
         tbody = itemTable.querySelector('tbody');
         tbody.innerHTML = `
             <tr>
@@ -607,7 +614,8 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                     <td>-</td>
                     <td style="color: #000000 !important;">-</td>
                     <td style="color: #000000 !important;">-</td>
-                    <td style="color: #000000 !important;">-</td>
+ 
+                   <td style="color: #000000 !important;">-</td>
                     <td style="color: #000000 !important;">-</td>
                 ` : `
                     <td style="color: #000000 !important;">Loading...</td>
@@ -621,7 +629,6 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
         `;
         wrapper = container.querySelector('.item-level-wrapper');
 
-        // Debug the placeholder row's computed style
         const placeholderCell = itemTable.querySelector('tbody tr td:first-child');
         if (placeholderCell) {
             console.log('Placeholder cell computed style:', {
@@ -632,6 +639,7 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
     }
 
     let url = `/tab/${window.cachedTabNum}/data?common_name=${encodeURIComponent(commonName)}&page=${page}&subcategory=${encodeURIComponent(subcategory)}&category=${encodeURIComponent(category)}`;
+    console.log('Fetching items from:', url);
 
     fetch(url)
         .then(response => {
@@ -644,9 +652,8 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
         .then(data => {
             console.log('Items data received:', data);
 
-            // Update the tbody content
             tbody = itemTable.querySelector('tbody');
-            tbody.innerHTML = ''; // Clear the loading row
+            tbody.innerHTML = '';
 
             if (data.items && data.items.length > 0) {
                 data.items.forEach(item => {
@@ -725,13 +732,11 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                     }
                 });
 
-                // Remove existing pagination and bulk update controls
                 let paginationControls = wrapper.querySelector('.pagination-controls');
                 let bulkControls = wrapper.querySelector('.bulk-update-controls');
                 if (paginationControls) paginationControls.remove();
                 if (bulkControls) bulkControls.remove();
 
-                // Add pagination for items if total_items exceeds per_page
                 if (data.total_items > data.per_page) {
                     const totalPages = Math.ceil(data.total_items / data.per_page);
                     const escapedCommonName = commonName.replace(/'/g, "\\'").replace(/"/g, '\\"');
@@ -749,7 +754,6 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                     wrapper.appendChild(paginationDiv);
                 }
 
-                // Add bulk update controls for Tab 5
                 if (window.cachedTabNum == 5) {
                     const bulkDiv = document.createElement('div');
                     bulkDiv.className = 'bulk-update-controls mt-3';
@@ -801,7 +805,6 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                 tbody.innerHTML = `<tr><td colspan="${window.cachedTabNum == 5 ? 10 : window.cachedTabNum == 1 ? 8 : 6}">No items found for this common name.</td></tr>`;
             }
 
-            // Toggle Expand/Collapse button state
             const parentRow = container.closest('tr.common-name-row').previousElementSibling;
             if (parentRow) {
                 const toggleBtn = parentRow.querySelector(`.expand-btn[data-target-id="${targetId}"]`);
@@ -830,7 +833,6 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                 height: window.getComputedStyle(container).height
             });
 
-            // Log item table styles for debugging
             if (itemTable) {
                 console.log('Item table styles:', {
                     display: itemTable.style.display,
@@ -839,7 +841,6 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                     height: window.getComputedStyle(itemTable).height
                 });
 
-                // Debug the first row's computed style after loading
                 const firstRowCell = itemTable.querySelector('tbody tr td:first-child');
                 if (firstRowCell) {
                     console.log('First row cell computed style after loading:', {
@@ -849,7 +850,6 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                 }
             }
 
-            // Apply global filter to the newly loaded table
             if (typeof applyFilterToAllLevels === 'function') {
                 applyFilterToAllLevels();
             } else {
@@ -870,12 +870,12 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                 if (loadingSuccess) {
                     hideLoadingTab1_5(key);
                 }
-                container.classList.remove('loading'); // Ensure loading class is removed
-            }, 700); // Match the transition duration (0.7s)
+                container.classList.remove('loading');
+            }, 700);
         });
 }
 
-// Note: Used only in Tab 1
+// Show dropdown for editable cells [TAB 1 SPECIFIC]
 function showDropdown(event, cell, type, tagId, currentValue) {
     event.stopPropagation();
     console.log('showDropdown called with', { cell, type, tagId, currentValue });
@@ -900,7 +900,7 @@ function showDropdown(event, cell, type, tagId, currentValue) {
     }
 }
 
-// Note: Used only in Tab 1
+// Select option from dropdown [TAB 1 SPECIFIC]
 function selectOption(event, element, type, tagId, value) {
     event.preventDefault();
     event.stopPropagation();
@@ -917,7 +917,7 @@ function selectOption(event, element, type, tagId, value) {
     }
 }
 
-// Note: Used only in Tab 1
+// Save changes for individual item [TAB 1 SPECIFIC]
 function saveChanges(tagId) {
     console.log('saveChanges called for tagId:', tagId);
     const binLocationCell = document.querySelector(`tr[data-item-id="${tagId}"] td.editable[onclick*="showDropdown(event, this, 'bin-location', '${tagId}'"]`);
@@ -937,7 +937,12 @@ function saveChanges(tagId) {
                 bin_location: newBinLocation
             })
         })
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`Bin location update failed with status ${response.status}`);
+            }
+            return response.json();
+        })
         .then(data => {
             if (data.error) {
                 console.error('Error updating bin location:', data.error);
@@ -964,7 +969,12 @@ function saveChanges(tagId) {
                 status: newStatus
             })
         })
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`Status update failed with status ${response.status}`);
+            }
+            return response.json();
+        })
         .then(data => {
             if (data.error) {
                 console.error('Error updating status:', data.error);
@@ -990,7 +1000,7 @@ function saveChanges(tagId) {
     }
 }
 
-// Note: Event listener for Tabs 1 and 5
+// Event listener for Tabs 1 and 5 [TAB 1/5 SPECIFIC]
 document.addEventListener('DOMContentLoaded', function() {
     console.log('tab1_5.js: DOMContentLoaded event fired');
 
@@ -999,7 +1009,6 @@ document.addEventListener('DOMContentLoaded', function() {
         return;
     }
 
-    // Remove any existing click event listeners to prevent duplicates
     document.removeEventListener('click', handleClick);
     document.addEventListener('click', handleClick);
 
@@ -1017,7 +1026,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             console.log('Toggle button attributes:', { category, subcategory, commonName, targetId, isExpanded });
 
-            if (!commonName || !targetId) {
+            if (!targetId) {
                 console.error('Missing required attributes for toggle button:', toggleBtn);
                 return;
             }
@@ -1029,21 +1038,24 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             if (isExpanded) {
-                // Collapse the section
                 container.classList.remove('expanded');
                 container.classList.add('collapsed');
                 container.style.opacity = '0';
                 setTimeout(() => {
-                    container.style.display = 'none'; // Remove space after opacity transition
-                }, 700); // Match the transition duration (0.7s)
+                    container.style.display = 'none';
+                }, 700);
 
                 toggleBtn.textContent = 'Expand Items';
                 toggleBtn.setAttribute('data-expanded', 'false');
                 sessionStorage.removeItem(`expanded_items_${targetId}`);
             } else {
-                // Expand the section
-                console.log('Triggering loadItems for common name:', commonName);
-                loadItems(category, subcategory, commonName, targetId);
+                if (commonName && category && subcategory) {
+                    console.log('Triggering loadItems for common name:', commonName);
+                    loadItems(category, subcategory, commonName, targetId);
+                } else {
+                    console.log('Triggering expandCategory for category:', category);
+                    window.expandCategory(category, targetId, null);
+                }
             }
             return;
         }
