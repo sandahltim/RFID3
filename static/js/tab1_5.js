@@ -1,6 +1,6 @@
-console.log('tab1_5.js version: 2025-05-16-v47 loaded');
+console.log('tab1_5.js version: 2025-05-16-v48 loaded');
 
-// Note: Ensure formatDate is available (defined in common.js) [REUSABLE]
+// Ensure formatDate is available (defined in common.js) [REUSABLE]
 if (typeof formatDate !== 'function') {
     console.error('formatDate function is not defined. Ensure common.js is loaded.');
     function formatDate(isoDateString) {
@@ -62,6 +62,7 @@ function loadCommonNames(selectElement, page = 1) {
         collapseSection(categoryRow, targetId);
         fetch(`/tab/${window.cachedTabNum}/subcat_data?category=${encodeURIComponent(category)}`)
             .then(response => {
+                console.log(`Subcategory fetch response status for ${category}: ${response.status}`);
                 if (!response.ok) {
                     throw new Error(`Subcategory fetch failed with status ${response.status}`);
                 }
@@ -305,6 +306,7 @@ function bulkUpdateCommonName(category, subcategory, targetId, key) {
         })
     })
     .then(response => {
+        console.log(`Bulk update response status: ${response.status}`);
         if (!response.ok) {
             throw new Error(`Bulk update failed with status ${response.status}`);
         }
@@ -363,6 +365,7 @@ function bulkUpdateSelectedItems(key) {
         })
     })
     .then(response => {
+        console.log(`Bulk update selected items response status: ${response.status}`);
         if (!response.ok) {
             throw new Error(`Bulk update failed with status ${response.status}`);
         }
@@ -432,6 +435,7 @@ function updateItem(tagId, key, category, subcategory, commonName, targetId) {
                 })
             })
             .then(response => {
+                console.log(`Bin location update response status for ${tagId}: ${response.status}`);
                 if (!response.ok) {
                     throw new Error(`Bin location update failed with status ${response.status}`);
                 }
@@ -459,6 +463,7 @@ function updateItem(tagId, key, category, subcategory, commonName, targetId) {
                 })
             })
             .then(response => {
+                console.log(`Status update response status for ${tagId}: ${response.status}`);
                 if (!response.ok) {
                     throw new Error(`Status update failed with status ${response.status}`);
                 }
@@ -614,8 +619,7 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                     <td>-</td>
                     <td style="color: #000000 !important;">-</td>
                     <td style="color: #000000 !important;">-</td>
- 
-                   <td style="color: #000000 !important;">-</td>
+                    <td style="color: #000000 !important;">-</td>
                     <td style="color: #000000 !important;">-</td>
                 ` : `
                     <td style="color: #000000 !important;">Loading...</td>
@@ -938,6 +942,7 @@ function saveChanges(tagId) {
             })
         })
         .then(response => {
+            console.log(`Bin location update response status for ${tagId}: ${response.status}`);
             if (!response.ok) {
                 throw new Error(`Bin location update failed with status ${response.status}`);
             }
@@ -970,6 +975,7 @@ function saveChanges(tagId) {
             })
         })
         .then(response => {
+            console.log(`Status update response status for ${tagId}: ${response.status}`);
             if (!response.ok) {
                 throw new Error(`Status update failed with status ${response.status}`);
             }
@@ -1045,16 +1051,18 @@ document.addEventListener('DOMContentLoaded', function() {
                     container.style.display = 'none';
                 }, 700);
 
-                toggleBtn.textContent = 'Expand Items';
+                toggleBtn.textContent = commonName ? 'Expand Items' : 'Expand';
                 toggleBtn.setAttribute('data-expanded', 'false');
                 sessionStorage.removeItem(`expanded_items_${targetId}`);
             } else {
                 if (commonName && category && subcategory) {
                     console.log('Triggering loadItems for common name:', commonName);
                     loadItems(category, subcategory, commonName, targetId);
+                } else if (category) {
+                    console.log('Triggering loadSubcategories for category:', category);
+                    loadSubcategories(category, targetId);
                 } else {
-                    console.log('Triggering expandCategory for category:', category);
-                    window.expandCategory(category, targetId, null);
+                    console.error('Insufficient attributes for expansion:', { category, commonName });
                 }
             }
             return;
@@ -1085,3 +1093,94 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 });
+
+// Load subcategories for category expansion [TAB 1/5 SPECIFIC]
+function loadSubcategories(category, targetId) {
+    console.log('loadSubcategories called with', { category, targetId });
+
+    const container = document.getElementById(targetId);
+    if (!container) {
+        console.error(`Container with ID ${targetId} not found`);
+        return;
+    }
+
+    const loadingSuccess = showLoadingTab1_5(targetId);
+
+    let url = `/tab/${window.cachedTabNum}/subcat_data?category=${encodeURIComponent(category)}&page=1`;
+    console.log('Fetching subcategories from:', url);
+
+    fetch(url)
+        .then(response => {
+            console.log(`Subcategory fetch response status for ${url}: ${response.status}`);
+            if (!response.ok) {
+                throw new Error(`Subcategory fetch failed with status ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log('Subcategory data received:', data);
+            if (data.error) {
+                console.error('Error fetching subcategories:', data.error);
+                container.innerHTML = `<p>Error: ${data.error}</p>`;
+                return;
+            }
+
+            let html = `
+                <select class="subcategory-select form-control" data-category="${category}" onchange="loadCommonNames(this)">
+                    <option value="">Select a subcategory</option>
+            `;
+            if (data.subcategories && data.subcategories.length > 0) {
+                data.subcategories.forEach(subcat => {
+                    const escapedSubcategory = subcat.subcategory.replace(/'/g, "\\'").replace(/"/g, '\\"');
+                    html += `<option value="${escapedSubcategory}">${subcat.subcategory}</option>`;
+                });
+            } else {
+                html += `<option value="">No subcategories available</option>`;
+            }
+            html += '</select>';
+
+            if (data.total_subcats > data.per_page) {
+                const totalPages = Math.ceil(data.total_subcats / data.per_page);
+                const escapedCategory = category.replace(/'/g, "\\'").replace(/"/g, '\\"');
+                html += `
+                    <div class="pagination-controls mt-2">
+                        <button class="btn btn-sm btn-secondary" onclick="loadSubcategories('${escapedCategory}', '${targetId}', ${data.page - 1})" ${data.page === 1 ? 'disabled' : ''}>Previous</button>
+                        <span class="mx-2">Page ${data.page} of ${totalPages}</span>
+                        <button class="btn btn-sm btn-secondary" onclick="loadSubcategories('${escapedCategory}', '${targetId}', ${data.page + 1})" ${data.page === totalPages ? 'disabled' : ''}>Next</button>
+                    </div>
+                `;
+            }
+
+            container.innerHTML = html;
+            container.classList.remove('collapsed');
+            container.classList.add('expanded');
+            container.style.display = 'block';
+            container.style.opacity = '1';
+            container.style.visibility = 'visible';
+
+            console.log('Container styles after subcategory load:', {
+                classList: container.classList.toString(),
+                display: container.style.display,
+                opacity: container.style.opacity,
+                visibility: window.getComputedStyle(container).visibility,
+                computedDisplay: window.getComputedStyle(container).display,
+                height: window.getComputedStyle(container).height
+            });
+
+            sessionStorage.setItem(`expanded_${targetId}`, JSON.stringify({ category, page: 1 }));
+        })
+        .catch(error => {
+            console.error('Error fetching subcategories:', error);
+            container.innerHTML = `<p>Error loading subcategories: ${error.message}</p>`;
+            container.classList.remove('collapsed');
+            container.classList.add('expanded');
+            container.style.display = 'block';
+            container.style.opacity = '1';
+            container.style.visibility = 'visible';
+        })
+        .finally(() => {
+            if (loadingSuccess) {
+                hideLoadingTab1_5(targetId);
+            }
+        });
+}
