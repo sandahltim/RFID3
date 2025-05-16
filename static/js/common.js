@@ -1,4 +1,4 @@
-console.log('common.js version: 2025-05-16-v16 loaded - confirming script load');
+console.log('common.js version: 2025-05-16-v17 loaded - confirming script load');
 
 // Function to format ISO date strings into "Thurs, Aug 21 2025 4:55 pm"
 function formatDate(isoDateString) {
@@ -101,9 +101,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Apply global filter function
 window.applyGlobalFilter = function() {
-    // Skip global filter for Tab 3
-    if (window.cachedTabNum === 3) {
-        console.log('Skipping global filter application for Tab 3');
+    // Skip global filter for Tab 3 and non-tab pages (e.g., /categories)
+    if (window.cachedTabNum === 3 || !window.location.pathname.match(/\/tab\/\d+/)) {
+        console.log('Skipping global filter application for Tab 3 or non-tab page');
         return;
     }
 
@@ -146,9 +146,9 @@ window.clearGlobalFilter = function() {
 
 // Apply filter to all levels (category, subcategory, common names, items)
 function applyFilterToAllLevels() {
-    // Skip filtering for Tab 3
-    if (window.cachedTabNum === 3) {
-        console.log('Skipping applyFilterToAllLevels for Tab 3');
+    // Skip filtering for Tab 3 and non-tab pages
+    if (window.cachedTabNum === 3 || !window.location.pathname.match(/\/tab\/\d+/)) {
+        console.log('Skipping applyFilterToAllLevels for Tab 3 or non-tab page');
         return;
     }
 
