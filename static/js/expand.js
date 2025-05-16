@@ -1,13 +1,12 @@
-console.log('expand.js version: 2025-05-16-v86 loaded - confirming script load');
+console.log('expand.js version: 2025-05-16-v87 loaded');
 
 // Show loading indicator [REUSABLE]
 function showLoadingExpand(targetId) {
     const container = document.getElementById(targetId);
     if (!container) {
-        console.warn(`Container with ID ${targetId} not found for showing loading indicator (expand.js)`);
+        console.warn(`Container ${targetId} not found for loading indicator`);
         return false;
     }
-
     const loadingDiv = document.createElement('div');
     loadingDiv.id = `loading-${targetId}`;
     loadingDiv.className = 'loading-indicator';
@@ -33,56 +32,55 @@ function collapseSection(targetId) {
         section.classList.add('collapsed');
         section.style.display = 'none';
         section.style.opacity = '0';
-
         const collapseBtn = document.querySelector(`button[data-collapse-target="${targetId}"]`);
         const expandBtn = collapseBtn ? collapseBtn.previousElementSibling : null;
         if (expandBtn && collapseBtn) {
             expandBtn.style.display = 'inline-block';
             collapseBtn.style.display = 'none';
         } else {
-            console.warn('Could not find expand/collapse buttons for targetId:', targetId);
+            console.warn(`Expand/collapse buttons not found for ${targetId}`);
         }
-
         sessionStorage.removeItem(`expanded_${targetId}`);
         sessionStorage.removeItem(`expanded_items_${targetId}`);
     } else {
-        console.error(`Section with ID ${targetId} not found for collapsing`);
+        console.error(`Section ${targetId} not found for collapsing`);
     }
 }
 
 // Expand category [TAB 2/4 SPECIFIC]
 window.expandCategory = function(category, targetId, contractNumber, page = 1) {
-    console.log('expandCategory called with', { category, targetId, contractNumber, page });
+    console.log('expandCategory:', { category, targetId, contractNumber, page });
 
     const targetElement = document.getElementById(targetId);
     if (!targetElement) {
-        console.error(`Target element with ID ${targetId} not found`);
+        console.error(`Target ${targetId} not found`);
         return;
     }
 
     if (targetElement.classList.contains('expanded') && page === 1) {
-        console.log(`Section ${targetId} is already expanded, collapsing instead`);
+        console.log(`Collapsing ${targetId}`);
         collapseSection(targetId);
         return;
     }
 
     const loadingSuccess = showLoadingExpand(targetId);
-
-    let url = `/tab/${window.cachedTabNum}/common_names?contract_number=${encodeURIComponent(contractNumber)}&page=${page}`;
-    console.log('Fetching data from URL:', url);
+    const url = `/tab/${window.cachedTabNum}/common_names?contract_number=${encodeURIComponent(contractNumber)}&page=${page}`;
+    console.log(`Fetching common names: ${url}`);
 
     fetch(url)
         .then(response => {
-            console.log(`Fetch response status for ${url}: ${response.status}`);
+            console.log(`Common names fetch status: ${response.status}`);
             if (!response.ok) {
-                throw new Error(`Fetch failed with status ${response.status}`);
+                return response.text().then(text => {
+                    throw new Error(`Common names fetch failed: ${response.status} - ${text}`);
+                });
             }
             return response.json();
         })
         .then(data => {
-            console.log('Data received:', data);
+            console.log('Common names data:', data);
             if (data.error) {
-                console.error('Error fetching data:', data.error);
+                console.error('Common names error:', data.error);
                 targetElement.innerHTML = `<p>Error: ${data.error}</p>`;
                 return;
             }
@@ -130,11 +128,7 @@ window.expandCategory = function(category, targetId, contractNumber, page = 1) {
                 `;
             });
 
-            html += `
-                        </tbody>
-                    </table>
-                </div>
-            `;
+            html += `</tbody></table></div>`;
 
             if (totalCommonNames > perPage) {
                 const totalPages = Math.ceil(totalCommonNames / perPage);
@@ -155,13 +149,11 @@ window.expandCategory = function(category, targetId, contractNumber, page = 1) {
             targetElement.style.opacity = '1';
             targetElement.style.visibility = 'visible';
 
-            console.log('Target element styles after update:', {
+            console.log('Common names container styles:', {
                 classList: targetElement.classList.toString(),
                 display: targetElement.style.display,
                 opacity: targetElement.style.opacity,
-                visibility: window.getComputedStyle(targetElement).visibility,
-                computedDisplay: window.getComputedStyle(targetElement).display,
-                height: window.getComputedStyle(targetElement).height
+                visibility: window.getComputedStyle(targetElement).visibility
             });
 
             const table = targetElement.querySelector('.common-table');
@@ -172,8 +164,8 @@ window.expandCategory = function(category, targetId, contractNumber, page = 1) {
             sessionStorage.setItem(`expanded_${targetId}`, JSON.stringify({ category, page }));
         })
         .catch(error => {
-            console.error('Error fetching data:', error);
-            targetElement.innerHTML = `<p>Error loading data: ${error.message}</p>`;
+            console.error('Common names error:', error.message);
+            targetElement.innerHTML = `<p>Error: ${error.message}</p>`;
             targetElement.classList.remove('collapsed');
             targetElement.classList.add('expanded');
             targetElement.style.display = 'block';
@@ -181,24 +173,22 @@ window.expandCategory = function(category, targetId, contractNumber, page = 1) {
             targetElement.style.visibility = 'visible';
         })
         .finally(() => {
-            if (loadingSuccess) {
-                hideLoadingExpand(targetId);
-            }
+            if (loadingSuccess) hideLoadingExpand(targetId);
         });
 };
 
-// Expand items under a common name [TAB 2/4 SPECIFIC]
+// Expand items [TAB 2/4 SPECIFIC]
 window.expandItems = function(contractNumber, commonName, targetId, page = 1) {
-    console.log('expandItems called with', { contractNumber, commonName, targetId, page });
+    console.log('expandItems:', { contractNumber, commonName, targetId, page });
 
     const targetElement = document.getElementById(targetId);
     if (!targetElement) {
-        console.error(`Target element with ID ${targetId} not found`);
+        console.error(`Target ${targetId} not found`);
         return;
     }
 
     if (targetElement.classList.contains('expanded') && page === 1) {
-        console.log(`Section ${targetId} is already expanded, collapsing instead`);
+        console.log(`Collapsing ${targetId}`);
         collapseSection(targetId);
         return;
     }
@@ -207,21 +197,23 @@ window.expandItems = function(contractNumber, commonName, targetId, page = 1) {
     const loadingSuccess = showLoadingExpand(commonId);
     targetElement.innerHTML = '';
 
-    let url = `/tab/${window.cachedTabNum}/data?contract_number=${encodeURIComponent(contractNumber)}&common_name=${encodeURIComponent(commonName)}&page=${page}`;
-    console.log('Fetching items from:', url);
+    const url = `/tab/${window.cachedTabNum}/data?contract_number=${encodeURIComponent(contractNumber)}&common_name=${encodeURIComponent(commonName)}&page=${page}`;
+    console.log(`Fetching items: ${url}`);
 
     fetch(url)
         .then(response => {
-            console.log(`Fetch response status for ${url}: ${response.status}`);
+            console.log(`Items fetch status: ${response.status}`);
             if (!response.ok) {
-                throw new Error(`Items fetch failed with status ${response.status}`);
+                return response.text().then(text => {
+                    throw new Error(`Items fetch failed: ${response.status} - ${text}`);
+                });
             }
             return response.json();
         })
         .then(data => {
-            console.log('Items data received:', data);
+            console.log('Items data:', data);
             if (data.error) {
-                console.error('Error fetching items:', data.error);
+                console.error('Items error:', data.error);
                 targetElement.innerHTML = `<p>Error: ${data.error}</p>`;
                 return;
             }
@@ -261,11 +253,7 @@ window.expandItems = function(contractNumber, commonName, targetId, page = 1) {
                 `;
             });
 
-            html += `
-                        </tbody>
-                    </table>
-                </div>
-            `;
+            html += `</tbody></table></div>`;
 
             if (totalItems > perPage) {
                 const totalPages = Math.ceil(totalItems / perPage);
@@ -286,13 +274,11 @@ window.expandItems = function(contractNumber, commonName, targetId, page = 1) {
             targetElement.style.opacity = '1';
             targetElement.style.visibility = 'visible';
 
-            console.log('Target element styles after update:', {
+            console.log('Items container styles:', {
                 classList: targetElement.classList.toString(),
                 display: targetElement.style.display,
                 opacity: targetElement.style.opacity,
-                visibility: window.getComputedStyle(targetElement).visibility,
-                computedDisplay: window.getComputedStyle(targetElement).display,
-                height: window.getComputedStyle(targetElement).height
+                visibility: window.getComputedStyle(targetElement).visibility
             });
 
             const table = targetElement.querySelector('.item-table');
@@ -303,8 +289,8 @@ window.expandItems = function(contractNumber, commonName, targetId, page = 1) {
             sessionStorage.setItem(`expanded_items_${targetId}`, JSON.stringify({ contractNumber, commonName, page }));
         })
         .catch(error => {
-            console.error('Error fetching items:', error);
-            targetElement.innerHTML = `<p>Error loading items: ${error.message}</p>`;
+            console.error('Items error:', error.message);
+            targetElement.innerHTML = `<p>Error: ${error.message}</p>`;
             targetElement.classList.remove('collapsed');
             targetElement.classList.add('expanded');
             targetElement.style.display = 'block';
@@ -312,13 +298,15 @@ window.expandItems = function(contractNumber, commonName, targetId, page = 1) {
             targetElement.style.visibility = 'visible';
         })
         .finally(() => {
-            if (loadingSuccess) {
-                hideLoadingExpand(commonId);
-            }
+            if (loadingSuccess) hideLoadingExpand(commonId);
         });
 };
 
-// Sort common names table [TAB 2/4 SPECIFIC]
+// Sorting state [TAB 2/4 SPECIFIC]
+let commonSortState = {};
+let itemSortState = {};
+
+// Sort common names [TAB 2/4 SPECIFIC]
 function sortCommonNames(contractNumber, column) {
     const targetId = `common-${contractNumber}`;
     if (!commonSortState[contractNumber]) {
@@ -343,19 +331,21 @@ function sortCommonNames(contractNumber, column) {
         }
     });
 
-    let url = `/tab/${window.cachedTabNum}/common_names?contract_number=${encodeURIComponent(contractNumber)}&sort=${column}_${direction}`;
-    console.log('Fetching sorted common names from:', url);
+    const url = `/tab/${window.cachedTabNum}/common_names?contract_number=${encodeURIComponent(contractNumber)}&sort=${column}_${direction}`;
+    console.log(`Fetching sorted common names: ${url}`);
 
     fetch(url)
         .then(response => {
-            console.log(`Fetch response status for ${url}: ${response.status}`);
+            console.log(`Common names sort fetch status: ${response.status}`);
             if (!response.ok) {
-                throw new Error(`Common names sort fetch failed with status ${response.status}`);
+                return response.text().then(text => {
+                    throw new Error(`Common names sort failed: ${response.status} - ${text}`);
+                });
             }
             return response.json();
         })
         .then(data => {
-            console.log('Sorted common names data received:', data);
+            console.log('Sorted common names data:', data);
             const targetElement = document.getElementById(targetId);
             if (!targetElement) return;
 
@@ -402,11 +392,7 @@ function sortCommonNames(contractNumber, column) {
                 `;
             });
 
-            html += `
-                        </tbody>
-                    </table>
-                </div>
-            `;
+            html += `</tbody></table></div>`;
 
             if (totalCommonNames > perPage) {
                 const totalPages = Math.ceil(totalCommonNames / perPage);
@@ -426,11 +412,11 @@ function sortCommonNames(contractNumber, column) {
             }
         })
         .catch(error => {
-            console.error('Error sorting common names:', error);
+            console.error('Common names sort error:', error.message);
         });
 };
 
-// Sort items table [TAB 2/4 SPECIFIC]
+// Sort items [TAB 2/4 SPECIFIC]
 function sortItems(contractNumber, commonName, column) {
     const targetId = `items-${contractNumber}-${commonName.replace(/[^a-z0-9]/g, '_')}`;
     if (!itemSortState[targetId]) {
@@ -455,19 +441,21 @@ function sortItems(contractNumber, commonName, column) {
         }
     });
 
-    let url = `/tab/${window.cachedTabNum}/data?contract_number=${encodeURIComponent(contractNumber)}&common_name=${encodeURIComponent(commonName)}&sort=${column}_${direction}`;
-    console.log('Fetching sorted items from:', url);
+    const url = `/tab/${window.cachedTabNum}/data?contract_number=${encodeURIComponent(contractNumber)}&common_name=${encodeURIComponent(commonName)}&sort=${column}_${direction}`;
+    console.log(`Fetching sorted items: ${url}`);
 
     fetch(url)
         .then(response => {
-            console.log(`Fetch response status for ${url}: ${response.status}`);
+            console.log(`Items sort fetch status: ${response.status}`);
             if (!response.ok) {
-                throw new Error(`Items sort fetch failed with status ${response.status}`);
+                return response.text().then(text => {
+                    throw new Error(`Items sort failed: ${response.status} - ${text}`);
+                });
             }
             return response.json();
         })
         .then(data => {
-            console.log('Sorted items data received:', data);
+            console.log('Sorted items data:', data);
             const targetElement = document.getElementById(targetId);
             if (!targetElement) return;
 
@@ -506,11 +494,7 @@ function sortItems(contractNumber, commonName, column) {
                 `;
             });
 
-            html += `
-                        </tbody>
-                    </table>
-                </div>
-            `;
+            html += `</tbody></table></div>`;
 
             if (totalItems > perPage) {
                 const totalPages = Math.ceil(totalItems / perPage);
@@ -531,13 +515,13 @@ function sortItems(contractNumber, commonName, column) {
             }
         })
         .catch(error => {
-            console.error('Error sorting items:', error);
+            console.error('Items sort error:', error.message);
         });
 };
 
-// Event listener for Tabs 2, 3, 4, Categories, and Home [TAB 2/4 SPECIFIC]
+// Event listener [TAB 2/4 SPECIFIC]
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('expand.js: DOMContentLoaded event fired');
+    console.log('expand.js: DOMContentLoaded');
 
     if (!window.cachedTabNum) {
         const pathMatch = window.location.pathname.match(/\/tab\/(\d+)/);
@@ -547,8 +531,8 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log('expand.js: window.cachedTabNum already set:', window.cachedTabNum);
     }
 
-    if (window.cachedTabNum === 1 || window.cachedTabNum === 3 || window.cachedTabNum === 5) {
-        console.log(`Tab ${window.cachedTabNum} detected, skipping expand.js event listeners`);
+    if (window.cachedTabNum !== 2 && window.cachedTabNum !== 4) {
+        console.log(`Tab ${window.cachedTabNum} detected, skipping expand.js`);
         return;
     }
 
@@ -558,37 +542,41 @@ document.addEventListener('DOMContentLoaded', function() {
                 const state = JSON.parse(sessionStorage.getItem(key));
                 const targetId = key.replace(/^(expanded_|expanded_common_|expanded_items_)/, '');
                 if (!document.getElementById(targetId) && !document.getElementById(`common-${targetId}`) && !document.getElementById(`items-${targetId}`)) {
-                    console.log(`Removing outdated sessionStorage entry: ${key}`);
+                    console.log(`Removing outdated sessionStorage: ${key}`);
                     sessionStorage.removeItem(key);
                 }
             } catch (e) {
-                console.error('Error parsing sessionStorage for', key, ':', e);
+                console.error('Error parsing sessionStorage:', key, e.message);
                 sessionStorage.removeItem(key);
             }
         }
     });
 
     document.removeEventListener('click', handleClick);
-    console.log('Attaching click event listener for expand.js');
+    console.log('Attaching click event listener');
     document.addEventListener('click', handleClick);
 
     function handleClick(event) {
         const expandBtn = event.target.closest('.expand-btn');
         if (expandBtn) {
             event.stopPropagation();
-            console.log('Expand button clicked:', expandBtn);
+            console.log('Expand button clicked:', {
+                category: expandBtn.getAttribute('data-category'),
+                commonName: expandBtn.getAttribute('data-common-name'),
+                targetId: expandBtn.getAttribute('data-target-id'),
+                contractNumber: expandBtn.getAttribute('data-contract-number')
+            });
+
             const category = expandBtn.getAttribute('data-category');
             const commonName = expandBtn.getAttribute('data-common-name');
             const targetId = expandBtn.getAttribute('data-target-id');
             const contractNumber = expandBtn.getAttribute('data-contract-number');
 
-            console.log('Expand button attributes:', { category, commonName, targetId, contractNumber });
-
             if (commonName) {
-                console.log('Expanding items for:', { contractNumber, commonName, targetId });
+                console.log(`Expanding items for ${contractNumber}, ${commonName}`);
                 expandItems(contractNumber, commonName, targetId);
             } else {
-                console.log('Expanding common names for:', { contractNumber, targetId });
+                console.log(`Expanding common names for ${contractNumber}`);
                 window.expandCategory(category, targetId, contractNumber);
             }
             return;
@@ -597,30 +585,29 @@ document.addEventListener('DOMContentLoaded', function() {
         const collapseBtn = event.target.closest('.collapse-btn');
         if (collapseBtn) {
             event.stopPropagation();
-            console.log('Collapse button clicked:', collapseBtn);
-            const targetId = collapseBtn.getAttribute('data-collapse-target');
-            collapseSection(targetId);
+            console.log(`Collapsing ${collapseBtn.getAttribute('data-collapse-target')}`);
+            collapseSection(collapseBtn.getAttribute('data-collapse-target'));
             return;
         }
 
         const header = event.target.closest('.common-table th');
         if (header) {
-            console.log('Common table header clicked:', header);
             const table = header.closest('table');
             const contractNumber = table.closest('.expandable').id.replace('common-', '');
             const column = header.textContent.trim().toLowerCase().replace(/\s+/g, '_');
+            console.log(`Sorting common names for ${contractNumber}, column: ${column}`);
             sortCommonNames(contractNumber, column);
             return;
         }
 
         const itemHeader = event.target.closest('.item-table th');
         if (itemHeader) {
-            console.log('Item table header clicked:', itemHeader);
             const table = itemHeader.closest('table');
             const itemId = table.closest('.expandable').id;
             const contractNumber = itemId.split('-')[0];
             const commonName = itemId.split('-').slice(1).join('-').replace(/_/g, ' ');
             const column = itemHeader.textContent.trim().toLowerCase().replace(/\s+/g, '_');
+            console.log(`Sorting items for ${contractNumber}, ${commonName}, column: ${column}`);
             sortItems(contractNumber, commonName, column);
             return;
         }

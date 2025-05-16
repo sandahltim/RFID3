@@ -1,8 +1,8 @@
-console.log('tab1_5.js version: 2025-05-16-v48 loaded');
+console.log('tab1_5.js version: 2025-05-16-v50 loaded');
 
-// Ensure formatDate is available (defined in common.js) [REUSABLE]
+// Ensure formatDate is available [REUSABLE]
 if (typeof formatDate !== 'function') {
-    console.error('formatDate function is not defined. Ensure common.js is loaded.');
+    console.error('formatDate not defined. Ensure common.js is loaded.');
     function formatDate(isoDateString) {
         return 'N/A'; // Fallback
     }
@@ -12,10 +12,9 @@ if (typeof formatDate !== 'function') {
 function showLoadingTab1_5(targetId) {
     const container = document.getElementById(targetId);
     if (!container) {
-        console.warn(`Container with ID ${targetId} not found for showing loading indicator (tab1_5.js)`);
+        console.warn(`Container ${targetId} not found for loading indicator`);
         return false;
     }
-
     const loadingDiv = document.createElement('div');
     loadingDiv.id = `loading-${targetId}`;
     loadingDiv.className = 'loading-indicator';
@@ -36,15 +35,51 @@ function hideLoadingTab1_5(targetId) {
 // Collapse section [REUSABLE]
 function collapseSection(categoryRow, targetId) {
     if (!targetId || !categoryRow) {
-        console.error('collapseSection called with undefined or null parameters', { targetId, categoryRow });
+        console.error('collapseSection: Invalid parameters', { targetId, categoryRow });
         return;
     }
-    console.log('collapseSection called for targetId:', targetId);
-
+    console.log(`Collapsing ${targetId}`);
     const existingRows = categoryRow.parentNode.querySelectorAll(`tr.common-name-row[data-target-id="${targetId}"]`);
     existingRows.forEach(row => row.remove());
-
     sessionStorage.removeItem(`expanded_${targetId}`);
+}
+
+// Populate subcategories [TAB 1/5 SPECIFIC]
+function populateSubcategories() {
+    const selects = document.querySelectorAll('.subcategory-select');
+    selects.forEach(select => {
+        const category = select.getAttribute('data-category');
+        console.log(`Populating subcategories for ${category}`);
+        const url = `/tab/${window.cachedTabNum}/subcat_data?category=${encodeURIComponent(category)}`;
+        fetch(url)
+            .then(response => {
+                console.log(`Subcategory fetch status for ${category}: ${response.status}`);
+                if (!response.ok) {
+                    return response.text().then(text => {
+                        throw new Error(`Subcategory fetch failed: ${response.status} - ${text}`);
+                    });
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log(`Subcategory data for ${category}:`, data);
+                select.innerHTML = '<option value="">Select a subcategory</option>';
+                if (data.subcategories && data.subcategories.length > 0) {
+                    data.subcategories.forEach(subcat => {
+                        const option = document.createElement('option');
+                        option.value = subcat.subcategory;
+                        option.textContent = subcat.subcategory;
+                        select.appendChild(option);
+                    });
+                } else {
+                    select.innerHTML += '<option value="">No subcategories</option>';
+                }
+            })
+            .catch(error => {
+                console.error(`Subcategory error for ${category}:`, error.message);
+                select.innerHTML = '<option value="">Error loading subcategories</option>';
+            });
+    });
 }
 
 // Load common names [TAB 1/5 SPECIFIC]
@@ -55,58 +90,63 @@ function loadCommonNames(selectElement, page = 1) {
     const categoryRow = selectElement.closest('tr');
     const tbody = categoryRow.closest('tbody');
 
-    console.log('loadCommonNames invoked with:', { subcategory, category, targetId, page });
+    console.log('loadCommonNames:', { subcategory, category, targetId, page });
 
     if (!subcategory && page === 1) {
-        console.log('No subcategory selected, collapsing section');
+        console.log('No subcategory, collapsing');
         collapseSection(categoryRow, targetId);
-        fetch(`/tab/${window.cachedTabNum}/subcat_data?category=${encodeURIComponent(category)}`)
+        const url = `/tab/${window.cachedTabNum}/subcat_data?category=${encodeURIComponent(category)}`;
+        fetch(url)
             .then(response => {
-                console.log(`Subcategory fetch response status for ${category}: ${response.status}`);
+                console.log(`Subcat fetch status: ${response.status}`);
                 if (!response.ok) {
-                    throw new Error(`Subcategory fetch failed with status ${response.status}`);
+                    return response.text().then(text => {
+                        throw new Error(`Subcat fetch failed: ${response.status} - ${text}`);
+                    });
                 }
                 return response.json();
             })
             .then(data => {
-                const totalItems = data.subcategories.reduce((sum, subcat) => sum + (subcat.total_items || 0), 0);
-                const itemsOnContracts = data.subcategories.reduce((sum, subcat) => sum + (subcat.items_on_contracts || 0), 0);
-                const itemsInService = data.subcategories.reduce((sum, subcat) => sum + (subcat.items_in_service || 0), 0);
-                const itemsAvailable = data.subcategories.reduce((sum, subcat) => sum + (subcat.items_available || 0), 0);
-                categoryRow.cells[2].textContent = totalItems || '0';
-                categoryRow.cells[3].textContent = itemsOnContracts || '0';
-                categoryRow.cells[4].textContent = itemsInService || '0';
-                categoryRow.cells[5].textContent = itemsAvailable || '0';
-                console.log('Category totals reset:', { totalItems, itemsOnContracts, itemsInService, itemsAvailable });
+                const totals = {
+                    totalItems: data.subcategories.reduce((sum, subcat) => sum + (subcat.total_items || 0), 0),
+                    itemsOnContracts: data.subcategories.reduce((sum, subcat) => sum + (subcat.items_on_contracts || 0), 0),
+                    itemsInService: data.subcategories.reduce((sum, subcat) => sum + (subcat.items_in_service || 0), 0),
+                    itemsAvailable: data.subcategories.reduce((sum, subcat) => sum + (subcat.items_available || 0), 0)
+                };
+                categoryRow.cells[2].textContent = totals.totalItems || '0';
+                categoryRow.cells[3].textContent = totals.itemsOnContracts || '0';
+                categoryRow.cells[4].textContent = totals.itemsInService || '0';
+                categoryRow.cells[5].textContent = totals.itemsAvailable || '0';
+                console.log('Category totals:', totals);
             })
-            .catch(error => console.error('Error resetting category totals:', error));
+            .catch(error => console.error('Error resetting totals:', error.message));
         return;
     }
 
     if (!category || !subcategory || !targetId) {
-        console.error('Invalid parameters for loadCommonNames:', { category, subcategory, targetId });
+        console.error('loadCommonNames: Invalid parameters', { category, subcategory, targetId });
         return;
     }
 
     const loadingId = `loading-subcat-${targetId}`;
-    let loadingDiv = document.getElementById(loadingId);
-    if (loadingDiv) {
-        loadingDiv.style.display = 'block';
-    }
+    const loadingDiv = document.getElementById(loadingId);
+    if (loadingDiv) loadingDiv.style.display = 'block';
 
-    let url = `/tab/${window.cachedTabNum}/common_names?category=${encodeURIComponent(category)}&subcategory=${encodeURIComponent(subcategory)}&page=${page}`;
-    console.log('Fetching common names from:', url);
+    const url = `/tab/${window.cachedTabNum}/common_names?category=${encodeURIComponent(category)}&subcategory=${encodeURIComponent(subcategory)}&page=${page}`;
+    console.log(`Fetching common names: ${url}`);
 
     fetch(url)
         .then(response => {
-            console.log(`Fetch response status for ${url}: ${response.status}`);
+            console.log(`Common names fetch status: ${response.status}`);
             if (!response.ok) {
-                throw new Error(`Common names fetch failed with status ${response.status}`);
+                return response.text().then(text => {
+                    throw new Error(`Common names fetch failed: ${response.status} - ${text}`);
+                });
             }
             return response.json();
         })
         .then(data => {
-            console.log('Common names data received:', data);
+            console.log('Common names data:', data);
 
             let headerRow = categoryRow.parentNode.querySelector(`tr.common-name-row[data-target-id="${targetId}"] .common-table`);
             if (!headerRow) {
@@ -146,16 +186,17 @@ function loadCommonNames(selectElement, page = 1) {
             tableBody.innerHTML = '';
 
             if (data.common_names && data.common_names.length > 0) {
-                const totalItems = data.common_names.reduce((sum, item) => sum + (item.total_items || 0), 0);
-                const itemsOnContracts = data.common_names.reduce((sum, item) => sum + (item.items_on_contracts || 0), 0);
-                const itemsInService = data.common_names.reduce((sum, item) => sum + (item.items_in_service || 0), 0);
-                const itemsAvailable = data.common_names.reduce((sum, item) => sum + (item.items_available || 0), 0);
-
-                console.log('Updating category row with totals:', { totalItems, itemsOnContracts, itemsInService, itemsAvailable });
-                categoryRow.cells[2].textContent = totalItems || '0';
-                categoryRow.cells[3].textContent = itemsOnContracts || '0';
-                categoryRow.cells[4].textContent = itemsInService || '0';
-                categoryRow.cells[5].textContent = itemsAvailable || '0';
+                const totals = {
+                    totalItems: data.common_names.reduce((sum, item) => sum + (item.total_items || 0), 0),
+                    itemsOnContracts: data.common_names.reduce((sum, item) => sum + (item.items_on_contracts || 0), 0),
+                    itemsInService: data.common_names.reduce((sum, item) => sum + (item.items_in_service || 0), 0),
+                    itemsAvailable: data.common_names.reduce((sum, item) => sum + (item.items_available || 0), 0)
+                };
+                console.log('Common name totals:', totals);
+                categoryRow.cells[2].textContent = totals.totalItems || '0';
+                categoryRow.cells[3].textContent = totals.itemsOnContracts || '0';
+                categoryRow.cells[4].textContent = totals.itemsInService || '0';
+                categoryRow.cells[5].textContent = totals.itemsAvailable || '0';
 
                 data.common_names.forEach(item => {
                     const rowId = `${targetId}_${item.name.replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '')}`;
@@ -226,122 +267,101 @@ function loadCommonNames(selectElement, page = 1) {
                 if (commonTable) {
                     console.log('Common table styles:', {
                         display: commonTable.style.display,
-                        visibility: window.getComputedStyle(commonTable).visibility,
-                        computedDisplay: window.getComputedStyle(commonTable).display,
-                        height: window.getComputedStyle(commonTable).height
+                        visibility: window.getComputedStyle(commonTable).visibility
                     });
                 }
             } else {
-                const noDataRow = document.createElement('tr');
-                noDataRow.className = 'common-name-row';
-                noDataRow.setAttribute('data-target-id', targetId);
-                noDataRow.innerHTML = `
-                    <td colspan="7">
-                        <p>No common names found for this subcategory.</p>
-                    </td>
-                `;
-                tableBody.appendChild(noDataRow);
+                tableBody.innerHTML = `<tr><td colspan="7">No common names found.</td></tr>`;
             }
 
             if (typeof applyFilterToAllLevels === 'function') {
                 applyFilterToAllLevels();
             } else {
-                console.warn('applyFilterToAllLevels function is not available');
+                console.warn('applyFilterToAllLevels not available');
             }
 
             sessionStorage.setItem(`expanded_${targetId}`, JSON.stringify({ category, subcategory, page }));
         })
         .catch(error => {
-            console.error('Common names fetch error:', error);
-            const errorRow = document.createElement('tr');
-            errorRow.className = 'common-name-row';
-            errorRow.setAttribute('data-target-id', targetId);
-            errorRow.innerHTML = `
-                <td colspan="7">
-                    <p>Error loading common names: ${error.message}</p>
-                </td>
-            `;
-            tbody.insertBefore(errorRow, categoryRow.nextSibling);
+            console.error('Common names error:', error.message);
+            tableBody.innerHTML = `<tr><td colspan="7">Error: ${error.message}</td></tr>`;
         })
         .finally(() => {
             setTimeout(() => {
-                if (loadingDiv) {
-                    loadingDiv.style.display = 'none';
-                }
+                if (loadingDiv) loadingDiv.style.display = 'none';
             }, 700);
         });
 }
 
-// Bulk update for all items under a common name [TAB 5 SPECIFIC]
+// Bulk update common name [TAB 5 SPECIFIC]
 function bulkUpdateCommonName(category, subcategory, targetId, key) {
     const binLocation = document.getElementById(`bulk-bin-location-${key}`)?.value;
     const status = document.getElementById(`bulk-status-${key}`)?.value;
 
     if (!binLocation && !status) {
-        alert('Please select a Bin Location or Status to update.');
+        alert('Select a Bin Location or Status.');
         return;
     }
 
     const commonTable = document.getElementById(`common-table-${key}`);
-    const commonNameCell = commonTable?.querySelector('tbody tr td:first-child');
-    const commonName = commonNameCell ? commonNameCell.textContent : null;
-
+    const commonName = commonTable?.querySelector('tbody tr td:first-child')?.textContent;
     if (!commonName) {
         console.error('Common name not found for bulk update');
-        alert('Error: Common name not found for bulk update.');
+        alert('Error: Common name not found.');
         return;
     }
 
-    fetch('/tab/5/bulk_update_common_name', {
+    const url = '/tab/5/bulk_update_common_name';
+    fetch(url, {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-            category: category,
-            subcategory: subcategory,
+            category,
+            subcategory,
             common_name: commonName,
             bin_location: binLocation || undefined,
             status: status || undefined
         })
     })
-    .then(response => {
-        console.log(`Bulk update response status: ${response.status}`);
-        if (!response.ok) {
-            throw new Error(`Bulk update failed with status ${response.status}`);
-        }
-        return response.json();
-    })
-    .then(data => {
-        if (data.error) {
-            console.error('Bulk update error:', data.error);
-            alert('Failed to bulk update: ' + data.error);
-        } else {
-            console.log('Bulk update successful:', data);
-            alert('Bulk update successful!');
-            loadItems(category, subcategory, commonName, targetId);
-        }
-    })
-    .catch(error => {
-        console.error('Bulk update error:', error);
-        alert('Error during bulk update: ' + error.message);
-    });
+        .then(response => {
+            console.log(`Bulk update status: ${response.status}`);
+            if (!response.ok) {
+                return response.text().then(text => {
+                    throw new Error(`Bulk update failed: ${response.status} - ${text}`);
+                });
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.error) {
+                console.error('Bulk update error:', data.error);
+                alert('Failed to bulk update: ' + data.error);
+            } else {
+                console.log('Bulk update successful');
+                alert('Bulk update successful!');
+                loadItems(category, subcategory, commonName, targetId);
+            }
+        })
+        .catch(error => {
+            console.error('Bulk update error:', error.message);
+            alert('Error: ' + error.message);
+        });
 }
 
-// Bulk update for selected items [TAB 5 SPECIFIC]
+// Bulk update selected items [TAB 5 SPECIFIC]
 function bulkUpdateSelectedItems(key) {
     const itemTable = document.getElementById(`item-table-${key}`);
     if (!itemTable) {
-        console.error(`Item table with ID item-table-${key} not found`);
-        alert('Error: Item table not found for bulk update.');
+        console.error(`Item table ${key} not found`);
+        alert('Error: Item table not found.');
         return;
     }
 
     const selectedItems = Array.from(itemTable.querySelectorAll('tbody input[type="checkbox"]:checked'))
         .map(checkbox => checkbox.value);
 
-    if (selectedItems.length === 0) {
-        alert('Please select at least one item to update.');
+    if (!selectedItems.length) {
+        alert('Select at least one item.');
         return;
     }
 
@@ -349,64 +369,63 @@ function bulkUpdateSelectedItems(key) {
     const status = document.getElementById(`bulk-item-status-${key}`)?.value;
 
     if (!binLocation && !status) {
-        alert('Please select a Bin Location or Status to update.');
+        alert('Select a Bin Location or Status.');
         return;
     }
 
-    fetch('/tab/5/bulk_update_items', {
+    const url = '/tab/5/bulk_update_items';
+    fetch(url, {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
             tag_ids: selectedItems,
             bin_location: binLocation || undefined,
             status: status || undefined
         })
     })
-    .then(response => {
-        console.log(`Bulk update selected items response status: ${response.status}`);
-        if (!response.ok) {
-            throw new Error(`Bulk update failed with status ${response.status}`);
-        }
-        return response.json();
-    })
-    .then(data => {
-        if (data.error) {
-            console.error('Bulk update error:', data.error);
-            alert('Failed to bulk update: ' + data.error);
-        } else {
-            console.log('Bulk update successful:', data);
-            alert('Bulk update successful!');
-            const category = document.querySelector(`#item-table-${key}`).closest('.common-level')?.querySelector('button[data-category]')?.getAttribute('data-category') || 
-                             document.querySelector(`#item-table-${key}`).closest('tr')?.previousElementSibling?.querySelector('button[data-category]')?.getAttribute('data-category');
-            const subcategory = document.querySelector(`#item-table-${key}`).closest('.common-level')?.querySelector('button[data-subcategory]')?.getAttribute('data-subcategory') ||
-                                document.querySelector(`#item-table-${key}`).closest('tr')?.previousElementSibling?.querySelector('button[data-subcategory]')?.getAttribute('data-subcategory');
-            const commonName = document.querySelector(`#common-table-${key} tbody tr td:first-child`)?.textContent;
-            const targetId = document.querySelector(`#item-table-${key}`).closest('.expandable')?.id;
-            if (category && subcategory && commonName && targetId) {
-                loadItems(category, subcategory, commonName, targetId);
-            } else {
-                console.warn('Missing parameters for reloading items after bulk update:', { category, subcategory, commonName, targetId });
-                window.location.reload();
+        .then(response => {
+            console.log(`Bulk update selected status: ${response.status}`);
+            if (!response.ok) {
+                return response.text().then(text => {
+                    throw new Error(`Bulk update failed: ${response.status} - ${text}`);
+                });
             }
-        }
-    })
-    .catch(error => {
-        console.error('Bulk update error:', error);
-        alert('Error during bulk update: ' + error.message);
-    });
+            return response.json();
+        })
+        .then(data => {
+            if (data.error) {
+                console.error('Bulk update error:', data.error);
+                alert('Failed to bulk update: ' + data.error);
+            } else {
+                console.log('Bulk update successful');
+                alert('Bulk update successful!');
+                const category = document.querySelector(`#item-table-${key}`)?.closest('.common-level')?.querySelector('button[data-category]')?.getAttribute('data-category') ||
+                                 document.querySelector(`#item-table-${key}`)?.closest('tr')?.previousElementSibling?.querySelector('button[data-category]')?.getAttribute('data-category');
+                const subcategory = document.querySelector(`#item-table-${key}`)?.closest('.common-level')?.querySelector('button[data-subcategory]')?.getAttribute('data-subcategory') ||
+                                    document.querySelector(`#item-table-${key}`)?.closest('tr')?.previousElementSibling?.querySelector('button[data-subcategory]')?.getAttribute('data-subcategory');
+                const commonName = document.querySelector(`#common-table-${key} tbody tr td:first-child`)?.textContent;
+                const targetId = document.querySelector(`#item-table-${key}`)?.closest('.expandable')?.id;
+                if (category && subcategory && commonName && targetId) {
+                    loadItems(category, subcategory, commonName, targetId);
+                } else {
+                    console.warn('Missing parameters for reload:', { category, subcategory, commonName, targetId });
+                    window.location.reload();
+                }
+            }
+        })
+        .catch(error => {
+            console.error('Bulk update error:', error.message);
+            alert('Error: ' + error.message);
+        });
 }
 
-// Update dropdown visibility for bulk update [TAB 5 SPECIFIC]
+// Update bulk field [TAB 5 SPECIFIC]
 function updateBulkField(key, field) {
     const select = document.getElementById(`bulk-${field}-${key}`);
     if (select && select.value) {
         const otherField = field === 'bin_location' ? 'status' : 'bin_location';
         const otherSelect = document.getElementById(`bulk-${otherField}-${key}`);
-        if (otherSelect) {
-            otherSelect.value = '';
-        }
+        if (otherSelect) otherSelect.value = '';
     }
 }
 
@@ -416,63 +435,55 @@ function updateItem(tagId, key, category, subcategory, commonName, targetId) {
     const status = document.getElementById(`status-${tagId}`)?.value;
 
     if (!binLocation && !status) {
-        alert('Please select a Bin Location or Status to update.');
+        alert('Select a Bin Location or Status.');
         return;
     }
 
     const promises = [];
 
     if (binLocation) {
+        const url = '/tab/5/update_bin_location';
         promises.push(
-            fetch('/tab/5/update_bin_location', {
+            fetch(url, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    tag_id: tagId,
-                    bin_location: binLocation
-                })
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ tag_id: tagId, bin_location: binLocation })
             })
             .then(response => {
-                console.log(`Bin location update response status for ${tagId}: ${response.status}`);
+                console.log(`Bin location update status for ${tagId}: ${response.status}`);
                 if (!response.ok) {
-                    throw new Error(`Bin location update failed with status ${response.status}`);
+                    return response.text().then(text => {
+                        throw new Error(`Bin location update failed: ${response.status} - ${text}`);
+                    });
                 }
                 return response.json();
             })
             .then(data => {
-                if (data.error) {
-                    throw new Error(`Failed to update bin location: ${data.error}`);
-                }
+                if (data.error) throw new Error(`Bin location error: ${data.error}`);
                 return { field: 'bin_location', data };
             })
         );
     }
 
     if (status) {
+        const url = '/tab/5/update_status';
         promises.push(
-            fetch('/tab/5/update_status', {
+            fetch(url, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    tag_id: tagId,
-                    status: status
-                })
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ tag_id: tagId, status })
             })
             .then(response => {
-                console.log(`Status update response status for ${tagId}: ${response.status}`);
+                console.log(`Status update status for ${tagId}: ${response.status}`);
                 if (!response.ok) {
-                    throw new Error(`Status update failed with status ${response.status}`);
+                    return response.text().then(text => {
+                        throw new Error(`Status update failed: ${response.status} - ${text}`);
+                    });
                 }
                 return response.json();
             })
             .then(data => {
-                if (data.error) {
-                    throw new Error(`Failed to update status: ${data.error}`);
-                }
+                if (data.error) throw new Error(`Status error: ${data.error}`);
                 return { field: 'status', data };
             })
         );
@@ -480,33 +491,33 @@ function updateItem(tagId, key, category, subcategory, commonName, targetId) {
 
     Promise.all(promises)
         .then(results => {
-            console.log('Update successful:', results);
+            console.log('Update successful');
             alert('Update successful!');
             loadItems(category, subcategory, commonName, targetId);
         })
         .catch(error => {
-            console.error('Update error:', error);
-            alert('Error during update: ' + error.message);
+            console.error('Update error:', error.message);
+            alert('Error: ' + error.message);
         });
 }
 
 // Load items [TAB 1/5 SPECIFIC]
 function loadItems(category, subcategory, commonName, targetId, page = 1) {
-    console.log('loadItems called with', { category, subcategory, commonName, targetId, page });
+    console.log('loadItems:', { category, subcategory, commonName, targetId, page });
 
     if (!category || !subcategory || !commonName || !targetId) {
-        console.error('Invalid parameters for loadItems:', { category, subcategory, commonName, targetId });
+        console.error('loadItems: Invalid parameters', { category, subcategory, commonName, targetId });
         return;
     }
 
     const container = document.getElementById(targetId);
     if (!container) {
-        console.error(`Container with ID ${targetId} not found`);
+        console.error(`Container ${targetId} not found`);
         return;
     }
 
     if (container.classList.contains('loading')) {
-        console.log(`Container ${targetId} is already loading, skipping...`);
+        console.log(`Container ${targetId} already loading`);
         return;
     }
     container.classList.add('loading');
@@ -533,7 +544,7 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                                 <th style="color: #000000 !important;">Quality</th>
                                 <th style="color: #000000 !important;">Notes</th>
                                 <th style="color: #000000 !important;">Actions</th>
-                            ` : window.cachedTabNum == 1 ? `
+                            ` : `
                                 <th style="color: #000000 !important;">Tag ID</th>
                                 <th style="color: #000000 !important;">Common Name</th>
                                 <th style="color: #000000 !important;">Bin Location</th>
@@ -542,13 +553,6 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                                 <th style="color: #000000 !important;">Last Scanned Date</th>
                                 <th style="color: #000000 !important;">Quality</th>
                                 <th style="color: #000000 !important;">Notes</th>
-                            ` : `
-                                <th style="color: #000000 !important;">Tag ID</th>
-                                <th style="color: #000000 !important;">Common Name</th>
-                                <th style="color: #000000 !important;">Bin Location</th>
-                                <th style="color: #000000 !important;">Status</th>
-                                <th style="color: #000000 !important;">Last Contract</th>
-                                <th style="color: #000000 !important;">Last Scanned Date</th>
                             `}
                         </tr>
                     </thead>
@@ -565,18 +569,11 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                                 <td style="color: #000000 !important;">-</td>
                                 <td style="color: #000000 !important;">-</td>
                                 <td>-</td>
-                            ` : window.cachedTabNum == 1 ? `
-                                <td style="color: #000000 !important;">Loading...</td>
-                                <td style="color: #000000 !important;">-</td>
-                                <td>-</td>
-                                <td>-</td>
-                                <td style="color: #000000 !important;">-</td>
-                                <td style="color: #000000 !important;">-</td>
-                                <td style="color: #000000 !important;">-</td>
-                                <td style="color: #000000 !important;">-</td>
                             ` : `
                                 <td style="color: #000000 !important;">Loading...</td>
                                 <td style="color: #000000 !important;">-</td>
+                                <td>-</td>
+                                <td>-</td>
                                 <td style="color: #000000 !important;">-</td>
                                 <td style="color: #000000 !important;">-</td>
                                 <td style="color: #000000 !important;">-</td>
@@ -589,14 +586,6 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
         `;
         itemTable = container.querySelector(`#item-table-${key}`);
         wrapper = container.querySelector('.item-level-wrapper');
-
-        const placeholderCell = itemTable.querySelector('tbody tr td:first-child');
-        if (placeholderCell) {
-            console.log('Placeholder cell computed style:', {
-                color: window.getComputedStyle(placeholderCell).color,
-                inlineColor: placeholderCell.style.color
-            });
-        }
     } else {
         tbody = itemTable.querySelector('tbody');
         tbody.innerHTML = `
@@ -612,18 +601,11 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                     <td style="color: #000000 !important;">-</td>
                     <td style="color: #000000 !important;">-</td>
                     <td>-</td>
-                ` : window.cachedTabNum == 1 ? `
-                    <td style="color: #000000 !important;">Loading...</td>
-                    <td style="color: #000000 !important;">-</td>
-                    <td>-</td>
-                    <td>-</td>
-                    <td style="color: #000000 !important;">-</td>
-                    <td style="color: #000000 !important;">-</td>
-                    <td style="color: #000000 !important;">-</td>
-                    <td style="color: #000000 !important;">-</td>
                 ` : `
                     <td style="color: #000000 !important;">Loading...</td>
                     <td style="color: #000000 !important;">-</td>
+                    <td>-</td>
+                    <td>-</td>
                     <td style="color: #000000 !important;">-</td>
                     <td style="color: #000000 !important;">-</td>
                     <td style="color: #000000 !important;">-</td>
@@ -632,31 +614,23 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
             </tr>
         `;
         wrapper = container.querySelector('.item-level-wrapper');
-
-        const placeholderCell = itemTable.querySelector('tbody tr td:first-child');
-        if (placeholderCell) {
-            console.log('Placeholder cell computed style:', {
-                color: window.getComputedStyle(placeholderCell).color,
-                inlineColor: placeholderCell.style.color
-            });
-        }
     }
 
-    let url = `/tab/${window.cachedTabNum}/data?common_name=${encodeURIComponent(commonName)}&page=${page}&subcategory=${encodeURIComponent(subcategory)}&category=${encodeURIComponent(category)}`;
-    console.log('Fetching items from:', url);
+    const url = `/tab/${window.cachedTabNum}/data?common_name=${encodeURIComponent(commonName)}&page=${page}&subcategory=${encodeURIComponent(subcategory)}&category=${encodeURIComponent(category)}`;
+    console.log(`Fetching items: ${url}`);
 
     fetch(url)
         .then(response => {
-            console.log(`Fetch response status for ${url}: ${response.status}`);
+            console.log(`Items fetch status: ${response.status}`);
             if (!response.ok) {
-                throw new Error(`Items fetch failed with status ${response.status}`);
+                return response.text().then(text => {
+                    throw new Error(`Items fetch failed: ${response.status} - ${text}`);
+                });
             }
             return response.json();
         })
         .then(data => {
-            console.log('Items data received:', data);
-
-            tbody = itemTable.querySelector('tbody');
+            console.log('Items data:', data);
             tbody.innerHTML = '';
 
             if (data.items && data.items.length > 0) {
@@ -699,7 +673,7 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                             </td>
                         `;
                         tbody.appendChild(row);
-                    } else if (window.cachedTabNum == 1) {
+                    } else {
                         const row = document.createElement('tr');
                         row.setAttribute('data-item-id', item.tag_id);
                         row.innerHTML = `
@@ -720,17 +694,6 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                             <div id="dropdown-status-${item.tag_id}" class="dropdown-menu">
                                 <a class="dropdown-item" href="#" onclick="selectOption(event, this, 'status', '${item.tag_id}', 'Ready to Rent')" ${item.status !== 'On Rent' && item.status !== 'Delivered' ? 'style="pointer-events: none; color: #ccc;"' : ''}>Ready to Rent</a>
                             </div>
-                        `;
-                        tbody.appendChild(row);
-                    } else {
-                        const row = document.createElement('tr');
-                        row.innerHTML = `
-                            <td style="color: #000000 !important;">${item.tag_id}</td>
-                            <td style="color: #000000 !important;">${item.common_name}</td>
-                            <td style="color: #000000 !important;">${item.bin_location || 'N/A'}</td>
-                            <td style="color: #000000 !important;">${item.status}</td>
-                            <td style="color: #000000 !important;">${item.last_contract_num || 'N/A'}</td>
-                            <td style="color: #000000 !important;">${lastScanned}</td>
                         `;
                         tbody.appendChild(row);
                     }
@@ -806,7 +769,7 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                     wrapper.appendChild(bulkDiv);
                 }
             } else {
-                tbody.innerHTML = `<tr><td colspan="${window.cachedTabNum == 5 ? 10 : window.cachedTabNum == 1 ? 8 : 6}">No items found for this common name.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="${window.cachedTabNum == 5 ? 10 : 8}">No items found.</td></tr>`;
             }
 
             const parentRow = container.closest('tr.common-name-row').previousElementSibling;
@@ -816,10 +779,10 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                     toggleBtn.textContent = 'Collapse';
                     toggleBtn.setAttribute('data-expanded', 'true');
                 } else {
-                    console.warn('Toggle button not found for targetId:', targetId);
+                    console.warn(`Toggle button not found for ${targetId}`);
                 }
             } else {
-                console.warn('Parent row not found for targetId:', targetId);
+                console.warn(`Parent row not found for ${targetId}`);
             }
 
             container.classList.remove('collapsed');
@@ -828,41 +791,29 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
             container.style.opacity = '1';
             container.style.visibility = 'visible';
 
-            console.log('Container styles after update:', {
+            console.log('Container styles:', {
                 classList: container.classList.toString(),
                 display: container.style.display,
                 opacity: container.style.opacity,
-                visibility: window.getComputedStyle(container).visibility,
-                computedDisplay: window.getComputedStyle(container).display,
-                height: window.getComputedStyle(container).height
+                visibility: window.getComputedStyle(container).visibility
             });
 
             if (itemTable) {
                 console.log('Item table styles:', {
                     display: itemTable.style.display,
-                    visibility: window.getComputedStyle(itemTable).visibility,
-                    computedDisplay: window.getComputedStyle(itemTable).display,
-                    height: window.getComputedStyle(itemTable).height
+                    visibility: window.getComputedStyle(itemTable).visibility
                 });
-
-                const firstRowCell = itemTable.querySelector('tbody tr td:first-child');
-                if (firstRowCell) {
-                    console.log('First row cell computed style after loading:', {
-                        color: window.getComputedStyle(firstRowCell).color,
-                        inlineColor: firstRowCell.style.color
-                    });
-                }
             }
 
             if (typeof applyFilterToAllLevels === 'function') {
                 applyFilterToAllLevels();
             } else {
-                console.warn('applyFilterToAllLevels function is not available');
+                console.warn('applyFilterToAllLevels not available');
             }
         })
         .catch(error => {
-            console.error('Items fetch error:', error);
-            tbody.innerHTML = `<tr><td colspan="${window.cachedTabNum == 5 ? 10 : window.cachedTabNum == 1 ? 8 : 6}">Error loading items: ${error.message}</td></tr>`;
+            console.error('Items error:', error.message);
+            tbody.innerHTML = `<tr><td colspan="${window.cachedTabNum == 5 ? 10 : 8}">Error: ${error.message}</td></tr>`;
             container.classList.remove('collapsed');
             container.classList.add('expanded');
             container.style.display = 'block';
@@ -871,18 +822,16 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
         })
         .finally(() => {
             setTimeout(() => {
-                if (loadingSuccess) {
-                    hideLoadingTab1_5(key);
-                }
+                if (loadingSuccess) hideLoadingTab1_5(key);
                 container.classList.remove('loading');
             }, 700);
         });
 }
 
-// Show dropdown for editable cells [TAB 1 SPECIFIC]
+// Show dropdown [TAB 1 SPECIFIC]
 function showDropdown(event, cell, type, tagId, currentValue) {
     event.stopPropagation();
-    console.log('showDropdown called with', { cell, type, tagId, currentValue });
+    console.log('showDropdown:', { type, tagId, currentValue });
     const dropdown = document.getElementById(`dropdown-${type}-${tagId}`);
     if (dropdown) {
         document.querySelectorAll('.dropdown-menu').forEach(d => {
@@ -900,15 +849,15 @@ function showDropdown(event, cell, type, tagId, currentValue) {
         dropdown.style.zIndex = '1000';
         cell.setAttribute(`data-${type}`, currentValue);
     } else {
-        console.error(`Dropdown not found for ${type} with tagId ${tagId}`);
+        console.error(`Dropdown not found for ${type}, tagId ${tagId}`);
     }
 }
 
-// Select option from dropdown [TAB 1 SPECIFIC]
+// Select option [TAB 1 SPECIFIC]
 function selectOption(event, element, type, tagId, value) {
     event.preventDefault();
     event.stopPropagation();
-    console.log('selectOption called with', { type, tagId, value });
+    console.log('selectOption:', { type, tagId, value });
     const cell = document.querySelector(`tr[data-item-id="${tagId}"] td.editable[onclick*="showDropdown(event, this, '${type}', '${tagId}'"]`);
     if (cell) {
         cell.textContent = value;
@@ -921,206 +870,116 @@ function selectOption(event, element, type, tagId, value) {
     }
 }
 
-// Save changes for individual item [TAB 1 SPECIFIC]
+// Save changes [TAB 1 SPECIFIC]
 function saveChanges(tagId) {
-    console.log('saveChanges called for tagId:', tagId);
+    console.log('saveChanges:', tagId);
     const binLocationCell = document.querySelector(`tr[data-item-id="${tagId}"] td.editable[onclick*="showDropdown(event, this, 'bin-location', '${tagId}'"]`);
     const statusCell = document.querySelector(`tr[data-item-id="${tagId}"] td.editable[onclick*="showDropdown(event, this, 'status', '${tagId}'"]`);
 
-    const newBinLocation = binLocationCell ? binLocationCell.getAttribute('data-bin-location') : null;
-    const newStatus = statusCell ? statusCell.getAttribute('data-status') : null;
+    const newBinLocation = binLocationCell?.getAttribute('data-bin-location');
+    const newStatus = statusCell?.getAttribute('data-status');
 
     if (newBinLocation) {
-        fetch('/tab/5/update_bin_location', {
+        const url = '/tab/5/update_bin_location';
+        fetch(url, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                tag_id: tagId,
-                bin_location: newBinLocation
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tag_id: tagId, bin_location: newBinLocation })
+        })
+            .then(response => {
+                console.log(`Bin location update status for ${tagId}: ${response.status}`);
+                if (!response.ok) {
+                    return response.text().then(text => {
+                        throw new Error(`Bin location update failed: ${response.status} - ${text}`);
+                    });
+                }
+                return response.json();
             })
-        })
-        .then(response => {
-            console.log(`Bin location update response status for ${tagId}: ${response.status}`);
-            if (!response.ok) {
-                throw new Error(`Bin location update failed with status ${response.status}`);
-            }
-            return response.json();
-        })
-        .then(data => {
-            if (data.error) {
-                console.error('Error updating bin location:', data.error);
-                alert('Failed to update bin location: ' + data.error);
-            } else {
-                console.log('Bin location updated successfully:', data);
-                alert('Bin location updated successfully!');
-            }
-        })
-        .catch(error => {
-            console.error('Error updating bin location:', error);
-            alert('Error updating bin location: ' + error.message);
-        });
+            .then(data => {
+                if (data.error) {
+                    console.error('Bin location error:', data.error);
+                    alert('Failed to update bin location: ' + data.error);
+                } else {
+                    console.log('Bin location updated');
+                    alert('Bin location updated!');
+                }
+            })
+            .catch(error => {
+                console.error('Bin location error:', error.message);
+                alert('Error: ' + error.message);
+            });
     }
 
     if (newStatus) {
-        fetch('/tab/5/update_status', {
+        const url = '/tab/5/update_status';
+        fetch(url, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                tag_id: tagId,
-                status: newStatus
-            })
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tag_id: tagId, status: newStatus })
         })
-        .then(response => {
-            console.log(`Status update response status for ${tagId}: ${response.status}`);
-            if (!response.ok) {
-                throw new Error(`Status update failed with status ${response.status}`);
-            }
-            return response.json();
-        })
-        .then(data => {
-            if (data.error) {
-                console.error('Error updating status:', data.error);
-                alert('Failed to update status: ' + data.error);
-            } else {
-                console.log('Status updated successfully:', data);
-                alert('Status updated successfully!');
-                const itemsContainer = document.getElementById(`items-${tagId.split('-')[0]}`);
-                if (itemsContainer) {
-                    const category = itemsContainer.closest('.common-level')?.querySelector('button[data-category]')?.getAttribute('data-category') || 
-                                     itemsContainer.closest('tr')?.previousElementSibling?.querySelector('button[data-category]')?.getAttribute('data-category');
-                    const subcategory = itemsContainer.closest('.common-level')?.querySelector('button[data-subcategory]')?.getAttribute('data-subcategory') ||
-                                        itemsContainer.closest('tr')?.previousElementSibling?.querySelector('button[data-subcategory]')?.getAttribute('data-subcategory');
-                    const commonName = itemsContainer.closest('tr')?.querySelector('td:first-child')?.textContent;
-                    loadItems(category, subcategory, commonName, `items-${tagId.split('-')[0]}`);
+            .then(response => {
+                console.log(`Status update status for ${tagId}: ${response.status}`);
+                if (!response.ok) {
+                    return response.text().then(text => {
+                        throw new Error(`Status update failed: ${response.status} - ${text}`);
+                    });
                 }
-            }
-        })
-        .catch(error => {
-            console.error('Error updating status:', error);
-            alert('Error updating status: ' + error.message);
-        });
+                return response.json();
+            })
+            .then(data => {
+                if (data.error) {
+                    console.error('Status error:', data.error);
+                    alert('Failed to update status: ' + data.error);
+                } else {
+                    console.log('Status updated');
+                    alert('Status updated!');
+                    const itemsContainer = document.getElementById(`items-${tagId.split('-')[0]}`);
+                    if (itemsContainer) {
+                        const category = itemsContainer.closest('.common-level')?.querySelector('button[data-category]')?.getAttribute('data-category') ||
+                                         itemsContainer.closest('tr')?.previousElementSibling?.querySelector('button[data-category]')?.getAttribute('data-category');
+                        const subcategory = itemsContainer.closest('.common-level')?.querySelector('button[data-subcategory]')?.getAttribute('data-subcategory') ||
+                                            itemsContainer.closest('tr')?.previousElementSibling?.querySelector('button[data-subcategory]')?.getAttribute('data-subcategory');
+                        const commonName = itemsContainer.closest('tr')?.querySelector('td:first-child')?.textContent;
+                        loadItems(category, subcategory, commonName, `items-${tagId.split('-')[0]}`);
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Status error:', error.message);
+                alert('Error: ' + error.message);
+            });
     }
 }
 
-// Event listener for Tabs 1 and 5 [TAB 1/5 SPECIFIC]
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('tab1_5.js: DOMContentLoaded event fired');
-
-    if (window.cachedTabNum !== 1 && window.cachedTabNum !== 5) {
-        console.log('Not Tab 1 or Tab 5, skipping event listeners');
-        return;
-    }
-
-    document.removeEventListener('click', handleClick);
-    document.addEventListener('click', handleClick);
-
-    function handleClick(event) {
-        const toggleBtn = event.target.closest('.expand-btn');
-        if (toggleBtn) {
-            event.preventDefault();
-            event.stopPropagation();
-            console.log('Toggle button clicked:', toggleBtn);
-            const category = toggleBtn.getAttribute('data-category');
-            const subcategory = toggleBtn.getAttribute('data-subcategory');
-            const commonName = toggleBtn.getAttribute('data-common-name');
-            const targetId = toggleBtn.getAttribute('data-target-id');
-            const isExpanded = toggleBtn.getAttribute('data-expanded') === 'true';
-
-            console.log('Toggle button attributes:', { category, subcategory, commonName, targetId, isExpanded });
-
-            if (!targetId) {
-                console.error('Missing required attributes for toggle button:', toggleBtn);
-                return;
-            }
-
-            const container = document.getElementById(targetId);
-            if (!container) {
-                console.error(`Container with ID ${targetId} not found`);
-                return;
-            }
-
-            if (isExpanded) {
-                container.classList.remove('expanded');
-                container.classList.add('collapsed');
-                container.style.opacity = '0';
-                setTimeout(() => {
-                    container.style.display = 'none';
-                }, 700);
-
-                toggleBtn.textContent = commonName ? 'Expand Items' : 'Expand';
-                toggleBtn.setAttribute('data-expanded', 'false');
-                sessionStorage.removeItem(`expanded_items_${targetId}`);
-            } else {
-                if (commonName && category && subcategory) {
-                    console.log('Triggering loadItems for common name:', commonName);
-                    loadItems(category, subcategory, commonName, targetId);
-                } else if (category) {
-                    console.log('Triggering loadSubcategories for category:', category);
-                    loadSubcategories(category, targetId);
-                } else {
-                    console.error('Insufficient attributes for expansion:', { category, commonName });
-                }
-            }
-            return;
-        }
-
-        const saveBtn = event.target.closest('.save-btn');
-        if (saveBtn && window.cachedTabNum === 1) {
-            event.preventDefault();
-            event.stopPropagation();
-            const tagId = saveBtn.closest('tr').getAttribute('data-item-id');
-            console.log('Save button clicked for tagId:', tagId);
-            saveChanges(tagId);
-            return;
-        }
-    }
-
-    if (window.cachedTabNum === 1) {
-        document.removeEventListener('click', handleDropdownClick);
-        document.addEventListener('click', handleDropdownClick);
-
-        function handleDropdownClick(event) {
-            if (!event.target.closest('.editable') && !event.target.closest('.dropdown-menu')) {
-                document.querySelectorAll('.dropdown-menu').forEach(dropdown => {
-                    dropdown.classList.remove('show');
-                    dropdown.style.display = 'none';
-                });
-            }
-        }
-    }
-});
-
-// Load subcategories for category expansion [TAB 1/5 SPECIFIC]
+// Load subcategories [TAB 1/5 SPECIFIC]
 function loadSubcategories(category, targetId) {
-    console.log('loadSubcategories called with', { category, targetId });
+    console.log('loadSubcategories:', { category, targetId });
 
     const container = document.getElementById(targetId);
     if (!container) {
-        console.error(`Container with ID ${targetId} not found`);
+        console.error(`Container ${targetId} not found`);
         return;
     }
 
     const loadingSuccess = showLoadingTab1_5(targetId);
 
-    let url = `/tab/${window.cachedTabNum}/subcat_data?category=${encodeURIComponent(category)}&page=1`;
-    console.log('Fetching subcategories from:', url);
+    const url = `/tab/${window.cachedTabNum}/subcat_data?category=${encodeURIComponent(category)}&page=1`;
+    console.log(`Fetching subcategories: ${url}`);
 
     fetch(url)
         .then(response => {
-            console.log(`Subcategory fetch response status for ${url}: ${response.status}`);
+            console.log(`Subcategory fetch status: ${response.status}`);
             if (!response.ok) {
-                throw new Error(`Subcategory fetch failed with status ${response.status}`);
+                return response.text().then(text => {
+                    throw new Error(`Subcategory fetch failed: ${response.status} - ${text}`);
+                });
             }
             return response.json();
         })
         .then(data => {
-            console.log('Subcategory data received:', data);
+            console.log('Subcategory data:', data);
             if (data.error) {
-                console.error('Error fetching subcategories:', data.error);
+                console.error('Subcategories error:', data.error);
                 container.innerHTML = `<p>Error: ${data.error}</p>`;
                 return;
             }
@@ -1158,20 +1017,18 @@ function loadSubcategories(category, targetId) {
             container.style.opacity = '1';
             container.style.visibility = 'visible';
 
-            console.log('Container styles after subcategory load:', {
+            console.log('Subcategory container styles:', {
                 classList: container.classList.toString(),
                 display: container.style.display,
                 opacity: container.style.opacity,
-                visibility: window.getComputedStyle(container).visibility,
-                computedDisplay: window.getComputedStyle(container).display,
-                height: window.getComputedStyle(container).height
+                visibility: window.getComputedStyle(container).visibility
             });
 
             sessionStorage.setItem(`expanded_${targetId}`, JSON.stringify({ category, page: 1 }));
         })
         .catch(error => {
-            console.error('Error fetching subcategories:', error);
-            container.innerHTML = `<p>Error loading subcategories: ${error.message}</p>`;
+            console.error('Subcategories error:', error.message);
+            container.innerHTML = `<p>Error: ${error.message}</p>`;
             container.classList.remove('collapsed');
             container.classList.add('expanded');
             container.style.display = 'block';
@@ -1179,8 +1036,99 @@ function loadSubcategories(category, targetId) {
             container.style.visibility = 'visible';
         })
         .finally(() => {
-            if (loadingSuccess) {
-                hideLoadingTab1_5(targetId);
-            }
+            if (loadingSuccess) hideLoadingTab1_5(targetId);
         });
 }
+
+// Event listener [TAB 1/5 SPECIFIC]
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('tab1_5.js: DOMContentLoaded');
+
+    if (window.cachedTabNum !== 1 && window.cachedTabNum !== 5) {
+        console.log('Not Tab 1 or 5, skipping');
+        return;
+    }
+
+    populateSubcategories();
+
+    document.removeEventListener('click', handleClick);
+    document.addEventListener('click', handleClick);
+
+    function handleClick(event) {
+        const toggleBtn = event.target.closest('.expand-btn');
+        if (toggleBtn) {
+            event.preventDefault();
+            event.stopPropagation();
+            console.log('Expand button clicked:', {
+                category: toggleBtn.getAttribute('data-category'),
+                subcategory: toggleBtn.getAttribute('data-subcategory'),
+                commonName: toggleBtn.getAttribute('data-common-name'),
+                targetId: toggleBtn.getAttribute('data-target-id'),
+                isExpanded: toggleBtn.getAttribute('data-expanded')
+            });
+
+            const category = toggleBtn.getAttribute('data-category');
+            const subcategory = toggleBtn.getAttribute('data-subcategory');
+            const commonName = toggleBtn.getAttribute('data-common-name');
+            const targetId = toggleBtn.getAttribute('data-target-id');
+            const isExpanded = toggleBtn.getAttribute('data-expanded') === 'true';
+
+            if (!targetId || !category) {
+                console.error('Missing attributes on expand button');
+                return;
+            }
+
+            const container = document.getElementById(targetId);
+            if (!container) {
+                console.error(`Container ${targetId} not found`);
+                return;
+            }
+
+            if (isExpanded) {
+                console.log(`Collapsing ${targetId}`);
+                container.classList.remove('expanded');
+                container.classList.add('collapsed');
+                container.style.opacity = '0';
+                setTimeout(() => {
+                    container.style.display = 'none';
+                }, 700);
+                toggleBtn.textContent = commonName ? 'Expand Items' : 'Expand';
+                toggleBtn.setAttribute('data-expanded', 'false');
+                sessionStorage.removeItem(`expanded_items_${targetId}`);
+            } else {
+                if (commonName && subcategory) {
+                    console.log(`Loading items for ${commonName}`);
+                    loadItems(category, subcategory, commonName, targetId);
+                } else {
+                    console.log(`Loading subcategories for ${category}`);
+                    loadSubcategories(category, targetId);
+                }
+            }
+            return;
+        }
+
+        const saveBtn = event.target.closest('.save-btn');
+        if (saveBtn && window.cachedTabNum === 1) {
+            event.preventDefault();
+            event.stopPropagation();
+            const tagId = saveBtn.closest('tr').getAttribute('data-item-id');
+            console.log('Save button clicked:', tagId);
+            saveChanges(tagId);
+            return;
+        }
+    }
+
+    if (window.cachedTabNum === 1) {
+        document.removeEventListener('click', handleDropdownClick);
+        document.addEventListener('click', handleDropdownClick);
+
+        function handleDropdownClick(event) {
+            if (!event.target.closest('.editable') && !event.target.closest('.dropdown-menu')) {
+                document.querySelectorAll('.dropdown-menu').forEach(dropdown => {
+                    dropdown.classList.remove('show');
+                    dropdown.style.display = 'none';
+                });
+            }
+        }
+    }
+});
