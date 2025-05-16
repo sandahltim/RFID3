@@ -45,13 +45,13 @@
     <script src="/static/js/tab.js"></script>
     {% block scripts %}
         {% if request.path == '/tab/1' %}
-            <script src="/static/js/tab1.js"></script>
+            <script defer src="/static/js/tab1.js"></script>
         {% elif request.path == '/tab/5' %}
-            <script src="/static/js/tab5.js"></script>
+            <script defer src="/static/js/tab5.js"></script>
         {% elif request.path == '/tab/2' or request.path == '/tab/4' %}
-            <script src="/static/js/expand.js"></script>
+            <script defer src="/static/js/expand.js"></script>
         {% elif request.path == '/tab/3' %}
-            <script src="/static/js/tab3.js"></script>
+            <script defer src="/static/js/tab3.js"></script>
         {% endif %}
     {% endblock %}
 </body>
