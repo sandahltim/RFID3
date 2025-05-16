@@ -9,7 +9,7 @@ from urllib.parse import unquote
 
 # Configure logging
 logger = logging.getLogger('tab1')
-logger.setLevel(logging.INFO)  # Changed to INFO to reduce verbosity
+logger.setLevel(logging.INFO)
 
 # Remove existing handlers to avoid duplicates
 logger.handlers = []
@@ -30,15 +30,13 @@ logger.addHandler(console_handler)
 tab1_bp = Blueprint('tab1', __name__)
 
 # Version marker
-logger.info("Deployed tab1.py version: 2025-05-16-v17")
+logger.info("Deployed tab1.py version: 2025-05-16-v18")
 
 def get_category_data(session, filter_query='', sort='', status_filter='', bin_filter=''):
-    # Fetch all rental class mappings from both tables
     base_mappings = session.query(RentalClassMapping).all()
     user_mappings = session.query(UserRentalClassMapping).all()
-    logger.info(f"Fetched {len(base_mappings)} base mappings and {len(user_mappings)} user mappings")  # Reduced to INFO
+    logger.info(f"Fetched {len(base_mappings)} base mappings and {len(user_mappings)} user mappings")
 
-    # Merge mappings, prioritizing user mappings
     mappings_dict = {m.rental_class_id: {'category': m.category, 'subcategory': m.subcategory} for m in base_mappings}
     for um in user_mappings:
         mappings_dict[um.rental_class_id] = {'category': um.category, 'subcategory': um.subcategory}
@@ -47,7 +45,6 @@ def get_category_data(session, filter_query='', sort='', status_filter='', bin_f
         logger.warning("No rental class mappings found")
         return []
 
-    # Group by category
     categories = {}
     for rental_class_id, data in mappings_dict.items():
         category = data['category']
@@ -59,14 +56,12 @@ def get_category_data(session, filter_query='', sort='', status_filter='', bin_f
             'subcategory': data['subcategory']
         })
 
-    # Calculate counts for each category
     category_data = []
     for cat, mappings in categories.items():
         if filter_query and filter_query not in cat.lower():
             continue
         rental_class_ids = [str(m['rental_class_id']) for m in mappings]
 
-        # Total items in this category
         total_items_query = session.query(func.count(ItemMaster.tag_id)).filter(
             func.trim(func.cast(ItemMaster.rental_class_num, db.String)).in_(rental_class_ids)
         )
@@ -78,7 +73,6 @@ def get_category_data(session, filter_query='', sort='', status_filter='', bin_f
             )
         total_items = total_items_query.scalar() or 0
 
-        # Items on contracts (status = 'On Rent' or 'Delivered')
         items_on_contracts_query = session.query(func.count(ItemMaster.tag_id)).filter(
             func.trim(func.cast(ItemMaster.rental_class_num, db.String)).in_(rental_class_ids),
             ItemMaster.status.in_(['On Rent', 'Delivered'])
@@ -91,7 +85,6 @@ def get_category_data(session, filter_query='', sort='', status_filter='', bin_f
             )
         items_on_contracts = items_on_contracts_query.scalar() or 0
 
-        # Items in service
         subquery = session.query(
             Transaction.tag_id,
             Transaction.scan_date,
@@ -122,7 +115,6 @@ def get_category_data(session, filter_query='', sort='', status_filter='', bin_f
             )
         items_in_service = items_in_service_query.scalar() or 0
 
-        # Items available (status = 'Ready to Rent')
         items_available_query = session.query(func.count(ItemMaster.tag_id)).filter(
             func.trim(func.cast(ItemMaster.rental_class_num, db.String)).in_(rental_class_ids),
             ItemMaster.status == 'Ready to Rent'
@@ -144,7 +136,6 @@ def get_category_data(session, filter_query='', sort='', status_filter='', bin_f
             'items_available': items_available
         })
 
-    # Sort category data alphabetically by default if no sort parameter is provided
     if not sort:
         sort = 'category_asc'
 
@@ -174,11 +165,11 @@ def tab1_view():
         logger.info(f"Fetched {len(category_data)} categories for tab1")
 
         session.close()
-        return render_template('tab1.html', categories=category_data, cache_bust=int(time()))
+        return render_template('common.html', categories=category_data, cache_bust=int(time()))
     except Exception as e:
         logger.error(f"Error rendering Tab 1: {str(e)}", exc_info=True)
         current_app.logger.error(f"Error rendering Tab 1: {str(e)}", exc_info=True)
-        return render_template('tab1.html', categories=[], cache_bust=int(time()))
+        return render_template('common.html', categories=[], cache_bust=int(time()))
 
 @tab1_bp.route('/tab/1/filter', methods=['POST'])
 def tab1_filter():
@@ -193,7 +184,6 @@ def tab1_filter():
         category_data = get_category_data(session, filter_query, sort, status_filter, bin_filter)
         session.close()
 
-        # Render only the table rows for HTMX
         return render_template('_category_rows.html', categories=category_data)
     except Exception as e:
         logger.error(f"Error filtering Tab 1: {str(e)}", exc_info=True)
@@ -242,7 +232,7 @@ def tab1_subcat_data():
         subcategories = {}
         for rental_class_id, data in mappings_dict.items():
             subcategory = data['subcategory']
-            if not subcategory:  # Skip if subcategory is None or empty
+            if not subcategory:
                 continue
             if subcategory not in subcategories:
                 subcategories[subcategory] = []
