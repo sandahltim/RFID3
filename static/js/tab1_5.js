@@ -1,4 +1,4 @@
-console.log('tab1_5.js version: 2025-05-16-v50 loaded');
+console.log('tab1_5.js version: 2025-05-16-v51 loaded');
 
 // Ensure formatDate is available [REUSABLE]
 if (typeof formatDate !== 'function') {
@@ -44,6 +44,24 @@ function collapseSection(categoryRow, targetId) {
     sessionStorage.removeItem(`expanded_${targetId}`);
 }
 
+// Collapse items [REUSABLE]
+function collapseItems(targetId) {
+    const container = document.getElementById(targetId);
+    if (!container) {
+        console.error(`Container ${targetId} not found for collapsing items`);
+        return;
+    }
+    console.log(`Collapsing items ${targetId}`);
+    container.classList.remove('expanded');
+    container.classList.add('collapsed');
+    container.style.opacity = '0';
+    setTimeout(() => {
+        container.style.display = 'none';
+        container.innerHTML = ''; // Clear content
+    }, 700);
+    sessionStorage.removeItem(`expanded_items_${targetId}`);
+}
+
 // Populate subcategories [TAB 1/5 SPECIFIC]
 function populateSubcategories() {
     const selects = document.querySelectorAll('.subcategory-select');
@@ -71,6 +89,13 @@ function populateSubcategories() {
                         option.textContent = subcat.subcategory;
                         select.appendChild(option);
                     });
+                    // Ensure "Concession Resale" is included if present
+                    if (!Array.from(select.options).some(opt => opt.value === "Concession Resale") && data.subcategories.some(subcat => subcat.subcategory === "Concession Resale")) {
+                        const option = document.createElement('option');
+                        option.value = "Concession Resale";
+                        option.textContent = "Concession Resale";
+                        select.appendChild(option);
+                    }
                 } else {
                     select.innerHTML += '<option value="">No subcategories</option>';
                 }
@@ -216,6 +241,9 @@ function loadCommonNames(selectElement, page = 1) {
                                         data-common-name="${escapedName}" 
                                         data-target-id="items-${rowId}" 
                                         data-expanded="false">Expand Items</button>
+                                <button class="btn btn-sm btn-secondary collapse-btn" 
+                                        data-collapse-target="items-${rowId}" 
+                                        style="display:none;">Collapse</button>
                                 <button class="btn btn-sm btn-info print-btn" 
                                         data-print-level="Common Name" 
                                         data-print-id="common-table-${targetId}" 
@@ -525,70 +553,44 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
     const key = targetId;
     const loadingSuccess = showLoadingTab1_5(key);
 
-    let itemTable = container.querySelector(`#item-table-${key}`);
-    let tbody, wrapper;
-    if (!itemTable) {
-        container.innerHTML = `
-            <div class="item-level-wrapper">
-                <table class="item-table" id="item-table-${key}" style="color: #000000 !important;">
-                    <thead>
-                        <tr>
-                            ${window.cachedTabNum == 5 ? `
-                                <th style="color: #000000 !important;">Select</th>
-                                <th style="color: #000000 !important;">Tag ID</th>
-                                <th style="color: #000000 !important;">Common Name</th>
-                                <th style="color: #000000 !important;">Bin Location</th>
-                                <th style="color: #000000 !important;">Status</th>
-                                <th style="color: #000000 !important;">Last Contract</th>
-                                <th style="color: #000000 !important;">Last Scanned Date</th>
-                                <th style="color: #000000 !important;">Quality</th>
-                                <th style="color: #000000 !important;">Notes</th>
-                                <th style="color: #000000 !important;">Actions</th>
-                            ` : `
-                                <th style="color: #000000 !important;">Tag ID</th>
-                                <th style="color: #000000 !important;">Common Name</th>
-                                <th style="color: #000000 !important;">Bin Location</th>
-                                <th style="color: #000000 !important;">Status</th>
-                                <th style="color: #000000 !important;">Last Contract</th>
-                                <th style="color: #000000 !important;">Last Scanned Date</th>
-                                <th style="color: #000000 !important;">Quality</th>
-                                <th style="color: #000000 !important;">Notes</th>
-                            `}
-                        </tr>
-                    </thead>
-                    <tbody style="min-height: 50px;">
-                        <tr>
-                            ${window.cachedTabNum == 5 ? `
-                                <td>-</td>
-                                <td style="color: #000000 !important;">Loading...</td>
-                                <td style="color: #000000 !important;">-</td>
-                                <td>-</td>
-                                <td>-</td>
-                                <td style="color: #000000 !important;">-</td>
-                                <td style="color: #000000 !important;">-</td>
-                                <td style="color: #000000 !important;">-</td>
-                                <td style="color: #000000 !important;">-</td>
-                                <td>-</td>
-                            ` : `
-                                <td style="color: #000000 !important;">Loading...</td>
-                                <td style="color: #000000 !important;">-</td>
-                                <td>-</td>
-                                <td>-</td>
-                                <td style="color: #000000 !important;">-</td>
-                                <td style="color: #000000 !important;">-</td>
-                                <td style="color: #000000 !important;">-</td>
-                                <td style="color: #000000 !important;">-</td>
-                            `}
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        `;
-        itemTable = container.querySelector(`#item-table-${key}`);
-        wrapper = container.querySelector('.item-level-wrapper');
-    } else {
-        tbody = itemTable.querySelector('tbody');
-        tbody.innerHTML = `
+    // Clear existing content to prevent duplicates
+    container.innerHTML = '';
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'item-level-wrapper';
+    container.appendChild(wrapper);
+
+    const itemTable = document.createElement('table');
+    itemTable.className = 'item-table';
+    itemTable.id = `item-table-${key}`;
+    itemTable.style.color = '#000000 !important';
+    itemTable.innerHTML = `
+        <thead>
+            <tr>
+                ${window.cachedTabNum == 5 ? `
+                    <th style="color: #000000 !important;">Select</th>
+                    <th style="color: #000000 !important;">Tag ID</th>
+                    <th style="color: #000000 !important;">Common Name</th>
+                    <th style="color: #000000 !important;">Bin Location</th>
+                    <th style="color: #000000 !important;">Status</th>
+                    <th style="color: #000000 !important;">Last Contract</th>
+                    <th style="color: #000000 !important;">Last Scanned Date</th>
+                    <th style="color: #000000 !important;">Quality</th>
+                    <th style="color: #000000 !important;">Notes</th>
+                    <th style="color: #000000 !important;">Actions</th>
+                ` : `
+                    <th style="color: #000000 !important;">Tag ID</th>
+                    <th style="color: #000000 !important;">Common Name</th>
+                    <th style="color: #000000 !important;">Bin Location</th>
+                    <th style="color: #000000 !important;">Status</th>
+                    <th style="color: #000000 !important;">Last Contract</th>
+                    <th style="color: #000000 !important;">Last Scanned Date</th>
+                    <th style="color: #000000 !important;">Quality</th>
+                    <th style="color: #000000 !important;">Notes</th>
+                `}
+            </tr>
+        </thead>
+        <tbody style="min-height: 50px;">
             <tr>
                 ${window.cachedTabNum == 5 ? `
                     <td>-</td>
@@ -612,9 +614,9 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                     <td style="color: #000000 !important;">-</td>
                 `}
             </tr>
-        `;
-        wrapper = container.querySelector('.item-level-wrapper');
-    }
+        </tbody>
+    `;
+    wrapper.appendChild(itemTable);
 
     const url = `/tab/${window.cachedTabNum}/data?common_name=${encodeURIComponent(commonName)}&page=${page}&subcategory=${encodeURIComponent(subcategory)}&category=${encodeURIComponent(category)}`;
     console.log(`Fetching items: ${url}`);
@@ -631,6 +633,7 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
         })
         .then(data => {
             console.log('Items data:', data);
+            const tbody = itemTable.querySelector('tbody');
             tbody.innerHTML = '';
 
             if (data.items && data.items.length > 0) {
@@ -699,16 +702,11 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                     }
                 });
 
-                let paginationControls = wrapper.querySelector('.pagination-controls');
-                let bulkControls = wrapper.querySelector('.bulk-update-controls');
-                if (paginationControls) paginationControls.remove();
-                if (bulkControls) bulkControls.remove();
-
+                const paginationDiv = document.createElement('div');
+                paginationDiv.className = 'pagination-controls';
                 if (data.total_items > data.per_page) {
                     const totalPages = Math.ceil(data.total_items / data.per_page);
                     const escapedCommonName = commonName.replace(/'/g, "\\'").replace(/"/g, '\\"');
-                    const paginationDiv = document.createElement('div');
-                    paginationDiv.className = 'pagination-controls';
                     paginationDiv.innerHTML = `
                         <button class="btn btn-sm btn-secondary" 
                                 onclick="loadItems('${category}', '${subcategory}', '${escapedCommonName}', '${targetId}', ${data.page - 1})" 
@@ -718,8 +716,8 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                                 onclick="loadItems('${category}', '${subcategory}', '${escapedCommonName}', '${targetId}', ${data.page + 1})" 
                                 ${data.page === totalPages ? 'disabled' : ''}>Next</button>
                     `;
-                    wrapper.appendChild(paginationDiv);
                 }
+                wrapper.appendChild(paginationDiv);
 
                 if (window.cachedTabNum == 5) {
                     const bulkDiv = document.createElement('div');
@@ -774,12 +772,13 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
 
             const parentRow = container.closest('tr.common-name-row').previousElementSibling;
             if (parentRow) {
-                const toggleBtn = parentRow.querySelector(`.expand-btn[data-target-id="${targetId}"]`);
-                if (toggleBtn) {
-                    toggleBtn.textContent = 'Collapse';
-                    toggleBtn.setAttribute('data-expanded', 'true');
+                const expandBtn = parentRow.querySelector(`.expand-btn[data-target-id="${targetId}"]`);
+                const collapseBtn = parentRow.querySelector(`.collapse-btn[data-collapse-target="${targetId}"]`);
+                if (expandBtn && collapseBtn) {
+                    expandBtn.style.display = 'none';
+                    collapseBtn.style.display = 'inline-block';
                 } else {
-                    console.warn(`Toggle button not found for ${targetId}`);
+                    console.warn(`Expand/Collapse buttons not found for ${targetId}`);
                 }
             } else {
                 console.warn(`Parent row not found for ${targetId}`);
@@ -813,6 +812,7 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
         })
         .catch(error => {
             console.error('Items error:', error.message);
+            const tbody = itemTable.querySelector('tbody');
             tbody.innerHTML = `<tr><td colspan="${window.cachedTabNum == 5 ? 10 : 8}">Error: ${error.message}</td></tr>`;
             container.classList.remove('collapsed');
             container.classList.add('expanded');
@@ -1055,23 +1055,23 @@ document.addEventListener('DOMContentLoaded', function() {
     document.addEventListener('click', handleClick);
 
     function handleClick(event) {
-        const toggleBtn = event.target.closest('.expand-btn');
-        if (toggleBtn) {
+        const expandBtn = event.target.closest('.expand-btn');
+        if (expandBtn) {
             event.preventDefault();
             event.stopPropagation();
             console.log('Expand button clicked:', {
-                category: toggleBtn.getAttribute('data-category'),
-                subcategory: toggleBtn.getAttribute('data-subcategory'),
-                commonName: toggleBtn.getAttribute('data-common-name'),
-                targetId: toggleBtn.getAttribute('data-target-id'),
-                isExpanded: toggleBtn.getAttribute('data-expanded')
+                category: expandBtn.getAttribute('data-category'),
+                subcategory: expandBtn.getAttribute('data-subcategory'),
+                commonName: expandBtn.getAttribute('data-common-name'),
+                targetId: expandBtn.getAttribute('data-target-id'),
+                isExpanded: expandBtn.getAttribute('data-expanded')
             });
 
-            const category = toggleBtn.getAttribute('data-category');
-            const subcategory = toggleBtn.getAttribute('data-subcategory');
-            const commonName = toggleBtn.getAttribute('data-common-name');
-            const targetId = toggleBtn.getAttribute('data-target-id');
-            const isExpanded = toggleBtn.getAttribute('data-expanded') === 'true';
+            const category = expandBtn.getAttribute('data-category');
+            const subcategory = expandBtn.getAttribute('data-subcategory');
+            const commonName = expandBtn.getAttribute('data-common-name');
+            const targetId = expandBtn.getAttribute('data-target-id');
+            const isExpanded = expandBtn.getAttribute('data-expanded') === 'true';
 
             if (!targetId || !category) {
                 console.error('Missing attributes on expand button');
@@ -1084,25 +1084,65 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
 
+            const collapseBtn = expandBtn.parentElement.querySelector('.collapse-btn[data-collapse-target="' + targetId + '"]');
+
             if (isExpanded) {
                 console.log(`Collapsing ${targetId}`);
-                container.classList.remove('expanded');
-                container.classList.add('collapsed');
-                container.style.opacity = '0';
-                setTimeout(() => {
-                    container.style.display = 'none';
-                }, 700);
-                toggleBtn.textContent = commonName ? 'Expand Items' : 'Expand';
-                toggleBtn.setAttribute('data-expanded', 'false');
-                sessionStorage.removeItem(`expanded_items_${targetId}`);
+                if (commonName) {
+                    collapseItems(targetId);
+                } else {
+                    collapseSection(expandBtn.closest('tr'), targetId);
+                }
+                if (expandBtn && collapseBtn) {
+                    expandBtn.style.display = 'inline-block';
+                    collapseBtn.style.display = 'none';
+                    expandBtn.setAttribute('data-expanded', 'false');
+                    expandBtn.textContent = commonName ? 'Expand Items' : 'Expand';
+                }
             } else {
                 if (commonName && subcategory) {
                     console.log(`Loading items for ${commonName}`);
                     loadItems(category, subcategory, commonName, targetId);
+                    if (expandBtn && collapseBtn) {
+                        expandBtn.style.display = 'none';
+                        collapseBtn.style.display = 'inline-block';
+                        expandBtn.setAttribute('data-expanded', 'true');
+                    }
                 } else {
                     console.log(`Loading subcategories for ${category}`);
                     loadSubcategories(category, targetId);
+                    if (expandBtn && collapseBtn) {
+                        expandBtn.style.display = 'none';
+                        collapseBtn.style.display = 'inline-block';
+                        expandBtn.setAttribute('data-expanded', 'true');
+                    }
                 }
+            }
+            return;
+        }
+
+        const collapseBtn = event.target.closest('.collapse-btn');
+        if (collapseBtn) {
+            event.preventDefault();
+            event.stopPropagation();
+            const targetId = collapseBtn.getAttribute('data-collapse-target');
+            console.log(`Collapsing ${targetId}`);
+            const container = document.getElementById(targetId);
+            if (!container) {
+                console.error(`Container ${targetId} not found`);
+                return;
+            }
+            const expandBtn = collapseBtn.parentElement.querySelector('.expand-btn[data-target-id="' + targetId + '"]');
+            if (container.classList.contains('item-level')) {
+                collapseItems(targetId);
+            } else {
+                collapseSection(collapseBtn.closest('tr'), targetId);
+            }
+            if (expandBtn && collapseBtn) {
+                expandBtn.style.display = 'inline-block';
+                collapseBtn.style.display = 'none';
+                expandBtn.setAttribute('data-expanded', 'false');
+                expandBtn.textContent = expandBtn.getAttribute('data-common-name') ? 'Expand Items' : 'Expand';
             }
             return;
         }
