@@ -3,7 +3,7 @@ from .. import db, cache
 from ..models.db_models import ItemMaster, Transaction, RentalClassMapping, UserRentalClassMapping
 from ..services.api_client import APIClient
 from sqlalchemy import func, desc, or_, asc, text
-from time import time
+import time
 from datetime import datetime, timedelta
 import logging
 import sys
@@ -50,7 +50,7 @@ if not any(isinstance(h, logging.StreamHandler) for h in root_logger.handlers):
 tab5_bp = Blueprint('tab5', __name__)
 
 # Version marker
-logger.info("Deployed tab5.py version: 2025-05-19-v36")
+logger.info("Deployed tab5.py version: 2025-05-19-v37")
 
 def get_category_data(session, filter_query='', sort='', status_filter='', bin_filter=''):
     cache_key = f'tab5_view_data_{filter_query}_{sort}_{status_filter}_{bin_filter}'
@@ -727,7 +727,9 @@ def update_items_async(app, tag_ids_to_update, current_time, scheduler):
             logger.debug("Creating new SQLAlchemy session for background thread")
             session_factory = sessionmaker(bind=db.engine)
             session = scoped_session(session_factory)
-            logger.debug("Successfully created new session for background thread")
+            # Disable autoflush to prevent premature flushes
+            session.autoflush = False
+            logger.debug("Successfully created new session for background thread with autoflush disabled")
         except Exception as e:
             logger.error(f"Failed to create SQLAlchemy session in background thread: {str(e)}")
             if scheduler and scheduler.running:
@@ -766,19 +768,21 @@ def update_items_async(app, tag_ids_to_update, current_time, scheduler):
                         api_client.update_status(tag_id, 'Sold')
                         item.status = 'Sold'
                         item.date_last_scanned = current_time
+                        # Commit immediately to reduce lock contention
+                        session.commit()
                         updated_items += 1
                         logger.debug(f"Successfully updated tag_id {tag_id} to status 'Sold'")
                         break
                     except Exception as e:
+                        session.rollback()
                         logger.error(f"Failed to update tag_id {tag_id} on attempt {attempt + 1}: {str(e)}")
                         if attempt == max_retries - 1:
                             failed_items.append((tag_id, str(e)))
                         else:
-                            logger.info(f"Retrying update for tag_id {tag_id} after 3 seconds")
-                            time.sleep(3)
+                            logger.info(f"Retrying update for tag_id {tag_id} after 5 seconds")
+                            time.sleep(5)
                         continue
 
-            session.commit()
             logger.info(f"Updated {updated_items} items from resale/pack to Sold status in background task")
             if failed_items:
                 logger.warning(f"Failed to update {len(failed_items)} items: {failed_items}")
