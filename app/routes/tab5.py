@@ -13,6 +13,7 @@ from io import StringIO
 import json
 import threading
 from ..services.scheduler import get_scheduler
+from sqlalchemy.orm import scoped_session, sessionmaker
 
 # Configure logging
 logger = logging.getLogger('tab5')
@@ -49,7 +50,7 @@ if not any(isinstance(h, logging.StreamHandler) for h in root_logger.handlers):
 tab5_bp = Blueprint('tab5', __name__)
 
 # Version marker
-logger.info("Deployed tab5.py version: 2025-05-19-v33")
+logger.info("Deployed tab5.py version: 2025-05-19-v34")
 
 def get_category_data(session, filter_query='', sort='', status_filter='', bin_filter=''):
     cache_key = f'tab5_view_data_{filter_query}_{sort}_{status_filter}_{bin_filter}'
@@ -719,7 +720,20 @@ def update_items_async(tag_ids_to_update, current_time, scheduler):
     api_client = APIClient()
     updated_items = 0
     failed_items = []
-    session = db.session()
+
+    # Create a new session independent of Flask-SQLAlchemy's request context
+    try:
+        logger.debug("Creating new SQLAlchemy session for background thread")
+        session_factory = sessionmaker(bind=db.engine)
+        session = scoped_session(session_factory)
+        logger.debug("Successfully created new session for background thread")
+    except Exception as e:
+        logger.error(f"Failed to create SQLAlchemy session in background thread: {str(e)}")
+        if scheduler and scheduler.running:
+            scheduler.resume()
+            logger.info("Scheduler resumed after session creation failure")
+        logger.info("Background update task aborted due to session creation failure")
+        return
 
     try:
         # Retry token refresh to handle transient failures
@@ -771,7 +785,7 @@ def update_items_async(tag_ids_to_update, current_time, scheduler):
         session.rollback()
         logger.error(f"Critical error in background update task: {str(e)}", exc_info=True)
     finally:
-        session.close()
+        session.remove()
         if scheduler and scheduler.running:
             scheduler.resume()
             logger.info("Scheduler resumed after background update task")
@@ -815,7 +829,7 @@ def update_resale_pack_to_sold():
         threading.Thread(
             target=update_items_async,
             args=(tag_ids_to_update, current_time, scheduler),
-            daemon=False  # Ensure the thread runs to completion
+            daemon=False
         ).start()
         session.close()
 
