@@ -12,7 +12,7 @@ import csv
 from io import StringIO
 import json
 import threading
-from apscheduler.schedulers.background import BackgroundScheduler
+from ..services.scheduler import get_scheduler  # Import the get_scheduler function
 
 # Configure logging
 logger = logging.getLogger('tab5')
@@ -49,7 +49,7 @@ if not any(isinstance(h, logging.StreamHandler) for h in root_logger.handlers):
 tab5_bp = Blueprint('tab5', __name__)
 
 # Version marker
-logger.info("Deployed tab5.py version: 2025-05-19-v30")
+logger.info("Deployed tab5.py version: 2025-05-19-v31")
 
 def get_category_data(session, filter_query='', sort='', status_filter='', bin_filter=''):
     # Check if data is in cache
@@ -773,8 +773,9 @@ def update_items_async(items_to_update, current_time, scheduler):
     finally:
         session.close()
         # Resume the scheduler
-        scheduler.resume()
-        logger.info("Scheduler resumed after background update task")
+        if scheduler and scheduler.running:
+            scheduler.resume()
+            logger.info("Scheduler resumed after background update task")
 
 @tab5_bp.route('/tab/5/update_resale_pack_to_sold', methods=['POST'])
 def update_resale_pack_to_sold():
@@ -806,7 +807,7 @@ def update_resale_pack_to_sold():
             return jsonify({'status': 'success', 'message': 'No items found to update'})
 
         # Pause the scheduler to prevent conflicts with incremental_refresh
-        scheduler = BackgroundScheduler.get_scheduler()
+        scheduler = get_scheduler()  # Use the imported get_scheduler function
         if scheduler and scheduler.running:
             scheduler.pause()
             logger.info("Paused scheduler to prevent conflicts during update")
