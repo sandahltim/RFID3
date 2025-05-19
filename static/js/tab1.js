@@ -1,4 +1,178 @@
-console.log('tab1.js version: 2025-05-19-v4 loaded');
+console.log('tab1.js version: 2025-05-19-v5 loaded');
+
+// Utility functions for Tab 1 (moved from common.js)
+function formatDate(dateStr) {
+    if (!dateStr || dateStr === 'N/A') return 'N/A';
+    try {
+        const date = new Date(dateStr);
+        if (isNaN(date.getTime())) return 'N/A';
+        return date.toLocaleString('en-US', {
+            weekday: 'short',
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true
+        }).replace(',', '');
+    } catch (error) {
+        console.error('Error formatting date:', error.message);
+        return 'N/A';
+    }
+}
+
+function showLoading(key) {
+    try {
+        const loadingDiv = document.getElementById(`loading-${key}`);
+        if (loadingDiv) {
+            loadingDiv.classList.remove('collapsed');
+            loadingDiv.classList.add('expanded');
+            loadingDiv.style.display = 'block';
+            loadingDiv.style.opacity = '1';
+            loadingDiv.style.visibility = 'visible';
+            return true;
+        }
+        return false;
+    } catch (error) {
+        console.error('Error showing loading indicator:', error.message);
+        return false;
+    }
+}
+
+function hideLoading(key) {
+    try {
+        const loadingDiv = document.getElementById(`loading-${key}`);
+        if (loadingDiv) {
+            loadingDiv.classList.remove('expanded');
+            loadingDiv.classList.add('collapsed');
+            loadingDiv.style.opacity = '0';
+            setTimeout(() => {
+                loadingDiv.style.display = 'none';
+                loadingDiv.style.visibility = 'hidden';
+            }, 700);
+            return true;
+        }
+        return false;
+    } catch (error) {
+        console.error('Error hiding loading indicator:', error.message);
+        return false;
+    }
+}
+
+function collapseSection(categoryRow, targetId) {
+    const container = document.getElementById(targetId);
+    if (!container) {
+        console.error(`Container ${targetId} not found`);
+        return;
+    }
+    const headerRow = categoryRow.parentNode.querySelector(`tr.common-name-row[data-target-id="${targetId}"]`);
+    if (headerRow) {
+        headerRow.remove();
+    }
+    container.classList.remove('expanded');
+    container.classList.add('collapsed');
+    container.style.opacity = '0';
+    setTimeout(() => {
+        container.style.display = 'none';
+        container.style.visibility = 'hidden';
+    }, 700);
+    sessionStorage.removeItem(`expanded_${targetId}`);
+}
+
+function collapseItems(targetId) {
+    const container = document.getElementById(targetId);
+    if (!container) {
+        console.error(`Container ${targetId} not found`);
+        return;
+    }
+    container.classList.remove('expanded');
+    container.classList.add('collapsed');
+    container.style.opacity = '0';
+    setTimeout(() => {
+        container.style.display = 'none';
+        container.style.visibility = 'hidden';
+    }, 700);
+    sessionStorage.removeItem(`expanded_${targetId}`);
+}
+
+// Filter application for Tab 1 (moved from common.js)
+function applyFilterWithRetryTab1(tableId, tableType, retries = 10, delay = 200) {
+    const table = document.getElementById(tableId);
+    console.log(`Checking ${tableType} table ${tableId}: ${table ? 'Found' : 'Not found'}`);
+    if (table && typeof applyFilterToAllLevelsTab1 === 'function') {
+        applyFilterToAllLevelsTab1();
+        console.log(`Filter applied for ${tableId} (${tableType})`);
+    } else if (retries > 0) {
+        console.log(`Table ${tableId} (${tableType}) not ready, retrying (${retries} attempts left)`);
+        setTimeout(() => applyFilterWithRetryTab1(tableId, tableType, retries - 1, delay), delay);
+    } else {
+        console.warn(`Failed to apply filter for ${tableId} (${tableType}): Table not found after retries`);
+    }
+}
+
+function applyFilterToAllLevelsTab1() {
+    try {
+        const categoryFilter = document.getElementById('category-filter')?.value.toLowerCase() || '';
+        const statusFilter = document.getElementById('statusFilter')?.value.toLowerCase() || '';
+        const binFilter = document.getElementById('binFilter')?.value.toLowerCase() || '';
+
+        const categoryRows = document.querySelectorAll('#category-table tbody tr:not(.common-name-row)');
+
+        let visibleRows = 0;
+        categoryRows.forEach(row => {
+            const category = row.cells[0]?.textContent.toLowerCase() || '';
+            const matchesCategory = category.includes(categoryFilter);
+            const matchesStatus = !statusFilter || row.cells[3]?.textContent.toLowerCase() !== '0' || row.cells[4]?.textContent.toLowerCase() !== '0';
+            const matchesBin = !binFilter;
+
+            if (matchesCategory && matchesStatus && matchesBin) {
+                row.style.display = '';
+                visibleRows++;
+            } else {
+                row.style.display = 'none';
+                const targetId = `subcat-${category.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
+                collapseSection(row, targetId);
+            }
+        });
+
+        const commonTables = document.querySelectorAll('.common-table');
+        commonTables.forEach(table => {
+            const category = table.closest('tr.common-name-row')?.previousElementSibling?.cells[0]?.textContent.toLowerCase().replace(/[^a-z0-9]/g, '_') || '';
+            if (!category) {
+                console.warn('Category not found for common table');
+                return;
+            }
+            const matchesCategory = category.includes(categoryFilter);
+            if (!matchesCategory) {
+                table.closest('tr.common-name-row').style.display = 'none';
+            } else {
+                table.closest('tr.common-name-row').style.display = '';
+            }
+        });
+
+        const itemTables = document.querySelectorAll('.item-table');
+        itemTables.forEach(table => {
+            const category = table.closest('tr.common-name-row')?.previousElementSibling?.previousElementSibling?.cells[0]?.textContent.toLowerCase().replace(/[^a-z0-9]/g, '_') || '';
+            if (!category) {
+                console.warn('Category not found for item table');
+                return;
+            }
+            const matchesCategory = category.includes(categoryFilter);
+            if (!matchesCategory) {
+                table.closest('tr.common-name-row').style.display = 'none';
+            } else {
+                table.closest('tr.common-name-row').style.display = '';
+            }
+        });
+
+        const rowCountDiv = document.getElementById('row-count');
+        if (rowCountDiv) {
+            rowCountDiv.textContent = `Showing ${visibleRows} categories`;
+        }
+    } catch (error) {
+        console.error('Error applying filters:', error.message);
+    }
+}
 
 // Populate subcategories for Tab 1
 function populateSubcategories() {
@@ -36,21 +210,6 @@ function populateSubcategories() {
                 select.innerHTML = '<option value="">Error loading subcategories</option>';
             });
     });
-}
-
-// Apply filter with retry mechanism
-function applyFilterWithRetry(tableId, tableType, retries = 10, delay = 200) {
-    const table = document.getElementById(tableId);
-    console.log(`Checking ${tableType} table ${tableId}: ${table ? 'Found' : 'Not found'}`);
-    if (table && typeof applyFilterToAllLevels === 'function') {
-        applyFilterToAllLevels();
-        console.log(`Filter applied for ${tableId} (${tableType})`);
-    } else if (retries > 0) {
-        console.log(`Table ${tableId} (${tableType}) not ready, retrying (${retries} attempts left)`);
-        setTimeout(() => applyFilterWithRetry(tableId, tableType, retries - 1, delay), delay);
-    } else {
-        console.warn(`Failed to apply filter for ${tableId} (${tableType}): Table not found after retries`);
-    }
 }
 
 // Load common names for Tab 1
@@ -249,7 +408,7 @@ function loadCommonNames(selectElement, page = 1) {
             }
 
             // Apply filter with retry for common table
-            applyFilterWithRetry(`common-table-${targetId}`, 'common');
+            applyFilterWithRetryTab1(`common-table-${targetId}`, 'common');
         })
         .catch(error => {
             console.error('Common names error:', error.message);
@@ -426,7 +585,7 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
             }
 
             // Apply filter with retry for item table
-            applyFilterWithRetry(`item-table-${key}`, 'item');
+            applyFilterWithRetryTab1(`item-table-${key}`, 'item');
         })
         .catch(error => {
             console.error('Items error:', error.message);
