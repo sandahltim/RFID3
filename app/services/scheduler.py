@@ -1,10 +1,11 @@
 from apscheduler.schedulers.background import BackgroundScheduler
 from app.services.refresh import incremental_refresh, full_refresh
 
+# Global scheduler instance
+scheduler = BackgroundScheduler()
+
 def init_scheduler(app):
     """Initialize APScheduler for incremental refreshes with the correct app context."""
-    scheduler = BackgroundScheduler()
-    
     # Trigger a full refresh on startup
     with app.app_context():
         app.logger.info("Triggering full refresh on startup")
@@ -33,3 +34,7 @@ def init_scheduler(app):
     )
     scheduler.start()
     app.logger.info("Background scheduler started for incremental refresh")
+
+def get_scheduler():
+    """Return the global scheduler instance."""
+    return scheduler
