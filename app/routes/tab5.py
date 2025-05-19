@@ -11,6 +11,7 @@ from urllib.parse import unquote
 import csv
 from io import StringIO
 import json
+import threading
 
 # Configure logging
 logger = logging.getLogger('tab5')
@@ -47,7 +48,7 @@ if not any(isinstance(h, logging.StreamHandler) for h in root_logger.handlers):
 tab5_bp = Blueprint('tab5', __name__)
 
 # Version marker
-logger.info("Deployed tab5.py version: 2025-05-19-v27")
+logger.info("Deployed tab5.py version: 2025-05-19-v28")
 
 def get_category_data(session, filter_query='', sort='', status_filter='', bin_filter=''):
     # Check if data is in cache
@@ -721,12 +722,44 @@ def update_status():
         session.close()
         return jsonify({'error': str(e)}), 500
 
+def update_items_async(items_to_update, current_time):
+    """
+    Background task to update items' status to 'Sold' and sync with the external API.
+    """
+    api_client = APIClient()
+    updated_items = 0
+    session = db.session()
+
+    try:
+        for item in items_to_update:
+            try:
+                logger.debug(f"Updating tag_id {item.tag_id}: current status={item.status}, date_last_scanned={item.date_last_scanned}")
+                # Update status to 'Sold' via API
+                api_client.update_status(item.tag_id, 'Sold')
+                # Update local database
+                item.status = 'Sold'
+                item.date_last_scanned = current_time
+                updated_items += 1
+                logger.debug(f"Successfully updated tag_id {item.tag_id} to status 'Sold'")
+            except Exception as e:
+                logger.error(f"Failed to update tag_id {item.tag_id}: {str(e)}")
+                continue
+
+        session.commit()
+        logger.info(f"Updated {updated_items} items from resale/pack to Sold status in background task")
+    except Exception as e:
+        session.rollback()
+        logger.error(f"Error in background update task: {str(e)}", exc_info=True)
+    finally:
+        session.close()
+
 @tab5_bp.route('/tab/5/update_resale_pack_to_sold', methods=['POST'])
 def update_resale_pack_to_sold():
     """
     Update items in ItemMaster with bin_location 'resale' or 'pack', status 'On Rent' or 'Delivered',
     and date_last_scanned more than 4 days ago to status 'Sold' via API PATCH.
     Items with NULL date_last_scanned are ignored as they haven't been recently changed.
+    This operation is now asynchronous to prevent Gunicorn timeouts.
     """
     try:
         logger.info("Starting update_resale_pack_to_sold process")
@@ -749,30 +782,15 @@ def update_resale_pack_to_sold():
             logger.info("No items found to update")
             return jsonify({'status': 'success', 'message': 'No items found to update'})
 
-        api_client = APIClient()
-        updated_items = 0
-
-        for item in items_to_update:
-            try:
-                logger.debug(f"Updating tag_id {item.tag_id}: current status={item.status}, date_last_scanned={item.date_last_scanned}")
-                # Update status to 'Sold' via API
-                api_client.update_status(item.tag_id, 'Sold')
-                # Update local database
-                item.status = 'Sold'
-                item.date_last_scanned = current_time
-                updated_items += 1
-                logger.debug(f"Successfully updated tag_id {item.tag_id} to status 'Sold'")
-            except Exception as e:
-                logger.error(f"Failed to update tag_id {item.tag_id}: {str(e)}")
-                continue
-
-        session.commit()
+        # Start a background thread to handle the updates
+        threading.Thread(target=update_items_async, args=(items_to_update, current_time), daemon=True).start()
         session.close()
-        logger.info(f"Updated {updated_items} items from resale/pack to Sold status")
-        return jsonify({'status': 'success', 'message': f'Updated {updated_items} items to Sold status'})
+
+        logger.info("Started background task to update items")
+        return jsonify({'status': 'success', 'message': f'Started update for {len(items_to_update)} items. Updates are processing in the background.'})
     except Exception as e:
         session.rollback()
-        logger.error(f"Error updating resale/pack items to Sold: {str(e)}", exc_info=True)
+        logger.error(f"Error initiating update_resale_pack_to_sold: {str(e)}", exc_info=True)
         session.close()
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
