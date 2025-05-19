@@ -50,7 +50,7 @@ if not any(isinstance(h, logging.StreamHandler) for h in root_logger.handlers):
 tab5_bp = Blueprint('tab5', __name__)
 
 # Version marker
-logger.info("Deployed tab5.py version: 2025-05-19-v34")
+logger.info("Deployed tab5.py version: 2025-05-19-v35")
 
 def get_category_data(session, filter_query='', sort='', status_filter='', bin_filter=''):
     cache_key = f'tab5_view_data_{filter_query}_{sort}_{status_filter}_{bin_filter}'
@@ -88,99 +88,99 @@ def get_category_data(session, filter_query='', sort='', status_filter='', bin_f
             continue
         rental_class_ids = [str(m['rental_class_id']).strip() for m in mappings]
 
-        total_items_query = session.query(func.count(ItemMaster.tag_id)).filter(
-            func.trim(func.cast(func.replace(ItemMaster.rental_class_num, '\x00', '#pragma warning disable CS8632'), db.String)).in_(rental_class_ids),
-            func.lower(func.trim(func.replace(func.coalesce(ItemMaster.bin_location, ''), '\x00', ''))).in_(['resale', 'sold', 'pack', 'burst'])
+    total_items_query = session.query(func.count(ItemMaster.tag_id)).filter(
+        func.trim(func.cast(func.replace(ItemMaster.rental_class_num, '\x00', '#pragma warning disable CS8632'), db.String)).in_(rental_class_ids),
+        func.lower(func.trim(func.replace(func.coalesce(ItemMaster.bin_location, ''), '\x00', ''))).in_(['resale', 'sold', 'pack', 'burst'])
+    )
+    if status_filter:
+        total_items_query = total_items_query.filter(func.lower(ItemMaster.status) == status_filter.lower())
+    if bin_filter:
+        total_items_query = total_items_query.filter(
+            func.lower(func.trim(func.replace(func.coalesce(ItemMaster.bin_location, ''), '\x00', ''))) == bin_filter.lower()
         )
-        if status_filter:
-            total_items_query = total_items_query.filter(func.lower(ItemMaster.status) == status_filter.lower())
-        if bin_filter:
-            total_items_query = total_items_query.filter(
-                func.lower(func.trim(func.replace(func.coalesce(ItemMaster.bin_location, ''), '\x00', ''))) == bin_filter.lower()
-            )
-        total_items = total_items_query.scalar() or 0
+    total_items = total_items_query.scalar() or 0
 
-        items_on_contracts_query = session.query(func.count(ItemMaster.tag_id)).filter(
-            func.trim(func.cast(func.replace(ItemMaster.rental_class_num, '\x00', ''), db.String)).in_(rental_class_ids),
-            ItemMaster.status.in_(['On Rent', 'Delivered']),
-            func.lower(func.trim(func.replace(func.coalesce(ItemMaster.bin_location, ''), '\x00', ''))).in_(['resale', 'sold', 'pack', 'burst'])
+    items_on_contracts_query = session.query(func.count(ItemMaster.tag_id)).filter(
+        func.trim(func.cast(func.replace(ItemMaster.rental_class_num, '\x00', ''), db.String)).in_(rental_class_ids),
+        ItemMaster.status.in_(['On Rent', 'Delivered']),
+        func.lower(func.trim(func.replace(func.coalesce(ItemMaster.bin_location, ''), '\x00', ''))).in_(['resale', 'sold', 'pack', 'burst'])
+    )
+    if status_filter:
+        items_on_contracts_query = items_on_contracts_query.filter(func.lower(ItemMaster.status) == status_filter.lower())
+    if bin_filter:
+        items_on_contracts_query = items_on_contracts_query.filter(
+            func.lower(func.trim(func.replace(func.coalesce(ItemMaster.bin_location, ''), '\x00', ''))) == bin_filter.lower()
         )
-        if status_filter:
-            items_on_contracts_query = items_on_contracts_query.filter(func.lower(ItemMaster.status) == status_filter.lower())
-        if bin_filter:
-            items_on_contracts_query = items_on_contracts_query.filter(
-                func.lower(func.trim(func.replace(func.coalesce(ItemMaster.bin_location, ''), '\x00', ''))) == bin_filter.lower()
-            )
-        items_on_contracts = items_on_contracts_query.scalar() or 0
+    items_on_contracts = items_on_contracts_query.scalar() or 0
 
-        subquery = session.query(
-            Transaction.tag_id,
-            Transaction.scan_date,
-            Transaction.service_required
-        ).filter(
-            Transaction.tag_id == ItemMaster.tag_id
-        ).order_by(
-            Transaction.scan_date.desc()
-        ).subquery()
+    subquery = session.query(
+        Transaction.tag_id,
+        Transaction.scan_date,
+        Transaction.service_required
+    ).filter(
+        Transaction.tag_id == ItemMaster.tag_id
+    ).order_by(
+        Transaction.scan_date.desc()
+    ).subquery()
 
-        items_in_service_query = session.query(func.count(ItemMaster.tag_id)).filter(
-            func.trim(func.cast(func.replace(ItemMaster.rental_class_num, '\x00', ''), db.String)).in_(rental_class_ids),
-            func.lower(func.trim(func.replace(func.coalesce(ItemMaster.bin_location, ''), '\x00', ''))).in_(['resale', 'sold', 'pack', 'burst']),
-            or_(
-                ItemMaster.status.notin_(['Ready to Rent', 'On Rent', 'Delivered']),
-                ItemMaster.tag_id.in_(
-                    session.query(subquery.c.tag_id).filter(
-                        subquery.c.scan_date == session.query(func.max(Transaction.scan_date)).filter(Transaction.tag_id == subquery.c.tag_id).correlate(subquery).scalar_subquery(),
-                        subquery.c.service_required == True
-                    )
+    items_in_service_query = session.query(func.count(ItemMaster.tag_id)).filter(
+        func.trim(func.cast(func.replace(ItemMaster.rental_class_num, '\x00', ''), db.String)).in_(rental_class_ids),
+        func.lower(func.trim(func.replace(func.coalesce(ItemMaster.bin_location, ''), '\x00', ''))).in_(['resale', 'sold', 'pack', 'burst']),
+        or_(
+            ItemMaster.status.notin_(['Ready to Rent', 'On Rent', 'Delivered']),
+            ItemMaster.tag_id.in_(
+                session.query(subquery.c.tag_id).filter(
+                    subquery.c.scan_date == session.query(func.max(Transaction.scan_date)).filter(Transaction.tag_id == subquery.c.tag_id).correlate(subquery).scalar_subquery(),
+                    subquery.c.service_required == True
                 )
             )
         )
-        if status_filter:
-            items_in_service_query = items_in_service_query.filter(func.lower(ItemMaster.status) == status_filter.lower())
-        if bin_filter:
-            items_in_service_query = items_in_service_query.filter(
-                func.lower(func.trim(func.replace(func.coalesce(ItemMaster.bin_location, ''), '\x00', ''))) == bin_filter.lower()
-            )
-        items_in_service = items_in_service_query.scalar() or 0
-
-        items_available_query = session.query(func.count(ItemMaster.tag_id)).filter(
-            func.trim(func.cast(func.replace(ItemMaster.rental_class_num, '\x00', ''), db.String)).in_(rental_class_ids),
-            ItemMaster.status == 'Ready to Rent',
-            func.lower(func.trim(func.replace(func.coalesce(ItemMaster.bin_location, ''), '\x00', ''))).in_(['resale', 'sold', 'pack', 'burst'])
+    )
+    if status_filter:
+        items_in_service_query = items_in_service_query.filter(func.lower(ItemMaster.status) == status_filter.lower())
+    if bin_filter:
+        items_in_service_query = items_in_service_query.filter(
+            func.lower(func.trim(func.replace(func.coalesce(ItemMaster.bin_location, ''), '\x00', ''))) == bin_filter.lower()
         )
-        if status_filter:
-            items_available_query = items_available_query.filter(func.lower(ItemMaster.status) == status_filter.lower())
-        if bin_filter:
-            items_available_query = items_available_query.filter(
-                func.lower(func.trim(func.replace(func.coalesce(ItemMaster.bin_location, ''), '\x00', ''))) == bin_filter.lower()
-            )
-        items_available = items_available_query.scalar() or 0
+    items_in_service = items_in_service_query.scalar() or 0
 
-        if total_items == 0:
-            continue
+    items_available_query = session.query(func.count(ItemMaster.tag_id)).filter(
+        func.trim(func.cast(func.replace(ItemMaster.rental_class_num, '\x00', ''), db.String)).in_(rental_class_ids),
+        ItemMaster.status == 'Ready to Rent',
+        func.lower(func.trim(func.replace(func.coalesce(ItemMaster.bin_location, ''), '\x00', ''))).in_(['resale', 'sold', 'pack', 'burst'])
+    )
+    if status_filter:
+        items_available_query = items_available_query.filter(func.lower(ItemMaster.status) == status_filter.lower())
+    if bin_filter:
+        items_available_query = items_available_query.filter(
+            func.lower(func.trim(func.replace(func.coalesce(ItemMaster.bin_location, ''), '\x00', ''))) == bin_filter.lower()
+        )
+    items_available = items_available_query.scalar() or 0
 
-        category_data.append({
-            'category': cat,
-            'cat_id': cat.lower().replace(' ', '_').replace('/', '_'),
-            'total_items': total_items,
-            'items_on_contracts': items_on_contracts,
-            'items_in_service': items_in_service,
-            'items_available': items_available
-        })
+    if total_items == 0:
+        continue
 
-    if sort == 'category_asc':
-        category_data.sort(key=lambda x: x['category'].lower())
-    elif sort == 'category_desc':
-        category_data.sort(key=lambda x: x['category'].lower(), reverse=True)
-    elif sort == 'total_items_asc':
-        category_data.sort(key=lambda x: x['total_items'])
-    elif sort == 'total_items_desc':
-        category_data.sort(key=lambda x: x['total_items'], reverse=True)
+    category_data.append({
+        'category': cat,
+        'cat_id': cat.lower().replace(' ', '_').replace('/', '_'),
+        'total_items': total_items,
+        'items_on_contracts': items_on_contracts,
+        'items_in_service': items_in_service,
+        'items_available': items_available
+    })
 
-    cache.set(cache_key, json.dumps(category_data), ex=60)
-    logger.info("Cached Tab 5 data")
-    return category_data
+if sort == 'category_asc':
+    category_data.sort(key=lambda x: x['category'].lower())
+elif sort == 'category_desc':
+    category_data.sort(key=lambda x: x['category'].lower(), reverse=True)
+elif sort == 'total_items_asc':
+    category_data.sort(key=lambda x: x['total_items'])
+elif sort == 'total_items_desc':
+    category_data.sort(key=lambda x: x['total_items'], reverse=True)
+
+cache.set(cache_key, json.dumps(category_data), ex=60)
+logger.info("Cached Tab 5 data")
+return category_data
 
 @tab5_bp.route('/tab/5')
 def tab5_view():
@@ -710,7 +710,7 @@ def update_status():
         session.close()
         return jsonify({'error': str(e)}), 500
 
-def update_items_async(tag_ids_to_update, current_time, scheduler):
+def update_items_async(app, tag_ids_to_update, current_time, scheduler):
     """
     Background task to update items' status to 'Sold' and sync with the external API.
     Takes a list of tag_ids and fetches fresh ItemMaster objects to avoid session issues.
@@ -721,75 +721,76 @@ def update_items_async(tag_ids_to_update, current_time, scheduler):
     updated_items = 0
     failed_items = []
 
-    # Create a new session independent of Flask-SQLAlchemy's request context
-    try:
-        logger.debug("Creating new SQLAlchemy session for background thread")
-        session_factory = sessionmaker(bind=db.engine)
-        session = scoped_session(session_factory)
-        logger.debug("Successfully created new session for background thread")
-    except Exception as e:
-        logger.error(f"Failed to create SQLAlchemy session in background thread: {str(e)}")
-        if scheduler and scheduler.running:
-            scheduler.resume()
-            logger.info("Scheduler resumed after session creation failure")
-        logger.info("Background update task aborted due to session creation failure")
-        return
+    # Create a new session within the Flask application context
+    with app.app_context():
+        try:
+            logger.debug("Creating new SQLAlchemy session for background thread")
+            session_factory = sessionmaker(bind=db.engine)
+            session = scoped_session(session_factory)
+            logger.debug("Successfully created new session for background thread")
+        except Exception as e:
+            logger.error(f"Failed to create SQLAlchemy session in background thread: {str(e)}")
+            if scheduler and scheduler.running:
+                scheduler.resume()
+                logger.info("Scheduler resumed after session creation failure")
+            logger.info("Background update task aborted due to session creation failure")
+            return
 
-    try:
-        # Retry token refresh to handle transient failures
-        max_auth_retries = 3
-        for auth_attempt in range(max_auth_retries):
-            try:
-                logger.debug(f"Attempting token refresh, attempt {auth_attempt + 1}")
-                api_client.authenticate()
-                logger.info("Forced token refresh before starting updates")
-                break
-            except Exception as e:
-                logger.error(f"Token refresh failed on attempt {auth_attempt + 1}: {str(e)}")
-                if auth_attempt == max_auth_retries - 1:
-                    logger.error("Failed to authenticate after 3 attempts, aborting update task")
-                    raise
-                logger.info("Retrying token refresh after 5 seconds")
-                time.sleep(5)
-
-        for tag_id in tag_ids_to_update:
-            max_retries = 3
-            for attempt in range(max_retries):
+        try:
+            # Retry token refresh to handle transient failures
+            max_auth_retries = 3
+            for auth_attempt in range(max_auth_retries):
                 try:
-                    logger.debug(f"Processing tag_id {tag_id}: attempt {attempt + 1}")
-                    item = session.query(ItemMaster).filter_by(tag_id=tag_id).first()
-                    if not item:
-                        logger.warning(f"Item with tag_id {tag_id} not found in database, skipping")
-                        break
-                    logger.debug(f"Updating tag_id {tag_id}: current status={item.status}, date_last_scanned={item.date_last_scanned}")
-                    api_client.update_status(tag_id, 'Sold')
-                    item.status = 'Sold'
-                    item.date_last_scanned = current_time
-                    updated_items += 1
-                    logger.debug(f"Successfully updated tag_id {tag_id} to status 'Sold'")
+                    logger.debug(f"Attempting token refresh, attempt {auth_attempt + 1}")
+                    api_client.authenticate()
+                    logger.info("Forced token refresh before starting updates")
                     break
                 except Exception as e:
-                    logger.error(f"Failed to update tag_id {tag_id} on attempt {attempt + 1}: {str(e)}")
-                    if attempt == max_retries - 1:
-                        failed_items.append((tag_id, str(e)))
-                    else:
-                        logger.info(f"Retrying update for tag_id {tag_id} after 3 seconds")
-                        time.sleep(3)
-                    continue
+                    logger.error(f"Token refresh failed on attempt {auth_attempt + 1}: {str(e)}")
+                    if auth_attempt == max_auth_retries - 1:
+                        logger.error("Failed to authenticate after 3 attempts, aborting update task")
+                        raise
+                    logger.info("Retrying token refresh after 5 seconds")
+                    time.sleep(5)
 
-        session.commit()
-        logger.info(f"Updated {updated_items} items from resale/pack to Sold status in background task")
-        if failed_items:
-            logger.warning(f"Failed to update {len(failed_items)} items: {failed_items}")
-    except Exception as e:
-        session.rollback()
-        logger.error(f"Critical error in background update task: {str(e)}", exc_info=True)
-    finally:
-        session.remove()
-        if scheduler and scheduler.running:
-            scheduler.resume()
-            logger.info("Scheduler resumed after background update task")
-        logger.info("Background update task completed")
+            for tag_id in tag_ids_to_update:
+                max_retries = 3
+                for attempt in range(max_retries):
+                    try:
+                        logger.debug(f"Processing tag_id {tag_id}: attempt {attempt + 1}")
+                        item = session.query(ItemMaster).filter_by(tag_id=tag_id).first()
+                        if not item:
+                            logger.warning(f"Item with tag_id {tag_id} not found in database, skipping")
+                            break
+                        logger.debug(f"Updating tag_id {tag_id}: current status={item.status}, date_last_scanned={item.date_last_scanned}")
+                        api_client.update_status(tag_id, 'Sold')
+                        item.status = 'Sold'
+                        item.date_last_scanned = current_time
+                        updated_items += 1
+                        logger.debug(f"Successfully updated tag_id {tag_id} to status 'Sold'")
+                        break
+                    except Exception as e:
+                        logger.error(f"Failed to update tag_id {tag_id} on attempt {attempt + 1}: {str(e)}")
+                        if attempt == max_retries - 1:
+                            failed_items.append((tag_id, str(e)))
+                        else:
+                            logger.info(f"Retrying update for tag_id {tag_id} after 3 seconds")
+                            time.sleep(3)
+                        continue
+
+            session.commit()
+            logger.info(f"Updated {updated_items} items from resale/pack to Sold status in background task")
+            if failed_items:
+                logger.warning(f"Failed to update {len(failed_items)} items: {failed_items}")
+        except Exception as e:
+            session.rollback()
+            logger.error(f"Critical error in background update task: {str(e)}", exc_info=True)
+        finally:
+            session.remove()
+            if scheduler and scheduler.running:
+                scheduler.resume()
+                logger.info("Scheduler resumed after background update task")
+            logger.info("Background update task completed")
 
 @tab5_bp.route('/tab/5/update_resale_pack_to_sold', methods=['POST'])
 def update_resale_pack_to_sold():
@@ -826,9 +827,10 @@ def update_resale_pack_to_sold():
             scheduler.pause()
             logger.info("Paused scheduler to prevent conflicts during update")
 
+        # Pass the Flask app to the background thread
         threading.Thread(
             target=update_items_async,
-            args=(tag_ids_to_update, current_time, scheduler),
+            args=(current_app._get_current_object(), tag_ids_to_update, current_time, scheduler),
             daemon=False
         ).start()
         session.close()
