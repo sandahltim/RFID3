@@ -49,7 +49,7 @@ if not any(isinstance(h, logging.StreamHandler) for h in root_logger.handlers):
 tab5_bp = Blueprint('tab5', __name__)
 
 # Version marker
-logger.info("Deployed tab5.py version: 2025-05-19-v31")
+logger.info("Deployed tab5.py version: 2025-05-19-v32")
 
 def get_category_data(session, filter_query='', sort='', status_filter='', bin_filter=''):
     # Check if data is in cache
@@ -725,11 +725,13 @@ def update_status():
         session.close()
         return jsonify({'error': str(e)}), 500
 
-def update_items_async(items_to_update, current_time, scheduler):
+def update_items_async(tag_ids_to_update, current_time, scheduler):
     """
     Background task to update items' status to 'Sold' and sync with the external API.
+    Takes a list of tag_ids and fetches fresh ItemMaster objects to avoid session issues.
     Includes retries for API calls and better error handling.
     """
+    logger.info(f"Starting background update task for {len(tag_ids_to_update)} items")
     api_client = APIClient()
     updated_items = 0
     failed_items = []
@@ -740,25 +742,32 @@ def update_items_async(items_to_update, current_time, scheduler):
         api_client.authenticate()
         logger.info("Forced token refresh before starting updates")
 
-        for item in items_to_update:
+        for tag_id in tag_ids_to_update:
             max_retries = 3
             for attempt in range(max_retries):
                 try:
-                    logger.debug(f"Updating tag_id {item.tag_id}: attempt {attempt + 1}, current status={item.status}, date_last_scanned={item.date_last_scanned}")
+                    logger.debug(f"Processing tag_id {tag_id}: attempt {attempt + 1}")
+                    # Fetch a fresh ItemMaster object
+                    item = session.query(ItemMaster).filter_by(tag_id=tag_id).first()
+                    if not item:
+                        logger.warning(f"Item with tag_id {tag_id} not found in database, skipping")
+                        break
+
+                    logger.debug(f"Updating tag_id {tag_id}: current status={item.status}, date_last_scanned={item.date_last_scanned}")
                     # Update status to 'Sold' via API
-                    api_client.update_status(item.tag_id, 'Sold')
+                    api_client.update_status(tag_id, 'Sold')
                     # Update local database
                     item.status = 'Sold'
                     item.date_last_scanned = current_time
                     updated_items += 1
-                    logger.debug(f"Successfully updated tag_id {item.tag_id} to status 'Sold'")
+                    logger.debug(f"Successfully updated tag_id {tag_id} to status 'Sold'")
                     break  # Success, move to next item
                 except Exception as e:
-                    logger.error(f"Failed to update tag_id {item.tag_id} on attempt {attempt + 1}: {str(e)}")
+                    logger.error(f"Failed to update tag_id {tag_id} on attempt {attempt + 1}: {str(e)}")
                     if attempt == max_retries - 1:
-                        failed_items.append((item.tag_id, str(e)))
+                        failed_items.append((tag_id, str(e)))
                     else:
-                        logger.info(f"Retrying update for tag_id {item.tag_id} after 3 seconds")
+                        logger.info(f"Retrying update for tag_id {tag_id} after 3 seconds")
                         time.sleep(3)
                     continue
 
@@ -800,28 +809,31 @@ def update_resale_pack_to_sold():
             ItemMaster.date_last_scanned < four_days_ago
         ).all()
 
-        logger.info(f"Found {len(items_to_update)} items to update")
-        if not items_to_update:
+        # Extract tag_ids to pass to the background thread
+        tag_ids_to_update = [item.tag_id for item in items_to_update]
+        logger.info(f"Found {len(tag_ids_to_update)} items to update")
+
+        if not tag_ids_to_update:
             session.close()
             logger.info("No items found to update")
             return jsonify({'status': 'success', 'message': 'No items found to update'})
 
         # Pause the scheduler to prevent conflicts with incremental_refresh
-        scheduler = get_scheduler()  # Use the imported get_scheduler function
+        scheduler = get_scheduler()
         if scheduler and scheduler.running:
             scheduler.pause()
             logger.info("Paused scheduler to prevent conflicts during update")
 
-        # Start a background thread to handle the updates
+        # Start a background thread to handle the updates, passing tag_ids instead of ItemMaster objects
         threading.Thread(
             target=update_items_async,
-            args=(items_to_update, current_time, scheduler),
+            args=(tag_ids_to_update, current_time, scheduler),
             daemon=True
         ).start()
         session.close()
 
         logger.info("Started background task to update items")
-        return jsonify({'status': 'success', 'message': f'Started update for {len(items_to_update)} items. Updates are processing in the background.'})
+        return jsonify({'status': 'success', 'message': f'Started update for {len(tag_ids_to_update)} items. Updates are processing in the background.'})
     except Exception as e:
         session.rollback()
         logger.error(f"Error initiating update_resale_pack_to_sold: {str(e)}", exc_info=True)
