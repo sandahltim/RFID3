@@ -1,4 +1,3 @@
-<!DOCTYPE html>
 {% extends "base.html" %}
 
 {% block title %}Resale/Rental Packs{% endblock %}
@@ -7,36 +6,39 @@
 <script>
     window.cachedTabNum = 5; // Set tab number
 </script>
+<style>
+    .filter-row {
+        margin-bottom: 20px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: center;
+    }
+    .filter-row select,
+    .filter-row button {
+        margin-right: 10px;
+        max-width: 200px;
+    }
+    .table th, .table td {
+        vertical-align: middle;
+    }
+    .btn-group .btn {
+        margin-right: 5px;
+    }
+</style>
 {% endblock %}
 
 {% block content %}
-<div class="mt-0">
-    <!-- Page title for Tab 5 -->
+<div class="mt-4">
     <h2>Resale/Rental Packs</h2>
-    <!-- Buttons and bulk update controls -->
-    <div class="mb-2 d-flex align-items-center gap-2 flex-wrap">
-        <!-- Button to update resale/pack items to Sold -->
+
+    <div class="filter-row">
         <button class="btn btn-primary" onclick="updateResalePackToSold()">Update Resale/Pack to Sold</button>
-        <!-- Button to export CSV -->
         <button class="btn btn-primary" onclick="exportSoldItemsCSV()">Export Sold Items CSV</button>
-        <!-- Bulk update controls -->
-        <select id="bulk-bin-location" class="form-control" style="max-width: 200px;">
-            <option value="">Select Bin Location...</option>
-            <option value="resale">Resale</option>
-            <option value="sold">Sold</option>
-            <option value="pack">Pack</option>
-            <option value="burst">Burst</option>
-        </select>
-        <select id="bulk-status" class="form-control" style="max-width: 200px;">
-            <option value="">Select Status...</option>
-            <option value="Ready to Rent">Ready to Rent</option>
-            <option value="Sold">Sold</option>
-        </select>
-        <button class="btn btn-primary" onclick="bulkUpdateItems()">Bulk Update</button>
     </div>
-    <!-- Table for displaying categories -->
-    <table class="table table-bordered category-table" id="category-table">
-        <thead>
+
+    <table id="category-table" class="table table-bordered table-hover">
+        <thead class="thead-dark">
             <tr>
                 <th>Category</th>
                 <th>Subcategory</th>
@@ -48,41 +50,35 @@
             </tr>
         </thead>
         <tbody id="category-rows">
-            {% include '_category_rows.html' %}
+            {% for category in categories %}
+            <tr class="category-row" id="category-{{ category.cat_id }}">
+                <td>{{ category.category }}</td>
+                <td>
+                    <select class="subcategory-select form-control" data-category="{{ category.category }}" onchange="loadCommonNames(this)">
+                        <option value="">Select a subcategory</option>
+                    </select>
+                </td>
+                <td>{{ category.total_items }}</td>
+                <td>{{ category.items_on_contracts }}</td>
+                <td>{{ category.items_in_service }}</td>
+                <td>{{ category.items_available }}</td>
+                <td>
+                    <div class="btn-group">
+                        <button class="btn btn-sm btn-secondary expand-btn" data-category="{{ category.category }}"
+                                data-target-id="common-{{ category.cat_id }}" data-expanded="false">Expand</button>
+                        <button class="btn btn-sm btn-secondary collapse-btn" data-collapse-target="common-{{ category.cat_id }}"
+                                style="display:none;">Collapse</button>
+                        <button class="btn btn-sm btn-info print-btn" data-print-level="Contract"
+                                data-print-id="common-{{ category.cat_id }}" data-category="{{ category.category }}">Print</button>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
         </tbody>
     </table>
 </div>
 
-<!-- JavaScript for refreshing the table and handling updates -->
 <script>
-function refreshTab() {
-    window.location.reload();
-}
-
-function updateResalePackToSold() {
-    if (confirm('Are you sure you want to update all items with bin_location "resale" or "pack", status "On Rent" or "Delivered", and last scanned more than 4 days ago to status "Sold"?')) {
-        fetch('/tab/5/update_resale_pack_to_sold', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            }
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.status === 'success') {
-                alert(data.message);
-                refreshTab(); // Refresh the table to reflect changes
-            } else {
-                alert('Error: ' + data.message);
-            }
-        })
-        .catch(error => {
-            console.error('Error updating items:', error);
-            alert('Failed to update items: ' + error.message);
-        });
-    }
-}
-
 function exportSoldItemsCSV() {
     window.location.href = '/tab/5/export_sold_items_csv';
 }
@@ -139,43 +135,5 @@ function bulkUpdateItems() {
         alert('Failed to update items: ' + error.message);
     });
 }
-
-// Populate subcategory dropdowns on page load and apply filter afterward
-document.addEventListener('DOMContentLoaded', function() {
-    const selects = document.querySelectorAll('.subcategory-select');
-    const promises = Array.from(selects).map(select => {
-        const category = select.getAttribute('data-category');
-        const catId = category.toLowerCase().replace(/[^a-z0-9]/g, '_'); // Use category name as identifier
-        const loadingDiv = document.getElementById(`loading-subcat-${catId}`);
-        if (loadingDiv) {
-            loadingDiv.style.display = 'block';
-        }
-        return fetch(`/tab/5/subcat_data?category=${category}`)
-            .then(response => response.json())
-            .then(data => {
-                data.subcategories.forEach(subcat => {
-                    const option = document.createElement('option');
-                    option.value = subcat.subcategory;
-                    option.textContent = subcat.subcategory;
-                    select.appendChild(option);
-                });
-            })
-            .catch(error => console.error('Error fetching subcategories:', error))
-            .finally(() => {
-                if (loadingDiv) {
-                    loadingDiv.style.display = 'none';
-                }
-            });
-    });
-
-    // Apply the global filter after all subcategory dropdowns are populated
-    Promise.all(promises).then(() => {
-        if (typeof applyFilterToAllLevels === 'function') {
-            applyFilterToAllLevels();
-        } else {
-            console.warn('applyFilterToAllLevels function is not available');
-        }
-    });
-});
 </script>
 {% endblock %}
