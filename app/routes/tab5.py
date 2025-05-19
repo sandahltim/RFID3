@@ -50,7 +50,7 @@ if not any(isinstance(h, logging.StreamHandler) for h in root_logger.handlers):
 tab5_bp = Blueprint('tab5', __name__)
 
 # Version marker
-logger.info("Deployed tab5.py version: 2025-05-19-v37")
+logger.info("Deployed tab5.py version: 2025-05-19-v38")
 
 def get_category_data(session, filter_query='', sort='', status_filter='', bin_filter=''):
     cache_key = f'tab5_view_data_{filter_query}_{sort}_{status_filter}_{bin_filter}'
@@ -196,10 +196,10 @@ def tab5_view():
         logger.info(f"Fetched {len(category_data)} categories for tab5")
 
         session.close()
-        return render_template('tab5.html', categories=category_data, cache_bust=int(time()))
+        return render_template('tab5.html', categories=category_data, cache_bust=int(time.time()))
     except Exception as e:
         logger.error(f"Error rendering Tab 5: {str(e)}", exc_info=True)
-        return render_template('tab5.html', categories=[], cache_bust=int(time()))
+        return render_template('tab5.html', categories=[], cache_bust=int(time.time()))
 
 @tab5_bp.route('/tab/5/filter', methods=['POST'])
 def tab5_filter():
