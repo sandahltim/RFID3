@@ -475,13 +475,19 @@ def create_app():
     app.logger.info("Application starting up - logging initialized")
     app.logger.debug(f"Static folder path: {app.static_folder}")
 
-    # Database configuration
+    # Database configuration with connection pooling
     try:
         app.config['SQLALCHEMY_DATABASE_URI'] = (
             f"mysql+mysqlconnector://{DB_CONFIG['user']}:{DB_CONFIG['password']}@"
             f"{DB_CONFIG['host']}/{DB_CONFIG['database']}?charset={DB_CONFIG['charset']}"
         )
         app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+        app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+            'pool_size': 10,
+            'max_overflow': 20,
+            'pool_timeout': 30,
+            'pool_recycle': 1800,  # Recycle connections every 30 minutes
+        }
         app.config['REDIS_URL'] = REDIS_URL
         app.logger.info("Database and Redis configuration set successfully")
     except Exception as e:
@@ -546,7 +552,6 @@ def create_app():
 
     app.logger.info("Application startup completed successfully")
     return app
-
 
 
 ### Not all items will have Category or Subcategory assigned until assigned by user.
