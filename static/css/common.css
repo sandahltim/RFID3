@@ -18,28 +18,33 @@
     background: linear-gradient(180deg, var(--bte-light-gray) 0%, var(--bte-white) 100%);
     font-family: 'Roboto', sans-serif;
     min-height: 100vh;
+    max-width: 1400px;
+    margin: 0 auto;
 }
 
-/* Navigation bar styling with Bootstrap fallback */
+/* Navigation bar styling with Bootstrap enhancement */
 .navbar {
     background: linear-gradient(90deg, var(--bte-royal-blue) 0%, #0047AB 100%) !important;
-    padding: 15px 20px;
+    padding: 12px 20px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
     display: flex;
     justify-content: space-between;
     align-items: center;
     flex-wrap: wrap;
+    position: sticky;
+    top: 0;
+    z-index: 1000;
 }
 
 .navbar-brand, .navbar-nav .nav-link {
     color: var(--bte-gold) !important;
     font-weight: 700;
-    font-size: 1.3rem;
+    font-size: 1.2rem;
     text-transform: uppercase;
     letter-spacing: 1px;
     transition: color 0.3s ease, transform 0.2s ease;
     text-decoration: none;
-    margin: 0 10px;
+    padding: 8px 12px;
 }
 
 .navbar-brand:hover, .navbar-nav .nav-link:hover {
@@ -53,6 +58,7 @@
     list-style: none;
     margin: 0;
     padding: 0;
+    align-items: center;
 }
 
 .navbar-toggler {
@@ -61,35 +67,59 @@
     color: var(--bte-gold);
     font-size: 1.5rem;
     cursor: pointer;
+    padding: 8px;
 }
 
 .navbar-collapse {
     flex-grow: 1;
+    display: flex;
+    justify-content: flex-end;
+}
+
+@media (max-width: 991px) {
+    .navbar-collapse {
+        display: none;
+    }
+    .navbar-collapse.show {
+        display: flex;
+        flex-direction: column;
+        width: 100%;
+        background: var(--bte-royal-blue);
+        padding: 10px;
+    }
+    .navbar-nav {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    .navbar-nav .nav-link {
+        padding: 10px 20px;
+        width: 100%;
+    }
 }
 
 /* Headings */
 h2 {
     color: var(--bte-royal-blue);
     font-weight: 800;
-    font-size: 2.5rem;
-    margin: 30px auto;
-    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
-    border-bottom: 4px solid var(--bte-gold);
+    font-size: 2.3rem;
+    margin: 20px auto;
+    text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.2);
+    border-bottom: 3px solid var(--bte-gold);
     display: block;
-    padding: 10px 20px;
-    background: linear-gradient(90deg, var(--bte-white) 0%, var(--bte-light-gray) 100%);
-    border-radius: 8px;
+    padding: 8px 15px;
+    background: var(--bte-white);
+    border-radius: 6px;
     text-align: center;
-    max-width: 90%;
+    max-width: 95%;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
 }
 
 /* Subheadings */
 h4 {
     color: var(--bte-royal-blue);
     font-weight: 700;
-    font-size: 1.8rem;
-    margin-top: 20px;
-    margin-bottom: 15px;
+    font-size: 1.6rem;
+    margin: 15px 0;
     text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1);
 }
 
@@ -127,22 +157,22 @@ h4 {
 /* Filter and sort controls */
 .filter-sort-controls {
     display: flex;
-    gap: 15px;
+    gap: 12px;
     margin-bottom: 20px;
     flex-wrap: wrap;
     background: var(--bte-white);
-    padding: 15px;
-    border-radius: 8px;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
-    border: 2px solid var(--bte-royal-blue);
+    padding: 12px;
+    border-radius: 6px;
+    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.15);
+    border: 1px solid var(--bte-royal-blue);
 }
 
 .filter-sort-controls .form-control {
-    border: 2px solid var(--bte-royal-blue);
-    border-radius: 6px;
-    padding: 8px 12px;
-    font-size: 1rem;
-    max-width: 220px;
+    border: 1px solid var(--bte-royal-blue);
+    border-radius: 5px;
+    padding: 7px 10px;
+    font-size: 0.95rem;
+    max-width: 200px;
     transition: border-color 0.3s ease, box-shadow 0.3s ease;
     background-color: var(--bte-white);
     color: var(--bte-dark-gray);
@@ -150,26 +180,25 @@ h4 {
 
 .filter-sort-controls .form-control:focus {
     border-color: var(--bte-gold);
-    box-shadow: 0 0 8px rgba(255, 193, 7, 0.4);
+    box-shadow: 0 0 6px rgba(255, 193, 7, 0.3);
     outline: none;
 }
 
 /* Pagination controls */
 .pagination-controls {
     text-align: center;
-    margin-top: 10px;
-    margin-bottom: 20px;
+    margin: 10px 0;
 }
 
 .pagination-controls .btn {
-    margin: 0 10px;
+    margin: 0 8px;
     background: linear-gradient(90deg, var(--bte-royal-blue) 0%, #0047AB 100%);
     color: var(--bte-white);
     border: none;
-    padding: 10px 20px;
-    font-size: 1rem;
+    padding: 8px 16px;
+    font-size: 0.95rem;
     font-weight: 600;
-    border-radius: 6px;
+    border-radius: 5px;
     transition: background 0.3s ease, transform 0.2s ease;
 }
 
@@ -188,10 +217,10 @@ h4 {
 .filter-row input {
     width: 100%;
     box-sizing: border-box;
-    border: 2px solid var(--bte-royal-blue);
-    border-radius: 6px;
-    padding: 8px 12px;
-    font-size: 1rem;
+    border: 1px solid var(--bte-royal-blue);
+    border-radius: 5px;
+    padding: 7px 10px;
+    font-size: 0.95rem;
     transition: border-color 0.3s ease, box-shadow 0.3s ease;
     background-color: var(--bte-white);
     color: var(--bte-dark-gray);
@@ -199,40 +228,40 @@ h4 {
 
 .filter-row input:focus {
     border-color: var(--bte-gold);
-    box-shadow: 0 0 8px rgba(255, 193, 7, 0.4);
+    box-shadow: 0 0 6px rgba(255, 193, 7, 0.3);
     outline: none;
 }
 
 /* Row count display */
 .row-count {
-    font-size: 1rem;
+    font-size: 0.95rem;
     color: var(--bte-dark-gray);
-    margin-top: 15px;
+    margin-top: 10px;
     font-style: italic;
     background: var(--bte-light-gray);
-    padding: 5px 10px;
-    border-radius: 6px;
+    padding: 4px 8px;
+    border-radius: 5px;
     display: inline-block;
 }
 
-/* Table styling with Bootstrap fallback */
+/* Table styling */
 .table {
     width: 100%;
-    margin-bottom: 2rem;
+    margin-bottom: 1.5rem;
     color: var(--bte-dark-gray);
-    font-size: 1.1rem;
+    font-size: 1rem;
     background-color: var(--bte-white);
-    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
     border-collapse: separate;
     border-spacing: 0;
-    border-radius: 8px;
+    border-radius: 6px;
     overflow: hidden;
     border: 1px solid var(--bte-medium-gray);
 }
 
 .table th,
 .table td {
-    padding: 10px 15px;
+    padding: 8px 12px;
     vertical-align: middle;
     border: 1px solid var(--bte-medium-gray);
     transition: background-color 0.3s ease;
@@ -244,7 +273,7 @@ h4 {
     border-bottom: 2px solid var(--bte-gold);
     text-align: center;
     font-weight: 600;
-    font-size: 0.95rem;
+    font-size: 0.9rem;
     text-transform: none;
     letter-spacing: normal;
 }
@@ -259,18 +288,18 @@ h4 {
 
 /* Small buttons */
 .btn-sm {
-    padding: 5px 10px;
-    font-size: 14px;
+    padding: 4px 8px;
+    font-size: 0.85rem;
     line-height: 1.5;
-    border-radius: 6px;
-    margin-right: 8px;
+    border-radius: 5px;
+    margin-right: 6px;
     font-weight: 600;
     transition: background 0.3s ease, transform 0.2s ease, box-shadow 0.3s ease;
 }
 
 .btn-sm:hover {
     transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.2);
 }
 
 .btn-secondary {
@@ -330,14 +359,14 @@ h4 {
 
 /* Filter inputs */
 .filter-row input.form-control-sm {
-    padding: 8px 12px;
-    font-size: 1rem;
+    padding: 7px 10px;
+    font-size: 0.95rem;
 }
 
 /* Button group */
 .btn-group {
     display: flex;
-    gap: 5px;
+    gap: 4px;
     justify-content: center;
 }
 
@@ -353,26 +382,26 @@ h4 {
     }
     .table {
         box-shadow: none;
-        font-size: 10pt;
+        font-size: 9pt;
     }
     .table thead th {
         background-color: var(--bte-white) !important;
         color: var(--bte-dark-gray) !important;
         border: 1px solid var(--bte-dark-gray) !important;
-        font-size: 8pt;
-        padding: 4px 8px;
+        font-size: 7pt;
+        padding: 3px 6px;
     }
     .table th, .table td {
         border: 1px solid var(--bte-dark-gray) !important;
         color: var(--bte-dark-gray) !important;
-        padding: 4px 8px;
-        font-size: 8pt;
+        padding: 3px 6px;
+        font-size: 7pt;
     }
     .table tbody tr:nth-child(odd) {
         background-color: var(--bte-white) !important;
     }
     .print-header {
-        margin-bottom: 30px;
+        margin-bottom: 20px;
     }
     .print-header h1, .print-header h2 {
         color: var(--bte-dark-gray) !important;

@@ -1,4 +1,4 @@
-console.log('tab1.js version: 2025-05-19-v3 loaded');
+console.log('tab1.js version: 2025-05-19-v4 loaded');
 
 // Populate subcategories for Tab 1
 function populateSubcategories() {
@@ -39,16 +39,17 @@ function populateSubcategories() {
 }
 
 // Apply filter with retry mechanism
-function applyFilterWithRetry(targetId, retries = 5, delay = 100) {
-    const table = document.getElementById(`common-table-${targetId}`);
+function applyFilterWithRetry(tableId, tableType, retries = 10, delay = 200) {
+    const table = document.getElementById(tableId);
+    console.log(`Checking ${tableType} table ${tableId}: ${table ? 'Found' : 'Not found'}`);
     if (table && typeof applyFilterToAllLevels === 'function') {
         applyFilterToAllLevels();
-        console.log(`Filter applied for ${targetId}`);
+        console.log(`Filter applied for ${tableId} (${tableType})`);
     } else if (retries > 0) {
-        console.log(`Table ${targetId} not ready, retrying (${retries} attempts left)`);
-        setTimeout(() => applyFilterWithRetry(targetId, retries - 1, delay), delay);
+        console.log(`Table ${tableId} (${tableType}) not ready, retrying (${retries} attempts left)`);
+        setTimeout(() => applyFilterWithRetry(tableId, tableType, retries - 1, delay), delay);
     } else {
-        console.warn(`Failed to apply filter for ${targetId}: Table not found after retries`);
+        console.warn(`Failed to apply filter for ${tableId} (${tableType}): Table not found after retries`);
     }
 }
 
@@ -247,8 +248,8 @@ function loadCommonNames(selectElement, page = 1) {
                 tableBody.innerHTML = `<tr><td colspan="7">No common names found.</td></tr>`;
             }
 
-            // Apply filter with retry
-            applyFilterWithRetry(targetId);
+            // Apply filter with retry for common table
+            applyFilterWithRetry(`common-table-${targetId}`, 'common');
         })
         .catch(error => {
             console.error('Common names error:', error.message);
@@ -424,8 +425,8 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                 });
             }
 
-            // Apply filter with retry
-            applyFilterWithRetry(targetId);
+            // Apply filter with retry for item table
+            applyFilterWithRetry(`item-table-${key}`, 'item');
         })
         .catch(error => {
             console.error('Items error:', error.message);
