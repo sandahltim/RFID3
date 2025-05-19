@@ -1,6 +1,6 @@
 /* Shared styles for RFID Dashboard - Broadway Tent and Event */
 
-/* Define Broadway Tent and Event colors (from style.css) */
+/* Define Broadway Tent and Event colors */
 :root {
     --bte-royal-blue: #003087;
     --bte-gold: #FFC107;
@@ -12,7 +12,7 @@
     --bte-accent-green: #28A745;
 }
 
-/* General container styling (from style.css) */
+/* General container styling */
 .container {
     padding-top: 40px;
     background: linear-gradient(180deg, var(--bte-light-gray) 0%, var(--bte-white) 100%);
@@ -20,7 +20,7 @@
     min-height: 100vh;
 }
 
-/* Navigation bar styling (from style.css) */
+/* Navigation bar styling */
 .navbar {
     background: linear-gradient(90deg, var(--bte-royal-blue) 0%, #0047AB 100%) !important;
     padding: 15px 20px;
@@ -41,7 +41,7 @@
     transform: translateY(-2px);
 }
 
-/* Headings (from style.css) */
+/* Headings */
 h2 {
     color: var(--bte-royal-blue);
     font-weight: 800;
@@ -54,9 +54,11 @@ h2 {
     background: linear-gradient(90deg, var(--bte-white) 0%, var(--bte-light-gray) 100%);
     padding: 10px 20px;
     border-radius: 8px;
+    width: auto; /* Ensure header fits content */
+    text-align: center; /* Center align for consistency */
 }
 
-/* Subheadings (e.g., Hand-Counted Items) (from style.css) */
+/* Subheadings (e.g., Hand-Counted Items) */
 h4 {
     color: var(--bte-royal-blue);
     font-weight: 700;
@@ -66,7 +68,7 @@ h4 {
     text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1);
 }
 
-/* Expandable sections (from style.css) */
+/* Expandable sections */
 .expandable {
     opacity: 0;
     transition: opacity 0.7s ease;
@@ -86,7 +88,7 @@ h4 {
     min-height: 0;
 }
 
-/* Loading indicator (from tab1_5.css) */
+/* Loading indicator */
 .loading-indicator {
     font-style: italic;
     font-weight: bold;
@@ -97,7 +99,7 @@ h4 {
     display: none;
 }
 
-/* Filter and sort controls (from style.css) */
+/* Filter and sort controls */
 .filter-sort-controls {
     display: flex;
     gap: 15px;
@@ -127,7 +129,7 @@ h4 {
     outline: none;
 }
 
-/* Pagination controls (from tab1_5.css) */
+/* Pagination controls */
 .pagination-controls {
     text-align: center;
     margin-top: 10px;
@@ -157,7 +159,7 @@ h4 {
     cursor: not-allowed;
 }
 
-/* Filter row inputs (from style.css) */
+/* Filter row inputs */
 .filter-row input {
     width: 100%;
     box-sizing: border-box;
@@ -176,7 +178,7 @@ h4 {
     outline: none;
 }
 
-/* Row count display (from style.css) */
+/* Row count display */
 .row-count {
     font-size: 1rem;
     color: var(--bte-dark-gray);
@@ -188,7 +190,7 @@ h4 {
     display: inline-block;
 }
 
-/* Ensure tables are styled (from style.css) */
+/* Ensure tables are styled */
 .table {
     width: 100%;
     margin-bottom: 2rem;
@@ -230,7 +232,7 @@ h4 {
     background-color: rgba(255, 193, 7, 0.3);
 }
 
-/* Small buttons (from tab1_5.css) */
+/* Small buttons */
 .btn-sm {
     padding: 5px 10px;
     font-size: 14px;
@@ -301,20 +303,20 @@ h4 {
     color: var(--bte-dark-gray);
 }
 
-/* Filter inputs (from style.css) */
+/* Filter inputs */
 .filter-row input.form-control-sm {
     padding: 8px 12px;
     font-size: 1rem;
 }
 
-/* Button group (from tab1_5.css) */
+/* Button group */
 .btn-group {
     display: flex;
     gap: 5px;
     justify-content: center;
 }
 
-/* Print styles (from style.css) */
+/* Print styles */
 @media print {
     body {
         background-color: var(--bte-white);

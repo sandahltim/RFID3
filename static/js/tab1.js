@@ -1,4 +1,4 @@
-console.log('tab1.js version: 2025-05-16-v1 loaded');
+console.log('tab1.js version: 2025-05-19-v2 loaded');
 
 // Populate subcategories for Tab 1
 function populateSubcategories() {
@@ -233,13 +233,14 @@ function loadCommonNames(selectElement, page = 1) {
                 tableBody.innerHTML = `<tr><td colspan="7">No common names found.</td></tr>`;
             }
 
-            if (typeof applyFilterToAllLevels === 'function') {
-                applyFilterToAllLevels();
-            } else {
-                console.warn('applyFilterToAllLevels not available');
-            }
-
-            sessionStorage.setItem(`expanded_${targetId}`, JSON.stringify({ category, subcategory, page }));
+            // Delay filter application to ensure DOM is updated
+            setTimeout(() => {
+                if (typeof applyFilterToAllLevels === 'function') {
+                    applyFilterToAllLevels();
+                } else {
+                    console.warn('applyFilterToAllLevels not available');
+                }
+            }, 0);
         })
         .catch(error => {
             console.error('Common names error:', error.message);
@@ -415,11 +416,14 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                 });
             }
 
-            if (typeof applyFilterToAllLevels === 'function') {
-                applyFilterToAllLevels();
-            } else {
-                console.warn('applyFilterToAllLevels not available');
-            }
+            // Delay filter application to ensure DOM is updated
+            setTimeout(() => {
+                if (typeof applyFilterToAllLevels === 'function') {
+                    applyFilterToAllLevels();
+                } else {
+                    console.warn('applyFilterToAllLevels not available');
+                }
+            }, 0);
         })
         .catch(error => {
             console.error('Items error:', error.message);

@@ -6,7 +6,7 @@ test_rfidpi/ RFID6
 │   │   ├── tabs.py
 │   │   ├── tab1.py
 │   │   ├── tab2.py
-│   │   ├── tab4.py
+│   │   ├── tab3.py
 │   │   ├── tab4.py
 │   │   ├── tab5.py
 │   │   ├── categories.py
@@ -14,49 +14,61 @@ test_rfidpi/ RFID6
 │   ├── services/
 │   │   ├── api_client.py
 │   │   ├── refresh.py
-│   │   └── scheduler.py
+│   │   ├── scheduler.py
 │   ├── models/
 │   │   └── db_models.py
 │   ├── templates/
 │   │   ├── base.html
 │   │   ├── categories.html
-│   │   ├── _category_rows.html
+│   │   ├── common.html
 │   │   ├── home.html
 │   │   ├── tab1.html
 │   │   ├── tab2.html
 │   │   ├── tab3.html
 │   │   ├── tab4.html
 │   │   ├── tab5.html
-│   │   ├── _hand_counted_item.html.html
+│   │   ├── _category_rows.html
+│   │   ├── _hand_counted_item.html
 │   │   └── tab.html
-├── static/
-│   └── css/
-│   │   ├── tab1_5.css
-│   │   ├── tab2_4.css
-│   │   └── style.css
-│   └── js/
-│   │   ├── tab.js
-│   │   ├── tab3.js
-│   │   ├── tab1_5.js
-│   │   ├── common.js
-│   │   └── expand.js
-│   └── lib/
-│        ├── htmx/
-│        │   └── htmx.min.js
-│        └── bootstrap/
-│            ├── bootstrap.min.css
-│            └── bootstrap.bundle.min.js
+│   ├── static/
+│   │   ├── css/
+│   │   │   ├── common.css
+│   │   │   ├── tab1.css
+│   │   │   ├── tab5.css
+│   │   │   ├── tab2_4.css
+│   │   │   └── style.css
+│   │   ├── js/
+│   │   │   ├── common.js
+│   │   │   ├── tab.js
+│   │   │   ├── tab1.js
+│   │   │   ├── tab3.js
+│   │   │   ├── tab5.js
+│   │   │   ├── expand.js
+│   │   │   └── htmx.min.js
+│   │   ├── lib/
+│   │   │   ├── htmx/
+│   │   │   │   └── htmx.min.js
+│   │   │   └── bootstrap/
+│   │   │       ├── bootstrap.min.css
+│   │   │       └── bootstrap.bundle.min.js
 ├── scripts/
 │   ├── migrate_db.sql
 │   ├── update_rental_class_mappings.py
 │   ├── migrate_hand_counted_items.sql
-│   └── setup_mariadb.sh
+│   ├── setup_mariadb.sh
 ├── run.py
 ├── config.py
-└── logs/
+├── logs/
+│   ├── gunicorn_error.log
+│   ├── gunicorn_access.log
+│   ├── rfid_dashboard.log
+│   ├── app.log
+│   ├── sync.log
+├── README.md
+└── rfid_dash_dev.service
 
 
-git pull origin RFID2restore
+git pull origin 
 > /home/tim/test_rfidpi/logs/gunicorn_error.log
 > /home/tim/test_rfidpi/logs/gunicorn_access.log
 > /home/tim/test_rfidpi/logs/app.log
@@ -646,3 +658,97 @@ def create_app():
 - `id_item_master.rental_class_num` ↔ `rental_class_mappings.rental_class_id` (many-to-one).
 - `id_transactions.rental_class_num` ↔ `seed_rental_classes.rental_class_id` (many-to-one).
 - `id_hand_counted_items.contract_number` ↔ `id_item_master.last_contract_num` (one-to-many).
+
+### Deployment Instructions
+
+Clone the Repository:
+
+git clone https://github.com/sandahltim/_rfidpi.git
+cd test_rfidpi
+git checkout RFID6
+
+Set Up Virtual Environment:
+
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+
+Configure MariaDB and Redis:
+
+
+Run the setup script:
+
+chmod +x scripts/setup_mariadb.sh
+./scripts/setup_mariadb.sh
+
+Apply database migrations:
+
+mysql -u root -prfid_root_password rfid_inventory < scripts/migrate_db.sql
+mysql -u root -prfid_root_password rfid_inventory < scripts/migrate_hand_counted_items.sql
+
+Update Rental Class Mappings:
+
+python scripts/update_rental_class_mappings.py
+
+Set Up Service:
+
+Copy the service file:
+
+sudo cp rfid_dash_dev.service /etc/systemd/system/rfid_dash_dev.service
+sudo systemctl daemon-reload
+
+Enable and start the service:
+
+sudo systemctl enable rfid_dash_dev.service
+sudo systemctl start rfid_dash_dev.service
+
+
+
+
+
+
+
+Commit changes to Git:
+
+git add .
+git commit -m "Update files"
+git push origin RFID6
+
+
+
+Pull and restart on the Pi:
+
+git pull origin RFID6
+sudo systemctl stop rfid_dash_dev.service
+sudo systemctl start rfid_dash_dev.service
+sudo systemctl status rfid_dash_dev.service
+
+
+
+Check Logs:
+
+cat /home/tim/test_rfidpi/logs/rfid_dashboard.log
+cat /home/tim/test_rfidpi/logs/gunicorn_error.log
+cat /home/tim/test_rfidpi/logs/gunicorn_access.log
+cat /home/tim/test_rfidpi/logs/app.log
+cat /home/tim/test_rfidpi/logs/sync.log
+
+Configuration
+
+
+
+
+
+Database: MariaDB (rfid_inventory database, user: rfid_user, password: rfid_user_password).
+
+
+
+Redis: redis://localhost:6379/0.
+
+
+
+API: Configured in config.py with endpoints for item master, transactions, and seed rental classes.
+
+
+
+Logging: Logs are stored in /home/tim/test_rfidpi/logs/
