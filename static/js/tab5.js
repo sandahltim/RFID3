@@ -1,4 +1,4 @@
-console.log('tab5.js version: 2025-05-19-v4 loaded');
+console.log('tab5.js version: 2025-05-19-v5 loaded');
 
 /**
  * Tab5.js: Logic for Tab 5 (Resale/Rental Packs).
@@ -623,6 +623,8 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                     const lastScanned = formatDate(item.last_scanned_date);
                     const currentStatus = item.status || 'N/A';
                     const canSetReadyToRent = currentStatus === 'On Rent' || currentStatus === 'Delivered';
+                    // Make bin_location comparison case-insensitive
+                    const binLocationLower = item.bin_location ? item.bin_location.toLowerCase() : '';
                     const row = document.createElement('tr');
                     row.setAttribute('data-item-id', item.tag_id);
                     row.innerHTML = `
@@ -632,10 +634,10 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                         <td>
                             <select id="bin-location-${item.tag_id}">
                                 <option value="" ${!item.bin_location ? 'selected' : ''}>Select Bin Location</option>
-                                <option value="resale" ${item.bin_location === 'resale' ? 'selected' : ''}>Resale</option>
-                                <option value="sold" ${item.bin_location === 'sold' ? 'selected' : ''}>Sold</option>
-                                <option value="pack" ${item.bin_location === 'pack' ? 'selected' : ''}>Pack</option>
-                                <option value="burst" ${item.bin_location === 'burst' ? 'selected' : ''}>Burst</option>
+                                <option value="resale" ${binLocationLower === 'resale' ? 'selected' : ''}>Resale</option>
+                                <option value="sold" ${binLocationLower === 'sold' ? 'selected' : ''}>Sold</option>
+                                <option value="pack" ${binLocationLower === 'pack' ? 'selected' : ''}>Pack</option>
+                                <option value="burst" ${binLocationLower === 'burst' ? 'selected' : ''}>Burst</option>
                             </select>
                         </td>
                         <td>

@@ -64,12 +64,7 @@
                 <td>{{ category.items_available }}</td>
                 <td>
                     <div class="btn-group">
-                        <button class="btn btn-sm btn-secondary expand-btn" data-category="{{ category.category }}"
-                                data-target-id="common-{{ category.cat_id }}" data-expanded="false">Expand</button>
-                        <button class="btn btn-sm btn-secondary collapse-btn" data-collapse-target="common-{{ category.cat_id }}"
-                                style="display:none;">Collapse</button>
-                        <button class="btn btn-sm btn-info print-btn" data-print-level="Contract"
-                                data-print-id="common-{{ category.cat_id }}" data-category="{{ category.category }}">Print</button>
+                        <button class="btn btn-sm btn-info print-btn" data-print-level="Category" data-print-id="category-{{ category.cat_id }}" data-category="{{ category.category }}">Print</button>
                     </div>
                 </td>
             </tr>
