@@ -1,9 +1,9 @@
-console.log('tab5.js version: 2025-05-19-v2 loaded');
+console.log('tab5.js version: 2025-05-19-v3 loaded');
 
 /**
  * Tab5.js: Logic for Tab 5 (Resale/Rental Packs).
  * Dependencies: None (self-contained, uses common.js for printing).
- * Note: Updated from 2025-05-16-v1 to be independent; removed reliance on common.js utilities.
+ * Note: Updated to v3 to add updateResalePackToSold function for resale/pack to sold update.
  */
 
 /**
@@ -877,6 +877,41 @@ function loadSubcategories(category, targetId) {
         })
         .finally(() => {
             if (loadingSuccess) hideLoadingTab5(targetId);
+        });
+}
+
+/**
+ * Update resale/pack items to sold status
+ * Handles the "Update Resale/Pack to Sold" button
+ */
+function updateResalePackToSold() {
+    console.log('Updating resale/pack items to sold status');
+    fetch('/tab/5/update_resale_pack_to_sold', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+    })
+        .then(response => {
+            console.log(`Update resale/pack to sold status: ${response.status}`);
+            if (!response.ok) {
+                return response.text().then(text => {
+                    throw new Error(`Update failed: ${response.status} - ${text}`);
+                });
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.status === 'error') {
+                console.error('Update error:', data.message);
+                alert('Failed to update items: ' + data.message);
+            } else {
+                console.log('Update successful:', data.message);
+                alert(data.message);
+                window.location.reload(); // Refresh the page to reflect changes
+            }
+        })
+        .catch(error => {
+            console.error('Error updating items:', error.message);
+            alert('Error: ' + error.message);
         });
 }
 

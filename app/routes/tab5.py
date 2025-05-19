@@ -47,7 +47,7 @@ if not any(isinstance(h, logging.StreamHandler) for h in root_logger.handlers):
 tab5_bp = Blueprint('tab5', __name__)
 
 # Version marker
-logger.info("Deployed tab5.py version: 2025-05-07-v26")
+logger.info("Deployed tab5.py version: 2025-05-19-v27")
 
 def get_category_data(session, filter_query='', sort='', status_filter='', bin_filter=''):
     # Check if data is in cache
@@ -726,21 +726,27 @@ def update_resale_pack_to_sold():
     """
     Update items in ItemMaster with bin_location 'resale' or 'pack', status 'On Rent' or 'Delivered',
     and date_last_scanned more than 4 days ago to status 'Sold' via API PATCH.
+    Items with NULL date_last_scanned are ignored as they haven't been recently changed.
     """
     try:
+        logger.info("Starting update_resale_pack_to_sold process")
         session = db.session()
         current_time = datetime.now()
         four_days_ago = current_time - timedelta(days=4)
 
-        # Query items matching the criteria
+        # Query items matching the criteria, excluding NULL date_last_scanned
+        logger.debug("Querying items for update: bin_location in ['resale', 'pack'], status in ['On Rent', 'Delivered'], date_last_scanned < four_days_ago, and date_last_scanned is not NULL")
         items_to_update = session.query(ItemMaster).filter(
             func.lower(func.trim(func.replace(func.coalesce(ItemMaster.bin_location, ''), '\x00', ''))).in_(['resale', 'pack']),
             ItemMaster.status.in_(['On Rent', 'Delivered']),
+            ItemMaster.date_last_scanned.isnot(None),  # Ignore NULL dates
             ItemMaster.date_last_scanned < four_days_ago
         ).all()
 
+        logger.info(f"Found {len(items_to_update)} items to update")
         if not items_to_update:
             session.close()
+            logger.info("No items found to update")
             return jsonify({'status': 'success', 'message': 'No items found to update'})
 
         api_client = APIClient()
@@ -748,12 +754,14 @@ def update_resale_pack_to_sold():
 
         for item in items_to_update:
             try:
+                logger.debug(f"Updating tag_id {item.tag_id}: current status={item.status}, date_last_scanned={item.date_last_scanned}")
                 # Update status to 'Sold' via API
                 api_client.update_status(item.tag_id, 'Sold')
                 # Update local database
                 item.status = 'Sold'
                 item.date_last_scanned = current_time
                 updated_items += 1
+                logger.debug(f"Successfully updated tag_id {item.tag_id} to status 'Sold'")
             except Exception as e:
                 logger.error(f"Failed to update tag_id {item.tag_id}: {str(e)}")
                 continue
@@ -764,7 +772,7 @@ def update_resale_pack_to_sold():
         return jsonify({'status': 'success', 'message': f'Updated {updated_items} items to Sold status'})
     except Exception as e:
         session.rollback()
-        logger.error(f"Error updating resale/pack items to Sold: {str(e)}")
+        logger.error(f"Error updating resale/pack items to Sold: {str(e)}", exc_info=True)
         session.close()
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
