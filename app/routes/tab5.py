@@ -48,7 +48,7 @@ if not any(isinstance(h, logging.StreamHandler) for h in root_logger.handlers):
 tab5_bp = Blueprint('tab5', __name__)
 
 # Version marker
-logger.info("Deployed tab5.py version: 2025-05-19-v28")
+logger.info("Deployed tab5.py version: 2025-05-19-v29")
 
 def get_category_data(session, filter_query='', sort='', status_filter='', bin_filter=''):
     # Check if data is in cache
@@ -651,7 +651,9 @@ def update_bin_location():
         if not tag_id or not new_bin_location:
             return jsonify({'error': 'Tag ID and bin location are required'}), 400
 
-        if new_bin_location not in ['resale', 'sold', 'pack', 'burst']:
+        # Make bin_location comparison case-insensitive
+        new_bin_location_lower = new_bin_location.lower()
+        if new_bin_location_lower not in ['resale', 'sold', 'pack', 'burst']:
             return jsonify({'error': 'Invalid bin location'}), 400
 
         session = db.session()
@@ -660,7 +662,7 @@ def update_bin_location():
             session.close()
             return jsonify({'error': 'Item not found'}), 404
 
-        # Update local database
+        # Update local database with the original case
         current_time = datetime.now()
         item.bin_location = new_bin_location
         item.date_last_scanned = current_time
@@ -957,7 +959,12 @@ def bulk_update_common_name():
         current_time = datetime.now()
 
         for item in items:
-            if new_bin_location and new_bin_location in ['resale', 'sold', 'pack', 'burst']:
+            if new_bin_location:
+                # Make bin_location comparison case-insensitive
+                new_bin_location_lower = new_bin_location.lower()
+                if new_bin_location_lower not in ['resale', 'sold', 'pack', 'burst']:
+                    session.close()
+                    return jsonify({'error': 'Invalid bin location'}), 400
                 item.bin_location = new_bin_location
                 item.date_last_scanned = current_time
                 api_client.update_bin_location(item.tag_id, new_bin_location)
@@ -1011,7 +1018,12 @@ def bulk_update_items():
         current_time = datetime.now()
 
         for item in items:
-            if new_bin_location and new_bin_location in ['resale', 'sold', 'pack', 'burst']:
+            if new_bin_location:
+                # Make bin_location comparison case-insensitive
+                new_bin_location_lower = new_bin_location.lower()
+                if new_bin_location_lower not in ['resale', 'sold', 'pack', 'burst']:
+                    session.close()
+                    return jsonify({'error': 'Invalid bin location'}), 400
                 item.bin_location = new_bin_location
                 item.date_last_scanned = current_time
                 api_client.update_bin_location(item.tag_id, new_bin_location)
