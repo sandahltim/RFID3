@@ -1,44 +1,12 @@
-console.log('tab5.js version: 2025-05-19-v3 loaded');
+console.log('tab5.js version: 2025-05-19-v4 loaded');
 
 /**
  * Tab5.js: Logic for Tab 5 (Resale/Rental Packs).
- * Dependencies: None (self-contained, uses common.js for printing).
- * Note: Updated to v3 to add updateResalePackToSold function for resale/pack to sold update.
+ * Dependencies: common.js for formatDate, printTable, printFullItemList.
  */
-
-/**
- * Show loading indicator
- * Moved from common.js, specific to Tab 5
- */
-function showLoadingTab5(targetId) {
-    const container = document.getElementById(targetId);
-    if (!container) {
-        console.warn(`Container ${targetId} not found for loading indicator`);
-        return false;
-    }
-    const loadingDiv = document.createElement('div');
-    loadingDiv.id = `loading-${targetId}`;
-    loadingDiv.className = 'loading-indicator';
-    loadingDiv.textContent = 'Loading...';
-    loadingDiv.style.display = 'block';
-    container.appendChild(loadingDiv);
-    return true;
-}
-
-/**
- * Hide loading indicator
- * Moved from common.js, specific to Tab 5
- */
-function hideLoadingTab5(targetId) {
-    const loadingDiv = document.getElementById(`loading-${targetId}`);
-    if (loadingDiv) {
-        loadingDiv.remove();
-    }
-}
 
 /**
  * Collapse section (category/subcategory level)
- * Moved from common.js, specific to Tab 5
  */
 function collapseSection(categoryRow, targetId) {
     if (!targetId || !categoryRow) {
@@ -53,7 +21,6 @@ function collapseSection(categoryRow, targetId) {
 
 /**
  * Collapse items (item level)
- * Moved from common.js, specific to Tab 5
  */
 function collapseItems(targetId) {
     const container = document.getElementById(targetId);
@@ -73,15 +40,43 @@ function collapseItems(targetId) {
 }
 
 /**
+ * Show loading indicator
+ */
+function showLoadingTab5(targetId) {
+    const container = document.getElementById(targetId);
+    if (!container) {
+        console.warn(`Container ${targetId} not found for loading indicator`);
+        return false;
+    }
+    const loadingDiv = document.createElement('div');
+    loadingDiv.id = `loading-${targetId}`;
+    loadingDiv.className = 'loading-indicator';
+    loadingDiv.textContent = 'Loading...';
+    loadingDiv.style.display = 'block';
+    container.appendChild(loadingDiv);
+    return true;
+}
+
+/**
+ * Hide loading indicator
+ */
+function hideLoadingTab5(targetId) {
+    const loadingDiv = document.getElementById(`loading-${targetId}`);
+    if (loadingDiv) {
+        loadingDiv.remove();
+    }
+}
+
+/**
  * Populate subcategories for Tab 5
  */
 function populateSubcategories() {
     const selects = document.querySelectorAll('.subcategory-select');
-    selects.forEach(select => {
+    const promises = Array.from(selects).map(select => {
         const category = select.getAttribute('data-category');
         console.log(`Populating subcategories for ${category}`);
         const url = `/tab/5/subcat_data?category=${encodeURIComponent(category)}`;
-        fetch(url)
+        return fetch(url)
             .then(response => {
                 console.log(`Subcategory fetch status for ${category}: ${response.status}`);
                 if (!response.ok) {
@@ -101,21 +96,14 @@ function populateSubcategories() {
                         option.textContent = subcat.subcategory;
                         select.appendChild(option);
                     });
-                    if (!Array.from(select.options).some(opt => opt.value === "Concession Resale") && data.subcategories.some(subcat => subcat.subcategory === "Concession Resale")) {
-                        const option = document.createElement('option');
-                        option.value = "Concession Resale";
-                        option.textContent = "Concession Resale";
-                        select.appendChild(option);
-                    }
                 } else {
                     select.innerHTML += '<option value="">No subcategories</option>';
                 }
             })
-            .catch(error => {
-                console.error(`Subcategory error for ${category}:`, error.message);
-                select.innerHTML = '<option value="">Error loading subcategories</option>';
-            });
+            .catch(error => console.error(`Subcategory error for ${category}: ${error.message}`));
     });
+
+    Promise.all(promises).catch(error => console.error('Error populating subcategories:', error));
 }
 
 /**
@@ -634,7 +622,7 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                 data.items.forEach(item => {
                     const lastScanned = formatDate(item.last_scanned_date);
                     const currentStatus = item.status || 'N/A';
-                    const canSetReadyToRent = currentStatus === 'On Rent' || currentStatus === 'Delivered' || currentStatus === 'Sold';
+                    const canSetReadyToRent = currentStatus === 'On Rent' || currentStatus === 'Delivered';
                     const row = document.createElement('tr');
                     row.setAttribute('data-item-id', item.tag_id);
                     row.innerHTML = `
@@ -644,10 +632,10 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                         <td>
                             <select id="bin-location-${item.tag_id}">
                                 <option value="" ${!item.bin_location ? 'selected' : ''}>Select Bin Location</option>
-                                <option value="resale" ${item.bin_location === 'resale' ? 'selected' : ''}>resale</option>
-                                <option value="sold" ${item.bin_location === 'sold' ? 'selected' : ''}>sold</option>
-                                <option value="pack" ${item.bin_location === 'pack' ? 'selected' : ''}>pack</option>
-                                <option value="burst" ${item.bin_location === 'burst' ? 'selected' : ''}>burst</option>
+                                <option value="resale" ${item.bin_location === 'resale' ? 'selected' : ''}>Resale</option>
+                                <option value="sold" ${item.bin_location === 'sold' ? 'selected' : ''}>Sold</option>
+                                <option value="pack" ${item.bin_location === 'pack' ? 'selected' : ''}>Pack</option>
+                                <option value="burst" ${item.bin_location === 'burst' ? 'selected' : ''}>Burst</option>
                             </select>
                         </td>
                         <td>
@@ -655,8 +643,6 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                                 <option value="${currentStatus}" selected>${currentStatus}</option>
                                 <option value="Ready to Rent" ${canSetReadyToRent ? '' : 'disabled'}>Ready to Rent</option>
                                 <option value="Sold">Sold</option>
-                                <option value="On Rent" disabled>On Rent</option>
-                                <option value="Delivered" disabled>Delivered</option>
                             </select>
                         </td>
                         <td style="color: #000000 !important;">${item.last_contract_num || 'N/A'}</td>
@@ -696,10 +682,10 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                         <label for="bulk-bin-location-${key}">Bin Location:</label>
                         <select id="bulk-bin-location-${key}" onchange="updateBulkField('${key}', 'bin_location')">
                             <option value="">Select Bin Location</option>
-                            <option value="resale">resale</option>
-                            <option value="sold">sold</option>
-                            <option value="pack">pack</option>
-                            <option value="burst">burst</option>
+                            <option value="resale">Resale</option>
+                            <option value="sold">Sold</option>
+                            <option value="pack">Pack</option>
+                            <option value="burst">Burst</option>
                         </select>
                     </div>
                     <div class="form-group">
@@ -716,10 +702,10 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                         <label for="bulk-item-bin-location-${key}">Bin Location:</label>
                         <select id="bulk-item-bin-location-${key}">
                             <option value="">Select Bin Location</option>
-                            <option value="resale">resale</option>
-                            <option value="sold">sold</option>
-                            <option value="pack">pack</option>
-                            <option value="burst">burst</option>
+                            <option value="resale">Resale</option>
+                            <option value="sold">Sold</option>
+                            <option value="pack">Pack</option>
+                            <option value="burst">Burst</option>
                         </select>
                     </div>
                     <div class="form-group">
@@ -790,106 +776,17 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
 }
 
 /**
- * Load subcategories for Tab 5
- */
-function loadSubcategories(category, targetId) {
-    console.log('loadSubcategories:', { category, targetId });
-
-    const container = document.getElementById(targetId);
-    if (!container) {
-        console.error(`Container ${targetId} not found`);
-        return;
-    }
-
-    const loadingSuccess = showLoadingTab5(targetId);
-
-    const url = `/tab/5/subcat_data?category=${encodeURIComponent(category)}&page=1`;
-    console.log(`Fetching subcategories: ${url}`);
-
-    fetch(url)
-        .then(response => {
-            console.log(`Subcategory fetch status: ${response.status}`);
-            if (!response.ok) {
-                return response.text().then(text => {
-                    throw new Error(`Subcategory fetch failed: ${response.status} - ${text}`);
-                });
-            }
-            return response.json();
-        })
-        .then(data => {
-            console.log('Subcategory data:', data);
-            if (data.error) {
-                console.error('Subcategories error:', data.error);
-                container.innerHTML = `<p>Error: ${data.error}</p>`;
-                return;
-            }
-
-            let html = `
-                <select class="subcategory-select form-control" data-category="${category}" onchange="loadCommonNames(this)">
-                    <option value="">Select a subcategory</option>
-            `;
-            if (data.subcategories && data.subcategories.length > 0) {
-                data.subcategories.forEach(subcat => {
-                    const escapedSubcategory = subcat.subcategory.replace(/'/g, "\\'").replace(/"/g, '\\"');
-                    html += `<option value="${escapedSubcategory}">${subcat.subcategory}</option>`;
-                });
-            } else {
-                html += `<option value="">No subcategories available</option>`;
-            }
-            html += '</select>';
-
-            if (data.total_subcats > data.per_page) {
-                const totalPages = Math.ceil(data.total_subcats / data.per_page);
-                const escapedCategory = category.replace(/'/g, "\\'").replace(/"/g, '\\"');
-                html += `
-                    <div class="pagination-controls mt-2">
-                        <button class="btn btn-sm btn-secondary" onclick="loadSubcategories('${escapedCategory}', '${targetId}', ${data.page - 1})" ${data.page === 1 ? 'disabled' : ''}>Previous</button>
-                        <span class="mx-2">Page ${data.page} of ${totalPages}</span>
-                        <button class="btn btn-sm btn-secondary" onclick="loadSubcategories('${escapedCategory}', '${targetId}', ${data.page + 1})" ${data.page === totalPages ? 'disabled' : ''}>Next</button>
-                    </div>
-                `;
-            }
-
-            container.innerHTML = html;
-            container.classList.remove('collapsed');
-            container.classList.add('expanded');
-            container.style.display = 'block';
-            container.style.opacity = '1';
-            container.style.visibility = 'visible';
-
-            console.log('Subcategory container styles:', {
-                classList: container.classList.toString(),
-                display: container.style.display,
-                opacity: container.style.opacity,
-                visibility: window.getComputedStyle(container).visibility
-            });
-
-            sessionStorage.setItem(`expanded_${targetId}`, JSON.stringify({ category, page: 1 }));
-        })
-        .catch(error => {
-            console.error('Subcategories error:', error.message);
-            container.innerHTML = `<p>Error: ${error.message}</p>`;
-            container.classList.remove('collapsed');
-            container.classList.add('expanded');
-            container.style.display = 'block';
-            container.style.opacity = '1';
-            container.style.visibility = 'visible';
-        })
-        .finally(() => {
-            if (loadingSuccess) hideLoadingTab5(targetId);
-        });
-}
-
-/**
- * Update resale/pack items to sold status
- * Handles the "Update Resale/Pack to Sold" button
+ * Update resale/pack items to sold status for Tab 5
  */
 function updateResalePackToSold() {
-    console.log('Updating resale/pack items to sold status');
-    fetch('/tab/5/update_resale_pack_to_sold', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
-    })
+    if (confirm('Are you sure you want to update all items with bin_location "resale" or "pack", status "On Rent" or "Delivered", and last scanned more than 4 days ago to status "Sold"?')) {
+        console.log('Updating resale/pack items to sold status');
+        fetch('/tab/5/update_resale_pack_to_sold', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        })
         .then(response => {
             console.log(`Update resale/pack to sold status: ${response.status}`);
             if (!response.ok) {
@@ -900,19 +797,26 @@ function updateResalePackToSold() {
             return response.json();
         })
         .then(data => {
-            if (data.status === 'error') {
-                console.error('Update error:', data.message);
-                alert('Failed to update items: ' + data.message);
-            } else {
+            if (data.status === 'success') {
                 console.log('Update successful:', data.message);
                 alert(data.message);
-                window.location.reload(); // Refresh the page to reflect changes
+                // Since updates are asynchronous, we can't immediately refresh the table
+                // Notify the user to check back later or manually refresh
+                setTimeout(() => {
+                    if (confirm('Updates are processing in the background. Would you like to refresh the page now to check the status?')) {
+                        window.location.reload();
+                    }
+                }, 2000);
+            } else {
+                console.error('Update failed:', data.message);
+                alert('Error: ' + data.message);
             }
         })
         .catch(error => {
             console.error('Error updating items:', error.message);
-            alert('Error: ' + error.message);
+            alert('Failed to update items: ' + error.message);
         });
+    }
 }
 
 /**
@@ -985,14 +889,6 @@ document.addEventListener('DOMContentLoaded', function() {
                         collapseBtn.style.display = 'inline-block';
                         expandBtn.setAttribute('data-expanded', 'true');
                     }
-                } else {
-                    console.log(`Loading subcategories for ${category}`);
-                    loadSubcategories(category, targetId);
-                    if (expandBtn && collapseBtn) {
-                        expandBtn.style.display = 'none';
-                        collapseBtn.style.display = 'inline-block';
-                        expandBtn.setAttribute('data-expanded', 'true');
-                    }
                 }
             }
             return;
@@ -1024,21 +920,27 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        const saveBtn = event.target.closest('.save-btn');
-        if (saveBtn) {
+        const printBtn = event.target.closest('.print-btn');
+        if (printBtn) {
             event.preventDefault();
             event.stopPropagation();
-            const tagId = saveBtn.closest('tr').getAttribute('data-item-id');
-            const key = saveBtn.closest('.item-level-wrapper').querySelector('.item-table').id.replace('item-table-', '');
-            const category = saveBtn.closest('tr').querySelector('button[data-category]')?.getAttribute('data-category') ||
-                             saveBtn.closest('tr').previousElementSibling?.querySelector('button[data-category]')?.getAttribute('data-category');
-            const subcategory = saveBtn.closest('tr').querySelector('button[data-subcategory]')?.getAttribute('data-subcategory') ||
-                                saveBtn.closest('tr').previousElementSibling?.querySelector('button[data-subcategory]')?.getAttribute('data-subcategory');
-            const commonName = saveBtn.closest('tr').previousElementSibling?.querySelector('td:first-child')?.textContent;
-            const targetId = saveBtn.closest('.expandable').id;
+            const printLevel = printBtn.getAttribute('data-print-level');
+            const printId = printBtn.getAttribute('data-print-id');
+            const category = printBtn.getAttribute('data-category');
+            const subcategory = printBtn.getAttribute('data-subcategory');
+            const commonName = printBtn.getAttribute('data-common-name');
+            printTable(printId, printLevel, category, subcategory, commonName);
+            return;
+        }
 
-            console.log('Save button clicked:', { tagId, key, category, subcategory, commonName, targetId });
-            updateItem(tagId, key, category, subcategory, commonName, targetId);
+        const printFullBtn = event.target.closest('.print-full-btn');
+        if (printFullBtn) {
+            event.preventDefault();
+            event.stopPropagation();
+            const commonName = printFullBtn.getAttribute('data-common-name');
+            const category = printFullBtn.getAttribute('data-category');
+            const subcategory = printFullBtn.getAttribute('data-subcategory');
+            printFullItemList(category, subcategory, commonName, 5);
             return;
         }
     }
