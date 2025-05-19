@@ -50,7 +50,7 @@ if not any(isinstance(h, logging.StreamHandler) for h in root_logger.handlers):
 tab5_bp = Blueprint('tab5', __name__)
 
 # Version marker
-logger.info("Deployed tab5.py version: 2025-05-19-v35")
+logger.info("Deployed tab5.py version: 2025-05-19-v36")
 
 def get_category_data(session, filter_query='', sort='', status_filter='', bin_filter=''):
     cache_key = f'tab5_view_data_{filter_query}_{sort}_{status_filter}_{bin_filter}'
@@ -88,99 +88,99 @@ def get_category_data(session, filter_query='', sort='', status_filter='', bin_f
             continue
         rental_class_ids = [str(m['rental_class_id']).strip() for m in mappings]
 
-    total_items_query = session.query(func.count(ItemMaster.tag_id)).filter(
-        func.trim(func.cast(func.replace(ItemMaster.rental_class_num, '\x00', '#pragma warning disable CS8632'), db.String)).in_(rental_class_ids),
-        func.lower(func.trim(func.replace(func.coalesce(ItemMaster.bin_location, ''), '\x00', ''))).in_(['resale', 'sold', 'pack', 'burst'])
-    )
-    if status_filter:
-        total_items_query = total_items_query.filter(func.lower(ItemMaster.status) == status_filter.lower())
-    if bin_filter:
-        total_items_query = total_items_query.filter(
-            func.lower(func.trim(func.replace(func.coalesce(ItemMaster.bin_location, ''), '\x00', ''))) == bin_filter.lower()
+        total_items_query = session.query(func.count(ItemMaster.tag_id)).filter(
+            func.trim(func.cast(func.replace(ItemMaster.rental_class_num, '\x00', '#pragma warning disable CS8632'), db.String)).in_(rental_class_ids),
+            func.lower(func.trim(func.replace(func.coalesce(ItemMaster.bin_location, ''), '\x00', ''))).in_(['resale', 'sold', 'pack', 'burst'])
         )
-    total_items = total_items_query.scalar() or 0
+        if status_filter:
+            total_items_query = total_items_query.filter(func.lower(ItemMaster.status) == status_filter.lower())
+        if bin_filter:
+            total_items_query = total_items_query.filter(
+                func.lower(func.trim(func.replace(func.coalesce(ItemMaster.bin_location, ''), '\x00', ''))) == bin_filter.lower()
+            )
+        total_items = total_items_query.scalar() or 0
 
-    items_on_contracts_query = session.query(func.count(ItemMaster.tag_id)).filter(
-        func.trim(func.cast(func.replace(ItemMaster.rental_class_num, '\x00', ''), db.String)).in_(rental_class_ids),
-        ItemMaster.status.in_(['On Rent', 'Delivered']),
-        func.lower(func.trim(func.replace(func.coalesce(ItemMaster.bin_location, ''), '\x00', ''))).in_(['resale', 'sold', 'pack', 'burst'])
-    )
-    if status_filter:
-        items_on_contracts_query = items_on_contracts_query.filter(func.lower(ItemMaster.status) == status_filter.lower())
-    if bin_filter:
-        items_on_contracts_query = items_on_contracts_query.filter(
-            func.lower(func.trim(func.replace(func.coalesce(ItemMaster.bin_location, ''), '\x00', ''))) == bin_filter.lower()
+        items_on_contracts_query = session.query(func.count(ItemMaster.tag_id)).filter(
+            func.trim(func.cast(func.replace(ItemMaster.rental_class_num, '\x00', ''), db.String)).in_(rental_class_ids),
+            ItemMaster.status.in_(['On Rent', 'Delivered']),
+            func.lower(func.trim(func.replace(func.coalesce(ItemMaster.bin_location, ''), '\x00', ''))).in_(['resale', 'sold', 'pack', 'burst'])
         )
-    items_on_contracts = items_on_contracts_query.scalar() or 0
+        if status_filter:
+            items_on_contracts_query = items_on_contracts_query.filter(func.lower(ItemMaster.status) == status_filter.lower())
+        if bin_filter:
+            items_on_contracts_query = items_on_contracts_query.filter(
+                func.lower(func.trim(func.replace(func.coalesce(ItemMaster.bin_location, ''), '\x00', ''))) == bin_filter.lower()
+            )
+        items_on_contracts = items_on_contracts_query.scalar() or 0
 
-    subquery = session.query(
-        Transaction.tag_id,
-        Transaction.scan_date,
-        Transaction.service_required
-    ).filter(
-        Transaction.tag_id == ItemMaster.tag_id
-    ).order_by(
-        Transaction.scan_date.desc()
-    ).subquery()
+        subquery = session.query(
+            Transaction.tag_id,
+            Transaction.scan_date,
+            Transaction.service_required
+        ).filter(
+            Transaction.tag_id == ItemMaster.tag_id
+        ).order_by(
+            Transaction.scan_date.desc()
+        ).subquery()
 
-    items_in_service_query = session.query(func.count(ItemMaster.tag_id)).filter(
-        func.trim(func.cast(func.replace(ItemMaster.rental_class_num, '\x00', ''), db.String)).in_(rental_class_ids),
-        func.lower(func.trim(func.replace(func.coalesce(ItemMaster.bin_location, ''), '\x00', ''))).in_(['resale', 'sold', 'pack', 'burst']),
-        or_(
-            ItemMaster.status.notin_(['Ready to Rent', 'On Rent', 'Delivered']),
-            ItemMaster.tag_id.in_(
-                session.query(subquery.c.tag_id).filter(
-                    subquery.c.scan_date == session.query(func.max(Transaction.scan_date)).filter(Transaction.tag_id == subquery.c.tag_id).correlate(subquery).scalar_subquery(),
-                    subquery.c.service_required == True
+        items_in_service_query = session.query(func.count(ItemMaster.tag_id)).filter(
+            func.trim(func.cast(func.replace(ItemMaster.rental_class_num, '\x00', ''), db.String)).in_(rental_class_ids),
+            func.lower(func.trim(func.replace(func.coalesce(ItemMaster.bin_location, ''), '\x00', ''))).in_(['resale', 'sold', 'pack', 'burst']),
+            or_(
+                ItemMaster.status.notin_(['Ready to Rent', 'On Rent', 'Delivered']),
+                ItemMaster.tag_id.in_(
+                    session.query(subquery.c.tag_id).filter(
+                        subquery.c.scan_date == session.query(func.max(Transaction.scan_date)).filter(Transaction.tag_id == subquery.c.tag_id).correlate(subquery).scalar_subquery(),
+                        subquery.c.service_required == True
+                    )
                 )
             )
         )
-    )
-    if status_filter:
-        items_in_service_query = items_in_service_query.filter(func.lower(ItemMaster.status) == status_filter.lower())
-    if bin_filter:
-        items_in_service_query = items_in_service_query.filter(
-            func.lower(func.trim(func.replace(func.coalesce(ItemMaster.bin_location, ''), '\x00', ''))) == bin_filter.lower()
+        if status_filter:
+            items_in_service_query = items_in_service_query.filter(func.lower(ItemMaster.status) == status_filter.lower())
+        if bin_filter:
+            items_in_service_query = items_in_service_query.filter(
+                func.lower(func.trim(func.replace(func.coalesce(ItemMaster.bin_location, ''), '\x00', ''))) == bin_filter.lower()
+            )
+        items_in_service = items_in_service_query.scalar() or 0
+
+        items_available_query = session.query(func.count(ItemMaster.tag_id)).filter(
+            func.trim(func.cast(func.replace(ItemMaster.rental_class_num, '\x00', ''), db.String)).in_(rental_class_ids),
+            ItemMaster.status == 'Ready to Rent',
+            func.lower(func.trim(func.replace(func.coalesce(ItemMaster.bin_location, ''), '\x00', ''))).in_(['resale', 'sold', 'pack', 'burst'])
         )
-    items_in_service = items_in_service_query.scalar() or 0
+        if status_filter:
+            items_available_query = items_available_query.filter(func.lower(ItemMaster.status) == status_filter.lower())
+        if bin_filter:
+            items_available_query = items_available_query.filter(
+                func.lower(func.trim(func.replace(func.coalesce(ItemMaster.bin_location, ''), '\x00', ''))) == bin_filter.lower()
+            )
+        items_available = items_available_query.scalar() or 0
 
-    items_available_query = session.query(func.count(ItemMaster.tag_id)).filter(
-        func.trim(func.cast(func.replace(ItemMaster.rental_class_num, '\x00', ''), db.String)).in_(rental_class_ids),
-        ItemMaster.status == 'Ready to Rent',
-        func.lower(func.trim(func.replace(func.coalesce(ItemMaster.bin_location, ''), '\x00', ''))).in_(['resale', 'sold', 'pack', 'burst'])
-    )
-    if status_filter:
-        items_available_query = items_available_query.filter(func.lower(ItemMaster.status) == status_filter.lower())
-    if bin_filter:
-        items_available_query = items_available_query.filter(
-            func.lower(func.trim(func.replace(func.coalesce(ItemMaster.bin_location, ''), '\x00', ''))) == bin_filter.lower()
-        )
-    items_available = items_available_query.scalar() or 0
+        if total_items == 0:
+            continue
 
-    if total_items == 0:
-        continue
+        category_data.append({
+            'category': cat,
+            'cat_id': cat.lower().replace(' ', '_').replace('/', '_'),
+            'total_items': total_items,
+            'items_on_contracts': items_on_contracts,
+            'items_in_service': items_in_service,
+            'items_available': items_available
+        })
 
-    category_data.append({
-        'category': cat,
-        'cat_id': cat.lower().replace(' ', '_').replace('/', '_'),
-        'total_items': total_items,
-        'items_on_contracts': items_on_contracts,
-        'items_in_service': items_in_service,
-        'items_available': items_available
-    })
+    if sort == 'category_asc':
+        category_data.sort(key=lambda x: x['category'].lower())
+    elif sort == 'category_desc':
+        category_data.sort(key=lambda x: x['category'].lower(), reverse=True)
+    elif sort == 'total_items_asc':
+        category_data.sort(key=lambda x: x['total_items'])
+    elif sort == 'total_items_desc':
+        category_data.sort(key=lambda x: x['total_items'], reverse=True)
 
-if sort == 'category_asc':
-    category_data.sort(key=lambda x: x['category'].lower())
-elif sort == 'category_desc':
-    category_data.sort(key=lambda x: x['category'].lower(), reverse=True)
-elif sort == 'total_items_asc':
-    category_data.sort(key=lambda x: x['total_items'])
-elif sort == 'total_items_desc':
-    category_data.sort(key=lambda x: x['total_items'], reverse=True)
-
-cache.set(cache_key, json.dumps(category_data), ex=60)
-logger.info("Cached Tab 5 data")
-return category_data
+    cache.set(cache_key, json.dumps(category_data), ex=60)
+    logger.info("Cached Tab 5 data")
+    return category_data
 
 @tab5_bp.route('/tab/5')
 def tab5_view():
@@ -827,7 +827,6 @@ def update_resale_pack_to_sold():
             scheduler.pause()
             logger.info("Paused scheduler to prevent conflicts during update")
 
-        # Pass the Flask app to the background thread
         threading.Thread(
             target=update_items_async,
             args=(current_app._get_current_object(), tag_ids_to_update, current_time, scheduler),
