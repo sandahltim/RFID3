@@ -12,6 +12,8 @@
         <link href="/static/css/tab1.css" rel="stylesheet">
     {% elif request.path == '/tab/5' %}
         <link href="/static/css/tab5.css" rel="stylesheet">
+    {% elif request.path == '/tab/2' or request.path == '/tab/4' %}
+        <link href="/static/css/tab2_4.css" rel="stylesheet">
     {% endif %}
     {% endblock %}
     {% block extra_head %}{% endblock %}

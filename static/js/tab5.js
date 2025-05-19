@@ -1,6 +1,80 @@
-console.log('tab5.js version: 2025-05-16-v1 loaded');
+console.log('tab5.js version: 2025-05-19-v2 loaded');
 
-// Populate subcategories for Tab 5
+/**
+ * Tab5.js: Logic for Tab 5 (Resale/Rental Packs).
+ * Dependencies: None (self-contained, uses common.js for printing).
+ * Note: Updated from 2025-05-16-v1 to be independent; removed reliance on common.js utilities.
+ */
+
+/**
+ * Show loading indicator
+ * Moved from common.js, specific to Tab 5
+ */
+function showLoadingTab5(targetId) {
+    const container = document.getElementById(targetId);
+    if (!container) {
+        console.warn(`Container ${targetId} not found for loading indicator`);
+        return false;
+    }
+    const loadingDiv = document.createElement('div');
+    loadingDiv.id = `loading-${targetId}`;
+    loadingDiv.className = 'loading-indicator';
+    loadingDiv.textContent = 'Loading...';
+    loadingDiv.style.display = 'block';
+    container.appendChild(loadingDiv);
+    return true;
+}
+
+/**
+ * Hide loading indicator
+ * Moved from common.js, specific to Tab 5
+ */
+function hideLoadingTab5(targetId) {
+    const loadingDiv = document.getElementById(`loading-${targetId}`);
+    if (loadingDiv) {
+        loadingDiv.remove();
+    }
+}
+
+/**
+ * Collapse section (category/subcategory level)
+ * Moved from common.js, specific to Tab 5
+ */
+function collapseSection(categoryRow, targetId) {
+    if (!targetId || !categoryRow) {
+        console.error('collapseSection: Invalid parameters', { targetId, categoryRow });
+        return;
+    }
+    console.log(`Collapsing ${targetId}`);
+    const existingRows = categoryRow.parentNode.querySelectorAll(`tr.common-name-row[data-target-id="${targetId}"]`);
+    existingRows.forEach(row => row.remove());
+    sessionStorage.removeItem(`expanded_${targetId}`);
+}
+
+/**
+ * Collapse items (item level)
+ * Moved from common.js, specific to Tab 5
+ */
+function collapseItems(targetId) {
+    const container = document.getElementById(targetId);
+    if (!container) {
+        console.error(`Container ${targetId} not found for collapsing items`);
+        return;
+    }
+    console.log(`Collapsing items ${targetId}`);
+    container.classList.remove('expanded');
+    container.classList.add('collapsed');
+    container.style.opacity = '0';
+    setTimeout(() => {
+        container.style.display = 'none';
+        container.innerHTML = ''; // Clear content
+    }, 700);
+    sessionStorage.removeItem(`expanded_items_${targetId}`);
+}
+
+/**
+ * Populate subcategories for Tab 5
+ */
 function populateSubcategories() {
     const selects = document.querySelectorAll('.subcategory-select');
     selects.forEach(select => {
@@ -44,7 +118,9 @@ function populateSubcategories() {
     });
 }
 
-// Load common names for Tab 5
+/**
+ * Load common names for Tab 5
+ */
 function loadCommonNames(selectElement, page = 1) {
     const subcategory = selectElement.value;
     const category = selectElement.getAttribute('data-category');
@@ -239,12 +315,6 @@ function loadCommonNames(selectElement, page = 1) {
                 tableBody.innerHTML = `<tr><td colspan="7">No common names found.</td></tr>`;
             }
 
-            if (typeof applyFilterToAllLevels === 'function') {
-                applyFilterToAllLevels();
-            } else {
-                console.warn('applyFilterToAllLevels not available');
-            }
-
             sessionStorage.setItem(`expanded_${targetId}`, JSON.stringify({ category, subcategory, page }));
         })
         .catch(error => {
@@ -258,7 +328,9 @@ function loadCommonNames(selectElement, page = 1) {
         });
 }
 
-// Bulk update common name for Tab 5
+/**
+ * Bulk update common name for Tab 5
+ */
 function bulkUpdateCommonName(category, subcategory, targetId, key) {
     const binLocation = document.getElementById(`bulk-bin-location-${key}`)?.value;
     const status = document.getElementById(`bulk-status-${key}`)?.value;
@@ -313,7 +385,9 @@ function bulkUpdateCommonName(category, subcategory, targetId, key) {
         });
 }
 
-// Bulk update selected items for Tab 5
+/**
+ * Bulk update selected items for Tab 5
+ */
 function bulkUpdateSelectedItems(key) {
     const itemTable = document.getElementById(`item-table-${key}`);
     if (!itemTable) {
@@ -384,7 +458,9 @@ function bulkUpdateSelectedItems(key) {
         });
 }
 
-// Update bulk field for Tab 5
+/**
+ * Update bulk field for Tab 5
+ */
 function updateBulkField(key, field) {
     const select = document.getElementById(`bulk-${field}-${key}`);
     if (select && select.value) {
@@ -394,7 +470,9 @@ function updateBulkField(key, field) {
     }
 }
 
-// Update individual item for Tab 5
+/**
+ * Update individual item for Tab 5
+ */
 function updateItem(tagId, key, category, subcategory, commonName, targetId) {
     const binLocation = document.getElementById(`bin-location-${tagId}`)?.value;
     const status = document.getElementById(`status-${tagId}`)?.value;
@@ -466,7 +544,9 @@ function updateItem(tagId, key, category, subcategory, commonName, targetId) {
         });
 }
 
-// Load items for Tab 5
+/**
+ * Load items for Tab 5
+ */
 function loadItems(category, subcategory, commonName, targetId, page = 1) {
     console.log('loadItems:', { category, subcategory, commonName, targetId, page });
 
@@ -488,7 +568,7 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
     container.classList.add('loading');
 
     const key = targetId;
-    const loadingSuccess = showLoading(key);
+    const loadingSuccess = showLoadingTab5(key);
 
     container.innerHTML = '';
 
@@ -690,12 +770,6 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                     visibility: window.getComputedStyle(itemTable).visibility
                 });
             }
-
-            if (typeof applyFilterToAllLevels === 'function') {
-                applyFilterToAllLevels();
-            } else {
-                console.warn('applyFilterToAllLevels not available');
-            }
         })
         .catch(error => {
             console.error('Items error:', error.message);
@@ -709,13 +783,15 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
         })
         .finally(() => {
             setTimeout(() => {
-                if (loadingSuccess) hideLoading(key);
+                if (loadingSuccess) hideLoadingTab5(key);
                 container.classList.remove('loading');
             }, 700);
         });
 }
 
-// Load subcategories for Tab 5
+/**
+ * Load subcategories for Tab 5
+ */
 function loadSubcategories(category, targetId) {
     console.log('loadSubcategories:', { category, targetId });
 
@@ -725,7 +801,7 @@ function loadSubcategories(category, targetId) {
         return;
     }
 
-    const loadingSuccess = showLoading(targetId);
+    const loadingSuccess = showLoadingTab5(targetId);
 
     const url = `/tab/5/subcat_data?category=${encodeURIComponent(category)}&page=1`;
     console.log(`Fetching subcategories: ${url}`);
@@ -800,11 +876,13 @@ function loadSubcategories(category, targetId) {
             container.style.visibility = 'visible';
         })
         .finally(() => {
-            if (loadingSuccess) hideLoading(targetId);
+            if (loadingSuccess) hideLoadingTab5(targetId);
         });
 }
 
-// Event listener for Tab 5
+/**
+ * Event listener for Tab 5
+ */
 document.addEventListener('DOMContentLoaded', function() {
     console.log('tab5.js: DOMContentLoaded');
 
