@@ -1,6 +1,15 @@
-console.log('common.js version: 2025-05-16-v17 loaded - confirming script load');
+console.log('common.js version: 2025-05-19-v19 loaded');
 
-// Function to format ISO date strings into "Thurs, Aug 21 2025 4:55 pm"
+/**
+ * Common.js: Minimal shared utilities for all tabs.
+ * Dependencies: None (self-contained for printing and formatting).
+ * Note: Filtering and other tab-specific logic have been moved to tab-specific files.
+ */
+
+/**
+ * Format ISO date strings into "Thurs, Aug 21 2025 4:55 pm"
+ * Used by: All tabs (for printing and display)
+ */
 function formatDate(isoDateString) {
     if (!isoDateString || isoDateString === 'N/A') return 'N/A';
     try {
@@ -27,617 +36,526 @@ function formatDate(isoDateString) {
     }
 }
 
-// Show loading indicator
-function showLoading(targetId) {
-    const container = document.getElementById(targetId);
-    if (!container) {
-        console.warn(`Container ${targetId} not found for loading indicator`);
-        return false;
-    }
-    const loadingDiv = document.createElement('div');
-    loadingDiv.id = `loading-${targetId}`;
-    loadingDiv.className = 'loading-indicator';
-    loadingDiv.textContent = 'Loading...';
-    loadingDiv.style.display = 'block';
-    container.appendChild(loadingDiv);
-    return true;
+/**
+ * Wrapper for formatDate to maintain consistency
+ * Used by: All tabs (via printTable)
+ */
+function formatDateTime(dateTimeStr) {
+    return formatDate(dateTimeStr);
 }
 
-// Hide loading indicator
-function hideLoading(targetId) {
-    const loadingDiv = document.getElementById(`loading-${targetId}`);
-    if (loadingDiv) {
-        loadingDiv.remove();
-    }
-}
-
-// Collapse section (category/subcategory level)
-function collapseSection(categoryRow, targetId) {
-    if (!targetId || !categoryRow) {
-        console.error('collapseSection: Invalid parameters', { targetId, categoryRow });
-        return;
-    }
-    console.log(`Collapsing ${targetId}`);
-    const existingRows = categoryRow.parentNode.querySelectorAll(`tr.common-name-row[data-target-id="${targetId}"]`);
-    existingRows.forEach(row => row.remove());
-    sessionStorage.removeItem(`expanded_${targetId}`);
-}
-
-// Collapse items (item level)
-function collapseItems(targetId) {
-    const container = document.getElementById(targetId);
-    if (!container) {
-        console.error(`Container ${targetId} not found for collapsing items`);
-        return;
-    }
-    console.log(`Collapsing items ${targetId}`);
-    container.classList.remove('expanded');
-    container.classList.add('collapsed');
-    container.style.opacity = '0';
-    setTimeout(() => {
-        container.style.display = 'none';
-        container.innerHTML = ''; // Clear content
-    }, 700);
-    sessionStorage.removeItem(`expanded_items_${targetId}`);
-}
-
-// Global filter state
-let globalFilter = {
-    commonName: '',
-    contractNumber: ''
-};
-
-// Load global filter from sessionStorage on page load
-document.addEventListener('DOMContentLoaded', function() {
-    const savedFilter = sessionStorage.getItem('globalFilter');
-    if (savedFilter) {
-        globalFilter = JSON.parse(savedFilter);
-        const commonNameInput = document.getElementById('commonNameFilter');
-        const contractNumberInput = document.getElementById('contractNumberFilter');
-        if (commonNameInput) commonNameInput.value = globalFilter.commonName || '';
-        if (contractNumberInput) contractNumberInput.value = globalFilter.contractNumber || '';
-    }
-});
-
-// Apply global filter function
-window.applyGlobalFilter = function() {
-    // Skip global filter for Tab 3 and non-tab pages (e.g., /categories)
-    if (window.cachedTabNum === 3 || !window.location.pathname.match(/\/tab\/\d+/)) {
-        console.log('Skipping global filter application for Tab 3 or non-tab page');
-        return;
-    }
-
-    const commonNameInput = document.getElementById('commonNameFilter');
-    const contractNumberInput = document.getElementById('contractNumberFilter');
-    const commonName = commonNameInput ? commonNameInput.value.toLowerCase().trim() : '';
-    const contractNumber = contractNumberInput ? contractNumberInput.value.toLowerCase().trim() : '';
-
-    globalFilter = {
-        commonName: commonName,
-        contractNumber: contractNumber
-    };
-
-    // Save filter state to sessionStorage
-    sessionStorage.setItem('globalFilter', JSON.stringify(globalFilter));
-
-    // Apply filter to all levels
-    applyFilterToAllLevels();
-};
-
-// Clear global filter function
-window.clearGlobalFilter = function() {
-    globalFilter = {
-        commonName: '',
-        contractNumber: ''
-    };
-
-    // Clear sessionStorage
-    sessionStorage.removeItem('globalFilter');
-
-    // Clear input fields
-    const commonNameInput = document.getElementById('commonNameFilter');
-    const contractNumberInput = document.getElementById('contractNumberFilter');
-    if (commonNameInput) commonNameInput.value = '';
-    if (contractNumberInput) contractNumberInput.value = '';
-
-    // Refresh the page to clear filters
+/**
+ * Refresh the current tab
+ * Used by: All tabs (via refresh buttons)
+ */
+function refreshTab() {
     window.location.reload();
-};
+}
 
-// Apply filter to all levels (category, subcategory, common names, items)
-function applyFilterToAllLevels() {
-    // Skip filtering for Tab 3 and non-tab pages
-    if (window.cachedTabNum === 3 || !window.location.pathname.match(/\/tab\/\d+/)) {
-        console.log('Skipping applyFilterToAllLevels for Tab 3 or non-tab page');
+/**
+ * Normalize common name by removing quotes and extra spaces
+ * Used by: All tabs (via printFullItemList)
+ */
+function normalizeCommonName(commonName) {
+    return commonName.replace(/['"]/g, '').replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * Print a table (Contract, Common Name, or Item level)
+ * Used by: All tabs
+ * Dependency: formatDateTime, removeTotalItemsInventoryColumn
+ */
+async function printTable(level, id, commonName = null, category = null, subcategory = null) {
+    console.log(`Printing table: ${level}, ID: ${id}, Common Name: ${commonName}, Category: ${category}, Subcategory: ${subcategory}`);
+    const element = document.getElementById(id);
+    if (!element) {
+        console.error(`Element with ID ${id} not found for printing`);
         return;
     }
 
-    // For Tabs 1 and 5
-    if (window.cachedTabNum === 1 || window.cachedTabNum === 5) {
-        const categoryTable = document.getElementById('category-table');
-        if (!categoryTable) {
-            console.warn('Category table not found, skipping filter application');
-            return;
+    const tabNum = window.cachedTabNum || 1;
+    const tabName = tabNum == 2 ? 'Open Contracts' : tabNum == 4 ? 'Laundry Contracts' : tabNum == 5 ? 'Resale/Rental Packs' : `Tab ${tabNum}`;
+
+    let contractNumber = '';
+    if (level === 'Contract') {
+        // For contract level, the ID might be 'category-table' or 'common-<contract_number>'
+        if (id.startsWith('common-')) {
+            contractNumber = id.replace('common-', '');
+        } else {
+            const contractCell = element.querySelector('td:first-child');
+            contractNumber = contractCell ? contractCell.textContent.trim() : '';
         }
-
-        const categoryRows = categoryTable.querySelectorAll('.category-row') || [];
-        if (!categoryRows.length) {
-            console.warn('No category rows found in table, skipping filter application');
-            return;
-        }
-
-        let visibleCategoryRows = 0;
-
-        categoryRows.forEach(categoryRow => {
-            let showCategoryRow = true;
-            const categoryCell = categoryRow.querySelector('td:nth-child(1)'); // Category column
-            const categoryValue = categoryCell ? categoryCell.textContent.toLowerCase() : '';
-            const normalizedCategoryValue = categoryValue.toLowerCase().replace(/\s+/g, '_');
-            const subcatSelect = categoryRow.querySelector('.subcategory-select');
-            let hasMatchingItems = false;
-
-            const options = subcatSelect ? subcatSelect.querySelectorAll('option:not([value=""])') : [];
-            const selectedOption = subcatSelect ? subcatSelect.options[subcatSelect.selectedIndex] : null;
-            const selectedValue = selectedOption ? selectedOption.value : '';
-
-            if (selectedValue) {
-                const commonTables = categoryRow.parentNode.querySelectorAll(`.common-name-row[data-target-id^="common-${normalizedCategoryValue}"] .common-table`);
-                if (!commonTables.length) {
-                    console.warn(`Common tables not found for category ${categoryValue} (normalized: ${normalizedCategoryValue})`);
-                    return;
-                }
-
-                let visibleSubcategories = 0;
-                commonTables.forEach(commonTable => {
-                    const commonRows = commonTable.querySelectorAll('tbody tr:not(.common-name-row)') || [];
-                    let visibleCommonRows = 0;
-
-                    commonRows.forEach((commonRow, index) => {
-                        if (index % 2 !== 0) return;
-
-                        let showCommonRow = true;
-                        const commonNameCell = commonRow.querySelector('td:nth-child(1)'); // Common Name column
-                        const commonNameValue = commonNameCell ? commonNameCell.textContent.toLowerCase() : '';
-
-                        if (globalFilter.commonName && !commonNameValue.includes(globalFilter.commonName)) {
-                            showCommonRow = false;
-                        }
-
-                        const commonExpandableRow = commonRow.nextElementSibling;
-                        let visibleItemRows = 0;
-                        if (commonExpandableRow && commonExpandableRow.classList.contains('common-name-row')) {
-                            const itemsDiv = commonExpandableRow.querySelector('.expandable');
-                            if (itemsDiv && itemsDiv.classList.contains('expanded')) {
-                                const itemTable = itemsDiv.querySelector('.item-table');
-                                if (itemTable) {
-                                    const itemRows = itemTable.querySelectorAll('tbody tr') || [];
-                                    itemRows.forEach(itemRow => {
-                                        let showItemRow = true;
-                                        const colOffset = window.cachedTabNum == 5 ? 1 : 0;
-                                        const itemCommonNameCell = itemRow.querySelector(`td:nth-child(${2 + colOffset})`);
-                                        const itemContractCell = itemRow.querySelector(`td:nth-child(${5 + colOffset})`);
-                                        const itemCommonNameValue = itemCommonNameCell ? itemCommonNameCell.textContent.toLowerCase() : '';
-                                        const itemContractValue = itemContractCell ? itemContractCell.textContent.toLowerCase() : '';
-
-                                        if (globalFilter.commonName && !itemCommonNameValue.includes(globalFilter.commonName)) {
-                                            showItemRow = false;
-                                        }
-                                        if (globalFilter.contractNumber && !itemContractValue.includes(globalFilter.contractNumber)) {
-                                            showItemRow = false;
-                                        }
-
-                                        itemRow.style.display = showItemRow ? '' : 'none';
-                                        if (showItemRow) {
-                                            visibleItemRows++;
-                                            showCommonRow = true;
-                                            hasMatchingItems = true;
-                                        }
-                                    });
-
-                                    let itemRowCountDiv = itemTable.nextElementSibling;
-                                    if (itemRowCountDiv && !itemRowCountDiv.classList.contains('row-count')) {
-                                        itemRowCountDiv = document.createElement('div');
-                                        itemRowCountDiv.className = 'row-count mt-2';
-                                        itemTable.insertAdjacentElement('afterend', itemRowCountDiv);
-                                    }
-                                    if (itemRowCountDiv) {
-                                        itemRowCountDiv.textContent = `Showing ${visibleItemRows} of ${itemRows.length} rows`;
-                                    }
-
-                                    if (visibleItemRows > 0) {
-                                        itemsDiv.classList.remove('collapsed');
-                                        itemsDiv.classList.add('expanded');
-                                        itemsDiv.style.display = 'block';
-                                        itemsDiv.style.opacity = '1';
-                                        const expandBtn = commonRow.querySelector('.expand-btn');
-                                        const collapseBtn = commonRow.querySelector('.collapse-btn');
-                                        if (expandBtn && collapseBtn) {
-                                            expandBtn.style.display = 'none';
-                                            collapseBtn.style.display = 'inline-block';
-                                        }
-                                    } else {
-                                        itemsDiv.classList.remove('expanded');
-                                        itemsDiv.classList.add('collapsed');
-                                        itemsDiv.style.display = 'block';
-                                        itemsDiv.style.opacity = '0';
-                                        const expandBtn = commonRow.querySelector('.expand-btn');
-                                        const collapseBtn = commonRow.querySelector('.collapse-btn');
-                                        if (expandBtn && collapseBtn) {
-                                            expandBtn.style.display = 'inline-block';
-                                            collapseBtn.style.display = 'none';
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        commonRow.style.display = showCommonRow ? '' : 'none';
-                        if (commonExpandableRow) {
-                            commonExpandableRow.style.display = showCommonRow ? '' : 'none';
-                        }
-                        if (showCommonRow) visibleCommonRows++;
-                    });
-
-                    let commonRowCountDiv = commonTable.nextElementSibling;
-                    if (commonRowCountDiv && !commonRowCountDiv.classList.contains('row-count')) {
-                        commonRowCountDiv = document.createElement('div');
-                        commonRowCountDiv.className = 'row-count mt-2';
-                        commonTable.insertAdjacentElement('afterend', commonRowCountDiv);
-                    }
-                    if (commonRowCountDiv) {
-                        commonRowCountDiv.textContent = `Showing ${visibleCommonRows} of ${commonRows.length / 2} rows`;
-                    }
-
-                    if (visibleCommonRows > 0 || hasMatchingItems) {
-                        visibleSubcategories++;
-                        showCategoryRow = true;
-                    }
-                });
-            } else {
-                if (globalFilter.commonName) {
-                    if (categoryValue.includes(globalFilter.commonName)) {
-                        showCategoryRow = true;
-                    }
-                } else {
-                    showCategoryRow = true;
-                }
-            }
-
-            if (!globalFilter.commonName && !globalFilter.contractNumber) {
-                showCategoryRow = true;
-                options.forEach(option => option.style.display = '');
-            }
-
-            categoryRow.style.display = showCategoryRow ? '' : 'none';
-            if (showCategoryRow) {
-                visibleCategoryRows++;
-                const relatedRows = categoryRow.parentNode.querySelectorAll(`.common-name-row[data-target-id^="common-${normalizedCategoryValue}"]`);
-                relatedRows.forEach(row => {
-                    row.style.display = showCategoryRow ? '' : 'none';
-                });
-            }
-        });
-
-        let rowCountDiv = document.querySelector('.row-count');
-        if (!rowCountDiv) {
-            rowCountDiv = document.createElement('div');
-            rowCountDiv.className = 'row-count mt-2';
-            categoryTable.insertAdjacentElement('afterend', rowCountDiv);
-        }
-        rowCountDiv.textContent = `Showing ${visibleCategoryRows} of ${categoryRows.length} rows`;
     } else {
-        // For Tabs 2 and 4
-        const categoryTable = document.getElementById('category-table');
-        if (!categoryTable) {
-            console.warn('Category table not found, skipping filter application');
-            return;
+        contractNumber = category || '';
+    }
+
+    let contractDate = 'N/A';
+    if (contractNumber && (tabNum == 2 || tabNum == 4)) {
+        try {
+            const response = await fetch(`/get_contract_date?contract_number=${encodeURIComponent(contractNumber)}`);
+            const data = await response.json();
+            contractDate = data.date ? formatDateTime(data.date) : 'N/A';
+        } catch (error) {
+            console.error('Error fetching contract date:', error);
         }
+    }
 
-        const categoryRows = categoryTable.querySelectorAll('tbody tr:not(.expandable)') || [];
-        if (!categoryRows.length) {
-            console.warn('No category rows found in table, skipping filter application');
-            return;
+    let printElement;
+    let tableWrapper;
+
+    if (level === 'Common Name' && commonName && category) {
+        let url = `/tab/${tabNum}/data?common_name=${encodeURIComponent(commonName)}`;
+        if (tabNum == 2 || tabNum == 4) {
+            url += `&contract_number=${encodeURIComponent(category)}`;
+        } else {
+            url += `&category=${encodeURIComponent(category)}`;
         }
+        if (subcategory) {
+            url += `&subcategory=${encodeURIComponent(subcategory)}`;
+        }
+        const response = await fetch(url);
+        const data = await response.json();
+        const items = data.items || [];
 
-        let visibleCategoryRows = 0;
-
-        categoryRows.forEach(categoryRow => {
-            let showCategoryRow = false;
-            const contractCell = categoryRow.querySelector('td:nth-child(1)');
-            const contractValue = contractCell ? contractCell.textContent.toLowerCase() : '';
-            const expandableRow = categoryRow.nextElementSibling;
-            const subcatDiv = expandableRow ? expandableRow.querySelector('.expandable') : null;
-
-            if (globalFilter.contractNumber) {
-                if (contractValue.includes(globalFilter.contractNumber)) {
-                    showCategoryRow = true;
-                }
-            } else {
-                showCategoryRow = true;
-            }
-
-            let hasMatchingItems = false;
-            if (subcatDiv && subcatDiv.classList.contains('expanded')) {
-                const commonTable = subcatDiv.querySelector('.common-table');
-                if (commonTable) {
-                    const commonRows = commonTable.querySelectorAll('tbody tr:not(.expandable)') || [];
-                    let visibleCommonRows = 0;
-
-                    commonRows.forEach(commonRow => {
-                        let showCommonRow = false;
-                        const commonNameCell = commonRow.querySelector('td:nth-child(1)');
-                        const commonNameValue = commonNameCell ? commonNameCell.textContent.toLowerCase() : '';
-
-                        if (globalFilter.commonName) {
-                            if (commonNameValue.includes(globalFilter.commonName)) {
-                                showCommonRow = true;
-                            }
-                        } else {
-                            showCommonRow = true;
-                        }
-
-                        const commonExpandableRow = commonRow.nextElementSibling;
-                        let visibleItemRows = 0;
-                        if (commonExpandableRow && commonExpandableRow.classList.contains('expandable') && commonExpandableRow.classList.contains('expanded')) {
-                            const itemTable = commonExpandableRow.querySelector('.item-table');
-                            if (itemTable) {
-                                const itemRows = itemTable.querySelectorAll('tbody tr') || [];
-                                itemRows.forEach(itemRow => {
-                                    let showItemRow = true;
-                                    const itemCommonNameCell = itemRow.querySelector('td:nth-child(2)');
-                                    const itemContractCell = itemRow.querySelector('td:nth-child(5)');
-                                    const itemCommonNameValue = itemCommonNameCell ? itemCommonNameCell.textContent.toLowerCase() : '';
-                                    const itemContractValue = itemContractCell ? itemContractCell.textContent.toLowerCase() : '';
-
-                                    if (globalFilter.commonName && !itemCommonNameValue.includes(globalFilter.commonName)) {
-                                        showItemRow = false;
-                                    }
-                                    if (globalFilter.contractNumber && !itemContractValue.includes(globalFilter.contractNumber)) {
-                                        showItemRow = false;
-                                    }
-
-                                    itemRow.style.display = showItemRow ? '' : 'none';
-                                    if (showItemRow) {
-                                        visibleItemRows++;
-                                        showCommonRow = true;
-                                        hasMatchingItems = true;
-                                    }
-                                });
-
-                                let itemRowCountDiv = itemTable.nextElementSibling;
-                                if (itemRowCountDiv && !itemRowCountDiv.classList.contains('row-count')) {
-                                    itemRowCountDiv = document.createElement('div');
-                                    itemRowCountDiv.className = 'row-count mt-2';
-                                    itemTable.insertAdjacentElement('afterend', itemRowCountDiv);
-                                }
-                                if (itemRowCountDiv) {
-                                    itemRowCountDiv.textContent = `Showing ${visibleItemRows} of ${itemRows.length} rows`;
-                                }
-
-                                if (visibleItemRows > 0) {
-                                    commonExpandableRow.classList.remove('collapsed');
-                                    commonExpandableRow.classList.add('expanded');
-                                    commonExpandableRow.style.display = 'block';
-                                    commonExpandableRow.style.opacity = '1';
-                                    const expandBtn = commonRow.querySelector('.expand-btn');
-                                    const collapseBtn = commonRow.querySelector('.collapse-btn');
-                                    if (expandBtn && collapseBtn) {
-                                        expandBtn.style.display = 'none';
-                                        collapseBtn.style.display = 'inline-block';
-                                    }
-                                } else {
-                                    commonExpandableRow.classList.remove('expanded');
-                                    commonExpandableRow.classList.add('collapsed');
-                                    commonExpandableRow.style.display = 'block';
-                                    commonExpandableRow.style.opacity = '0';
-                                    const expandBtn = commonRow.querySelector('.expand-btn');
-                                    const collapseBtn = commonRow.querySelector('.collapse-btn');
-                                    if (expandBtn && collapseBtn) {
-                                        expandBtn.style.display = 'inline-block';
-                                        collapseBtn.style.display = 'none';
-                                    }
-                                }
-                            }
-                        }
-
-                        commonRow.style.display = showCommonRow ? '' : 'none';
-                        if (showCommonRow) visibleCommonRows++;
-                    });
-
-                    let commonRowCountDiv = commonTable.nextElementSibling;
-                    if (commonRowCountDiv && !commonRowCountDiv.classList.contains('row-count')) {
-                        commonRowCountDiv = document.createElement('div');
-                        commonRowCountDiv.className = 'row-count mt-2';
-                        commonTable.insertAdjacentElement('afterend', commonRowCountDiv);
-                    }
-                    if (commonRowCountDiv) {
-                        commonRowCountDiv.textContent = `Showing ${visibleCommonRows} of ${commonRows.length} rows`;
-                    }
-
-                    if (visibleCommonRows > 0 || hasMatchingItems) {
-                        showCategoryRow = true;
-                        subcatDiv.classList.remove('collapsed');
-                        subcatDiv.classList.add('expanded');
-                        subcatDiv.style.display = 'block';
-                        subcatDiv.style.opacity = '1';
-                        const categoryExpandBtn = categoryRow.querySelector('.expand-btn');
-                        const categoryCollapseBtn = categoryRow.querySelector('.collapse-btn');
-                        if (categoryExpandBtn && categoryCollapseBtn) {
-                            categoryExpandBtn.style.display = 'none';
-                            categoryCollapseBtn.style.display = 'inline-block';
-                        }
-                    } else {
-                        subcatDiv.classList.remove('expanded');
-                        subcatDiv.classList.add('collapsed');
-                        subcatDiv.style.display = 'block';
-                        subcatDiv.style.opacity = '0';
-                        const categoryExpandBtn = categoryRow.querySelector('.expand-btn');
-                        const categoryCollapseBtn = categoryRow.querySelector('.collapse-btn');
-                        if (categoryExpandBtn && categoryCollapseBtn) {
-                            categoryExpandBtn.style.display = 'inline-block';
-                            categoryCollapseBtn.style.display = 'none';
-                        }
-                    }
-                }
-            }
-
-            if (!globalFilter.commonName && !globalFilter.contractNumber) {
-                showCategoryRow = true;
-                if (subcatDiv) {
-                    subcatDiv.classList.remove('expanded');
-                    subcatDiv.classList.add('collapsed');
-                    subcatDiv.style.display = 'block';
-                    subcatDiv.style.opacity = '0';
-                    const categoryExpandBtn = categoryRow.querySelector('.expand-btn');
-                    const categoryCollapseBtn = categoryRow.querySelector('.collapse-btn');
-                    if (categoryExpandBtn && categoryCollapseBtn) {
-                        categoryExpandBtn.style.display = 'inline-block';
-                        categoryCollapseBtn.style.display = 'none';
-                    }
-                }
-            }
-
-            categoryRow.style.display = showCategoryRow ? '' : 'none';
-            if (expandableRow) {
-                expandableRow.style.display = showCategoryRow ? '' : 'none';
-            }
-            if (showCategoryRow) visibleCategoryRows++;
+        const statusCounts = {};
+        items.forEach(item => {
+            const status = item.status || 'Unknown';
+            statusCounts[status] = (statusCounts[status] || 0) + 1;
         });
 
-        let rowCountDiv = document.querySelector('.row-count');
-        if (!rowCountDiv) {
-            rowCountDiv = document.createElement('div');
-            rowCountDiv.className = 'row-count mt-2';
-            categoryTable.insertAdjacentElement('afterend', rowCountDiv);
+        tableWrapper = document.createElement('table');
+        tableWrapper.className = 'table table-bordered';
+        tableWrapper.innerHTML = `
+            <thead>
+                <tr>
+                    <th>Common Name</th>
+                    <th>Status</th>
+                    <th>Count</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${Object.entries(statusCounts).map(([status, count]) => `
+                    <tr>
+                        <td>${commonName}</td>
+                        <td>${status}</td>
+                        <td>${count}</td>
+                    </tr>
+                `).join('')}
+            </tbody>
+        `;
+    } else if (level === 'Contract' && tabNum === 4) {
+        // Special handling for Tab 4: Fetch all common names without pagination
+        const url = `/tab/4/common_names?contract_number=${encodeURIComponent(contractNumber)}&all=true`;
+        try {
+            const response = await fetch(url);
+            if (!response.ok) {
+                throw new Error(`Failed to fetch all common names: ${response.status}`);
+            }
+            const data = await response.json();
+            const commonNames = data.common_names || [];
+
+            tableWrapper = document.createElement('table');
+            tableWrapper.className = 'table table-bordered';
+            tableWrapper.innerHTML = `
+                <thead>
+                    <tr>
+                        <th>Common Name</th>
+                        <th>Items on Contract</th>
+                        <th>Total Items in Inventory</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${commonNames.map(common => `
+                        <tr>
+                            <td>${common.name}</td>
+                            <td>${common.on_contracts}</td>
+                            <td>${common.is_hand_counted ? 'N/A' : common.total_items_inventory}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            `;
+        } catch (error) {
+            console.error('Error fetching all common names for print:', error);
+            tableWrapper = document.createElement('table');
+            tableWrapper.className = 'table table-bordered';
+            tableWrapper.innerHTML = `<tr><td colspan="3">Error loading common names: ${error.message}</td></tr>`;
         }
-        rowCountDiv.textContent = `Showing ${visibleCategoryRows} of ${categoryRows.length} rows`;
+    } else {
+        printElement = element.cloneNode(true);
+
+        if (level === 'Contract') {
+            let commonTable;
+            if (id.startsWith('common-')) {
+                // Check if the common table is expanded
+                if (printElement.classList.contains('expanded')) {
+                    commonTable = printElement.querySelector('.common-table');
+                }
+            } else {
+                // Find the corresponding expandable section
+                const row = element.closest('tr');
+                if (row) {
+                    const nextRow = row.nextElementSibling;
+                    if (nextRow) {
+                        const expandedContent = nextRow.querySelector('.expandable.expanded');
+                        if (expandedContent) {
+                            commonTable = expandedContent.querySelector('.common-table');
+                        }
+                    }
+                }
+            }
+
+            if (commonTable) {
+                tableWrapper = commonTable.cloneNode(true);
+            } else {
+                // Fetch the common names data if not expanded
+                const url = `/tab/${tabNum}/common_names?contract_number=${encodeURIComponent(contractNumber)}`;
+                const response = await fetch(url);
+                const data = await response.json();
+                const commonNames = data.common_names || [];
+
+                tableWrapper = document.createElement('table');
+                tableWrapper.className = 'table table-bordered';
+                tableWrapper.innerHTML = `
+                    <thead>
+                        <tr>
+                            <th>Common Name</th>
+                            <th>Items on Contract</th>
+                            <th>Total Items in Inventory</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${commonNames.map(common => `
+                            <tr>
+                                <td>${common.name}</td>
+                                <td>${common.on_contracts}</td>
+                                <td>${common.total_items_inventory}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                `;
+            }
+        } else {
+            tableWrapper = printElement;
+        }
+
+        removeTotalItemsInventoryColumn(tableWrapper, tabNum);
+
+        // Remove buttons and other interactive elements
+        tableWrapper.querySelectorAll('.btn, .loading, .expandable.collapsed, .pagination-controls, .filter-sort-controls, .filter-row').forEach(el => el.remove());
+    }
+
+    tableWrapper.querySelectorAll('br').forEach(br => br.remove());
+
+    const printContent = `
+        <html>
+            <head>
+                <title>Broadway Tent and Event - ${tabName} - ${level}</title>
+                <link href="/static/css/style.css" rel="stylesheet">
+                <style>
+                    body {
+                        font-family: 'Roboto', sans-serif;
+                        margin: 20px;
+                        color: #333;
+                    }
+                    .print-header {
+                        text-align: center;
+                        margin-bottom: 40px;
+                    }
+                    .print-header h1 {
+                        font-size: 28px;
+                        margin: 0;
+                    }
+                    .print-header h2 {
+                        font-size: 20px;
+                        margin: 5px 0;
+                    }
+                    .print-header p {
+                        font-size: 14px;
+                        color: #666;
+                        margin: 5px 0;
+                    }
+                    table {
+                        border-collapse: collapse;
+                        width: 100%;
+                        margin-top: 20px;
+                    }
+                    th, td {
+                        border: 1px solid #ccc;
+                        padding: 12px;
+                        text-align: center;
+                        font-size: 14px;
+                        white-space: normal;
+                        word-wrap: break-word;
+                    }
+                    th {
+                        background-color: #f2f2f2;
+                        font-weight: bold;
+                    }
+                    td {
+                        vertical-align: middle;
+                    }
+                    .hidden {
+                        display: none;
+                    }
+                    .common-level {
+                        margin-left: 1rem;
+                        background-color: #e9ecef;
+                        padding: 0.5rem;
+                        border-left: 3px solid #28a745;
+                        margin-top: 10px;
+                    }
+                    .item-level-wrapper {
+                        margin-left: 1rem;
+                        background-color: #dee2e6;
+                        padding: 0.5rem;
+                        border-left: 3px solid #dc3545;
+                        margin-top: 10px;
+                    }
+                    .signature-line {
+                        margin-top: 40px;
+                        border-top: 1px solid #000;
+                        width: 300px;
+                        text-align: center;
+                        padding-top: 10px;
+                        font-size: 14px;
+                    }
+                    @media print {
+                        body {
+                            margin: 0;
+                        }
+                        .print-header {
+                            position: static;
+                            width: 100%;
+                            margin-bottom: 20px;
+                        }
+                        table {
+                            page-break-inside: auto;
+                        }
+                        tr {
+                            page-break-inside: avoid;
+                            page-break-after: auto;
+                        }
+                        th, td {
+                            font-size: 8pt;
+                            padding: 4px 8px;
+                            word-break: break-word;
+                            text-align: center;
+                        }
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="print-header">
+                    <h1>Broadway Tent and Event</h1>
+                    <h2>${tabName}</h2>
+                    ${contractNumber ? `<p>Contract Number: ${contractNumber}</p>` : ''}
+                    ${contractDate !== 'N/A' ? `<p>Contract Created: ${contractDate}</p>` : ''}
+                    ${commonName ? `<p>Common Name: ${commonName}</p>` : ''}
+                    <p>Printed on: ${new Date().toLocaleString()}</p>
+                </div>
+                <div>
+                    ${tableWrapper.outerHTML}
+                </div>
+                <div class="signature-line">
+                    Signature: _______________________________
+                </div>
+                <script>
+                    window.onload = function() {
+                        window.print();
+                        window.onafterprint = function() {
+                            window.close();
+                        };
+                    };
+                </script>
+            </body>
+        </html>
+    `;
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+        console.error('Failed to open print window. Please allow popups.');
+        return;
+    }
+    printWindow.document.write(printContent);
+    printWindow.document.close();
+}
+
+/**
+ * Remove "Total Items in Inventory" column for Tabs 2 and 4
+ * Used by: Tabs 2, 4 (via printTable)
+ */
+function removeTotalItemsInventoryColumn(table, tabNum) {
+    if (tabNum == 2 || tabNum == 4) {
+        const headers = table.querySelectorAll('th');
+        const rows = table.querySelectorAll('tbody tr');
+        headers.forEach((th, index) => {
+            if (th.textContent.trim() === 'Total Items in Inventory') {
+                th.remove();
+                rows.forEach(row => {
+                    const cell = row.cells[index];
+                    if (cell) cell.remove();
+                });
+            }
+        });
     }
 }
 
-// Apply filter to a specific table (used for Tabs 2 and 4)
-function applyFilterToTable(table) {
-    if (!table) {
-        console.warn('Table element is null, skipping applyFilterToTable');
+/**
+ * Print full item list
+ * Used by: All tabs
+ * Dependency: normalizeCommonName, formatDateTime
+ */
+async function printFullItemList(category, subcategory, commonName) {
+    console.log(`Printing full item list for Category: ${category}, Subcategory: ${subcategory}, Common Name: ${commonName}`);
+    const tabNum = window.cachedTabNum || 1;
+    const tabName = tabNum == 2 ? 'Open Contracts' : tabNum == 4 ? 'Laundry Contracts' : tabNum == 5 ? 'Resale/Rental Packs' : `Tab ${tabNum}`;
+
+    // Normalize the commonName to remove quotes and extra spaces
+    const normalizedCommonName = normalizeCommonName(commonName);
+    console.log(`Normalized Common Name: ${normalizedCommonName}`);
+
+    const url = `/tab/${tabNum}/full_items_by_rental_class?category=${encodeURIComponent(category)}&subcategory=${subcategory ? encodeURIComponent(subcategory) : 'null'}&common_name=${encodeURIComponent(normalizedCommonName)}`;
+    const response = await fetch(url);
+    const data = await response.json();
+    const items = data.items || [];
+
+    const tableWrapper = document.createElement('table');
+    tableWrapper.className = 'table table-bordered';
+    const headers = ['Tag ID', 'Common Name', 'Rental Class Num', 'Bin Location', 'Status', 'Last Contract', 'Last Scanned Date', 'Quality', 'Notes'];
+    tableWrapper.innerHTML = `
+        <thead>
+            <tr>
+                ${headers.map(header => `<th>${header}</th>`).join('')}
+            </tr>
+        </thead>
+        <tbody>
+            ${items.map(item => `
+                <tr>
+                    <td>${item.tag_id}</td>
+                    <td>${item.common_name}</td>
+                    <td>${item.rental_class_num || 'N/A'}</td>
+                    <td>${item.bin_location || 'N/A'}</td>
+                    <td>${item.status}</td>
+                    <td>${item.last_contract_num || 'N/A'}</td>
+                    <td>${formatDateTime(item.last_scanned_date)}</td>
+                    <td>${item.quality || 'N/A'}</td>
+                    <td>${item.notes || 'N/A'}</td>
+                </tr>
+            `).join('')}
+        </tbody>
+    `;
+
+    const printContent = `
+        <html>
+            <head>
+                <title>Broadway Tent and Event - ${tabName} - Full Item List</title>
+                <link href="/static/css/style.css" rel="stylesheet">
+                <style>
+                    body {
+                        font-family: 'Roboto', sans-serif;
+                        margin: 20px;
+                        color: #333;
+                    }
+                    .print-header {
+                        text-align: center;
+                        margin-bottom: 40px;
+                    }
+                    .print-header h1 {
+                        font-size: 28px;
+                        margin: 0;
+                    }
+                    .print-header h2 {
+                        font-size: 20px;
+                        margin: 5px 0;
+                    }
+                    .print-header p {
+                        font-size: 14px;
+                        color: #666;
+                        margin: 5px 0;
+                    }
+                    table {
+                        border-collapse: collapse;
+                        width: 100%;
+                        margin-top: 20px;
+                    }
+                    th, td {
+                        border: 1px solid #ccc;
+                        padding: 8px;
+                        text-align: center;
+                        font-size: 12px;
+                        white-space: normal;
+                        word-wrap: break-word;
+                    }
+                    th {
+                        background-color: #f2f2f2;
+                        font-weight: bold;
+                    }
+                    td {
+                        vertical-align: middle;
+                    }
+                    .signature-line {
+                        margin-top: 40px;
+                        border-top: 1px solid #000;
+                        width: 300px;
+                        text-align: center;
+                        padding-top: 10px;
+                        font-size: 14px;
+                    }
+                    @media print {
+                        body {
+                            margin: 0;
+                        }
+                        .print-header {
+                            position: static;
+                            width: 100%;
+                            margin-bottom: 20px;
+                        }
+                        table {
+                            page-break-inside: auto;
+                        }
+                        tr {
+                            page-break-inside: avoid;
+                            page-break-after: auto;
+                        }
+                        th, td {
+                            font-size: 8pt;
+                            padding: 4px 8px;
+                            word-break: break-word;
+                            text-align: center;
+                        }
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="print-header">
+                    <h1>Broadway Tent and Event</h1>
+                    <h2>${tabName}</h2>
+                    <p>Common Name: ${commonName}</p>
+                    <p>Printed on: ${new Date().toLocaleString()}</p>
+                </div>
+                <div>
+                    ${tableWrapper.outerHTML}
+                </div>
+                <div class="signature-line">
+                    Signature: _______________________________
+                </div>
+                <script>
+                    window.onload = function() {
+                        window.print();
+                        window.onafterprint = function() {
+                            window.close();
+                        };
+                    };
+                </script>
+            </body>
+        </html>
+    `;
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+        console.error('Failed to open print window. Please allow popups.');
         return;
     }
-
-    const rows = table.querySelectorAll('tbody tr:not(.expandable)') || [];
-    if (!rows.length) {
-        console.warn('No rows found in table, skipping applyFilterToTable');
-        return;
-    }
-
-    let visibleRows = 0;
-
-    if (!globalFilter.commonName && !globalFilter.contractNumber) {
-        rows.forEach(row => {
-            row.style.display = '';
-            visibleRows++;
-            const expandableRow = row.nextElementSibling;
-            if (expandableRow && expandableRow.classList.contains('expandable')) {
-                expandableRow.style.display = '';
-                const childTable = expandableRow.querySelector('.common-table, .item-table');
-                if (childTable) {
-                    applyFilterToTable(childTable);
-                }
-            }
-        });
-    } else {
-        rows.forEach(row => {
-            let showRow = true;
-
-            const contractCell = row.querySelector('td:nth-child(1)');
-            const commonNameCell = row.querySelector('td:nth-child(2)') || row.querySelector('td:nth-child(1)');
-            const contractValue = contractCell ? contractCell.textContent.toLowerCase() : '';
-            const commonNameValue = commonNameCell ? commonNameCell.textContent.toLowerCase() : '';
-
-            if (globalFilter.contractNumber && !contractValue.includes(globalFilter.contractNumber)) {
-                showRow = false;
-            }
-            if (globalFilter.commonName && !commonNameValue.includes(globalFilter.commonName)) {
-                showRow = false;
-            }
-
-            let hasMatchingChildren = false;
-            const expandableRow = row.nextElementSibling;
-            if (expandableRow && expandableRow.classList.contains('expandable') && expandableRow.classList.contains('expanded')) {
-                const childTable = expandableRow.querySelector('.common-table, .item-table');
-                if (childTable) {
-                    const childRows = childTable.querySelectorAll('tbody tr:not(.expandable)') || [];
-                    childRows.forEach(childRow => {
-                        let showChildRow = true;
-                        const childContractCell = childRow.querySelector('td:nth-child(1)');
-                        const childCommonNameCell = childRow.querySelector('td:nth-child(2)') || childRow.querySelector('td:nth-child(1)');
-                        const childContractValue = childContractCell ? childContractCell.textContent.toLowerCase() : '';
-                        const childCommonNameValue = childCommonNameCell ? childCommonNameCell.textContent.toLowerCase() : '';
-
-                        if (globalFilter.contractNumber && !childContractValue.includes(globalFilter.contractNumber)) {
-                            showChildRow = false;
-                        }
-                        if (globalFilter.commonName && !childCommonNameValue.includes(globalFilter.commonName)) {
-                            showChildRow = false;
-                        }
-
-                        childRow.style.display = showChildRow ? '' : 'none';
-                        if (showChildRow) hasMatchingChildren = true;
-                    });
-
-                    const visibleChildRows = Array.from(childRows).filter(r => r.style.display !== 'none').length;
-                    let childRowCountDiv = childTable.nextElementSibling;
-                    if (childRowCountDiv && !childRowCountDiv.classList.contains('row-count')) {
-                        childRowCountDiv = document.createElement('div');
-                        childRowCountDiv.className = 'row-count mt-2';
-                        childTable.insertAdjacentElement('afterend', childRowCountDiv);
-                    }
-                    if (childRowCountDiv) {
-                        childRowCountDiv.textContent = `Showing ${visibleChildRows} of ${childRows.length} rows`;
-                    }
-                }
-            }
-
-            if (showRow || hasMatchingChildren) {
-                row.style.display = '';
-                visibleRows++;
-                if (expandableRow) {
-                    expandableRow.style.display = '';
-                    if (hasMatchingChildren) {
-                        expandableRow.classList.remove('collapsed');
-                        expandableRow.classList.add('expanded');
-                        expandableRow.style.opacity = '1';
-                        const expandBtn = row.querySelector('.expand-btn');
-                        const collapseBtn = row.querySelector('.collapse-btn');
-                        if (expandBtn && collapseBtn) {
-                            expandBtn.style.display = 'none';
-                            collapseBtn.style.display = 'inline-block';
-                        }
-                    }
-                }
-            } else {
-                row.style.display = 'none';
-                if (expandableRow) {
-                    expandableRow.style.display = 'none';
-                    expandableRow.classList.remove('expanded');
-                    expandableRow.classList.add('collapsed');
-                    expandableRow.style.opacity = '0';
-                    const expandBtn = row.querySelector('.expand-btn');
-                    const collapseBtn = row.querySelector('.collapse-btn');
-                    if (expandBtn && collapseBtn) {
-                        expandBtn.style.display = 'inline-block';
-                        collapseBtn.style.display = 'none';
-                    }
-                }
-            }
-        });
-    }
-
-    let rowCountDiv = table.nextElementSibling;
-    while (rowCountDiv && !rowCountDiv.classList.contains('row-count') && !rowCountDiv.classList.contains('pagination-controls')) {
-        rowCountDiv = rowCountDiv.nextElementSibling;
-    }
-    if (!rowCountDiv || !rowCountDiv.classList.contains('row-count')) {
-        rowCountDiv = document.createElement('div');
-        rowCountDiv.className = 'row-count mt-2';
-        table.insertAdjacentElement('afterend', rowCountDiv);
-    }
-    rowCountDiv.textContent = `Showing ${visibleRows} of ${rows.length} rows`;
+    printWindow.document.write(printContent);
+    printWindow.document.close();
 }
