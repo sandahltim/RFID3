@@ -3,18 +3,18 @@
 {% block content %}
 <div class="container">
     <h2>
-        {% if window.cachedTabNum == 1 %}
+        {% if tab_num == 1 %}
             Rental Inventory
-        {% elif window.cachedTabNum == 2 %}
+        {% elif tab_num == 2 %}
             Open Contracts
-        {% elif window.cachedTabNum == 3 %}
+        {% elif tab_num == 3 %}
             Service
-        {% elif window.cachedTabNum == 4 %}
+        {% elif tab_num == 4 %}
             Laundry Contracts
-        {% elif window.cachedTabNum == 5 %}
+        {% elif tab_num == 5 %}
             Resale/Rental Packs
         {% else %}
-            Tab {{ window.cachedTabNum }}
+            Tab {{ tab_num | default('Unknown') }}
         {% endif %}
     </h2>
 
