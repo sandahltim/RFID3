@@ -12,6 +12,7 @@ import csv
 from io import StringIO
 import json
 import threading
+from apscheduler.schedulers.background import BackgroundScheduler
 
 # Configure logging
 logger = logging.getLogger('tab5')
@@ -48,7 +49,7 @@ if not any(isinstance(h, logging.StreamHandler) for h in root_logger.handlers):
 tab5_bp = Blueprint('tab5', __name__)
 
 # Version marker
-logger.info("Deployed tab5.py version: 2025-05-19-v29")
+logger.info("Deployed tab5.py version: 2025-05-19-v30")
 
 def get_category_data(session, filter_query='', sort='', status_filter='', bin_filter=''):
     # Check if data is in cache
@@ -724,36 +725,56 @@ def update_status():
         session.close()
         return jsonify({'error': str(e)}), 500
 
-def update_items_async(items_to_update, current_time):
+def update_items_async(items_to_update, current_time, scheduler):
     """
     Background task to update items' status to 'Sold' and sync with the external API.
+    Includes retries for API calls and better error handling.
     """
     api_client = APIClient()
     updated_items = 0
+    failed_items = []
     session = db.session()
 
     try:
+        # Force token refresh before starting updates
+        api_client.authenticate()
+        logger.info("Forced token refresh before starting updates")
+
         for item in items_to_update:
-            try:
-                logger.debug(f"Updating tag_id {item.tag_id}: current status={item.status}, date_last_scanned={item.date_last_scanned}")
-                # Update status to 'Sold' via API
-                api_client.update_status(item.tag_id, 'Sold')
-                # Update local database
-                item.status = 'Sold'
-                item.date_last_scanned = current_time
-                updated_items += 1
-                logger.debug(f"Successfully updated tag_id {item.tag_id} to status 'Sold'")
-            except Exception as e:
-                logger.error(f"Failed to update tag_id {item.tag_id}: {str(e)}")
-                continue
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    logger.debug(f"Updating tag_id {item.tag_id}: attempt {attempt + 1}, current status={item.status}, date_last_scanned={item.date_last_scanned}")
+                    # Update status to 'Sold' via API
+                    api_client.update_status(item.tag_id, 'Sold')
+                    # Update local database
+                    item.status = 'Sold'
+                    item.date_last_scanned = current_time
+                    updated_items += 1
+                    logger.debug(f"Successfully updated tag_id {item.tag_id} to status 'Sold'")
+                    break  # Success, move to next item
+                except Exception as e:
+                    logger.error(f"Failed to update tag_id {item.tag_id} on attempt {attempt + 1}: {str(e)}")
+                    if attempt == max_retries - 1:
+                        failed_items.append((item.tag_id, str(e)))
+                    else:
+                        logger.info(f"Retrying update for tag_id {item.tag_id} after 3 seconds")
+                        time.sleep(3)
+                    continue
 
         session.commit()
         logger.info(f"Updated {updated_items} items from resale/pack to Sold status in background task")
+        if failed_items:
+            logger.warning(f"Failed to update {len(failed_items)} items: {failed_items}")
     except Exception as e:
         session.rollback()
-        logger.error(f"Error in background update task: {str(e)}", exc_info=True)
+        logger.error(f"Critical error in background update task: {str(e)}", exc_info=True)
+        raise
     finally:
         session.close()
+        # Resume the scheduler
+        scheduler.resume()
+        logger.info("Scheduler resumed after background update task")
 
 @tab5_bp.route('/tab/5/update_resale_pack_to_sold', methods=['POST'])
 def update_resale_pack_to_sold():
@@ -761,7 +782,7 @@ def update_resale_pack_to_sold():
     Update items in ItemMaster with bin_location 'resale' or 'pack', status 'On Rent' or 'Delivered',
     and date_last_scanned more than 4 days ago to status 'Sold' via API PATCH.
     Items with NULL date_last_scanned are ignored as they haven't been recently changed.
-    This operation is now asynchronous to prevent Gunicorn timeouts.
+    This operation is asynchronous to prevent Gunicorn timeouts.
     """
     try:
         logger.info("Starting update_resale_pack_to_sold process")
@@ -784,8 +805,18 @@ def update_resale_pack_to_sold():
             logger.info("No items found to update")
             return jsonify({'status': 'success', 'message': 'No items found to update'})
 
+        # Pause the scheduler to prevent conflicts with incremental_refresh
+        scheduler = BackgroundScheduler.get_scheduler()
+        if scheduler and scheduler.running:
+            scheduler.pause()
+            logger.info("Paused scheduler to prevent conflicts during update")
+
         # Start a background thread to handle the updates
-        threading.Thread(target=update_items_async, args=(items_to_update, current_time), daemon=True).start()
+        threading.Thread(
+            target=update_items_async,
+            args=(items_to_update, current_time, scheduler),
+            daemon=True
+        ).start()
         session.close()
 
         logger.info("Started background task to update items")
