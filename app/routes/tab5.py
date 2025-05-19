@@ -12,7 +12,7 @@ import csv
 from io import StringIO
 import json
 import threading
-from ..services.scheduler import get_scheduler  # Import the get_scheduler function
+from ..services.scheduler import get_scheduler
 
 # Configure logging
 logger = logging.getLogger('tab5')
@@ -49,22 +49,19 @@ if not any(isinstance(h, logging.StreamHandler) for h in root_logger.handlers):
 tab5_bp = Blueprint('tab5', __name__)
 
 # Version marker
-logger.info("Deployed tab5.py version: 2025-05-19-v32")
+logger.info("Deployed tab5.py version: 2025-05-19-v33")
 
 def get_category_data(session, filter_query='', sort='', status_filter='', bin_filter=''):
-    # Check if data is in cache
     cache_key = f'tab5_view_data_{filter_query}_{sort}_{status_filter}_{bin_filter}'
     cached_data = cache.get(cache_key)
     if cached_data is not None:
         logger.info("Serving Tab 5 data from cache")
         return json.loads(cached_data)
 
-    # Fetch all rental class mappings from both tables
     base_mappings = session.query(RentalClassMapping).all()
     user_mappings = session.query(UserRentalClassMapping).all()
     logger.debug(f"Fetched {len(base_mappings)} base mappings and {len(user_mappings)} user mappings")
 
-    # Merge mappings, prioritizing user mappings
     mappings_dict = {m.rental_class_id: {'category': m.category, 'subcategory': m.subcategory} for m in base_mappings}
     for um in user_mappings:
         mappings_dict[um.rental_class_id] = {'category': um.category, 'subcategory': um.subcategory}
@@ -73,7 +70,6 @@ def get_category_data(session, filter_query='', sort='', status_filter='', bin_f
         logger.warning("No rental class mappings found")
         return []
 
-    # Group by category
     categories = {}
     for rental_class_id, data in mappings_dict.items():
         category = data['category']
@@ -85,14 +81,12 @@ def get_category_data(session, filter_query='', sort='', status_filter='', bin_f
             'subcategory': data['subcategory']
         })
 
-    # Calculate counts for each category
     category_data = []
     for cat, mappings in categories.items():
         if filter_query and filter_query not in cat.lower():
             continue
         rental_class_ids = [str(m['rental_class_id']).strip() for m in mappings]
 
-        # Always filter by bin_location for Tab 5
         total_items_query = session.query(func.count(ItemMaster.tag_id)).filter(
             func.trim(func.cast(func.replace(ItemMaster.rental_class_num, '\x00', '#pragma warning disable CS8632'), db.String)).in_(rental_class_ids),
             func.lower(func.trim(func.replace(func.coalesce(ItemMaster.bin_location, ''), '\x00', ''))).in_(['resale', 'sold', 'pack', 'burst'])
@@ -162,7 +156,6 @@ def get_category_data(session, filter_query='', sort='', status_filter='', bin_f
             )
         items_available = items_available_query.scalar() or 0
 
-        # Only include categories with items matching the bin_location filter
         if total_items == 0:
             continue
 
@@ -175,7 +168,6 @@ def get_category_data(session, filter_query='', sort='', status_filter='', bin_f
             'items_available': items_available
         })
 
-    # Sort category data
     if sort == 'category_asc':
         category_data.sort(key=lambda x: x['category'].lower())
     elif sort == 'category_desc':
@@ -185,7 +177,6 @@ def get_category_data(session, filter_query='', sort='', status_filter='', bin_f
     elif sort == 'total_items_desc':
         category_data.sort(key=lambda x: x['total_items'], reverse=True)
 
-    # Cache the data
     cache.set(cache_key, json.dumps(category_data), ex=60)
     logger.info("Cached Tab 5 data")
     return category_data
@@ -222,7 +213,7 @@ def tab5_filter():
         category_data = get_category_data(session, filter_query, sort, status_filter, bin_filter)
         session.close()
 
-        return jsonify(category_data)  # Return JSON data directly since we're not using _category_rows.html
+        return jsonify(category_data)
     except Exception as e:
         logger.error(f"Error filtering Tab 5: {str(e)}", exc_info=True)
         return jsonify({'error': 'Failed to filter categories'}), 500
@@ -270,7 +261,7 @@ def tab5_subcat_data():
         subcategories = {}
         for rental_class_id, data in mappings_dict.items():
             subcategory = data['subcategory']
-            if not subcategory:  # Skip empty subcategories
+            if not subcategory:
                 continue
             if subcategory not in subcategories:
                 subcategories[subcategory] = []
@@ -362,7 +353,6 @@ def tab5_subcat_data():
                 )
             items_available = items_available_query.scalar() or 0
 
-            # Include the subcategory in the response even if total_items is 0
             subcategory_data.append({
                 'subcategory': subcat,
                 'total_items': total_items,
@@ -652,7 +642,6 @@ def update_bin_location():
         if not tag_id or not new_bin_location:
             return jsonify({'error': 'Tag ID and bin location are required'}), 400
 
-        # Make bin_location comparison case-insensitive
         new_bin_location_lower = new_bin_location.lower()
         if new_bin_location_lower not in ['resale', 'sold', 'pack', 'burst']:
             return jsonify({'error': 'Invalid bin location'}), 400
@@ -663,13 +652,11 @@ def update_bin_location():
             session.close()
             return jsonify({'error': 'Item not found'}), 404
 
-        # Update local database with the original case
         current_time = datetime.now()
         item.bin_location = new_bin_location
         item.date_last_scanned = current_time
         session.commit()
 
-        # Update external API
         api_client = APIClient()
         api_client.update_bin_location(tag_id, new_bin_location)
 
@@ -701,18 +688,15 @@ def update_status():
             session.close()
             return jsonify({'error': 'Item not found'}), 404
 
-        # For "Ready to Rent", only allow update from "On Rent", "Delivered", or "Sold"
         if new_status == 'Ready to Rent' and item.status not in ['On Rent', 'Delivered', 'Sold']:
             session.close()
             return jsonify({'error': 'Status can only be updated to "Ready to Rent" from "On Rent", "Delivered", or "Sold"'}), 400
 
-        # Update local database
         current_time = datetime.now()
         item.status = new_status
         item.date_last_scanned = current_time
         session.commit()
 
-        # Update external API
         api_client = APIClient()
         api_client.update_status(tag_id, new_status)
 
@@ -738,30 +722,38 @@ def update_items_async(tag_ids_to_update, current_time, scheduler):
     session = db.session()
 
     try:
-        # Force token refresh before starting updates
-        api_client.authenticate()
-        logger.info("Forced token refresh before starting updates")
+        # Retry token refresh to handle transient failures
+        max_auth_retries = 3
+        for auth_attempt in range(max_auth_retries):
+            try:
+                logger.debug(f"Attempting token refresh, attempt {auth_attempt + 1}")
+                api_client.authenticate()
+                logger.info("Forced token refresh before starting updates")
+                break
+            except Exception as e:
+                logger.error(f"Token refresh failed on attempt {auth_attempt + 1}: {str(e)}")
+                if auth_attempt == max_auth_retries - 1:
+                    logger.error("Failed to authenticate after 3 attempts, aborting update task")
+                    raise
+                logger.info("Retrying token refresh after 5 seconds")
+                time.sleep(5)
 
         for tag_id in tag_ids_to_update:
             max_retries = 3
             for attempt in range(max_retries):
                 try:
                     logger.debug(f"Processing tag_id {tag_id}: attempt {attempt + 1}")
-                    # Fetch a fresh ItemMaster object
                     item = session.query(ItemMaster).filter_by(tag_id=tag_id).first()
                     if not item:
                         logger.warning(f"Item with tag_id {tag_id} not found in database, skipping")
                         break
-
                     logger.debug(f"Updating tag_id {tag_id}: current status={item.status}, date_last_scanned={item.date_last_scanned}")
-                    # Update status to 'Sold' via API
                     api_client.update_status(tag_id, 'Sold')
-                    # Update local database
                     item.status = 'Sold'
                     item.date_last_scanned = current_time
                     updated_items += 1
                     logger.debug(f"Successfully updated tag_id {tag_id} to status 'Sold'")
-                    break  # Success, move to next item
+                    break
                 except Exception as e:
                     logger.error(f"Failed to update tag_id {tag_id} on attempt {attempt + 1}: {str(e)}")
                     if attempt == max_retries - 1:
@@ -778,13 +770,12 @@ def update_items_async(tag_ids_to_update, current_time, scheduler):
     except Exception as e:
         session.rollback()
         logger.error(f"Critical error in background update task: {str(e)}", exc_info=True)
-        raise
     finally:
         session.close()
-        # Resume the scheduler
         if scheduler and scheduler.running:
             scheduler.resume()
             logger.info("Scheduler resumed after background update task")
+        logger.info("Background update task completed")
 
 @tab5_bp.route('/tab/5/update_resale_pack_to_sold', methods=['POST'])
 def update_resale_pack_to_sold():
@@ -800,16 +791,14 @@ def update_resale_pack_to_sold():
         current_time = datetime.now()
         four_days_ago = current_time - timedelta(days=4)
 
-        # Query items matching the criteria, excluding NULL date_last_scanned
         logger.debug("Querying items for update: bin_location in ['resale', 'pack'], status in ['On Rent', 'Delivered'], date_last_scanned < four_days_ago, and date_last_scanned is not NULL")
         items_to_update = session.query(ItemMaster).filter(
             func.lower(func.trim(func.replace(func.coalesce(ItemMaster.bin_location, ''), '\x00', ''))).in_(['resale', 'pack']),
             ItemMaster.status.in_(['On Rent', 'Delivered']),
-            ItemMaster.date_last_scanned.isnot(None),  # Ignore NULL dates
+            ItemMaster.date_last_scanned.isnot(None),
             ItemMaster.date_last_scanned < four_days_ago
         ).all()
 
-        # Extract tag_ids to pass to the background thread
         tag_ids_to_update = [item.tag_id for item in items_to_update]
         logger.info(f"Found {len(tag_ids_to_update)} items to update")
 
@@ -818,17 +807,15 @@ def update_resale_pack_to_sold():
             logger.info("No items found to update")
             return jsonify({'status': 'success', 'message': 'No items found to update'})
 
-        # Pause the scheduler to prevent conflicts with incremental_refresh
         scheduler = get_scheduler()
         if scheduler and scheduler.running:
             scheduler.pause()
             logger.info("Paused scheduler to prevent conflicts during update")
 
-        # Start a background thread to handle the updates, passing tag_ids instead of ItemMaster objects
         threading.Thread(
             target=update_items_async,
             args=(tag_ids_to_update, current_time, scheduler),
-            daemon=True
+            daemon=False  # Ensure the thread runs to completion
         ).start()
         session.close()
 
@@ -845,15 +832,12 @@ def export_sold_items_csv():
     try:
         session = db.session()
 
-        # Fetch all rental class mappings to map rental_class_num to subcategory and short_common_name
         base_mappings = session.query(RentalClassMapping).all()
         user_mappings = session.query(UserRentalClassMapping).all()
-        # Merge mappings, prioritizing user mappings
         mappings_dict = {str(m.rental_class_id).strip(): {'category': m.category, 'subcategory': m.subcategory, 'short_common_name': m.short_common_name} for m in base_mappings}
         for um in user_mappings:
             mappings_dict[str(um.rental_class_id).strip()] = {'category': um.category, 'subcategory': um.subcategory, 'short_common_name': um.short_common_name}
 
-        # Fetch items with bin_location in ['resale', 'sold', 'pack', 'burst'] and status 'Sold'
         items = session.query(ItemMaster).filter(
             func.lower(func.trim(func.replace(func.coalesce(ItemMaster.bin_location, ''), '\x00', ''))).in_(['resale', 'sold', 'pack', 'burst']),
             ItemMaster.status == 'Sold'
@@ -862,18 +846,14 @@ def export_sold_items_csv():
         output = StringIO()
         writer = csv.writer(output)
 
-        # Define headers with the new 'Subcategory' and 'Short Common Name' columns
         headers = ['Tag ID', 'Common Name', 'Subcategory', 'Short Common Name']
         writer.writerow(headers)
 
-        # Write item data, including the subcategory and short_common_name
         for item in items:
-            # Get the rental_class_num, stripped of any null characters
             rental_class_num = str(item.rental_class_num).strip() if item.rental_class_num else None
-            # Look up the subcategory and short_common_name from mappings_dict
             mapping = mappings_dict.get(rental_class_num, {})
-            subcategory = mapping.get('subcategory', 'N/A')  # Default to 'N/A' if not found
-            short_common_name = mapping.get('short_common_name', 'N/A')  # Default to 'N/A' if not found
+            subcategory = mapping.get('subcategory', 'N/A')
+            short_common_name = mapping.get('short_common_name', 'N/A')
             writer.writerow([
                 item.tag_id,
                 item.common_name,
@@ -970,7 +950,6 @@ def bulk_update_common_name():
 
         session = db.session()
 
-        # Get rental class IDs for the category and subcategory
         base_mappings = session.query(RentalClassMapping).filter(
             func.lower(RentalClassMapping.category) == category.lower(),
             func.lower(RentalClassMapping.subcategory) == subcategory.lower()
@@ -986,7 +965,6 @@ def bulk_update_common_name():
 
         rental_class_ids = list(mappings_dict.keys())
 
-        # Query items matching the criteria
         query = session.query(ItemMaster).filter(
             func.trim(func.cast(func.replace(ItemMaster.rental_class_num, '\x00', ''), db.String)).in_(rental_class_ids),
             ItemMaster.common_name == common_name,
@@ -1004,7 +982,6 @@ def bulk_update_common_name():
 
         for item in items:
             if new_bin_location:
-                # Make bin_location comparison case-insensitive
                 new_bin_location_lower = new_bin_location.lower()
                 if new_bin_location_lower not in ['resale', 'sold', 'pack', 'burst']:
                     session.close()
@@ -1019,7 +996,7 @@ def bulk_update_common_name():
                     session.close()
                     return jsonify({'error': 'Status can only be updated to "Ready to Rent" or "Sold"'}), 400
                 if new_status == 'Ready to Rent' and item.status not in ['On Rent', 'Delivered', 'Sold']:
-                    continue  # Skip items that can't be updated to "Ready to Rent"
+                    continue
                 item.status = new_status
                 item.date_last_scanned = current_time
                 api_client.update_status(item.tag_id, new_status)
@@ -1063,7 +1040,6 @@ def bulk_update_items():
 
         for item in items:
             if new_bin_location:
-                # Make bin_location comparison case-insensitive
                 new_bin_location_lower = new_bin_location.lower()
                 if new_bin_location_lower not in ['resale', 'sold', 'pack', 'burst']:
                     session.close()
@@ -1078,7 +1054,7 @@ def bulk_update_items():
                     session.close()
                     return jsonify({'error': 'Status can only be updated to "Ready to Rent" or "Sold"'}), 400
                 if new_status == 'Ready to Rent' and item.status not in ['On Rent', 'Delivered', 'Sold']:
-                    continue  # Skip items that can't be updated to "Ready to Rent"
+                    continue
                 item.status = new_status
                 item.date_last_scanned = current_time
                 api_client.update_status(item.tag_id, new_status)
