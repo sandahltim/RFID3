@@ -1,4 +1,4 @@
-console.log('tab1.js version: 2025-05-19-v2 loaded');
+console.log('tab1.js version: 2025-05-19-v3 loaded');
 
 // Populate subcategories for Tab 1
 function populateSubcategories() {
@@ -36,6 +36,20 @@ function populateSubcategories() {
                 select.innerHTML = '<option value="">Error loading subcategories</option>';
             });
     });
+}
+
+// Apply filter with retry mechanism
+function applyFilterWithRetry(targetId, retries = 5, delay = 100) {
+    const table = document.getElementById(`common-table-${targetId}`);
+    if (table && typeof applyFilterToAllLevels === 'function') {
+        applyFilterToAllLevels();
+        console.log(`Filter applied for ${targetId}`);
+    } else if (retries > 0) {
+        console.log(`Table ${targetId} not ready, retrying (${retries} attempts left)`);
+        setTimeout(() => applyFilterWithRetry(targetId, retries - 1, delay), delay);
+    } else {
+        console.warn(`Failed to apply filter for ${targetId}: Table not found after retries`);
+    }
 }
 
 // Load common names for Tab 1
@@ -233,14 +247,8 @@ function loadCommonNames(selectElement, page = 1) {
                 tableBody.innerHTML = `<tr><td colspan="7">No common names found.</td></tr>`;
             }
 
-            // Delay filter application to ensure DOM is updated
-            setTimeout(() => {
-                if (typeof applyFilterToAllLevels === 'function') {
-                    applyFilterToAllLevels();
-                } else {
-                    console.warn('applyFilterToAllLevels not available');
-                }
-            }, 0);
+            // Apply filter with retry
+            applyFilterWithRetry(targetId);
         })
         .catch(error => {
             console.error('Common names error:', error.message);
@@ -416,14 +424,8 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                 });
             }
 
-            // Delay filter application to ensure DOM is updated
-            setTimeout(() => {
-                if (typeof applyFilterToAllLevels === 'function') {
-                    applyFilterToAllLevels();
-                } else {
-                    console.warn('applyFilterToAllLevels not available');
-                }
-            }, 0);
+            // Apply filter with retry
+            applyFilterWithRetry(targetId);
         })
         .catch(error => {
             console.error('Items error:', error.message);
