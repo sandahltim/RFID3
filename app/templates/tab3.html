@@ -108,9 +108,23 @@
         <input type="number" id="tagQuantity" class="form-control" min="1" value="1">
     </div>
     <button id="syncToPcBtn" class="btn btn-primary mt-2">Sync to PC</button>
+    <h5 class="mt-4">Synced Items</h5>
+    <table class="table table-bordered" id="csvContentsTable">
+        <thead>
+            <tr>
+                <th>Tag ID</th>
+                <th>Common Name</th>
+                <th>Status</th>
+                <th>Bin Location</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody id="csvContentsBody"></tbody>
+    </table>
     <button id="updateStatusBtn" class="btn btn-success mt-2" disabled>Update Status to Ready to Rent</button>
     <div id="syncMessage" class="mt-2"></div>
 </div>
 
+<script src="/static/js/common.js?v={{ cache_bust }}"></script>
 <script src="/static/js/tab3.js?v={{ cache_bust }}"></script>
 {% endblock %}
