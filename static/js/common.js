@@ -1,9 +1,8 @@
-console.log('common.js version: 2025-05-19-v19 loaded');
+console.log('common.js version: 2025-05-20-v21 loaded');
 
 /**
- * Common.js: Minimal shared utilities for all tabs.
- * Dependencies: None (self-contained for printing and formatting).
- * Note: Filtering and other tab-specific logic have been moved to tab-specific files.
+ * Common.js: Shared utilities for all tabs.
+ * Dependencies: None (self-contained for printing, formatting, and pagination).
  */
 
 /**
@@ -27,7 +26,7 @@ function formatDate(isoDateString) {
         let hours = date.getHours();
         const minutes = date.getMinutes().toString().padStart(2, '0');
         const ampm = hours >= 12 ? 'pm' : 'am';
-        hours = hours % 12 || 12; // Convert 0 to 12 for midnight
+        hours = hours % 12 || 12;
 
         return `${dayName}, ${monthName} ${day} ${year} ${hours}:${minutes} ${ampm}`;
     } catch (error) {
@@ -38,7 +37,7 @@ function formatDate(isoDateString) {
 
 /**
  * Wrapper for formatDate to maintain consistency
- * Used by: All tabs (via printTable)
+ * Used by: All tabs
  */
 function formatDateTime(dateTimeStr) {
     return formatDate(dateTimeStr);
@@ -61,6 +60,83 @@ function normalizeCommonName(commonName) {
 }
 
 /**
+ * Render pagination controls
+ * Used by: All tabs for parent and expanded layers
+ * @param {HTMLElement} container - The container to render pagination controls
+ * @param {number} totalItems - Total number of items
+ * @param {number} currentPage - Current page number
+ * @param {number} perPage - Items per page
+ * @param {function} onPageChange - Callback to handle page changes
+ */
+function renderPaginationControls(container, totalItems, currentPage, perPage, onPageChange) {
+    if (!container) return;
+
+    const totalPages = Math.ceil(totalItems / perPage);
+    container.innerHTML = '';
+
+    if (totalPages <= 1) return;
+
+    const nav = document.createElement('nav');
+    nav.setAttribute('aria-label', 'Pagination');
+    const ul = document.createElement('ul');
+    ul.className = 'pagination justify-content-center';
+
+    // Previous button
+    const prevLi = document.createElement('li');
+    prevLi.className = `page-item ${currentPage === 1 ? 'disabled' : ''}`;
+    const prevLink = document.createElement('a');
+    prevLink.className = 'page-link';
+    prevLink.href = '#';
+    prevLink.textContent = 'Previous';
+    prevLink.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (currentPage > 1) onPageChange(currentPage - 1);
+    });
+    prevLi.appendChild(prevLink);
+    ul.appendChild(prevLi);
+
+    // Page numbers (show up to 5 pages around current)
+    const maxPagesToShow = 5;
+    let startPage = Math.max(1, currentPage - Math.floor(maxPagesToShow / 2));
+    let endPage = Math.min(totalPages, startPage + maxPagesToShow - 1);
+    if (endPage - startPage + 1 < maxPagesToShow) {
+        startPage = Math.max(1, endPage - maxPagesToShow + 1);
+    }
+
+    for (let i = startPage; i <= endPage; i++) {
+        const li = document.createElement('li');
+        li.className = `page-item ${i === currentPage ? 'active' : ''}`;
+        const link = document.createElement('a');
+        link.className = 'page-link';
+        link.href = '#';
+        link.textContent = i;
+        link.addEventListener('click', (e) => {
+            e.preventDefault();
+            onPageChange(i);
+        });
+        li.appendChild(link);
+        ul.appendChild(li);
+    }
+
+    // Next button
+    const nextLi = document.createElement('li');
+    nextLi.className = `page-item ${currentPage === totalPages ? 'disabled' : ''}`;
+    const nextLink = document.createElement('a');
+    nextLink.className = 'page-link';
+    nextLink.href = '#';
+    nextLink.textContent = 'Next';
+    nextLink.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (currentPage < totalPages) onPageChange(currentPage + 1);
+    });
+    nextLi.appendChild(nextLink);
+    ul.appendChild(nextLi);
+
+    nav.appendChild(ul);
+    container.appendChild(nav);
+}
+
+/**
  * Print a table (Contract, Common Name, or Item level)
  * Used by: All tabs
  * Dependency: formatDateTime, removeTotalItemsInventoryColumn
@@ -74,11 +150,10 @@ async function printTable(level, id, commonName = null, category = null, subcate
     }
 
     const tabNum = window.cachedTabNum || 1;
-    const tabName = tabNum == 2 ? 'Open Contracts' : tabNum == 4 ? 'Laundry Contracts' : tabNum == 5 ? 'Resale/Rental Packs' : `Tab ${tabNum}`;
+    const tabName = tabNum == 2 ? 'Open Contracts' : tabNum == 4 ? 'Laundry Contracts' : tabNum == 5 ? 'Resale/Rental Packs' : tabNum == 3 ? 'Service' : `Tab ${tabNum}`;
 
     let contractNumber = '';
     if (level === 'Contract') {
-        // For contract level, the ID might be 'category-table' or 'common-<contract_number>'
         if (id.startsWith('common-')) {
             contractNumber = id.replace('common-', '');
         } else {
@@ -144,7 +219,6 @@ async function printTable(level, id, commonName = null, category = null, subcate
             </tbody>
         `;
     } else if (level === 'Contract' && tabNum === 4) {
-        // Special handling for Tab 4: Fetch all common names without pagination
         const url = `/tab/4/common_names?contract_number=${encodeURIComponent(contractNumber)}&all=true`;
         try {
             const response = await fetch(url);
@@ -186,12 +260,10 @@ async function printTable(level, id, commonName = null, category = null, subcate
         if (level === 'Contract') {
             let commonTable;
             if (id.startsWith('common-')) {
-                // Check if the common table is expanded
                 if (printElement.classList.contains('expanded')) {
                     commonTable = printElement.querySelector('.common-table');
                 }
             } else {
-                // Find the corresponding expandable section
                 const row = element.closest('tr');
                 if (row) {
                     const nextRow = row.nextElementSibling;
@@ -207,7 +279,6 @@ async function printTable(level, id, commonName = null, category = null, subcate
             if (commonTable) {
                 tableWrapper = commonTable.cloneNode(true);
             } else {
-                // Fetch the common names data if not expanded
                 const url = `/tab/${tabNum}/common_names?contract_number=${encodeURIComponent(contractNumber)}`;
                 const response = await fetch(url);
                 const data = await response.json();
@@ -240,7 +311,6 @@ async function printTable(level, id, commonName = null, category = null, subcate
 
         removeTotalItemsInventoryColumn(tableWrapper, tabNum);
 
-        // Remove buttons and other interactive elements
         tableWrapper.querySelectorAll('.btn, .loading, .expandable.collapsed, .pagination-controls, .filter-sort-controls, .filter-row').forEach(el => el.remove());
     }
 
@@ -408,9 +478,8 @@ function removeTotalItemsInventoryColumn(table, tabNum) {
 async function printFullItemList(category, subcategory, commonName) {
     console.log(`Printing full item list for Category: ${category}, Subcategory: ${subcategory}, Common Name: ${commonName}`);
     const tabNum = window.cachedTabNum || 1;
-    const tabName = tabNum == 2 ? 'Open Contracts' : tabNum == 4 ? 'Laundry Contracts' : tabNum == 5 ? 'Resale/Rental Packs' : `Tab ${tabNum}`;
+    const tabName = tabNum == 2 ? 'Open Contracts' : tabNum == 4 ? 'Laundry Contracts' : tabNum == 5 ? 'Resale/Rental Packs' : tabNum == 3 ? 'Service' : `Tab ${tabNum}`;
 
-    // Normalize the commonName to remove quotes and extra spaces
     const normalizedCommonName = normalizeCommonName(commonName);
     console.log(`Normalized Common Name: ${normalizedCommonName}`);
 
