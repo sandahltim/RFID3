@@ -46,6 +46,7 @@
                     <th>Last Scanned Date</th>
                     <th>Location of Repair</th>
                     <th>Repair Types</th>
+                    <th>Notes</th>
                     <th>Actions</th>
                 </tr>
             </thead>
@@ -72,7 +73,11 @@
                         <td>{{ item.location_of_repair }}</td>
                         <td>{{ item.repair_types | join(', ') }}</td>
                         <td>
-                            <button class="btn btn-sm btn-primary save-btn" onclick="updateStatus('{{ item.tag_id }}')">Save</button>
+                            <textarea id="notes-{{ item.tag_id }}" rows="2" class="form-control" data-original-notes="{{ item.notes | escape }}" oninput="updateNotesVisibility('{{ item.tag_id }}')">{{ item.notes | escape }}</textarea>
+                        </td>
+                        <td>
+                            <button class="btn btn-sm btn-primary save-status-btn" onclick="updateStatus('{{ item.tag_id }}')" style="display: none;">Save Status</button>
+                            <button class="btn btn-sm btn-primary save-notes-btn" onclick="updateNotes('{{ item.tag_id }}')" style="display: none;">Save Notes</button>
                         </td>
                     </tr>
                 {% endfor %}

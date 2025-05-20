@@ -45,7 +45,7 @@ if not os.path.exists(SHARED_DIR):
     os.chown(SHARED_DIR, pwd.getpwnam('tim').pw_uid, grp.getgrnam('tim').gr_gid)
 
 # Version marker
-logger.info("Deployed tab3.py version: 2025-05-20-v35")
+logger.info("Deployed tab3.py version: 2025-05-20-v37")
 
 @tab3_bp.route('/tab/3')
 def tab3_view():
@@ -70,7 +70,7 @@ def tab3_view():
 
         # Raw SQL query to fetch items with service-related statuses
         sql_query = """
-            SELECT tag_id, common_name, status, bin_location, last_contract_num, date_last_scanned, rental_class_num
+            SELECT tag_id, common_name, status, bin_location, last_contract_num, date_last_scanned, rental_class_num, notes
             FROM id_item_master
             WHERE LOWER(TRIM(REPLACE(COALESCE(status, ''), '\0', ''))) IN ('repair', 'needs to be inspected', 'staged', 'wash', 'wet')
             AND LOWER(TRIM(REPLACE(COALESCE(status, ''), '\0', ''))) != 'sold'
@@ -114,12 +114,13 @@ def tab3_view():
                 'bin_location': row[3] or 'N/A',
                 'last_contract_num': row[4] or 'N/A',
                 'date_last_scanned': row[5].isoformat() if row[5] else 'N/A',
-                'rental_class_num': str(row[6]).strip().upper() if row[6] else None
+                'rental_class_num': str(row[6]).strip().upper() if row[6] else None,
+                'notes': row[7] or ''
             }
             for row in rows
         ]
-        print(f"DEBUG: Processed {len(items_in_service)} items: {[item['tag_id'] + ': ' + item['status'] + ', rental_class_num=' + (item['rental_class_num'] or 'None') for item in items_in_service]}")
-        logger.info(f"Processed {len(items_in_service)} items: {[item['tag_id'] + ': ' + item['status'] + ', rental_class_num=' + (item['rental_class_num'] or 'None') for item in items_in_service]}")
+        print(f"DEBUG: Processed {len(items_in_service)} items: {[item['tag_id'] + ': ' + item['status'] for item in items_in_service]}")
+        logger.info(f"Processed {len(items_in_service)} items: {[item['tag_id'] + ': ' + item['status'] for item in items_in_service]}")
 
         # Fetch total count for pagination
         count_query = """
@@ -202,7 +203,6 @@ def tab3_view():
         crew_items = {'Linen': [], 'Tents': [], 'Service': []}
         for item in items_in_service:
             common_name = item['common_name'].lower()
-            # Grouping rules
             if 'linen' in common_name or 'napkin' in common_name or 'tablecloth' in common_name:
                 category = 'Linen'
             elif 'tent' in common_name or 'canopy' in common_name:
@@ -220,14 +220,15 @@ def tab3_view():
                 'last_contract_num': item['last_contract_num'],
                 'date_last_scanned': item['date_last_scanned'],
                 'location_of_repair': t_data['location_of_repair'],
-                'repair_types': t_data['repair_types']
+                'repair_types': t_data['repair_types'],
+                'notes': item['notes']
             })
 
         # Convert to list of crews for template
         crews = [
             {
                 'name': category,
-                'item_list': item_list,  # No expansion, show all items
+                'item_list': item_list,
                 'total_items': len(item_list)
             }
             for category, item_list in crew_items.items() if item_list
@@ -411,78 +412,102 @@ def sync_to_pc():
         print(f"DEBUG: Found {len(csv_tag_ids)} existing tag_ids in CSV")
         logger.info(f"Found {len(csv_tag_ids)} existing tag_ids in CSV")
 
-        # Query ItemMaster for tags, prioritizing 'Sold' status
-        print("DEBUG: Querying ItemMaster for existing items")
-        items = []
+        # Initialize synced items
+        synced_items = []
+        existing_tag_ids = csv_tag_ids.copy()
         remaining_quantity = quantity
 
-        # Step 1: Get 'Sold' items
-        sold_items = session.query(ItemMaster)\
-            .filter(ItemMaster.common_name == common_name,
-                    ItemMaster.bin_location.in_(['pack', 'resale']),
-                    ItemMaster.status == 'Sold')\
-            .order_by(ItemMaster.date_updated.asc())\
-            .limit(remaining_quantity)\
-            .all()
-        items.extend(sold_items)
-        remaining_quantity -= len(sold_items)
-        print(f"DEBUG: Found {len(sold_items)} 'Sold' items in ItemMaster for common_name={common_name}, remaining_quantity={remaining_quantity}")
-
-        # Step 2: Get non-'Sold' items if needed
-        if remaining_quantity > 0:
-            other_items = session.query(ItemMaster)\
+        # Step 1: Query ItemMaster for existing items
+        print("DEBUG: Querying ItemMaster for existing items")
+        try:
+            # Get 'Sold' items first
+            sold_items = session.query(ItemMaster)\
                 .filter(ItemMaster.common_name == common_name,
                         ItemMaster.bin_location.in_(['pack', 'resale']),
-                        ItemMaster.status != 'Sold',
-                        ~ItemMaster.tag_id.in_(csv_tag_ids))\
-                .order_by(ItemMaster.status.asc())\
+                        ItemMaster.status == 'Sold')\
+                .order_by(ItemMaster.date_updated.asc())\
                 .limit(remaining_quantity)\
                 .all()
-            items.extend(other_items)
-            remaining_quantity -= len(other_items)
-            print(f"DEBUG: Found {len(other_items)} non-'Sold' items in ItemMaster, remaining_quantity={remaining_quantity}")
+            print(f"DEBUG: Found {len(sold_items)} 'Sold' items in ItemMaster for common_name={common_name}")
 
-        print(f"DEBUG: Total items from ItemMaster: {len(items)} (Sold: {len(sold_items)}, Other: {len(other_items)})")
+            for item in sold_items:
+                if item.tag_id in existing_tag_ids:
+                    print(f"DEBUG: Skipping tag_id {item.tag_id} as it’s already in use")
+                    logger.warning(f"Skipping tag_id {item.tag_id} as it’s already in use")
+                    continue
+                synced_items.append({
+                    'tag_id': item.tag_id,
+                    'common_name': item.common_name,
+                    'subcategory': 'Unknown',
+                    'short_common_name': item.common_name,
+                    'status': item.status,
+                    'bin_location': item.bin_location,
+                    'rental_class_num': item.rental_class_num,
+                    'is_new': False
+                })
+                existing_tag_ids.add(item.tag_id)
+                print(f"DEBUG: Added to synced_items: tag_id={item.tag_id}, common_name={item.common_name}, status={item.status}")
+                logger.info(f"Added to synced_items: tag_id={item.tag_id}, common_name={item.common_name}, status={item.status}")
 
-        # Prepare items to sync
-        synced_items = []
+            remaining_quantity = quantity - len(synced_items)
+            print(f"DEBUG: After Sold items, remaining_quantity={remaining_quantity}")
+
+            # Get non-'Sold' items if needed
+            if remaining_quantity > 0:
+                other_items = session.query(ItemMaster)\
+                    .filter(ItemMaster.common_name == common_name,
+                            ItemMaster.bin_location.in_(['pack', 'resale']),
+                            ItemMaster.status != 'Sold')\
+                    .order_by(ItemMaster.status.asc())\
+                    .limit(remaining_quantity)\
+                    .all()
+                print(f"DEBUG: Found {len(other_items)} non-'Sold' items in ItemMaster")
+
+                for item in other_items:
+                    if item.tag_id in existing_tag_ids:
+                        print(f"DEBUG: Skipping tag_id {item.tag_id} as it’s already in use")
+                        logger.warning(f"Skipping tag_id {item.tag_id} as it’s already in use")
+                        continue
+                    synced_items.append({
+                        'tag_id': item.tag_id,
+                        'common_name': item.common_name,
+                        'subcategory': 'Unknown',
+                        'short_common_name': item.common_name,
+                        'status': item.status,
+                        'bin_location': item.bin_location,
+                        'rental_class_num': item.rental_class_num,
+                        'is_new': False
+                    })
+                    existing_tag_ids.add(item.tag_id)
+                    print(f"DEBUG: Added to synced_items: tag_id={item.tag_id}, common_name={item.common_name}, status={item.status}")
+                    logger.info(f"Added to synced_items: tag_id={item.tag_id}, common_name={item.common_name}, status={item.status}")
+
+                remaining_quantity = quantity - len(synced_items)
+                print(f"DEBUG: After non-Sold items, remaining_quantity={remaining_quantity}")
+        except Exception as e:
+            print(f"DEBUG: Error querying ItemMaster: {str(e)}")
+            logger.error(f"Error querying ItemMaster: {str(e)}", exc_info=True)
+            return jsonify({'error': f"Error querying ItemMaster: {str(e)}"}), 500
+
+        # Step 2: Generate new tags if needed
         new_items = []
-        existing_tag_ids = csv_tag_ids.copy()  # Start with CSV tags
-
-        # Add existing items to synced_items
-        for item in items:
-            tag_id = item.tag_id
-            if tag_id in existing_tag_ids:
-                print(f"DEBUG: Skipping tag_id {tag_id} as it’s already in use")
-                logger.warning(f"Skipping tag_id {tag_id} as it’s already in use")
-                continue
-            synced_items.append({
-                'tag_id': tag_id,
-                'common_name': item.common_name,
-                'subcategory': 'Unknown',
-                'short_common_name': item.common_name,
-                'status': item.status,
-                'bin_location': item.bin_location,
-                'rental_class_num': item.rental_class_num,
-                'is_new': False
-            })
-            existing_tag_ids.add(tag_id)
-            print(f"DEBUG: Added to synced_items: tag_id={tag_id}, common_name={item.common_name}, status={item.status}")
-            logger.info(f"Added to synced_items: tag_id={tag_id}, common_name={item.common_name}, status={item.status}")
-
-        # Generate new tags if needed
         if remaining_quantity > 0:
             print(f"DEBUG: Generating {remaining_quantity} new items for common_name={common_name}")
             logger.info(f"Generating {remaining_quantity} new items for common_name={common_name}")
 
             # Fetch rental_class_id and bin_location from SeedRentalClass
             print(f"DEBUG: Querying SeedRentalClass for common_name={common_name}")
-            seed_entry = session.query(SeedRentalClass)\
-                .filter(SeedRentalClass.common_name == common_name,
-                        SeedRentalClass.bin_location.in_(['pack', 'resale']))\
-                .first()
-            print(f"DEBUG: SeedRentalClass query result: {seed_entry}")
-            logger.info(f"SeedRentalClass query result: {seed_entry}")
+            try:
+                seed_entry = session.query(SeedRentalClass)\
+                    .filter(SeedRentalClass.common_name == common_name,
+                            SeedRentalClass.bin_location.in_(['pack', 'resale']))\
+                    .first()
+                print(f"DEBUG: SeedRentalClass query result: {seed_entry}")
+                logger.info(f"SeedRentalClass query result: {seed_entry}")
+            except Exception as e:
+                print(f"DEBUG: Error querying SeedRentalClass: {str(e)}")
+                logger.error(f"Error querying SeedRentalClass: {str(e)}", exc_info=True)
+                return jsonify({'error': f"Error querying SeedRentalClass: {str(e)}"}), 500
 
             if not seed_entry:
                 print(f"DEBUG: No SeedRentalClass entry found for common_name={common_name} and bin_location in ['pack', 'resale']")
@@ -497,11 +522,16 @@ def sync_to_pc():
             # Generate new tag IDs
             for i in range(remaining_quantity):
                 print(f"DEBUG: Generating new tag ID {i+1}/{remaining_quantity}")
-                max_tag_id = session.query(func.max(ItemMaster.tag_id))\
-                    .filter(ItemMaster.tag_id.startswith('425445'))\
-                    .scalar()
-                print(f"DEBUG: Max tag_id from ItemMaster: {max_tag_id}")
-                logger.info(f"Max tag_id from ItemMaster: {max_tag_id}")
+                try:
+                    max_tag_id = session.query(func.max(ItemMaster.tag_id))\
+                        .filter(ItemMaster.tag_id.startswith('425445'))\
+                        .scalar()
+                    print(f"DEBUG: Max tag_id from ItemMaster: {max_tag_id}")
+                    logger.info(f"Max tag_id from ItemMaster: {max_tag_id}")
+                except Exception as e:
+                    print(f"DEBUG: Error querying max tag_id: {str(e)}")
+                    logger.error(f"Error querying max tag_id: {str(e)}", exc_info=True)
+                    max_tag_id = None
 
                 new_num = 1
                 if max_tag_id and len(max_tag_id) == 24 and max_tag_id.startswith('425445'):
@@ -565,7 +595,7 @@ def sync_to_pc():
                 print(f"DEBUG: Created new ItemMaster entry: tag_id={tag_id}, common_name={common_name}, rental_class_num={rental_class_num}")
                 logger.info(f"Created new ItemMaster entry: tag_id={tag_id}, common_name={common_name}, rental_class_num={rental_class_num}")
 
-        # Ensure we have exactly the requested quantity
+        # Ensure exactly the requested quantity
         if len(synced_items) > quantity:
             synced_items = synced_items[:quantity]
             print(f"DEBUG: Truncated synced_items to {quantity} items")
@@ -576,21 +606,26 @@ def sync_to_pc():
 
         # Fetch rental class mappings
         print("DEBUG: Fetching rental class mappings")
-        base_mappings = session.query(RentalClassMapping).all()
-        user_mappings = session.query(UserRentalClassMapping).all()
-        mappings_dict = {str(m.rental_class_id).strip().upper(): {
-            'category': m.category,
-            'subcategory': m.subcategory,
-            'short_common_name': m.short_common_name if hasattr(m, 'short_common_name') else None
-        } for m in base_mappings}
-        for um in user_mappings:
-            mappings_dict[str(um.rental_class_id).strip().upper()] = {
-                'category': um.category,
-                'subcategory': um.subcategory,
-                'short_common_name': um.short_common_name if hasattr(um, 'short_common_name') else None
-            }
-        print(f"DEBUG: Fetched {len(mappings_dict)} rental class mappings")
-        logger.info(f"Fetched {len(mappings_dict)} rental class mappings")
+        try:
+            base_mappings = session.query(RentalClassMapping).all()
+            user_mappings = session.query(UserRentalClassMapping).all()
+            mappings_dict = {str(m.rental_class_id).strip().upper(): {
+                'category': m.category,
+                'subcategory': m.subcategory,
+                'short_common_name': m.short_common_name if hasattr(m, 'short_common_name') else None
+            } for m in base_mappings}
+            for um in user_mappings:
+                mappings_dict[str(um.rental_class_id).strip().upper()] = {
+                    'category': um.category,
+                    'subcategory': um.subcategory,
+                    'short_common_name': um.short_common_name if hasattr(um, 'short_common_name') else None
+                }
+            print(f"DEBUG: Fetched {len(mappings_dict)} rental class mappings")
+            logger.info(f"Fetched {len(mappings_dict)} rental class mappings")
+        except Exception as e:
+            print(f"DEBUG: Error fetching rental class mappings: {str(e)}")
+            logger.error(f"Error fetching rental class mappings: {str(e)}", exc_info=True)
+            return jsonify({'error': f"Error fetching rental class mappings: {str(e)}"}), 500
 
         # Update synced_items with mapping data
         for item in synced_items:
@@ -611,6 +646,10 @@ def sync_to_pc():
                     print("DEBUG: Wrote CSV header row")
                     logger.info("Wrote CSV header row")
                 for item in synced_items:
+                    if item['tag_id'] in csv_tag_ids:
+                        print(f"DEBUG: Skipping duplicate tag_id {item['tag_id']} in CSV append")
+                        logger.warning(f"Skipping duplicate tag_id {item['tag_id']} in CSV append")
+                        continue
                     writer.writerow({
                         'tag_id': item['tag_id'],
                         'common_name': item['common_name'],
@@ -619,6 +658,7 @@ def sync_to_pc():
                         'status': item['status'],
                         'bin_location': item['bin_location']
                     })
+                    csv_tag_ids.add(item['tag_id'])
                     print(f"DEBUG: Appended CSV row: {item}")
                     logger.info(f"Appended CSV row: {item}")
         except Exception as e:
@@ -865,4 +905,64 @@ def update_status():
         if session:
             session.rollback()
             session.close()
+        return jsonify({'error': str(e)}), 500
+
+@tab3_bp.route('/tab/3/update_notes', methods=['POST'])
+def update_notes():
+    session = None
+    try:
+        session = db.session()
+        print("DEBUG: Entering /tab/3/update_notes route")
+        data = request.get_json()
+        tag_id = data.get('tag_id')
+        new_notes = data.get('notes')
+
+        if not tag_id:
+            print(f"DEBUG: Invalid input in update_notes: tag_id={tag_id}")
+            logger.warning(f"Invalid input in update_notes: tag_id={tag_id}")
+            return jsonify({'error': 'Tag ID is required'}), 400
+
+        print(f"DEBUG: Querying ItemMaster for tag_id={tag_id}")
+        item = session.query(ItemMaster).filter_by(tag_id=tag_id).first()
+        if not item:
+            session.close()
+            print(f"DEBUG: Item not found for tag_id {tag_id}")
+            logger.info(f"Item not found for tag_id {tag_id}")
+            return jsonify({'error': 'Item not found'}), 404
+
+        print(f"DEBUG: Updating ItemMaster notes for tag_id={tag_id}")
+        current_time = datetime.now()
+        item.notes = new_notes if new_notes else None
+        item.date_updated = current_time
+        session.commit()
+
+        session.close()
+        print(f"DEBUG: Updated notes for tag_id {tag_id} to '{new_notes}' and date_updated to {current_time}")
+        logger.info(f"Updated notes for tag_id {tag_id} to '{new_notes}' and date_updated to {current_time}")
+        return jsonify({'message': 'Notes updated successfully'})
+    except Exception as e:
+        print(f"DEBUG: Uncaught exception in update_notes: {str(e)}")
+        logger.error(f"Error updating notes for tag {tag_id}: {str(e)}", exc_info=True)
+        if session:
+            session.rollback()
+            session.close()
+        return jsonify({'error': str(e)}), 500
+
+@tab3_bp.route('/tab/3/pack_resale_common_names', methods=['GET'])
+def get_pack_resale_common_names():
+    """
+    Fetch distinct common names for items with bin_location 'pack' or 'resale' from SeedRentalClass.
+    """
+    try:
+        common_names = db.session.query(SeedRentalClass.common_name)\
+            .filter(SeedRentalClass.bin_location.in_(['pack', 'resale']))\
+            .distinct()\
+            .all()
+        common_names = [name[0] for name in common_names if name[0]]
+        print(f"DEBUG: Fetched {len(common_names)} common names from SeedRentalClass for pack/resale: {common_names}")
+        logger.info(f"Fetched {len(common_names)} common names from SeedRentalClass for pack/resale: {common_names}")
+        return jsonify({'common_names': sorted(common_names)}), 200
+    except Exception as e:
+        print(f"DEBUG: Error fetching pack/resale common names from SeedRentalClass: {str(e)}")
+        logger.error(f"Error fetching pack/resale common names from SeedRentalClass: {str(e)}", exc_info=True)
         return jsonify({'error': str(e)}), 500

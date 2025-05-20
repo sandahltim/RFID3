@@ -1,4 +1,4 @@
-console.log('tab3.js version: 2025-05-20-v7 loaded');
+console.log('tab3.js version: 2025-05-20-v9 loaded');
 
 // Populate the common name dropdown for printing tags
 function populateCommonNameDropdown() {
@@ -234,12 +234,13 @@ function clearTab3Filters() {
 
 function updateStatusVisibility(tagId) {
     const select = document.getElementById(`status-${tagId}`);
-    const saveBtn = select.closest('tr').querySelector('.save-btn');
-    if (select.value !== select.options[0].value) {
-        saveBtn.style.display = 'inline-block';
-    } else {
-        saveBtn.style.display = 'none';
+    const saveBtn = select.closest('tr').querySelector('.save-status-btn');
+    if (!select || !saveBtn) {
+        console.warn(`Status select or save button not found for tag_id: ${tagId}`);
+        return;
     }
+    const originalStatus = select.options[0].value;
+    saveBtn.style.display = select.value !== originalStatus ? 'inline-block' : 'none';
 }
 
 function updateStatus(tagId) {
@@ -270,6 +271,45 @@ function updateStatus(tagId) {
     });
 }
 
+function updateNotesVisibility(tagId) {
+    const textarea = document.getElementById(`notes-${tagId}`);
+    const saveBtn = textarea.closest('tr').querySelector('.save-notes-btn');
+    if (!textarea || !saveBtn) {
+        console.warn(`Notes textarea or save button not found for tag_id: ${tagId}`);
+        return;
+    }
+    const originalNotes = textarea.dataset.originalNotes || '';
+    saveBtn.style.display = textarea.value !== originalNotes ? 'inline-block' : 'none';
+}
+
+function updateNotes(tagId) {
+    const newNotes = document.getElementById(`notes-${tagId}`).value;
+
+    fetch('/tab/3/update_notes', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            tag_id: tagId,
+            notes: newNotes
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            alert('Error: ' + data.error);
+        } else {
+            alert(data.message);
+            window.location.reload();
+        }
+    })
+    .catch(error => {
+        console.error('Error updating notes:', error);
+        alert('Failed to update notes');
+    });
+}
+
 // Initialize the page
 document.addEventListener('DOMContentLoaded', function() {
     // Format timestamps in the crew tables
@@ -285,10 +325,15 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // Initialize save button visibility for status updates
+    // Initialize save button visibility for status and notes
     document.querySelectorAll('.crew-table select').forEach(select => {
         const tagId = select.id.replace('status-', '');
         updateStatusVisibility(tagId);
+    });
+
+    document.querySelectorAll('.crew-table textarea').forEach(textarea => {
+        const tagId = textarea.id.replace('notes-', '');
+        updateNotesVisibility(tagId);
     });
 
     // Initialize the print tags section
