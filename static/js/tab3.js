@@ -1,4 +1,4 @@
-console.log('tab3.js version: 2025-05-20-v3 loaded');
+console.log('tab3.js version: 2025-05-20-v4 loaded');
 
 // Ensure common.js is loaded
 if (typeof formatDate !== 'function') {
@@ -179,7 +179,7 @@ function updateStatus(tagId) {
     fetch('/tab/3/update_status', {
         method: 'POST',
         headers: {
-            'Content-Typewärts: 'application/json'
+            'Content-Type': 'application/json'
         },
         body: JSON.stringify({
             tag_id: tagId,
@@ -205,6 +205,10 @@ function updateStatus(tagId) {
 function toggleCrewSection(crewId) {
     const content = document.getElementById(`crew-content-${crewId}`);
     const button = document.querySelector(`.toggle-crew[data-crew-id="${crewId}"]`);
+    if (!content || !button) {
+        console.warn(`Crew section elements not found for crewId: ${crewId}`);
+        return;
+    }
     if (content.classList.contains('collapsed')) {
         content.classList.remove('collapsed');
         content.classList.add('expanded');
@@ -332,8 +336,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Initialize pagination
         const crewId = table.getAttribute('data-crew-id');
-        const totalItems = parseInt(table.closest('.crew-section').querySelector('.row-count').textContent.match(/of (\d+) items/)[1]);
-        initializeCrewPagination(crewId, totalItems);
+        const rowCountElement = table.closest('.crew-section').querySelector('.row-count');
+        if (rowCountElement) {
+            const totalItems = parseInt(rowCountElement.textContent.match(/of (\d+) items/)[1]);
+            initializeCrewPagination(crewId, totalItems);
+        }
     });
 
     // Initialize save button visibility for status updates

@@ -36,7 +36,7 @@
     <h3>
         {{ crew.name }} Items
         <button class="btn btn-sm btn-info toggle-crew" data-crew-id="{{ crew.name | lower | replace(' ', '-') }}">
-            {% if crew.item_list | length > 20 %}Show More{% else %}Expand{% endif %}
+            {% if crew.total_items > 20 %}Show More{% else %}Expand{% endif %}
         </button>
     </h3>
     <div class="expandable collapsed" id="crew-content-{{ crew.name | lower | replace(' ', '-') }}">
