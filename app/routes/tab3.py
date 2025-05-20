@@ -45,7 +45,7 @@ if not os.path.exists(SHARED_DIR):
     os.chown(SHARED_DIR, pwd.getpwnam('tim').pw_uid, grp.getgrnam('tim').gr_gid)
 
 # Version marker
-logger.info("Deployed tab3.py version: 2025-05-20-v29")
+logger.info("Deployed tab3.py version: 2025-05-20-v31")
 
 @tab3_bp.route('/tab/3')
 def tab3_view():
@@ -67,16 +67,6 @@ def tab3_view():
         sort = request.args.get('sort', 'date_last_scanned_desc')
         page = int(request.args.get('page', 1))
         per_page = 20
-
-        # Fetch all rental class mappings
-        base_mappings = session.query(RentalClassMapping).all()
-        user_mappings = session.query(UserRentalClassMapping).all()
-
-        mappings_dict = {str(m.rental_class_id).strip().upper(): {'category': m.category, 'subcategory': m.subcategory} for m in base_mappings}
-        for um in user_mappings:
-            mappings_dict[str(um.rental_class_id).strip().upper()] = {'category': um.category, 'subcategory': um.subcategory}
-        print(f"DEBUG: Fetched {len(mappings_dict)} rental class mappings: {list(mappings_dict.keys())}")
-        logger.info(f"Fetched {len(mappings_dict)} rental class mappings: {list(mappings_dict.keys())}")
 
         # Raw SQL query to fetch items with service-related statuses
         sql_query = """
@@ -208,16 +198,17 @@ def tab3_view():
                     'repair_types': repair_types if repair_types else ['None']
                 }
 
-        # Group items by category
-        crew_items = {}
+        # Group items into Linen, Tents, Service
+        crew_items = {'Linen': [], 'Tents': [], 'Service': []}
         for item in items_in_service:
-            rental_class_num = item['rental_class_num']
-            category = mappings_dict.get(rental_class_num, {}).get('category', 'Miscellaneous')
-            print(f"DEBUG: Item {item['tag_id']}: rental_class_num={rental_class_num}, mapped to category={category}")
-            logger.info(f"Item {item['tag_id']}: rental_class_num={rental_class_num}, mapped to category={category}")
-
-            if category not in crew_items:
-                crew_items[category] = []
+            common_name = item['common_name'].lower()
+            # Grouping rules (adjust based on your data)
+            if 'linen' in common_name or 'napkin' in common_name or 'tablecloth' in common_name:
+                category = 'Linen'
+            elif 'tent' in common_name or 'canopy' in common_name:
+                category = 'Tents'
+            else:
+                category = 'Service'
 
             t_data = transaction_data.get(item['tag_id'], {'location_of_repair': 'N/A', 'repair_types': ['None']})
 
@@ -239,7 +230,7 @@ def tab3_view():
                 'item_list': item_list[:20],  # Limit to 20 items initially
                 'total_items': len(item_list)  # Store total for pagination
             }
-            for category, item_list in sorted(crew_items.items(), key=lambda x: x[0].lower())
+            for category, item_list in crew_items.items() if item_list
         ]
         print(f"DEBUG: Final crews structure: {[{c['name']: len(c['item_list'])} for c in crews]}")
         logger.info(f"Final crews structure: {[{c['name']: len(c['item_list'])} for c in crews]}")
@@ -276,7 +267,7 @@ def tab3_view():
 @tab3_bp.route('/tab/3/crew_items', methods=['GET'])
 def crew_items():
     """
-    Fetch paginated items for a specific crew.
+    Fetch paginated items for a specific crew (Linen, Tents, Service).
     """
     session = None
     try:
@@ -288,28 +279,14 @@ def crew_items():
         date_filter = request.args.get('date_last_scanned', '')
         sort = request.args.get('sort', 'date_last_scanned_desc')
 
-        # Fetch rental class mappings
-        base_mappings = session.query(RentalClassMapping).all()
-        user_mappings = session.query(UserRentalClassMapping).all()
-        mappings_dict = {str(m.rental_class_id).strip().upper(): {'category': m.category, 'subcategory': m.subcategory} for m in base_mappings}
-        for um in user_mappings:
-            mappings_dict[str(um.rental_class_id).strip().upper()] = {'category': um.category, 'subcategory': um.subcategory}
-
-        # Find rental class numbers for the crew
-        rental_class_nums = [rcn for rcn, mapping in mappings_dict.items() if mapping['category'].lower().replace(' ', '-') == crew_id]
-
-        if not rental_class_nums:
-            return jsonify({'items': [], 'total_items': 0}), 200
-
         # Build query
         sql_query = """
             SELECT tag_id, common_name, status, bin_location, last_contract_num, date_last_scanned, rental_class_num
             FROM id_item_master
             WHERE LOWER(TRIM(REPLACE(COALESCE(status, ''), '\0', ''))) IN ('repair', 'needs to be inspected', 'staged', 'wash', 'wet')
             AND LOWER(TRIM(REPLACE(COALESCE(status, ''), '\0', ''))) != 'sold'
-            AND rental_class_num IN :rental_class_nums
         """
-        params = {'rental_class_nums': tuple(rental_class_nums)}
+        params = {}
         if common_name_filter:
             sql_query += " AND LOWER(common_name) LIKE :common_name_filter"
             params['common_name_filter'] = f'%{common_name_filter}%'
@@ -348,15 +325,25 @@ def crew_items():
             for row in rows
         ]
 
+        # Filter by crew_id (Linen, Tents, Service)
+        filtered_items = []
+        for item in items:
+            common_name = item['common_name'].lower()
+            if crew_id == 'linen' and ('linen' in common_name or 'napkin' in common_name or 'tablecloth' in common_name):
+                filtered_items.append(item)
+            elif crew_id == 'tents' and ('tent' in common_name or 'canopy' in common_name):
+                filtered_items.append(item)
+            elif crew_id == 'service' and not ('linen' in common_name or 'napkin' in common_name or 'tablecloth' in common_name or 'tent' in common_name or 'canopy' in common_name):
+                filtered_items.append(item)
+
         # Fetch total count
         count_query = """
             SELECT COUNT(*)
             FROM id_item_master
             WHERE LOWER(TRIM(REPLACE(COALESCE(status, ''), '\0', ''))) IN ('repair', 'needs to be inspected', 'staged', 'wash', 'wet')
             AND LOWER(TRIM(REPLACE(COALESCE(status, ''), '\0', ''))) != 'sold'
-            AND rental_class_num IN :rental_class_nums
         """
-        count_params = {'rental_class_nums': tuple(rental_class_nums)}
+        count_params = {}
         if common_name_filter:
             count_query += " AND LOWER(common_name) LIKE :common_name_filter"
             count_params['common_name_filter'] = f'%{common_name_filter}%'
@@ -370,8 +357,20 @@ def crew_items():
 
         total_items = session.execute(text(count_query), count_params).scalar()
 
+        # Adjust total_items based on crew_id
+        all_items = session.execute(text(count_query.replace('COUNT(*)', 'tag_id, common_name')), count_params).fetchall()
+        total_crew_items = 0
+        for row in all_items:
+            common_name = row[1].lower()
+            if crew_id == 'linen' and ('linen' in common_name or 'napkin' in common_name or 'tablecloth' in common_name):
+                total_crew_items += 1
+            elif crew_id == 'tents' and ('tent' in common_name or 'canopy' in common_name):
+                total_crew_items += 1
+            elif crew_id == 'service' and not ('linen' in common_name or 'napkin' in common_name or 'tablecloth' in common_name or 'tent' in common_name or 'canopy' in common_name):
+                total_crew_items += 1
+
         # Fetch repair details
-        tag_ids = [item['tag_id'] for item in items]
+        tag_ids = [item['tag_id'] for item in filtered_items]
         transaction_data = {}
         if tag_ids:
             max_scan_date_subquery = session.query(
@@ -427,13 +426,13 @@ def crew_items():
                 }
 
         # Add repair details to items
-        for item in items:
+        for item in filtered_items:
             t_data = transaction_data.get(item['tag_id'], {'location_of_repair': 'N/A', 'repair_types': ['None']})
             item['location_of_repair'] = t_data['location_of_repair']
             item['repair_types'] = t_data['repair_types']
 
         session.commit()
-        return jsonify({'items': items, 'total_items': total_items}), 200
+        return jsonify({'items': filtered_items, 'total_items': total_crew_items}), 200
     except Exception as e:
         logger.error(f"Error fetching crew items: {str(e)}", exc_info=True)
         if session:
@@ -466,9 +465,8 @@ def get_pack_resale_common_names():
 def sync_to_pc():
     """
     Sync selected items to a CSV file for printing RFID tags.
-    Creates exactly the requested number of unique entries, overwriting the existing CSV file.
+    Appends new entries to the existing CSV file, ensuring headers and unique tag IDs.
     If no items exist in ItemMaster, create new entries based on SeedRentalClass.
-    Ensure new tag IDs are unique across ItemMaster and new items.
     """
     session = None
     try:
@@ -510,11 +508,41 @@ def sync_to_pc():
         print(f"DEBUG: Found {len(items)} items in ItemMaster for common_name={common_name} and bin_location in ['pack', 'resale']")
         logger.info(f"Found {len(items)} items in ItemMaster for common_name={common_name} and bin_location in ['pack', 'resale']")
 
+        # Read existing tag_ids from the CSV to ensure uniqueness
+        print("DEBUG: Reading existing tag_ids from CSV")
+        csv_tag_ids = set()
+        needs_header = not os.path.exists(CSV_FILE_PATH)
+        if os.path.exists(CSV_FILE_PATH):
+            try:
+                with open(CSV_FILE_PATH, 'r') as csvfile:
+                    first_line = csvfile.readline().strip()
+                    if not first_line:
+                        needs_header = True
+                    else:
+                        csvfile.seek(0)
+                        reader = csv.DictReader(csvfile)
+                        required_fields = ['tag_id', 'common_name', 'subcategory', 'short_common_name', 'status', 'bin_location']
+                        if not all(field in reader.fieldnames for field in required_fields):
+                            print("DEBUG: CSV file exists but lacks valid headers. Rewriting with headers.")
+                            logger.warning(f"CSV file exists but lacks valid headers. Rewriting with headers.")
+                            needs_header = True
+                        else:
+                            for row in reader:
+                                if 'tag_id' in row:
+                                    csv_tag_ids.add(row['tag_id'])
+            except Exception as e:
+                print(f"DEBUG: Error reading existing CSV file: {str(e)}")
+                logger.error(f"Error reading existing CSV file: {str(e)}", exc_info=True)
+                return jsonify({'error': f"Failed to read existing CSV file: {str(e)}"}), 500
+
+        print(f"DEBUG: Existing tag_ids in CSV: {csv_tag_ids}")
+        logger.info(f"Existing tag_ids in CSV: {csv_tag_ids}")
+
         # Prepare items to sync
         synced_items = []
         new_items = []
         new_tag_ids = set()
-        existing_tag_ids = set(item.tag_id for item in items)
+        existing_tag_ids = set(item.tag_id for item in items).union(csv_tag_ids)
         remaining_quantity = quantity - len(items)
 
         if remaining_quantity > 0:
@@ -660,15 +688,16 @@ def sync_to_pc():
             print(f"DEBUG: Updated synced_item with mappings: {item}")
             logger.info(f"Updated synced_item with mappings: {item}")
 
-        # Overwrite the CSV file
-        print("DEBUG: Writing to CSV file")
+        # Append to the CSV file
+        print("DEBUG: Appending to CSV file")
         try:
-            with open(CSV_FILE_PATH, 'w', newline='') as csvfile:
+            with open(CSV_FILE_PATH, 'a', newline='') as csvfile:
                 fieldnames = ['tag_id', 'common_name', 'subcategory', 'short_common_name', 'status', 'bin_location']
                 writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-                writer.writeheader()
-                print("DEBUG: Wrote CSV header row")
-                logger.info("Wrote CSV header row")
+                if needs_header:
+                    writer.writeheader()
+                    print("DEBUG: Wrote CSV header row")
+                    logger.info("Wrote CSV header row")
                 for item in synced_items:
                     writer.writerow({
                         'tag_id': item['tag_id'],
@@ -678,29 +707,29 @@ def sync_to_pc():
                         'status': item['status'],
                         'bin_location': item['bin_location']
                     })
-                    print(f"DEBUG: Wrote CSV row: {item}")
-                    logger.info(f"Wrote CSV row: {item}")
+                    print(f"DEBUG: Appended CSV row: {item}")
+                    logger.info(f"Appended CSV row: {item}")
         except Exception as e:
-            print(f"DEBUG: Failed to write to CSV file {CSV_FILE_PATH}: {str(e)}")
-            logger.error(f"Failed to write to CSV file {CSV_FILE_PATH}: {str(e)}", exc_info=True)
-            return jsonify({'error': f"Failed to write to CSV file: {str(e)}"}), 500
+            print(f"DEBUG: Failed to append to CSV file {CSV_FILE_PATH}: {str(e)}")
+            logger.error(f"Failed to append to CSV file {CSV_FILE_PATH}: {str(e)}", exc_info=True)
+            return jsonify({'error': f"Failed to append to CSV file: {str(e)}"}), 500
 
         # Commit new ItemMaster entries
         if new_items:
-            print("DEBUG: Committing session after CSV write")
+            print("DEBUG: Committing session after CSV append")
             try:
                 session.flush()
-                print(f"DEBUG: Session flushed successfully after CSV write")
-                logger.info(f"Session flushed successfully after CSV write")
+                print(f"DEBUG: Session flushed successfully after CSV append")
+                logger.info(f"Session flushed successfully after CSV append")
                 session.commit()
                 print(f"DEBUG: Successfully committed {len(new_items)} new ItemMaster entries")
                 logger.info(f"Successfully committed {len(new_items)} new ItemMaster entries")
             except Exception as e:
-                print(f"DEBUG: Failed to commit session after CSV write: {str(e)}")
-                logger.error(f"Failed to commit session after CSV write: {str(e)}", exc_info=True)
+                print(f"DEBUG: Failed to commit session after CSV append: {str(e)}")
+                logger.error(f"Failed to commit session after CSV append: {str(e)}", exc_info=True)
                 session.rollback()
-                print("DEBUG: Returning success response despite commit failure (CSV write completed)")
-                logger.warning("Returning success response despite commit failure (CSV write completed)")
+                print("DEBUG: Returning success response despite commit failure (CSV append completed)")
+                logger.warning("Returning success response despite commit failure (CSV append completed)")
                 return jsonify({'synced_items': len(synced_items)}), 200
 
         print(f"DEBUG: Successfully synced {len(synced_items)} items to CSV")
