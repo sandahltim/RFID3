@@ -32,64 +32,75 @@
 </div>
 
 {% for crew in crews %}
-<h3>{{ crew.name }} Items</h3>
-{% if crew.item_list %}
-    <table class="table table-bordered crew-table" id="crew-table-{{ crew.name | lower | replace(' ', '-') }}">
-        <thead>
-            <tr>
-                <th>Tag ID</th>
-                <th>Common Name</th>
-                <th>Status</th>
-                <th>Bin Location</th>
-                <th>Last Contract</th>
-                <th>Last Scanned Date</th>
-                <th>Location of Repair</th>
-                <th>Repair Types</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for item in crew.item_list %}
-                <tr>
-                    <td>{{ item.tag_id }}</td>
-                    <td>{{ item.common_name }}</td>
-                    <td>
-                        <select id="status-{{ item.tag_id }}" onchange="updateStatusVisibility('{{ item.tag_id }}')">
-                            <option value="{{ item.status }}" selected>{{ item.status }}</option>
-                            <option value="Ready to Rent">Ready to Rent</option>
-                            <option value="Sold">Sold</option>
-                            <option value="Repair">Repair</option>
-                            <option value="Needs to be Inspected">Needs to be Inspected</option>
-                            <option value="Staged">Staged</option>
-                            <option value="Wash">Wash</option>
-                            <option value="Wet">Wet</option>
-                        </select>
-                    </td>
-                    <td>{{ item.bin_location }}</td>
-                    <td>{{ item.last_contract_num }}</td>
-                    <td class="date-last-scanned">{{ item.date_last_scanned }}</td>
-                    <td>{{ item.location_of_repair }}</td>
-                    <td>{{ item.repair_types | join(', ') }}</td>
-                    <td>
-                        <button class="btn btn-sm btn-primary save-btn" onclick="updateStatus('{{ item.tag_id }}')">Save</button>
-                    </td>
-                </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-{% else %}
-    <p>No items currently in service for {{ crew.name }}.</p>
-{% endif %}
+<div class="crew-section">
+    <h3>
+        {{ crew.name }} Items
+        <button class="btn btn-sm btn-info toggle-crew" data-crew-id="{{ crew.name | lower | replace(' ', '-') }}">
+            {% if crew.item_list | length > 20 %}Show More{% else %}Expand{% endif %}
+        </button>
+    </h3>
+    <div class="expandable collapsed" id="crew-content-{{ crew.name | lower | replace(' ', '-') }}">
+        {% if crew.item_list %}
+            <table class="table table-bordered crew-table" id="crew-table-{{ crew.name | lower | replace(' ', '-') }}" data-crew-id="{{ crew.name | lower | replace(' ', '-') }}">
+                <thead>
+                    <tr>
+                        <th>Tag ID</th>
+                        <th>Common Name</th>
+                        <th>Status</th>
+                        <th>Bin Location</th>
+                        <th>Last Contract</th>
+                        <th>Last Scanned Date</th>
+                        <th>Location of Repair</th>
+                        <th>Repair Types</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in crew.item_list %}
+                        <tr>
+                            <td>{{ item.tag_id }}</td>
+                            <td>{{ item.common_name }}</td>
+                            <td>
+                                <select id="status-{{ item.tag_id }}" onchange="updateStatusVisibility('{{ item.tag_id }}')">
+                                    <option value="{{ item.status }}" selected>{{ item.status }}</option>
+                                    <option value="Ready to Rent">Ready to Rent</option>
+                                    <option value="Sold">Sold</option>
+                                    <option value="Repair">Repair</option>
+                                    <option value="Needs to be Inspected">Needs to be Inspected</option>
+                                    <option value="Staged">Staged</option>
+                                    <option value="Wash">Wash</option>
+                                    <option value="Wet">Wet</option>
+                                </select>
+                            </td>
+                            <td>{{ item.bin_location }}</td>
+                            <td>{{ item.last_contract_num }}</td>
+                            <td class="date-last-scanned">{{ item.date_last_scanned }}</td>
+                            <td>{{ item.location_of_repair }}</td>
+                            <td>{{ item.repair_types | join(', ') }}</td>
+                            <td>
+                                <button class="btn btn-sm btn-primary save-btn" onclick="updateStatus('{{ item.tag_id }}')">Save</button>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <div class="pagination-controls" id="pagination-{{ crew.name | lower | replace(' ', '-') }}"></div>
+            <div class="row-count" id="row-count-{{ crew.name | lower | replace(' ', '-') }}">
+                Showing {{ crew.item_list | length }} of {{ crew.total_items }} items
+            </div>
+        {% else %}
+            <p>No items currently in service for {{ crew.name }}.</p>
+        {% endif %}
+    </div>
+</div>
 {% endfor %}
 
-<!-- New Section for Printing RFID Tags - Moved to Bottom -->
 <div class="print-tags-section mt-4">
     <h4>Print RFID Tags</h4>
     <div class="form-group">
         <label for="commonNameSelect">Select Common Name (Pack/Resale):</label>
         <select id="commonNameSelect" class="form-control">
             <option value="">Select Common Name</option>
-            <!-- Populated by JS -->
         </select>
     </div>
     <div class="form-group">
