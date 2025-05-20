@@ -1,4 +1,4 @@
-console.log('tab3.js version: 2025-05-20-v6 loaded');
+console.log('tab3.js version: 2025-05-20-v7 loaded');
 
 // Populate the common name dropdown for printing tags
 function populateCommonNameDropdown() {
@@ -129,7 +129,7 @@ function setupPrintTagsSection() {
                 throw new Error(data.error);
             }
             syncMessage.textContent = `Successfully synced ${data.synced_items} items to PC.`;
-            fetchCsvContents(); // Refresh CSV contents
+            fetchCsvContents();
         })
         .catch(error => {
             console.error('Sync error:', error);
@@ -161,7 +161,7 @@ function setupPrintTagsSection() {
                 throw new Error(data.error);
             }
             syncMessage.textContent = `Successfully updated status for ${data.updated_items} items.`;
-            fetchCsvContents(); // Refresh CSV contents
+            fetchCsvContents();
             setTimeout(() => {
                 window.location.reload();
             }, 2000);
@@ -206,7 +206,7 @@ function setupPrintTagsSection() {
                 throw new Error(data.error);
             }
             syncMessage.textContent = data.message;
-            fetchCsvContents(); // Refresh CSV contents
+            fetchCsvContents();
         })
         .catch(error => {
             console.error('Error removing item:', error);
@@ -270,126 +270,6 @@ function updateStatus(tagId) {
     });
 }
 
-// Toggle crew section visibility
-function toggleCrewSection(crewId) {
-    console.log(`toggleCrewSection called for crewId: ${crewId}`);
-    const content = document.getElementById(`crew-content-${crewId}`);
-    const button = document.querySelector(`.toggle-crew[data-crew-id="${crewId}"]`);
-    if (!content || !button) {
-        console.warn(`Crew section elements not found for crewId: ${crewId}`);
-        return;
-    }
-    if (content.classList.contains('collapsed')) {
-        content.classList.remove('collapsed');
-        content.classList.add('expanded');
-        button.textContent = 'Show Less';
-    } else {
-        content.classList.remove('expanded');
-        content.classList.add('collapsed');
-        button.textContent = 'Show More';
-    }
-}
-
-// Initialize pagination for a crew table
-function initializeCrewPagination(crewId, totalItems, page = 1, perPage = 20) {
-    const table = document.getElementById(`crew-table-${crewId}`);
-    const paginationContainer = document.getElementById(`pagination-${crewId}`);
-    const rowCount = document.getElementById(`row-count-${crewId}`);
-
-    if (!table || !paginationContainer || !rowCount) {
-        console.warn(`Pagination elements not found for crew: ${crewId}`);
-        return;
-    }
-
-    // Update row count
-    const start = (page - 1) * perPage + 1;
-    const end = Math.min(page * perPage, totalItems);
-    rowCount.textContent = `Showing ${start} to ${end} of ${totalItems} items`;
-
-    // Render pagination controls
-    renderPaginationControls(paginationContainer, totalItems, page, perPage, (newPage) => {
-        fetchCrewItems(crewId, newPage, perPage);
-    });
-}
-
-// Fetch paginated items for a crew
-async function fetchCrewItems(crewId, page, perPage) {
-    const commonName = document.getElementById('commonNameFilterTab3').value;
-    const date = document.getElementById('dateFilterTab3').value;
-    const sort = document.getElementById('sortFilterTab3').value;
-
-    const params = new URLSearchParams({
-        crew_id: crewId,
-        page: page,
-        per_page: perPage
-    });
-    if (commonName) params.append('common_name', commonName);
-    if (date) params.append('date_last_scanned', date);
-    if (sort) params.append('sort', sort);
-
-    try {
-        const response = await fetch(`/tab/3/crew_items?${params.toString()}`);
-        if (!response.ok) {
-            throw new Error(`Failed to fetch crew items: ${response.status}`);
-        }
-        const data = await response.json();
-        updateCrewTable(crewId, data.items, data.total_items, page, perPage);
-    } catch (error) {
-        console.error(`Error fetching crew items for ${crewId}:`, error);
-    }
-}
-
-// Update crew table with new items
-function updateCrewTable(crewId, items, totalItems, page, perPage) {
-    const table = document.getElementById(`crew-table-${crewId}`);
-    const tbody = table.querySelector('tbody');
-    tbody.innerHTML = '';
-
-    items.forEach(item => {
-        const row = document.createElement('tr');
-        row.innerHTML = `
-            <td>${item.tag_id}</td>
-            <td>${item.common_name}</td>
-            <td>
-                <select id="status-${item.tag_id}" onchange="updateStatusVisibility('${item.tag_id}')">
-                    <option value="${item.status}" selected>${item.status}</option>
-                    <option value="Ready to Rent">Ready to Rent</option>
-                    <option value="Sold">Sold</option>
-                    <option value="Repair">Repair</option>
-                    <option value="Needs to be Inspected">Needs to be Inspected</option>
-                    <option value="Staged">Staged</option>
-                    <option value="Wash">Wash</option>
-                    <option value="Wet">Wet</option>
-                </select>
-            </td>
-            <td>${item.bin_location}</td>
-            <td>${item.last_contract_num}</td>
-            <td class="date-last-scanned">${item.date_last_scanned}</td>
-            <td>${item.location_of_repair}</td>
-            <td>${item.repair_types.join(', ')}</td>
-            <td>
-                <button class="btn btn-sm btn-primary save-btn" onclick="updateStatus('${item.tag_id}')">Save</button>
-            </td>
-        `;
-        tbody.appendChild(row);
-    });
-
-    // Reformat dates
-    tbody.querySelectorAll('.date-last-scanned').forEach(cell => {
-        const rawDate = cell.textContent.trim();
-        cell.textContent = formatDate(rawDate);
-    });
-
-    // Update save button visibility
-    tbody.querySelectorAll('select').forEach(select => {
-        const tagId = select.id.replace('status-', '');
-        updateStatusVisibility(tagId);
-    });
-
-    // Reinitialize pagination
-    initializeCrewPagination(crewId, totalItems, page, perPage);
-}
-
 // Initialize the page
 document.addEventListener('DOMContentLoaded', function() {
     // Format timestamps in the crew tables
@@ -403,19 +283,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 dateCell.textContent = formattedDate;
             }
         });
-
-        // Initialize pagination
-        const crewId = table.getAttribute('data-crew-id');
-        const rowCountElement = table.closest('.crew-section').querySelector('.row-count');
-        if (rowCountElement) {
-            const totalItemsMatch = rowCountElement.textContent.match(/of (\d+) items/);
-            if (totalItemsMatch) {
-                const totalItems = parseInt(totalItemsMatch[1]);
-                initializeCrewPagination(crewId, totalItems);
-            } else {
-                console.warn(`Failed to parse total items for crew: ${crewId}`);
-            }
-        }
     });
 
     // Initialize save button visibility for status updates
@@ -424,16 +291,8 @@ document.addEventListener('DOMContentLoaded', function() {
         updateStatusVisibility(tagId);
     });
 
-    // Initialize toggle buttons
-    document.querySelectorAll('.toggle-crew').forEach(button => {
-        button.addEventListener('click', () => {
-            const crewId = button.getAttribute('data-crew-id');
-            toggleCrewSection(crewId);
-        });
-    });
-
     // Initialize the print tags section
     populateCommonNameDropdown();
     setupPrintTagsSection();
-    fetchCsvContents(); // Initial CSV contents load
+    fetchCsvContents();
 });
