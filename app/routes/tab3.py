@@ -10,6 +10,7 @@ import csv
 import os
 import pwd
 import grp
+import tempfile
 
 # Configure logging
 logger = logging.getLogger('tab3')
@@ -45,7 +46,7 @@ if not os.path.exists(SHARED_DIR):
     os.chown(SHARED_DIR, pwd.getpwnam('tim').pw_uid, grp.getgrnam('tim').gr_gid)
 
 # Version marker
-logger.info("Deployed tab3.py version: 2025-05-20-v31")
+logger.info("Deployed tab3.py version: 2025-05-20-v34")
 
 @tab3_bp.route('/tab/3')
 def tab3_view():
@@ -202,7 +203,7 @@ def tab3_view():
         crew_items = {'Linen': [], 'Tents': [], 'Service': []}
         for item in items_in_service:
             common_name = item['common_name'].lower()
-            # Grouping rules (adjust based on your data)
+            # Grouping rules
             if 'linen' in common_name or 'napkin' in common_name or 'tablecloth' in common_name:
                 category = 'Linen'
             elif 'tent' in common_name or 'canopy' in common_name:
@@ -461,12 +462,94 @@ def get_pack_resale_common_names():
         logger.error(f"Error fetching pack/resale common names from SeedRentalClass: {str(e)}", exc_info=True)
         return jsonify({'error': str(e)}), 500
 
+@tab3_bp.route('/tab/3/csv_contents', methods=['GET'])
+def get_csv_contents():
+    """
+    Fetch the contents of rfid_tags.csv.
+    """
+    try:
+        if not os.path.exists(CSV_FILE_PATH):
+            print("DEBUG: CSV file does not exist")
+            logger.info("CSV file does not exist")
+            return jsonify({'items': [], 'count': 0}), 200
+
+        items = []
+        with open(CSV_FILE_PATH, 'r') as csvfile:
+            reader = csv.DictReader(csvfile)
+            required_fields = ['tag_id', 'common_name', 'subcategory', 'short_common_name', 'status', 'bin_location']
+            if not all(field in reader.fieldnames for field in required_fields):
+                print("DEBUG: CSV file missing required fields")
+                logger.warning("CSV file missing required fields")
+                return jsonify({'error': 'CSV file missing required fields'}), 400
+
+            for row in reader:
+                items.append({
+                    'tag_id': row['tag_id'],
+                    'common_name': row['common_name'],
+                    'subcategory': row['subcategory'],
+                    'short_common_name': row['short_common_name'],
+                    'status': row['status'],
+                    'bin_location': row['bin_location']
+                })
+
+        print(f"DEBUG: Fetched {len(items)} items from CSV")
+        logger.info(f"Fetched {len(items)} items from CSV")
+        return jsonify({'items': items, 'count': len(items)}), 200
+    except Exception as e:
+        print(f"DEBUG: Error reading CSV file: {str(e)}")
+        logger.error(f"Error reading CSV file: {str(e)}", exc_info=True)
+        return jsonify({'error': f"Error reading CSV file: {str(e)}"}), 500
+
+@tab3_bp.route('/tab/3/remove_csv_item', methods=['POST'])
+def remove_csv_item():
+    """
+    Remove a specific item from rfid_tags.csv based on tag_id.
+    """
+    try:
+        data = request.get_json()
+        tag_id = data.get('tag_id')
+
+        if not tag_id:
+            print("DEBUG: tag_id is required")
+            logger.warning("tag_id is required")
+            return jsonify({'error': 'tag_id is required'}), 400
+
+        if not os.path.exists(CSV_FILE_PATH):
+            print("DEBUG: CSV file does not exist")
+            logger.info("CSV file does not exist")
+            return jsonify({'error': 'CSV file does not exist'}), 404
+
+        # Read existing items
+        items = []
+        with open(CSV_FILE_PATH, 'r') as csvfile:
+            reader = csv.DictReader(csvfile)
+            fieldnames = reader.fieldnames
+            for row in reader:
+                if row['tag_id'] != tag_id:
+                    items.append(row)
+
+        # Write back items excluding the removed one
+        with open(CSV_FILE_PATH, 'w', newline='') as csvfile:
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            writer.writeheader()
+            for item in items:
+                writer.writerow(item)
+
+        print(f"DEBUG: Removed item with tag_id {tag_id} from CSV")
+        logger.info(f"Removed item with tag_id {tag_id} from CSV")
+        return jsonify({'message': f"Removed item with tag_id {tag_id}"}), 200
+    except Exception as e:
+        print(f"DEBUG: Error removing item from CSV: {str(e)}")
+        logger.error(f"Error removing item from CSV: {str(e)}", exc_info=True)
+        return jsonify({'error': f"Error removing item from CSV: {str(e)}"}), 500
+
 @tab3_bp.route('/tab/3/sync_to_pc', methods=['POST'])
 def sync_to_pc():
     """
     Sync selected items to a CSV file for printing RFID tags.
     Appends new entries to the existing CSV file, ensuring headers and unique tag IDs.
-    If no items exist in ItemMaster, create new entries based on SeedRentalClass.
+    Prioritizes tags with status 'Sold' from ItemMaster, then other statuses, before generating new tags.
+    Verifies against ItemMaster and CSV to prevent duplicates.
     """
     session = None
     try:
@@ -497,17 +580,6 @@ def sync_to_pc():
             logger.error(f"Shared directory {SHARED_DIR} is not writable")
             return jsonify({'error': f"Shared directory {SHARED_DIR} is not writable"}), 500
 
-        # Query items matching the common name and bin location from ItemMaster
-        print("DEBUG: Querying ItemMaster for existing items")
-        items = session.query(ItemMaster)\
-            .filter(ItemMaster.common_name == common_name,
-                    ItemMaster.bin_location.in_(['pack', 'resale']))\
-            .order_by(ItemMaster.status.asc())\
-            .limit(quantity)\
-            .all()
-        print(f"DEBUG: Found {len(items)} items in ItemMaster for common_name={common_name} and bin_location in ['pack', 'resale']")
-        logger.info(f"Found {len(items)} items in ItemMaster for common_name={common_name} and bin_location in ['pack', 'resale']")
-
         # Read existing tag_ids from the CSV to ensure uniqueness
         print("DEBUG: Reading existing tag_ids from CSV")
         csv_tag_ids = set()
@@ -535,19 +607,66 @@ def sync_to_pc():
                 logger.error(f"Error reading existing CSV file: {str(e)}", exc_info=True)
                 return jsonify({'error': f"Failed to read existing CSV file: {str(e)}"}), 500
 
-        print(f"DEBUG: Existing tag_ids in CSV: {csv_tag_ids}")
-        logger.info(f"Existing tag_ids in CSV: {csv_tag_ids}")
+        print(f"DEBUG: Found {len(csv_tag_ids)} existing tag_ids in CSV")
+        logger.info(f"Found {len(csv_tag_ids)} existing tag_ids in CSV")
+
+        # Query ItemMaster for tags, prioritizing 'Sold' status
+        print("DEBUG: Querying ItemMaster for existing items")
+        sold_items = session.query(ItemMaster)\
+            .filter(ItemMaster.common_name == common_name,
+                    ItemMaster.bin_location.in_(['pack', 'resale']),
+                    ItemMaster.status == 'Sold')\
+            .order_by(ItemMaster.date_updated.asc())\
+            .limit(quantity)\
+            .all()
+        print(f"DEBUG: Found {len(sold_items)} 'Sold' items in ItemMaster for common_name={common_name}")
+
+        remaining_quantity = quantity - len(sold_items)
+        other_items = []
+        if remaining_quantity > 0:
+            other_items = session.query(ItemMaster)\
+                .filter(ItemMaster.common_name == common_name,
+                        ItemMaster.bin_location.in_(['pack', 'resale']),
+                        ItemMaster.status != 'Sold')\
+                .order_by(ItemMaster.status.asc())\
+                .limit(remaining_quantity)\
+                .all()
+            print(f"DEBUG: Found {len(other_items)} non-'Sold' items in ItemMaster for common_name={common_name}")
+            remaining_quantity -= len(other_items)
+
+        items = sold_items + other_items
+        print(f"DEBUG: Total items from ItemMaster: {len(items)} (Sold: {len(sold_items)}, Other: {len(other_items)})")
 
         # Prepare items to sync
         synced_items = []
         new_items = []
         new_tag_ids = set()
         existing_tag_ids = set(item.tag_id for item in items).union(csv_tag_ids)
-        remaining_quantity = quantity - len(items)
 
+        # Add existing items to synced_items
+        for item in items:
+            tag_id = item.tag_id
+            if tag_id in synced_items:  # Skip duplicates
+                print(f"DEBUG: Skipping duplicate tag_id {tag_id} from ItemMaster")
+                logger.warning(f"Skipping duplicate tag_id {tag_id} from ItemMaster")
+                continue
+            synced_items.append({
+                'tag_id': tag_id,
+                'common_name': item.common_name,
+                'subcategory': 'Unknown',
+                'short_common_name': item.common_name,
+                'status': item.status,
+                'bin_location': item.bin_location,
+                'rental_class_num': item.rental_class_num,
+                'is_new': False
+            })
+            print(f"DEBUG: Added to synced_items: tag_id={tag_id}, common_name={item.common_name}, status={item.status}")
+            logger.info(f"Added to synced_items: tag_id={tag_id}, common_name={item.common_name}, status={item.status}")
+
+        # Generate new tags if needed
         if remaining_quantity > 0:
-            print(f"DEBUG: Not enough items found in ItemMaster. Need to create {remaining_quantity} new items for common_name={common_name}")
-            logger.info(f"Not enough items found in ItemMaster. Need to create {remaining_quantity} new items for common_name={common_name}")
+            print(f"DEBUG: Need to create {remaining_quantity} new items for common_name={common_name}")
+            logger.info(f"Need to create {remaining_quantity} new items for common_name={common_name}")
 
             # Fetch rental_class_id and bin_location from SeedRentalClass
             print(f"DEBUG: Querying SeedRentalClass for common_name={common_name}")
@@ -613,8 +732,8 @@ def sync_to_pc():
                     'is_new': True
                 })
                 new_tag_ids.add(tag_id)
-                print(f"DEBUG: Added to synced_items: tag_id={tag_id}, common_name={common_name}")
-                logger.info(f"Added to synced_items: tag_id={tag_id}, common_name={common_name}")
+                print(f"DEBUG: Added to synced_items: tag_id={tag_id}, common_name={common_name}, status=Ready to Rent")
+                logger.info(f"Added to synced_items: tag_id={tag_id}, common_name={common_name}, status=Ready to Rent")
 
                 new_item = ItemMaster(
                     tag_id=tag_id,
@@ -640,27 +759,6 @@ def sync_to_pc():
                 new_items.append(new_item)
                 print(f"DEBUG: Created new ItemMaster entry: tag_id={tag_id}, common_name={common_name}, rental_class_num={rental_class_num}")
                 logger.info(f"Created new ItemMaster entry: tag_id={tag_id}, common_name={common_name}, rental_class_num={rental_class_num}")
-
-        # Add existing items to synced_items
-        for item in items:
-            tag_id = item.tag_id
-            if tag_id.startswith('425445'):
-                new_tag_ids.add(tag_id)
-            print(f"DEBUG: Using tag_id {tag_id} for item with common_name={item.common_name}")
-            logger.info(f"Using tag_id {tag_id} for item with common_name={item.common_name}")
-
-            synced_items.append({
-                'tag_id': tag_id,
-                'common_name': item.common_name,
-                'subcategory': 'Unknown',
-                'short_common_name': item.common_name,
-                'status': item.status,
-                'bin_location': item.bin_location,
-                'rental_class_num': item.rental_class_num,
-                'is_new': False
-            })
-            print(f"DEBUG: Added to synced_items: tag_id={tag_id}, common_name={item.common_name}")
-            logger.info(f"Added to synced_items: tag_id={tag_id}, common_name={item.common_name}")
 
         # Fetch rental class mappings
         print("DEBUG: Fetching rental class mappings")
