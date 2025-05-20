@@ -1,4 +1,4 @@
-console.log('tab2.js version: 2025-05-20-v1 loaded');
+console.log('tab2.js version: 2025-05-20-v2 loaded');
 
 // Format ISO date strings into "Thurs, Aug 21 2025 4:55 pm"
 function formatDate(isoDateString) {
@@ -680,7 +680,7 @@ let globalFilter = {
     contractNumber: ''
 };
 
-// Load global filter from sessionStorage on page load
+// Load global filter from sessionStorage on page load and format timestamps
 document.addEventListener('DOMContentLoaded', function() {
     const savedFilter = sessionStorage.getItem('globalFilter');
     if (savedFilter) {
@@ -704,6 +704,17 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log(`Tab ${window.cachedTabNum} detected, skipping tab2.js`);
         return;
     }
+
+    // Format timestamps in the contract table
+    const contractRows = document.querySelectorAll('#category-rows tr:not(.expandable)');
+    contractRows.forEach(row => {
+        const timestampCell = row.querySelector('td:nth-child(5)'); // Last Scanned Date column
+        if (timestampCell) {
+            const rawDate = timestampCell.textContent.trim();
+            const formattedDate = formatDate(rawDate);
+            timestampCell.textContent = formattedDate;
+        }
+    });
 
     // Clean up outdated sessionStorage keys
     Object.keys(sessionStorage).forEach(key => {
