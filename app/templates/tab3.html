@@ -44,7 +44,7 @@
                         {{ group.common_name }} ({{ group.total_items }} items)
                     </button>
                 </h4>
-                <div id="common-{{ loop.index }}" class="expandable expanded">
+                <div id="common-{{ loop.index }}">
                     {% for status_group in group.status_groups %}
                         <div class="status-section ml-3 mb-2">
                             <h5>
@@ -52,7 +52,7 @@
                                     {{ status_group.status }} ({{ status_group.total_items }} items)
                                 </button>
                             </h5>
-                            <div id="status-{{ loop.parent.loop.index }}-{{ loop.index }}" class="expandable collapsed">
+                            <div id="status-{{ loop.parent.loop.index }}-{{ loop.index }}">
                                 <table class="table table-bordered status-table" id="status-table-{{ loop.parent.loop.index }}-{{ loop.index }}">
                                     <thead>
                                         <tr>
@@ -164,12 +164,6 @@
 </div>
 
 <style>
-.expandable.collapsed {
-    display: none;
-}
-.expandable.expanded {
-    display: block;
-}
 .common-name-section {
     border-left: 3px solid #007bff;
     padding-left: 10px;
