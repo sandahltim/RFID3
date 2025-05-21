@@ -11,6 +11,7 @@ import os
 import pwd
 import grp
 import sqlalchemy.exc
+import fcntl
 
 # Configure logging for Tab 3
 logger = logging.getLogger('tab3')
@@ -38,6 +39,7 @@ tab3_bp = Blueprint('tab3', __name__)
 # Directory for shared CSV files
 SHARED_DIR = '/home/tim/test_rfidpi/shared'
 CSV_FILE_PATH = os.path.join(SHARED_DIR, 'rfid_tags.csv')
+LOCK_FILE_PATH = os.path.join(SHARED_DIR, 'rfid_tags.lock')
 
 # Ensure shared directory exists with correct permissions
 if not os.path.exists(SHARED_DIR):
@@ -47,7 +49,7 @@ if not os.path.exists(SHARED_DIR):
     os.chown(SHARED_DIR, pwd.getpwnam('tim').pw_uid, grp.getgrnam('tim').gr_gid)
 
 # Version marker for deployment tracking
-logger.info("Deployed tab3.py version: 2025-05-21-v41")
+logger.info("Deployed tab3.py version: 2025-05-21-v42")
 
 @tab3_bp.route('/tab/3')
 def tab3_view():
@@ -307,7 +309,14 @@ def get_csv_contents():
 @tab3_bp.route('/tab/3/remove_csv_item', methods=['POST'])
 def remove_csv_item():
     """Remove a specific item from rfid_tags.csv based on tag_id."""
+    lock_file = None
     try:
+        # Acquire lock to prevent concurrent CSV modifications
+        lock_file = open(LOCK_FILE_PATH, 'w')
+        fcntl.flock(lock_file, fcntl.LOCK_EX)
+        print("DEBUG: Acquired lock for remove_csv_item")
+        logger.debug("Acquired lock for remove_csv_item")
+
         data = request.get_json()
         tag_id = data.get('tag_id')
 
@@ -344,6 +353,12 @@ def remove_csv_item():
         print(f"DEBUG: Error removing item from CSV: {str(e)}")
         logger.error(f"Error removing item from CSV: {str(e)}", exc_info=True)
         return jsonify({'error': f"Error removing item from CSV: {str(e)}"}), 500
+    finally:
+        if lock_file:
+            fcntl.flock(lock_file, fcntl.LOCK_UN)
+            lock_file.close()
+            print("DEBUG: Released lock for remove_csv_item")
+            logger.debug("Released lock for remove_csv_item")
 
 @tab3_bp.route('/tab/3/sync_to_pc', methods=['POST'])
 def sync_to_pc():
@@ -351,13 +366,25 @@ def sync_to_pc():
     Sync selected items to rfid_tags.csv for printing RFID tags.
     Appends exactly 'quantity' unique entries to the CSV, using existing ItemMaster tags
     (prioritizing 'Sold', then others) and generating new tags if needed.
-    Enhanced error handling to fix 500 errors and prevent duplicate entries.
+    Added file-based lock to prevent concurrent CSV writes and duplicates.
     """
     session = None
+    lock_file = None
     try:
         session = db.session()
         print("DEBUG: Entering /tab/3/sync_to_pc route")
         logger.info("Entering /tab/3/sync_to_pc route")
+
+        # Acquire lock to prevent concurrent CSV modifications
+        lock_file = open(LOCK_FILE_PATH, 'w')
+        try:
+            fcntl.flock(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            print("DEBUG: Acquired lock for sync_to_pc")
+            logger.debug("Acquired lock for sync_to_pc")
+        except BlockingIOError:
+            print("DEBUG: Another sync_to_pc operation is in progress")
+            logger.warning("Another sync_to_pc operation is in progress")
+            return jsonify({'error': 'Another sync operation is in progress'}), 429
 
         data = request.get_json()
         print(f"DEBUG: Received request data: {data}")
@@ -404,7 +431,7 @@ def sync_to_pc():
                         required_fields = ['tag_id', 'common_name', 'subcategory', 'short_common_name', 'status', 'bin_location']
                         if not all(field in reader.fieldnames for field in required_fields):
                             print("DEBUG: CSV file exists but lacks valid headers. Rewriting with headers.")
-                            logger.warning("CSV file exists but lacks valid headers. Rewriting with headers.")
+                            logger.warning("CSV file exists but lacks_unofficial lacks valid headers. Rewriting with headers.")
                             needs_header = True
                         else:
                             for row in reader:
@@ -416,8 +443,8 @@ def sync_to_pc():
                 logger.error(f"Error reading existing CSV file: {str(e)}", exc_info=True)
                 return jsonify({'error': f"Failed to read existing CSV file: {str(e)}"}), 500
 
-        print(f"DEBUG: Found {len(csv_tag_ids)} unique tag_ids in CSV")
-        logger.info(f"Found {len(csv_tag_ids)} unique tag_ids in CSV")
+        print(f"DEBUG: Found {len(csv_tag_ids)} unique tag_ids in CSV before sync")
+        logger.info(f"Found {len(csv_tag_ids)} unique tag_ids in CSV before sync")
 
         # Initialize synced items and tracking set
         synced_items = []
@@ -711,6 +738,11 @@ def sync_to_pc():
             session.rollback()
         return jsonify({'error': str(e)}), 500
     finally:
+        if lock_file:
+            fcntl.flock(lock_file, fcntl.LOCK_UN)
+            lock_file.close()
+            print("DEBUG: Released lock for sync_to_pc")
+            logger.debug("Released lock for sync_to_pc")
         if session:
             session.close()
             print("DEBUG: Session closed")
@@ -723,10 +755,22 @@ def update_synced_status():
     and clear the CSV file.
     """
     session = None
+    lock_file = None
     try:
         session = db.session()
         print("DEBUG: Entering /tab/3/update_synced_status route")
         logger.info("Received request for /tab/3/update_synced_status")
+
+        # Acquire lock to prevent concurrent CSV modifications
+        lock_file = open(LOCK_FILE_PATH, 'w')
+        try:
+            fcntl.flock(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            print("DEBUG: Acquired lock for update_synced_status")
+            logger.debug("Acquired lock for update_synced_status")
+        except BlockingIOError:
+            print("DEBUG: Another update_synced_status operation is in progress")
+            logger.warning("Another update_synced_status operation is in progress")
+            return jsonify({'error': 'Another update operation is in progress'}), 429
 
         if not os.path.exists(CSV_FILE_PATH):
             print("DEBUG: No synced items found in CSV file")
@@ -877,6 +921,11 @@ def update_synced_status():
             session.rollback()
         return jsonify({'error': str(e)}), 500
     finally:
+        if lock_file:
+            fcntl.flock(lock_file, fcntl.LOCK_UN)
+            lock_file.close()
+            print("DEBUG: Released lock for update_synced_status")
+            logger.debug("Released lock for update_synced_status")
         if session:
             session.close()
             print("DEBUG: Session closed")
