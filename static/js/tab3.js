@@ -1,29 +1,27 @@
-console.log('tab3.js version: 2025-05-21-v11 loaded');
+console.log('tab3.js version: 2025-05-21-v12 loaded');
 
-// Debounce function with locking mechanism to prevent multiple rapid clicks
+// Debounce function with immediate lock to prevent multiple rapid executions
 function debounce(func, wait) {
     let timeout;
     let isProcessing = false; // Lock to prevent concurrent requests
 
     return function executedFunction(...args) {
+        // Check lock immediately to prevent scheduling multiple timeouts
         if (isProcessing) {
             console.log('DEBUG: Request blocked - sync already in progress');
             return;
         }
 
+        clearTimeout(timeout);
         isProcessing = true;
         console.log('DEBUG: Setting isProcessing to true');
 
-        const later = () => {
-            clearTimeout(timeout);
+        timeout = setTimeout(() => {
             func(...args).finally(() => {
                 isProcessing = false;
                 console.log('DEBUG: Setting isProcessing to false');
             });
-        };
-
-        clearTimeout(timeout);
-        timeout = setTimeout(later, wait);
+        }, wait);
     };
 }
 
@@ -113,8 +111,9 @@ function setupPrintTagsSection() {
     const syncBtn = document.getElementById('syncToPcBtn');
     const updateStatusBtn = document.getElementById('updateStatusBtn');
     const syncMessage = document.getElementById('syncMessage');
+    const csvContentsTable = document.getElementById('csvContentsTable');
 
-    if (!syncBtn || !updateStatusBtn || !syncMessage) {
+    if (!syncBtn || !updateStatusBtn || !syncMessage || !csvContentsTable) {
         console.warn('Print tags section elements not found');
         return;
     }
@@ -169,11 +168,15 @@ function setupPrintTagsSection() {
         }
     }, 500);
 
+    // Remove any existing listeners to prevent duplicates
+    syncBtn.removeEventListener('click', debouncedSync);
+    // Add the click listener with the `once` option to ensure single execution
     syncBtn.addEventListener('click', () => {
         console.log('DEBUG: Sync to PC button clicked');
         debouncedSync();
-    });
+    }, { once: true });
 
+    // Update status button click handler
     updateStatusBtn.addEventListener('click', () => {
         updateStatusBtn.disabled = true;
         syncMessage.textContent = 'Updating status...';
@@ -205,10 +208,10 @@ function setupPrintTagsSection() {
             syncMessage.textContent = `Error updating status: ${error.message}`;
             updateStatusBtn.disabled = false;
         });
-    });
+    }, { once: true });
 
-    // Handle remove buttons
-    document.getElementById('csvContentsTable').addEventListener('click', (event) => {
+    // Event delegation for remove buttons to prevent duplicate dialogs
+    csvContentsTable.addEventListener('click', (event) => {
         const removeBtn = event.target.closest('.remove-btn');
         if (!removeBtn) return;
 
@@ -218,7 +221,15 @@ function setupPrintTagsSection() {
             return;
         }
 
+        // Prevent multiple rapid clicks on the same button
+        if (removeBtn.classList.contains('processing')) {
+            console.log('DEBUG: Remove button already processing for tag_id:', tagId);
+            return;
+        }
+        removeBtn.classList.add('processing');
+
         if (!confirm(`Are you sure you want to remove item with Tag ID ${tagId}?`)) {
+            removeBtn.classList.remove('processing');
             return;
         }
 
@@ -245,8 +256,11 @@ function setupPrintTagsSection() {
         .catch(error => {
             console.error('Error removing item:', error);
             syncMessage.textContent = `Error removing item: ${error.message}`;
+        })
+        .finally(() => {
+            removeBtn.classList.remove('processing');
         });
-    });
+    }, { once: false }); // Keep delegation active for dynamic rows
 }
 
 // Apply filters for Tab 3
@@ -359,7 +373,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const dateCell = row.querySelector('.date-last-scanned');
             if (dateCell) {
                 const rawDate = dateCell.textContent.trim();
-                const formattedDate = formatDate(rawDate);
+                const formattedDate = window.formatDate ? window.formatDate(rawDate) : rawDate;
                 dateCell.textContent = formattedDate;
             }
         });
