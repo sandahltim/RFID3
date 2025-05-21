@@ -1,4 +1,17 @@
-console.log('tab3.js version: 2025-05-20-v9 loaded');
+console.log('tab3.js version: 2025-05-21-v10 loaded');
+
+// Debounce function to prevent multiple rapid clicks
+function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
+}
 
 // Populate the common name dropdown for printing tags
 function populateCommonNameDropdown() {
@@ -92,7 +105,8 @@ function setupPrintTagsSection() {
         return;
     }
 
-    syncBtn.addEventListener('click', () => {
+    // Debounced sync function to prevent multiple requests
+    const debouncedSync = debounce(() => {
         const commonName = document.getElementById('commonNameSelect')?.value;
         const quantity = parseInt(document.getElementById('tagQuantity')?.value) || 0;
 
@@ -107,6 +121,7 @@ function setupPrintTagsSection() {
 
         syncBtn.disabled = true;
         syncMessage.textContent = 'Syncing to PC...';
+        console.log(`DEBUG: Sending sync request: commonName=${commonName}, quantity=${quantity}`);
 
         fetch('/tab/3/sync_to_pc', {
             method: 'POST',
@@ -129,6 +144,7 @@ function setupPrintTagsSection() {
                 throw new Error(data.error);
             }
             syncMessage.textContent = `Successfully synced ${data.synced_items} items to PC.`;
+            console.log(`DEBUG: Sync successful, ${data.synced_items} items added`);
             fetchCsvContents();
         })
         .catch(error => {
@@ -138,7 +154,9 @@ function setupPrintTagsSection() {
         .finally(() => {
             syncBtn.disabled = false;
         });
-    });
+    }, 500);
+
+    syncBtn.addEventListener('click', debouncedSync);
 
     updateStatusBtn.addEventListener('click', () => {
         updateStatusBtn.disabled = true;
@@ -215,6 +233,7 @@ function setupPrintTagsSection() {
     });
 }
 
+// Apply filters for Tab 3
 function applyTab3Filters() {
     const commonName = document.getElementById('commonNameFilterTab3').value;
     const date = document.getElementById('dateFilterTab3').value;
@@ -228,10 +247,12 @@ function applyTab3Filters() {
     window.location.href = `/tab/3?${params.toString()}`;
 }
 
+// Clear filters for Tab 3
 function clearTab3Filters() {
     window.location.href = '/tab/3';
 }
 
+// Update status button visibility
 function updateStatusVisibility(tagId) {
     const select = document.getElementById(`status-${tagId}`);
     const saveBtn = select.closest('tr').querySelector('.save-status-btn');
@@ -243,6 +264,7 @@ function updateStatusVisibility(tagId) {
     saveBtn.style.display = select.value !== originalStatus ? 'inline-block' : 'none';
 }
 
+// Update item status
 function updateStatus(tagId) {
     const newStatus = document.getElementById(`status-${tagId}`).value;
 
@@ -271,6 +293,7 @@ function updateStatus(tagId) {
     });
 }
 
+// Update notes button visibility
 function updateNotesVisibility(tagId) {
     const textarea = document.getElementById(`notes-${tagId}`);
     const saveBtn = textarea.closest('tr').querySelector('.save-notes-btn');
@@ -282,6 +305,7 @@ function updateNotesVisibility(tagId) {
     saveBtn.style.display = textarea.value !== originalNotes ? 'inline-block' : 'none';
 }
 
+// Update item notes
 function updateNotes(tagId) {
     const newNotes = document.getElementById(`notes-${tagId}`).value;
 
