@@ -3,8 +3,10 @@
 {% block title %}Tab 3 - Items in Service{% endblock %}
 
 {% block content %}
+<!-- Main heading for Tab 3 -->
 <h1>Tab 3 - Items in Service</h1>
 
+<!-- Filter and sort controls for item table -->
 <div class="filter-sort-controls mb-4">
     <div class="row">
         <div class="col-md-4">
@@ -31,6 +33,7 @@
     </div>
 </div>
 
+<!-- Crew sections for Linen, Tents, Service -->
 {% for crew in crews %}
 <div class="crew-section">
     <h3>{{ crew.name }} Items</h3>
@@ -89,6 +92,7 @@
 </div>
 {% endfor %}
 
+<!-- Section for printing RFID tags -->
 <div class="print-tags-section mt-4">
     <h4>Print RFID Tags</h4>
     <div class="form-group">
@@ -119,6 +123,7 @@
     <div id="syncMessage" class="mt-2"></div>
 </div>
 
+<!-- Scripts for Tab 3 functionality; single inclusion to prevent double loading -->
 <script src="/static/js/common.js?v={{ cache_bust }}"></script>
 <script src="/static/js/tab3.js?v={{ cache_bust }}"></script>
 {% endblock %}

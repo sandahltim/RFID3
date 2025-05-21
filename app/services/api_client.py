@@ -5,18 +5,21 @@ from config import API_USERNAME, API_PASSWORD, LOGIN_URL, ITEM_MASTER_URL, TRANS
 import logging
 from urllib.parse import quote
 
+# Configure logging for API client
 logger = logging.getLogger(__name__)
 
 class APIClient:
     def __init__(self):
+        """Initialize API client with base URL and authentication."""
         self.base_url = "https://cs.iot.ptshome.com/api/v1/data/"
         self.auth_url = LOGIN_URL
-        self.item_master_endpoint = "14223767938169344381"  # For updating item master records
+        self.item_master_endpoint = "14223767938169344381"  # Endpoint for Item Master operations
         self.token = None
         self.token_expiry = None
         self.authenticate()
 
     def authenticate(self):
+        """Authenticate with the API to obtain an access token."""
         payload = {"username": API_USERNAME, "password": API_PASSWORD}
         for attempt in range(5):
             try:
@@ -41,6 +44,7 @@ class APIClient:
         raise Exception("Failed to fetch access token after 5 attempts")
 
     def _make_request(self, endpoint_id, params=None, method='GET', data=None):
+        """Make an API request with the specified method, endpoint, and data."""
         if not params:
             params = {}
         if method == 'GET':
@@ -102,6 +106,7 @@ class APIClient:
             raise ValueError(f"Unsupported method: {method}")
 
     def get_item_master(self, since_date=None):
+        """Fetch Item Master records, optionally filtered by since_date."""
         params = {}
         if since_date:
             since_date = datetime.fromisoformat(since_date).strftime('%Y-%m-%d %H:%M:%S') if isinstance(since_date, str) else since_date.strftime('%Y-%m-%d %H:%M:%S')
@@ -126,6 +131,7 @@ class APIClient:
         return data
 
     def get_transactions(self, since_date=None):
+        """Fetch transaction records, optionally filtered by since_date."""
         params = {}
         if since_date:
             since_date = datetime.fromisoformat(since_date).strftime('%Y-%m-%d %H:%M:%S') if isinstance(since_date, str) else since_date.strftime('%Y-%m-%d %H:%M:%S')
@@ -151,30 +157,22 @@ class APIClient:
         return data
 
     def get_seed_data(self, since_date=None):
+        """Fetch seed data (no date filtering supported)."""
         params = {}
-        # Seed data doesn't support filtering by date_updated, so fetch all data
         data = self._make_request("14223767938169215907", params)
         logger.debug(f"Seed data sample: {data[:5] if data else 'No data'}")
         return data
 
     def update_bin_location(self, tag_id, bin_location):
-        """
-        Update the bin location of an item in the Item Master via the API.
-        Also updates the date_last_scanned to the current timestamp.
-        """
+        """Update an item's bin location and date_last_scanned via API PATCH."""
         if not tag_id or not bin_location:
             raise ValueError("tag_id and bin_location are required")
 
-        # First, fetch the current item record to get its full data
-        params = {
-            'filter[eq]': f"tag_id,eq,'{tag_id}'"
-        }
+        params = {'filter[eq]': f"tag_id,eq,'{tag_id}'"}
         items = self._make_request(self.item_master_endpoint, params)
         if not items:
             raise Exception(f"Item with tag_id {tag_id} not found in Item Master")
 
-        item = items[0]  # Assuming tag_id is unique, take the first match
-        # Update the bin_location and date_last_scanned fields
         current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         update_data = {
             'tag_id': tag_id,
@@ -182,29 +180,20 @@ class APIClient:
             'date_last_scanned': current_time
         }
 
-        # Send the updated fields back to the API using PATCH
-        response = self._make_request(self.item_master_endpoint, method='PATCH', data=[update_data])
+        response = self._make_request(self.item_master_endpoint, params=params, method='PATCH', data=[update_data])
         logger.info(f"Updated bin_location for tag_id {tag_id} to {bin_location} and date_last_scanned to {current_time} via API")
         return response
 
     def update_status(self, tag_id, status):
-        """
-        Update the status of an item in the Item Master via the API.
-        Also updates the date_last_scanned to the current timestamp.
-        """
+        """Update an item's status and date_last_scanned via API PATCH."""
         if not tag_id or not status:
             raise ValueError("tag_id and status are required")
 
-        # First, fetch the current item record to get its full data
-        params = {
-            'filter[eq]': f"tag_id,eq,'{tag_id}'"
-        }
+        params = {'filter[eq]': f"tag_id,eq,'{tag_id}'"}
         items = self._make_request(self.item_master_endpoint, params)
         if not items:
             raise Exception(f"Item with tag_id {tag_id} not found in Item Master")
 
-        item = items[0]  # Assuming tag_id is unique, take the first match
-        # Update the status and date_last_scanned fields
         current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         update_data = {
             'tag_id': tag_id,
@@ -212,19 +201,36 @@ class APIClient:
             'date_last_scanned': current_time
         }
 
-        # Send the updated fields back to the API using PATCH
-        response = self._make_request(self.item_master_endpoint, method='PATCH', data=[update_data])
+        response = self._make_request(self.item_master_endpoint, params=params, method='PATCH', data=[update_data])
         logger.info(f"Updated status for tag_id {tag_id} to {status} and date_last_scanned to {current_time} via API")
         return response
 
+    def update_notes(self, tag_id, notes):
+        """Update an item's notes and date_updated via API PATCH."""
+        if not tag_id:
+            raise ValueError("tag_id is required")
+
+        params = {'filter[eq]': f"tag_id,eq,'{tag_id}'"}
+        items = self._make_request(self.item_master_endpoint, params)
+        if not items:
+            raise Exception(f"Item with tag_id {tag_id} not found in Item Master")
+
+        current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        update_data = {
+            'tag_id': tag_id,
+            'notes': notes if notes else '',
+            'date_updated': current_time
+        }
+
+        response = self._make_request(self.item_master_endpoint, params=params, method='PATCH', data=[update_data])
+        logger.info(f"Updated notes for tag_id {tag_id} to '{notes}' and date_updated to {current_time} via API")
+        return response
+
     def insert_item(self, item_data):
-        """
-        Insert a new item into the Item Master via the API using POST.
-        """
+        """Insert a new item into Item Master via API POST."""
         if not item_data or 'tag_id' not in item_data:
             raise ValueError("item_data must contain a tag_id")
 
-        # Send the new item to the API using POST
         response = self._make_request(self.item_master_endpoint, method='POST', data=[item_data])
         logger.info(f"Inserted new item with tag_id {item_data['tag_id']} into API via POST")
         return response

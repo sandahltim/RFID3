@@ -3,36 +3,52 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RFID Dashboard - Broadway Tent and Event</title>
+    <title>{% block title %}{% endblock %}</title>
     <link rel="stylesheet" href="/static/lib/bootstrap/bootstrap.min.css">
-    <link rel="stylesheet" href="/static/css/common.css">
+    <link rel="stylesheet" href="/static/css/style.css">
     {% block head %}
     {% if request.path == '/tab/1' %}
-        <link rel="stylesheet" href="/static/css/tab1.css">
+        <!-- Tab 1 specific head content -->
     {% elif request.path == '/tab/5' %}
-        <link rel="stylesheet" href="/static/css/tab5.css">
+        <!-- Tab 5 specific head content -->
     {% elif request.path == '/tab/2' or request.path == '/tab/4' %}
-        <link rel="stylesheet" href="/static/css/tab2_4.css">
+        <!-- Tab 2/4 specific head content -->
     {% endif %}
     {% endblock %}
     {% block extra_head %}{% endblock %}
 </head>
 <body>
-    <nav class="navbar navbar-expand-lg navbar-dark">
-        <a class="navbar-brand" href="/">RFID DASHBOARD</a>
-        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
-            <span class="navbar-toggler-icon"></span>
-        </button>
-        <div class="collapse navbar-collapse" id="navbarNav">
-            <ul class="navbar-nav ml-auto">
-                <li class="nav-item"><a class="nav-link" href="/">Home</a></li>
-                <li class="nav-item"><a class="nav-link" href="/tab/1">Rental Inventory</a></li>
-                <li class="nav-item"><a class="nav-link" href="/tab/2">Open Contracts</a></li>
-                <li class="nav-item"><a class="nav-link" href="/tab/3">Service</a></li>
-                <li class="nav-item"><a class="nav-link" href="/tab/4">Laundry Contracts</a></li>
-                <li class="nav-item"><a class="nav-link" href="/tab/5">Resale</a></li>
-                <li class="nav-item"><a class="nav-link" href="/categories">Manage Categories</a></li>
-            </ul>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="/">RFID DASHBOARD</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/">Home</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/tab/1">Rental Inventory</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/tab/2">Open Contracts</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/tab/3">Service</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/tab/4">Laundry Contracts</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/tab/5">Resale</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/categories">Manage Categories</a>
+                    </li>
+                </ul>
+            </div>
         </div>
     </nav>
 
@@ -41,21 +57,22 @@
     </div>
 
     <script src="/static/lib/bootstrap/bootstrap.bundle.min.js"></script>
-    <script src="/static/js/common.js"></script>
-    <script src="/static/js/tab.js"></script>
+    <!-- Retaining htmx.min.js for potential use in other tabs; remove if confirmed unused -->
+    <script src="/static/js/htmx.min.js"></script>
     {% block scripts %}
         {% if request.path == '/tab/1' %}
             <script src="/static/js/tab1.js"></script>
         {% elif request.path == '/tab/5' %}
             <script src="/static/js/tab5.js"></script>
         {% elif request.path == '/tab/2' %}
-            <script src="/static/js/tab2.js"></script>
+            <script src="/static/js/common.js"></script>
+            <script src="/static/js/tab.js"></script>
         {% elif request.path == '/tab/4' %}
-            <script src="/static/lib/htmx/htmx.min.js"></script>
-            <script src="/static/js/tab4.js"></script>
+            <script src="/static/js/common.js"></script>
+            <script src="/static/js/tab.js"></script>
         {% elif request.path == '/tab/3' %}
-            <script src="/static/js/htmx.min.js"></script>
-            <script src="/static/js/tab3.js"></script>
+            <script src="/static/js/common.js?v={{ cache_bust }}"></script>
+            <script src="/static/js/tab3.js?v={{ cache_bust }}"></script>
         {% endif %}
     {% endblock %}
 </body>
