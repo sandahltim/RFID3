@@ -34,26 +34,22 @@
 </div>
 
 <!-- Items in Service section, grouped by common_name and status -->
-<div class="items-section">
+<div class="tab3-items-section">
     <h3>Items in Service</h3>
     {% if common_name_groups %}
         {% for group in common_name_groups %}
-            <div class="common-name-section mb-3">
+            <div class="tab3-common-name-section mb-3">
                 <h4>
-                    <button class="btn btn-link expand-btn" data-target="common-{{ loop.index }}">
-                        {{ group.common_name }} ({{ group.total_items }} items)
-                    </button>
+                    {{ group.common_name }} ({{ group.total_items }} items)
                 </h4>
-                <div id="common-{{ loop.index }}">
+                <div id="tab3-common-{{ loop.index }}">
                     {% for status_group in group.status_groups %}
-                        <div class="status-section ml-3 mb-2">
+                        <div class="tab3-status-section ml-3 mb-2">
                             <h5>
-                                <button class="btn btn-link expand-btn" data-target="status-{{ loop.parent.loop.index }}-{{ loop.index }}">
-                                    {{ status_group.status }} ({{ status_group.total_items }} items)
-                                </button>
+                                {{ status_group.status }} ({{ status_group.total_items }} items)
                             </h5>
-                            <div id="status-{{ loop.parent.loop.index }}-{{ loop.index }}">
-                                <table class="table table-bordered status-table" id="status-table-{{ loop.parent.loop.index }}-{{ loop.index }}">
+                            <div id="tab3-status-{{ loop.parent.loop.index }}-{{ loop.index }}">
+                                <table class="table table-bordered tab3-status-table" id="tab3-status-table-{{ loop.parent.loop.index }}-{{ loop.index }}">
                                     <thead>
                                         <tr>
                                             <th>Tag ID</th>
@@ -73,7 +69,7 @@
                                             <tr>
                                                 <td>{{ item.tag_id }}</td>
                                                 <td>
-                                                    <select id="status-{{ item.tag_id }}" onchange="updateStatusVisibility('{{ item.tag_id }}')">
+                                                    <select id="tab3-status-{{ item.tag_id }}" onchange="updateStatusVisibility('{{ item.tag_id }}')">
                                                         <option value="{{ item.status }}" selected>{{ item.status }}</option>
                                                         <option value="Ready to Rent">Ready to Rent</option>
                                                         <option value="Sold">Sold</option>
@@ -86,7 +82,7 @@
                                                 </td>
                                                 <td>{{ item.bin_location }}</td>
                                                 <td>{{ item.last_contract_num }}</td>
-                                                <td class="date-last-scanned">{{ item.date_last_scanned }}</td>
+                                                <td class="tab3-date-last-scanned">{{ item.date_last_scanned }}</td>
                                                 <td>{{ item.location_of_repair }}</td>
                                                 <td>{{ item.repair_types | join(', ') }}</td>
                                                 <td>
@@ -111,11 +107,11 @@
                                                     </ul>
                                                 </td>
                                                 <td>
-                                                    <textarea id="notes-{{ item.tag_id }}" rows="2" class="form-control" data-original-notes="{{ item.notes | escape }}" oninput="updateNotesVisibility('{{ item.tag_id }}')">{{ item.notes | escape }}</textarea>
+                                                    <textarea id="tab3-notes-{{ item.tag_id }}" rows="2" class="form-control" data-original-notes="{{ item.notes | escape }}" oninput="updateNotesVisibility('{{ item.tag_id }}')">{{ item.notes | escape }}</textarea>
                                                 </td>
                                                 <td>
-                                                    <button class="btn btn-sm btn-primary save-status-btn" onclick="updateStatus('{{ item.tag_id }}')" style="display: none;">Save Status</button>
-                                                    <button class="btn btn-sm btn-primary save-notes-btn" onclick="updateNotes('{{ item.tag_id }}')" style="display: none;">Save Notes</button>
+                                                    <button class="btn btn-sm btn-primary tab3-save-status-btn" onclick="updateStatus('{{ item.tag_id }}')" style="display: none;">Save Status</button>
+                                                    <button class="btn btn-sm btn-primary tab3-save-notes-btn" onclick="updateNotes('{{ item.tag_id }}')" style="display: none;">Save Notes</button>
                                                 </td>
                                             </tr>
                                         {% endfor %}
@@ -164,11 +160,11 @@
 </div>
 
 <style>
-.common-name-section {
+.tab3-common-name-section {
     border-left: 3px solid #007bff;
     padding-left: 10px;
 }
-.status-section {
+.tab3-status-section {
     border-left: 3px solid #28a745;
     padding-left: 10px;
 }
