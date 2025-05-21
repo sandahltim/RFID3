@@ -51,11 +51,11 @@ if not os.path.exists(SHARED_DIR):
     os.chown(SHARED_DIR, pwd.getpwnam('tim').pw_uid, grp.getgrnam('tim').gr_gid)
 
 # Version marker for deployment tracking
-logger.info("Deployed tab3.py version: 2025-05-21-v43")
+logger.info("Deployed tab3.py version: 2025-05-21-v44")
 
 @tab3_bp.route('/tab/3')
 def tab3_view():
-    """Render Tab 3 view with items in service, grouped by crew (Linen, Tents, Service)."""
+    """Render Tab 3 view with items grouped by common_name and status."""
     session = None
     try:
         session = db.session()
@@ -150,7 +150,7 @@ def tab3_view():
 
         total_items = session.execute(text(count_query), count_params).scalar()
 
-        # Fetch repair details for items with transactions
+        # Fetch repair details and additional transaction fields
         tag_ids = [item['tag_id'] for item in items_in_service]
         transaction_data = {}
         if tag_ids:
@@ -178,12 +178,19 @@ def tab3_view():
                 Transaction.rope,
                 Transaction.buckle,
                 Transaction.wet,
-                Transaction.other
+                Transaction.other,
+                Transaction.service_required,
+                Transaction.longitude,
+                Transaction.latitude,
+                Transaction.scan_date
             ).join(
                 max_scan_date_subquery,
                 (Transaction.tag_id == max_scan_date_subquery.c.tag_id) &
                 (Transaction.scan_date == max_scan_date_subquery.c.max_scan_date)
             ).all()
+
+            print(f"DEBUG: Fetched {len(transactions)} transactions for {len(tag_ids)} tag_ids")
+            logger.info(f"Fetched {len(transactions)} transactions for {len(tag_ids)} tag_ids")
 
             for t in transactions:
                 repair_types = []
@@ -200,26 +207,65 @@ def tab3_view():
                 if t.buckle: repair_types.append("Buckle")
                 if t.wet: repair_types.append("Wet")
                 if t.other: repair_types.append(f"Other: {t.other}")
+                if t.service_required: repair_types.append("Service Required")
 
                 transaction_data[t.tag_id] = {
                     'location_of_repair': t.location_of_repair or 'N/A',
-                    'repair_types': repair_types if repair_types else ['None']
+                    'repair_types': repair_types if repair_types else ['None'],
+                    'dirty_or_mud': t.dirty_or_mud,
+                    'leaves': t.leaves,
+                    'oil': t.oil,
+                    'mold': t.mold,
+                    'stain': t.stain,
+                    'oxidation': t.oxidation,
+                    'rip_or_tear': t.rip_or_tear,
+                    'sewing_repair_needed': t.sewing_repair_needed,
+                    'grommet': t.grommet,
+                    'rope': t.rope,
+                    'buckle': t.buckle,
+                    'wet': t.wet,
+                    'other': t.other or 'N/A',
+                    'service_required': t.service_required,
+                    'longitude': float(t.longitude) if t.longitude is not None else None,
+                    'latitude': float(t.latitude) if t.latitude is not None else None,
+                    'last_transaction_scan_date': t.scan_date.strftime('%Y-%m-%d %H:%M:%S') if t.scan_date else 'N/A'
                 }
+                print(f"DEBUG: Transaction data for tag_id {t.tag_id}: {transaction_data[t.tag_id]}")
+                logger.debug(f"Transaction data for tag_id {t.tag_id}: {transaction_data[t.tag_id]}")
 
-        # Group items into Linen, Tents, Service
-        crew_items = {'Linen': [], 'Tents': [], 'Service': []}
+        # Group items by common_name and status
+        items_by_common_name = {}
         for item in items_in_service:
-            common_name = item['common_name'].lower()
-            if 'linen' in common_name or 'napkin' in common_name or 'tablecloth' in common_name:
-                category = 'Linen'
-            elif 'tent' in common_name or 'canopy' in common_name:
-                category = 'Tents'
-            else:
-                category = 'Service'
+            common_name = item['common_name']
+            status = item['status']
+            if common_name not in items_by_common_name:
+                items_by_common_name[common_name] = {}
+            if status not in items_by_common_name[common_name]:
+                items_by_common_name[common_name][status] = []
+            
+            t_data = transaction_data.get(item['tag_id'], {
+                'location_of_repair': 'N/A',
+                'repair_types': ['None'],
+                'dirty_or_mud': False,
+                'leaves': False,
+                'oil': False,
+                'mold': False,
+                'stain': False,
+                'oxidation': False,
+                'rip_or_tear': False,
+                'sewing_repair_needed': False,
+                'grommet': False,
+                'rope': False,
+                'buckle': False,
+                'wet': False,
+                'other': 'N/A',
+                'service_required': False,
+                'longitude': None,
+                'latitude': None,
+                'last_transaction_scan_date': 'N/A'
+            })
 
-            t_data = transaction_data.get(item['tag_id'], {'location_of_repair': 'N/A', 'repair_types': ['None']})
-
-            crew_items[category].append({
+            items_by_common_name[common_name][status].append({
                 'tag_id': item['tag_id'],
                 'common_name': item['common_name'],
                 'status': item['status'],
@@ -228,29 +274,61 @@ def tab3_view():
                 'date_last_scanned': item['date_last_scanned'],
                 'location_of_repair': t_data['location_of_repair'],
                 'repair_types': t_data['repair_types'],
-                'notes': item['notes']
+                'notes': item['notes'],
+                'dirty_or_mud': t_data['dirty_or_mud'],
+                'leaves': t_data['leaves'],
+                'oil': t_data['oil'],
+                'mold': t_data['mold'],
+                'stain': t_data['stain'],
+                'oxidation': t_data['oxidation'],
+                'rip_or_tear': t_data['rip_or_tear'],
+                'sewing_repair_needed': t_data['sewing_repair_needed'],
+                'grommet': t_data['grommet'],
+                'rope': t_data['rope'],
+                'buckle': t_data['buckle'],
+                'wet': t_data['wet'],
+                'other': t_data['other'],
+                'service_required': t_data['service_required'],
+                'longitude': t_data['longitude'],
+                'latitude': t_data['latitude'],
+                'last_transaction_scan_date': t_data['last_transaction_scan_date']
             })
 
-        # Convert to list of crews for template
-        crews = [
-            {
-                'name': category,
-                'item_list': item_list,
-                'total_items': len(item_list)
-            }
-            for category, item_list in crew_items.items() if item_list
-        ]
-        print(f"DEBUG: Final crews structure: {[{c['name']: len(c['item_list'])} for c in crews]}")
-        logger.info(f"Final crews structure: {[{c['name']: len(c['item_list'])} for c in crews]}")
-        print(f"DEBUG: Fetched {sum(len(c['item_list']) for c in crews)} total items across {len(crews)} crews")
-        logger.info(f"Fetched {sum(len(c['item_list']) for c in crews)} total items across {len(crews)} crews")
-        current_app.logger.info(f"Fetched {sum(len(c['item_list']) for c in crews)} total items across {len(crews)} crews")
+        # Define status priority order
+        status_priority = {
+            'Repair': 1,
+            'Wash': 2,
+            'Wet': 3,
+            'Staged': 4,
+            'Needs to be Inspected': 5
+        }
+
+        # Structure data for template: list of common names, each with a list of status groups
+        common_name_groups = []
+        for common_name, statuses in sorted(items_by_common_name.items()):
+            status_groups = []
+            for status in sorted(statuses.keys(), key=lambda s: status_priority.get(s, 6)):
+                status_groups.append({
+                    'status': status,
+                    'items': statuses[status],
+                    'total_items': len(statuses[status])
+                })
+            common_name_groups.append({
+                'common_name': common_name,
+                'status_groups': status_groups,
+                'total_items': sum(len(statuses[s]) for s in statuses)
+            })
+
+        print(f"DEBUG: Final common_name_groups structure: {[{'common_name': c['common_name'], 'total_items': c['total_items'], 'status_groups': [{s['status']: s['total_items']} for s in c['status_groups']]} for c in common_name_groups]}")
+        logger.info(f"Final common_name_groups structure: {[{'common_name': c['common_name'], 'total_items': c['total_items'], 'status_groups': [{s['status']: s['total_items']} for s in c['status_groups']]} for c in common_name_groups]}")
+        print(f"DEBUG: Total items fetched: {sum(c['total_items'] for c in common_name_groups)}")
+        logger.info(f"Total items fetched: {sum(c['total_items'] for c in common_name_groups)}")
 
         session.commit()
         session.close()
         return render_template(
             'tab3.html',
-            crews=crews,
+            common_name_groups=common_name_groups,
             common_name_filter=common_name_filter,
             date_filter=date_filter,
             sort=sort,
@@ -265,7 +343,7 @@ def tab3_view():
             session.close()
         return render_template(
             'tab3.html',
-            crews=[],
+            common_name_groups=[],
             common_name_filter='',
             date_filter='',
             sort='date_last_scanned_desc',
