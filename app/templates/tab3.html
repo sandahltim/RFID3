@@ -48,8 +48,8 @@
                             <h5>
                                 {{ status_group.status }} ({{ status_group.total_items }} items)
                             </h5>
-                            <div id="tab3-status-{{ loop.parent.loop.index }}-{{ loop.index }}">
-                                <table class="table table-bordered tab3-status-table" id="tab3-status-table-{{ loop.parent.loop.index }}-{{ loop.index }}">
+                            <div id="tab3-status-{{ loop.parent.index }}-{{ loop.index }}">
+                                <table class="table table-bordered tab3-status-table" id="tab3-status-table-{{ loop.parent.index }}-{{ loop.index }}">
                                     <thead>
                                         <tr>
                                             <th>Tag ID</th>
