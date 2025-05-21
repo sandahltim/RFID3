@@ -33,7 +33,6 @@ test_rfidpi/ RFID6(needs update)
 │   │   └── tab.html
 ├── static/
 │   ├── css/
-│   │   ├── common.css
 │   │   ├── tab1.css
 │   │   ├── tab5.css
 │   │   ├── tab2_4.css

@@ -10,6 +10,7 @@ import csv
 import os
 import pwd
 import grp
+import sqlalchemy.exc
 
 # Configure logging for Tab 3
 logger = logging.getLogger('tab3')
@@ -46,7 +47,7 @@ if not os.path.exists(SHARED_DIR):
     os.chown(SHARED_DIR, pwd.getpwnam('tim').pw_uid, grp.getgrnam('tim').gr_gid)
 
 # Version marker for deployment tracking
-logger.info("Deployed tab3.py version: 2025-05-21-v40")
+logger.info("Deployed tab3.py version: 2025-05-21-v41")
 
 @tab3_bp.route('/tab/3')
 def tab3_view():
@@ -350,7 +351,7 @@ def sync_to_pc():
     Sync selected items to rfid_tags.csv for printing RFID tags.
     Appends exactly 'quantity' unique entries to the CSV, using existing ItemMaster tags
     (prioritizing 'Sold', then others) and generating new tags if needed.
-    Fixed duplicate tag issue by clearing duplicates, enforcing quantity, and validating CSV.
+    Enhanced error handling to fix 500 errors and prevent duplicate entries.
     """
     session = None
     try:
@@ -493,10 +494,10 @@ def sync_to_pc():
                 remaining_quantity = quantity - len(synced_items)
                 print(f"DEBUG: After non-Sold items, remaining_quantity={remaining_quantity}")
                 logger.debug(f"After non-Sold items, remaining_quantity={remaining_quantity}")
-        except Exception as e:
-            print(f"DEBUG: Error querying ItemMaster: {str(e)}")
-            logger.error(f"Error querying ItemMaster: {str(e)}", exc_info=True)
-            return jsonify({'error': f"Error querying ItemMaster: {str(e)}"}), 500
+        except sqlalchemy.exc.DatabaseError as e:
+            print(f"DEBUG: Database error querying ItemMaster: {str(e)}")
+            logger.error(f"Database error querying ItemMaster: {str(e)}", exc_info=True)
+            return jsonify({'error': f"Database error querying ItemMaster: {str(e)}"}), 500
 
         # Step 2: Generate new tags if needed
         new_items = []
@@ -515,10 +516,10 @@ def sync_to_pc():
                     .first()
                 print(f"DEBUG: SeedRentalClass query result: {seed_entry}")
                 logger.debug(f"SeedRentalClass query result: {seed_entry}")
-            except Exception as e:
-                print(f"DEBUG: Error querying SeedRentalClass: {str(e)}")
-                logger.error(f"Error querying SeedRentalClass: {str(e)}", exc_info=True)
-                return jsonify({'error': f"Error querying SeedRentalClass: {str(e)}"}), 500
+            except sqlalchemy.exc.DatabaseError as e:
+                print(f"DEBUG: Database error querying SeedRentalClass: {str(e)}")
+                logger.error(f"Database error querying SeedRentalClass: {str(e)}", exc_info=True)
+                return jsonify({'error': f"Database error querying SeedRentalClass: {str(e)}"}), 500
 
             if not seed_entry:
                 print(f"DEBUG: No SeedRentalClass entry found for common_name={common_name} and bin_location in ['pack', 'resale']")
@@ -540,10 +541,10 @@ def sync_to_pc():
                         .scalar()
                     print(f"DEBUG: Max tag_id from ItemMaster: {max_tag_id}")
                     logger.debug(f"Max tag_id from ItemMaster: {max_tag_id}")
-                except Exception as e:
-                    print(f"DEBUG: Error querying max tag_id: {str(e)}")
-                    logger.error(f"Error querying max tag_id: {str(e)}", exc_info=True)
-                    max_tag_id = None
+                except sqlalchemy.exc.DatabaseError as e:
+                    print(f"DEBUG: Database error querying max tag_id: {str(e)}")
+                    logger.error(f"Database error querying max tag_id: {str(e)}", exc_info=True)
+                    return jsonify({'error': f"Database error querying max tag_id: {str(e)}"}), 500
 
                 new_num = 1
                 if max_tag_id and len(max_tag_id) == 24 and max_tag_id.startswith('425445'):
@@ -581,7 +582,7 @@ def sync_to_pc():
                 })
                 existing_tag_ids.add(tag_id)
                 print(f"DEBUG: Added to synced_items: tag_id={tag_id}, common_name={common_name}, status=Ready to Rent")
-                logger.info(f"Added to synced_items: tag_id={item.tag_id}, common_name={item.common_name}, status={item.status}")
+                logger.info(f"Added to synced_items: tag_id={tag_id}, common_name={common_name}, status=Ready to Rent")
 
                 new_item = ItemMaster(
                     tag_id=tag_id,
@@ -640,10 +641,10 @@ def sync_to_pc():
                 }
             print(f"DEBUG: Fetched {len(mappings_dict)} rental class mappings")
             logger.info(f"Fetched {len(mappings_dict)} rental class mappings")
-        except Exception as e:
-            print(f"DEBUG: Error fetching rental class mappings: {str(e)}")
-            logger.error(f"Error fetching rental class mappings: {str(e)}", exc_info=True)
-            return jsonify({'error': f"Error fetching rental class mappings: {str(e)}"}), 500
+        except sqlalchemy.exc.DatabaseError as e:
+            print(f"DEBUG: Database error fetching rental class mappings: {str(e)}")
+            logger.error(f"Database error fetching rental class mappings: {str(e)}", exc_info=True)
+            return jsonify({'error': f"Database error fetching rental class mappings: {str(e)}"}), 500
 
         # Update synced_items with mapping data
         for item in synced_items:
@@ -694,13 +695,11 @@ def sync_to_pc():
                 session.commit()
                 print(f"DEBUG: Successfully committed {len(new_items)} new ItemMaster entries")
                 logger.info(f"Successfully committed {len(new_items)} new ItemMaster entries")
-            except Exception as e:
-                print(f"DEBUG: Failed to commit session after CSV write: {str(e)}")
-                logger.error(f"Failed to commit session after CSV write: {str(e)}", exc_info=True)
+            except sqlalchemy.exc.DatabaseError as e:
+                print(f"DEBUG: Database error committing session: {str(e)}")
+                logger.error(f"Database error committing session: {str(e)}", exc_info=True)
                 session.rollback()
-                print("DEBUG: Returning success response despite commit failure (CSV write completed)")
-                logger.warning("Returning success response despite commit failure (CSV write completed)")
-                return jsonify({'synced_items': len(synced_items)}), 200
+                return jsonify({'error': f"Database error committing session: {str(e)}"}), 500
 
         print(f"DEBUG: Successfully synced {len(synced_items)} items to CSV")
         logger.info(f"Successfully synced {len(synced_items)} items to CSV")
@@ -747,7 +746,7 @@ def update_synced_status():
                 reader = csv.DictReader(csvfile)
                 required_fields = ['tag_id', 'common_name', 'bin_location', 'status']
                 if not all(field in reader.fieldnames for field in required_fields):
-                    missing = [field for field in reader.fieldnames for field in required_fields if field not in reader.fieldnames]
+                    missing = [field for field in required_fields if field not in reader.fieldnames]
                     print(f"DEBUG: CSV file missing required fields: {missing}")
                     logger.error(f"CSV file missing required fields: {missing}")
                     return jsonify({'error': f"CSV file missing required fields: {missing}"}), 400
@@ -793,10 +792,10 @@ def update_synced_status():
             } for item in items_in_db}
             print(f"DEBUG: Fetched {len(item_dict)} items from ItemMaster for tag_ids: {list(item_dict.keys())}")
             logger.debug(f"Fetched {len(item_dict)} items from ItemMaster for tag_ids: {list(item_dict.keys())}")
-        except Exception as e:
-            print(f"DEBUG: Error querying ItemMaster for tag_ids: {str(e)}")
-            logger.error(f"Error querying ItemMaster for tag_ids: {str(e)}", exc_info=True)
-            return jsonify({'error': f"Error querying ItemMaster: {str(e)}"}), 500
+        except sqlalchemy.exc.DatabaseError as e:
+            print(f"DEBUG: Database error querying ItemMaster for tag_ids: {str(e)}")
+            logger.error(f"Database error querying ItemMaster for tag_ids: {str(e)}", exc_info=True)
+            return jsonify({'error': f"Database error querying ItemMaster: {str(e)}"}), 500
 
         print("DEBUG: Updating ItemMaster status to 'Ready to Rent'")
         logger.debug("Updating ItemMaster status to 'Ready to Rent'")
@@ -806,10 +805,10 @@ def update_synced_status():
                 .update({ItemMaster.status: 'Ready to Rent'}, synchronize_session='fetch')
             print(f"DEBUG: Updated {updated_items} items in ItemMaster to 'Ready to Rent'")
             logger.info(f"Updated {updated_items} items in ItemMaster to 'Ready to Rent'")
-        except Exception as e:
-            print(f"DEBUG: Error updating ItemMaster status: {str(e)}")
-            logger.error(f"Error updating ItemMaster status: {str(e)}", exc_info=True)
-            return jsonify({'error': f"Error updating ItemMaster: {str(e)}"}), 500
+        except sqlalchemy.exc.DatabaseError as e:
+            print(f"DEBUG: Database error updating ItemMaster status: {str(e)}")
+            logger.error(f"Database error updating ItemMaster status: {str(e)}", exc_info=True)
+            return jsonify({'error': f"Database error updating ItemMaster: {str(e)}"}), 500
 
         print("DEBUG: Updating items via API")
         logger.debug("Updating items via API")
@@ -861,7 +860,13 @@ def update_synced_status():
 
         print("DEBUG: Committing session after API updates")
         logger.debug("Committing session after API updates")
-        session.commit()
+        try:
+            session.commit()
+        except sqlalchemy.exc.DatabaseError as e:
+            print(f"DEBUG: Database error committing session: {str(e)}")
+            logger.error(f"Database error committing session: {str(e)}", exc_info=True)
+            return jsonify({'error': f"Database error committing session: {str(e)}"}), 500
+
         print(f"DEBUG: Updated status for {updated_items} items and cleared CSV file")
         logger.info(f"Updated status for {updated_items} items and cleared CSV file")
         return jsonify({'updated_items': updated_items}), 200
@@ -920,7 +925,13 @@ def update_status():
         current_time = datetime.now()
         item.status = new_status
         item.date_last_scanned = current_time
-        session.commit()
+        try:
+            session.commit()
+        except sqlalchemy.exc.DatabaseError as e:
+            print(f"DEBUG: Database error updating ItemMaster status: {str(e)}")
+            logger.error(f"Database error updating ItemMaster status: {str(e)}", exc_info=True)
+            session.rollback()
+            return jsonify({'error': f"Database error updating status: {str(e)}"}), 500
 
         print(f"DEBUG: Updating external API for tag_id={tag_id}")
         logger.debug(f"Updating external API for tag_id={tag_id}")
@@ -976,7 +987,13 @@ def update_notes():
         current_time = datetime.now()
         item.notes = new_notes if new_notes else None
         item.date_updated = current_time
-        session.commit()
+        try:
+            session.commit()
+        except sqlalchemy.exc.DatabaseError as e:
+            print(f"DEBUG: Database error updating ItemMaster notes: {str(e)}")
+            logger.error(f"Database error updating ItemMaster notes: {str(e)}", exc_info=True)
+            session.rollback()
+            return jsonify({'error': f"Database error updating notes: {str(e)}"}), 500
 
         print(f"DEBUG: Updating external API notes for tag_id={tag_id}")
         logger.debug(f"Updating external API notes for tag_id={tag_id}")
@@ -1013,6 +1030,10 @@ def get_pack_resale_common_names():
         print(f"DEBUG: Fetched {len(common_names)} common names from SeedRentalClass for pack/resale: {common_names}")
         logger.info(f"Fetched {len(common_names)} common names from SeedRentalClass for pack/resale: {common_names}")
         return jsonify({'common_names': sorted(common_names)}), 200
+    except sqlalchemy.exc.DatabaseError as e:
+        print(f"DEBUG: Database error fetching pack/resale common names: {str(e)}")
+        logger.error(f"Database error fetching pack/resale common names: {str(e)}", exc_info=True)
+        return jsonify({'error': f"Database error: {str(e)}"}), 500
     except Exception as e:
         print(f"DEBUG: Error fetching pack/resale common names from SeedRentalClass: {str(e)}")
         logger.error(f"Error fetching pack/resale common names from SeedRentalClass: {str(e)}", exc_info=True)
