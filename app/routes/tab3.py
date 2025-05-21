@@ -51,7 +51,7 @@ if not os.path.exists(SHARED_DIR):
     os.chown(SHARED_DIR, pwd.getpwnam('tim').pw_uid, grp.getgrnam('tim').gr_gid)
 
 # Version marker for deployment tracking
-logger.info("Deployed tab3.py version: 2025-05-21-v44")
+logger.info("Deployed tab3.py version: 2025-05-21-v45")
 
 @tab3_bp.route('/tab/3')
 def tab3_view():
@@ -68,6 +68,17 @@ def tab3_view():
         print("DEBUG: Database connection test successful")
         logger.info("Database connection test successful")
 
+        # Log distinct status values in id_item_master for debugging
+        status_query = """
+            SELECT DISTINCT status
+            FROM id_item_master
+            WHERE status IS NOT NULL
+        """
+        status_result = session.execute(text(status_query))
+        statuses = [row[0] for row in status_result.fetchall()]
+        print(f"DEBUG: Distinct statuses in id_item_master: {statuses}")
+        logger.info(f"Distinct statuses in id_item_master: {statuses}")
+
         # Query parameters for filtering and sorting
         common_name_filter = request.args.get('common_name', '').lower()
         date_filter = request.args.get('date_last_scanned', '')
@@ -75,12 +86,15 @@ def tab3_view():
         page = int(request.args.get('page', 1))
         per_page = 20
 
-        # Raw SQL query to fetch items with service-related statuses
+        # Modified query to use LIKE for more lenient status matching
         sql_query = """
             SELECT tag_id, common_name, status, bin_location, last_contract_num, date_last_scanned, rental_class_num, notes
             FROM id_item_master
-            WHERE LOWER(TRIM(REPLACE(COALESCE(status, ''), '\0', ''))) IN ('repair', 'needs to be inspected', 'staged', 'wash', 'wet')
-            AND LOWER(TRIM(REPLACE(COALESCE(status, ''), '\0', ''))) != 'sold'
+            WHERE LOWER(TRIM(REPLACE(COALESCE(status, ''), '\0', ''))) LIKE '%repair%'
+               OR LOWER(TRIM(REPLACE(COALESCE(status, ''), '\0', ''))) LIKE '%needs to be inspected%'
+               OR LOWER(TRIM(REPLACE(COALESCE(status, ''), '\0', ''))) LIKE '%staged%'
+               OR LOWER(TRIM(REPLACE(COALESCE(status, ''), '\0', ''))) LIKE '%wash%'
+               OR LOWER(TRIM(REPLACE(COALESCE(status, ''), '\0', ''))) LIKE '%wet%'
         """
         params = {}
         if common_name_filter:
@@ -111,7 +125,24 @@ def tab3_view():
         result = session.execute(text(sql_query), params)
         rows = result.fetchall()
         print(f"DEBUG: Raw query returned {len(rows)} rows")
-        logger.info(f"Raw query returned {len(rows)} rows")
+        logger.info(f"DEBUG: Raw query returned {len(rows)} rows")
+
+        # Log the raw rows for debugging
+        raw_data = [
+            {
+                'tag_id': row[0],
+                'common_name': row[1],
+                'status': row[2],
+                'bin_location': row[3],
+                'last_contract_num': row[4],
+                'date_last_scanned': row[5],
+                'rental_class_num': row[6],
+                'notes': row[7]
+            }
+            for row in rows
+        ]
+        print(f"DEBUG: Raw rows: {raw_data}")
+        logger.info(f"DEBUG: Raw rows: {raw_data}")
 
         items_in_service = [
             {
@@ -133,8 +164,11 @@ def tab3_view():
         count_query = """
             SELECT COUNT(*) 
             FROM id_item_master
-            WHERE LOWER(TRIM(REPLACE(COALESCE(status, ''), '\0', ''))) IN ('repair', 'needs to be inspected', 'staged', 'wash', 'wet')
-            AND LOWER(TRIM(REPLACE(COALESCE(status, ''), '\0', ''))) != 'sold'
+            WHERE LOWER(TRIM(REPLACE(COALESCE(status, ''), '\0', ''))) LIKE '%repair%'
+               OR LOWER(TRIM(REPLACE(COALESCE(status, ''), '\0', ''))) LIKE '%needs to be inspected%'
+               OR LOWER(TRIM(REPLACE(COALESCE(status, ''), '\0', ''))) LIKE '%staged%'
+               OR LOWER(TRIM(REPLACE(COALESCE(status, ''), '\0', ''))) LIKE '%wash%'
+               OR LOWER(TRIM(REPLACE(COALESCE(status, ''), '\0', ''))) LIKE '%wet%'
         """
         count_params = {}
         if common_name_filter:
@@ -149,6 +183,8 @@ def tab3_view():
                 pass
 
         total_items = session.execute(text(count_query), count_params).scalar()
+        print(f"DEBUG: Total items matching query: {total_items}")
+        logger.info(f"DEBUG: Total items matching query: {total_items}")
 
         # Fetch repair details and additional transaction fields
         tag_ids = [item['tag_id'] for item in items_in_service]
