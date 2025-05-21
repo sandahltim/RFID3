@@ -1,4 +1,4 @@
-console.log('tab3.js version: 2025-05-21-v12 loaded');
+console.log('tab3.js version: 2025-05-21-v13 loaded');
 
 // Debounce function with immediate lock to prevent multiple rapid executions
 function debounce(func, wait) {
@@ -364,12 +364,36 @@ function updateNotes(tagId) {
     });
 }
 
+// Handle expand/collapse functionality
+function setupExpandCollapse() {
+    document.addEventListener('click', (event) => {
+        const expandBtn = event.target.closest('.expand-btn');
+        if (!expandBtn) return;
+
+        const targetId = expandBtn.getAttribute('data-target');
+        const expandable = document.getElementById(targetId);
+        if (!expandable) {
+            console.warn(`Expandable section not found for target: ${targetId}`);
+            return;
+        }
+
+        if (expandable.classList.contains('collapsed')) {
+            expandable.classList.remove('collapsed');
+            expandable.classList.add('expanded');
+        } else {
+            expandable.classList.remove('expanded');
+            expandable.classList.add('collapsed');
+        }
+    });
+}
+
 // Initialize the page
 document.addEventListener('DOMContentLoaded', function() {
-    // Format timestamps in the crew tables
-    document.querySelectorAll('.crew-table').forEach(table => {
+    // Format timestamps in the status tables
+    document.querySelectorAll('.status-table').forEach(table => {
         const rows = table.querySelectorAll('tbody tr');
         rows.forEach(row => {
+            // Format date_last_scanned (from id_item_master)
             const dateCell = row.querySelector('.date-last-scanned');
             if (dateCell) {
                 const rawDate = dateCell.textContent.trim();
@@ -380,15 +404,18 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // Initialize save button visibility for status and notes
-    document.querySelectorAll('.crew-table select').forEach(select => {
+    document.querySelectorAll('.status-table select').forEach(select => {
         const tagId = select.id.replace('status-', '');
         updateStatusVisibility(tagId);
     });
 
-    document.querySelectorAll('.crew-table textarea').forEach(textarea => {
+    document.querySelectorAll('.status-table textarea').forEach(textarea => {
         const tagId = textarea.id.replace('notes-', '');
         updateNotesVisibility(tagId);
     });
+
+    // Set up expand/collapse functionality
+    setupExpandCollapse();
 
     // Initialize the print tags section
     populateCommonNameDropdown();
