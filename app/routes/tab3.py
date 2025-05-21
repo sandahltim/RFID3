@@ -12,6 +12,8 @@ import pwd
 import grp
 import sqlalchemy.exc
 import fcntl
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+import requests.exceptions
 
 # Configure logging for Tab 3
 logger = logging.getLogger('tab3')
@@ -49,7 +51,7 @@ if not os.path.exists(SHARED_DIR):
     os.chown(SHARED_DIR, pwd.getpwnam('tim').pw_uid, grp.getgrnam('tim').gr_gid)
 
 # Version marker for deployment tracking
-logger.info("Deployed tab3.py version: 2025-05-21-v42")
+logger.info("Deployed tab3.py version: 2025-05-21-v43")
 
 @tab3_bp.route('/tab/3')
 def tab3_view():
@@ -431,7 +433,7 @@ def sync_to_pc():
                         required_fields = ['tag_id', 'common_name', 'subcategory', 'short_common_name', 'status', 'bin_location']
                         if not all(field in reader.fieldnames for field in required_fields):
                             print("DEBUG: CSV file exists but lacks valid headers. Rewriting with headers.")
-                            logger.warning("CSV file exists but lacks_unofficial lacks valid headers. Rewriting with headers.")
+                            logger.warning("CSV file exists but lacks valid headers. Rewriting with headers.")
                             needs_header = True
                         else:
                             for row in reader:
@@ -753,6 +755,7 @@ def update_synced_status():
     """
     Update the status of items in rfid_tags.csv to 'Ready to Rent', sync to API,
     and clear the CSV file.
+    Added retry logic and timeout handling to prevent API timeouts.
     """
     session = None
     lock_file = None
@@ -857,6 +860,17 @@ def update_synced_status():
         print("DEBUG: Updating items via API")
         logger.debug("Updating items via API")
         api_client = APIClient()
+
+        # Retry decorator for API calls with exponential backoff
+        @retry(
+            stop=stop_after_attempt(3),
+            wait=wait_exponential(multiplier=1, min=4, max=10),
+            retry=retry_if_exception_type((requests.exceptions.RequestException,))
+        )
+        def make_api_request(url, params, headers):
+            return api_client._make_request(url, params=params, headers=headers)
+
+        failed_items = []
         for item in items_to_update:
             tag_id = item['tag_id']
             db_item = item_dict.get(tag_id, {})
@@ -864,7 +878,8 @@ def update_synced_status():
             logger.debug(f"Processing tag_id {tag_id}: db_item={db_item}")
             try:
                 params = {'filter[eq]': f"tag_id,eq,'{tag_id}'"}
-                existing_items = api_client._make_request("14223767938169344381", params)
+                headers = api_client.get_headers()
+                existing_items = make_api_request("14223767938169344381", params, headers)
                 print(f"DEBUG: API check for tag_id {tag_id}: found {len(existing_items)} items")
                 logger.debug(f"API check for tag_id {tag_id}: found {len(existing_items)} items")
                 if existing_items:
@@ -886,7 +901,12 @@ def update_synced_status():
             except Exception as api_error:
                 print(f"DEBUG: Error updating/inserting tag_id {tag_id} in API: {str(api_error)}")
                 logger.error(f"Error updating/inserting tag_id {tag_id} in API: {str(api_error)}", exc_info=True)
-                return jsonify({'error': f"Failed to update/insert tag_id {tag_id} in API: {str(api_error)}"}), 500
+                failed_items.append(tag_id)
+
+        if failed_items:
+            print(f"DEBUG: Failed to update {len(failed_items)} items in API: {failed_items}")
+            logger.warning(f"Failed to update {len(failed_items)} items in API: {failed_items}")
+            return jsonify({'error': f"Failed to update {len(failed_items)} items in API", 'failed_items': failed_items}), 500
 
         print("DEBUG: Clearing CSV file")
         logger.debug("Clearing CSV file")
