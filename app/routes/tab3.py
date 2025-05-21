@@ -46,7 +46,7 @@ if not os.path.exists(SHARED_DIR):
     os.chown(SHARED_DIR, pwd.getpwnam('tim').pw_uid, grp.getgrnam('tim').gr_gid)
 
 # Version marker for deployment tracking
-logger.info("Deployed tab3.py version: 2025-05-21-v38")
+logger.info("Deployed tab3.py version: 2025-05-21-v39")
 
 @tab3_bp.route('/tab/3')
 def tab3_view():
@@ -348,9 +348,9 @@ def remove_csv_item():
 def sync_to_pc():
     """
     Sync selected items to rfid_tags.csv for printing RFID tags.
-    Ensures exactly 'quantity' unique entries are appended, using existing ItemMaster tags
+    Appends exactly 'quantity' unique entries to the CSV, using existing ItemMaster tags
     (prioritizing 'Sold', then others) and generating new tags if needed.
-    Fixes duplicate tag issue by strictly limiting synced_items to quantity.
+    Fixed duplicate tag issue by truncating synced_items before CSV write and enforcing quantity.
     """
     session = None
     try:
@@ -606,14 +606,18 @@ def sync_to_pc():
                 print(f"DEBUG: Created new ItemMaster entry: tag_id={tag_id}, common_name={common_name}, rental_class_num={rental_class_num}")
                 logger.info(f"Created new ItemMaster entry: tag_id={tag_id}, common_name={common_name}, rental_class_num={rental_class_num}")
 
-        # Verify synced items count
-        if len(synced_items) != quantity:
-            print(f"DEBUG: Expected {quantity} items, but got {len(synced_items)}")
-            logger.warning(f"Expected {quantity} items, but got {len(synced_items)}")
-            if len(synced_items) > quantity:
-                synced_items = synced_items[:quantity]
-                print(f"DEBUG: Truncated synced_items to {quantity} items")
-                logger.info(f"Truncated synced_items to {quantity} items")
+        # Ensure exactly the requested quantity before CSV write
+        if len(synced_items) > quantity:
+            synced_items = synced_items[:quantity]
+            print(f"DEBUG: Truncated synced_items to {quantity} items before CSV write")
+            logger.info(f"Truncated synced_items to {quantity} items before CSV write")
+        elif len(synced_items) < quantity:
+            print(f"DEBUG: Warning: Only {len(synced_items)} items synced, requested {quantity}")
+            logger.warning(f"Only {len(synced_items)} items synced, requested {quantity}")
+
+        # Log final synced items for debugging
+        print(f"DEBUG: Final synced_items ({len(synced_items)}): {[item['tag_id'] for item in synced_items]}")
+        logger.info(f"Final synced_items ({len(synced_items)}): {[item['tag_id'] for item in synced_items]}")
 
         # Fetch rental class mappings
         print("DEBUG: Fetching rental class mappings")
