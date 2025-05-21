@@ -1,13 +1,27 @@
-console.log('tab3.js version: 2025-05-21-v10 loaded');
+console.log('tab3.js version: 2025-05-21-v11 loaded');
 
-// Debounce function to prevent multiple rapid clicks
+// Debounce function with locking mechanism to prevent multiple rapid clicks
 function debounce(func, wait) {
     let timeout;
+    let isProcessing = false; // Lock to prevent concurrent requests
+
     return function executedFunction(...args) {
+        if (isProcessing) {
+            console.log('DEBUG: Request blocked - sync already in progress');
+            return;
+        }
+
+        isProcessing = true;
+        console.log('DEBUG: Setting isProcessing to true');
+
         const later = () => {
             clearTimeout(timeout);
-            func(...args);
+            func(...args).finally(() => {
+                isProcessing = false;
+                console.log('DEBUG: Setting isProcessing to false');
+            });
         };
+
         clearTimeout(timeout);
         timeout = setTimeout(later, wait);
     };
@@ -106,7 +120,7 @@ function setupPrintTagsSection() {
     }
 
     // Debounced sync function to prevent multiple requests
-    const debouncedSync = debounce(() => {
+    const debouncedSync = debounce(async () => {
         const commonName = document.getElementById('commonNameSelect')?.value;
         const quantity = parseInt(document.getElementById('tagQuantity')?.value) || 0;
 
@@ -123,40 +137,42 @@ function setupPrintTagsSection() {
         syncMessage.textContent = 'Syncing to PC...';
         console.log(`DEBUG: Sending sync request: commonName=${commonName}, quantity=${quantity}`);
 
-        fetch('/tab/3/sync_to_pc', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                common_name: commonName,
-                quantity: quantity
-            })
-        })
-        .then(response => {
+        try {
+            const response = await fetch('/tab/3/sync_to_pc', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    common_name: commonName,
+                    quantity: quantity
+                })
+            });
+
             if (!response.ok) {
                 throw new Error(`Sync failed with status ${response.status}`);
             }
-            return response.json();
-        })
-        .then(data => {
+
+            const data = await response.json();
             if (data.error) {
                 throw new Error(data.error);
             }
+
             syncMessage.textContent = `Successfully synced ${data.synced_items} items to PC.`;
             console.log(`DEBUG: Sync successful, ${data.synced_items} items added`);
             fetchCsvContents();
-        })
-        .catch(error => {
+        } catch (error) {
             console.error('Sync error:', error);
             syncMessage.textContent = `Error syncing to PC: ${error.message}`;
-        })
-        .finally(() => {
+        } finally {
             syncBtn.disabled = false;
-        });
+        }
     }, 500);
 
-    syncBtn.addEventListener('click', debouncedSync);
+    syncBtn.addEventListener('click', () => {
+        console.log('DEBUG: Sync to PC button clicked');
+        debouncedSync();
+    });
 
     updateStatusBtn.addEventListener('click', () => {
         updateStatusBtn.disabled = true;
