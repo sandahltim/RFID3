@@ -3,6 +3,7 @@ test_rfidpi/ RFID6(needs update)
 │   ├── __init__.py
 │   ├── routes/
 │   │   ├── home.py
+│   │   ├── common.py
 │   │   ├── tabs.py
 │   │   ├── tab1.py
 │   │   ├── tab2.py
@@ -32,18 +33,20 @@ test_rfidpi/ RFID6(needs update)
 │   │   └── tab.html
 ├── static/
 │   ├── css/
-│   ├── common.css
-│   ├── tab1.css
+│   │   ├── common.css
+│   │   ├── tab1.css
 │   │   ├── tab5.css
 │   │   ├── tab2_4.css
-│   │   └── style.css
+│   │   └── common.css
 │   ├── js/
 │   │   ├── common.js
 │   │   ├── tab.js
 │   │   ├── tab1.js
+│   │   ├── tab2.js
 │   │   ├── tab3.js
+│   │   ├── tab4.js
 │   │   ├── tab5.js
-│   │   ├── expand.js
+│   │   ├── expand_old.js
 │   │   └── htmx.min.js
 │   ├── lib/
 │   │   ├── htmx/
