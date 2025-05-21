@@ -44,7 +44,7 @@
                         {{ group.common_name }} ({{ group.total_items }} items)
                     </button>
                 </h4>
-                <div id="common-{{ loop.index }}" class="expandable collapsed">
+                <div id="common-{{ loop.index }}" class="expandable expanded">
                     {% for status_group in group.status_groups %}
                         <div class="status-section ml-3 mb-2">
                             <h5>
@@ -128,7 +128,7 @@
             </div>
         {% endfor %}
     {% else %}
-        <p>No items currently in service.</p>
+        <p>No items currently in service. If this is unexpected, please check the database or contact support.</p>
     {% endif %}
 </div>
 
@@ -179,4 +179,11 @@
     padding-left: 10px;
 }
 </style>
+
+<!-- Fallback message for JavaScript issues -->
+<noscript>
+    <div style="color: red; text-align: center; margin: 20px;">
+        <p>JavaScript is disabled or failed to load. Please enable JavaScript to use the expand/collapse functionality and other interactive features.</p>
+    </div>
+</noscript>
 {% endblock %}
