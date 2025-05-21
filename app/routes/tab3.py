@@ -11,7 +11,7 @@ import os
 import pwd
 import grp
 
-# Configure logging
+# Configure logging for Tab 3
 logger = logging.getLogger('tab3')
 logger.setLevel(logging.INFO)
 
@@ -25,12 +25,13 @@ formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(messag
 file_handler.setFormatter(formatter)
 logger.addHandler(file_handler)
 
-# Console handler
+# Console handler for stdout
 console_handler = logging.StreamHandler(sys.stdout)
 console_handler.setLevel(logging.INFO)
 console_handler.setFormatter(formatter)
 logger.addHandler(console_handler)
 
+# Blueprint for Tab 3 routes
 tab3_bp = Blueprint('tab3', __name__)
 
 # Directory for shared CSV files
@@ -44,11 +45,12 @@ if not os.path.exists(SHARED_DIR):
     os.makedirs(SHARED_DIR, mode=0o770)
     os.chown(SHARED_DIR, pwd.getpwnam('tim').pw_uid, grp.getgrnam('tim').gr_gid)
 
-# Version marker
-logger.info("Deployed tab3.py version: 2025-05-20-v37")
+# Version marker for deployment tracking
+logger.info("Deployed tab3.py version: 2025-05-21-v38")
 
 @tab3_bp.route('/tab/3')
 def tab3_view():
+    """Render Tab 3 view with items in service, grouped by crew (Linen, Tents, Service)."""
     session = None
     try:
         session = db.session()
@@ -267,9 +269,7 @@ def tab3_view():
 
 @tab3_bp.route('/tab/3/csv_contents', methods=['GET'])
 def get_csv_contents():
-    """
-    Fetch the contents of rfid_tags.csv.
-    """
+    """Fetch the contents of rfid_tags.csv for display in the UI."""
     try:
         if not os.path.exists(CSV_FILE_PATH):
             print("DEBUG: CSV file does not exist")
@@ -305,9 +305,7 @@ def get_csv_contents():
 
 @tab3_bp.route('/tab/3/remove_csv_item', methods=['POST'])
 def remove_csv_item():
-    """
-    Remove a specific item from rfid_tags.csv based on tag_id.
-    """
+    """Remove a specific item from rfid_tags.csv based on tag_id."""
     try:
         data = request.get_json()
         tag_id = data.get('tag_id')
@@ -349,23 +347,28 @@ def remove_csv_item():
 @tab3_bp.route('/tab/3/sync_to_pc', methods=['POST'])
 def sync_to_pc():
     """
-    Sync selected items to a CSV file for printing RFID tags.
-    Appends exactly the requested number of unique entries to the CSV, verifying against ItemMaster and CSV.
-    Prioritizes tags with status 'Sold' from ItemMaster, then other statuses, before generating new tags.
+    Sync selected items to rfid_tags.csv for printing RFID tags.
+    Ensures exactly 'quantity' unique entries are appended, using existing ItemMaster tags
+    (prioritizing 'Sold', then others) and generating new tags if needed.
+    Fixes duplicate tag issue by strictly limiting synced_items to quantity.
     """
     session = None
     try:
         session = db.session()
         print("DEBUG: Entering /tab/3/sync_to_pc route")
+        logger.info("Entering /tab/3/sync_to_pc route")
 
         data = request.get_json()
         print(f"DEBUG: Received request data: {data}")
+        logger.debug(f"Received request data: {data}")
 
         common_name = data.get('common_name')
         quantity = data.get('quantity')
 
         print(f"DEBUG: Sync request: common_name={common_name}, quantity={quantity}")
+        logger.info(f"Sync request: common_name={common_name}, quantity={quantity}")
 
+        # Validate input
         if not common_name or not isinstance(quantity, int) or quantity <= 0:
             print(f"DEBUG: Invalid input: common_name={common_name}, quantity={quantity}")
             logger.warning(f"Invalid input: common_name={common_name}, quantity={quantity}")
@@ -382,8 +385,9 @@ def sync_to_pc():
             logger.error(f"Shared directory {SHARED_DIR} is not writable")
             return jsonify({'error': f"Shared directory {SHARED_DIR} is not writable"}), 500
 
-        # Read existing tag_ids from the CSV
+        # Read existing tag_ids from CSV to avoid duplicates
         print("DEBUG: Reading existing tag_ids from CSV")
+        logger.debug("Reading existing tag_ids from CSV")
         csv_tag_ids = set()
         needs_header = not os.path.exists(CSV_FILE_PATH)
         if os.path.exists(CSV_FILE_PATH):
@@ -412,28 +416,30 @@ def sync_to_pc():
         print(f"DEBUG: Found {len(csv_tag_ids)} existing tag_ids in CSV")
         logger.info(f"Found {len(csv_tag_ids)} existing tag_ids in CSV")
 
-        # Initialize synced items
+        # Initialize synced items and tracking set
         synced_items = []
         existing_tag_ids = csv_tag_ids.copy()
-        remaining_quantity = quantity
 
         # Step 1: Query ItemMaster for existing items
         print("DEBUG: Querying ItemMaster for existing items")
+        logger.debug("Querying ItemMaster for existing items")
         try:
-            # Get 'Sold' items first
+            # Get 'Sold' items first, up to quantity
             sold_items = session.query(ItemMaster)\
                 .filter(ItemMaster.common_name == common_name,
                         ItemMaster.bin_location.in_(['pack', 'resale']),
                         ItemMaster.status == 'Sold')\
                 .order_by(ItemMaster.date_updated.asc())\
-                .limit(remaining_quantity)\
                 .all()
             print(f"DEBUG: Found {len(sold_items)} 'Sold' items in ItemMaster for common_name={common_name}")
+            logger.debug(f"Found {len(sold_items)} 'Sold' items in ItemMaster for common_name={common_name}")
 
             for item in sold_items:
+                if len(synced_items) >= quantity:
+                    break
                 if item.tag_id in existing_tag_ids:
                     print(f"DEBUG: Skipping tag_id {item.tag_id} as it’s already in use")
-                    logger.warning(f"Skipping tag_id {item.tag_id} as it’s already in use")
+                    logger.debug(f"Skipping tag_id {item.tag_id} as it’s already in use")
                     continue
                 synced_items.append({
                     'tag_id': item.tag_id,
@@ -449,24 +455,24 @@ def sync_to_pc():
                 print(f"DEBUG: Added to synced_items: tag_id={item.tag_id}, common_name={item.common_name}, status={item.status}")
                 logger.info(f"Added to synced_items: tag_id={item.tag_id}, common_name={item.common_name}, status={item.status}")
 
-            remaining_quantity = quantity - len(synced_items)
-            print(f"DEBUG: After Sold items, remaining_quantity={remaining_quantity}")
-
-            # Get non-'Sold' items if needed
-            if remaining_quantity > 0:
+            # Get non-'Sold' items if needed, up to remaining quantity
+            if len(synced_items) < quantity:
+                remaining_quantity = quantity - len(synced_items)
                 other_items = session.query(ItemMaster)\
                     .filter(ItemMaster.common_name == common_name,
                             ItemMaster.bin_location.in_(['pack', 'resale']),
                             ItemMaster.status != 'Sold')\
                     .order_by(ItemMaster.status.asc())\
-                    .limit(remaining_quantity)\
                     .all()
                 print(f"DEBUG: Found {len(other_items)} non-'Sold' items in ItemMaster")
+                logger.debug(f"Found {len(other_items)} non-'Sold' items in ItemMaster")
 
                 for item in other_items:
+                    if len(synced_items) >= quantity:
+                        break
                     if item.tag_id in existing_tag_ids:
                         print(f"DEBUG: Skipping tag_id {item.tag_id} as it’s already in use")
-                        logger.warning(f"Skipping tag_id {item.tag_id} as it’s already in use")
+                        logger.debug(f"Skipping tag_id {item.tag_id} as it’s already in use")
                         continue
                     synced_items.append({
                         'tag_id': item.tag_id,
@@ -484,6 +490,7 @@ def sync_to_pc():
 
                 remaining_quantity = quantity - len(synced_items)
                 print(f"DEBUG: After non-Sold items, remaining_quantity={remaining_quantity}")
+                logger.debug(f"After non-Sold items, remaining_quantity={remaining_quantity}")
         except Exception as e:
             print(f"DEBUG: Error querying ItemMaster: {str(e)}")
             logger.error(f"Error querying ItemMaster: {str(e)}", exc_info=True)
@@ -491,19 +498,21 @@ def sync_to_pc():
 
         # Step 2: Generate new tags if needed
         new_items = []
-        if remaining_quantity > 0:
+        if len(synced_items) < quantity:
+            remaining_quantity = quantity - len(synced_items)
             print(f"DEBUG: Generating {remaining_quantity} new items for common_name={common_name}")
             logger.info(f"Generating {remaining_quantity} new items for common_name={common_name}")
 
             # Fetch rental_class_id and bin_location from SeedRentalClass
             print(f"DEBUG: Querying SeedRentalClass for common_name={common_name}")
+            logger.debug(f"Querying SeedRentalClass for common_name={common_name}")
             try:
                 seed_entry = session.query(SeedRentalClass)\
                     .filter(SeedRentalClass.common_name == common_name,
                             SeedRentalClass.bin_location.in_(['pack', 'resale']))\
                     .first()
                 print(f"DEBUG: SeedRentalClass query result: {seed_entry}")
-                logger.info(f"SeedRentalClass query result: {seed_entry}")
+                logger.debug(f"SeedRentalClass query result: {seed_entry}")
             except Exception as e:
                 print(f"DEBUG: Error querying SeedRentalClass: {str(e)}")
                 logger.error(f"Error querying SeedRentalClass: {str(e)}", exc_info=True)
@@ -522,12 +531,13 @@ def sync_to_pc():
             # Generate new tag IDs
             for i in range(remaining_quantity):
                 print(f"DEBUG: Generating new tag ID {i+1}/{remaining_quantity}")
+                logger.debug(f"Generating new tag ID {i+1}/{remaining_quantity}")
                 try:
                     max_tag_id = session.query(func.max(ItemMaster.tag_id))\
                         .filter(ItemMaster.tag_id.startswith('425445'))\
                         .scalar()
                     print(f"DEBUG: Max tag_id from ItemMaster: {max_tag_id}")
-                    logger.info(f"Max tag_id from ItemMaster: {max_tag_id}")
+                    logger.debug(f"Max tag_id from ItemMaster: {max_tag_id}")
                 except Exception as e:
                     print(f"DEBUG: Error querying max tag_id: {str(e)}")
                     logger.error(f"Error querying max tag_id: {str(e)}", exc_info=True)
@@ -550,6 +560,7 @@ def sync_to_pc():
                         break
                     new_num += 1
                     print(f"DEBUG: Tag ID {tag_id} already exists, incrementing to {new_num}")
+                    logger.debug(f"Tag ID {tag_id} already exists, incrementing to {new_num}")
 
                 if len(tag_id) != 24:
                     print(f"DEBUG: Generated tag_id {tag_id} is not 24 characters long (length={len(tag_id)})")
@@ -595,17 +606,18 @@ def sync_to_pc():
                 print(f"DEBUG: Created new ItemMaster entry: tag_id={tag_id}, common_name={common_name}, rental_class_num={rental_class_num}")
                 logger.info(f"Created new ItemMaster entry: tag_id={tag_id}, common_name={common_name}, rental_class_num={rental_class_num}")
 
-        # Ensure exactly the requested quantity
-        if len(synced_items) > quantity:
-            synced_items = synced_items[:quantity]
-            print(f"DEBUG: Truncated synced_items to {quantity} items")
-            logger.info(f"Truncated synced_items to {quantity} items")
-        elif len(synced_items) < quantity:
-            print(f"DEBUG: Warning: Only {len(synced_items)} items synced, requested {quantity}")
-            logger.warning(f"Only {len(synced_items)} items synced, requested {quantity}")
+        # Verify synced items count
+        if len(synced_items) != quantity:
+            print(f"DEBUG: Expected {quantity} items, but got {len(synced_items)}")
+            logger.warning(f"Expected {quantity} items, but got {len(synced_items)}")
+            if len(synced_items) > quantity:
+                synced_items = synced_items[:quantity]
+                print(f"DEBUG: Truncated synced_items to {quantity} items")
+                logger.info(f"Truncated synced_items to {quantity} items")
 
         # Fetch rental class mappings
         print("DEBUG: Fetching rental class mappings")
+        logger.debug("Fetching rental class mappings")
         try:
             base_mappings = session.query(RentalClassMapping).all()
             user_mappings = session.query(UserRentalClassMapping).all()
@@ -633,10 +645,11 @@ def sync_to_pc():
             item['subcategory'] = mapping.get('subcategory', 'Unknown')
             item['short_common_name'] = mapping.get('short_common_name', item['common_name'])
             print(f"DEBUG: Updated synced_item with mappings: {item}")
-            logger.info(f"Updated synced_item with mappings: {item}")
+            logger.debug(f"Updated synced_item with mappings: {item}")
 
         # Append to the CSV file
         print("DEBUG: Appending to CSV file")
+        logger.debug("Appending to CSV file")
         try:
             with open(CSV_FILE_PATH, 'a', newline='') as csvfile:
                 fieldnames = ['tag_id', 'common_name', 'subcategory', 'short_common_name', 'status', 'bin_location']
@@ -669,6 +682,7 @@ def sync_to_pc():
         # Commit new ItemMaster entries
         if new_items:
             print("DEBUG: Committing session after CSV append")
+            logger.debug("Committing session after CSV append")
             try:
                 session.flush()
                 print(f"DEBUG: Session flushed successfully after CSV append")
@@ -697,12 +711,13 @@ def sync_to_pc():
         if session:
             session.close()
             print("DEBUG: Session closed")
+            logger.debug("Session closed")
 
 @tab3_bp.route('/tab/3/update_synced_status', methods=['POST'])
 def update_synced_status():
     """
-    Update the status of items in the CSV file to 'Ready to Rent' and clear the CSV file.
-    Inserts new tag_id entries into the API via POST and updates existing ones via PATCH.
+    Update the status of items in rfid_tags.csv to 'Ready to Rent', sync to API,
+    and clear the CSV file.
     """
     session = None
     try:
@@ -721,6 +736,7 @@ def update_synced_status():
             return jsonify({'error': 'No items found in CSV file'}), 404
 
         print("DEBUG: Reading items from CSV file")
+        logger.debug("Reading items from CSV file")
         items_to_update = []
         try:
             with open(CSV_FILE_PATH, 'r') as csvfile:
@@ -741,6 +757,7 @@ def update_synced_status():
                             'status': row['status']
                         })
                         print(f"DEBUG: Read CSV row: {row}")
+                        logger.debug(f"Read CSV row: {row}")
                     except KeyError as ke:
                         print(f"DEBUG: Missing required field in CSV row: {ke}, row: {row}")
                         logger.error(f"Missing required field in CSV row: {ke}, row: {row}")
@@ -760,6 +777,7 @@ def update_synced_status():
         logger.info(f"Found {len(tag_ids)} items to update: {tag_ids}")
 
         print("DEBUG: Fetching rental_class_num from ItemMaster")
+        logger.debug("Fetching rental_class_num from ItemMaster")
         try:
             items_in_db = session.query(ItemMaster.tag_id, ItemMaster.rental_class_num, ItemMaster.common_name, ItemMaster.bin_location)\
                 .filter(ItemMaster.tag_id.in_(tag_ids))\
@@ -777,6 +795,7 @@ def update_synced_status():
             return jsonify({'error': f"Error querying ItemMaster: {str(e)}"}), 500
 
         print("DEBUG: Updating ItemMaster status to 'Ready to Rent'")
+        logger.debug("Updating ItemMaster status to 'Ready to Rent'")
         try:
             updated_items = ItemMaster.query\
                 .filter(ItemMaster.tag_id.in_(tag_ids))\
@@ -789,6 +808,7 @@ def update_synced_status():
             return jsonify({'error': f"Error updating ItemMaster: {str(e)}"}), 500
 
         print("DEBUG: Updating items via API")
+        logger.debug("Updating items via API")
         api_client = APIClient()
         for item in items_to_update:
             tag_id = item['tag_id']
@@ -822,6 +842,7 @@ def update_synced_status():
                 return jsonify({'error': f"Failed to update/insert tag_id {tag_id} in API: {str(api_error)}"}), 500
 
         print("DEBUG: Clearing CSV file")
+        logger.debug("Clearing CSV file")
         try:
             with open(CSV_FILE_PATH, 'w', newline='') as csvfile:
                 fieldnames = ['tag_id', 'common_name', 'subcategory', 'short_common_name', 'status', 'bin_location']
@@ -835,6 +856,7 @@ def update_synced_status():
             return jsonify({'error': f"Error clearing CSV file: {str(e)}"}), 500
 
         print("DEBUG: Committing session after API updates")
+        logger.debug("Committing session after API updates")
         session.commit()
         print(f"DEBUG: Updated status for {updated_items} items and cleared CSV file")
         logger.info(f"Updated status for {updated_items} items and cleared CSV file")
@@ -849,13 +871,16 @@ def update_synced_status():
         if session:
             session.close()
             print("DEBUG: Session closed")
+            logger.debug("Session closed")
 
 @tab3_bp.route('/tab/3/update_status', methods=['POST'])
 def update_status():
+    """Update an item's status in ItemMaster and sync to API."""
     session = None
     try:
         session = db.session()
         print("DEBUG: Entering /tab/3/update_status route")
+        logger.info("Entering /tab/3/update_status route")
         data = request.get_json()
         tag_id = data.get('tag_id')
         new_status = data.get('status')
@@ -872,6 +897,7 @@ def update_status():
             return jsonify({'error': f'Status must be one of {", ".join(valid_statuses)}'}), 400
 
         print(f"DEBUG: Querying ItemMaster for tag_id={tag_id}")
+        logger.debug(f"Querying ItemMaster for tag_id={tag_id}")
         item = session.query(ItemMaster).filter_by(tag_id=tag_id).first()
         if not item:
             session.close()
@@ -886,14 +912,22 @@ def update_status():
             return jsonify({'error': 'Status cannot be updated to "On Rent" or "Delivered" manually'}), 400
 
         print(f"DEBUG: Updating ItemMaster status for tag_id={tag_id} to {new_status}")
+        logger.debug(f"Updating ItemMaster status for tag_id={tag_id} to {new_status}")
         current_time = datetime.now()
         item.status = new_status
         item.date_last_scanned = current_time
         session.commit()
 
         print(f"DEBUG: Updating external API for tag_id={tag_id}")
-        api_client = APIClient()
-        api_client.update_status(tag_id, new_status)
+        logger.debug(f"Updating external API for tag_id={tag_id}")
+        try:
+            api_client = APIClient()
+            api_client.update_status(tag_id, new_status)
+            print(f"DEBUG: Successfully updated API status for tag_id {tag_id}")
+            logger.info(f"Successfully updated API status for tag_id {tag_id}")
+        except Exception as e:
+            print(f"DEBUG: Failed to update API status for tag_id {tag_id}: {str(e)}")
+            logger.error(f"Failed to update API status for tag_id {tag_id}: {str(e)}", exc_info=True)
 
         session.close()
         print(f"DEBUG: Updated status for tag_id {tag_id} to {new_status} and date_last_scanned to {current_time}")
@@ -909,10 +943,12 @@ def update_status():
 
 @tab3_bp.route('/tab/3/update_notes', methods=['POST'])
 def update_notes():
+    """Update an item's notes in ItemMaster and sync to API."""
     session = None
     try:
         session = db.session()
         print("DEBUG: Entering /tab/3/update_notes route")
+        logger.info("Entering /tab/3/update_notes route")
         data = request.get_json()
         tag_id = data.get('tag_id')
         new_notes = data.get('notes')
@@ -923,6 +959,7 @@ def update_notes():
             return jsonify({'error': 'Tag ID is required'}), 400
 
         print(f"DEBUG: Querying ItemMaster for tag_id={tag_id}")
+        logger.debug(f"Querying ItemMaster for tag_id={tag_id}")
         item = session.query(ItemMaster).filter_by(tag_id=tag_id).first()
         if not item:
             session.close()
@@ -931,10 +968,22 @@ def update_notes():
             return jsonify({'error': 'Item not found'}), 404
 
         print(f"DEBUG: Updating ItemMaster notes for tag_id={tag_id}")
+        logger.debug(f"Updating ItemMaster notes for tag_id={tag_id}")
         current_time = datetime.now()
         item.notes = new_notes if new_notes else None
         item.date_updated = current_time
         session.commit()
+
+        print(f"DEBUG: Updating external API notes for tag_id={tag_id}")
+        logger.debug(f"Updating external API notes for tag_id={tag_id}")
+        try:
+            api_client = APIClient()
+            api_client.update_notes(tag_id, new_notes if new_notes else '')
+            print(f"DEBUG: Successfully updated API notes for tag_id {tag_id}")
+            logger.info(f"Successfully updated API notes for tag_id {tag_id}")
+        except Exception as e:
+            print(f"DEBUG: Failed to update API notes for tag_id {tag_id}: {str(e)}")
+            logger.error(f"Failed to update API notes for tag_id {tag_id}: {str(e)}", exc_info=True)
 
         session.close()
         print(f"DEBUG: Updated notes for tag_id {tag_id} to '{new_notes}' and date_updated to {current_time}")
@@ -950,9 +999,7 @@ def update_notes():
 
 @tab3_bp.route('/tab/3/pack_resale_common_names', methods=['GET'])
 def get_pack_resale_common_names():
-    """
-    Fetch distinct common names for items with bin_location 'pack' or 'resale' from SeedRentalClass.
-    """
+    """Fetch distinct common names from SeedRentalClass for pack/resale bin locations."""
     try:
         common_names = db.session.query(SeedRentalClass.common_name)\
             .filter(SeedRentalClass.bin_location.in_(['pack', 'resale']))\
