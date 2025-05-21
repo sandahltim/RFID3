@@ -33,64 +33,104 @@
     </div>
 </div>
 
-<!-- Crew sections for Linen, Tents, Service -->
-{% for crew in crews %}
-<div class="crew-section">
-    <h3>{{ crew.name }} Items</h3>
-    {% if crew.item_list %}
-        <table class="table table-bordered crew-table" id="crew-table-{{ crew.name | lower | replace(' ', '-') }}">
-            <thead>
-                <tr>
-                    <th>Tag ID</th>
-                    <th>Common Name</th>
-                    <th>Status</th>
-                    <th>Bin Location</th>
-                    <th>Last Contract</th>
-                    <th>Last Scanned Date</th>
-                    <th>Location of Repair</th>
-                    <th>Repair Types</th>
-                    <th>Notes</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for item in crew.item_list %}
-                    <tr>
-                        <td>{{ item.tag_id }}</td>
-                        <td>{{ item.common_name }}</td>
-                        <td>
-                            <select id="status-{{ item.tag_id }}" onchange="updateStatusVisibility('{{ item.tag_id }}')">
-                                <option value="{{ item.status }}" selected>{{ item.status }}</option>
-                                <option value="Ready to Rent">Ready to Rent</option>
-                                <option value="Sold">Sold</option>
-                                <option value="Repair">Repair</option>
-                                <option value="Needs to be Inspected">Needs to be Inspected</option>
-                                <option value="Staged">Staged</option>
-                                <option value="Wash">Wash</option>
-                                <option value="Wet">Wet</option>
-                            </select>
-                        </td>
-                        <td>{{ item.bin_location }}</td>
-                        <td>{{ item.last_contract_num }}</td>
-                        <td class="date-last-scanned">{{ item.date_last_scanned }}</td>
-                        <td>{{ item.location_of_repair }}</td>
-                        <td>{{ item.repair_types | join(', ') }}</td>
-                        <td>
-                            <textarea id="notes-{{ item.tag_id }}" rows="2" class="form-control" data-original-notes="{{ item.notes | escape }}" oninput="updateNotesVisibility('{{ item.tag_id }}')">{{ item.notes | escape }}</textarea>
-                        </td>
-                        <td>
-                            <button class="btn btn-sm btn-primary save-status-btn" onclick="updateStatus('{{ item.tag_id }}')" style="display: none;">Save Status</button>
-                            <button class="btn btn-sm btn-primary save-notes-btn" onclick="updateNotes('{{ item.tag_id }}')" style="display: none;">Save Notes</button>
-                        </td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+<!-- Items in Service section, grouped by common_name and status -->
+<div class="items-section">
+    <h3>Items in Service</h3>
+    {% if common_name_groups %}
+        {% for group in common_name_groups %}
+            <div class="common-name-section mb-3">
+                <h4>
+                    <button class="btn btn-link expand-btn" data-target="common-{{ loop.index }}">
+                        {{ group.common_name }} ({{ group.total_items }} items)
+                    </button>
+                </h4>
+                <div id="common-{{ loop.index }}" class="expandable collapsed">
+                    {% for status_group in group.status_groups %}
+                        <div class="status-section ml-3 mb-2">
+                            <h5>
+                                <button class="btn btn-link expand-btn" data-target="status-{{ loop.parent.loop.index }}-{{ loop.index }}">
+                                    {{ status_group.status }} ({{ status_group.total_items }} items)
+                                </button>
+                            </h5>
+                            <div id="status-{{ loop.parent.loop.index }}-{{ loop.index }}" class="expandable collapsed">
+                                <table class="table table-bordered status-table" id="status-table-{{ loop.parent.loop.index }}-{{ loop.index }}">
+                                    <thead>
+                                        <tr>
+                                            <th>Tag ID</th>
+                                            <th>Status</th>
+                                            <th>Bin Location</th>
+                                            <th>Last Contract</th>
+                                            <th>Last Scanned Date</th>
+                                            <th>Location of Repair</th>
+                                            <th>Repair Types</th>
+                                            <th>Transaction Details</th>
+                                            <th>Notes</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for item in status_group.items %}
+                                            <tr>
+                                                <td>{{ item.tag_id }}</td>
+                                                <td>
+                                                    <select id="status-{{ item.tag_id }}" onchange="updateStatusVisibility('{{ item.tag_id }}')">
+                                                        <option value="{{ item.status }}" selected>{{ item.status }}</option>
+                                                        <option value="Ready to Rent">Ready to Rent</option>
+                                                        <option value="Sold">Sold</option>
+                                                        <option value="Repair">Repair</option>
+                                                        <option value="Needs to be Inspected">Needs to be Inspected</option>
+                                                        <option value="Staged">Staged</option>
+                                                        <option value="Wash">Wash</option>
+                                                        <option value="Wet">Wet</option>
+                                                    </select>
+                                                </td>
+                                                <td>{{ item.bin_location }}</td>
+                                                <td>{{ item.last_contract_num }}</td>
+                                                <td class="date-last-scanned">{{ item.date_last_scanned }}</td>
+                                                <td>{{ item.location_of_repair }}</td>
+                                                <td>{{ item.repair_types | join(', ') }}</td>
+                                                <td>
+                                                    <ul>
+                                                        <li><strong>Last Transaction Scan Date:</strong> {{ item.last_transaction_scan_date }}</li>
+                                                        <li><strong>Dirty/Mud:</strong> {{ 'Yes' if item.dirty_or_mud else 'No' }}</li>
+                                                        <li><strong>Leaves:</strong> {{ 'Yes' if item.leaves else 'No' }}</li>
+                                                        <li><strong>Oil:</strong> {{ 'Yes' if item.oil else 'No' }}</li>
+                                                        <li><strong>Mold:</strong> {{ 'Yes' if item.mold else 'No' }}</li>
+                                                        <li><strong>Stain:</strong> {{ 'Yes' if item.stain else 'No' }}</li>
+                                                        <li><strong>Oxidation:</strong> {{ 'Yes' if item.oxidation else 'No' }}</li>
+                                                        <li><strong>Rip/Tear:</strong> {{ 'Yes' if item.rip_or_tear else 'No' }}</li>
+                                                        <li><strong>Sewing Repair Needed:</strong> {{ 'Yes' if item.sewing_repair_needed else 'No' }}</li>
+                                                        <li><strong>Grommet:</strong> {{ 'Yes' if item.grommet else 'No' }}</li>
+                                                        <li><strong>Rope:</strong> {{ 'Yes' if item.rope else 'No' }}</li>
+                                                        <li><strong>Buckle:</strong> {{ 'Yes' if item.buckle else 'No' }}</li>
+                                                        <li><strong>Wet:</strong> {{ 'Yes' if item.wet else 'No' }}</li>
+                                                        <li><strong>Other:</strong> {{ item.other }}</li>
+                                                        <li><strong>Service Required:</strong> {{ 'Yes' if item.service_required else 'No' }}</li>
+                                                        <li><strong>Longitude:</strong> {{ item.longitude if item.longitude is not none else 'N/A' }}</li>
+                                                        <li><strong>Latitude:</strong> {{ item.latitude if item.latitude is not none else 'N/A' }}</li>
+                                                    </ul>
+                                                </td>
+                                                <td>
+                                                    <textarea id="notes-{{ item.tag_id }}" rows="2" class="form-control" data-original-notes="{{ item.notes | escape }}" oninput="updateNotesVisibility('{{ item.tag_id }}')">{{ item.notes | escape }}</textarea>
+                                                </td>
+                                                <td>
+                                                    <button class="btn btn-sm btn-primary save-status-btn" onclick="updateStatus('{{ item.tag_id }}')" style="display: none;">Save Status</button>
+                                                    <button class="btn btn-sm btn-primary save-notes-btn" onclick="updateNotes('{{ item.tag_id }}')" style="display: none;">Save Notes</button>
+                                                </td>
+                                            </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        {% endfor %}
     {% else %}
-        <p>No items currently in service for {{ crew.name }}.</p>
+        <p>No items currently in service.</p>
     {% endif %}
 </div>
-{% endfor %}
 
 <!-- Section for printing RFID tags -->
 <div class="print-tags-section mt-4">
@@ -122,4 +162,21 @@
     <button id="updateStatusBtn" class="btn btn-success mt-2" disabled>Update Status to Ready to Rent</button>
     <div id="syncMessage" class="mt-2"></div>
 </div>
+
+<style>
+.expandable.collapsed {
+    display: none;
+}
+.expandable.expanded {
+    display: block;
+}
+.common-name-section {
+    border-left: 3px solid #007bff;
+    padding-left: 10px;
+}
+.status-section {
+    border-left: 3px solid #28a745;
+    padding-left: 10px;
+}
+</style>
 {% endblock %}
