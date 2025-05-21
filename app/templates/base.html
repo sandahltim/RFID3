@@ -4,9 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}{% endblock %}</title>
-    <!-- Bootstrap CSS -->
+    <!-- Bootstrap CSS from static/lib/bootstrap/ -->
     <link rel="stylesheet" href="/static/lib/bootstrap/bootstrap.min.css">
-    <!-- Application CSS; path verified to match app/static/css/style.css -->
+    <!-- Application CSS; verified to match static/css/style.css -->
     <link rel="stylesheet" href="/static/css/style.css">
     {% block head %}
     {% if request.path == '/tab/1' %}
@@ -58,9 +58,9 @@
         {% block content %}{% endblock %}
     </div>
 
-    <!-- Bootstrap JS bundle -->
+    <!-- Bootstrap JS bundle from static/lib/bootstrap/ -->
     <script src="/static/lib/bootstrap/bootstrap.bundle.min.js"></script>
-    <!-- HTMX for potential use in other tabs; verify app/static/js/htmx.min.js exists; remove if confirmed unused -->
+    <!-- HTMX for other tabs; ensure static/js/htmx.min.js exists; remove if confirmed unused -->
     <script src="/static/js/htmx.min.js"></script>
     {% block scripts %}
         {% if request.path == '/tab/1' %}

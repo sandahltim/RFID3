@@ -46,7 +46,7 @@ if not os.path.exists(SHARED_DIR):
     os.chown(SHARED_DIR, pwd.getpwnam('tim').pw_uid, grp.getgrnam('tim').gr_gid)
 
 # Version marker for deployment tracking
-logger.info("Deployed tab3.py version: 2025-05-21-v39")
+logger.info("Deployed tab3.py version: 2025-05-21-v40")
 
 @tab3_bp.route('/tab/3')
 def tab3_view():
@@ -350,7 +350,7 @@ def sync_to_pc():
     Sync selected items to rfid_tags.csv for printing RFID tags.
     Appends exactly 'quantity' unique entries to the CSV, using existing ItemMaster tags
     (prioritizing 'Sold', then others) and generating new tags if needed.
-    Fixed duplicate tag issue by truncating synced_items before CSV write and enforcing quantity.
+    Fixed duplicate tag issue by clearing duplicates, enforcing quantity, and validating CSV.
     """
     session = None
     try:
@@ -385,10 +385,11 @@ def sync_to_pc():
             logger.error(f"Shared directory {SHARED_DIR} is not writable")
             return jsonify({'error': f"Shared directory {SHARED_DIR} is not writable"}), 500
 
-        # Read existing tag_ids from CSV to avoid duplicates
+        # Read existing tag_ids from CSV and remove duplicates
         print("DEBUG: Reading existing tag_ids from CSV")
         logger.debug("Reading existing tag_ids from CSV")
         csv_tag_ids = set()
+        existing_items = []
         needs_header = not os.path.exists(CSV_FILE_PATH)
         if os.path.exists(CSV_FILE_PATH):
             try:
@@ -406,15 +407,16 @@ def sync_to_pc():
                             needs_header = True
                         else:
                             for row in reader:
-                                if 'tag_id' in row:
+                                if 'tag_id' in row and row['tag_id'] not in csv_tag_ids:
                                     csv_tag_ids.add(row['tag_id'])
+                                    existing_items.append(row)
             except Exception as e:
                 print(f"DEBUG: Error reading existing CSV file: {str(e)}")
                 logger.error(f"Error reading existing CSV file: {str(e)}", exc_info=True)
                 return jsonify({'error': f"Failed to read existing CSV file: {str(e)}"}), 500
 
-        print(f"DEBUG: Found {len(csv_tag_ids)} existing tag_ids in CSV")
-        logger.info(f"Found {len(csv_tag_ids)} existing tag_ids in CSV")
+        print(f"DEBUG: Found {len(csv_tag_ids)} unique tag_ids in CSV")
+        logger.info(f"Found {len(csv_tag_ids)} unique tag_ids in CSV")
 
         # Initialize synced items and tracking set
         synced_items = []
@@ -579,7 +581,7 @@ def sync_to_pc():
                 })
                 existing_tag_ids.add(tag_id)
                 print(f"DEBUG: Added to synced_items: tag_id={tag_id}, common_name={common_name}, status=Ready to Rent")
-                logger.info(f"Added to synced_items: tag_id={tag_id}, common_name={common_name}, status=Ready to Rent")
+                logger.info(f"Added to synced_items: tag_id={item.tag_id}, common_name={item.common_name}, status={item.status}")
 
                 new_item = ItemMaster(
                     tag_id=tag_id,
@@ -651,22 +653,21 @@ def sync_to_pc():
             print(f"DEBUG: Updated synced_item with mappings: {item}")
             logger.debug(f"Updated synced_item with mappings: {item}")
 
-        # Append to the CSV file
-        print("DEBUG: Appending to CSV file")
-        logger.debug("Appending to CSV file")
+        # Write to CSV, preserving existing non-duplicate items
+        print("DEBUG: Writing to CSV file")
+        logger.debug("Writing to CSV file")
         try:
-            with open(CSV_FILE_PATH, 'a', newline='') as csvfile:
+            # Combine existing items (minus duplicates) with new synced items
+            all_items = [item for item in existing_items if item['tag_id'] not in {i['tag_id'] for i in synced_items}]
+            all_items.extend(synced_items)
+            print(f"DEBUG: Total items to write to CSV: {len(all_items)}")
+            logger.info(f"Total items to write to CSV: {len(all_items)}")
+
+            with open(CSV_FILE_PATH, 'w', newline='') as csvfile:
                 fieldnames = ['tag_id', 'common_name', 'subcategory', 'short_common_name', 'status', 'bin_location']
                 writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-                if needs_header:
-                    writer.writeheader()
-                    print("DEBUG: Wrote CSV header row")
-                    logger.info("Wrote CSV header row")
-                for item in synced_items:
-                    if item['tag_id'] in csv_tag_ids:
-                        print(f"DEBUG: Skipping duplicate tag_id {item['tag_id']} in CSV append")
-                        logger.warning(f"Skipping duplicate tag_id {item['tag_id']} in CSV append")
-                        continue
+                writer.writeheader()
+                for item in all_items:
                     writer.writerow({
                         'tag_id': item['tag_id'],
                         'common_name': item['common_name'],
@@ -675,31 +676,30 @@ def sync_to_pc():
                         'status': item['status'],
                         'bin_location': item['bin_location']
                     })
-                    csv_tag_ids.add(item['tag_id'])
-                    print(f"DEBUG: Appended CSV row: {item}")
-                    logger.info(f"Appended CSV row: {item}")
+                    print(f"DEBUG: Wrote CSV row: {item}")
+                    logger.info(f"Wrote CSV row: {item}")
         except Exception as e:
-            print(f"DEBUG: Failed to append to CSV file {CSV_FILE_PATH}: {str(e)}")
-            logger.error(f"Failed to append to CSV file {CSV_FILE_PATH}: {str(e)}", exc_info=True)
-            return jsonify({'error': f"Failed to append to CSV file: {str(e)}"}), 500
+            print(f"DEBUG: Failed to write to CSV file {CSV_FILE_PATH}: {str(e)}")
+            logger.error(f"Failed to write to CSV file {CSV_FILE_PATH}: {str(e)}", exc_info=True)
+            return jsonify({'error': f"Failed to write to CSV file: {str(e)}"}), 500
 
         # Commit new ItemMaster entries
         if new_items:
-            print("DEBUG: Committing session after CSV append")
-            logger.debug("Committing session after CSV append")
+            print("DEBUG: Committing session after CSV write")
+            logger.debug("Committing session after CSV write")
             try:
                 session.flush()
-                print(f"DEBUG: Session flushed successfully after CSV append")
-                logger.info(f"Session flushed successfully after CSV append")
+                print(f"DEBUG: Session flushed successfully after CSV write")
+                logger.info(f"Session flushed successfully after CSV write")
                 session.commit()
                 print(f"DEBUG: Successfully committed {len(new_items)} new ItemMaster entries")
                 logger.info(f"Successfully committed {len(new_items)} new ItemMaster entries")
             except Exception as e:
-                print(f"DEBUG: Failed to commit session after CSV append: {str(e)}")
-                logger.error(f"Failed to commit session after CSV append: {str(e)}", exc_info=True)
+                print(f"DEBUG: Failed to commit session after CSV write: {str(e)}")
+                logger.error(f"Failed to commit session after CSV write: {str(e)}", exc_info=True)
                 session.rollback()
-                print("DEBUG: Returning success response despite commit failure (CSV append completed)")
-                logger.warning("Returning success response despite commit failure (CSV append completed)")
+                print("DEBUG: Returning success response despite commit failure (CSV write completed)")
+                logger.warning("Returning success response despite commit failure (CSV write completed)")
                 return jsonify({'synced_items': len(synced_items)}), 200
 
         print(f"DEBUG: Successfully synced {len(synced_items)} items to CSV")
@@ -747,7 +747,7 @@ def update_synced_status():
                 reader = csv.DictReader(csvfile)
                 required_fields = ['tag_id', 'common_name', 'bin_location', 'status']
                 if not all(field in reader.fieldnames for field in required_fields):
-                    missing = [field for field in required_fields if field not in reader.fieldnames]
+                    missing = [field for field in reader.fieldnames for field in required_fields if field not in reader.fieldnames]
                     print(f"DEBUG: CSV file missing required fields: {missing}")
                     logger.error(f"CSV file missing required fields: {missing}")
                     return jsonify({'error': f"CSV file missing required fields: {missing}"}), 400

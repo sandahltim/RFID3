@@ -30,27 +30,27 @@ test_rfidpi/ RFID6(needs update)
 │   │   ├── _category_rows.html
 │   │   ├── _hand_counted_item.html
 │   │   └── tab.html
-│   ├── static/
-│   │   ├── css/
-│   │   │   ├── common.css
-│   │   │   ├── tab1.css
-│   │   │   ├── tab5.css
-│   │   │   ├── tab2_4.css
-│   │   │   └── style.css
-│   │   ├── js/
-│   │   │   ├── common.js
-│   │   │   ├── tab.js
-│   │   │   ├── tab1.js
-│   │   │   ├── tab3.js
-│   │   │   ├── tab5.js
-│   │   │   ├── expand.js
+├── static/
+│   ├── css/
+│   ├── common.css
+│   ├── tab1.css
+│   │   ├── tab5.css
+│   │   ├── tab2_4.css
+│   │   └── style.css
+│   ├── js/
+│   │   ├── common.js
+│   │   ├── tab.js
+│   │   ├── tab1.js
+│   │   ├── tab3.js
+│   │   ├── tab5.js
+│   │   ├── expand.js
+│   │   └── htmx.min.js
+│   ├── lib/
+│   │   ├── htmx/
 │   │   │   └── htmx.min.js
-│   │   ├── lib/
-│   │   │   ├── htmx/
-│   │   │   │   └── htmx.min.js
-│   │   │   └── bootstrap/
-│   │   │       ├── bootstrap.min.css
-│   │   │       └── bootstrap.bundle.min.js
+│   │   └── bootstrap/
+│   │       ├── bootstrap.min.css
+│   │       └── bootstrap.bundle.min.js
 ├── scripts/
 │   ├── migrate_db.sql
 │   ├── update_rental_class_mappings.py
