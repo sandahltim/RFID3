@@ -6,8 +6,8 @@
     <title>{% block title %}{% endblock %}</title>
     <!-- Bootstrap CSS from static/lib/bootstrap/ -->
     <link rel="stylesheet" href="/static/lib/bootstrap/bootstrap.min.css">
-    <!-- Application CSS; verified to match static/css/style.css -->
-    <link rel="stylesheet" href="/static/css/style.css">
+    <!-- Application CSS; uses common.css after style.css rename -->
+    <link rel="stylesheet" href="/static/css/common.css">
     {% block head %}
     {% if request.path == '/tab/1' %}
         <!-- Tab 1 specific head content -->
@@ -60,7 +60,7 @@
 
     <!-- Bootstrap JS bundle from static/lib/bootstrap/ -->
     <script src="/static/lib/bootstrap/bootstrap.bundle.min.js"></script>
-    <!-- HTMX for other tabs; ensure static/js/htmx.min.js exists; remove if confirmed unused -->
+    <!-- HTMX for other tabs; ensure static/js/htmx.min.js exists -->
     <script src="/static/js/htmx.min.js"></script>
     {% block scripts %}
         {% if request.path == '/tab/1' %}
