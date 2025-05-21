@@ -17,23 +17,37 @@ import requests.exceptions
 
 # Configure logging for Tab 3
 logger = logging.getLogger('tab3')
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG)  # Changed to DEBUG for more granularity
 
 # Remove existing handlers to avoid duplicates
 logger.handlers = []
 
 # File handler for rfid_dashboard.log
-file_handler = logging.FileHandler('/home/tim/test_rfidpi/logs/rfid_dashboard.log')
-file_handler.setLevel(logging.INFO)
+log_file_path = '/home/tim/test_rfidpi/logs/rfid_dashboard.log'
+# Ensure log file exists and has correct permissions
+try:
+    if not os.path.exists(log_file_path):
+        open(log_file_path, 'a').close()
+    os.chmod(log_file_path, 0o666)  # Ensure write permissions
+    os.chown(log_file_path, pwd.getpwnam('tim').pw_uid, grp.getgrnam('tim').gr_gid)
+except Exception as e:
+    print(f"ERROR: Failed to set up log file {log_file_path}: {str(e)}")
+    sys.stderr.write(f"ERROR: Failed to set up log file {log_file_path}: {str(e)}\n")
+
+file_handler = logging.FileHandler(log_file_path)
+file_handler.setLevel(logging.DEBUG)
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 file_handler.setFormatter(formatter)
 logger.addHandler(file_handler)
 
 # Console handler for stdout
 console_handler = logging.StreamHandler(sys.stdout)
-console_handler.setLevel(logging.INFO)
+console_handler.setLevel(logging.DEBUG)
 console_handler.setFormatter(formatter)
 logger.addHandler(console_handler)
+
+# Ensure logger propagates to root logger
+logger.propagate = True
 
 # Blueprint for Tab 3 routes
 tab3_bp = Blueprint('tab3', __name__)
@@ -51,21 +65,22 @@ if not os.path.exists(SHARED_DIR):
     os.chown(SHARED_DIR, pwd.getpwnam('tim').pw_uid, grp.getgrnam('tim').gr_gid)
 
 # Version marker for deployment tracking
-logger.info("Deployed tab3.py version: 2025-05-21-v46")
+logger.info("Deployed tab3.py version: 2025-05-21-v47")
 
 @tab3_bp.route('/tab/3')
 def tab3_view():
     """Render Tab 3 view with items grouped by common_name and status."""
+    logger.debug("Entering /tab/3 endpoint")
     session = None
     try:
+        logger.debug("Attempting to create new database session")
         session = db.session()
-        print("DEBUG: Starting new session for tab3")
-        logger.info("Starting new session for tab3")
-        current_app.logger.info("Starting new session for tab3")
+        logger.info("Successfully created new session for tab3")
+        current_app.logger.info("Successfully created new session for tab3")
 
         # Test database connection
+        logger.debug("Testing database connection with SELECT 1")
         session.execute(text("SELECT 1"))
-        print("DEBUG: Database connection test successful")
         logger.info("Database connection test successful")
 
         # Log distinct status values in id_item_master for debugging
@@ -74,10 +89,10 @@ def tab3_view():
             FROM id_item_master
             WHERE status IS NOT NULL
         """
+        logger.debug(f"Executing status query: {status_query}")
         status_result = session.execute(text(status_query))
         statuses = [row[0] for row in status_result.fetchall()]
-        print(f"DEBUG: Distinct statuses in id_item_master: {statuses}")
-        logger.info(f"DEBUG: Distinct statuses in id_item_master: {statuses}")
+        logger.info(f"Distinct statuses in id_item_master: {statuses}")
 
         # Query parameters for filtering and sorting
         common_name_filter = request.args.get('common_name', '').lower()
@@ -85,6 +100,7 @@ def tab3_view():
         sort = request.args.get('sort', 'date_last_scanned_desc')
         page = int(request.args.get('page', 1))
         per_page = 20
+        logger.debug(f"Query parameters - common_name_filter: {common_name_filter}, date_filter: {date_filter}, sort: {sort}, page: {page}, per_page: {per_page}")
 
         # Simplified query with direct IN clause for status matching
         sql_query = """
@@ -103,7 +119,6 @@ def tab3_view():
                 sql_query += " AND DATE(date_last_scanned) = :date_filter"
                 params['date_filter'] = date
             except ValueError:
-                print(f"DEBUG: Invalid date format for date_last_scanned filter: {date_filter}")
                 logger.warning(f"Invalid date format for date_last_scanned filter: {date_filter}")
 
         # Apply sorting
@@ -117,12 +132,10 @@ def tab3_view():
         params['limit'] = per_page
         params['offset'] = (page - 1) * per_page
 
-        print(f"DEBUG: Executing raw SQL query: {sql_query} with params: {params}")
-        logger.info(f"DEBUG: Executing raw SQL query: {sql_query} with params: {params}")
+        logger.debug(f"Executing raw SQL query: {sql_query} with params: {params}")
         result = session.execute(text(sql_query), params)
         rows = result.fetchall()
-        print(f"DEBUG: Raw query returned {len(rows)} rows")
-        logger.info(f"DEBUG: Raw query returned {len(rows)} rows")
+        logger.info(f"Raw query returned {len(rows)} rows")
 
         # Log the raw rows for debugging
         raw_data = [
@@ -138,8 +151,7 @@ def tab3_view():
             }
             for row in rows
         ]
-        print(f"DEBUG: Raw rows: {raw_data}")
-        logger.info(f"DEBUG: Raw rows: {raw_data}")
+        logger.info(f"Raw rows: {raw_data}")
 
         items_in_service = [
             {
@@ -154,8 +166,7 @@ def tab3_view():
             }
             for row in rows
         ]
-        print(f"DEBUG: Processed {len(items_in_service)} items: {[item['tag_id'] + ': ' + item['status'] for item in items_in_service]}")
-        logger.info(f"DEBUG: Processed {len(items_in_service)} items: {[item['tag_id'] + ': ' + item['status'] for item in items_in_service]}")
+        logger.info(f"Processed {len(items_in_service)} items: {[item['tag_id'] + ': ' + item['status'] for item in items_in_service]}")
 
         # Fetch total count for pagination
         count_query = """
@@ -176,14 +187,15 @@ def tab3_view():
             except ValueError:
                 pass
 
+        logger.debug(f"Executing count query: {count_query} with params: {count_params}")
         total_items = session.execute(text(count_query), count_params).scalar()
-        print(f"DEBUG: Total items matching query: {total_items}")
-        logger.info(f"DEBUG: Total items matching query: {total_items}")
+        logger.info(f"Total items matching query: {total_items}")
 
         # Fetch repair details and additional transaction fields
         tag_ids = [item['tag_id'] for item in items_in_service]
         transaction_data = {}
         if tag_ids:
+            logger.debug(f"Fetching transactions for {len(tag_ids)} tag_ids")
             max_scan_date_subquery = session.query(
                 Transaction.tag_id,
                 func.max(Transaction.scan_date).label('max_scan_date')
@@ -219,8 +231,7 @@ def tab3_view():
                 (Transaction.scan_date == max_scan_date_subquery.c.max_scan_date)
             ).all()
 
-            print(f"DEBUG: Fetched {len(transactions)} transactions for {len(tag_ids)} tag_ids")
-            logger.info(f"DEBUG: Fetched {len(transactions)} transactions for {len(tag_ids)} tag_ids")
+            logger.info(f"Fetched {len(transactions)} transactions for {len(tag_ids)} tag_ids")
 
             for t in transactions:
                 repair_types = []
@@ -260,8 +271,7 @@ def tab3_view():
                     'latitude': float(t.latitude) if t.latitude is not None else None,
                     'last_transaction_scan_date': t.scan_date.strftime('%Y-%m-%d %H:%M:%S') if t.scan_date else 'N/A'
                 }
-                print(f"DEBUG: Transaction data for tag_id {t.tag_id}: {transaction_data[t.tag_id]}")
-                logger.info(f"DEBUG: Transaction data for tag_id {t.tag_id}: {transaction_data[t.tag_id]}")
+                logger.debug(f"Transaction data for tag_id {t.tag_id}: {transaction_data[t.tag_id]}")
 
         # Group items by common_name and status
         items_by_common_name = {}
@@ -349,13 +359,12 @@ def tab3_view():
                 'total_items': sum(len(statuses[s]) for s in statuses)
             })
 
-        print(f"DEBUG: Final common_name_groups structure: {[{'common_name': c['common_name'], 'total_items': c['total_items'], 'status_groups': [{s['status']: s['total_items']} for s in c['status_groups']]} for c in common_name_groups]}")
-        logger.info(f"DEBUG: Final common_name_groups structure: {[{'common_name': c['common_name'], 'total_items': c['total_items'], 'status_groups': [{s['status']: s['total_items']} for s in c['status_groups']]} for c in common_name_groups]}")
-        print(f"DEBUG: Total items fetched: {sum(c['total_items'] for c in common_name_groups)}")
-        logger.info(f"DEBUG: Total items fetched: {sum(c['total_items'] for c in common_name_groups)}")
+        logger.info(f"Final common_name_groups structure: {[{'common_name': c['common_name'], 'total_items': c['total_items'], 'status_groups': [{s['status']: s['total_items']} for s in c['status_groups']]} for c in common_name_groups]}")
+        logger.info(f"Total items fetched: {sum(c['total_items'] for c in common_name_groups)}")
 
         session.commit()
         session.close()
+        logger.debug("Rendering tab3.html with common_name_groups")
         return render_template(
             'tab3.html',
             common_name_groups=common_name_groups,
@@ -365,12 +374,12 @@ def tab3_view():
             cache_bust=int(datetime.now().timestamp())
         )
     except Exception as e:
-        print(f"DEBUG: Error rendering Tab 3: {str(e)}")
-        logger.error(f"DEBUG: Error rendering Tab 3: {str(e)}", exc_info=True)
-        current_app.logger.error(f"DEBUG: Error rendering Tab 3: {str(e)}", exc_info=True)
+        logger.error(f"Error rendering Tab 3: {str(e)}", exc_info=True)
+        current_app.logger.error(f"Error rendering Tab 3: {str(e)}", exc_info=True)
         if session:
             session.rollback()
             session.close()
+        logger.debug("Rendering tab3.html with empty common_name_groups due to error")
         return render_template(
             'tab3.html',
             common_name_groups=[],
@@ -384,9 +393,9 @@ def tab3_view():
 def get_csv_contents():
     """Fetch the contents of rfid_tags.csv for display in the UI."""
     try:
+        logger.debug("Entering /tab/3/csv_contents endpoint")
         if not os.path.exists(CSV_FILE_PATH):
-            print("DEBUG: CSV file does not exist")
-            logger.info("DEBUG: CSV file does not exist")
+            logger.info("CSV file does not exist")
             return jsonify({'items': [], 'count': 0}), 200
 
         items = []
@@ -394,8 +403,7 @@ def get_csv_contents():
             reader = csv.DictReader(csvfile)
             required_fields = ['tag_id', 'common_name', 'subcategory', 'short_common_name', 'status', 'bin_location']
             if not all(field in reader.fieldnames for field in required_fields):
-                print("DEBUG: CSV file missing required fields")
-                logger.warning("DEBUG: CSV file missing required fields")
+                logger.warning("CSV file missing required fields")
                 return jsonify({'error': 'CSV file missing required fields'}), 400
 
             for row in reader:
@@ -408,12 +416,10 @@ def get_csv_contents():
                     'bin_location': row['bin_location']
                 })
 
-        print(f"DEBUG: Fetched {len(items)} items from CSV")
-        logger.info(f"DEBUG: Fetched {len(items)} items from CSV")
+        logger.info(f"Fetched {len(items)} items from CSV")
         return jsonify({'items': items, 'count': len(items)}), 200
     except Exception as e:
-        print(f"DEBUG: Error reading CSV file: {str(e)}")
-        logger.error(f"DEBUG: Error reading CSV file: {str(e)}", exc_info=True)
+        logger.error(f"Error reading CSV file: {str(e)}", exc_info=True)
         return jsonify({'error': f"Error reading CSV file: {str(e)}"}), 500
 
 @tab3_bp.route('/tab/3/remove_csv_item', methods=['POST'])
@@ -421,23 +427,21 @@ def remove_csv_item():
     """Remove a specific item from rfid_tags.csv based on tag_id."""
     lock_file = None
     try:
+        logger.debug("Entering /tab/3/remove_csv_item endpoint")
         # Acquire lock to prevent concurrent CSV modifications
         lock_file = open(LOCK_FILE_PATH, 'w')
         fcntl.flock(lock_file, fcntl.LOCK_EX)
-        print("DEBUG: Acquired lock for remove_csv_item")
-        logger.info("DEBUG: Acquired lock for remove_csv_item")
+        logger.debug("Acquired lock for remove_csv_item")
 
         data = request.get_json()
         tag_id = data.get('tag_id')
 
         if not tag_id:
-            print("DEBUG: tag_id is required")
-            logger.warning("DEBUG: tag_id is required")
+            logger.warning("tag_id is required")
             return jsonify({'error': 'tag_id is required'}), 400
 
         if not os.path.exists(CSV_FILE_PATH):
-            print("DEBUG: CSV file does not exist")
-            logger.info("DEBUG: CSV file does not exist")
+            logger.info("CSV file does not exist")
             return jsonify({'error': 'CSV file does not exist'}), 404
 
         # Read existing items
@@ -456,19 +460,16 @@ def remove_csv_item():
             for item in items:
                 writer.writerow(item)
 
-        print(f"DEBUG: Removed item with tag_id {tag_id} from CSV")
-        logger.info(f"DEBUG: Removed item with tag_id {tag_id} from CSV")
+        logger.info(f"Removed item with tag_id {tag_id} from CSV")
         return jsonify({'message': f"Removed item with tag_id {tag_id}"}), 200
     except Exception as e:
-        print(f"DEBUG: Error removing item from CSV: {str(e)}")
-        logger.error(f"DEBUG: Error removing item from CSV: {str(e)}", exc_info=True)
+        logger.error(f"Error removing item from CSV: {str(e)}", exc_info=True)
         return jsonify({'error': f"Error removing item from CSV: {str(e)}"}), 500
     finally:
         if lock_file:
             fcntl.flock(lock_file, fcntl.LOCK_UN)
             lock_file.close()
-            print("DEBUG: Released lock for remove_csv_item")
-            logger.info("DEBUG: Released lock for remove_csv_item")
+            logger.debug("Released lock for remove_csv_item")
 
 @tab3_bp.route('/tab/3/sync_to_pc', methods=['POST'])
 def sync_to_pc():
@@ -481,51 +482,43 @@ def sync_to_pc():
     session = None
     lock_file = None
     try:
+        logger.debug("Entering /tab/3/sync_to_pc endpoint")
         session = db.session()
-        print("DEBUG: Entering /tab/3/sync_to_pc route")
-        logger.info("DEBUG: Entering /tab/3/sync_to_pc route")
+        logger.info("Entering /tab/3/sync_to_pc route")
 
         # Acquire lock to prevent concurrent CSV modifications
         lock_file = open(LOCK_FILE_PATH, 'w')
         try:
             fcntl.flock(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            print("DEBUG: Acquired lock for sync_to_pc")
-            logger.info("DEBUG: Acquired lock for sync_to_pc")
+            logger.debug("Acquired lock for sync_to_pc")
         except BlockingIOError:
-            print("DEBUG: Another sync_to_pc operation is in progress")
-            logger.warning("DEBUG: Another sync_to_pc operation is in progress")
+            logger.warning("Another sync_to_pc operation is in progress")
             return jsonify({'error': 'Another sync operation is in progress'}), 429
 
         data = request.get_json()
-        print(f"DEBUG: Received request data: {data}")
-        logger.info(f"DEBUG: Received request data: {data}")
+        logger.debug(f"Received request data: {data}")
 
         common_name = data.get('common_name')
         quantity = data.get('quantity')
 
-        print(f"DEBUG: Sync request: common_name={common_name}, quantity={quantity}")
-        logger.info(f"DEBUG: Sync request: common_name={common_name}, quantity={quantity}")
+        logger.info(f"Sync request: common_name={common_name}, quantity={quantity}")
 
         # Validate input
         if not common_name or not isinstance(quantity, int) or quantity <= 0:
-            print(f"DEBUG: Invalid input: common_name={common_name}, quantity={quantity}")
-            logger.warning(f"DEBUG: Invalid input: common_name={common_name}, quantity={quantity}")
+            logger.warning(f"Invalid input: common_name={common_name}, quantity={quantity}")
             return jsonify({'error': 'Invalid common name or quantity'}), 400
 
         # Ensure shared directory is writable
         if not os.path.exists(SHARED_DIR):
-            print(f"DEBUG: Creating shared directory: {SHARED_DIR}")
-            logger.info(f"DEBUG: Creating shared directory: {SHARED_DIR}")
+            logger.info(f"Creating shared directory: {SHARED_DIR}")
             os.makedirs(SHARED_DIR, mode=0o770)
             os.chown(SHARED_DIR, pwd.getpwnam('tim').pw_uid, grp.getgrnam('tim').gr_gid)
         if not os.access(SHARED_DIR, os.W_OK):
-            print(f"DEBUG: Shared directory {SHARED_DIR} is not writable")
-            logger.error(f"DEBUG: Shared directory {SHARED_DIR} is not writable")
+            logger.error(f"Shared directory {SHARED_DIR} is not writable")
             return jsonify({'error': f"Shared directory {SHARED_DIR} is not writable"}), 500
 
         # Read existing tag_ids from CSV and remove duplicates
-        print("DEBUG: Reading existing tag_ids from CSV")
-        logger.info("DEBUG: Reading existing tag_ids from CSV")
+        logger.debug("Reading existing tag_ids from CSV")
         csv_tag_ids = set()
         existing_items = []
         needs_header = not os.path.exists(CSV_FILE_PATH)
@@ -540,8 +533,7 @@ def sync_to_pc():
                         reader = csv.DictReader(csvfile)
                         required_fields = ['tag_id', 'common_name', 'subcategory', 'short_common_name', 'status', 'bin_location']
                         if not all(field in reader.fieldnames for field in required_fields):
-                            print("DEBUG: CSV file exists but lacks valid headers. Rewriting with headers.")
-                            logger.warning("DEBUG: CSV file exists but lacks valid headers. Rewriting with headers.")
+                            logger.warning("CSV file exists but lacks valid headers. Rewriting with headers.")
                             needs_header = True
                         else:
                             for row in reader:
@@ -549,20 +541,17 @@ def sync_to_pc():
                                     csv_tag_ids.add(row['tag_id'])
                                     existing_items.append(row)
             except Exception as e:
-                print(f"DEBUG: Error reading existing CSV file: {str(e)}")
-                logger.error(f"DEBUG: Error reading existing CSV file: {str(e)}", exc_info=True)
+                logger.error(f"Error reading existing CSV file: {str(e)}", exc_info=True)
                 return jsonify({'error': f"Failed to read existing CSV file: {str(e)}"}), 500
 
-        print(f"DEBUG: Found {len(csv_tag_ids)} unique tag_ids in CSV before sync")
-        logger.info(f"DEBUG: Found {len(csv_tag_ids)} unique tag_ids in CSV before sync")
+        logger.info(f"Found {len(csv_tag_ids)} unique tag_ids in CSV before sync")
 
         # Initialize synced items and tracking set
         synced_items = []
         existing_tag_ids = csv_tag_ids.copy()
 
         # Step 1: Query ItemMaster for existing items
-        print("DEBUG: Querying ItemMaster for existing items")
-        logger.info("DEBUG: Querying ItemMaster for existing items")
+        logger.debug("Querying ItemMaster for existing items")
         try:
             # Get 'Sold' items first, up to quantity
             sold_items = session.query(ItemMaster)\
@@ -571,15 +560,13 @@ def sync_to_pc():
                         ItemMaster.status == 'Sold')\
                 .order_by(ItemMaster.date_updated.asc())\
                 .all()
-            print(f"DEBUG: Found {len(sold_items)} 'Sold' items in ItemMaster for common_name={common_name}")
-            logger.info(f"DEBUG: Found {len(sold_items)} 'Sold' items in ItemMaster for common_name={common_name}")
+            logger.debug(f"Found {len(sold_items)} 'Sold' items in ItemMaster for common_name={common_name}")
 
             for item in sold_items:
                 if len(synced_items) >= quantity:
                     break
                 if item.tag_id in existing_tag_ids:
-                    print(f"DEBUG: Skipping tag_id {item.tag_id} as it’s already in use")
-                    logger.info(f"DEBUG: Skipping tag_id {item.tag_id} as it’s already in use")
+                    logger.debug(f"Skipping tag_id {item.tag_id} as it’s already in use")
                     continue
                 synced_items.append({
                     'tag_id': item.tag_id,
@@ -592,8 +579,7 @@ def sync_to_pc():
                     'is_new': False
                 })
                 existing_tag_ids.add(item.tag_id)
-                print(f"DEBUG: Added to synced_items: tag_id={item.tag_id}, common_name={item.common_name}, status={item.status}")
-                logger.info(f"DEBUG: Added to synced_items: tag_id={item.tag_id}, common_name={item.common_name}, status={item.status}")
+                logger.info(f"Added to synced_items: tag_id={item.tag_id}, common_name={item.common_name}, status={item.status}")
 
             # Get non-'Sold' items if needed, up to remaining quantity
             if len(synced_items) < quantity:
@@ -604,15 +590,13 @@ def sync_to_pc():
                             ItemMaster.status != 'Sold')\
                     .order_by(ItemMaster.status.asc())\
                     .all()
-                print(f"DEBUG: Found {len(other_items)} non-'Sold' items in ItemMaster")
-                logger.info(f"DEBUG: Found {len(other_items)} non-'Sold' items in ItemMaster")
+                logger.debug(f"Found {len(other_items)} non-'Sold' items in ItemMaster")
 
                 for item in other_items:
                     if len(synced_items) >= quantity:
                         break
                     if item.tag_id in existing_tag_ids:
-                        print(f"DEBUG: Skipping tag_id {item.tag_id} as it’s already in use")
-                        logger.info(f"DEBUG: Skipping tag_id {item.tag_id} as it’s already in use")
+                        logger.debug(f"Skipping tag_id {item.tag_id} as it’s already in use")
                         continue
                     synced_items.append({
                         'tag_id': item.tag_id,
@@ -625,62 +609,50 @@ def sync_to_pc():
                         'is_new': False
                     })
                     existing_tag_ids.add(item.tag_id)
-                    print(f"DEBUG: Added to synced_items: tag_id={item.tag_id}, common_name={item.common_name}, status={item.status}")
-                    logger.info(f"DEBUG: Added to synced_items: tag_id={item.tag_id}, common_name={item.common_name}, status={item.status}")
+                    logger.info(f"Added to synced_items: tag_id={item.tag_id}, common_name={item.common_name}, status={item.status}")
 
                 remaining_quantity = quantity - len(synced_items)
-                print(f"DEBUG: After non-Sold items, remaining_quantity={remaining_quantity}")
-                logger.info(f"DEBUG: After non-Sold items, remaining_quantity={remaining_quantity}")
+                logger.debug(f"After non-Sold items, remaining_quantity={remaining_quantity}")
         except sqlalchemy.exc.DatabaseError as e:
-            print(f"DEBUG: Database error querying ItemMaster: {str(e)}")
-            logger.error(f"DEBUG: Database error querying ItemMaster: {str(e)}", exc_info=True)
+            logger.error(f"Database error querying ItemMaster: {str(e)}", exc_info=True)
             return jsonify({'error': f"Database error querying ItemMaster: {str(e)}"}), 500
 
         # Step 2: Generate new tags if needed
         new_items = []
         if len(synced_items) < quantity:
             remaining_quantity = quantity - len(synced_items)
-            print(f"DEBUG: Generating {remaining_quantity} new items for common_name={common_name}")
-            logger.info(f"DEBUG: Generating {remaining_quantity} new items for common_name={common_name}")
+            logger.info(f"Generating {remaining_quantity} new items for common_name={common_name}")
 
             # Fetch rental_class_id and bin_location from SeedRentalClass
-            print(f"DEBUG: Querying SeedRentalClass for common_name={common_name}")
-            logger.info(f"DEBUG: Querying SeedRentalClass for common_name={common_name}")
+            logger.debug(f"Querying SeedRentalClass for common_name={common_name}")
             try:
                 seed_entry = session.query(SeedRentalClass)\
                     .filter(SeedRentalClass.common_name == common_name,
                             SeedRentalClass.bin_location.in_(['pack', 'resale']))\
                     .first()
-                print(f"DEBUG: SeedRentalClass query result: {seed_entry}")
-                logger.info(f"DEBUG: SeedRentalClass query result: {seed_entry}")
+                logger.debug(f"SeedRentalClass query result: {seed_entry}")
             except sqlalchemy.exc.DatabaseError as e:
-                print(f"DEBUG: Database error querying SeedRentalClass: {str(e)}")
-                logger.error(f"DEBUG: Database error querying SeedRentalClass: {str(e)}", exc_info=True)
+                logger.error(f"Database error querying SeedRentalClass: {str(e)}", exc_info=True)
                 return jsonify({'error': f"Database error querying SeedRentalClass: {str(e)}"}), 500
 
             if not seed_entry:
-                print(f"DEBUG: No SeedRentalClass entry found for common_name={common_name} and bin_location in ['pack', 'resale']")
-                logger.warning(f"DEBUG: No SeedRentalClass entry found for common_name={common_name} and bin_location in ['pack', 'resale']")
+                logger.warning(f"No SeedRentalClass entry found for common_name={common_name} and bin_location in ['pack', 'resale']")
                 return jsonify({'error': f"No SeedRentalClass entry found for common name '{common_name}'"}), 404
 
             rental_class_num = seed_entry.rental_class_id
             bin_location = seed_entry.bin_location
-            print(f"DEBUG: SeedRentalClass entry: rental_class_id={rental_class_num}, bin_location={bin_location}")
-            logger.info(f"DEBUG: SeedRentalClass entry: rental_class_id={rental_class_num}, bin_location={bin_location}")
+            logger.info(f"SeedRentalClass entry: rental_class_id={rental_class_num}, bin_location={bin_location}")
 
             # Generate new tag IDs
             for i in range(remaining_quantity):
-                print(f"DEBUG: Generating new tag ID {i+1}/{remaining_quantity}")
-                logger.info(f"DEBUG: Generating new tag ID {i+1}/{remaining_quantity}")
+                logger.debug(f"Generating new tag ID {i+1}/{remaining_quantity}")
                 try:
                     max_tag_id = session.query(func.max(ItemMaster.tag_id))\
                         .filter(ItemMaster.tag_id.startswith('425445'))\
                         .scalar()
-                    print(f"DEBUG: Max tag_id from ItemMaster: {max_tag_id}")
-                    logger.info(f"DEBUG: Max tag_id from ItemMaster: {max_tag_id}")
+                    logger.debug(f"Max tag_id from ItemMaster: {max_tag_id}")
                 except sqlalchemy.exc.DatabaseError as e:
-                    print(f"DEBUG: Database error querying max tag_id: {str(e)}")
-                    logger.error(f"DEBUG: Database error querying max tag_id: {str(e)}", exc_info=True)
+                    logger.error(f"Database error querying max tag_id: {str(e)}", exc_info=True)
                     return jsonify({'error': f"Database error querying max tag_id: {str(e)}"}), 500
 
                 new_num = 1
@@ -689,8 +661,7 @@ def sync_to_pc():
                         incremental_part = int(max_tag_id[6:], 16)
                         new_num = incremental_part + 1
                     except ValueError:
-                        print(f"DEBUG: Invalid incremental part in max_tag_id: {max_tag_id}, starting from 1")
-                        logger.warning(f"DEBUG: Invalid incremental part in max_tag_id: {max_tag_id}, starting from 1")
+                        logger.warning(f"Invalid incremental part in max_tag_id: {max_tag_id}, starting from 1")
 
                 # Ensure unique tag_id
                 while True:
@@ -699,12 +670,10 @@ def sync_to_pc():
                     if tag_id not in existing_tag_ids:
                         break
                     new_num += 1
-                    print(f"DEBUG: Tag ID {tag_id} already exists, incrementing to {new_num}")
-                    logger.info(f"DEBUG: Tag ID {tag_id} already exists, incrementing to {new_num}")
+                    logger.debug(f"Tag ID {tag_id} already exists, incrementing to {new_num}")
 
                 if len(tag_id) != 24:
-                    print(f"DEBUG: Generated tag_id {tag_id} is not 24 characters long (length={len(tag_id)})")
-                    logger.error(f"DEBUG: Generated tag_id {tag_id} is not 24 characters long (length={len(tag_id)})")
+                    logger.error(f"Generated tag_id {tag_id} is not 24 characters long (length={len(tag_id)})")
                     raise ValueError(f"Generated tag_id {tag_id} must be 24 characters long")
 
                 synced_items.append({
@@ -718,8 +687,7 @@ def sync_to_pc():
                     'is_new': True
                 })
                 existing_tag_ids.add(tag_id)
-                print(f"DEBUG: Added to synced_items: tag_id={tag_id}, common_name={common_name}, status=Ready to Rent")
-                logger.info(f"DEBUG: Added to synced_items: tag_id={tag_id}, common_name={common_name}, status=Ready to Rent")
+                logger.info(f"Added to synced_items: tag_id={tag_id}, common_name={common_name}, status=Ready to Rent")
 
                 new_item = ItemMaster(
                     tag_id=tag_id,
@@ -743,25 +711,20 @@ def sync_to_pc():
                 )
                 session.add(new_item)
                 new_items.append(new_item)
-                print(f"DEBUG: Created new ItemMaster entry: tag_id={tag_id}, common_name={common_name}, rental_class_num={rental_class_num}")
-                logger.info(f"DEBUG: Created new ItemMaster entry: tag_id={tag_id}, common_name={common_name}, rental_class_num={rental_class_num}")
+                logger.info(f"Created new ItemMaster entry: tag_id={tag_id}, common_name={common_name}, rental_class_num={rental_class_num}")
 
         # Ensure exactly the requested quantity before CSV write
         if len(synced_items) > quantity:
             synced_items = synced_items[:quantity]
-            print(f"DEBUG: Truncated synced_items to {quantity} items before CSV write")
-            logger.info(f"DEBUG: Truncated synced_items to {quantity} items before CSV write")
+            logger.info(f"Truncated synced_items to {quantity} items before CSV write")
         elif len(synced_items) < quantity:
-            print(f"DEBUG: Warning: Only {len(synced_items)} items synced, requested {quantity}")
-            logger.warning(f"DEBUG: Warning: Only {len(synced_items)} items synced, requested {quantity}")
+            logger.warning(f"Only {len(synced_items)} items synced, requested {quantity}")
 
         # Log final synced items for debugging
-        print(f"DEBUG: Final synced_items ({len(synced_items)}): {[item['tag_id'] for item in synced_items]}")
-        logger.info(f"DEBUG: Final synced_items ({len(synced_items)}): {[item['tag_id'] for item in synced_items]}")
+        logger.info(f"Final synced_items ({len(synced_items)}): {[item['tag_id'] for item in synced_items]}")
 
         # Fetch rental class mappings
-        print("DEBUG: Fetching rental class mappings")
-        logger.info("DEBUG: Fetching rental class mappings")
+        logger.debug("Fetching rental class mappings")
         try:
             base_mappings = session.query(RentalClassMapping).all()
             user_mappings = session.query(UserRentalClassMapping).all()
@@ -776,11 +739,9 @@ def sync_to_pc():
                     'subcategory': um.subcategory,
                     'short_common_name': um.short_common_name if hasattr(um, 'short_common_name') else None
                 }
-            print(f"DEBUG: Fetched {len(mappings_dict)} rental class mappings")
-            logger.info(f"DEBUG: Fetched {len(mappings_dict)} rental class mappings")
+            logger.info(f"Fetched {len(mappings_dict)} rental class mappings")
         except sqlalchemy.exc.DatabaseError as e:
-            print(f"DEBUG: Database error fetching rental class mappings: {str(e)}")
-            logger.error(f"DEBUG: Database error fetching rental class mappings: {str(e)}", exc_info=True)
+            logger.error(f"Database error fetching rental class mappings: {str(e)}", exc_info=True)
             return jsonify({'error': f"Database error fetching rental class mappings: {str(e)}"}), 500
 
         # Update synced_items with mapping data
@@ -788,18 +749,15 @@ def sync_to_pc():
             mapping = mappings_dict.get(str(item['rental_class_num']).strip().upper() if item['rental_class_num'] else '', {})
             item['subcategory'] = mapping.get('subcategory', 'Unknown')
             item['short_common_name'] = mapping.get('short_common_name', item['common_name'])
-            print(f"DEBUG: Updated synced_item with mappings: {item}")
-            logger.info(f"DEBUG: Updated synced_item with mappings: {item}")
+            logger.debug(f"Updated synced_item with mappings: {item}")
 
         # Write to CSV, preserving existing non-duplicate items
-        print("DEBUG: Writing to CSV file")
-        logger.info("DEBUG: Writing to CSV file")
+        logger.debug("Writing to CSV file")
         try:
             # Combine existing items (minus duplicates) with new synced items
             all_items = [item for item in existing_items if item['tag_id'] not in {i['tag_id'] for i in synced_items}]
             all_items.extend(synced_items)
-            print(f"DEBUG: Total items to write to CSV: {len(all_items)}")
-            logger.info(f"DEBUG: Total items to write to CSV: {len(all_items)}")
+            logger.info(f"Total items to write to CSV: {len(all_items)}")
 
             with open(CSV_FILE_PATH, 'w', newline='') as csvfile:
                 fieldnames = ['tag_id', 'common_name', 'subcategory', 'short_common_name', 'status', 'bin_location']
@@ -814,36 +772,28 @@ def sync_to_pc():
                         'status': item['status'],
                         'bin_location': item['bin_location']
                     })
-                    print(f"DEBUG: Wrote CSV row: {item}")
-                    logger.info(f"DEBUG: Wrote CSV row: {item}")
+                    logger.info(f"Wrote CSV row: {item}")
         except Exception as e:
-            print(f"DEBUG: Failed to write to CSV file {CSV_FILE_PATH}: {str(e)}")
-            logger.error(f"DEBUG: Failed to write to CSV file {CSV_FILE_PATH}: {str(e)}", exc_info=True)
+            logger.error(f"Failed to write to CSV file {CSV_FILE_PATH}: {str(e)}", exc_info=True)
             return jsonify({'error': f"Failed to write to CSV file: {str(e)}"}), 500
 
         # Commit new ItemMaster entries
         if new_items:
-            print("DEBUG: Committing session after CSV write")
-            logger.info("DEBUG: Committing session after CSV write")
+            logger.debug("Committing session after CSV write")
             try:
                 session.flush()
-                print(f"DEBUG: Session flushed successfully after CSV write")
-                logger.info(f"DEBUG: Session flushed successfully after CSV write")
+                logger.info("Session flushed successfully after CSV write")
                 session.commit()
-                print(f"DEBUG: Successfully committed {len(new_items)} new ItemMaster entries")
-                logger.info(f"DEBUG: Successfully committed {len(new_items)} new ItemMaster entries")
+                logger.info(f"Successfully committed {len(new_items)} new ItemMaster entries")
             except sqlalchemy.exc.DatabaseError as e:
-                print(f"DEBUG: Database error committing session: {str(e)}")
-                logger.error(f"DEBUG: Database error committing session: {str(e)}", exc_info=True)
+                logger.error(f"Database error committing session: {str(e)}", exc_info=True)
                 session.rollback()
                 return jsonify({'error': f"Database error committing session: {str(e)}"}), 500
 
-        print(f"DEBUG: Successfully synced {len(synced_items)} items to CSV")
-        logger.info(f"DEBUG: Successfully synced {len(synced_items)} items to CSV")
+        logger.info(f"Successfully synced {len(synced_items)} items to CSV")
         return jsonify({'synced_items': len(synced_items)}), 200
     except Exception as e:
-        print(f"DEBUG: Uncaught exception in sync_to_pc: {str(e)}")
-        logger.error(f"DEBUG: Error in sync_to_pc: {str(e)}", exc_info=True)
+        logger.error(f"Uncaught exception in sync_to_pc: {str(e)}", exc_info=True)
         if session:
             session.rollback()
         return jsonify({'error': str(e)}), 500
@@ -851,12 +801,10 @@ def sync_to_pc():
         if lock_file:
             fcntl.flock(lock_file, fcntl.LOCK_UN)
             lock_file.close()
-            print("DEBUG: Released lock for sync_to_pc")
-            logger.info("DEBUG: Released lock for sync_to_pc")
+            logger.debug("Released lock for sync_to_pc")
         if session:
             session.close()
-            print("DEBUG: Session closed")
-            logger.info("DEBUG: Session closed")
+            logger.debug("Session closed")
 
 @tab3_bp.route('/tab/3/update_synced_status', methods=['POST'])
 def update_synced_status():
@@ -868,33 +816,28 @@ def update_synced_status():
     session = None
     lock_file = None
     try:
+        logger.debug("Entering /tab/3/update_synced_status endpoint")
         session = db.session()
-        print("DEBUG: Entering /tab/3/update_synced_status route")
-        logger.info("DEBUG: Received request for /tab/3/update_synced_status")
+        logger.info("Received request for /tab/3/update_synced_status")
 
         # Acquire lock to prevent concurrent CSV modifications
         lock_file = open(LOCK_FILE_PATH, 'w')
         try:
             fcntl.flock(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            print("DEBUG: Acquired lock for update_synced_status")
-            logger.info("DEBUG: Acquired lock for update_synced_status")
+            logger.debug("Acquired lock for update_synced_status")
         except BlockingIOError:
-            print("DEBUG: Another update_synced_status operation is in progress")
-            logger.warning("DEBUG: Another update_synced_status operation is in progress")
+            logger.warning("Another update_synced_status operation is in progress")
             return jsonify({'error': 'Another update operation is in progress'}), 429
 
         if not os.path.exists(CSV_FILE_PATH):
-            print("DEBUG: No synced items found in CSV file")
-            logger.info("DEBUG: No synced items found in CSV file")
+            logger.info("No synced items found in CSV file")
             return jsonify({'error': 'No synced items found'}), 404
 
         if os.path.getsize(CSV_FILE_PATH) == 0:
-            print("DEBUG: CSV file is empty")
-            logger.info("DEBUG: CSV file is empty")
+            logger.info("CSV file is empty")
             return jsonify({'error': 'No items found in CSV file'}), 404
 
-        print("DEBUG: Reading items from CSV file")
-        logger.info("DEBUG: Reading items from CSV file")
+        logger.debug("Reading items from CSV file")
         items_to_update = []
         try:
             with open(CSV_FILE_PATH, 'r') as csvfile:
@@ -902,8 +845,7 @@ def update_synced_status():
                 required_fields = ['tag_id', 'common_name', 'bin_location', 'status']
                 if not all(field in reader.fieldnames for field in required_fields):
                     missing = [field for field in required_fields if field not in reader.fieldnames]
-                    print(f"DEBUG: CSV file missing required fields: {missing}")
-                    logger.error(f"DEBUG: CSV file missing required fields: {missing}")
+                    logger.error(f"CSV file missing required fields: {missing}")
                     return jsonify({'error': f"CSV file missing required fields: {missing}"}), 400
 
                 for row in reader:
@@ -914,28 +856,22 @@ def update_synced_status():
                             'bin_location': row['bin_location'],
                             'status': row['status']
                         })
-                        print(f"DEBUG: Read CSV row: {row}")
-                        logger.info(f"DEBUG: Read CSV row: {row}")
+                        logger.debug(f"Read CSV row: {row}")
                     except KeyError as ke:
-                        print(f"DEBUG: Missing required field in CSV row: {ke}, row: {row}")
-                        logger.error(f"DEBUG: Missing required field in CSV row: {ke}, row: {row}")
+                        logger.error(f"Missing required field in CSV row: {ke}, row: {row}")
                         return jsonify({'error': f"Missing required field in CSV row: {ke}"}), 400
         except Exception as e:
-            print(f"DEBUG: Error reading CSV file: {str(e)}")
-            logger.error(f"DEBUG: Error reading CSV file: {str(e)}", exc_info=True)
+            logger.error(f"Error reading CSV file: {str(e)}", exc_info=True)
             return jsonify({'error': f"Error reading CSV file: {str(e)}"}), 500
 
         if not items_to_update:
-            print("DEBUG: No items found in CSV file to update")
-            logger.info("DEBUG: No items found in CSV file to update")
+            logger.info("No items found in CSV file to update")
             return jsonify({'error': 'No items found in CSV file'}), 404
 
         tag_ids = [item['tag_id'] for item in items_to_update]
-        print(f"DEBUG: Found {len(tag_ids)} items to update: {tag_ids}")
-        logger.info(f"DEBUG: Found {len(tag_ids)} items to update: {tag_ids}")
+        logger.info(f"Found {len(tag_ids)} items to update: {tag_ids}")
 
-        print("DEBUG: Fetching rental_class_num from ItemMaster")
-        logger.info("DEBUG: Fetching rental_class_num from ItemMaster")
+        logger.debug("Fetching rental_class_num from ItemMaster")
         try:
             items_in_db = session.query(ItemMaster.tag_id, ItemMaster.rental_class_num, ItemMaster.common_name, ItemMaster.bin_location)\
                 .filter(ItemMaster.tag_id.in_(tag_ids))\
@@ -945,28 +881,22 @@ def update_synced_status():
                 'common_name': item.common_name,
                 'bin_location': item.bin_location
             } for item in items_in_db}
-            print(f"DEBUG: Fetched {len(item_dict)} items from ItemMaster for tag_ids: {list(item_dict.keys())}")
-            logger.info(f"DEBUG: Fetched {len(item_dict)} items from ItemMaster for tag_ids: {list(item_dict.keys())}")
+            logger.debug(f"Fetched {len(item_dict)} items from ItemMaster for tag_ids: {list(item_dict.keys())}")
         except sqlalchemy.exc.DatabaseError as e:
-            print(f"DEBUG: Database error querying ItemMaster for tag_ids: {str(e)}")
-            logger.error(f"DEBUG: Database error querying ItemMaster for tag_ids: {str(e)}", exc_info=True)
+            logger.error(f"Database error querying ItemMaster for tag_ids: {str(e)}", exc_info=True)
             return jsonify({'error': f"Database error querying ItemMaster: {str(e)}"}), 500
 
-        print("DEBUG: Updating ItemMaster status to 'Ready to Rent'")
-        logger.info("DEBUG: Updating ItemMaster status to 'Ready to Rent'")
+        logger.debug("Updating ItemMaster status to 'Ready to Rent'")
         try:
             updated_items = ItemMaster.query\
                 .filter(ItemMaster.tag_id.in_(tag_ids))\
                 .update({ItemMaster.status: 'Ready to Rent'}, synchronize_session='fetch')
-            print(f"DEBUG: Updated {updated_items} items in ItemMaster to 'Ready to Rent'")
-            logger.info(f"DEBUG: Updated {updated_items} items in ItemMaster to 'Ready to Rent'")
+            logger.info(f"Updated {updated_items} items in ItemMaster to 'Ready to Rent'")
         except sqlalchemy.exc.DatabaseError as e:
-            print(f"DEBUG: Database error updating ItemMaster status: {str(e)}")
-            logger.error(f"DEBUG: Database error updating ItemMaster status: {str(e)}", exc_info=True)
+            logger.error(f"Database error updating ItemMaster status: {str(e)}", exc_info=True)
             return jsonify({'error': f"Database error updating ItemMaster: {str(e)}"}), 500
 
-        print("DEBUG: Updating items via API")
-        logger.info("DEBUG: Updating items via API")
+        logger.debug("Updating items via API")
         api_client = APIClient()
 
         # Retry decorator for API calls with exponential backoff
@@ -982,18 +912,15 @@ def update_synced_status():
         for item in items_to_update:
             tag_id = item['tag_id']
             db_item = item_dict.get(tag_id, {})
-            print(f"DEBUG: Processing tag_id {tag_id}: db_item={db_item}")
-            logger.info(f"DEBUG: Processing tag_id {tag_id}: db_item={db_item}")
+            logger.debug(f"Processing tag_id {tag_id}: db_item={db_item}")
             try:
                 params = {'filter[eq]': f"tag_id,eq,'{tag_id}'"}
                 headers = api_client.get_headers()
                 existing_items = make_api_request("14223767938169344381", params, headers)
-                print(f"DEBUG: API check for tag_id {tag_id}: found {len(existing_items)} items")
-                logger.info(f"DEBUG: API check for tag_id {tag_id}: found {len(existing_items)} items")
+                logger.debug(f"API check for tag_id {tag_id}: found {len(existing_items)} items")
                 if existing_items:
                     api_client.update_status(tag_id, 'Ready to Rent')
-                    print(f"DEBUG: Updated existing tag_id {tag_id} via API PATCH")
-                    logger.info(f"DEBUG: Updated existing tag_id {tag_id} via API PATCH")
+                    logger.info(f"Updated existing tag_id {tag_id} via API PATCH")
                 else:
                     new_item = {
                         'tag_id': tag_id,
@@ -1004,47 +931,37 @@ def update_synced_status():
                         'rental_class_num': db_item.get('rental_class_num', '')
                     }
                     api_client.insert_item(new_item)
-                    print(f"DEBUG: Inserted new tag_id {tag_id} via API POST with data: {new_item}")
-                    logger.info(f"DEBUG: Inserted new tag_id {tag_id} via API POST with data: {new_item}")
+                    logger.info(f"Inserted new tag_id {tag_id} via API POST with data: {new_item}")
             except Exception as api_error:
-                print(f"DEBUG: Error updating/inserting tag_id {tag_id} in API: {str(api_error)}")
-                logger.error(f"DEBUG: Error updating/inserting tag_id {tag_id} in API: {str(api_error)}", exc_info=True)
+                logger.error(f"Error updating/inserting tag_id {tag_id} in API: {str(api_error)}", exc_info=True)
                 failed_items.append(tag_id)
 
         if failed_items:
-            print(f"DEBUG: Failed to update {len(failed_items)} items in API: {failed_items}")
-            logger.warning(f"DEBUG: Failed to update {len(failed_items)} items in API: {failed_items}")
+            logger.warning(f"Failed to update {len(failed_items)} items in API: {failed_items}")
             return jsonify({'error': f"Failed to update {len(failed_items)} items in API", 'failed_items': failed_items}), 500
 
-        print("DEBUG: Clearing CSV file")
-        logger.info("DEBUG: Clearing CSV file")
+        logger.debug("Clearing CSV file")
         try:
             with open(CSV_FILE_PATH, 'w', newline='') as csvfile:
                 fieldnames = ['tag_id', 'common_name', 'subcategory', 'short_common_name', 'status', 'bin_location']
                 writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
                 writer.writeheader()
-            print("DEBUG: Cleared CSV file")
-            logger.info("DEBUG: Cleared CSV file")
+            logger.info("Cleared CSV file")
         except Exception as e:
-            print(f"DEBUG: Error clearing CSV file: {str(e)}")
-            logger.error(f"DEBUG: Error clearing CSV file: {str(e)}", exc_info=True)
+            logger.error(f"Error clearing CSV file: {str(e)}", exc_info=True)
             return jsonify({'error': f"Error clearing CSV file: {str(e)}"}), 500
 
-        print("DEBUG: Committing session after API updates")
-        logger.info("DEBUG: Committing session after API updates")
+        logger.debug("Committing session after API updates")
         try:
             session.commit()
         except sqlalchemy.exc.DatabaseError as e:
-            print(f"DEBUG: Database error committing session: {str(e)}")
-            logger.error(f"DEBUG: Database error committing session: {str(e)}", exc_info=True)
+            logger.error(f"Database error committing session: {str(e)}", exc_info=True)
             return jsonify({'error': f"Database error committing session: {str(e)}"}), 500
 
-        print(f"DEBUG: Updated status for {updated_items} items and cleared CSV file")
-        logger.info(f"DEBUG: Updated status for {updated_items} items and cleared CSV file")
+        logger.info(f"Updated status for {updated_items} items and cleared CSV file")
         return jsonify({'updated_items': updated_items}), 200
     except Exception as e:
-        print(f"DEBUG: Uncaught exception in update_synced_status: {str(e)}")
-        logger.error(f"DEBUG: Error in update_synced_status: {str(e)}", exc_info=True)
+        logger.error(f"Uncaught exception in update_synced_status: {str(e)}", exc_info=True)
         if session:
             session.rollback()
         return jsonify({'error': str(e)}), 500
@@ -1052,82 +969,68 @@ def update_synced_status():
         if lock_file:
             fcntl.flock(lock_file, fcntl.LOCK_UN)
             lock_file.close()
-            print("DEBUG: Released lock for update_synced_status")
-            logger.info("DEBUG: Released lock for update_synced_status")
+            logger.debug("Released lock for update_synced_status")
         if session:
             session.close()
-            print("DEBUG: Session closed")
-            logger.info("DEBUG: Session closed")
+            logger.debug("Session closed")
 
 @tab3_bp.route('/tab/3/update_status', methods=['POST'])
 def update_status():
     """Update an item's status in ItemMaster and sync to API."""
     session = None
     try:
+        logger.debug("Entering /tab/3/update_status endpoint")
         session = db.session()
-        print("DEBUG: Entering /tab/3/update_status route")
-        logger.info("DEBUG: Entering /tab/3/update_status route")
+        logger.info("Entering /tab/3/update_status route")
         data = request.get_json()
         tag_id = data.get('tag_id')
         new_status = data.get('status')
 
         if not tag_id or not new_status:
-            print(f"DEBUG: Invalid input in update_status: tag_id={tag_id}, new_status={new_status}")
-            logger.warning(f"DEBUG: Invalid input in update_status: tag_id={tag_id}, new_status={new_status}")
+            logger.warning(f"Invalid input in update_status: tag_id={tag_id}, new_status={new_status}")
             return jsonify({'error': 'Tag ID and status are required'}), 400
 
         valid_statuses = ['Ready to Rent', 'Sold', 'Repair', 'Needs to be Inspected', 'Staged', 'Wash', 'Wet']
         if new_status not in valid_statuses:
-            print(f"DEBUG: Invalid status value: {new_status}")
-            logger.warning(f"DEBUG: Invalid status value: {new_status}")
+            logger.warning(f"Invalid status value: {new_status}")
             return jsonify({'error': f'Status must be one of {", ".join(valid_statuses)}'}), 400
 
-        print(f"DEBUG: Querying ItemMaster for tag_id={tag_id}")
-        logger.info(f"DEBUG: Querying ItemMaster for tag_id={tag_id}")
+        logger.debug(f"Querying ItemMaster for tag_id={tag_id}")
         item = session.query(ItemMaster).filter_by(tag_id=tag_id).first()
         if not item:
             session.close()
-            print(f"DEBUG: Item not found for tag_id {tag_id}")
-            logger.info(f"DEBUG: Item not found for tag_id {tag_id}")
+            logger.info(f"Item not found for tag_id {tag_id}")
             return jsonify({'error': 'Item not found'}), 404
 
         if new_status in ['On Rent', 'Delivered']:
             session.close()
-            print(f"DEBUG: Attempted manual update to restricted status {new_status} for tag_id {tag_id}")
-            logger.warning(f"DEBUG: Attempted manual update to restricted status {new_status} for tag_id {tag_id}")
+            logger.warning(f"Attempted manual update to restricted status {new_status} for tag_id {tag_id}")
             return jsonify({'error': 'Status cannot be updated to "On Rent" or "Delivered" manually'}), 400
 
-        print(f"DEBUG: Updating ItemMaster status for tag_id={tag_id} to {new_status}")
-        logger.info(f"DEBUG: Updating ItemMaster status for tag_id={tag_id} to {new_status}")
+        logger.debug(f"Updating ItemMaster status for tag_id={tag_id} to {new_status}")
         current_time = datetime.now()
         item.status = new_status
         item.date_last_scanned = current_time
         try:
             session.commit()
         except sqlalchemy.exc.DatabaseError as e:
-            print(f"DEBUG: Database error updating ItemMaster status: {str(e)}")
-            logger.error(f"DEBUG: Database error updating ItemMaster status: {str(e)}", exc_info=True)
+            logger.error(f"Database error updating ItemMaster status: {str(e)}", exc_info=True)
             session.rollback()
             return jsonify({'error': f"Database error updating status: {str(e)}"}), 500
 
-        print(f"DEBUG: Updating external API for tag_id={tag_id}")
-        logger.info(f"DEBUG: Updating external API for tag_id={tag_id}")
+        logger.debug(f"Updating external API for tag_id={tag_id}")
         try:
             api_client = APIClient()
             api_client.update_status(tag_id, new_status)
-            print(f"DEBUG: Successfully updated API status for tag_id {tag_id}")
-            logger.info(f"DEBUG: Successfully updated API status for tag_id {tag_id}")
+            logger.info(f"Successfully updated API status for tag_id {tag_id}")
         except Exception as e:
-            print(f"DEBUG: Failed to update API status for tag_id {tag_id}: {str(e)}")
-            logger.error(f"DEBUG: Failed to update API status for tag_id {tag_id}: {str(e)}", exc_info=True)
+            logger.error(f"Failed to update API status for tag_id {tag_id}: {str(e)}", exc_info=True)
 
         session.close()
-        print(f"DEBUG: Updated status for tag_id {tag_id} to {new_status} and date_last_scanned to {current_time}")
-        logger.info(f"DEBUG: Updated status for tag_id {tag_id} to {new_status} and date_last_scanned to {current_time}")
+        logger.info(f"Updated status for tag_id {tag_id} to {new_status} and date_last_scanned to {current_time}")
         return jsonify({'message': 'Status updated successfully'})
     except Exception as e:
-        print(f"DEBUG: Uncaught exception in update_status: {str(e)}")
-        logger.error(f"DEBUG: Error updating status for tag {tag_id}: {str(e)}", exc_info=True)
+        logger.error(f"Uncaught exception in update_status: {str(e)}", exc_info=True)
         if session:
             session.rollback()
             session.close()
@@ -1138,58 +1041,48 @@ def update_notes():
     """Update an item's notes in ItemMaster and sync to API."""
     session = None
     try:
+        logger.debug("Entering /tab/3/update_notes endpoint")
         session = db.session()
-        print("DEBUG: Entering /tab/3/update_notes route")
-        logger.info("DEBUG: Entering /tab/3/update_notes route")
+        logger.info("Entering /tab/3/update_notes route")
         data = request.get_json()
         tag_id = data.get('tag_id')
         new_notes = data.get('notes')
 
         if not tag_id:
-            print(f"DEBUG: Invalid input in update_notes: tag_id={tag_id}")
-            logger.warning(f"DEBUG: Invalid input in update_notes: tag_id={tag_id}")
+            logger.warning(f"Invalid input in update_notes: tag_id={tag_id}")
             return jsonify({'error': 'Tag ID is required'}), 400
 
-        print(f"DEBUG: Querying ItemMaster for tag_id={tag_id}")
-        logger.info(f"DEBUG: Querying ItemMaster for tag_id={tag_id}")
+        logger.debug(f"Querying ItemMaster for tag_id={tag_id}")
         item = session.query(ItemMaster).filter_by(tag_id=tag_id).first()
         if not item:
             session.close()
-            print(f"DEBUG: Item not found for tag_id {tag_id}")
-            logger.info(f"DEBUG: Item not found for tag_id {tag_id}")
+            logger.info(f"Item not found for tag_id {tag_id}")
             return jsonify({'error': 'Item not found'}), 404
 
-        print(f"DEBUG: Updating ItemMaster notes for tag_id={tag_id}")
-        logger.info(f"DEBUG: Updating ItemMaster notes for tag_id={tag_id}")
+        logger.debug(f"Updating ItemMaster notes for tag_id={tag_id}")
         current_time = datetime.now()
         item.notes = new_notes if new_notes else None
         item.date_updated = current_time
         try:
             session.commit()
         except sqlalchemy.exc.DatabaseError as e:
-            print(f"DEBUG: Database error updating ItemMaster notes: {str(e)}")
-            logger.error(f"DEBUG: Database error updating ItemMaster notes: {str(e)}", exc_info=True)
+            logger.error(f"Database error updating ItemMaster notes: {str(e)}", exc_info=True)
             session.rollback()
             return jsonify({'error': f"Database error updating notes: {str(e)}"}), 500
 
-        print(f"DEBUG: Updating external API notes for tag_id={tag_id}")
-        logger.info(f"DEBUG: Updating external API notes for tag_id={tag_id}")
+        logger.debug(f"Updating external API notes for tag_id={tag_id}")
         try:
             api_client = APIClient()
             api_client.update_notes(tag_id, new_notes if new_notes else '')
-            print(f"DEBUG: Successfully updated API notes for tag_id {tag_id}")
-            logger.info(f"DEBUG: Successfully updated API notes for tag_id {tag_id}")
+            logger.info(f"Successfully updated API notes for tag_id {tag_id}")
         except Exception as e:
-            print(f"DEBUG: Failed to update API notes for tag_id {tag_id}: {str(e)}")
-            logger.error(f"DEBUG: Failed to update API notes for tag_id {tag_id}: {str(e)}", exc_info=True)
+            logger.error(f"Failed to update API notes for tag_id {tag_id}: {str(e)}", exc_info=True)
 
         session.close()
-        print(f"DEBUG: Updated notes for tag_id {tag_id} to '{new_notes}' and date_updated to {current_time}")
-        logger.info(f"DEBUG: Updated notes for tag_id {tag_id} to '{new_notes}' and date_updated to {current_time}")
+        logger.info(f"Updated notes for tag_id {tag_id} to '{new_notes}' and date_updated to {current_time}")
         return jsonify({'message': 'Notes updated successfully'})
     except Exception as e:
-        print(f"DEBUG: Uncaught exception in update_notes: {str(e)}")
-        logger.error(f"DEBUG: Error updating notes for tag {tag_id}: {str(e)}", exc_info=True)
+        logger.error(f"Uncaught exception in update_notes: {str(e)}", exc_info=True)
         if session:
             session.rollback()
             session.close()
@@ -1199,19 +1092,17 @@ def update_notes():
 def get_pack_resale_common_names():
     """Fetch distinct common names from SeedRentalClass for pack/resale bin locations."""
     try:
+        logger.debug("Entering /tab/3/pack_resale_common_names endpoint")
         common_names = db.session.query(SeedRentalClass.common_name)\
             .filter(SeedRentalClass.bin_location.in_(['pack', 'resale']))\
             .distinct()\
             .all()
         common_names = [name[0] for name in common_names if name[0]]
-        print(f"DEBUG: Fetched {len(common_names)} common names from SeedRentalClass for pack/resale: {common_names}")
-        logger.info(f"DEBUG: Fetched {len(common_names)} common names from SeedRentalClass for pack/resale: {common_names}")
+        logger.info(f"Fetched {len(common_names)} common names from SeedRentalClass for pack/resale: {common_names}")
         return jsonify({'common_names': sorted(common_names)}), 200
     except sqlalchemy.exc.DatabaseError as e:
-        print(f"DEBUG: Database error fetching pack/resale common names: {str(e)}")
-        logger.error(f"DEBUG: Database error fetching pack/resale common names: {str(e)}", exc_info=True)
+        logger.error(f"Database error fetching pack/resale common names: {str(e)}", exc_info=True)
         return jsonify({'error': f"Database error: {str(e)}"}), 500
     except Exception as e:
-        print(f"DEBUG: Error fetching pack/resale common names from SeedRentalClass: {str(e)}")
-        logger.error(f"DEBUG: Error fetching pack/resale common names from SeedRentalClass: {str(e)}", exc_info=True)
+        logger.error(f"Error fetching pack/resale common names from SeedRentalClass: {str(e)}", exc_info=True)
         return jsonify({'error': str(e)}), 500
