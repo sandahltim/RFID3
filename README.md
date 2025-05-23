@@ -23,14 +23,12 @@ test_rfidpi/ RFID6(needs update)
 │   │   ├── categories.html
 │   │   ├── common.html
 │   │   ├── home.html
-│   │   ├── tab1.html
 │   │   ├── tab2.html
 │   │   ├── tab3.html
 │   │   ├── tab4.html
 │   │   ├── tab5.html
 │   │   ├── _category_rows.html
-│   │   ├── _hand_counted_item.html
-│   │   └── tab.html
+│   │   └── _hand_counted_item.html
 ├── static/
 │   ├── css/
 │   │   ├── tab1.css
