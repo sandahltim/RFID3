@@ -1,6 +1,6 @@
 import logging
 from datetime import datetime, timedelta
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import SQLAlchemyError, OperationalError
 from app.models.db_models import ItemMaster, Transaction, RentalClassMapping, SeedRentalClass, db
 from app.services.api_client import APIClient
 from flask import Blueprint, jsonify, current_app
@@ -13,45 +13,49 @@ api_client = APIClient()
 
 def update_item_master(session, items):
     logger.info(f"Updating {len(items)} items in id_item_master")
-    for item in items:
-        try:
-            tag_id = item.get('tag_id')
-            if not tag_id:
-                logger.warning(f"Skipping item with missing tag_id: {item}")
-                continue
+    batch_size = 100
+    with session.no_autoflush:
+        for i in range(0, len(items), batch_size):
+            batch = items[i:i + batch_size]
+            for item in batch:
+                try:
+                    tag_id = item.get('tag_id')
+                    if not tag_id:
+                        logger.warning(f"Skipping item with missing tag_id: {item}")
+                        continue
 
-            db_item = session.query(ItemMaster).filter_by(tag_id=tag_id).first()
-            if not db_item:
-                db_item = ItemMaster(tag_id=tag_id)
+                    db_item = session.query(ItemMaster).filter_by(tag_id=tag_id).first()
+                    if not db_item:
+                        db_item = ItemMaster(tag_id=tag_id)
 
-            db_item.serial_number = item.get('serial_number')
-            db_item.rental_class_num = item.get('rental_class_num')
-            db_item.client_name = item.get('client_name')
-            db_item.common_name = item.get('common_name')
-            db_item.quality = item.get('quality')
-            db_item.bin_location = item.get('bin_location')
-            # Log raw status value
-            raw_status = item.get('status')
-            logger.debug(f"Raw status for tag_id {tag_id}: {raw_status}")
-            # Use the status as-is from the API, only set 'Unknown' if missing
-            status = raw_status if raw_status else 'Unknown'
-            db_item.status = status
-            logger.debug(f"Set status for tag_id {tag_id} to {status}")
-            db_item.last_contract_num = item.get('last_contract_num')
-            db_item.last_scanned_by = item.get('last_scanned_by')
-            db_item.notes = item.get('notes')
-            db_item.status_notes = item.get('status_notes')
-            longitude = item.get('long')
-            latitude = item.get('lat')
-            db_item.longitude = float(longitude) if longitude and longitude.strip() else None
-            db_item.latitude = float(latitude) if latitude and latitude.strip() else None
-            db_item.date_last_scanned = item.get('date_last_scanned')
+                    db_item.serial_number = item.get('serial_number')
+                    db_item.rental_class_num = item.get('rental_class_num')
+                    db_item.client_name = item.get('client_name')
+                    db_item.common_name = item.get('common_name')
+                    db_item.quality = item.get('quality')
+                    db_item.bin_location = item.get('bin_location')
+                    raw_status = item.get('status')
+                    logger.debug(f"Raw status for tag_id {tag_id}: {raw_status}")
+                    status = raw_status if raw_status else 'Unknown'
+                    db_item.status = status
+                    logger.debug(f"Set status for tag_id {tag_id} to {status}")
+                    db_item.last_contract_num = item.get('last_contract_num')
+                    db_item.last_scanned_by = item.get('last_scanned_by')
+                    db_item.notes = item.get('notes')
+                    db_item.status_notes = item.get('status_notes')
+                    longitude = item.get('long')
+                    latitude = item.get('lat')
+                    db_item.longitude = float(longitude) if longitude and longitude.strip() else None
+                    db_item.latitude = float(latitude) if latitude and latitude.strip() else None
+                    db_item.date_last_scanned = item.get('date_last_scanned')
 
-            session.merge(db_item)
-        except Exception as e:
-            logger.error(f"Error updating item {tag_id}: {str(e)}")
-            session.rollback()
-            raise
+                    session.merge(db_item)
+                except Exception as e:
+                    logger.error(f"Error updating item {tag_id}: {str(e)}")
+                    session.rollback()
+                    raise
+            session.commit()
+            logger.debug(f"Committed batch {i // batch_size + 1} of {len(items) // batch_size + 1}")
 
 def update_transactions(session, transactions):
     logger.info(f"Updating {len(transactions)} transactions in id_transactions")
@@ -138,50 +142,65 @@ def update_seed_data(session, seed_data):
 
 def full_refresh():
     logger.info("Starting full refresh")
-    session = db.session()
-    try:
-        deleted_items = session.query(ItemMaster).delete()
-        deleted_transactions = session.query(Transaction).delete()
-        deleted_seed = session.query(SeedRentalClass).delete()
-        logger.info(f"Deleted {deleted_items} items from id_item_master")
-        logger.info(f"Deleted {deleted_transactions} transactions from id_transactions")
-        logger.info(f"Deleted {deleted_seed} items from seed_rental_classes")
+    session = db.session
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            with session.begin():
+                deleted_items = session.query(ItemMaster).delete()
+                deleted_transactions = session.query(Transaction).delete()
+                deleted_seed = session.query(SeedRentalClass).delete()
+                logger.info(f"Deleted {deleted_items} items from id_item_master")
+                logger.info(f"Deleted {deleted_transactions} transactions from id_transactions")
+                logger.info(f"Deleted {deleted_seed} items from seed_rental_classes")
 
-        items = api_client.get_item_master()
-        transactions = api_client.get_transactions()
-        seed_data = api_client.get_seed_data()
+                items = api_client.get_item_master()
+                transactions = api_client.get_transactions()
+                seed_data = api_client.get_seed_data()
 
-        logger.info(f"Fetched {len(items)} items from item master")
-        logger.info(f"Fetched {len(transactions)} transactions")
-        logger.info(f"Fetched {len(seed_data)} items from seed data")
-        logger.debug(f"Item master data sample: {items[:5] if items else 'No items'}")
-        logger.debug(f"Transactions data sample: {transactions[:5] if items else 'No transactions'}")
-        logger.debug(f"Seed data sample: {seed_data[:5] if seed_data else 'No seed data'}")
+                logger.info(f"Fetched {len(items)} items from item master")
+                logger.info(f"Fetched {len(transactions)} transactions")
+                logger.info(f"Fetched {len(seed_data)} items from seed data")
+                logger.debug(f"Item master data sample: {items[:5] if items else 'No items'}")
+                logger.debug(f"Transactions data sample: {transactions[:5] if items else 'No transactions'}")
+                logger.debug(f"Seed data sample: {seed_data[:5] if seed_data else 'No seed data'}")
 
-        if not items:
-            logger.warning("No items fetched from item master API. Check API endpoint or authentication.")
-        if not transactions:
-            logger.warning("No transactions fetched from transactions API. Check API endpoint or authentication.")
-        if not seed_data:
-            logger.warning("No seed data fetched from seed API. Check API endpoint or authentication.")
+                if not items:
+                    logger.warning("No items fetched from item master API. Check API endpoint or authentication.")
+                if not transactions:
+                    logger.warning("No transactions fetched from transactions API. Check API endpoint or authentication.")
+                if not seed_data:
+                    logger.warning("No seed data fetched from seed API. Check API endpoint or authentication.")
 
-        update_item_master(session, items)
-        update_transactions(session, transactions)
-        update_seed_data(session, seed_data)
-
-        session.commit()
-        logger.info("Clear API data and full refresh completed successfully")
-    except Exception as e:
-        logger.error(f"Full refresh failed: {str(e)}")
-        session.rollback()
-        raise
-    finally:
-        session.close()
-        logger.debug("Full refresh session closed")
+                update_item_master(session, items)
+                update_transactions(session, transactions)
+                update_seed_data(session, seed_data)
+            break
+        except OperationalError as e:
+            if "Deadlock" in str(e):
+                if attempt < max_retries - 1:
+                    logger.warning(f"Deadlock detected, retrying ({attempt + 1}/{max_retries})")
+                    session.rollback()
+                    time.sleep(1)
+                    continue
+                else:
+                    logger.error(f"Max retries reached for deadlock: {str(e)}")
+                    raise
+            else:
+                logger.error(f"Database error: {str(e)}")
+                raise
+        except Exception as e:
+            logger.error(f"Full refresh failed: {str(e)}")
+            session.rollback()
+            raise
+        finally:
+            if session.is_active:
+                session.rollback()
+    logger.info("Clear API data and full refresh completed successfully")
 
 def incremental_refresh():
     logger.info("Starting incremental refresh")
-    session = db.session()
+    session = db.session
     try:
         since_date = datetime.utcnow() - timedelta(days=30)
         logger.info(f"Fetching item master data with since_date: {since_date}")
