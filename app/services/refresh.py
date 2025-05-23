@@ -54,8 +54,7 @@ def update_item_master(session, items):
                     logger.error(f"Error updating item {tag_id}: {str(e)}")
                     session.rollback()
                     raise
-            session.commit()
-            logger.debug(f"Committed batch {i // batch_size + 1} of {len(items) // batch_size + 1}")
+            logger.debug(f"Processed batch {i // batch_size + 1} of {len(items) // batch_size + 1}")
 
 def update_transactions(session, transactions):
     logger.info(f"Updating {len(transactions)} transactions in id_transactions")
