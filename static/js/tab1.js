@@ -1,16 +1,17 @@
-console.log('tab1.js version: 2025-05-19-v6 loaded');
+console.log('tab1.js version: 2025-05-23-v8 loaded');
 
 /**
  * Tab1.js: Logic for Tab 1 (Rental Inventory).
  * Dependencies: None (self-contained, uses common.js for printing).
  * Note: Split from tab1_5.js; removed Tab 5-specific functions (bulk updates).
+ * Updated: Fixed tab detection to ensure initialization on /tab/1.
  */
 
 /**
  * Show loading indicator
- * Moved from common.js, specific to Tab 1
  */
 function showLoadingTab1(targetId) {
+    console.log(`showLoadingTab1: targetId=${targetId}`);
     const container = document.getElementById(targetId);
     if (!container) {
         console.warn(`Container ${targetId} not found for loading indicator`);
@@ -27,9 +28,9 @@ function showLoadingTab1(targetId) {
 
 /**
  * Hide loading indicator
- * Moved from common.js, specific to Tab 1
  */
 function hideLoadingTab1(targetId) {
+    console.log(`hideLoadingTab1: targetId=${targetId}`);
     const loadingDiv = document.getElementById(`loading-${targetId}`);
     if (loadingDiv) {
         loadingDiv.remove();
@@ -38,14 +39,13 @@ function hideLoadingTab1(targetId) {
 
 /**
  * Collapse section (category/subcategory level)
- * Moved from common.js, specific to Tab 1
  */
 function collapseSection(categoryRow, targetId) {
+    console.log(`collapseSection: targetId=${targetId}`);
     if (!targetId || !categoryRow) {
         console.error('collapseSection: Invalid parameters', { targetId, categoryRow });
         return;
     }
-    console.log(`Collapsing ${targetId}`);
     const existingRows = categoryRow.parentNode.querySelectorAll(`tr.common-name-row[data-target-id="${targetId}"]`);
     existingRows.forEach(row => row.remove());
     sessionStorage.removeItem(`expanded_${targetId}`);
@@ -53,15 +53,14 @@ function collapseSection(categoryRow, targetId) {
 
 /**
  * Collapse items (item level)
- * Moved from common.js, specific to Tab 1
  */
 function collapseItems(targetId) {
+    console.log(`collapseItems: targetId=${targetId}`);
     const container = document.getElementById(targetId);
     if (!container) {
         console.error(`Container ${targetId} not found for collapsing items`);
         return;
     }
-    console.log(`Collapsing items ${targetId}`);
     container.classList.remove('expanded');
     container.classList.add('collapsed');
     container.style.opacity = '0';
@@ -74,11 +73,10 @@ function collapseItems(targetId) {
 
 /**
  * Apply filter with retry mechanism
- * Specific to Tab 1
  */
 function applyFilterWithRetryTab1(tableId, tableType, retries = 10, delay = 200) {
+    console.log(`applyFilterWithRetryTab1: tableId=${tableId}, tableType=${tableType}, retries=${retries}`);
     const table = document.getElementById(tableId);
-    console.log(`Checking ${tableType} table ${tableId}: ${table ? 'Found' : 'Not found'}`);
     if (table && typeof applyFilterToAllLevelsTab1 === 'function') {
         applyFilterToAllLevelsTab1();
         console.log(`Filter applied for ${tableId} (${tableType})`);
@@ -92,15 +90,17 @@ function applyFilterWithRetryTab1(tableId, tableType, retries = 10, delay = 200)
 
 /**
  * Apply filter to all levels (category, subcategory, common names, items)
- * Specific to Tab 1
  */
 function applyFilterToAllLevelsTab1() {
+    console.log('applyFilterToAllLevelsTab1: Starting');
     try {
         const categoryFilter = document.getElementById('category-filter')?.value.toLowerCase() || '';
         const statusFilter = document.getElementById('statusFilter')?.value.toLowerCase() || '';
         const binFilter = document.getElementById('binFilter')?.value.toLowerCase() || '';
+        console.log(`Filters: category=${categoryFilter}, status=${statusFilter}, bin=${binFilter}`);
 
         const categoryRows = document.querySelectorAll('#category-table tbody tr:not(.common-name-row)');
+        console.log(`Found ${categoryRows.length} category rows`);
 
         let visibleRows = 0;
         categoryRows.forEach(row => {
@@ -120,6 +120,7 @@ function applyFilterToAllLevelsTab1() {
         });
 
         const commonTables = document.querySelectorAll('.common-table');
+        console.log(`Found ${commonTables.length} common tables`);
         commonTables.forEach(table => {
             const category = table.closest('tr.common-name-row')?.previousElementSibling?.cells[0]?.textContent.toLowerCase().replace(/[^a-z0-9]/g, '_') || '';
             if (!category) {
@@ -135,6 +136,7 @@ function applyFilterToAllLevelsTab1() {
         });
 
         const itemTables = document.querySelectorAll('.item-table');
+        console.log(`Found ${itemTables.length} item tables`);
         itemTables.forEach(table => {
             const category = table.closest('tr.common-name-row')?.previousElementSibling?.previousElementSibling?.cells[0]?.textContent.toLowerCase().replace(/[^a-z0-9]/g, '_') || '';
             if (!category) {
@@ -160,13 +162,14 @@ function applyFilterToAllLevelsTab1() {
 
 /**
  * Populate subcategories
- * Specific to Tab 1
  */
 function populateSubcategories() {
+    console.log('populateSubcategories: Starting');
     const selects = document.querySelectorAll('.subcategory-select');
+    console.log(`Found ${selects.length} subcategory selects`);
     selects.forEach(select => {
         const category = select.getAttribute('data-category');
-        console.log(`Populating subcategories for ${category}`);
+        console.log(`Populating subcategories for category: ${category}`);
         const url = `/tab/1/subcat_data?category=${encodeURIComponent(category)}`;
         fetch(url)
             .then(response => {
@@ -208,9 +211,9 @@ function populateSubcategories() {
 
 /**
  * Load common names
- * Specific to Tab 1
  */
 function loadCommonNames(selectElement, page = 1) {
+    console.log('loadCommonNames: Starting', { page });
     const subcategory = selectElement.value;
     const category = selectElement.getAttribute('data-category');
     const targetId = `common-${category.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
@@ -419,7 +422,6 @@ function loadCommonNames(selectElement, page = 1) {
 
 /**
  * Load items
- * Specific to Tab 1
  */
 function loadItems(category, subcategory, commonName, targetId, page = 1) {
     console.log('loadItems:', { category, subcategory, commonName, targetId, page });
@@ -604,11 +606,10 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
 
 /**
  * Show dropdown for editable cells
- * Specific to Tab 1
  */
 function showDropdown(event, cell, type, tagId, currentValue) {
-    event.stopPropagation();
     console.log('showDropdown:', { type, tagId, currentValue });
+    event.stopPropagation();
     const dropdown = document.getElementById(`dropdown-${type}-${tagId}`);
     if (dropdown) {
         document.querySelectorAll('.dropdown-menu').forEach(d => {
@@ -632,12 +633,11 @@ function showDropdown(event, cell, type, tagId, currentValue) {
 
 /**
  * Select option from dropdown
- * Specific to Tab 1
  */
 function selectOption(event, element, type, tagId, value) {
+    console.log('selectOption:', { type, tagId, value });
     event.preventDefault();
     event.stopPropagation();
-    console.log('selectOption:', { type, tagId, value });
     const cell = document.querySelector(`tr[data-item-id="${tagId}"] td.editable[onclick*="showDropdown(event, this, '${type}', '${tagId}'"]`);
     if (cell) {
         cell.textContent = value;
@@ -652,7 +652,6 @@ function selectOption(event, element, type, tagId, value) {
 
 /**
  * Save changes for editable cells
- * Specific to Tab 1
  */
 function saveChanges(tagId) {
     console.log('saveChanges:', tagId);
@@ -736,10 +735,9 @@ function saveChanges(tagId) {
 
 /**
  * Load subcategories
- * Specific to Tab 1
  */
-function loadSubcategories(category, targetId) {
-    console.log('loadSubcategories:', { category, targetId });
+function loadSubcategories(category, targetId, page = 1) {
+    console.log('loadSubcategories:', { category, targetId, page });
 
     const container = document.getElementById(targetId);
     if (!container) {
@@ -749,7 +747,7 @@ function loadSubcategories(category, targetId) {
 
     const loadingSuccess = showLoadingTab1(targetId);
 
-    const url = `/tab/1/subcat_data?category=${encodeURIComponent(category)}&page=1`;
+    const url = `/tab/1/subcat_data?category=${encodeURIComponent(category)}&page=${page}`;
     console.log(`Fetching subcategories: ${url}`);
 
     fetch(url)
@@ -810,7 +808,7 @@ function loadSubcategories(category, targetId) {
                 visibility: window.getComputedStyle(container).visibility
             });
 
-            sessionStorage.setItem(`expanded_${targetId}`, JSON.stringify({ category, page: 1 }));
+            sessionStorage.setItem(`expanded_${targetId}`, JSON.stringify({ category, page }));
         })
         .catch(error => {
             console.error('Subcategories error:', error.message);
@@ -832,17 +830,23 @@ function loadSubcategories(category, targetId) {
 document.addEventListener('DOMContentLoaded', function() {
     console.log('tab1.js: DOMContentLoaded');
 
-    if (window.cachedTabNum !== 1) {
+    // Check if the current URL is /tab/1
+    const isTab1 = window.location.pathname.match(/\/tab\/1\b/);
+    console.log(`isTab1: ${isTab1}, window.cachedTabNum: ${window.cachedTabNum}, pathname: ${window.location.pathname}`);
+
+    if (!isTab1 && window.cachedTabNum !== 1) {
         console.log('Not Tab 1, skipping');
         return;
     }
 
+    console.log('Initializing Tab 1');
     populateSubcategories();
 
     document.removeEventListener('click', handleClick);
     document.addEventListener('click', handleClick);
 
     function handleClick(event) {
+        console.log('handleClick: Event triggered');
         const expandBtn = event.target.closest('.expand-btn');
         if (expandBtn) {
             event.preventDefault();
@@ -950,6 +954,7 @@ document.addEventListener('DOMContentLoaded', function() {
     document.addEventListener('click', handleDropdownClick);
 
     function handleDropdownClick(event) {
+        console.log('handleDropdownClick: Event triggered');
         if (!event.target.closest('.editable') && !event.target.closest('.dropdown-menu')) {
             document.querySelectorAll('.dropdown-menu').forEach(dropdown => {
                 dropdown.classList.remove('show');
