@@ -1,10 +1,10 @@
-console.log('tab1.js version: 2025-05-23-v8 loaded');
+console.log('tab1.js version: 2025-05-23-v9 loaded');
 
 /**
  * Tab1.js: Logic for Tab 1 (Rental Inventory).
  * Dependencies: None (self-contained, uses common.js for printing).
  * Note: Split from tab1_5.js; removed Tab 5-specific functions (bulk updates).
- * Updated: Fixed tab detection to ensure initialization on /tab/1.
+ * Updated: Fixed subcategory loading on category expand.
  */
 
 /**
@@ -161,52 +161,46 @@ function applyFilterToAllLevelsTab1() {
 }
 
 /**
- * Populate subcategories
+ * Populate subcategories for a specific category
  */
-function populateSubcategories() {
-    console.log('populateSubcategories: Starting');
-    const selects = document.querySelectorAll('.subcategory-select');
-    console.log(`Found ${selects.length} subcategory selects`);
-    selects.forEach(select => {
-        const category = select.getAttribute('data-category');
-        console.log(`Populating subcategories for category: ${category}`);
-        const url = `/tab/1/subcat_data?category=${encodeURIComponent(category)}`;
-        fetch(url)
-            .then(response => {
-                console.log(`Subcategory fetch status for ${category}: ${response.status}`);
-                if (!response.ok) {
-                    return response.text().then(text => {
-                        throw new Error(`Subcategory fetch failed: ${response.status} - ${text}`);
-                    });
+function populateSubcategories(category, select) {
+    console.log(`populateSubcategories: category=${category}`);
+    const url = `/tab/1/subcat_data?category=${encodeURIComponent(category)}`;
+    fetch(url)
+        .then(response => {
+            console.log(`Subcategory fetch status for ${category}: ${response.status}`);
+            if (!response.ok) {
+                return response.text().then(text => {
+                    throw new Error(`Subcategory fetch failed: ${response.status} - ${text}`);
+                });
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log(`Subcategory data for ${category}:`, data);
+            select.innerHTML = '<option value="">Select a subcategory</option>';
+            if (data.subcategories && data.subcategories.length > 0) {
+                data.subcategories.forEach(subcat => {
+                    const option = document.createElement('option');
+                    option.value = subcat.subcategory;
+                    option.textContent = subcat.subcategory;
+                    select.appendChild(option);
+                });
+                // Ensure "Concession Resale" is included if present
+                if (!Array.from(select.options).some(opt => opt.value === "Concession Resale") && data.subcategories.some(subcat => subcat.subcategory === "Concession Resale")) {
+                    const option = document.createElement('option');
+                    option.value = "Concession Resale";
+                    option.textContent = "Concession Resale";
+                    select.appendChild(option);
                 }
-                return response.json();
-            })
-            .then(data => {
-                console.log(`Subcategory data for ${category}:`, data);
-                select.innerHTML = '<option value="">Select a subcategory</option>';
-                if (data.subcategories && data.subcategories.length > 0) {
-                    data.subcategories.forEach(subcat => {
-                        const option = document.createElement('option');
-                        option.value = subcat.subcategory;
-                        option.textContent = subcat.subcategory;
-                        select.appendChild(option);
-                    });
-                    // Ensure "Concession Resale" is included if present
-                    if (!Array.from(select.options).some(opt => opt.value === "Concession Resale") && data.subcategories.some(subcat => subcat.subcategory === "Concession Resale")) {
-                        const option = document.createElement('option');
-                        option.value = "Concession Resale";
-                        option.textContent = "Concession Resale";
-                        select.appendChild(option);
-                    }
-                } else {
-                    select.innerHTML += '<option value="">No subcategories</option>';
-                }
-            })
-            .catch(error => {
-                console.error(`Subcategory error for ${category}:`, error.message);
-                select.innerHTML = '<option value="">Error loading subcategories</option>';
-            });
-    });
+            } else {
+                select.innerHTML += '<option value="">No subcategories</option>';
+            }
+        })
+        .catch(error => {
+            console.error(`Subcategory error for ${category}:`, error.message);
+            select.innerHTML = '<option value="">Error loading subcategories</option>';
+        });
 }
 
 /**
@@ -734,7 +728,7 @@ function saveChanges(tagId) {
 }
 
 /**
- * Load subcategories
+ * Load subcategories (not used directly in this workflow)
  */
 function loadSubcategories(category, targetId, page = 1) {
     console.log('loadSubcategories:', { category, targetId, page });
@@ -840,7 +834,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     console.log('Initializing Tab 1');
-    populateSubcategories();
+    // populateSubcategories is now called on expand
 
     document.removeEventListener('click', handleClick);
     document.addEventListener('click', handleClick);
@@ -901,8 +895,18 @@ document.addEventListener('DOMContentLoaded', function() {
                         expandBtn.setAttribute('data-expanded', 'true');
                     }
                 } else {
-                    console.log(`Loading subcategories for ${category}`);
-                    loadSubcategories(category, targetId);
+                    // Populate the subcategory dropdown
+                    const select = container.querySelector('.subcategory-select');
+                    if (select) {
+                        populateSubcategories(category, select);
+                    } else {
+                        console.error(`Subcategory select not found in ${targetId}`);
+                    }
+                    container.classList.remove('collapsed');
+                    container.classList.add('expanded');
+                    container.style.display = 'block';
+                    container.style.opacity = '1';
+                    container.style.visibility = 'visible';
                     if (expandBtn && collapseBtn) {
                         expandBtn.style.display = 'none';
                         collapseBtn.style.display = 'inline-block';
