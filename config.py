@@ -9,7 +9,7 @@ DB_CONFIG = {
     'user': 'rfid_user',
     'password': 'rfid_user_password',  # Change this to a secure password
     'database': 'rfid_inventory',
-    'charset': 'utf8mb4'
+    'charset': 'utf8mb4',
     'collation': 'utf8mb4_general_ci'
 }
 
