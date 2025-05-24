@@ -1,9 +1,16 @@
-console.log('tab.js loaded, cachedTabNum:', window.cachedTabNum);
+console.log('tab.js version: 2025-05-23-v2 loaded');
+
+/**
+ * Tab.js: Initializes tab-specific logic and handles printing.
+ * Dependencies: common.js (for formatDate, printTable).
+ * Updated: Added robust tab detection and debug logging.
+ */
 
 /**
  * Format ISO date strings for consistency (fallback if common.js is not loaded)
  */
 function formatDateTime(dateTimeStr) {
+    console.log(`formatDateTime: dateTimeStr=${dateTimeStr}`);
     if (typeof formatDate === 'function') {
         return formatDate(dateTimeStr);
     }
@@ -31,6 +38,7 @@ function formatDateTime(dateTimeStr) {
  * Refresh the current tab
  */
 function refreshTab() {
+    console.log('refreshTab: Reloading page');
     window.location.reload();
 }
 
@@ -38,6 +46,7 @@ function refreshTab() {
  * Remove "Total Items in Inventory" column for Tabs 2 and 4
  */
 function removeTotalItemsInventoryColumn(table, tabNum) {
+    console.log(`removeTotalItemsInventoryColumn: tabNum=${tabNum}`);
     if (tabNum == 2 || tabNum == 4) {
         const headers = table.querySelectorAll('th');
         const rows = table.querySelectorAll('tbody tr');
@@ -57,6 +66,7 @@ function removeTotalItemsInventoryColumn(table, tabNum) {
  * Normalize common name by removing quotes and extra spaces
  */
 function normalizeCommonName(commonName) {
+    console.log(`normalizeCommonName: commonName=${commonName}`);
     return commonName.replace(/['"]/g, '').replace(/\s+/g, ' ').trim();
 }
 
@@ -64,6 +74,7 @@ function normalizeCommonName(commonName) {
  * Initialize pagination for a table
  */
 function initializePagination(tableId, totalItems, page = 1, perPage = 20, fetchFunction) {
+    console.log(`initializePagination: tableId=${tableId}, totalItems=${totalItems}, page=${page}, perPage=${perPage}`);
     const table = document.getElementById(tableId);
     const paginationContainer = document.querySelector(`#pagination-${tableId}`);
     if (!table || !paginationContainer) {
@@ -80,6 +91,7 @@ function initializePagination(tableId, totalItems, page = 1, perPage = 20, fetch
  * Fetch paginated data for expandable sections (Tabs 1, 2, 4, 5)
  */
 async function fetchExpandableData(tabNum, contractNumber, page, perPage) {
+    console.log(`fetchExpandableData: tabNum=${tabNum}, contractNumber=${contractNumber}, page=${page}, perPage=${perPage}`);
     const url = `/tab/${tabNum}/common_names?contract_number=${encodeURIComponent(contractNumber)}&page=${page}&per_page=${perPage}`;
     try {
         const response = await fetch(url);
@@ -87,6 +99,7 @@ async function fetchExpandableData(tabNum, contractNumber, page, perPage) {
             throw new Error(`Failed to fetch expandable data: ${response.status}`);
         }
         const data = await response.json();
+        console.log(`fetchExpandableData: Data received`, data);
         return data;
     } catch (error) {
         console.error(`Error fetching expandable data for tab ${tabNum}:`, error);
@@ -98,6 +111,7 @@ async function fetchExpandableData(tabNum, contractNumber, page, perPage) {
  * Update expandable table with new data
  */
 function updateExpandableTable(tableId, data, page, perPage, tabNum, contractNumber) {
+    console.log(`updateExpandableTable: tableId=${tableId}, page=${page}, perPage=${perPage}, tabNum=${tabNum}, contractNumber=${contractNumber}`);
     const table = document.getElementById(tableId);
     if (!table) {
         console.warn(`Table not found: ${tableId}`);
@@ -124,7 +138,7 @@ function updateExpandableTable(tableId, data, page, perPage, tabNum, contractNum
  * Print a table (Contract, Common Name, or Item level)
  */
 async function printTable(level, id, commonName = null, category = null, subcategory = null) {
-    console.log(`Printing table: ${level}, ID: ${id}, Common Name: ${commonName}, Category: ${category}, Subcategory: ${subcategory}`);
+    console.log(`printTable: level=${level}, id=${id}, commonName=${commonName}, category=${category}, subcategory=${subcategory}`);
     const element = document.getElementById(id);
     if (!element) {
         console.error(`Element with ID ${id} not found for printing`);
@@ -436,7 +450,7 @@ async function printTable(level, id, commonName = null, category = null, subcate
  * Print full item list
  */
 async function printFullItemList(category, subcategory, commonName) {
-    console.log(`Printing full item list for Category: ${category}, Subcategory: ${subcategory}, Common Name: ${commonName}`);
+    console.log(`printFullItemList: category=${category}, subcategory=${subcategory}, commonName=${commonName}`);
     const tabNum = window.cachedTabNum || 1;
     const tabName = tabNum == 2 ? 'Open Contracts' : tabNum == 4 ? 'Laundry Contracts' : tabNum == 5 ? 'Resale/Rental Packs' : tabNum == 3 ? 'Service' : `Tab ${tabNum}`;
 
@@ -593,69 +607,81 @@ async function printFullItemList(category, subcategory, commonName) {
  * Initialize the page
  */
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('Document loaded, initializing script');
-
-    let tabNum;
-    const pathMatch = window.location.pathname.match(/\/tab\/(\d+)/);
-    if (pathMatch) {
-        tabNum = parseInt(pathMatch[1], 10);
-    } else if (window.location.pathname === '/') {
-        tabNum = 1;
-    } else {
-        console.warn('No tab number found in URL, using default tab number 1.');
-        tabNum = 1;
-    }
-
-    window.cachedTabNum = tabNum;
-
-    document.addEventListener('click', (event) => {
-        const printBtn = event.target.closest('.print-btn');
-        const printFullBtn = event.target.closest('.print-full-btn');
-        const expandBtn = event.target.closest('.expand-btn');
-
-        if (printBtn) {
-            const level = printBtn.getAttribute('data-print-level');
-            const id = printBtn.getAttribute('data-print-id');
-            const commonName = printBtn.getAttribute('data-common-name');
-            const category = printBtn.getAttribute('data-category');
-            const subcategory = printBtn.getAttribute('data-subcategory');
-            printTable(level, id, commonName, category, subcategory);
+    console.log('tab.js: DOMContentLoaded');
+    try {
+        let tabNum;
+        const path = window.location.pathname;
+        console.log(`Current path: ${path}`);
+        const pathMatch = path.match(/\/tab\/(\d+)/);
+        if (pathMatch) {
+            tabNum = parseInt(pathMatch[1], 10);
+            console.log(`Tab number extracted from URL: ${tabNum}`);
+        } else if (path === '/' || path === '/home') {
+            tabNum = 1;
+            console.log('Home page detected, setting tabNum=1');
+        } else {
+            console.warn('No tab number found in URL, using default tab number 1.');
+            tabNum = 1;
         }
+        window.cachedTabNum = tabNum;
+        console.log(`Set window.cachedTabNum=${window.cachedTabNum}`);
 
-        if (printFullBtn) {
-            const commonName = printFullBtn.getAttribute('data-common-name');
-            const category = printFullBtn.getAttribute('data-category');
-            const subcategory = printFullBtn.getAttribute('data-subcategory');
-            printFullItemList(category, subcategory, commonName);
-        }
+        document.addEventListener('click', (event) => {
+            console.log('Click event triggered');
+            const printBtn = event.target.closest('.print-btn');
+            const printFullBtn = event.target.closest('.print-full-btn');
+            const expandBtn = event.target.closest('.expand-btn');
 
-        // Handle expandable sections for Tabs 1, 2, 4, 5 (not Tab 3)
-        if (expandBtn && tabNum !== 3) {
-            const row = expandBtn.closest('tr');
-            const nextRow = row.nextElementSibling;
-            const expandable = nextRow.querySelector('.expandable');
-            if (!expandable) {
-                console.warn('Expandable section not found for row');
-                return;
-            }
-            const tableId = expandable.querySelector('.common-table')?.id;
-            const contractNumber = expandBtn.getAttribute('data-contract-number');
-
-            if (!tableId || !contractNumber) {
-                console.warn('Table ID or contract number missing for expandable section');
-                return;
+            if (printBtn) {
+                const level = printBtn.getAttribute('data-print-level');
+                const id = printBtn.getAttribute('data-print-id');
+                const commonName = printBtn.getAttribute('data-common-name');
+                const category = printBtn.getAttribute('data-category');
+                const subcategory = printBtn.getAttribute('data-subcategory');
+                printTable(level, id, commonName, category, subcategory);
             }
 
-            if (expandable.classList.contains('collapsed')) {
-                expandable.classList.remove('collapsed');
-                expandable.classList.add('expanded');
-                fetchExpandableData(tabNum, contractNumber, 1, 20).then(data => {
-                    updateExpandableTable(tableId, data, 1, 20, tabNum, contractNumber);
+            if (printFullBtn) {
+                const commonName = printFullBtn.getAttribute('data-common-name');
+                const category = printFullBtn.getAttribute('data-category');
+                const subcategory = printFullBtn.getAttribute('data-subcategory');
+                printFullItemList(category, subcategory, commonName);
+            }
+
+            // Handle expandable sections for Tabs 1, 2, 4, 5 (not Tab 3)
+            if (expandBtn && tabNum !== 3) {
+                console.log('Expand button clicked:', {
+                    contractNumber: expandBtn.getAttribute('data-contract-number'),
+                    targetId: expandBtn.getAttribute('data-target-id')
                 });
-            } else {
-                expandable.classList.remove('expanded');
-                expandable.classList.add('collapsed');
+                const row = expandBtn.closest('tr');
+                const nextRow = row.nextElementSibling;
+                const expandable = nextRow.querySelector('.expandable');
+                if (!expandable) {
+                    console.warn('Expandable section not found for row');
+                    return;
+                }
+                const tableId = expandable.querySelector('.common-table')?.id;
+                const contractNumber = expandBtn.getAttribute('data-contract-number');
+
+                if (!tableId || !contractNumber) {
+                    console.warn('Table ID or contract number missing for expandable section');
+                    return;
+                }
+
+                if (expandable.classList.contains('collapsed')) {
+                    expandable.classList.remove('collapsed');
+                    expandable.classList.add('expanded');
+                    fetchExpandableData(tabNum, contractNumber, 1, 20).then(data => {
+                        updateExpandableTable(tableId, data, 1, 20, tabNum, contractNumber);
+                    });
+                } else {
+                    expandable.classList.remove('expanded');
+                    expandable.classList.add('collapsed');
+                }
             }
-        }
-    });
+        });
+    } catch (error) {
+        console.error('Error initializing tab.js:', error);
+    }
 });
