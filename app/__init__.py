@@ -38,6 +38,7 @@ def create_app():
         app.config['SQLALCHEMY_DATABASE_URI'] = (
             f"mysql+mysqlconnector://{DB_CONFIG['user']}:{DB_CONFIG['password']}@"
             f"{DB_CONFIG['host']}/{DB_CONFIG['database']}?charset={DB_CONFIG['charset']}"
+            f"&collation={DB_CONFIG['collation']}"
         )
         app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
         app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
