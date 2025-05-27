@@ -47,24 +47,29 @@ SHARED_DIR = '/home/tim/test_rfidpi/shared'
 CSV_FILE_PATH = os.path.join(SHARED_DIR, 'rfid_tags.csv')
 LOCK_FILE_PATH = os.path.join(SHARED_DIR, 'rfid_tags.lock')
 
+# Ensure shared directory exists with correct permissions
 if not os.path.exists(SHARED_DIR):
     logger.info(f"Creating shared directory: {SHARED_DIR}")
     os.makedirs(SHARED_DIR, mode=0o770)
     os.chown(SHARED_DIR, pwd.getpwnam('tim').pw_uid, grp.getgrnam('tim').gr_gid)
 
-logger.info("Deployed tab3.py version: 2025-05-27-v55")
+# Log deployment version
+logger.info("Deployed tab3.py version: 2025-05-27-v57")
 
 @tab3_bp.route('/tab/3')
 def tab3_view():
+    # Log entry into endpoint
     logger.debug("Entering /tab/3 endpoint")
     session = None
     try:
         session = db.session()
         logger.info("Successfully created new session for tab3")
 
+        # Test database connection
         session.execute(text("SELECT 1"))
         logger.info("Database connection test successful")
 
+        # Fetch distinct statuses
         status_query = """
             SELECT DISTINCT status
             FROM id_item_master
@@ -74,12 +79,14 @@ def tab3_view():
         statuses = [row[0] for row in status_result.fetchall()]
         logger.info(f"Distinct statuses in id_item_master: {statuses}")
 
+        # Get query parameters
         common_name_filter = request.args.get('common_name', '').lower()
         date_filter = request.args.get('date_last_scanned', '')
         sort = request.args.get('sort', 'date_last_scanned_desc')
         page = int(request.args.get('page', 1))
         per_page = 20
 
+        # Build SQL query for items in service
         sql_query = """
             SELECT tag_id, common_name, status, bin_location, last_contract_num, date_last_scanned, rental_class_num, notes
             FROM id_item_master
@@ -98,6 +105,7 @@ def tab3_view():
             except ValueError:
                 logger.warning(f"Invalid date format for date_last_scanned filter: {date_filter}")
 
+        # Apply sorting
         if sort == 'date_last_scanned_asc':
             sql_query += " ORDER BY date_last_scanned ASC, LOWER(common_name) ASC"
         else:
@@ -107,10 +115,12 @@ def tab3_view():
         params['limit'] = per_page
         params['offset'] = (page - 1) * per_page
 
+        # Execute query
         result = session.execute(text(sql_query), params)
         rows = result.fetchall()
         logger.info(f"Raw query returned {len(rows)} rows")
 
+        # Structure items
         items_in_service = [
             {
                 'tag_id': row[0],
@@ -125,6 +135,7 @@ def tab3_view():
             for row in rows
         ]
 
+        # Count total items
         count_query = """
             SELECT COUNT(*) 
             FROM id_item_master
@@ -146,6 +157,7 @@ def tab3_view():
         total_items = session.execute(text(count_query), count_params).scalar()
         logger.info(f"Total items matching query: {total_items}")
 
+        # Fetch transaction data
         tag_ids = [item['tag_id'] for item in items_in_service]
         transaction_data = {}
         if tag_ids:
@@ -223,6 +235,7 @@ def tab3_view():
                     'last_transaction_scan_date': t.scan_date.strftime('%Y-%m-%d %H:%M:%S') if t.scan_date else 'N/A'
                 }
 
+        # Group items by common name and status
         items_by_common_name = {}
         for item in items_in_service:
             common_name = item['common_name']
@@ -283,6 +296,7 @@ def tab3_view():
                 'last_transaction_scan_date': t_data['last_transaction_scan_date']
             })
 
+        # Define status priority for sorting
         status_priority = {
             'Repair': 1,
             'Wash': 2,
@@ -291,13 +305,14 @@ def tab3_view():
             'Needs to be Inspected': 5
         }
 
+        # Structure common name groups
         common_name_groups = []
         for common_name, statuses in sorted(items_by_common_name.items()):
             status_groups = []
             for status in sorted(statuses.keys(), key=lambda s: status_priority.get(s, 6)):
                 status_groups.append({
                     'status': status,
-                    'items': statuses[status],
+                    'item_list': statuses[status],  # Use item_list to avoid dict.items() conflict
                     'total_items': len(statuses[status])
                 })
             common_name_groups.append({
@@ -305,6 +320,13 @@ def tab3_view():
                 'status_groups': status_groups,
                 'total_items': sum(len(statuses[s]) for s in statuses)
             })
+
+        # Debug log data structure
+        logger.debug(f"Common name groups structure: {len(common_name_groups)} groups")
+        for group in common_name_groups:
+            logger.debug(f"Group: {group['common_name']}, Status groups: {len(group['status_groups'])}")
+            for sg in group['status_groups']:
+                logger.debug(f"  Status: {sg['status']}, Items: {sg['total_items']}")
 
         session.commit()
         return render_template(
@@ -333,6 +355,7 @@ def tab3_view():
 
 @tab3_bp.route('/tab/3/csv_contents', methods=['GET'])
 def get_csv_contents():
+    # Fetch and return CSV contents
     try:
         logger.debug("Entering /tab/3/csv_contents endpoint")
         if not os.path.exists(CSV_FILE_PATH):
@@ -365,6 +388,7 @@ def get_csv_contents():
 
 @tab3_bp.route('/tab/3/remove_csv_item', methods=['POST'])
 def remove_csv_item():
+    # Remove an item from the CSV
     lock_file = None
     try:
         logger.debug("Entering /tab/3/remove_csv_item endpoint")
@@ -410,6 +434,7 @@ def remove_csv_item():
 
 @tab3_bp.route('/tab/3/sync_to_pc', methods=['POST'])
 def sync_to_pc():
+    # Sync items to CSV for printing
     session = None
     lock_file = None
     try:
@@ -437,6 +462,7 @@ def sync_to_pc():
             logger.warning(f"Invalid input: common_name={common_name}, quantity={quantity}")
             return jsonify({'error': 'Invalid common name or quantity'}), 400
 
+        # Ensure shared directory is writable
         if not os.path.exists(SHARED_DIR):
             logger.info(f"Creating shared directory: {SHARED_DIR}")
             os.makedirs(SHARED_DIR, mode=0o770)
@@ -445,6 +471,7 @@ def sync_to_pc():
             logger.error(f"Shared directory {SHARED_DIR} is not writable")
             return jsonify({'error': f"Shared directory {SHARED_DIR} is not writable"}), 500
 
+        # Read existing CSV
         csv_tag_ids = set()
         existing_items = []
         needs_header = not os.path.exists(CSV_FILE_PATH)
@@ -475,6 +502,7 @@ def sync_to_pc():
         synced_items = []
         existing_tag_ids = csv_tag_ids.copy()
 
+        # Query ItemMaster for items
         logger.debug("Querying ItemMaster for existing items")
         try:
             sold_items = session.query(ItemMaster)\
@@ -539,6 +567,7 @@ def sync_to_pc():
             logger.error(f"Database error querying ItemMaster: {str(e)}", exc_info=True)
             return jsonify({'error': f"Database error querying ItemMaster: {str(e)}"}), 500
 
+        # Generate new items if needed
         new_items = []
         if len(synced_items) < quantity:
             remaining_quantity = quantity - len(synced_items)
@@ -605,6 +634,7 @@ def sync_to_pc():
         if len(synced_items) > quantity:
             synced_items = synced_items[:quantity]
 
+        # Map rental class details
         base_mappings = session.query(RentalClassMapping).all()
         user_mappings = session.query(UserRentalClassMapping).all()
         mappings_dict = {str(m.rental_class_id).strip().upper(): {
@@ -624,6 +654,7 @@ def sync_to_pc():
             item['subcategory'] = mapping.get('subcategory', 'Unknown')
             item['short_common_name'] = mapping.get('short_common_name', item['common_name'])
 
+        # Write to CSV
         all_items = [item for item in existing_items if item['tag_id'] not in {i['tag_id'] for i in synced_items}]
         all_items.extend(synced_items)
 
@@ -661,6 +692,7 @@ def sync_to_pc():
 
 @tab3_bp.route('/tab/3/update_synced_status', methods=['POST'])
 def update_synced_status():
+    # Update synced items' status to Ready to Rent
     session = None
     lock_file = None
     try:
@@ -689,6 +721,7 @@ def update_synced_status():
             logger.error(f"CSV file {CSV_FILE_PATH} is not readable/writable")
             return jsonify({'error': f"CSV file {CSV_FILE_PATH} is not readable/writable"}), 500
 
+        # Read CSV items
         items_to_update = []
         try:
             with open(CSV_FILE_PATH, 'r') as csvfile:
@@ -721,6 +754,7 @@ def update_synced_status():
         tag_ids = [item['tag_id'] for item in items_to_update]
         logger.info(f"Found {len(tag_ids)} items to update: {tag_ids}")
 
+        # Fetch ItemMaster data
         logger.debug("Fetching items from ItemMaster")
         items_in_db = session.query(ItemMaster.tag_id, ItemMaster.rental_class_num, ItemMaster.common_name, ItemMaster.bin_location)\
             .filter(ItemMaster.tag_id.in_(tag_ids))\
@@ -731,12 +765,15 @@ def update_synced_status():
             'bin_location': item.bin_location
         } for item in items_in_db}
 
+        # Update ItemMaster status
         logger.debug("Updating ItemMaster status to 'Ready to Rent'")
         updated_items = ItemMaster.query\
             .filter(ItemMaster.tag_id.in_(tag_ids))\
             .update({ItemMaster.status: 'Ready to Rent'}, synchronize_session='fetch')
         session.flush()
+        logger.info(f"Updated {updated_items} items in ItemMaster")
 
+        # Update API
         api_client = APIClient()
         failed_items = []
         for item in items_to_update:
@@ -747,6 +784,7 @@ def update_synced_status():
                 existing_items = api_client._make_request("14223767938169344381", params)
                 if existing_items:
                     api_client.update_status(tag_id, 'Ready to Rent')
+                    logger.debug(f"Updated status for tag_id {tag_id} in API")
                 else:
                     new_item = {
                         'tag_id': tag_id,
@@ -757,6 +795,7 @@ def update_synced_status():
                         'rental_class_num': db_item.get('rental_class_num', '')
                     }
                     api_client.insert_item(new_item)
+                    logger.debug(f"Inserted new item for tag_id {tag_id} in API")
             except Exception as api_error:
                 logger.error(f"Error updating/inserting tag_id {tag_id} in API: {str(api_error)}", exc_info=True)
                 failed_items.append(tag_id)
@@ -766,20 +805,22 @@ def update_synced_status():
             session.rollback()
             return jsonify({'error': f"Failed to update {len(failed_items)} items in API", 'failed_items': failed_items}), 500
 
+        # Clear CSV
         logger.debug("Clearing CSV file")
         try:
             with open(CSV_FILE_PATH, 'w', newline='') as csvfile:
                 fieldnames = ['tag_id', 'common_name', 'subcategory', 'short_common_name', 'status', 'bin_location']
                 writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
                 writer.writeheader()
+            logger.info("CSV file cleared successfully")
         except Exception as e:
             logger.error(f"Error clearing CSV file: {str(e)}", exc_info=True)
             session.rollback()
             return jsonify({'error': f"Error clearing CSV file: {str(e)}"}), 500
 
         session.commit()
-        logger.info(f"Updated status for {updated_items} items and cleared CSV file")
-        return jsonify({'updated_items': updated_items}), 200
+        logger.info(f"Completed update_synced_status: Updated {updated_items} items and cleared CSV file")
+        return jsonify({'updated_items': updated_items, 'message': 'Status updated successfully'}), 200
     except Exception as e:
         logger.error(f"Uncaught exception in update_synced_status: {str(e)}", exc_info=True)
         if session:
@@ -789,11 +830,13 @@ def update_synced_status():
         if lock_file:
             fcntl.flock(lock_file, fcntl.LOCK_UN)
             lock_file.close()
+            logger.debug("Released lock for update_synced_status")
         if session:
             session.close()
 
 @tab3_bp.route('/tab/3/update_status', methods=['POST'])
 def update_status():
+    # Update individual item status
     session = None
     try:
         logger.debug("Entering /tab/3/update_status endpoint")
@@ -842,6 +885,7 @@ def update_status():
 
 @tab3_bp.route('/tab/3/update_notes', methods=['POST'])
 def update_notes():
+    # Update individual item notes
     session = None
     try:
         logger.debug("Entering /tab/3/update_notes endpoint")
@@ -881,6 +925,7 @@ def update_notes():
 
 @tab3_bp.route('/tab/3/pack_resale_common_names', methods=['GET'])
 def get_pack_resale_common_names():
+    # Fetch common names for pack/resale
     session = None
     try:
         logger.debug("Entering /tab/3/pack_resale_common_names endpoint")
