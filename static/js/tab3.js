@@ -1,6 +1,16 @@
-console.log('tab3.js version: 2025-05-27-v14 loaded');
+console.log('tab3.js version: 2025-05-27-v15 loaded');
 
-// Debounce function with immediate lock to prevent multiple rapid executions
+/**
+ * Tab3.js: Logic for Tab 3 (Items in Service).
+ * Dependencies: common.js for formatDate.
+ * Updated 2025-05-27: Added UI feedback for updateStatusBtn in setupPrintTagsSection.
+ * No code removed from v14 to preserve all functionality (debounce, expand/collapse, etc.).
+ */
+
+/**
+ * Debounce function with immediate lock to prevent multiple rapid executions
+ * Used by: setupPrintTagsSection for syncToPc
+ */
 function debounce(func, wait) {
     let timeout;
     let isProcessing = false;
@@ -24,7 +34,10 @@ function debounce(func, wait) {
     };
 }
 
-// Populate the common name dropdown for printing tags
+/**
+ * Populate the common name dropdown for printing tags
+ * Called on: DOMContentLoaded
+ */
 function populateCommonNameDropdown() {
     const select = document.getElementById('commonNameSelect');
     if (!select) {
@@ -54,7 +67,10 @@ function populateCommonNameDropdown() {
         });
 }
 
-// Fetch and display CSV contents
+/**
+ * Fetch and display CSV contents
+ * Called on: DOMContentLoaded, syncToPc, removeCsvItem, updateStatusBtn
+ */
 function fetchCsvContents() {
     const tbody = document.getElementById('csvContentsBody');
     const updateStatusBtn = document.getElementById('updateStatusBtn');
@@ -105,7 +121,10 @@ function fetchCsvContents() {
         });
 }
 
-// Handle sync to PC and status update for printing tags
+/**
+ * Handle sync to PC and status update for printing tags
+ * Updated 2025-05-27: Added UI feedback for updateStatusBtn with syncMessage alerts
+ */
 function setupPrintTagsSection() {
     const syncBtn = document.getElementById('syncToPcBtn');
     const updateStatusBtn = document.getElementById('updateStatusBtn');
@@ -122,16 +141,16 @@ function setupPrintTagsSection() {
         const quantity = parseInt(document.getElementById('tagQuantity')?.value) || 0;
 
         if (!commonName) {
-            alert('Please select a common name.');
+            syncMessage.innerHTML = '<div class="alert alert-danger">Please select a common name.</div>';
             return;
         }
         if (quantity <= 0) {
-            alert('Please enter a valid number of tags to print.');
+            syncMessage.innerHTML = '<div class="alert alert-danger">Please enter a valid number of tags to print.</div>';
             return;
         }
 
         syncBtn.disabled = true;
-        syncMessage.textContent = 'Syncing to PC...';
+        syncMessage.innerHTML = '<div class="alert alert-info">Syncing to PC...</div>';
         console.log(`DEBUG: Sending sync request: commonName=${commonName}, quantity=${quantity}`);
 
         try {
@@ -155,12 +174,12 @@ function setupPrintTagsSection() {
                 throw new Error(data.error);
             }
 
-            syncMessage.textContent = `Successfully synced ${data.synced_items} items to PC.`;
+            syncMessage.innerHTML = `<div class="alert alert-success">Successfully synced ${data.synced_items} items to PC.</div>`;
             console.log(`DEBUG: Sync successful, ${data.synced_items} items added`);
             fetchCsvContents();
         } catch (error) {
             console.error('Sync error:', error);
-            syncMessage.textContent = `Error syncing to PC: ${error.message}`;
+            syncMessage.innerHTML = `<div class="alert alert-danger">Error syncing to PC: ${error.message}</div>`;
         } finally {
             syncBtn.disabled = false;
         }
@@ -172,37 +191,38 @@ function setupPrintTagsSection() {
         debouncedSync();
     }, { once: true });
 
-    updateStatusBtn.addEventListener('click', () => {
+    // Added UI feedback for status update
+    updateStatusBtn.addEventListener('click', async () => {
         updateStatusBtn.disabled = true;
-        syncMessage.textContent = 'Updating status...';
+        syncMessage.innerHTML = '<div class="alert alert-info">Updating status...</div>';
 
-        fetch('/tab/3/update_synced_status', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            }
-        })
-        .then(response => {
+        try {
+            const response = await fetch('/tab/3/update_synced_status', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+
             if (!response.ok) {
                 throw new Error(`Status update failed with status ${response.status}`);
             }
-            return response.json();
-        })
-        .then(data => {
+
+            const data = await response.json();
             if (data.error) {
                 throw new Error(data.error);
             }
-            syncMessage.textContent = `Successfully updated status for ${data.updated_items} items.`;
+
+            syncMessage.innerHTML = `<div class="alert alert-success">Successfully updated status for ${data.updated_items} items.</div>`;
             fetchCsvContents();
             setTimeout(() => {
                 window.location.reload();
             }, 2000);
-        })
-        .catch(error => {
+        } catch (error) {
             console.error('Status update error:', error);
-            syncMessage.textContent = `Error updating status: ${error.message}`;
+            syncMessage.innerHTML = `<div class="alert alert-danger">Error updating status: ${error.message}</div>`;
             updateStatusBtn.disabled = false;
-        });
+        }
     }, { once: true });
 
     csvContentsTable.addEventListener('click', (event) => {
@@ -243,12 +263,12 @@ function setupPrintTagsSection() {
             if (data.error) {
                 throw new Error(data.error);
             }
-            syncMessage.textContent = data.message;
+            syncMessage.innerHTML = `<div class="alert alert-success">${data.message}</div>`;
             fetchCsvContents();
         })
         .catch(error => {
             console.error('Error removing item:', error);
-            syncMessage.textContent = `Error removing item: ${error.message}`;
+            syncMessage.innerHTML = `<div class="alert alert-danger">Error removing item: ${error.message}</div>`;
         })
         .finally(() => {
             removeBtn.classList.remove('processing');
@@ -256,7 +276,9 @@ function setupPrintTagsSection() {
     }, { once: false });
 }
 
-// Apply filters for Tab 3
+/**
+ * Apply filters for Tab 3
+ */
 function applyTab3Filters() {
     const commonName = document.getElementById('commonNameFilterTab3').value;
     const date = document.getElementById('dateFilterTab3').value;
@@ -270,12 +292,16 @@ function applyTab3Filters() {
     window.location.href = `/tab/3?${params.toString()}`;
 }
 
-// Clear filters for Tab 3
+/**
+ * Clear filters for Tab 3
+ */
 function clearTab3Filters() {
     window.location.href = '/tab/3';
 }
 
-// Update status button visibility
+/**
+ * Update status button visibility
+ */
 function updateStatusVisibility(tagId) {
     const select = document.getElementById(`tab3-status-${tagId}`);
     const saveBtn = select.closest('tr').querySelector('.tab3-save-status-btn');
@@ -287,7 +313,9 @@ function updateStatusVisibility(tagId) {
     saveBtn.style.display = select.value !== originalStatus ? 'inline-block' : 'none';
 }
 
-// Update item status
+/**
+ * Update item status
+ */
 function updateStatus(tagId) {
     const newStatus = document.getElementById(`tab3-status-${tagId}`).value;
 
@@ -316,7 +344,9 @@ function updateStatus(tagId) {
     });
 }
 
-// Update notes button visibility
+/**
+ * Update notes button visibility
+ */
 function updateNotesVisibility(tagId) {
     const textarea = document.getElementById(`tab3-notes-${tagId}`);
     const saveBtn = textarea.closest('tr').querySelector('.tab3-save-notes-btn');
@@ -328,7 +358,9 @@ function updateNotesVisibility(tagId) {
     saveBtn.style.display = textarea.value !== originalNotes ? 'inline-block' : 'none';
 }
 
-// Update item notes
+/**
+ * Update item notes
+ */
 function updateNotes(tagId) {
     const newNotes = document.getElementById(`tab3-notes-${tagId}`).value;
 
@@ -357,7 +389,9 @@ function updateNotes(tagId) {
     });
 }
 
-// Handle expand/collapse functionality
+/**
+ * Handle expand/collapse functionality
+ */
 function setupExpandCollapse() {
     document.addEventListener('click', (event) => {
         const expandBtn = event.target.closest('.expand-btn');
@@ -380,7 +414,9 @@ function setupExpandCollapse() {
     });
 }
 
-// Initialize the page
+/**
+ * Initialize the page
+ */
 document.addEventListener('DOMContentLoaded', function() {
     // Format timestamps in the status tables
     document.querySelectorAll('.tab3-status-table').forEach(table => {
