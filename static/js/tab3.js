@@ -1,12 +1,11 @@
-console.log('tab3.js version: 2025-05-21-v13 loaded');
+console.log('tab3.js version: 2025-05-27-v14 loaded');
 
 // Debounce function with immediate lock to prevent multiple rapid executions
 function debounce(func, wait) {
     let timeout;
-    let isProcessing = false; // Lock to prevent concurrent requests
+    let isProcessing = false;
 
     return function executedFunction(...args) {
-        // Check lock immediately to prevent scheduling multiple timeouts
         if (isProcessing) {
             console.log('DEBUG: Request blocked - sync already in progress');
             return;
@@ -118,7 +117,6 @@ function setupPrintTagsSection() {
         return;
     }
 
-    // Debounced sync function to prevent multiple requests
     const debouncedSync = debounce(async () => {
         const commonName = document.getElementById('commonNameSelect')?.value;
         const quantity = parseInt(document.getElementById('tagQuantity')?.value) || 0;
@@ -168,15 +166,12 @@ function setupPrintTagsSection() {
         }
     }, 500);
 
-    // Remove any existing listeners to prevent duplicates
     syncBtn.removeEventListener('click', debouncedSync);
-    // Add the click listener with the `once` option to ensure single execution
     syncBtn.addEventListener('click', () => {
         console.log('DEBUG: Sync to PC button clicked');
         debouncedSync();
     }, { once: true });
 
-    // Update status button click handler
     updateStatusBtn.addEventListener('click', () => {
         updateStatusBtn.disabled = true;
         syncMessage.textContent = 'Updating status...';
@@ -210,7 +205,6 @@ function setupPrintTagsSection() {
         });
     }, { once: true });
 
-    // Event delegation for remove buttons to prevent duplicate dialogs
     csvContentsTable.addEventListener('click', (event) => {
         const removeBtn = event.target.closest('.remove-btn');
         if (!removeBtn) return;
@@ -221,7 +215,6 @@ function setupPrintTagsSection() {
             return;
         }
 
-        // Prevent multiple rapid clicks on the same button
         if (removeBtn.classList.contains('processing')) {
             console.log('DEBUG: Remove button already processing for tag_id:', tagId);
             return;
@@ -260,7 +253,7 @@ function setupPrintTagsSection() {
         .finally(() => {
             removeBtn.classList.remove('processing');
         });
-    }, { once: false }); // Keep delegation active for dynamic rows
+    }, { once: false });
 }
 
 // Apply filters for Tab 3
@@ -284,8 +277,8 @@ function clearTab3Filters() {
 
 // Update status button visibility
 function updateStatusVisibility(tagId) {
-    const select = document.getElementById(`status-${tagId}`);
-    const saveBtn = select.closest('tr').querySelector('.save-status-btn');
+    const select = document.getElementById(`tab3-status-${tagId}`);
+    const saveBtn = select.closest('tr').querySelector('.tab3-save-status-btn');
     if (!select || !saveBtn) {
         console.warn(`Status select or save button not found for tag_id: ${tagId}`);
         return;
@@ -296,7 +289,7 @@ function updateStatusVisibility(tagId) {
 
 // Update item status
 function updateStatus(tagId) {
-    const newStatus = document.getElementById(`status-${tagId}`).value;
+    const newStatus = document.getElementById(`tab3-status-${tagId}`).value;
 
     fetch('/tab/3/update_status', {
         method: 'POST',
@@ -325,8 +318,8 @@ function updateStatus(tagId) {
 
 // Update notes button visibility
 function updateNotesVisibility(tagId) {
-    const textarea = document.getElementById(`notes-${tagId}`);
-    const saveBtn = textarea.closest('tr').querySelector('.save-notes-btn');
+    const textarea = document.getElementById(`tab3-notes-${tagId}`);
+    const saveBtn = textarea.closest('tr').querySelector('.tab3-save-notes-btn');
     if (!textarea || !saveBtn) {
         console.warn(`Notes textarea or save button not found for tag_id: ${tagId}`);
         return;
@@ -337,7 +330,7 @@ function updateNotesVisibility(tagId) {
 
 // Update item notes
 function updateNotes(tagId) {
-    const newNotes = document.getElementById(`notes-${tagId}`).value;
+    const newNotes = document.getElementById(`tab3-notes-${tagId}`).value;
 
     fetch('/tab/3/update_notes', {
         method: 'POST',
@@ -390,11 +383,10 @@ function setupExpandCollapse() {
 // Initialize the page
 document.addEventListener('DOMContentLoaded', function() {
     // Format timestamps in the status tables
-    document.querySelectorAll('.status-table').forEach(table => {
+    document.querySelectorAll('.tab3-status-table').forEach(table => {
         const rows = table.querySelectorAll('tbody tr');
         rows.forEach(row => {
-            // Format date_last_scanned (from id_item_master)
-            const dateCell = row.querySelector('.date-last-scanned');
+            const dateCell = row.querySelector('.tab3-date-last-scanned');
             if (dateCell) {
                 const rawDate = dateCell.textContent.trim();
                 const formattedDate = window.formatDate ? window.formatDate(rawDate) : rawDate;
@@ -404,13 +396,13 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // Initialize save button visibility for status and notes
-    document.querySelectorAll('.status-table select').forEach(select => {
-        const tagId = select.id.replace('status-', '');
+    document.querySelectorAll('.tab3-status-table select').forEach(select => {
+        const tagId = select.id.replace('tab3-status-', '');
         updateStatusVisibility(tagId);
     });
 
-    document.querySelectorAll('.status-table textarea').forEach(textarea => {
-        const tagId = textarea.id.replace('notes-', '');
+    document.querySelectorAll('.tab3-status-table textarea').forEach(textarea => {
+        const tagId = textarea.id.replace('tab3-notes-', '');
         updateNotesVisibility(tagId);
     });
 
