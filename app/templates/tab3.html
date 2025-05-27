@@ -3,10 +3,8 @@
 {% block title %}Tab 3 - Items in Service{% endblock %}
 
 {% block content %}
-<!-- Main heading for Tab 3 -->
 <h1>Tab 3 - Items in Service</h1>
 
-<!-- Filter and sort controls for item table -->
 <div class="filter-sort-controls mb-4">
     <div class="row">
         <div class="col-md-4">
@@ -33,23 +31,18 @@
     </div>
 </div>
 
-<!-- Items in Service section, grouped by common_name and status -->
 <div class="tab3-items-section">
     <h3>Items in Service</h3>
     {% if common_name_groups %}
         {% for group in common_name_groups %}
             <div class="tab3-common-name-section mb-3">
-                <h4>
-                    {{ group.common_name }} ({{ group.total_items }} items)
-                </h4>
-                <div id="tab3-common-{{ loop.index }}">
+                <h4>{{ group.common_name }} ({{ group.total_items }} items)</h4>
+                <div id="tab3-common-{{ loop.index0 }}">
                     {% for status_group in group.status_groups %}
                         <div class="tab3-status-section ml-3 mb-2">
-                            <h5>
-                                {{ status_group.status }} ({{ status_group.total_items }} items)
-                            </h5>
-                            <div id="tab3-status-{{ loop.parent.index }}-{{ loop.index }}">
-                                <table class="table table-bordered tab3-status-table" id="tab3-status-table-{{ loop.parent.index }}-{{ loop.index }}">
+                            <h5>{{ status_group.status }} ({{ status_group.total_items }} items)</h5>
+                            <div id="tab3-status-{{ loop.index0 }}-{{ loop.index0 }}">
+                                <table class="table table-bordered tab3-status-table" id="tab3-status-table-{{ loop.index0 }}-{{ loop.index0 }}">
                                     <thead>
                                         <tr>
                                             <th>Tag ID</th>
@@ -128,7 +121,6 @@
     {% endif %}
 </div>
 
-<!-- Section for printing RFID tags -->
 <div class="print-tags-section mt-4">
     <h4>Print RFID Tags</h4>
     <div class="form-group">
@@ -170,7 +162,6 @@
 }
 </style>
 
-<!-- Fallback message for JavaScript issues -->
 <noscript>
     <div style="color: red; text-align: center; margin: 20px;">
         <p>JavaScript is disabled or failed to load. Please enable JavaScript to use the expand/collapse functionality and other interactive features.</p>
