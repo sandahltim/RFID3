@@ -141,6 +141,31 @@
                 {% endfor %}
             </tbody>
         </table>
+
+        <!-- Pagination Controls -->
+        <div class="pagination-controls" id="pagination-tab3-summary-table">
+            {% if total_groups > per_page %}
+                <nav aria-label="Pagination">
+                    <ul class="pagination justify-content-center">
+                        <li class="page-item {% if current_page == 1 %}disabled{% endif %}">
+                            <a class="page-link" href="{% if current_page > 1 %}/tab/3?page={{ current_page - 1 }}{% if common_name_filter %}&common_name={{ common_name_filter }}{% endif %}{% if date_filter %}&date_last_scanned={{ date_filter }}{% endif %}{% if sort %}&sort={{ sort }}{% endif %}{% else %}#{% endif %}">Previous</a>
+                        </li>
+                        {% set total_pages = (total_groups / per_page) | int %}
+                        {% if total_groups % per_page != 0 %}
+                            {% set total_pages = total_pages + 1 %}
+                        {% endif %}
+                        {% for i in range(1, total_pages + 1) %}
+                            <li class="page-item {% if i == current_page %}active{% endif %}">
+                                <a class="page-link" href="/tab/3?page={{ i }}{% if common_name_filter %}&common_name={{ common_name_filter }}{% endif %}{% if date_filter %}&date_last_scanned={{ date_filter }}{% endif %}{% if sort %}&sort={{ sort }}{% endif %}">{{ i }}</a>
+                            </li>
+                        {% endfor %}
+                        <li class="page-item {% if current_page == total_pages %}disabled{% endif %}">
+                            <a class="page-link" href="{% if current_page < total_pages %}/tab/3?page={{ current_page + 1 }}{% if common_name_filter %}&common_name={{ common_name_filter }}{% endif %}{% if date_filter %}&date_last_scanned={{ date_filter }}{% endif %}{% if sort %}&sort={{ sort }}{% endif %}{% else %}#{% endif %}">Next</a>
+                        </li>
+                    </ul>
+                </nav>
+            {% endif %}
+        </div>
     {% else %}
         <p>No items currently in service. If this is unexpected, please check the database or contact support.</p>
     {% endif %}
