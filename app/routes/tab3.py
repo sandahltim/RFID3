@@ -55,7 +55,7 @@ if not os.path.exists(SHARED_DIR):
     os.chown(SHARED_DIR, pwd.getpwnam('tim').pw_uid, grp.getgrnam('tim').gr_gid)
 
 # Log deployment version
-logger.info("Deployed tab3.py version: 2025-05-28-v64")
+logger.info("Deployed tab3.py version: 2025-05-28-v65")
 
 # Helper function to normalize common_name by removing suffixes like (G1), (G2)
 def normalize_common_name(name):
@@ -295,6 +295,7 @@ def tab3_view():
                 }
 
         # Assign detailed items to summary groups using normalized common_name
+        unmatched_items = []
         for item in items_in_service:
             t_data = transaction_data.get(item['tag_id'], {
                 'location_of_repair': 'N/A',
@@ -349,6 +350,7 @@ def tab3_view():
             }
 
             # Find matching summary group using normalized common_name
+            matched = False
             for group in summary_groups:
                 if group['rental_class_id'] == item['rental_class_num'] and normalize_common_name(group['common_name']) == item['common_name_normalized']:
                     group['item_list'].append(item_details)
@@ -357,10 +359,14 @@ def tab3_view():
                     # Update statuses
                     if item['status'] not in group['statuses']:
                         group['statuses'].append(item['status'])
+                    matched = True
                     break
+            if not matched:
+                logger.debug(f"Unmatched item: tag_id={item['tag_id']}, common_name={item['common_name']}, rental_class_num={item['rental_class_num']}")
+                unmatched_items.append(item)
 
-        # Debug: Log groups before filtering
-        logger.debug(f"Before filtering - Summary groups: {len(summary_groups)}")
+        # Debug: Log groups after assignment but before filtering
+        logger.debug(f"After assignment - Summary groups: {len(summary_groups)}")
         for group in summary_groups:
             logger.debug(f"Group: rental_class_id={group['rental_class_id']}, common_name={group['common_name']}, number_in_service={group['number_in_service']}, items={len(group['item_list'])}")
 
@@ -371,6 +377,10 @@ def tab3_view():
         logger.debug(f"After filtering - Summary groups: {len(summary_groups)}")
         for group in summary_groups:
             logger.debug(f"Final group: rental_class_id={group['rental_class_id']}, common_name={group['common_name']}, items={len(group['item_list'])}, statuses={group['statuses']}")
+
+        # Debug: Log unmatched items
+        if unmatched_items:
+            logger.debug(f"Unmatched items: {[(item['tag_id'], item['common_name'], item['rental_class_num']) for item in unmatched_items]}")
 
         session.commit()
         logger.info("Rendering Tab 3 template")
