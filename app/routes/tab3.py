@@ -54,7 +54,7 @@ if not os.path.exists(SHARED_DIR):
     os.chown(SHARED_DIR, pwd.getpwnam('tim').pw_uid, grp.getgrnam('tim').gr_gid)
 
 # Log deployment version
-logger.info("Deployed tab3.py version: 2025-05-28-v62")
+logger.info("Deployed tab3.py version: 2025-05-28-v63")
 
 @tab3_bp.route('/tab/3')
 def tab3_view():
@@ -150,7 +150,7 @@ def tab3_view():
                 'number_on_rent': row[3] or 0,
                 'number_ready_to_rent': row[4] or 0,
                 'statuses': row[5].split(',') if row[5] else [],
-                'items': []  # To be populated with detailed items
+                'item_list': []  # Renamed from 'items' to avoid conflict with dict.items()
             })
 
         # Query detailed items for in-service statuses
@@ -341,13 +341,13 @@ def tab3_view():
             # Find matching summary group
             for group in summary_groups:
                 if group['rental_class_id'] == item['rental_class_num'] and group['common_name'] == item['common_name']:
-                    group['items'].append(item_details)
+                    group['item_list'].append(item_details)
                     break
 
         # Debug: Log groups before filtering
         logger.debug(f"Before filtering - Summary groups: {len(summary_groups)}")
         for group in summary_groups:
-            logger.debug(f"Group: rental_class_id={group['rental_class_id']}, common_name={group['common_name']}, number_in_service={group['number_in_service']}, items={len(group['items'])}")
+            logger.debug(f"Group: rental_class_id={group['rental_class_id']}, common_name={group['common_name']}, number_in_service={group['number_in_service']}, items={len(group['item_list'])}")
 
         # Filter out groups with no in-service items
         summary_groups = [g for g in summary_groups if g['number_in_service'] > 0]
@@ -355,7 +355,7 @@ def tab3_view():
         # Debug log data structure
         logger.debug(f"After filtering - Summary groups: {len(summary_groups)}")
         for group in summary_groups:
-            logger.debug(f"Final group: rental_class_id={group['rental_class_id']}, common_name={group['common_name']}, items={len(group['items'])}, statuses={group['statuses']}")
+            logger.debug(f"Final group: rental_class_id={group['rental_class_id']}, common_name={group['common_name']}, items={len(group['item_list'])}, statuses={group['statuses']}")
 
         session.commit()
         logger.info("Rendering Tab 3 template")
