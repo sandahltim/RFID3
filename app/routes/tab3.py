@@ -55,7 +55,7 @@ if not os.path.exists(SHARED_DIR):
     os.chown(SHARED_DIR, pwd.getpwnam('tim').pw_uid, grp.getgrnam('tim').gr_gid)
 
 # Log deployment version
-logger.info("Deployed tab3.py version: 2025-05-28-v66")
+logger.info("Deployed tab3.py version: 2025-05-28-v67")
 
 # Helper function to normalize common_name by removing suffixes like (G1), (G2)
 def normalize_common_name(name):
@@ -305,7 +305,7 @@ def tab3_view():
                     'last_transaction_scan_date': t.scan_date.strftime('%Y-%m-%d %H:%M:%S') if t.scan_date else 'N/A'
                 }
 
-        # Assign detailed items to summary groups, creating new groups if necessary
+        # Assign detailed items to summary groups, updating existing groups instead of creating duplicates
         unmatched_items = []
         for item in items_in_service:
             t_data = transaction_data.get(item['tag_id'], {
@@ -360,22 +360,21 @@ def tab3_view():
                 'last_transaction_scan_date': t_data['last_transaction_scan_date']
             }
 
-            # Find or create a matching summary group
-            matched = False
-            for group in summary_groups:
-                if group['rental_class_id'] == item['rental_class_num'] and normalize_common_name(group['common_name']) == item['common_name_normalized']:
-                    group['item_list'].append(item_details)
-                    group['number_in_service'] = len(group['item_list'])
-                    if item['status'] not in group['statuses']:
-                        group['statuses'].append(item['status'])
-                    matched = True
-                    break
-
-            if not matched:
-                # Create a new group if no match is found
+            # Find or update the existing summary group
+            group = rental_class_to_group.get(item['rental_class_num'])
+            if group:
+                # Update the existing group's common_name to the unnormalized version
+                group['common_name'] = item['common_name']
+                group['item_list'].append(item_details)
+                group['number_in_service'] = len(group['item_list'])
+                if item['status'] not in group['statuses']:
+                    group['statuses'].append(item['status'])
+                logger.debug(f"Updated existing group: rental_class_id={item['rental_class_num']}, common_name={item['common_name']}")
+            else:
+                # Create a new group if none exists
                 new_group = {
                     'rental_class_id': item['rental_class_num'],
-                    'common_name': item['common_name_normalized'],
+                    'common_name': item['common_name'],
                     'number_in_service': 1,
                     'number_on_rent': 0,
                     'number_ready_to_rent': 0,
@@ -384,9 +383,7 @@ def tab3_view():
                 }
                 summary_groups.append(new_group)
                 rental_class_to_group[item['rental_class_num']] = new_group
-                logger.debug(f"Created new group for unmatched item: rental_class_id={item['rental_class_num']}, common_name={item['common_name_normalized']}")
-            else:
-                logger.debug(f"Matched item: tag_id={item['tag_id']}, common_name={item['common_name']}, rental_class_num={item['rental_class_num']}")
+                logger.debug(f"Created new group for unmatched item: rental_class_id={item['rental_class_num']}, common_name={item['common_name']}")
 
         # Debug: Log groups after assignment but before filtering
         logger.debug(f"After assignment - Summary groups: {len(summary_groups)}")
