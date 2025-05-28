@@ -54,7 +54,7 @@ if not os.path.exists(SHARED_DIR):
     os.chown(SHARED_DIR, pwd.getpwnam('tim').pw_uid, grp.getgrnam('tim').gr_gid)
 
 # Log deployment version
-logger.info("Deployed tab3.py version: 2025-05-28-v58")
+logger.info("Deployed tab3.py version: 2025-05-28-v59")
 
 @tab3_bp.route('/tab/3')
 def tab3_view():
@@ -69,6 +69,16 @@ def tab3_view():
         session.execute(text("SELECT 1"))
         logger.info("Database connection test successful")
 
+        # Debug: Check all statuses in id_item_master
+        status_query = """
+            SELECT DISTINCT status
+            FROM id_item_master
+            WHERE status IS NOT NULL
+        """
+        status_result = session.execute(text(status_query))
+        statuses = [row[0] for row in status_result.fetchall()]
+        logger.info(f"All statuses in id_item_master: {statuses}")
+
         # Get query parameters
         common_name_filter = request.args.get('common_name', '').lower()
         date_filter = request.args.get('date_last_scanned', '')
@@ -76,20 +86,20 @@ def tab3_view():
         page = int(request.args.get('page', 1))
         per_page = 20
 
-        # Define in-service statuses
-        in_service_statuses = ['Repair', 'Needs to be Inspected', 'Wash', 'Wet']
+        # Define in-service statuses (case-insensitive)
+        in_service_statuses = ['repair', 'needs to be inspected', 'wash', 'wet']
 
         # Query for summary data (parent layer)
         summary_query = """
             SELECT 
                 COALESCE(rental_class_num, '') AS rental_class_id,
                 common_name,
-                COUNT(CASE WHEN status IN :in_service_statuses THEN 1 END) AS number_in_service,
-                COUNT(CASE WHEN status = 'On Rent' THEN 1 END) AS number_on_rent,
-                COUNT(CASE WHEN status = 'Ready to Rent' THEN 1 END) AS number_ready_to_rent,
-                GROUP_CONCAT(DISTINCT CASE WHEN status IN :in_service_statuses THEN status END) AS statuses
+                COUNT(CASE WHEN LOWER(TRIM(COALESCE(status, ''))) IN :in_service_statuses THEN 1 END) AS number_in_service,
+                COUNT(CASE WHEN LOWER(TRIM(COALESCE(status, ''))) = 'on rent' THEN 1 END) AS number_on_rent,
+                COUNT(CASE WHEN LOWER(TRIM(COALESCE(status, ''))) = 'ready to rent' THEN 1 END) AS number_ready_to_rent,
+                GROUP_CONCAT(DISTINCT CASE WHEN LOWER(TRIM(COALESCE(status, ''))) IN :in_service_statuses THEN status END) AS statuses
             FROM id_item_master
-            WHERE TRIM(COALESCE(status, '')) IN (:in_service_statuses, 'On Rent', 'Ready to Rent')
+            WHERE LOWER(TRIM(COALESCE(status, ''))) IN (:in_service_statuses, 'on rent', 'ready to rent')
         """
         params = {'in_service_statuses': tuple(in_service_statuses)}
         
@@ -109,9 +119,10 @@ def tab3_view():
         params['limit'] = per_page
         params['offset'] = (page - 1) * per_page
 
+        logger.debug(f"Executing summary query: {summary_query} with params: {params}")
         summary_result = session.execute(text(summary_query), params)
         summary_rows = summary_result.fetchall()
-        logger.info(f"Summary query returned {len(summary_rows)} groups")
+        logger.info(f"Summary query returned {len(summary_rows)} groups: {[(row[0], row[1], row[2]) for row in summary_rows]}")
 
         # Structure summary groups
         summary_groups = []
@@ -138,7 +149,7 @@ def tab3_view():
                 rental_class_num, 
                 notes
             FROM id_item_master
-            WHERE TRIM(COALESCE(status, '')) IN :in_service_statuses
+            WHERE LOWER(TRIM(COALESCE(status, ''))) IN :in_service_statuses
         """
         detail_params = {'in_service_statuses': tuple(in_service_statuses)}
         if common_name_filter:
@@ -157,9 +168,10 @@ def tab3_view():
         else:
             detail_query += " ORDER BY date_last_scanned DESC, LOWER(common_name) ASC"
 
+        logger.debug(f"Executing detail query: {detail_query} with params: {detail_params}")
         detail_result = session.execute(text(detail_query), detail_params)
         detail_rows = detail_result.fetchall()
-        logger.info(f"Detailed query returned {len(detail_rows)} items")
+        logger.info(f"Detailed query returned {len(detail_rows)} items: {[(row[0], row[1], row[2]) for row in detail_rows]}")
 
         # Structure detailed items
         items_in_service = [
@@ -180,6 +192,7 @@ def tab3_view():
         tag_ids = [item['tag_id'] for item in items_in_service]
         transaction_data = {}
         if tag_ids:
+            logger.debug(f"Fetching transactions for tag_ids: {tag_ids}")
             max_scan_date_subquery = session.query(
                 Transaction.tag_id,
                 func.max(Transaction.scan_date).label('max_scan_date')
@@ -214,6 +227,7 @@ def tab3_view():
                 (Transaction.tag_id == max_scan_date_subquery.c.tag_id) &
                 (Transaction.scan_date == max_scan_date_subquery.c.max_scan_date)
             ).all()
+            logger.info(f"Fetched {len(transactions)} transactions")
 
             for t in transactions:
                 repair_types = []
