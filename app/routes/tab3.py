@@ -54,7 +54,7 @@ if not os.path.exists(SHARED_DIR):
     os.chown(SHARED_DIR, pwd.getpwnam('tim').pw_uid, grp.getgrnam('tim').gr_gid)
 
 # Log deployment version
-logger.info("Deployed tab3.py version: 2025-05-27-v57")
+logger.info("Deployed tab3.py version: 2025-05-28-v58")
 
 @tab3_bp.route('/tab/3')
 def tab3_view():
@@ -69,16 +69,6 @@ def tab3_view():
         session.execute(text("SELECT 1"))
         logger.info("Database connection test successful")
 
-        # Fetch distinct statuses
-        status_query = """
-            SELECT DISTINCT status
-            FROM id_item_master
-            WHERE status IS NOT NULL
-        """
-        status_result = session.execute(text(status_query))
-        statuses = [row[0] for row in status_result.fetchall()]
-        logger.info(f"Distinct statuses in id_item_master: {statuses}")
-
         # Get query parameters
         common_name_filter = request.args.get('common_name', '').lower()
         date_filter = request.args.get('date_last_scanned', '')
@@ -86,41 +76,92 @@ def tab3_view():
         page = int(request.args.get('page', 1))
         per_page = 20
 
-        # Build SQL query for items in service
-        sql_query = """
-            SELECT tag_id, common_name, status, bin_location, last_contract_num, date_last_scanned, rental_class_num, notes
+        # Define in-service statuses
+        in_service_statuses = ['Repair', 'Needs to be Inspected', 'Wash', 'Wet']
+
+        # Query for summary data (parent layer)
+        summary_query = """
+            SELECT 
+                COALESCE(rental_class_num, '') AS rental_class_id,
+                common_name,
+                COUNT(CASE WHEN status IN :in_service_statuses THEN 1 END) AS number_in_service,
+                COUNT(CASE WHEN status = 'On Rent' THEN 1 END) AS number_on_rent,
+                COUNT(CASE WHEN status = 'Ready to Rent' THEN 1 END) AS number_ready_to_rent,
+                GROUP_CONCAT(DISTINCT CASE WHEN status IN :in_service_statuses THEN status END) AS statuses
             FROM id_item_master
-            WHERE TRIM(COALESCE(status, '')) IN ('Repair', 'Needs to be Inspected', 'Staged', 'Wash', 'Wet')
-              AND TRIM(COALESCE(status, '')) != 'Sold'
+            WHERE TRIM(COALESCE(status, '')) IN (:in_service_statuses, 'On Rent', 'Ready to Rent')
         """
-        params = {}
+        params = {'in_service_statuses': tuple(in_service_statuses)}
+        
         if common_name_filter:
-            sql_query += " AND LOWER(common_name) LIKE :common_name_filter"
+            summary_query += " AND LOWER(common_name) LIKE :common_name_filter"
             params['common_name_filter'] = f'%{common_name_filter}%'
-        if date_filter:
-            try:
-                date = datetime.strptime(date_filter, '%Y-%m-%d')
-                sql_query += " AND DATE(date_last_scanned) = :date_filter"
-                params['date_filter'] = date
-            except ValueError:
-                logger.warning(f"Invalid date format for date_last_scanned filter: {date_filter}")
-
-        # Apply sorting
+        
+        summary_query += " GROUP BY COALESCE(rental_class_num, ''), common_name"
+        
+        # Apply sorting for summary
         if sort == 'date_last_scanned_asc':
-            sql_query += " ORDER BY date_last_scanned ASC, LOWER(common_name) ASC"
+            summary_query += " ORDER BY MIN(date_last_scanned) ASC, common_name ASC"
         else:
-            sql_query += " ORDER BY date_last_scanned DESC, LOWER(common_name) ASC"
+            summary_query += " ORDER BY MIN(date_last_scanned) DESC, common_name ASC"
 
-        sql_query += " LIMIT :limit OFFSET :offset"
+        summary_query += " LIMIT :limit OFFSET :offset"
         params['limit'] = per_page
         params['offset'] = (page - 1) * per_page
 
-        # Execute query
-        result = session.execute(text(sql_query), params)
-        rows = result.fetchall()
-        logger.info(f"Raw query returned {len(rows)} rows")
+        summary_result = session.execute(text(summary_query), params)
+        summary_rows = summary_result.fetchall()
+        logger.info(f"Summary query returned {len(summary_rows)} groups")
 
-        # Structure items
+        # Structure summary groups
+        summary_groups = []
+        for row in summary_rows:
+            summary_groups.append({
+                'rental_class_id': row[0] or 'N/A',
+                'common_name': row[1] or 'Unknown',
+                'number_in_service': row[2] or 0,
+                'number_on_rent': row[3] or 0,
+                'number_ready_to_rent': row[4] or 0,
+                'statuses': row[5].split(',') if row[5] else [],
+                'items': []  # To be populated with detailed items
+            })
+
+        # Query detailed items for in-service statuses
+        detail_query = """
+            SELECT 
+                tag_id, 
+                common_name, 
+                status, 
+                bin_location, 
+                last_contract_num, 
+                date_last_scanned, 
+                rental_class_num, 
+                notes
+            FROM id_item_master
+            WHERE TRIM(COALESCE(status, '')) IN :in_service_statuses
+        """
+        detail_params = {'in_service_statuses': tuple(in_service_statuses)}
+        if common_name_filter:
+            detail_query += " AND LOWER(common_name) LIKE :common_name_filter"
+            detail_params['common_name_filter'] = f'%{common_name_filter}%'
+        if date_filter:
+            try:
+                date = datetime.strptime(date_filter, '%Y-%m-%d')
+                detail_query += " AND DATE(date_last_scanned) = :date_filter"
+                detail_params['date_filter'] = date
+            except ValueError:
+                logger.warning(f"Invalid date format for date_last_scanned filter: {date_filter}")
+
+        if sort == 'date_last_scanned_asc':
+            detail_query += " ORDER BY date_last_scanned ASC, LOWER(common_name) ASC"
+        else:
+            detail_query += " ORDER BY date_last_scanned DESC, LOWER(common_name) ASC"
+
+        detail_result = session.execute(text(detail_query), detail_params)
+        detail_rows = detail_result.fetchall()
+        logger.info(f"Detailed query returned {len(detail_rows)} items")
+
+        # Structure detailed items
         items_in_service = [
             {
                 'tag_id': row[0],
@@ -129,33 +170,11 @@ def tab3_view():
                 'bin_location': row[3] or 'N/A',
                 'last_contract_num': row[4] or 'N/A',
                 'date_last_scanned': row[5].isoformat() if row[5] else 'N/A',
-                'rental_class_num': str(row[6]).strip().upper() if row[6] else None,
+                'rental_class_num': str(row[6]).strip().upper() if row[6] else 'N/A',
                 'notes': row[7] or ''
             }
-            for row in rows
+            for row in detail_rows
         ]
-
-        # Count total items
-        count_query = """
-            SELECT COUNT(*) 
-            FROM id_item_master
-            WHERE TRIM(COALESCE(status, '')) IN ('Repair', 'Needs to be Inspected', 'Staged', 'Wash', 'Wet')
-              AND TRIM(COALESCE(status, '')) != 'Sold'
-        """
-        count_params = {}
-        if common_name_filter:
-            count_query += " AND LOWER(common_name) LIKE :common_name_filter"
-            count_params['common_name_filter'] = f'%{common_name_filter}%'
-        if date_filter:
-            try:
-                date = datetime.strptime(date_filter, '%Y-%m-%d')
-                count_query += " AND DATE(date_last_scanned) = :date_filter"
-                count_params['date_filter'] = date
-            except ValueError:
-                logger.warning(f"Invalid date format for date_last_scanned filter in count query: {date_filter}")
-
-        total_items = session.execute(text(count_query), count_params).scalar()
-        logger.info(f"Total items matching query: {total_items}")
 
         # Fetch transaction data
         tag_ids = [item['tag_id'] for item in items_in_service]
@@ -235,16 +254,8 @@ def tab3_view():
                     'last_transaction_scan_date': t.scan_date.strftime('%Y-%m-%d %H:%M:%S') if t.scan_date else 'N/A'
                 }
 
-        # Group items by common name and status
-        items_by_common_name = {}
+        # Assign detailed items to summary groups
         for item in items_in_service:
-            common_name = item['common_name']
-            status = item['status']
-            if common_name not in items_by_common_name:
-                items_by_common_name[common_name] = {}
-            if status not in items_by_common_name[common_name]:
-                items_by_common_name[common_name][status] = []
-
             t_data = transaction_data.get(item['tag_id'], {
                 'location_of_repair': 'N/A',
                 'repair_types': ['None'],
@@ -267,13 +278,14 @@ def tab3_view():
                 'last_transaction_scan_date': 'N/A'
             })
 
-            items_by_common_name[common_name][status].append({
+            item_details = {
                 'tag_id': item['tag_id'],
                 'common_name': item['common_name'],
                 'status': item['status'],
                 'bin_location': item['bin_location'],
                 'last_contract_num': item['last_contract_num'],
                 'date_last_scanned': item['date_last_scanned'],
+                'rental_class_id': item['rental_class_num'],
                 'location_of_repair': t_data['location_of_repair'],
                 'repair_types': t_data['repair_types'],
                 'notes': item['notes'],
@@ -294,44 +306,26 @@ def tab3_view():
                 'longitude': t_data['longitude'],
                 'latitude': t_data['latitude'],
                 'last_transaction_scan_date': t_data['last_transaction_scan_date']
-            })
+            }
 
-        # Define status priority for sorting
-        status_priority = {
-            'Repair': 1,
-            'Wash': 2,
-            'Wet': 3,
-            'Staged': 4,
-            'Needs to be Inspected': 5
-        }
+            # Find matching summary group
+            for group in summary_groups:
+                if group['rental_class_id'] == item['rental_class_num'] and group['common_name'] == item['common_name']:
+                    group['items'].append(item_details)
+                    break
 
-        # Structure common name groups
-        common_name_groups = []
-        for common_name, statuses in sorted(items_by_common_name.items()):
-            status_groups = []
-            for status in sorted(statuses.keys(), key=lambda s: status_priority.get(s, 6)):
-                status_groups.append({
-                    'status': status,
-                    'item_list': statuses[status],  # Use item_list to avoid dict.items() conflict
-                    'total_items': len(statuses[status])
-                })
-            common_name_groups.append({
-                'common_name': common_name,
-                'status_groups': status_groups,
-                'total_items': sum(len(statuses[s]) for s in statuses)
-            })
+        # Filter out groups with no in-service items
+        summary_groups = [g for g in summary_groups if g['number_in_service'] > 0]
 
         # Debug log data structure
-        logger.debug(f"Common name groups structure: {len(common_name_groups)} groups")
-        for group in common_name_groups:
-            logger.debug(f"Group: {group['common_name']}, Status groups: {len(group['status_groups'])}")
-            for sg in group['status_groups']:
-                logger.debug(f"  Status: {sg['status']}, Items: {sg['total_items']}")
+        logger.debug(f"Summary groups: {len(summary_groups)}")
+        for group in summary_groups:
+            logger.debug(f"Group: rental_class_id={group['rental_class_id']}, common_name={group['common_name']}, items={len(group['items'])}")
 
         session.commit()
         return render_template(
             'tab3.html',
-            common_name_groups=common_name_groups,
+            summary_groups=summary_groups,
             common_name_filter=common_name_filter,
             date_filter=date_filter,
             sort=sort,
@@ -343,7 +337,7 @@ def tab3_view():
             session.rollback()
         return render_template(
             'tab3.html',
-            common_name_groups=[],
+            summary_groups=[],
             common_name_filter='',
             date_filter='',
             sort='date_last_scanned_desc',
