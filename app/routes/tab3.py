@@ -54,7 +54,7 @@ if not os.path.exists(SHARED_DIR):
     os.chown(SHARED_DIR, pwd.getpwnam('tim').pw_uid, grp.getgrnam('tim').gr_gid)
 
 # Log deployment version
-logger.info("Deployed tab3.py version: 2025-05-28-v60")
+logger.info("Deployed tab3.py version: 2025-05-28-v62")
 
 @tab3_bp.route('/tab/3')
 def tab3_view():
@@ -101,22 +101,23 @@ def tab3_view():
         in_service_statuses = ['Repair', 'Needs to be Inspected', 'Wash', 'Wet']
         all_statuses = in_service_statuses + ['On Rent', 'Ready to Rent']
 
+        # Construct IN clause manually to avoid tuple conversion issue
+        in_service_statuses_sql = ', '.join([f"'{status}'" for status in in_service_statuses])
+        all_statuses_sql = ', '.join([f"'{status}'" for status in all_statuses])
+
         # Query for summary data (parent layer)
-        summary_query = """
+        summary_query = f"""
             SELECT 
                 COALESCE(rental_class_num, '') AS rental_class_id,
                 common_name,
-                COUNT(CASE WHEN TRIM(COALESCE(status, '')) IN :in_service_statuses THEN 1 END) AS number_in_service,
+                COUNT(CASE WHEN TRIM(COALESCE(status, '')) IN ({in_service_statuses_sql}) THEN 1 END) AS number_in_service,
                 COUNT(CASE WHEN TRIM(COALESCE(status, '')) = 'On Rent' THEN 1 END) AS number_on_rent,
                 COUNT(CASE WHEN TRIM(COALESCE(status, '')) = 'Ready to Rent' THEN 1 END) AS number_ready_to_rent,
-                GROUP_CONCAT(DISTINCT CASE WHEN TRIM(COALESCE(status, '')) IN :in_service_statuses THEN status END) AS statuses
+                GROUP_CONCAT(DISTINCT CASE WHEN TRIM(COALESCE(status, '')) IN ({in_service_statuses_sql}) THEN status END) AS statuses
             FROM id_item_master
-            WHERE TRIM(COALESCE(status, '')) IN :all_statuses
+            WHERE TRIM(COALESCE(status, '')) IN ({all_statuses_sql})
         """
-        params = {
-            'in_service_statuses': tuple(in_service_statuses),
-            'all_statuses': tuple(all_statuses)
-        }
+        params = {}
         
         if common_name_filter:
             summary_query += " AND LOWER(common_name) LIKE :common_name_filter"
@@ -153,7 +154,7 @@ def tab3_view():
             })
 
         # Query detailed items for in-service statuses
-        detail_query = """
+        detail_query = f"""
             SELECT 
                 tag_id, 
                 common_name, 
@@ -164,9 +165,9 @@ def tab3_view():
                 rental_class_num, 
                 notes
             FROM id_item_master
-            WHERE TRIM(COALESCE(status, '')) IN :in_service_statuses
+            WHERE TRIM(COALESCE(status, '')) IN ({in_service_statuses_sql})
         """
-        detail_params = {'in_service_statuses': tuple(in_service_statuses)}
+        detail_params = {}
         if common_name_filter:
             detail_query += " AND LOWER(common_name) LIKE :common_name_filter"
             detail_params['common_name_filter'] = f'%{common_name_filter}%'
@@ -354,9 +355,10 @@ def tab3_view():
         # Debug log data structure
         logger.debug(f"After filtering - Summary groups: {len(summary_groups)}")
         for group in summary_groups:
-            logger.debug(f"Group: rental_class_id={group['rental_class_id']}, common_name={group['common_name']}, items={len(group['items'])}")
+            logger.debug(f"Final group: rental_class_id={group['rental_class_id']}, common_name={group['common_name']}, items={len(group['items'])}, statuses={group['statuses']}")
 
         session.commit()
+        logger.info("Rendering Tab 3 template")
         return render_template(
             'tab3.html',
             summary_groups=summary_groups,
