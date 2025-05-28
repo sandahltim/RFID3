@@ -1,10 +1,10 @@
-console.log('tab3.js version: 2025-05-27-v15 loaded');
+console.log('tab3.js version: 2025-05-28-v16 loaded');
 
 /**
  * Tab3.js: Logic for Tab 3 (Items in Service).
  * Dependencies: common.js for formatDate.
- * Updated 2025-05-27: Added UI feedback for updateStatusBtn in setupPrintTagsSection.
- * No code removed from v14 to preserve all functionality (debounce, expand/collapse, etc.).
+ * Updated 2025-05-28: Updated setupExpandCollapse for summary table expand/collapse.
+ * No code removed from v15 to preserve all functionality (debounce, print tags, etc.).
  */
 
 /**
@@ -123,7 +123,6 @@ function fetchCsvContents() {
 
 /**
  * Handle sync to PC and status update for printing tags
- * Updated 2025-05-27: Added UI feedback for updateStatusBtn with syncMessage alerts
  */
 function setupPrintTagsSection() {
     const syncBtn = document.getElementById('syncToPcBtn');
@@ -191,7 +190,6 @@ function setupPrintTagsSection() {
         debouncedSync();
     }, { once: true });
 
-    // Added UI feedback for status update
     updateStatusBtn.addEventListener('click', async () => {
         updateStatusBtn.disabled = true;
         syncMessage.innerHTML = '<div class="alert alert-info">Updating status...</div>';
@@ -390,26 +388,44 @@ function updateNotes(tagId) {
 }
 
 /**
- * Handle expand/collapse functionality
+ * Handle expand/collapse functionality for summary table
+ * Updated 2025-05-28: Handles expand-btn and collapse-btn for tab3-details sections
  */
 function setupExpandCollapse() {
     document.addEventListener('click', (event) => {
         const expandBtn = event.target.closest('.expand-btn');
-        if (!expandBtn) return;
+        const collapseBtn = event.target.closest('.collapse-btn');
 
-        const targetId = expandBtn.getAttribute('data-target');
-        const expandable = document.getElementById(targetId);
-        if (!expandable) {
-            console.warn(`Expandable section not found for target: ${targetId}`);
-            return;
-        }
+        if (expandBtn) {
+            const targetId = expandBtn.getAttribute('data-target');
+            const expandable = document.getElementById(targetId);
+            if (!expandable) {
+                console.warn(`Expandable section not found for target: ${targetId}`);
+                return;
+            }
 
-        if (expandable.classList.contains('collapsed')) {
             expandable.classList.remove('collapsed');
             expandable.classList.add('expanded');
-        } else {
+            expandBtn.style.display = 'none';
+            const siblingCollapseBtn = expandBtn.parentElement.querySelector('.collapse-btn');
+            if (siblingCollapseBtn) {
+                siblingCollapseBtn.style.display = 'inline-block';
+            }
+        } else if (collapseBtn) {
+            const targetId = collapseBtn.getAttribute('data-target');
+            const expandable = document.getElementById(targetId);
+            if (!expandable) {
+                console.warn(`Expandable section not found for target: ${targetId}`);
+                return;
+            }
+
             expandable.classList.remove('expanded');
             expandable.classList.add('collapsed');
+            collapseBtn.style.display = 'none';
+            const siblingExpandBtn = collapseBtn.parentElement.querySelector('.expand-btn');
+            if (siblingExpandBtn) {
+                siblingExpandBtn.style.display = 'inline-block';
+            }
         }
     });
 }
@@ -418,8 +434,8 @@ function setupExpandCollapse() {
  * Initialize the page
  */
 document.addEventListener('DOMContentLoaded', function() {
-    // Format timestamps in the status tables
-    document.querySelectorAll('.tab3-status-table').forEach(table => {
+    // Format timestamps in the details tables
+    document.querySelectorAll('.tab3-details-table').forEach(table => {
         const rows = table.querySelectorAll('tbody tr');
         rows.forEach(row => {
             const dateCell = row.querySelector('.tab3-date-last-scanned');
@@ -432,12 +448,12 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // Initialize save button visibility for status and notes
-    document.querySelectorAll('.tab3-status-table select').forEach(select => {
+    document.querySelectorAll('.tab3-details-table select').forEach(select => {
         const tagId = select.id.replace('tab3-status-', '');
         updateStatusVisibility(tagId);
     });
 
-    document.querySelectorAll('.tab3-status-table textarea').forEach(textarea => {
+    document.querySelectorAll('.tab3-details-table textarea').forEach(textarea => {
         const tagId = textarea.id.replace('tab3-notes-', '');
         updateNotesVisibility(tagId);
     });

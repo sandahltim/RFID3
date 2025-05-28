@@ -33,19 +33,42 @@
 
 <div class="tab3-items-section">
     <h3>Items in Service</h3>
-    {% if common_name_groups %}
-        {% for group in common_name_groups %}
-            <div class="tab3-common-name-section mb-3">
-                <h4>{{ group.common_name }} ({{ group.total_items }} items)</h4>
-                <div id="tab3-common-{{ loop.index0 }}">
-                    {% for status_group in group.status_groups %}
-                        <div class="tab3-status-section ml-3 mb-2">
-                            <h5>{{ status_group.status }} ({{ status_group.total_items }} items)</h5>
-                            <div id="tab3-status-{{ loop.index0 }}-{{ loop.index0 }}">
-                                <table class="table table-bordered tab3-status-table" id="tab3-status-table-{{ loop.index0 }}-{{ loop.index0 }}">
+    {% if summary_groups %}
+        <table class="table table-bordered tab3-summary-table" id="tab3-summary-table">
+            <thead>
+                <tr>
+                    <th>Rental Class ID</th>
+                    <th>Common Name</th>
+                    <th>In Service</th>
+                    <th>On Rent</th>
+                    <th>Ready to Rent</th>
+                    <th>Statuses</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for group in summary_groups %}
+                    <tr>
+                        <td>{{ group.rental_class_id }}</td>
+                        <td>{{ group.common_name }}</td>
+                        <td>{{ group.number_in_service }}</td>
+                        <td>{{ group.number_on_rent }}</td>
+                        <td>{{ group.number_ready_to_rent }}</td>
+                        <td>{{ group.statuses | join(', ') }}</td>
+                        <td>
+                            <button class="btn btn-sm btn-secondary expand-btn" data-target="tab3-details-{{ loop.index0 }}">Expand</button>
+                            <button class="btn btn-sm btn-secondary collapse-btn" data-target="tab3-details-{{ loop.index0 }}" style="display: none;">Collapse</button>
+                        </td>
+                    </tr>
+                    <tr class="expandable collapsed" id="tab3-details-{{ loop.index0 }}">
+                        <td colspan="7">
+                            <div class="tab3-details-section">
+                                <table class="table table-bordered tab3-details-table">
                                     <thead>
                                         <tr>
                                             <th>Tag ID</th>
+                                            <th>Rental Class ID</th>
+                                            <th>Common Name</th>
                                             <th>Status</th>
                                             <th>Bin Location</th>
                                             <th>Last Contract</th>
@@ -58,9 +81,11 @@
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {% for item in status_group.item_list %}
+                                        {% for item in group.items %}
                                             <tr>
                                                 <td>{{ item.tag_id }}</td>
+                                                <td>{{ item.rental_class_id }}</td>
+                                                <td>{{ item.common_name }}</td>
                                                 <td>
                                                     <select id="tab3-status-{{ item.tag_id }}" onchange="updateStatusVisibility('{{ item.tag_id }}')">
                                                         <option value="{{ item.status }}" selected>{{ item.status }}</option>
@@ -111,11 +136,11 @@
                                     </tbody>
                                 </table>
                             </div>
-                        </div>
-                    {% endfor %}
-                </div>
-            </div>
-        {% endfor %}
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
     {% else %}
         <p>No items currently in service. If this is unexpected, please check the database or contact support.</p>
     {% endif %}
@@ -152,13 +177,16 @@
 </div>
 
 <style>
-.tab3-common-name-section {
-    border-left: 3px solid #007bff;
-    padding-left: 10px;
-}
-.tab3-status-section {
+.tab3-details-section {
+    margin-left: 1rem;
+    padding: 0.5rem;
     border-left: 3px solid #28a745;
-    padding-left: 10px;
+}
+.expandable.collapsed {
+    display: none;
+}
+.expandable.expanded {
+    display: table-row;
 }
 </style>
 
