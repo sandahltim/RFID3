@@ -14,6 +14,7 @@ import sqlalchemy.exc
 import fcntl
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 import requests.exceptions
+import re
 
 # Configure logging for Tab 3
 logger = logging.getLogger('tab3')
@@ -54,7 +55,14 @@ if not os.path.exists(SHARED_DIR):
     os.chown(SHARED_DIR, pwd.getpwnam('tim').pw_uid, grp.getgrnam('tim').gr_gid)
 
 # Log deployment version
-logger.info("Deployed tab3.py version: 2025-05-28-v63")
+logger.info("Deployed tab3.py version: 2025-05-28-v64")
+
+# Helper function to normalize common_name by removing suffixes like (G1), (G2)
+def normalize_common_name(name):
+    if not name:
+        return name
+    # Remove suffixes like (G1), (G2), etc.
+    return re.sub(r'\s*\(G[0-9]+\)$', '', name).strip()
 
 @tab3_bp.route('/tab/3')
 def tab3_view():
@@ -106,10 +114,11 @@ def tab3_view():
         all_statuses_sql = ', '.join([f"'{status}'" for status in all_statuses])
 
         # Query for summary data (parent layer)
+        # Normalize common_name by removing suffixes like (G1), (G2)
         summary_query = f"""
             SELECT 
                 COALESCE(rental_class_num, '') AS rental_class_id,
-                common_name,
+                REGEXP_REPLACE(common_name, '\s*\(G[0-9]+\)$', '') AS common_name,
                 COUNT(CASE WHEN TRIM(COALESCE(status, '')) IN ({in_service_statuses_sql}) THEN 1 END) AS number_in_service,
                 COUNT(CASE WHEN TRIM(COALESCE(status, '')) = 'On Rent' THEN 1 END) AS number_on_rent,
                 COUNT(CASE WHEN TRIM(COALESCE(status, '')) = 'Ready to Rent' THEN 1 END) AS number_ready_to_rent,
@@ -120,16 +129,16 @@ def tab3_view():
         params = {}
         
         if common_name_filter:
-            summary_query += " AND LOWER(common_name) LIKE :common_name_filter"
+            summary_query += " AND LOWER(REGEXP_REPLACE(common_name, '\s*\(G[0-9]+\)$', '')) LIKE :common_name_filter"
             params['common_name_filter'] = f'%{common_name_filter}%'
         
-        summary_query += " GROUP BY COALESCE(rental_class_num, ''), common_name"
+        summary_query += " GROUP BY COALESCE(rental_class_num, ''), REGEXP_REPLACE(common_name, '\s*\(G[0-9]+\)$', '')"
         
         # Apply sorting for summary
         if sort == 'date_last_scanned_asc':
-            summary_query += " ORDER BY MIN(date_last_scanned) ASC, common_name ASC"
+            summary_query += " ORDER BY MIN(date_last_scanned) ASC, REGEXP_REPLACE(common_name, '\s*\(G[0-9]+\)$', '') ASC"
         else:
-            summary_query += " ORDER BY MIN(date_last_scanned) DESC, common_name ASC"
+            summary_query += " ORDER BY MIN(date_last_scanned) DESC, REGEXP_REPLACE(common_name, '\s*\(G[0-9]+\)$', '') ASC"
 
         summary_query += " LIMIT :limit OFFSET :offset"
         params['limit'] = per_page
@@ -169,7 +178,7 @@ def tab3_view():
         """
         detail_params = {}
         if common_name_filter:
-            detail_query += " AND LOWER(common_name) LIKE :common_name_filter"
+            detail_query += " AND LOWER(REGEXP_REPLACE(common_name, '\s*\(G[0-9]+\)$', '')) LIKE :common_name_filter"
             detail_params['common_name_filter'] = f'%{common_name_filter}%'
         if date_filter:
             try:
@@ -180,9 +189,9 @@ def tab3_view():
                 logger.warning(f"Invalid date format for date_last_scanned filter: {date_filter}")
 
         if sort == 'date_last_scanned_asc':
-            detail_query += " ORDER BY date_last_scanned ASC, LOWER(common_name) ASC"
+            detail_query += " ORDER BY date_last_scanned ASC, LOWER(REGEXP_REPLACE(common_name, '\s*\(G[0-9]+\)$', '')) ASC"
         else:
-            detail_query += " ORDER BY date_last_scanned DESC, LOWER(common_name) ASC"
+            detail_query += " ORDER BY date_last_scanned DESC, LOWER(REGEXP_REPLACE(common_name, '\s*\(G[0-9]+\)$', '')) ASC"
 
         logger.debug(f"Executing detail query: {detail_query} with params: {detail_params}")
         detail_result = session.execute(text(detail_query), detail_params)
@@ -194,6 +203,7 @@ def tab3_view():
             {
                 'tag_id': row[0],
                 'common_name': row[1],
+                'common_name_normalized': normalize_common_name(row[1]),
                 'status': row[2],
                 'bin_location': row[3] or 'N/A',
                 'last_contract_num': row[4] or 'N/A',
@@ -284,7 +294,7 @@ def tab3_view():
                     'last_transaction_scan_date': t.scan_date.strftime('%Y-%m-%d %H:%M:%S') if t.scan_date else 'N/A'
                 }
 
-        # Assign detailed items to summary groups
+        # Assign detailed items to summary groups using normalized common_name
         for item in items_in_service:
             t_data = transaction_data.get(item['tag_id'], {
                 'location_of_repair': 'N/A',
@@ -338,10 +348,15 @@ def tab3_view():
                 'last_transaction_scan_date': t_data['last_transaction_scan_date']
             }
 
-            # Find matching summary group
+            # Find matching summary group using normalized common_name
             for group in summary_groups:
-                if group['rental_class_id'] == item['rental_class_num'] and group['common_name'] == item['common_name']:
+                if group['rental_class_id'] == item['rental_class_num'] and normalize_common_name(group['common_name']) == item['common_name_normalized']:
                     group['item_list'].append(item_details)
+                    # Increment number_in_service to reflect the actual count
+                    group['number_in_service'] = len(group['item_list'])
+                    # Update statuses
+                    if item['status'] not in group['statuses']:
+                        group['statuses'].append(item['status'])
                     break
 
         # Debug: Log groups before filtering

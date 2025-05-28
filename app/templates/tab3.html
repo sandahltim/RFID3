@@ -125,7 +125,7 @@
                                                     </ul>
                                                 </td>
                                                 <td>
-                                                    <textarea id="tab3-notes-{{ item.tag_id }}" rows="2" class="form-control" data-original-notes="{{ item.notes | escape }}" oninput="updateNotesVisibility('{{ item.tag_id }}')">{{ item.notes | escape }}</textarea>
+                                                    <textarea id="tab3-notes-{{ item.tag_id }}" rows="4" class="form-control notes-textarea" data-original-notes="{{ item.notes | escape }}" oninput="updateNotesVisibility('{{ item.tag_id }}')">{{ item.notes | escape }}</textarea>
                                                 </td>
                                                 <td>
                                                     <button class="btn btn-sm btn-primary tab3-save-status-btn" onclick="updateStatus('{{ item.tag_id }}')" style="display: none;">Save Status</button>
