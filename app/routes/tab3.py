@@ -54,7 +54,7 @@ if not os.path.exists(SHARED_DIR):
     os.chown(SHARED_DIR, pwd.getpwnam('tim').pw_uid, grp.getgrnam('tim').gr_gid)
 
 # Log deployment version
-logger.info("Deployed tab3.py version: 2025-05-28-v59")
+logger.info("Deployed tab3.py version: 2025-05-28-v60")
 
 @tab3_bp.route('/tab/3')
 def tab3_view():
@@ -79,6 +79,17 @@ def tab3_view():
         statuses = [row[0] for row in status_result.fetchall()]
         logger.info(f"All statuses in id_item_master: {statuses}")
 
+        # Debug: Count items by status
+        count_query = """
+            SELECT status, COUNT(*)
+            FROM id_item_master
+            WHERE TRIM(COALESCE(status, '')) IN ('Repair', 'Needs to be Inspected', 'Wash', 'Wet', 'On Rent', 'Ready to Rent')
+            GROUP BY status
+        """
+        count_result = session.execute(text(count_query))
+        status_counts = {row[0]: row[1] for row in count_result.fetchall()}
+        logger.info(f"Status counts: {status_counts}")
+
         # Get query parameters
         common_name_filter = request.args.get('common_name', '').lower()
         date_filter = request.args.get('date_last_scanned', '')
@@ -86,22 +97,26 @@ def tab3_view():
         page = int(request.args.get('page', 1))
         per_page = 20
 
-        # Define in-service statuses (case-insensitive)
-        in_service_statuses = ['repair', 'needs to be inspected', 'wash', 'wet']
+        # Define in-service statuses (exact match to database)
+        in_service_statuses = ['Repair', 'Needs to be Inspected', 'Wash', 'Wet']
+        all_statuses = in_service_statuses + ['On Rent', 'Ready to Rent']
 
         # Query for summary data (parent layer)
         summary_query = """
             SELECT 
                 COALESCE(rental_class_num, '') AS rental_class_id,
                 common_name,
-                COUNT(CASE WHEN LOWER(TRIM(COALESCE(status, ''))) IN :in_service_statuses THEN 1 END) AS number_in_service,
-                COUNT(CASE WHEN LOWER(TRIM(COALESCE(status, ''))) = 'on rent' THEN 1 END) AS number_on_rent,
-                COUNT(CASE WHEN LOWER(TRIM(COALESCE(status, ''))) = 'ready to rent' THEN 1 END) AS number_ready_to_rent,
-                GROUP_CONCAT(DISTINCT CASE WHEN LOWER(TRIM(COALESCE(status, ''))) IN :in_service_statuses THEN status END) AS statuses
+                COUNT(CASE WHEN TRIM(COALESCE(status, '')) IN :in_service_statuses THEN 1 END) AS number_in_service,
+                COUNT(CASE WHEN TRIM(COALESCE(status, '')) = 'On Rent' THEN 1 END) AS number_on_rent,
+                COUNT(CASE WHEN TRIM(COALESCE(status, '')) = 'Ready to Rent' THEN 1 END) AS number_ready_to_rent,
+                GROUP_CONCAT(DISTINCT CASE WHEN TRIM(COALESCE(status, '')) IN :in_service_statuses THEN status END) AS statuses
             FROM id_item_master
-            WHERE LOWER(TRIM(COALESCE(status, ''))) IN (:in_service_statuses, 'on rent', 'ready to rent')
+            WHERE TRIM(COALESCE(status, '')) IN :all_statuses
         """
-        params = {'in_service_statuses': tuple(in_service_statuses)}
+        params = {
+            'in_service_statuses': tuple(in_service_statuses),
+            'all_statuses': tuple(all_statuses)
+        }
         
         if common_name_filter:
             summary_query += " AND LOWER(common_name) LIKE :common_name_filter"
@@ -149,7 +164,7 @@ def tab3_view():
                 rental_class_num, 
                 notes
             FROM id_item_master
-            WHERE LOWER(TRIM(COALESCE(status, ''))) IN :in_service_statuses
+            WHERE TRIM(COALESCE(status, '')) IN :in_service_statuses
         """
         detail_params = {'in_service_statuses': tuple(in_service_statuses)}
         if common_name_filter:
@@ -328,11 +343,16 @@ def tab3_view():
                     group['items'].append(item_details)
                     break
 
+        # Debug: Log groups before filtering
+        logger.debug(f"Before filtering - Summary groups: {len(summary_groups)}")
+        for group in summary_groups:
+            logger.debug(f"Group: rental_class_id={group['rental_class_id']}, common_name={group['common_name']}, number_in_service={group['number_in_service']}, items={len(group['items'])}")
+
         # Filter out groups with no in-service items
         summary_groups = [g for g in summary_groups if g['number_in_service'] > 0]
 
         # Debug log data structure
-        logger.debug(f"Summary groups: {len(summary_groups)}")
+        logger.debug(f"After filtering - Summary groups: {len(summary_groups)}")
         for group in summary_groups:
             logger.debug(f"Group: rental_class_id={group['rental_class_id']}, common_name={group['common_name']}, items={len(group['items'])}")
 
