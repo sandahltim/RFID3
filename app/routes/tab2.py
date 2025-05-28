@@ -29,14 +29,19 @@ logger.addHandler(console_handler)
 tab2_bp = Blueprint('tab2', __name__)
 
 # Version marker
-logger.info("Deployed tab2.py version: 2025-04-27-v4")
+logger.info("Deployed tab2.py version: 2025-05-28-v5")
 
 @tab2_bp.route('/tab/2')
 def tab2_view():
+    session = None
     try:
         session = db.session()
         logger.info("Starting new session for tab2")
         current_app.logger.info("Starting new session for tab2")
+
+        # Test database connection
+        session.execute("SELECT 1")
+        logger.info("Database connection test successful")
 
         # Debug: Fetch all contract numbers to see what's in the database
         all_contracts = session.query(ItemMaster.last_contract_num).distinct().all()
@@ -94,13 +99,14 @@ def tab2_view():
         contracts.sort(key=lambda x: x['contract_number'])
         logger.info(f"Fetched {len(contracts)} contracts for tab2: {[c['contract_number'] for c in contracts]}")
         current_app.logger.info(f"Fetched {len(contracts)} contracts for tab2: {[c['contract_number'] for c in contracts]}")
-        session.close()
         return render_template('tab2.html', contracts=contracts, cache_bust=int(time()))
     except Exception as e:
         logger.error(f"Error rendering Tab 2: {str(e)}", exc_info=True)
         current_app.logger.error(f"Error rendering Tab 2: {str(e)}", exc_info=True)
-        session.close()
         return render_template('tab2.html', contracts=[], cache_bust=int(time()))
+    finally:
+        if session:
+            session.close()
 
 @tab2_bp.route('/tab/2/common_names')
 def tab2_common_names():
@@ -117,12 +123,20 @@ def tab2_common_names():
         current_app.logger.error("Missing required parameter: contract_number is required")
         return jsonify({'error': 'Contract number is required'}), 400
 
+    session = None
     try:
         session = db.session()
+        logger.info("Successfully created session for tab2_common_names")
 
+        # Test database connection
+        session.execute("SELECT 1")
+        logger.info("Database connection test successful in tab2_common_names")
+
+        # Define the query with the on_contracts alias
+        on_contracts = func.count(ItemMaster.tag_id).label('on_contracts')
         common_names_query = session.query(
             ItemMaster.common_name,
-            func.count(ItemMaster.tag_id).label('on_contracts')
+            on_contracts
         ).filter(
             ItemMaster.last_contract_num == contract_number,
             ItemMaster.status.in_(['On Rent', 'Delivered'])
@@ -136,13 +150,21 @@ def tab2_common_names():
         elif sort == 'name_desc':
             common_names_query = common_names_query.order_by(desc(func.lower(ItemMaster.common_name)))
         elif sort == 'on_contracts_asc':
-            common_names_query = common_names_query.order_by(asc('on_contracts'))
+            common_names_query = common_names_query.order_by(asc(on_contracts))
         elif sort == 'on_contracts_desc':
-            common_names_query = common_names_query.order_by(desc('on_contracts'))
+            common_names_query = common_names_query.order_by(desc(on_contracts))
         elif sort == 'total_items_inventory_asc':
             common_names_query = common_names_query.order_by(asc('total_items_inventory'))
         elif sort == 'total_items_inventory_desc':
             common_names_query = common_names_query.order_by(desc('total_items_inventory'))
+
+        # Debug: Log the query before executing
+        logger.debug(f"Common names query: {str(common_names_query)}")
+
+        # Verify query is not None
+        if common_names_query is None:
+            logger.error("Common names query is None; query construction failed")
+            return jsonify({'error': 'Failed to construct query'}), 500
 
         common_names_all = common_names_query.all()
 
@@ -150,7 +172,7 @@ def tab2_common_names():
         current_app.logger.debug(f"Common names for contract {contract_number}: {[(name, count) for name, count in common_names_all]}")
 
         common_names = []
-        for name, on_contracts in common_names_all:
+        for name, on_contracts_count in common_names_all:
             if not name:
                 continue
 
@@ -160,7 +182,7 @@ def tab2_common_names():
 
             common_names.append({
                 'name': name,
-                'on_contracts': on_contracts or 0,
+                'on_contracts': on_contracts_count or 0,
                 'total_items_inventory': total_items_inventory or 0
             })
 
@@ -178,7 +200,6 @@ def tab2_common_names():
         end = start + per_page
         paginated_common_names = common_names[start:end]
 
-        session.close()
         logger.info(f"Returning {len(paginated_common_names)} common names for contract {contract_number}")
         current_app.logger.info(f"Returning {len(paginated_common_names)} common names for contract {contract_number}")
         return jsonify({
@@ -188,10 +209,12 @@ def tab2_common_names():
             'per_page': per_page
         })
     except Exception as e:
-        logger.error(f"Error fetching common names for contract {contract_number}: {str(e)}")
-        current_app.logger.error(f"Error fetching common names for contract {contract_number}: {str(e)}")
-        session.close()
-        return jsonify({'error': 'Failed to fetch common names'}), 500
+        logger.error(f"Error fetching common names for contract {contract_number}: {str(e)}", exc_info=True)
+        current_app.logger.error(f"Error fetching common names for contract {contract_number}: {str(e)}", exc_info=True)
+        return jsonify({'error': f'Failed to fetch common names: {str(e)}'}), 500
+    finally:
+        if session:
+            session.close()
 
 @tab2_bp.route('/tab/2/data')
 def tab2_data():
@@ -209,8 +232,10 @@ def tab2_data():
         current_app.logger.error("Missing required parameters: contract number and common name are required")
         return jsonify({'error': 'Contract number and common name are required'}), 400
 
+    session = None
     try:
         session = db.session()
+        logger.info("Successfully created session for tab2_data")
 
         query = session.query(ItemMaster).filter(
             ItemMaster.last_contract_num == contract_number,
@@ -262,7 +287,6 @@ def tab2_data():
         logger.debug(f"Items for contract {contract_number}, common_name {common_name}: {len(items_data)} items")
         current_app.logger.debug(f"Items for contract {contract_number}, common_name {common_name}: {len(items_data)} items")
 
-        session.close()
         return jsonify({
             'items': items_data,
             'total_items': total_items,
@@ -270,10 +294,12 @@ def tab2_data():
             'per_page': per_page
         })
     except Exception as e:
-        logger.error(f"Error fetching items for contract {contract_number}, common_name {common_name}: {str(e)}")
-        current_app.logger.error(f"Error fetching items for contract {contract_number}, common_name {common_name}: {str(e)}")
-        session.close()
+        logger.error(f"Error fetching items for contract {contract_number}, common_name {common_name}: {str(e)}", exc_info=True)
+        current_app.logger.error(f"Error fetching items for contract {contract_number}, common_name {common_name}: {str(e)}", exc_info=True)
         return jsonify({'error': 'Failed to fetch items'}), 500
+    finally:
+        if session:
+            session.close()
 
 @tab2_bp.route('/tab/2/full_items_by_rental_class')
 def full_items_by_rental_class():
@@ -285,8 +311,10 @@ def full_items_by_rental_class():
         current_app.logger.error("Category (contract_number) and common name are required")
         return jsonify({'error': 'Category (contract_number) and common name are required'}), 400
 
+    session = None
     try:
         session = db.session()
+        logger.info("Successfully created session for full_items_by_rental_class")
 
         items_query = session.query(ItemMaster).filter(
             ItemMaster.last_contract_num == contract_number,
@@ -309,15 +337,17 @@ def full_items_by_rental_class():
                 'notes': item.notes
             })
 
-        session.close()
         return jsonify({
             'items': items_data,
             'total_items': len(items_data)
         })
     except Exception as e:
-        logger.error(f"Error fetching full items for contract {contract_number}, common_name {common_name}: {str(e)}")
-        current_app.logger.error(f"Error fetching full items for contract {contract_number}, common_name {common_name}: {str(e)}")
+        logger.error(f"Error fetching full items for contract {contract_number}, common_name {common_name}: {str(e)}", exc_info=True)
+        current_app.logger.error(f"Error fetching full items for contract {contract_number}, common_name {common_name}: {str(e)}", exc_info=True)
         return jsonify({'error': 'Failed to fetch full items'}), 500
+    finally:
+        if session:
+            session.close()
 
 @tab2_bp.route('/get_contract_date')
 def get_contract_date():
@@ -327,19 +357,23 @@ def get_contract_date():
         current_app.logger.error("Missing required parameter: contract_number is required")
         return jsonify({'error': 'Contract number is required'}), 400
 
+    session = None
     try:
         session = db.session()
+        logger.info("Successfully created session for get_contract_date")
+
         latest_transaction = session.query(Transaction.scan_date).filter(
             Transaction.contract_number == contract_number,
             Transaction.scan_type == 'Rental'
         ).order_by(desc(Transaction.scan_date)).first()
 
-        session.close()
         if latest_transaction and latest_transaction.scan_date:
             return jsonify({'date': latest_transaction.scan_date.isoformat()})
         return jsonify({'date': 'N/A'})
     except Exception as e:
-        logger.error(f"Error fetching contract date for {contract_number}: {str(e)}")
-        current_app.logger.error(f"Error fetching contract date for {contract_number}: {str(e)}")
-        session.close()
+        logger.error(f"Error fetching contract date for {contract_number}: {str(e)}", exc_info=True)
+        current_app.logger.error(f"Error fetching contract date for {contract_number}: {str(e)}", exc_info=True)
         return jsonify({'error': 'Failed to fetch contract date'}), 500
+    finally:
+        if session:
+            session.close()
