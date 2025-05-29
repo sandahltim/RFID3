@@ -1,6 +1,6 @@
 import logging
 import requests
-from datetime import datetime
+from datetime import datetime, timedelta
 from flask import Blueprint, current_app
 from .. import db, cache
 from ..models.db_models import ItemMaster, Transaction, RefreshState
@@ -124,7 +124,7 @@ def update_transactions(session, transactions):
 @retry(
     stop=stop_after_attempt(3),
     wait=wait_exponential(multiplier=1, min=4, max=10),
-    retry=retry_if_exception_type((requests.exceptions.RequestException,))
+    retry=retry_if_exception_type((requests.exceptions.RequestException, Exception))
 )
 def fetch_transactions(last_refresh):
     """Fetch transactions from API since last refresh."""
@@ -207,9 +207,15 @@ def incremental_refresh():
     try:
         session = db.session()
         
-        # Get last refresh time
+        # Get last refresh time, default to 30 days ago if not set
         refresh_state = session.query(RefreshState).first()
-        last_refresh = refresh_state.last_refresh if refresh_state else '2023-01-01 00:00:00'
+        if refresh_state and refresh_state.last_refresh:
+            last_refresh = refresh_state.last_refresh
+        else:
+            # Default to 30 days ago to avoid fetching excessive data
+            last_refresh_dt = datetime.now() - timedelta(days=30)
+            last_refresh = last_refresh_dt.strftime('%Y-%m-%d %H:%M:%S')
+            logger.info(f"No prior refresh state found, defaulting last_refresh to {last_refresh}")
         
         # Fetch new transactions
         transactions = fetch_transactions(last_refresh)

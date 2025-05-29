@@ -69,6 +69,9 @@ class APIClient:
                     response = requests.get(url, headers=headers, params=params, timeout=20)
                     data = response.json()
                     logger.debug(f"API response: {response.status_code} {response.reason}, response: {data}")
+                    if response.status_code == 500:
+                        logger.error(f"Server returned 500 Internal Server Error: {data}")
+                        raise Exception(f"500 Internal Server Error: {data.get('result', {}).get('message', 'Unknown error')}")
                     if response.status_code != 200:
                         logger.error(f"Request failed: {response.status_code} {response.reason}, response: {data}")
                         raise Exception(f"{response.status_code} {response.reason}")
@@ -95,6 +98,9 @@ class APIClient:
                     response = requests.patch(url, headers=headers, json=data, timeout=20)
                 data = response.json()
                 logger.debug(f"API response: {response.status_code} {response.reason}, response: {data}")
+                if response.status_code == 500:
+                    logger.error(f"Server returned 500 Internal Server Error: {data}")
+                    raise Exception(f"500 Internal Server Error: {data.get('result', {}).get('message', 'Unknown error')}")
                 if response.status_code not in [200, 201]:
                     logger.error(f"Request failed: {response.status_code} {response.reason}, response: {data}")
                     raise Exception(f"{response.status_code} {response.reason}")
