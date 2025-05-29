@@ -1,4 +1,4 @@
-console.log('tab4.js version: 2025-05-20-v1 loaded');
+console.log('tab4.js version: 2025-05-29-v2 loaded');
 
 // Format ISO date strings into "Thurs, Aug 21 2025 4:55 pm"
 function formatDate(isoDateString) {
@@ -150,7 +150,7 @@ function applyFilterToTable(table) {
                         childTable.insertAdjacentElement('afterend', childRowCountDiv);
                     }
                     if (childRowCountDiv) {
-                        childRowCountDiv.textContent = `Showing ${visibleChildRows} of ${childRows.length} rows`;
+                        childRowCountDiv.textContent = `Showing ${visibleChildRows} of ${childRows tops.length} rows`;
                     }
                 }
             }
@@ -204,7 +204,7 @@ function applyFilterToTable(table) {
 
 // Expand category
 window.expandCategory = function(category, targetId, contractNumber, page = 1) {
-    console.log('expandCategory:', { category, targetId, contractNumber, page });
+    console.log('expandCategory:', { category, targetId, contractNumber, contractNumber, page });
 
     const targetElement = document.getElementById(targetId);
     if (!targetElement) {
@@ -212,11 +212,12 @@ window.expandCategory = function(category, targetId, contractNumber, page = 1) {
         return;
     }
 
-    if (targetElement.classList.contains('expanded') && page === 1) {
-        console.log(`Collapsing ${targetId}`);
-        collapseSection(targetId);
-        return;
-    }
+    // Remove the collapse-on-reclick behavior to prevent immediate collapse
+    // if (targetElement.classList.contains('expanded') && page === 1) {
+    //     console.log(`Collapsing ${targetId}`);
+    //     collapseSection(targetId);
+    //     return;
+    // }
 
     const loadingSuccess = showLoading(targetId);
     const url = `/tab/4/common_names?contract_number=${encodeURIComponent(contractNumber)}&page=${page}`;
@@ -250,9 +251,9 @@ window.expandCategory = function(category, targetId, contractNumber, page = 1) {
                     <table class="table table-bordered table-hover common-table">
                         <thead class="thead-dark">
                             <tr>
-                                <th>Common Name <span class="sort-arrow"></span></th>
-                                <th>Items on Contract <span class="sort-arrow"></span></th>
-                                <th>Total Items in Inventory <span class="sort-arrow"></span></th>
+                                <th onclick="sortCommonNames('${contractNumber}', 'common_name')">Common Name <span class="sort-arrow"></span></th>
+                                <th onclick="sortCommonNames('${contractNumber}', 'on_contracts')">Items on Contract <span class="sort-arrow"></span></th>
+                                <th onclick="sortCommonNames('${contractNumber}', 'total_items_inventory')">Total Items in Inventory <span class="sort-arrow"></span></th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
@@ -383,12 +384,12 @@ window.expandItems = function(contractNumber, commonName, targetId, page = 1) {
                     <table class="table table-bordered table-hover item-table">
                         <thead class="thead-dark">
                             <tr>
-                                <th>Tag ID <span class="sort-arrow"></span></th>
-                                <th>Common Name <span class="sort-arrow"></span></th>
-                                <th>Bin Location <span class="sort-arrow"></span></th>
-                                <th>Status <span class="sort-arrow"></span></th>
-                                <th>Last Contract <span class="sort-arrow"></span></th>
-                                <th>Last Scanned Date <span class="sort-arrow"></span></th>
+                                <th onclick="sortItems('${contractNumber}', '${commonName}', 'tag_id')">Tag ID <span class="sort-arrow"></span></th>
+                                <th onclick="sortItems('${contractNumber}', '${commonName}', 'common_name')">Common Name <span class="sort-arrow"></span></th>
+                                <th onclick="sortItems('${contractNumber}', '${commonName}', 'bin_location')">Bin Location <span class="sort-arrow"></span></th>
+                                <th onclick="sortItems('${contractNumber}', '${commonName}', 'status')">Status <span class="sort-arrow"></span></th>
+                                <th onclick="sortItems('${contractNumber}', '${commonName}', 'last_contract_num')">Last Contract <span class="sort-arrow"></span></th>
+                                <th onclick="sortItems('${contractNumber}', '${commonName}', 'last_scanned_date')">Last Scanned Date <span class="sort-arrow"></span></th>
                             </tr>
                         </thead>
                         <tbody>
@@ -479,7 +480,8 @@ function sortCommonNames(contractNumber, column) {
         const sortArrow = header.querySelector('.sort-arrow') || document.createElement('span');
         sortArrow.className = 'sort-arrow';
         if (!header.querySelector('.sort-arrow')) header.appendChild(sortArrow);
-        if (header.textContent.trim().toLowerCase().replace(/\s+/g, '_') === column) {
+        const headerColumn = header.textContent.trim().toLowerCase().replace(/\s+/g, '_');
+        if (headerColumn === column) {
             sortArrow.textContent = direction === 'asc' ? '↑' : '↓';
         } else {
             sortArrow.textContent = '';
@@ -514,9 +516,9 @@ function sortCommonNames(contractNumber, column) {
                     <table class="table table-bordered table-hover common-table">
                         <thead class="thead-dark">
                             <tr>
-                                <th>Common Name <span class="sort-arrow"></span></th>
-                                <th>Items on Contract <span class="sort-arrow"></span></th>
-                                <th>Total Items in Inventory <span class="sort-arrow"></span></th>
+                                <th onclick="sortCommonNames('${contractNumber}', 'common_name')">Common Name <span class="sort-arrow"></span></th>
+                                <th onclick="sortCommonNames('${contractNumber}', 'on_contracts')">Items on Contract <span class="sort-arrow"></span></th>
+                                <th onclick="sortCommonNames('${contractNumber}', 'total_items_inventory')">Total Items in Inventory <span class="sort-arrow"></span></th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
@@ -589,7 +591,8 @@ function sortItems(contractNumber, commonName, column) {
         const sortArrow = header.querySelector('.sort-arrow') || document.createElement('span');
         sortArrow.className = 'sort-arrow';
         if (!header.querySelector('.sort-arrow')) header.appendChild(sortArrow);
-        if (header.textContent.trim().toLowerCase().replace(/\s+/g, '_') === column) {
+        const headerColumn = header.textContent.trim().toLowerCase().replace(/\s+/g, '_');
+        if (headerColumn === column) {
             sortArrow.textContent = direction === 'asc' ? '↑' : '↓';
         } else {
             sortArrow.textContent = '';
@@ -624,12 +627,12 @@ function sortItems(contractNumber, commonName, column) {
                     <table class="table table-bordered table-hover item-table">
                         <thead class="thead-dark">
                             <tr>
-                                <th>Tag ID <span class="sort-arrow"></span></th>
-                                <th>Common Name <span class="sort-arrow"></span></th>
-                                <th>Bin Location <span class="sort-arrow"></span></th>
-                                <th>Status <span class="sort-arrow"></span></th>
-                                <th>Last Contract <span class="sort-arrow"></span></th>
-                                <th>Last Scanned Date <span class="sort-arrow"></span></th>
+                                <th onclick="sortItems('${contractNumber}', '${commonName}', 'tag_id')">Tag ID <span class="sort-arrow"></span></th>
+                                <th onclick="sortItems('${contractNumber}', '${commonName}', 'common_name')">Common Name <span class="sort-arrow"></span></th>
+                                <th onclick="sortItems('${contractNumber}', '${commonName}', 'bin_location')">Bin Location <span class="sort-arrow"></span></th>
+                                <th onclick="sortItems('${contractNumber}', '${commonName}', 'status')">Status <span class="sort-arrow"></span></th>
+                                <th onclick="sortItems('${contractNumber}', '${commonName}', 'last_contract_num')">Last Contract <span class="sort-arrow"></span></th>
+                                <th onclick="sortItems('${contractNumber}', '${commonName}', 'last_scanned_date')">Last Scanned Date <span class="sort-arrow"></span></th>
                             </tr>
                         </thead>
                         <tbody>
