@@ -1,4 +1,4 @@
-console.log('common.js version: 2025-05-20-v21 loaded');
+console.log('common.js version: 2025-05-29-v22 loaded');
 
 /**
  * Common.js: Shared utilities for all tabs.
@@ -320,7 +320,7 @@ async function printTable(level, id, commonName = null, category = null, subcate
         <html>
             <head>
                 <title>Broadway Tent and Event - ${tabName} - ${level}</title>
-                <link href="/static/css/style.css" rel="stylesheet">
+                <!-- Removed reference to non-existent style.css -->
                 <style>
                     body {
                         font-family: 'Roboto', sans-serif;
@@ -518,7 +518,7 @@ async function printFullItemList(category, subcategory, commonName) {
         <html>
             <head>
                 <title>Broadway Tent and Event - ${tabName} - Full Item List</title>
-                <link href="/static/css/style.css" rel="stylesheet">
+                <!-- Removed reference to non-existent style.css -->
                 <style>
                     body {
                         font-family: 'Roboto', sans-serif;

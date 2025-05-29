@@ -5,13 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}RFID Dashboard{% endblock %}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='lib/bootstrap/bootstrap.min.css') }}">
-    {% block head %}
+    <!-- Load common.css site-wide -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}">
+    <!-- Load tab-specific CSS -->
     {% if request.path == '/tab/1' %}
+        <link rel="stylesheet" href="{{ url_for('static', filename='css/tab1.css') }}">
     {% elif request.path == '/tab/5' %}
+        <link rel="stylesheet" href="{{ url_for('static', filename='css/tab5.css') }}">
     {% elif request.path == '/tab/2' or request.path == '/tab/4' %}
-        <script src="{{ url_for('static', filename='lib/htmx/htmx.min.js') }}"></script> <!-- Removed defer -->
+        <link rel="stylesheet" href="{{ url_for('static', filename='css/tab2_4.css') }}">
+        <script src="{{ url_for('static', filename='lib/htmx/htmx.min.js') }}"></script>
     {% endif %}
-    {% endblock %}
+    {% block head %}{% endblock %}
     {% block extra_head %}{% endblock %}
 </head>
 <body>
@@ -38,25 +43,28 @@
     </div>
 
     <script src="{{ url_for('static', filename='lib/bootstrap/bootstrap.bundle.min.js') }}"></script>
+    <!-- Load common.js site-wide -->
+    <script src="{{ url_for('static', filename='js/common.js') }}?v={{ cache_bust }}"></script>
+    <!-- Load common_old.js instead of expand_old.js -->
     {% block scripts %}
         {% if request.path == '/tab/1' %}
-            <script src="{{ url_for('static', filename='js/expand_old.js') }}?v={{ cache_bust }}"></script>
+            <script src="{{ url_for('static', filename='js/common_old.js') }}?v={{ cache_bust }}"></script>
             <script src="{{ url_for('static', filename='js/tab.js') }}?v={{ cache_bust }}"></script>
             <script src="{{ url_for('static', filename='js/tab1.js') }}?v={{ cache_bust }}"></script>
         {% elif request.path == '/tab/5' %}
-            <script src="{{ url_for('static', filename='js/expand_old.js') }}?v={{ cache_bust }}"></script>
+            <script src="{{ url_for('static', filename='js/common_old.js') }}?v={{ cache_bust }}"></script>
             <script src="{{ url_for('static', filename='js/tab.js') }}?v={{ cache_bust }}"></script>
             <script src="{{ url_for('static', filename='js/tab5.js') }}?v={{ cache_bust }}"></script>
         {% elif request.path == '/tab/2' %}
-            <script src="{{ url_for('static', filename='js/expand_old.js') }}?v={{ cache_bust }}"></script>
+            <script src="{{ url_for('static', filename='js/common_old.js') }}?v={{ cache_bust }}"></script>
             <script src="{{ url_for('static', filename='js/tab.js') }}?v={{ cache_bust }}"></script>
             <script src="{{ url_for('static', filename='js/tab2.js') }}?v={{ cache_bust }}"></script>
         {% elif request.path == '/tab/4' %}
-            <script src="{{ url_for('static', filename='js/expand_old.js') }}?v={{ cache_bust }}"></script>
+            <script src="{{ url_for('static', filename='js/common_old.js') }}?v={{ cache_bust }}"></script>
             <script src="{{ url_for('static', filename='js/tab.js') }}?v={{ cache_bust }}"></script>
             <script src="{{ url_for('static', filename='js/tab4.js') }}?v={{ cache_bust }}"></script>
         {% elif request.path == '/tab/3' %}
-            <script src="{{ url_for('static', filename='js/expand_old.js') }}?v={{ cache_bust }}"></script>
+            <script src="{{ url_for('static', filename='js/common_old.js') }}?v={{ cache_bust }}"></script>
             <script src="{{ url_for('static', filename='js/tab.js') }}?v={{ cache_bust }}"></script>
             <script src="{{ url_for('static', filename='js/tab3.js') }}?v={{ cache_bust }}"></script>
         {% endif %}
