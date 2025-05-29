@@ -752,3 +752,322 @@ API: Configured in config.py with endpoints for item master, transactions, and s
 
 
 Logging: Logs are stored in /home/tim/test_rfidpi/logs/
+
+
+
+RFID Dashboard Application
+This Flask-based RFID dashboard application manages inventory, tracks contracts, and handles resale/rental packs for Broadway Tent and Event. It integrates with an external API for data synchronization and uses MariaDB and Redis for persistence and caching.
+Project Structure
+test_rfidpi/ RFID6
+├── app/
+│   ├── __init__.py
+│   ├── routes/
+│   │   ├── home.py
+│   │   ├── common.py
+│   │   ├── tabs.py
+│   │   ├── tab1.py
+│   │   ├── tab2.py
+│   │   ├── tab3.py
+│   │   ├── tab4.py
+│   │   ├── tab5.py
+│   │   ├── categories.py
+│   │   └── health.py
+│   ├── services/
+│   │   ├── api_client.py
+│   │   ├── refresh.py
+│   │   ├── scheduler.py
+│   ├── models/
+│   │   └── db_models.py
+│   ├── templates/
+│   │   ├── base.html
+│   │   ├── categories.html
+│   │   ├── common.html
+│   │   ├── home.html
+│   │   ├── tab2.html
+│   │   ├── tab3.html
+│   │   ├── tab4.html
+│   │   ├── tab5.html
+│   │   ├── _category_rows.html
+│   │   └── _hand_counted_item.html
+├── static/
+│   ├── css/
+│   │   ├── tab1.css
+│   │   ├── tab5.css
+│   │   ├── tab2_4.css
+│   │   └── common.css
+│   ├── js/
+│   │   ├── common.js
+│   │   ├── tab.js
+│   │   ├── tab1.js
+│   │   ├── tab2.js
+│   │   ├── tab3.js
+│   │   ├── tab4.js
+│   │   ├── tab5.js
+│   │   ├── expand_old.js
+│   │   └── htmx.min.js
+│   ├── lib/
+│   │   ├── htmx/
+│   │   │   └── htmx.min.js
+│   │   └── bootstrap/
+│   │       ├── bootstrap.min.css
+│   │       └── bootstrap.bundle.min.js
+├── scripts/
+│   ├── migrate_db.sql
+│   ├── update_rental_class_mappings.py
+│   ├── migrate_hand_counted_items.sql
+│   ├── setup_mariadb.sh
+├── run.py
+├── config.py
+├── logs/
+│   ├── gunicorn_error.log
+│   ├── gunicorn_access.log
+│   ├── rfid_dashboard.log
+│   ├── app.log
+│   ├── sync.log
+├── README.md
+└── rfid_dash_dev.service
+
+Features
+
+Tabs:
+
+Tab 1: Rental Inventory
+Tab 2: Open Contracts
+Tab 3: Items in Service
+Tab 4: Laundry Contracts
+Tab 5: Resale/Rental Packs
+Categories: Manage rental class mappings
+
+
+Functionality:
+
+View and manage inventory items, contracts, and service statuses.
+Expandable sections for detailed views (e.g., common names, items).
+Hand-counted item tracking for laundry contracts (Tab 4).
+Bulk updates and CSV exports for resale/rental packs (Tab 5).
+Print functionality for contracts, categories, and items.
+Scheduled data refreshes (full and incremental) from an external API.
+
+
+
+Prerequisites
+
+Raspberry Pi with Raspberry Pi OS (Bookworm)
+Python 3.11+
+MariaDB
+Redis
+Git
+Nginx (optional, for production)
+
+Installation
+Clone the Repository
+git clone https://github.com/sandahltim/_rfidpi.git
+cd test_rfidpi
+git checkout RFID6
+
+Set Up Virtual Environment
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+
+Configure MariaDB and Redis
+Run the setup script to install and configure MariaDB and Redis:
+chmod +x scripts/setup_mariadb.sh
+./scripts/setup_mariadb.sh
+
+Apply Database Migrations
+Apply the database schema migrations:
+mysql -u root -prfid_root_password rfid_inventory < scripts/migrate_db.sql
+mysql -u root -prfid_root_password rfid_inventory < scripts/migrate_hand_counted_items.sql
+
+Update Rental Class Mappings
+Run the script to populate rental class mappings:
+python scripts/update_rental_class_mappings.py
+
+Set Up Service
+Copy the service file to systemd:
+sudo cp rfid_dash_dev.service /etc/systemd/system/rfid_dash_dev.service
+sudo systemctl daemon-reload
+
+Enable and start the service:
+sudo systemctl enable rfid_dash_dev.service
+sudo systemctl start rfid_dash_dev.service
+
+Verify Service Status
+sudo systemctl status rfid_dash_dev.service
+
+Deployment
+Commit Changes to Git
+git add .
+git commit -m "Update files"
+git push origin RFID6
+
+Pull and Restart on the Pi
+ssh tim@192.168.3.112
+cd /home/tim/test_rfidpi
+git pull origin RFID6
+> /home/tim/test_rfidpi/logs/gunicorn_error.log
+> /home/tim/test_rfidpi/logs/gunicorn_access.log
+> /home/tim/test_rfidpi/logs/app.log
+> /home/tim/test_rfidpi/logs/sync.log
+> /home/tim/test_rfidpi/logs/rfid_dashboard.log
+sudo systemctl stop rfid_dash_dev.service
+sudo systemctl start rfid_dash_dev.service
+sudo systemctl status rfid_dash_dev.service
+sudo nginx -t
+sudo systemctl restart nginx
+sudo systemctl status nginx
+
+Check Logs
+cat /home/tim/test_rfidpi/logs/rfid_dashboard.log
+cat /home/tim/test_rfidpi/logs/gunicorn_error.log
+cat /home/tim/test_rfidpi/logs/gunicorn_access.log
+cat /home/tim/test_rfidpi/logs/app.log
+cat /home/tim/test_rfidpi/logs/sync.log
+
+Configuration
+
+Database: MariaDB (rfid_inventory database, user: rfid_user, password: rfid_user_password).
+Redis: redis://localhost:6379/0.
+API: Configured in config.py with endpoints for item master, transactions, and seed rental classes.
+Logging: Logs are stored in /home/tim/test_rfidpi/logs/.
+
+Database Schemas
+Item Master (id_item_master)
+
+Purpose: Master dataset of all items, uniquely identified by tag_id (RFID EPC code).
+Fields:
+tag_id (String(255), PK): RFID EPC code.
+uuid_accounts_fk (String(255)): Account foreign key.
+serial_number (String(255)): Serial number.
+client_name (String(255)): Client name.
+rental_class_num (String(255)): Rental class ID (links to seed_rental_classes.rental_class_id).
+common_name (String(255)): Item name.
+quality (String(50)): Quality.
+bin_location (String(255)): Location (e.g., "resale", "sold").
+status (String(50)): Status (e.g., "On Rent", "Ready to Rent").
+last_contract_num (String(255)): Latest contract number.
+last_scanned_by (String(255)): Who last scanned.
+notes (Text): Notes.
+status_notes (Text): Status notes.
+longitude (Decimal(9,6)): Scan longitude.
+latitude (Decimal(9,6)): Scan latitude.
+date_last_scanned (DateTime): Last scan date.
+date_created (DateTime): Record creation date.
+date_updated (DateTime): Last update date.
+
+
+API Endpoint: cs.iot.ptshome.com/api/v1/data/14223767938169344381 (GET/POST/PUT/PATCH)
+
+Transactions (id_transactions)
+
+Purpose: Transaction history for items.
+Fields:
+id (BigInteger, PK, Auto-increment): Unique transaction ID.
+contract_number (String(255)): Contract number.
+tag_id (String(255)): RFID EPC code (links to id_item_master.tag_id).
+scan_type (String(50)): "Touch", "Rental", or "Return".
+scan_date (DateTime): Transaction date.
+client_name (String(255)): Client name.
+common_name (String(255)): Item name.
+bin_location (String(255)): Location.
+status (String(50)): Status.
+scan_by (String(255)): Who scanned.
+location_of_repair (String(255)): Repair location.
+quality (String(50)): Quality.
+dirty_or_mud, leaves, oil, mold, stain, oxidation, rip_or_tear, sewing_repair_needed, grommet, rope, buckle, wet (Boolean): Condition flags.
+other (Text): Condition notes.
+rental_class_num (String(255)): Rental class ID (links to seed_rental_classes.rental_class_id).
+serial_number (String(255)): Serial number.
+longitude (Decimal(9,6)): Scan longitude.
+latitude (Decimal(9,6)): Scan latitude.
+service_required (Boolean): Service needed.
+date_created (DateTime): Creation date.
+date_updated (DateTime): Last update.
+uuid_accounts_fk (String(255)): Account foreign key.
+notes (Text): Notes.
+
+
+API Endpoint: cs.iot.ptshome.com/api/v1/data/14223767938169346196 (GET)
+
+Seed Rental Classes (seed_rental_classes)
+
+Purpose: Maps rental class IDs to common names and bin locations.
+Fields:
+rental_class_id (String(255), PK): Rental class ID (links to id_item_master.rental_class_num and id_transactions.rental_class_num).
+common_name (String(255)): Common name.
+bin_location (String(255)): Default bin location.
+
+
+API Endpoint: cs.iot.ptshome.com/api/v1/data/14223767938169215907 (GET/POST/PUT/PATCH)
+
+Hand Counted Items (id_hand_counted_items, Local)
+
+Purpose: Tracks manually counted items for contracts.
+Fields:
+id (Integer, PK, Auto-increment): Record ID.
+contract_number (String(50)): Contract number.
+item_name (String(255)): Item name.
+quantity (Integer): Quantity.
+action (String(50)): "Added" or "Removed".
+timestamp (DateTime): Action date.
+user (String(50)): Who performed the action.
+
+
+
+Categories/Mappings (rental_class_mappings and user_rental_class_mappings, Local)
+
+Purpose: Maps rental class IDs to categories and subcategories.
+Fields (both tables):
+rental_class_id (String(50), PK): Rental class ID (links to id_item_master.rental_class_num, id_transactions.rental_class_num, and seed_rental_classes.rental_class_id).
+category (String(100)): Category.
+subcategory (String(100)): Subcategory.
+short_common_name (String(50)): Shortened common name for display.
+
+
+Additional Fields (user_rental_class_mappings):
+created_at (DateTime): Creation date.
+updated_at (DateTime): Last update date.
+
+
+
+Relationships
+
+id_item_master.tag_id ↔ id_transactions.tag_id (one-to-many).
+id_item_master.last_contract_num ↔ id_transactions.contract_number (many-to-one).
+id_item_master.rental_class_num ↔ seed_rental_classes.rental_class_id (many-to-one).
+id_item_master.rental_class_num ↔ rental_class_mappings.rental_class_id (many-to-one).
+id_transactions.rental_class_num ↔ seed_rental_classes.rental_class_id (many-to-one).
+id_hand_counted_items.contract_number ↔ id_item_master.last_contract_num (one-to-many).
+
+Usage
+
+Access the application at http://tim:3607/ (or http://tim:8000/ via Nginx).
+Navigate through tabs to manage inventory, contracts, and categories.
+Use the "Full Refresh" and "Clear API Data and Refresh" buttons on the home page to sync data.
+Logs provide detailed debugging information for troubleshooting.
+
+Troubleshooting
+
+500 Errors:
+Check rfid_dashboard.log and gunicorn_error.log for detailed error messages.
+Common issues include endpoint mismatches in templates or database integrity errors.
+
+
+Database Issues:
+Verify MariaDB is running: sudo systemctl status mariadb
+Check database connectivity: mysql -u rfid_user -prfid_user_password -h localhost rfid_inventory -e "SELECT 1;"
+
+
+API Issues:
+Ensure API credentials in config.py are correct.
+Test API endpoints manually using curl or a similar tool.
+
+
+
+Notes
+
+Not all items will have a category or subcategory assigned until mapped by the user in the "Manage Categories" section.
+Hand-counted items are specific to laundry contracts (Tab 4) and are stored locally in the database.
+
+Last Updated: May 29, 2025
