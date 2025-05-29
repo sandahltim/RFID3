@@ -1,4 +1,4 @@
-console.log('tab4.js version: 2025-05-29-v2 loaded');
+console.log('tab4.js version: 2025-05-29-v3 loaded');
 
 // Format ISO date strings into "Thurs, Aug 21 2025 4:55 pm"
 function formatDate(isoDateString) {
@@ -150,7 +150,7 @@ function applyFilterToTable(table) {
                         childTable.insertAdjacentElement('afterend', childRowCountDiv);
                     }
                     if (childRowCountDiv) {
-                        childRowCountDiv.textContent = `Showing ${visibleChildRows} of ${childRows tops.length} rows`;
+                        childRowCountDiv.textContent = `Showing ${visibleChildRows} of ${childRows.length} rows`;
                     }
                 }
             }
@@ -204,7 +204,7 @@ function applyFilterToTable(table) {
 
 // Expand category
 window.expandCategory = function(category, targetId, contractNumber, page = 1) {
-    console.log('expandCategory:', { category, targetId, contractNumber, contractNumber, page });
+    console.log('expandCategory:', { category, targetId, contractNumber, page });
 
     const targetElement = document.getElementById(targetId);
     if (!targetElement) {

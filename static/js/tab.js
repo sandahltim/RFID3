@@ -1,8 +1,8 @@
-console.log('tab.js version: 2025-05-28-v3 loaded');
+console.log('tab.js version: 2025-05-29-v4 loaded');
 
 /**
  * Tab.js: Initializes tab-specific logic and handles printing.
- * Dependencies: common.js (for formatDate, printTable).
+ * Dependencies: common.js (for formatDate, printTable, renderPaginationControls).
  * Updated: Bypassed tableId check for Tab 2 to fix expand functionality.
  */
 
@@ -82,9 +82,13 @@ function initializePagination(tableId, totalItems, page = 1, perPage = 20, fetch
         return;
     }
 
-    renderPaginationControls(paginationContainer, totalItems, page, perPage, (newPage) => {
-        fetchFunction(newPage, perPage);
-    });
+    if (typeof renderPaginationControls === 'function') {
+        renderPaginationControls(paginationContainer, totalItems, page, perPage, (newPage) => {
+            fetchFunction(newPage, perPage);
+        });
+    } else {
+        console.error('renderPaginationControls is not defined');
+    }
 }
 
 /**
@@ -316,7 +320,7 @@ async function printTable(level, id, commonName = null, category = null, subcate
         <html>
             <head>
                 <title>Broadway Tent and Event - ${tabName} - ${level}</title>
-                <link href="/static/css/style.css" rel="stylesheet">
+                <!-- Removed reference to non-existent style.css -->
                 <style>
                     body {
                         font-family: 'Roboto', sans-serif;
@@ -415,7 +419,7 @@ async function printTable(level, id, commonName = null, category = null, subcate
                     <h1>Broadway Tent and Event</h1>
                     <h2>${tabName}</h2>
                     ${contractNumber ? `<p>Contract Number: ${contractNumber}</p>` : ''}
-                    ${contractDate !== 'N/A' ? `<p>Contract Created: ${contractDate}</p>` : ''}
+                    ${contractDate !== 'N/A' ? `< Levantando Created: ${contractDate}</p>` : ''}
                     ${commonName ? `<p>Common Name: ${commonName}</p>` : ''}
                     <p>Printed on: ${new Date().toLocaleString()}</p>
                 </div>
@@ -492,7 +496,7 @@ async function printFullItemList(category, subcategory, commonName) {
         <html>
             <head>
                 <title>Broadway Tent and Event - ${tabName} - Full Item List</title>
-                <link href="/static/css/style.css" rel="stylesheet">
+                <!-- Removed reference to non-existent style.css -->
                 <style>
                     body {
                         font-family: 'Roboto', sans-serif;
@@ -674,9 +678,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     expandable.classList.remove('collapsed');
                     expandable.classList.add('expanded');
 
-                    // For Tab 2, call expandCategory directly since the table is created dynamically
-                    if (tabNum === 2 && typeof window.expandCategory === 'function') {
-                        console.log(`Calling expandCategory for Tab 2: targetId=${targetId}, contractNumber=${contractNumber}`);
+                    // For Tab 2 and Tab 4, call expandCategory directly since the table is created dynamically
+                    if ((tabNum === 2 || tabNum === 4) && typeof window.expandCategory === 'function') {
+                        console.log(`Calling expandCategory for Tab ${tabNum}: targetId=${targetId}, contractNumber=${contractNumber}`);
                         window.expandCategory('', targetId, contractNumber);
                     } else {
                         // For other tabs, fetch data and update table
