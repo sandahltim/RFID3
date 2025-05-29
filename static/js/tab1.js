@@ -1,41 +1,11 @@
-console.log('tab1.js version: 2025-05-23-v10 loaded');
+console.log('tab1.js version: 2025-05-29-v11 loaded');
 
 /**
  * Tab1.js: Logic for Tab 1 (Rental Inventory).
- * Dependencies: None (self-contained, uses common.js for printing).
+ * Dependencies: common.js (for formatDate, showLoading, hideLoading, collapseSection, printTable, printFullItemList).
  * Note: Split from tab1_5.js; removed Tab 5-specific functions (bulk updates).
  * Updated: Pre-populate subcategory dropdowns on load, show common names on selection.
  */
-
-/**
- * Show loading indicator
- */
-function showLoadingTab1(targetId) {
-    console.log(`showLoadingTab1: targetId=${targetId}`);
-    const container = document.getElementById(targetId);
-    if (!container) {
-        console.warn(`Container ${targetId} not found for loading indicator`);
-        return false;
-    }
-    const loadingDiv = document.createElement('div');
-    loadingDiv.id = `loading-${targetId}`;
-    loadingDiv.className = 'loading-indicator';
-    loadingDiv.textContent = 'Loading...';
-    loadingDiv.style.display = 'block';
-    container.appendChild(loadingDiv);
-    return true;
-}
-
-/**
- * Hide loading indicator
- */
-function hideLoadingTab1(targetId) {
-    console.log(`hideLoadingTab1: targetId=${targetId}`);
-    const loadingDiv = document.getElementById(`loading-${targetId}`);
-    if (loadingDiv) {
-        loadingDiv.remove();
-    }
-}
 
 /**
  * Apply filter with retry mechanism
@@ -56,6 +26,7 @@ function applyFilterWithRetryTab1(tableId, tableType, retries = 10, delay = 200)
 
 /**
  * Apply filter to all levels (category, subcategory, common names, items)
+ * Specific to Tab 1, does not use globalFilter
  */
 function applyFilterToAllLevelsTab1() {
     console.log('applyFilterToAllLevelsTab1: Starting');
@@ -369,7 +340,7 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
     container.classList.add('loading');
 
     const key = targetId;
-    const loadingSuccess = showLoadingTab1(key);
+    const loadingSuccess = showLoading(key);
 
     // Clear existing content to prevent duplicates
     container.innerHTML = '';
@@ -501,36 +472,10 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
         })
         .finally(() => {
             setTimeout(() => {
-                if (loadingSuccess) hideLoadingTab1(key);
+                if (loadingSuccess) hideLoading(key);
                 container.classList.remove('loading');
             }, 700);
         });
-}
-
-/**
- * Collapse items when "Collapse Items" is clicked
- */
-function collapseItems(targetId) {
-    console.log(`collapseItems: targetId=${targetId}`);
-    const container = document.getElementById(targetId);
-    if (!container) {
-        console.error(`Container ${targetId} not found for collapsing items`);
-        return;
-    }
-    container.style.opacity = '0';
-    setTimeout(() => {
-        container.style.display = 'none';
-        container.innerHTML = ''; // Clear content
-    }, 700);
-    const parentRow = container.closest('tr.common-name-row').previousElementSibling;
-    if (parentRow) {
-        const expandBtn = parentRow.querySelector(`.expand-items-btn[data-target-id="${targetId}"]`);
-        const collapseBtn = parentRow.querySelector(`.collapse-items-btn[data-collapse-target="${targetId}"]`);
-        if (expandBtn && collapseBtn) {
-            expandBtn.style.display = 'inline-block';
-            collapseBtn.style.display = 'none';
-        }
-    }
 }
 
 /**
@@ -733,7 +678,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
             const expandBtn = collapseBtn.parentElement.querySelector(`.expand-items-btn[data-target-id="${targetId}"]`);
-            collapseItems(targetId);
+            collapseSection(targetId);
             if (expandBtn && collapseBtn) {
                 expandBtn.style.display = 'inline-block';
                 collapseBtn.style.display = 'none';

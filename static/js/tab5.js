@@ -1,69 +1,196 @@
-console.log('tab5.js version: 2025-05-19-v5 loaded');
+console.log('tab5.js version: 2025-05-29-v6 loaded');
 
 /**
  * Tab5.js: Logic for Tab 5 (Resale/Rental Packs).
- * Dependencies: common.js for formatDate, printTable, printFullItemList.
+ * Dependencies: common.js (for formatDate, showLoading, hideLoading, collapseSection, printTable, printFullItemList).
+ * Updated: Removed duplicate functions, now using common.js utilities.
  */
 
 /**
- * Collapse section (category/subcategory level)
+ * Apply filter to all levels for Tab 5
+ * Specific to Tab 5, uses globalFilter
  */
-function collapseSection(categoryRow, targetId) {
-    if (!targetId || !categoryRow) {
-        console.error('collapseSection: Invalid parameters', { targetId, categoryRow });
+function applyFilterToAllLevelsTab5() {
+    console.log('applyFilterToAllLevelsTab5: Starting');
+    // Skip filtering for Tab 3 and non-tab pages
+    if (window.cachedTabNum === 3 || !window.location.pathname.match(/\/tab\/\d+/)) {
+        console.log('Skipping applyFilterToAllLevels for Tab 3 or non-tab page');
         return;
     }
-    console.log(`Collapsing ${targetId}`);
-    const existingRows = categoryRow.parentNode.querySelectorAll(`tr.common-name-row[data-target-id="${targetId}"]`);
-    existingRows.forEach(row => row.remove());
-    sessionStorage.removeItem(`expanded_${targetId}`);
-}
 
-/**
- * Collapse items (item level)
- */
-function collapseItems(targetId) {
-    const container = document.getElementById(targetId);
-    if (!container) {
-        console.error(`Container ${targetId} not found for collapsing items`);
-        return;
-    }
-    console.log(`Collapsing items ${targetId}`);
-    container.classList.remove('expanded');
-    container.classList.add('collapsed');
-    container.style.opacity = '0';
-    setTimeout(() => {
-        container.style.display = 'none';
-        container.innerHTML = ''; // Clear content
-    }, 700);
-    sessionStorage.removeItem(`expanded_items_${targetId}`);
-}
+    // For Tabs 1 and 5
+    if (window.cachedTabNum === 1 || window.cachedTabNum === 5) {
+        const categoryTable = document.getElementById('category-table');
+        if (!categoryTable) {
+            console.warn('Category table not found, skipping filter application');
+            return;
+        }
 
-/**
- * Show loading indicator
- */
-function showLoadingTab5(targetId) {
-    const container = document.getElementById(targetId);
-    if (!container) {
-        console.warn(`Container ${targetId} not found for loading indicator`);
-        return false;
-    }
-    const loadingDiv = document.createElement('div');
-    loadingDiv.id = `loading-${targetId}`;
-    loadingDiv.className = 'loading-indicator';
-    loadingDiv.textContent = 'Loading...';
-    loadingDiv.style.display = 'block';
-    container.appendChild(loadingDiv);
-    return true;
-}
+        const categoryRows = categoryTable.querySelectorAll('.category-row') || [];
+        if (!categoryRows.length) {
+            console.warn('No category rows found in table, skipping filter application');
+            return;
+        }
 
-/**
- * Hide loading indicator
- */
-function hideLoadingTab5(targetId) {
-    const loadingDiv = document.getElementById(`loading-${targetId}`);
-    if (loadingDiv) {
-        loadingDiv.remove();
+        let visibleCategoryRows = 0;
+
+        categoryRows.forEach(categoryRow => {
+            let showCategoryRow = true;
+            const categoryCell = categoryRow.querySelector('td:nth-child(1)'); // Category column
+            const categoryValue = categoryCell ? categoryCell.textContent.toLowerCase() : '';
+            const normalizedCategoryValue = categoryValue.toLowerCase().replace(/\s+/g, '_');
+            const subcatSelect = categoryRow.querySelector('.subcategory-select');
+            let hasMatchingItems = false;
+
+            const options = subcatSelect ? subcatSelect.querySelectorAll('option:not([value=""])') : [];
+            const selectedOption = subcatSelect ? subcatSelect.options[subcatSelect.selectedIndex] : null;
+            const selectedValue = selectedOption ? selectedOption.value : '';
+
+            if (selectedValue) {
+                const commonTables = categoryRow.parentNode.querySelectorAll(`.common-name-row[data-target-id^="common-${normalizedCategoryValue}"] .common-table`);
+                if (!commonTables.length) {
+                    console.warn(`Common tables not found for category ${categoryValue} (normalized: ${normalizedCategoryValue})`);
+                    return;
+                }
+
+                let visibleSubcategories = 0;
+                commonTables.forEach(commonTable => {
+                    const commonRows = commonTable.querySelectorAll('tbody tr:not(.common-name-row)') || [];
+                    let visibleCommonRows = 0;
+
+                    commonRows.forEach((commonRow, index) => {
+                        if (index % 2 !== 0) return;
+
+                        let showCommonRow = true;
+                        const commonNameCell = commonRow.querySelector('td:nth-child(1)'); // Common Name column
+                        const commonNameValue = commonNameCell ? commonNameCell.textContent.toLowerCase() : '';
+
+                        if (window.globalFilter.commonName && !commonNameValue.includes(window.globalFilter.commonName)) {
+                            showCommonRow = false;
+                        }
+
+                        const commonExpandableRow = commonRow.nextElementSibling;
+                        let visibleItemRows = 0;
+                        if (commonExpandableRow && commonExpandableRow.classList.contains('common-name-row')) {
+                            const itemsDiv = commonExpandableRow.querySelector('.expandable');
+                            if (itemsDiv && itemsDiv.classList.contains('expanded')) {
+                                const itemTable = itemsDiv.querySelector('.item-table');
+                                if (itemTable) {
+                                    const itemRows = itemTable.querySelectorAll('tbody tr') || [];
+                                    itemRows.forEach(itemRow => {
+                                        let showItemRow = true;
+                                        const colOffset = window.cachedTabNum == 5 ? 1 : 0;
+                                        const itemCommonNameCell = itemRow.querySelector(`td:nth-child(${2 + colOffset})`);
+                                        const itemContractCell = itemRow.querySelector(`td:nth-child(${5 + colOffset})`);
+                                        const itemCommonNameValue = itemCommonNameCell ? itemCommonNameCell.textContent.toLowerCase() : '';
+                                        const itemContractValue = itemContractCell ? itemContractCell.textContent.toLowerCase() : '';
+
+                                        if (window.globalFilter.commonName && !itemCommonNameValue.includes(window.globalFilter.commonName)) {
+                                            showItemRow = false;
+                                        }
+                                        if (window.globalFilter.contractNumber && !itemContractValue.includes(window.globalFilter.contractNumber)) {
+                                            showItemRow = false;
+                                        }
+
+                                        itemRow.style.display = showItemRow ? '' : 'none';
+                                        if (showItemRow) {
+                                            visibleItemRows++;
+                                            showCommonRow = true;
+                                            hasMatchingItems = true;
+                                        }
+                                    });
+
+                                    let itemRowCountDiv = itemTable.nextElementSibling;
+                                    if (itemRowCountDiv && !itemRowCountDiv.classList.contains('row-count')) {
+                                        itemRowCountDiv = document.createElement('div');
+                                        itemRowCountDiv.className = 'row-count mt-2';
+                                        itemTable.insertAdjacentElement('afterend', itemRowCountDiv);
+                                    }
+                                    if (itemRowCountDiv) {
+                                        itemRowCountDiv.textContent = `Showing ${visibleItemRows} of ${itemRows.length} rows`;
+                                    }
+
+                                    if (visibleItemRows > 0) {
+                                        itemsDiv.classList.remove('collapsed');
+                                        itemsDiv.classList.add('expanded');
+                                        itemsDiv.style.display = 'block';
+                                        itemsDiv.style.opacity = '1';
+                                        const expandBtn = commonRow.querySelector('.expand-btn');
+                                        const collapseBtn = commonRow.querySelector('.collapse-btn');
+                                        if (expandBtn && collapseBtn) {
+                                            expandBtn.style.display = 'none';
+                                            collapseBtn.style.display = 'inline-block';
+                                        }
+                                    } else {
+                                        itemsDiv.classList.remove('expanded');
+                                        itemsDiv.classList.add('collapsed');
+                                        itemsDiv.style.display = 'block';
+                                        itemsDiv.style.opacity = '0';
+                                        const expandBtn = commonRow.querySelector('.expand-btn');
+                                        const collapseBtn = commonRow.querySelector('.collapse-btn');
+                                        if (expandBtn && collapseBtn) {
+                                            expandBtn.style.display = 'inline-block';
+                                            collapseBtn.style.display = 'none';
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        commonRow.style.display = showCommonRow ? '' : 'none';
+                        if (commonExpandableRow) {
+                            commonExpandableRow.style.display = showCommonRow ? '' : 'none';
+                        }
+                        if (showCommonRow) visibleCommonRows++;
+                    });
+
+                    let commonRowCountDiv = commonTable.nextElementSibling;
+                    if (commonRowCountDiv && !commonRowCountDiv.classList.contains('row-count')) {
+                        commonRowCountDiv = document.createElement('div');
+                        commonRowCountDiv.className = 'row-count mt-2';
+                        commonTable.insertAdjacentElement('afterend', commonRowCountDiv);
+                    }
+                    if (commonRowCountDiv) {
+                        commonRowCountDiv.textContent = `Showing ${visibleCommonRows} of ${commonRows.length / 2} rows`;
+                    }
+
+                    if (visibleCommonRows > 0 || hasMatchingItems) {
+                        visibleSubcategories++;
+                        showCategoryRow = true;
+                    }
+                });
+            } else {
+                if (window.globalFilter.commonName) {
+                    if (categoryValue.includes(window.globalFilter.commonName)) {
+                        showCategoryRow = true;
+                    }
+                } else {
+                    showCategoryRow = true;
+                }
+            }
+
+            if (!window.globalFilter.commonName && !window.globalFilter.contractNumber) {
+                showCategoryRow = true;
+                options.forEach(option => option.style.display = '');
+            }
+
+            categoryRow.style.display = showCategoryRow ? '' : 'none';
+            if (showCategoryRow) {
+                visibleCategoryRows++;
+                const relatedRows = categoryRow.parentNode.querySelectorAll(`.common-name-row[data-target-id^="common-${normalizedCategoryValue}"]`);
+                relatedRows.forEach(row => {
+                    row.style.display = showCategoryRow ? '' : 'none';
+                });
+            }
+        });
+
+        let rowCountDiv = document.querySelector('.row-count');
+        if (!rowCountDiv) {
+            rowCountDiv = document.createElement('div');
+            rowCountDiv.className = 'row-count mt-2';
+            categoryTable.insertAdjacentElement('afterend', rowCountDiv);
+        }
+        rowCountDiv.textContent = `Showing ${visibleCategoryRows} of ${categoryRows.length} rows`;
     }
 }
 
@@ -120,7 +247,6 @@ function loadCommonNames(selectElement, page = 1) {
 
     if (!subcategory && page === 1) {
         console.log('No subcategory, collapsing');
-        collapseSection(categoryRow, targetId);
         const url = `/tab/5/subcat_data?category=${encodeURIComponent(category)}`;
         fetch(url)
             .then(response => {
@@ -556,7 +682,7 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
     container.classList.add('loading');
 
     const key = targetId;
-    const loadingSuccess = showLoadingTab5(key);
+    const loadingSuccess = showLoading(key);
 
     container.innerHTML = '';
 
@@ -771,7 +897,7 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
         })
         .finally(() => {
             setTimeout(() => {
-                if (loadingSuccess) hideLoadingTab5(key);
+                if (loadingSuccess) hideLoading(key);
                 container.classList.remove('loading');
             }, 700);
         });
@@ -872,9 +998,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (isExpanded) {
                 console.log(`Collapsing ${targetId}`);
                 if (commonName) {
-                    collapseItems(targetId);
-                } else {
-                    collapseSection(expandBtn.closest('tr'), targetId);
+                    collapseSection(targetId);
                 }
                 if (expandBtn && collapseBtn) {
                     expandBtn.style.display = 'inline-block';
@@ -909,9 +1033,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             const expandBtn = collapseBtn.parentElement.querySelector(`.expand-btn[data-target-id="${targetId}"]`);
             if (container.classList.contains('item-level')) {
-                collapseItems(targetId);
-            } else {
-                collapseSection(collapseBtn.closest('tr'), targetId);
+                collapseSection(targetId);
             }
             if (expandBtn && collapseBtn) {
                 expandBtn.style.display = 'inline-block';
@@ -931,7 +1053,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const category = printBtn.getAttribute('data-category');
             const subcategory = printBtn.getAttribute('data-subcategory');
             const commonName = printBtn.getAttribute('data-common-name');
-            printTable(printId, printLevel, category, subcategory, commonName);
+            printTable(printLevel, printId, commonName, category, subcategory);
             return;
         }
 
@@ -942,7 +1064,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const commonName = printFullBtn.getAttribute('data-common-name');
             const category = printFullBtn.getAttribute('data-category');
             const subcategory = printFullBtn.getAttribute('data-subcategory');
-            printFullItemList(category, subcategory, commonName, 5);
+            printFullItemList(category, subcategory, commonName);
             return;
         }
     }
