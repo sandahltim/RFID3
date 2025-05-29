@@ -24,8 +24,8 @@
             </thead>
             <tbody id="category-rows">
                 {% for contract in contracts %}
-                <tr>
-                    <td class="expandable-cell" onclick="window.expandCategory('{{ contract.contract_number | urlencode | replace('\'', '\\\'') | replace('"', '\\"') }}', 'common-{{ contract.contract_number }}', '{{ contract.contract_number }}')">
+                <tr data-contract-number="{{ contract.contract_number }}">
+                    <td class="expandable-cell" onclick="window.expandCategory('{{ contract.contract_number | urlencode | replace('\'', '\\\'') | replace('\"', '\\\"') }}', 'common-{{ contract.contract_number }}', '{{ contract.contract_number }}')">
                         {{ contract.contract_number }}
                     </td>
                     <td>{{ contract.client_name }}</td>
@@ -138,7 +138,36 @@ function refreshTab() {
 function filterHandCountedItems() {
     const contractNumber = document.getElementById('hand-counted-filter').value;
     const url = contractNumber ? `/tab/4/hand_counted_items?contract_number=${encodeURIComponent(contractNumber)}` : '/tab/4/hand_counted_items';
-    htmx.ajax('GET', url, '#hand-counted-items');
+    
+    // Check if htmx is available
+    if (typeof htmx !== 'undefined') {
+        htmx.ajax('GET', url, '#hand-counted-items');
+    } else {
+        // Fallback: Fetch and manually update the table
+        console.warn('HTMX not available, using fallback fetch');
+        fetch(url)
+            .then(response => response.text())
+            .then(html => {
+                const target = document.getElementById('hand-counted-items');
+                if (target) {
+                    target.innerHTML = html;
+                    // Manually trigger formatting of timestamps
+                    const rows = target.querySelectorAll('tr');
+                    rows.forEach(row => {
+                        const timestampCell = row.querySelector('td:nth-child(5)');
+                        if (timestampCell) {
+                            const rawDate = timestampCell.textContent.trim();
+                            const formattedDate = formatDate(rawDate);
+                            timestampCell.textContent = formattedDate;
+                        }
+                    });
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching hand-counted items:', error);
+                document.getElementById('hand-counted-items').innerHTML = '<tr><td colspan="6">Error loading hand-counted items.</td></tr>';
+            });
+    }
 }
 
 // Toggle visibility of new contract number input
@@ -287,6 +316,8 @@ function addHandCountedItem() {
             employeeInput.value = '';
             // Refresh the hand-counted items table
             filterHandCountedItems();
+            // Dynamically add the contract to the table if it doesn't exist
+            addContractToTable(contractNumber);
             // Update the contract counts and common names list
             updateContractCounts(contractNumber);
             refreshCommonNames(contractNumber);
@@ -296,6 +327,7 @@ function addHandCountedItem() {
         console.error('Error adding hand-counted item:', error);
         alert('Failed to add item. Please try again.');
         // Still attempt to update counts and common names in case of partial success
+        addContractToTable(contractNumber);
         updateContractCounts(contractNumber);
         refreshCommonNames(contractNumber);
     });
@@ -357,6 +389,8 @@ function removeHandCountedItem() {
             employeeInput.value = '';
             // Refresh the hand-counted items table
             filterHandCountedItems();
+            // Dynamically add the contract to the table if it doesn't exist
+            addContractToTable(contractNumber);
             // Update the contract counts and common names list
             updateContractCounts(contractNumber);
             refreshCommonNames(contractNumber);
@@ -366,9 +400,46 @@ function removeHandCountedItem() {
         console.error('Error removing hand-counted item:', error);
         alert('Failed to remove item. Please try again.');
         // Still attempt to update counts and common names in case of partial success
+        addContractToTable(contractNumber);
         updateContractCounts(contractNumber);
         refreshCommonNames(contractNumber);
     });
+}
+
+// Dynamically add a new contract to the table if it doesn't exist
+function addContractToTable(contractNumber) {
+    const tbody = document.getElementById('category-rows');
+    const existingRow = tbody.querySelector(`tr[data-contract-number="${contractNumber}"]`);
+    
+    if (!existingRow) {
+        console.log(`Adding new contract row for ${contractNumber}`);
+        const newRowHtml = `
+            <tr data-contract-number="${contractNumber}">
+                <td class="expandable-cell" onclick="window.expandCategory('${encodeURIComponent(contractNumber).replace(/'/g, "\\'").replace(/"/g, '\\"')}', 'common-${contractNumber}', '${contractNumber}')">
+                    ${contractNumber}
+                </td>
+                <td>N/A</td>
+                <td id="items-on-contract-${contractNumber}">0</td>
+                <td>0</td>
+                <td id="hand-counted-entries-${contractNumber}">0</td>
+                <td class="date-last-scanned">N/A</td>
+                <td>
+                    <button class="btn btn-sm btn-secondary expand-btn" data-contract-number="${contractNumber}" data-target-id="common-${contractNumber}">Expand</button>
+                    <button class="btn btn-sm btn-secondary collapse-btn" data-collapse-target="common-${contractNumber}" style="display:none;">Collapse</button>
+                    <button class="btn btn-sm btn-info print-btn" data-print-level="Contract" data-print-id="common-${contractNumber}" data-contract-number="${contractNumber}">Print</button>
+                    <div id="loading-${contractNumber}" style="display:none;" class="loading">Loading...</div>
+                </td>
+            </tr>
+            <tr>
+                <td colspan="7">
+                    <div id="common-${contractNumber}" class="expandable collapsed"></div>
+                </td>
+            </tr>
+        `;
+        tbody.insertAdjacentHTML('beforeend', newRowHtml);
+    } else {
+        console.log(`Contract ${contractNumber} already exists in table`);
+    }
 }
 
 // Update the Items on Contract and Hand-Counted Entries counts dynamically
