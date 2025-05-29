@@ -28,7 +28,7 @@
         button.disabled = true;
         button.innerText = 'Refreshing...';
         
-        fetch('/full_refresh', {
+        fetch('/refresh/full', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -36,10 +36,10 @@
         })
         .then(response => response.json())
         .then(data => {
-            if (data.status === 'success') {
-                alert(data.message);
+            if (data.status === 'Full refresh triggered successfully') {
+                alert('Full refresh completed successfully');
             } else {
-                alert('Error: ' + data.message);
+                alert('Error: ' + data.error);
             }
         })
         .catch(error => {
@@ -52,12 +52,12 @@
         });
     }
 
-    function triggerClearAndRefresh() {
-        const button = document.getElementById('clear-refresh-btn');
+    function triggerIncrementalRefresh() {
+        const button = document.getElementById('incremental-refresh-btn');
         button.disabled = true;
-        button.innerText = 'Clearing and Refreshing...';
+        button.innerText = 'Refreshing...';
         
-        fetch('/clear_api_data', {
+        fetch('/refresh/incremental', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -65,19 +65,19 @@
         })
         .then(response => response.json())
         .then(data => {
-            if (data.status === 'success') {
-                alert(data.message);
+            if (data.status === 'Incremental refresh triggered successfully') {
+                alert('Incremental refresh completed successfully');
             } else {
-                alert('Error: ' + data.message);
+                alert('Error: ' + data.error);
             }
         })
         .catch(error => {
-            console.error('Error during clear and refresh:', error);
-            alert('Failed to clear API data and refresh');
+            console.error('Error during incremental refresh:', error);
+            alert('Failed to perform incremental refresh');
         })
         .finally(() => {
             button.disabled = false;
-            button.innerText = 'Clear API Data and Refresh';
+            button.innerText = 'Incremental Refresh';
         });
     }
 </script>
@@ -109,7 +109,7 @@
     <div class="row mb-3">
         <div class="col-md-12">
             <button id="full-refresh-btn" class="btn btn-primary" onclick="triggerFullRefresh()">Full Refresh</button>
-            <button id="clear-refresh-btn" class="btn btn-warning ml-2" onclick="triggerClearAndRefresh()">Clear API Data and Refresh</button>
+            <button id="incremental-refresh-btn" class="btn btn-warning ml-2" onclick="triggerIncrementalRefresh()">Incremental Refresh</button>
         </div>
     </div>
     <div class="row">
@@ -198,7 +198,7 @@
                     <tr>
                         <td>Manage Categories</td>
                         <td>
-                            <a href="/tab/6" class="btn btn-primary">View</a>
+                            <a href="{{ url_for('categories.manage_categories') }}" class="btn btn-primary">View</a>
                         </td>
                     </tr>
                 </tbody>
