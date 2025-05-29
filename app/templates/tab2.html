@@ -1,9 +1,15 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="mt-0"> <!-- Removed mt-4 to reduce gap -->
+<div class="mt-0">
     <!-- Page title -->
     <h2>Open Contracts</h2>
+    <!-- Error message if applicable -->
+    {% if error %}
+    <div class="alert alert-danger" role="alert">
+        Error loading contracts: {{ error }}
+    </div>
+    {% endif %}
     <!-- Table for displaying contracts -->
     <table class="category-table" id="category-table">
         <thead id="category-table-header" class="thead-dark">
@@ -17,36 +23,51 @@
             </tr>
         </thead>
         <tbody id="category-rows">
-            {% for contract in contracts %}
-            <tr>
-                <td class="expandable-cell" onclick="window.expandCategory('{{ contract.contract_number | urlencode | replace('\'', '\\\'') | replace('"', '\\"') }}', 'common-{{ contract.contract_number }}', '{{ contract.contract_number }}')">
-                    {{ contract.contract_number }}
-                </td>
-                <td>{{ contract.client_name }}</td>
-                <td>{{ contract.items_on_contract }}</td>
-                <td>{{ contract.total_items_inventory }}</td>
-                <td>{{ contract.scan_date }}</td>
-                <td>
-                    <button class="btn btn-sm btn-secondary expand-btn" data-contract-number="{{ contract.contract_number }}" data-target-id="common-{{ contract.contract_number }}">Expand</button>
-                    <button class="btn btn-sm btn-secondary collapse-btn" data-collapse-target="common-{{ contract.contract_number }}" style="display:none;">Collapse</button>
-                    <button class="btn btn-sm btn-info print-btn" data-print-level="Contract" data-print-id="common-{{ contract.contract_number }}" data-contract-number="{{ contract.contract_number }}">Print</button>
-                    <div id="loading-{{ contract.contract_number }}" style="display:none;" class="loading">Loading...</div>
-                </td>
-            </tr>
-            <tr>
-                <td colspan="6">
-                    <div id="common-{{ contract.contract_number }}" class="expandable collapsed"></div>
-                </td>
-            </tr>
-            {% endfor %}
+            {% if contracts %}
+                {% for contract in contracts %}
+                <tr>
+                    <td class="expandable-cell" onclick="window.expandCategory('{{ contract.contract_number | urlencode | replace('\'', '\\\'') | replace('"', '\\"') }}', 'common-{{ contract.contract_number }}', '{{ contract.contract_number }}')">
+                        {{ contract.contract_number }}
+                    </td>
+                    <td>{{ contract.client_name }}</td>
+                    <td>{{ contract.items_on_contract }}</td>
+                    <td>{{ contract.total_items_inventory }}</td>
+                    <td class="timestamp">{{ contract.scan_date }}</td>
+                    <td>
+                        <button class="btn btn-sm btn-secondary expand-btn" data-contract-number="{{ contract.contract_number }}" data-target-id="common-{{ contract.contract_number }}">Expand</button>
+                        <button class="btn btn-sm btn-secondary collapse-btn" data-collapse-target="common-{{ contract.contract_number }}" style="display:none;">Collapse</button>
+                        <button class="btn btn-sm btn-info print-btn" data-print-level="Contract" data-print-id="common-{{ contract.contract_number }}" data-contract-number="{{ contract.contract_number }}">Print</button>
+                        <div id="loading-{{ contract.contract_number }}" style="display:none;" class="loading">Loading...</div>
+                    </td>
+                </tr>
+                <tr>
+                    <td colspan="6">
+                        <div id="common-{{ contract.contract_number }}" class="expandable collapsed"></div>
+                    </td>
+                </tr>
+                {% endfor %}
+            {% else %}
+                <tr>
+                    <td colspan="6">No open contracts found. Please try refreshing or check data synchronization.</td>
+                </tr>
+            {% endif %}
         </tbody>
     </table>
 </div>
 
-<!-- JavaScript for refreshing the table -->
+<!-- JavaScript for refreshing the table and formatting dates -->
 <script>
 function refreshTab() {
     window.location.reload();
 }
+
+// Format timestamps on page load
+document.addEventListener('DOMContentLoaded', function() {
+    const timestampCells = document.querySelectorAll('.timestamp');
+    timestampCells.forEach(cell => {
+        const rawDate = cell.textContent.trim();
+        cell.textContent = formatDate(rawDate); // Uses common.js formatDate
+    });
+});
 </script>
 {% endblock %}

@@ -8,7 +8,7 @@ import sys
 
 # Configure logging
 logger = logging.getLogger('tab2')
-logger.setLevel(logging.DEBUG)  # Change to DEBUG for more detailed logging
+logger.setLevel(logging.DEBUG)
 
 # Remove existing handlers to avoid duplicates
 logger.handlers = []
@@ -29,7 +29,7 @@ logger.addHandler(console_handler)
 tab2_bp = Blueprint('tab2', __name__)
 
 # Version marker
-logger.info("Deployed tab2.py version: 2025-05-28-v5")
+logger.info("Deployed tab2.py version: 2025-05-29-v6")
 
 @tab2_bp.route('/tab/2')
 def tab2_view():
@@ -43,24 +43,27 @@ def tab2_view():
         session.execute("SELECT 1")
         logger.info("Database connection test successful")
 
-        # Debug: Fetch all contract numbers to see what's in the database
+        # Debug: Fetch all contract numbers
         all_contracts = session.query(ItemMaster.last_contract_num).distinct().all()
         logger.debug(f"All distinct contract numbers in ItemMaster: {[c[0] for c in all_contracts]}")
 
+        # Break down query for debugging
         contracts_query = session.query(
             ItemMaster.last_contract_num,
             func.count(ItemMaster.tag_id).label('total_items')
         ).filter(
-            ItemMaster.status.in_(['On Rent', 'Delivered']),
-            ItemMaster.last_contract_num != None,
+            func.lower(ItemMaster.status).in_(['on rent', 'delivered']),  # Case-insensitive
+            ItemMaster.last_contract_num.isnot(None),
             ItemMaster.last_contract_num != '00000',
-            ~func.trim(ItemMaster.last_contract_num).op('REGEXP')('^L[0-9]+$')  # Exclude laundry contracts
+            ~func.trim(ItemMaster.last_contract_num).op('REGEXP')('^L[0-9]+$')
         ).group_by(
             ItemMaster.last_contract_num
         ).having(
             func.count(ItemMaster.tag_id) > 0
-        ).all()
+        )
 
+        logger.debug(f"Contracts query SQL: {str(contracts_query)}")
+        contracts_query = contracts_query.all()
         logger.info(f"Raw contracts query result: {[(c.last_contract_num, c.total_items) for c in contracts_query]}")
         current_app.logger.info(f"Raw contracts query result: {[(c.last_contract_num, c.total_items) for c in contracts_query]}")
 
@@ -81,7 +84,7 @@ def tab2_view():
 
             items_on_contract = session.query(func.count(ItemMaster.tag_id)).filter(
                 ItemMaster.last_contract_num == contract_number,
-                ItemMaster.status.in_(['On Rent', 'Delivered'])
+                func.lower(ItemMaster.status).in_(['on rent', 'delivered'])
             ).scalar()
 
             total_items_inventory = session.query(func.count(ItemMaster.tag_id)).filter(
@@ -103,7 +106,7 @@ def tab2_view():
     except Exception as e:
         logger.error(f"Error rendering Tab 2: {str(e)}", exc_info=True)
         current_app.logger.error(f"Error rendering Tab 2: {str(e)}", exc_info=True)
-        return render_template('tab2.html', contracts=[], cache_bust=int(time()))
+        return render_template('tab2.html', contracts=[], error=str(e), cache_bust=int(time()))
     finally:
         if session:
             session.close()
@@ -139,7 +142,7 @@ def tab2_common_names():
             on_contracts
         ).filter(
             ItemMaster.last_contract_num == contract_number,
-            ItemMaster.status.in_(['On Rent', 'Delivered'])
+            func.lower(ItemMaster.status).in_(['on rent', 'delivered'])
         ).group_by(
             ItemMaster.common_name
         )
@@ -158,14 +161,7 @@ def tab2_common_names():
         elif sort == 'total_items_inventory_desc':
             common_names_query = common_names_query.order_by(desc('total_items_inventory'))
 
-        # Debug: Log the query before executing
         logger.debug(f"Common names query: {str(common_names_query)}")
-
-        # Verify query is not None
-        if common_names_query is None:
-            logger.error("Common names query is None; query construction failed")
-            return jsonify({'error': 'Failed to construct query'}), 500
-
         common_names_all = common_names_query.all()
 
         logger.debug(f"Common names for contract {contract_number}: {[(name, count) for name, count in common_names_all]}")
@@ -186,7 +182,7 @@ def tab2_common_names():
                 'total_items_inventory': total_items_inventory or 0
             })
 
-        # Apply sorting for computed fields if necessary
+        # Apply sorting for computed fields
         if sort in ['total_items_inventory_asc', 'total_items_inventory_desc']:
             sort_field = sort.split('_')[0]
             sort_direction = sort.split('_')[-1]
@@ -240,7 +236,7 @@ def tab2_data():
         query = session.query(ItemMaster).filter(
             ItemMaster.last_contract_num == contract_number,
             ItemMaster.common_name == common_name,
-            ItemMaster.status.in_(['On Rent', 'Delivered'])
+            func.lower(ItemMaster.status).in_(['on rent', 'delivered'])
         )
 
         # Apply sorting
@@ -345,35 +341,6 @@ def full_items_by_rental_class():
         logger.error(f"Error fetching full items for contract {contract_number}, common_name {common_name}: {str(e)}", exc_info=True)
         current_app.logger.error(f"Error fetching full items for contract {contract_number}, common_name {common_name}: {str(e)}", exc_info=True)
         return jsonify({'error': 'Failed to fetch full items'}), 500
-    finally:
-        if session:
-            session.close()
-
-@tab2_bp.route('/get_contract_date')
-def get_contract_date():
-    contract_number = request.args.get('contract_number')
-    if not contract_number:
-        logger.error("Missing required parameter: contract_number is required")
-        current_app.logger.error("Missing required parameter: contract_number is required")
-        return jsonify({'error': 'Contract number is required'}), 400
-
-    session = None
-    try:
-        session = db.session()
-        logger.info("Successfully created session for get_contract_date")
-
-        latest_transaction = session.query(Transaction.scan_date).filter(
-            Transaction.contract_number == contract_number,
-            Transaction.scan_type == 'Rental'
-        ).order_by(desc(Transaction.scan_date)).first()
-
-        if latest_transaction and latest_transaction.scan_date:
-            return jsonify({'date': latest_transaction.scan_date.isoformat()})
-        return jsonify({'date': 'N/A'})
-    except Exception as e:
-        logger.error(f"Error fetching contract date for {contract_number}: {str(e)}", exc_info=True)
-        current_app.logger.error(f"Error fetching contract date for {contract_number}: {str(e)}", exc_info=True)
-        return jsonify({'error': 'Failed to fetch contract date'}), 500
     finally:
         if session:
             session.close()
