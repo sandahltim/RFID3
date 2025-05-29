@@ -1,265 +1,279 @@
 import logging
-import requests
+import time
 from datetime import datetime, timedelta
-from flask import Blueprint, current_app
-from .. import db, cache
-from ..models.db_models import ItemMaster, Transaction, RefreshState
-from .api_client import APIClient
-from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+from sqlalchemy.exc import SQLAlchemyError, OperationalError
+from app.models.db_models import ItemMaster, Transaction, RentalClassMapping, SeedRentalClass, db
+from app.services.api_client import APIClient
+from flask import Blueprint, jsonify, current_app
 
-# Configure logging
-logger = logging.getLogger('app.services.refresh')
-logger.setLevel(logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 refresh_bp = Blueprint('refresh', __name__)
 
-# API Client
 api_client = APIClient()
 
-def update_transactions(session, transactions):
-    """Update or insert transactions and corresponding item master records."""
-    logger.info(f"Updating {len(transactions)} transactions in id_transactions")
-    
-    for i, transaction in enumerate(transactions):
-        try:
-            # Extract transaction data
-            scan_date = transaction.get('scan_date')
-            if isinstance(scan_date, str):
-                scan_date = datetime.strptime(scan_date, '%Y-%m-%d %H:%M:%S')
-            
-            # Check if transaction already exists
-            existing_transaction = session.query(Transaction).filter(
-                Transaction.tag_id == transaction['tag_id'],
-                Transaction.scan_date == scan_date
-            ).first()
-            
-            if not existing_transaction:
-                # Create new transaction
-                new_transaction = Transaction(
-                    contract_number=transaction.get('contract_number'),
-                    tag_id=transaction['tag_id'],
-                    scan_type=transaction.get('scan_type'),
-                    scan_date=scan_date,
-                    client_name=transaction.get('client_name'),
-                    common_name=transaction.get('common_name'),
-                    bin_location=transaction.get('bin_location'),
-                    status=transaction.get('status'),
-                    scan_by=transaction.get('scan_by'),
-                    location_of_repair=transaction.get('location_of_repair'),
-                    quality=transaction.get('quality'),
-                    dirty_or_mud=transaction.get('dirty_or_mud'),
-                    leaves=transaction.get('leaves'),
-                    oil=transaction.get('oil'),
-                    mold=transaction.get('mold'),
-                    stain=transaction.get('stain'),
-                    oxidation=transaction.get('oxidation'),
-                    other=transaction.get('other'),
-                    rip_or_tear=transaction.get('rip_or_tear'),
-                    sewing_repair_needed=transaction.get('sewing_repair_needed'),
-                    grommet=transaction.get('grommet'),
-                    rope=transaction.get('rope'),
-                    buckle=transaction.get('buckle'),
-                    date_created=transaction.get('date_created'),
-                    date_updated=transaction.get('date_updated'),
-                    uuid_accounts_fk=transaction.get('uuid_accounts_fk'),
-                    serial_number=transaction.get('serial_number'),
-                    rental_class_num=transaction.get('rental_class_id'),
-                    longitude=float(transaction.get('long', 0.0)) if transaction.get('long') else None,
-                    latitude=float(transaction.get('lat', 0.0)) if transaction.get('lat') else None,
-                    wet=transaction.get('wet'),
-                    service_required=transaction.get('service_required'),
-                    notes=transaction.get('notes')
-                )
-                session.add(new_transaction)
-            
-            # Update or insert corresponding ItemMaster record
-            with session.no_autoflush:  # Prevent premature flushing
-                existing_item = session.query(ItemMaster).filter(
-                    ItemMaster.tag_id == transaction['tag_id']
-                ).first()
-            
-            if existing_item:
-                # Update existing ItemMaster record
-                logger.debug(f"Updating existing ItemMaster for tag_id {transaction['tag_id']}")
-                existing_item.common_name = transaction.get('common_name')
-                existing_item.rental_class_num = transaction.get('rental_class_id')
-                existing_item.quality = transaction.get('quality')
-                existing_item.bin_location = transaction.get('bin_location')
-                existing_item.status = transaction.get('status')
-                existing_item.last_contract_num = transaction.get('contract_number', '00000')
-                existing_item.last_scanned_by = transaction.get('scan_by')
-                existing_item.notes = transaction.get('notes')
-                existing_item.date_last_scanned = scan_date
-                existing_item.date_updated = datetime.now()
-            else:
-                # Create new ItemMaster record
-                logger.debug(f"Creating new ItemMaster for tag_id {transaction['tag_id']}")
-                new_item = ItemMaster(
-                    tag_id=transaction['tag_id'],
-                    uuid_accounts_fk=transaction.get('uuid_accounts_fk'),
-                    serial_number=transaction.get('serial_number'),
-                    client_name=transaction.get('client_name'),
-                    rental_class_num=transaction.get('rental_class_id'),
-                    common_name=transaction.get('common_name'),
-                    quality=transaction.get('quality'),
-                    bin_location=transaction.get('bin_location'),
-                    status=transaction.get('status'),
-                    last_contract_num=transaction.get('contract_number', '00000'),
-                    last_scanned_by=transaction.get('scan_by'),
-                    notes=transaction.get('notes'),
-                    status_notes=None,
-                    longitude=float(transaction.get('long', 0.0)) if transaction.get('long') else None,
-                    latitude=float(transaction.get('lat', 0.0)) if transaction.get('lat') else None,
-                    date_last_scanned=scan_date,
-                    date_created=datetime.now(),
-                    date_updated=datetime.now()
-                )
-                session.add(new_item)
-                
-        except Exception as e:
-            logger.error(f"Error updating transaction {transaction['tag_id']} at {scan_date}: {str(e)}", exc_info=True)
-            session.rollback()
-            continue
+def update_item_master(session, items):
+    logger.info(f"Updating {len(items)} items in id_item_master")
+    batch_size = 100
+    with session.no_autoflush:
+        for i in range(0, len(items), batch_size):
+            batch = items[i:i + batch_size]
+            for item in batch:
+                try:
+                    tag_id = item.get('tag_id')
+                    if not tag_id:
+                        logger.warning(f"Skipping item with missing tag_id: {item}")
+                        continue
 
-@retry(
-    stop=stop_after_attempt(3),
-    wait=wait_exponential(multiplier=1, min=4, max=10),
-    retry=retry_if_exception_type((requests.exceptions.RequestException, Exception))
-)
-def fetch_transactions(last_refresh):
-    """Fetch transactions from API since last refresh."""
-    params = {
-        'filter[gt]': f"date_updated,gt,'{last_refresh}'",
-        'sort': 'date_updated,asc'
-    }
-    return api_client._make_request("14223767938169346196", params)
+                    db_item = session.query(ItemMaster).filter_by(tag_id=tag_id).first()
+                    if not db_item:
+                        db_item = ItemMaster(tag_id=tag_id)
+
+                    db_item.serial_number = item.get('serial_number')
+                    db_item.rental_class_num = item.get('rental_class_num')
+                    db_item.client_name = item.get('client_name')
+                    db_item.common_name = item.get('common_name')
+                    db_item.quality = item.get('quality')
+                    db_item.bin_location = item.get('bin_location')
+                    raw_status = item.get('status')
+                    logger.debug(f"Raw status for tag_id {tag_id}: {raw_status}")
+                    status = raw_status if raw_status else 'Unknown'
+                    db_item.status = status
+                    logger.debug(f"Set status for tag_id {tag_id} to {status}")
+                    db_item.last_contract_num = item.get('last_contract_num')
+                    db_item.last_scanned_by = item.get('last_scanned_by')
+                    db_item.notes = item.get('notes')
+                    db_item.status_notes = item.get('status_notes')
+                    longitude = item.get('long')
+                    latitude = item.get('lat')
+                    db_item.longitude = float(longitude) if longitude and longitude.strip() else None
+                    db_item.latitude = float(latitude) if latitude and latitude.strip() else None
+                    date_last_scanned = item.get('date_last_scanned')
+                    if date_last_scanned and date_last_scanned != '0000-00-00 00:00:00':
+                        try:
+                            db_item.date_last_scanned = datetime.strptime(date_last_scanned, '%Y-%m-%d %H:%M:%S')
+                        except ValueError as e:
+                            logger.warning(f"Invalid date_last_scanned for tag_id {tag_id}: {date_last_scanned}. Setting to None. Error: {str(e)}")
+                            db_item.date_last_scanned = None
+                    else:
+                        db_item.date_last_scanned = None
+
+                    session.merge(db_item)
+                except Exception as e:
+                    logger.error(f"Error updating item {tag_id}: {str(e)}")
+                    session.rollback()
+                    raise
+            logger.debug(f"Processed batch {i // batch_size + 1} of {len(items) // batch_size + 1}")
+
+def update_transactions(session, transactions):
+    logger.info(f"Updating {len(transactions)} transactions in id_transactions")
+    for transaction in transactions:
+        try:
+            tag_id = transaction.get('tag_id')
+            scan_date = transaction.get('scan_date')
+            if not tag_id or not scan_date:
+                logger.warning(f"Skipping transaction with missing tag_id or scan_date: {transaction}")
+                continue
+
+            # Handle invalid scan_date
+            if scan_date == '0000-00-00 00:00:00':
+                logger.warning(f"Invalid scan_date for tag_id {tag_id}: {scan_date}. Skipping transaction.")
+                continue
+            try:
+                scan_date = datetime.strptime(scan_date, '%Y-%m-%d %H:%M:%S')
+            except ValueError as e:
+                logger.warning(f"Invalid scan_date for tag_id {tag_id}: {scan_date}. Skipping transaction. Error: {str(e)}")
+                continue
+
+            db_transaction = session.query(Transaction).filter_by(
+                tag_id=tag_id, scan_date=scan_date
+            ).first()
+            if not db_transaction:
+                db_transaction = Transaction(tag_id=tag_id, scan_date=scan_date)
+
+            db_transaction.scan_type = transaction.get('scan_type')
+            db_transaction.contract_number = transaction.get('contract_number')
+            db_transaction.client_name = transaction.get('client_name')
+            db_transaction.notes = transaction.get('notes')
+            db_transaction.rental_class_num = transaction.get('rental_class_id')
+            db_transaction.common_name = transaction.get('common_name')
+            db_transaction.serial_number = transaction.get('serial_number')
+            db_transaction.location_of_repair = transaction.get('location_of_repair')
+            db_transaction.quality = transaction.get('quality')
+            db_transaction.bin_location = transaction.get('bin_location')
+            db_transaction.status = transaction.get('status')
+            db_transaction.scan_by = transaction.get('scan_by')
+            def to_bool(value):
+                if isinstance(value, str):
+                    return value.lower() == 'true'
+                return bool(value) if value is not None else None
+
+            db_transaction.dirty_or_mud = to_bool(transaction.get('dirty_or_mud'))
+            db_transaction.leaves = to_bool(transaction.get('leaves'))
+            db_transaction.oil = to_bool(transaction.get('oil'))
+            db_transaction.mold = to_bool(transaction.get('mold'))
+            db_transaction.stain = to_bool(transaction.get('stain'))
+            db_transaction.oxidation = to_bool(transaction.get('oxidation'))
+            db_transaction.other = transaction.get('other')
+            db_transaction.rip_or_tear = to_bool(transaction.get('rip_or_tear'))
+            db_transaction.sewing_repair_needed = to_bool(transaction.get('sewing_repair_needed'))
+            db_transaction.grommet = to_bool(transaction.get('grommet'))
+            db_transaction.rope = to_bool(transaction.get('rope'))
+            db_transaction.buckle = to_bool(transaction.get('buckle'))
+            longitude = transaction.get('long')
+            latitude = transaction.get('lat')
+            db_transaction.longitude = float(longitude) if longitude and longitude.strip() else None
+            db_transaction.latitude = float(latitude) if latitude and latitude.strip() else None
+            db_transaction.wet = to_bool(transaction.get('wet'))
+            db_transaction.service_required = to_bool(transaction.get('service_response'))
+            db_transaction.date_created = transaction.get('date_created')
+            db_transaction.date_updated = transaction.get('date_updated')
+
+            session.merge(db_transaction)
+        except Exception as e:
+            logger.error(f"Error updating transaction {tag_id} at {scan_date}: {str(e)}")
+            logger.debug(f"Raw transaction data: {transaction}")
+            session.rollback()
+            raise
+
+def update_seed_data(session, seed_data):
+    logger.info(f"Updating {len(seed_data)} items in seed_rental_classes")
+    for item in seed_data:
+        try:
+            rental_class_id = item.get('rental_class_id')
+            if not rental_class_id:
+                logger.warning(f"Skipping seed item with missing rental_class_id: {item}")
+                continue
+
+            db_seed = session.query(SeedRentalClass).filter_by(rental_class_id=rental_class_id).first()
+            if not db_seed:
+                db_seed = SeedRentalClass(rental_class_id=rental_class_id)
+
+            db_seed.common_name = item.get('common_name')
+            db_seed.bin_location = item.get('bin_location')
+
+            session.merge(db_seed)
+        except Exception as e:
+            logger.error(f"Error updating seed item {rental_class_id}: {str(e)}")
+            session.rollback()
+            raise
 
 def full_refresh():
-    """Perform a full refresh of item master and transactions."""
     logger.info("Starting full refresh")
-    session = None
-    try:
-        session = db.session()
-        
-        # Clear existing data
-        session.query(Transaction).delete()
-        session.query(ItemMaster).delete()
-        session.commit()
-        
-        # Fetch all items
-        items = api_client._make_request("14223767938169344381")
-        logger.info(f"Fetched {len(items)} items for full refresh")
-        
-        for item in items:
-            date_last_scanned = item.get('date_last_scanned')
-            if isinstance(date_last_scanned, str):
-                date_last_scanned = datetime.strptime(date_last_scanned, '%Y-%m-%d %H:%M:%S')
-                
-            new_item = ItemMaster(
-                tag_id=item['tag_id'],
-                uuid_accounts_fk=item.get('uuid_accounts_fk'),
-                serial_number=item.get('serial_number'),
-                client_name=item.get('client_name'),
-                rental_class_num=item.get('rental_class_num'),
-                common_name=item.get('common_name'),
-                quality=item.get('quality'),
-                bin_location=item.get('bin_location'),
-                status=item.get('status'),
-                last_contract_num=item.get('last_contract_num', '00000'),
-                last_scanned_by=item.get('last_scanned_by'),
-                notes=item.get('notes'),
-                status_notes=item.get('status_notes'),
-                longitude=float(item.get('longitude', 0.0)) if item.get('longitude') else None,
-                latitude=float(item.get('latitude', 0.0)) if item.get('latitude') else None,
-                date_last_scanned=date_last_scanned,
-                date_created=item.get('date_created'),
-                date_updated=item.get('date_updated')
-            )
-            session.add(new_item)
-        
-        # Fetch all transactions
-        transactions = api_client._make_request("14223767938169346196")
-        update_transactions(session, transactions)
-        
-        # Update refresh state
-        refresh_state = session.query(RefreshState).first()
-        if not refresh_state:
-            refresh_state = RefreshState(last_refresh=datetime.now().isoformat())
-            session.add(refresh_state)
-        else:
-            refresh_state.last_refresh = datetime.now().isoformat()
-        
-        session.commit()
-        logger.info("Full refresh completed successfully")
-        
-    except Exception as e:
-        logger.error(f"Full refresh failed: {str(e)}", exc_info=True)
-        if session:
+    session = db.session
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            with session.begin():
+                deleted_items = session.query(ItemMaster).delete()
+                deleted_transactions = session.query(Transaction).delete()
+                deleted_seed = session.query(SeedRentalClass).delete()
+                logger.info(f"Deleted {deleted_items} items from id_item_master")
+                logger.info(f"Deleted {deleted_transactions} transactions from id_transactions")
+                logger.info(f"Deleted {deleted_seed} items from seed_rental_classes")
+
+                items = api_client.get_item_master()
+                transactions = api_client.get_transactions()
+                seed_data = api_client.get_seed_data()
+
+                logger.info(f"Fetched {len(items)} items from item master")
+                logger.info(f"Fetched {len(transactions)} transactions")
+                logger.info(f"Fetched {len(seed_data)} items from seed data")
+                logger.debug(f"Item master data sample: {items[:5] if items else 'No items'}")
+                logger.debug(f"Transactions data sample: {transactions[:5] if items else 'No transactions'}")
+                logger.debug(f"Seed data sample: {seed_data[:5] if seed_data else 'No seed data'}")
+
+                if not items:
+                    logger.warning("No items fetched from item master API. Check API endpoint or authentication.")
+                if not transactions:
+                    logger.warning("No transactions fetched from transactions API. Check API endpoint or authentication.")
+                if not seed_data:
+                    logger.warning("No seed data fetched from seed API. Check API endpoint or authentication.")
+
+                update_item_master(session, items)
+                update_transactions(session, transactions)
+                update_seed_data(session, seed_data)
+            break
+        except OperationalError as e:
+            if "Deadlock" in str(e):
+                if attempt < max_retries - 1:
+                    logger.warning(f"Deadlock detected, retrying ({attempt + 1}/{max_retries})")
+                    session.rollback()
+                    time.sleep(1)
+                    continue
+                else:
+                    logger.error(f"Max retries reached for deadlock: {str(e)}")
+                    raise
+            else:
+                logger.error(f"Database error: {str(e)}")
+                raise
+        except Exception as e:
+            logger.error(f"Full refresh failed: {str(e)}")
             session.rollback()
-    finally:
-        if session:
-            session.close()
+            raise
+        finally:
+            if session.is_active:
+                session.rollback()
+    logger.info("Clear API data and full refresh completed successfully")
 
 def incremental_refresh():
-    """Perform an incremental refresh of transactions."""
     logger.info("Starting incremental refresh")
-    session = None
+    session = db.session
     try:
-        session = db.session()
-        
-        # Get last refresh time, default to 30 days ago if not set
-        refresh_state = session.query(RefreshState).first()
-        if refresh_state and refresh_state.last_refresh:
-            last_refresh = refresh_state.last_refresh
-        else:
-            # Default to 30 days ago to avoid fetching excessive data
-            last_refresh_dt = datetime.now() - timedelta(days=30)
-            last_refresh = last_refresh_dt.strftime('%Y-%m-%d %H:%M:%S')
-            logger.info(f"No prior refresh state found, defaulting last_refresh to {last_refresh}")
-        
-        # Fetch new transactions
-        transactions = fetch_transactions(last_refresh)
-        logger.info(f"Fetched {len(transactions)} new transactions for incremental refresh")
-        
-        # Update transactions
+        since_date = datetime.utcnow() - timedelta(days=30)
+        logger.info(f"Fetching item master data with since_date: {since_date}")
+        items = api_client.get_item_master(since_date=since_date)
+        logger.info(f"Fetched {len(items)} items from item master")
+        logger.debug(f"Item master data sample: {items[:5] if items else 'No items'}")
+        if not items:
+            logger.warning("No items fetched from item master API. Check API endpoint or authentication.")
+
+        logger.info(f"Fetching transactions data with since_date: {since_date}")
+        transactions = api_client.get_transactions(since_date=since_date)
+        logger.info(f"Fetched {len(transactions)} transactions")
+        logger.debug(f"Transactions data sample: {transactions[:5] if transactions else 'No transactions'}")
+        if not transactions:
+            logger.warning("No transactions fetched from transactions API. Check API endpoint or authentication.")
+
+        logger.info(f"Fetching seed data with since_date: {since_date}")
+        seed_data = api_client.get_seed_data()
+        logger.info(f"Fetched {len(seed_data)} items from seed data")
+        logger.debug(f"Seed data sample: {seed_data[:5] if seed_data else 'No seed data'}")
+        if not seed_data:
+            logger.warning("No seed data fetched from seed API. Check API endpoint or authentication.")
+
+        update_item_master(session, items)
         update_transactions(session, transactions)
-        
-        # Update refresh state
-        if not refresh_state:
-            refresh_state = RefreshState(last_refresh=datetime.now().isoformat())
-            session.add(refresh_state)
-        else:
-            refresh_state.last_refresh = datetime.now().isoformat()
-        
+        update_seed_data(session, seed_data)
+
         session.commit()
         logger.info("Incremental refresh completed successfully")
-        
     except Exception as e:
-        logger.error(f"Incremental refresh failed: {str(e)}", exc_info=True)
-        if session:
-            session.rollback()
+        logger.error(f"Incremental refresh failed: {str(e)}")
+        session.rollback()
         raise
     finally:
-        if session:
-            session.close()
+        session.close()
         logger.debug("Incremental refresh session closed")
 
-@refresh_bp.route('/refresh/full', methods=['POST'])
-def trigger_full_refresh():
-    """Trigger a full refresh."""
+@refresh_bp.route('/full_refresh', methods=['POST'])
+def full_refresh_endpoint():
     try:
+        current_app.logger.info("Starting full refresh via endpoint")
         full_refresh()
-        return {'status': 'Full refresh triggered successfully'}, 200
+        current_app.logger.info("Full refresh completed successfully")
+        return jsonify({'status': 'success', 'message': 'Full refresh completed successfully'})
     except Exception as e:
-        logger.error(f"Full refresh endpoint failed: {str(e)}", exc_info=True)
-        return {'error': str(e)}, 500
+        current_app.logger.error(f"Full refresh failed: {str(e)}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
 
-@refresh_bp.route('/refresh/incremental', methods=['POST'])
-def trigger_incremental_refresh():
-    """Trigger an incremental refresh."""
+@refresh_bp.route('/clear_api_data', methods=['POST'])
+def clear_api_data():
     try:
-        incremental_refresh()
-        return {'status': 'Incremental refresh triggered successfully'}, 200
+        current_app.logger.info("Starting clear API data and refresh")
+        full_refresh()
+        current_app.logger.info("Clear API data and refresh completed successfully")
+        return jsonify({'status': 'success', 'message': 'API data cleared and refreshed successfully'})
     except Exception as e:
-        logger.error(f"Incremental refresh endpoint failed: {str(e)}", exc_info=True)
-        return {'error': str(e)}, 500
+        current_app.logger.error(f"Clear API data and refresh failed: {str(e)}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
