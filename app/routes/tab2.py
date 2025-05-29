@@ -29,46 +29,59 @@ logger.addHandler(console_handler)
 tab2_bp = Blueprint('tab2', __name__)
 
 # Version marker
-logger.info("Deployed tab2.py version: 2025-05-29-v6")
+logger.info("Deployed tab2.py version: 2025-05-29-v7")
 
 @tab2_bp.route('/tab/2')
 def tab2_view():
     session = None
     try:
+        # Create a new session
         session = db.session()
         logger.info("Starting new session for tab2")
         current_app.logger.info("Starting new session for tab2")
 
         # Test database connection
-        session.execute("SELECT 1")
-        logger.info("Database connection test successful")
+        result = session.execute("SELECT 1").fetchall()
+        logger.info(f"Database connection test successful: {result}")
 
         # Debug: Fetch all contract numbers
         all_contracts = session.query(ItemMaster.last_contract_num).distinct().all()
         logger.debug(f"All distinct contract numbers in ItemMaster: {[c[0] for c in all_contracts]}")
 
-        # Break down query for debugging
-        contracts_query = session.query(
+        # Debug: Check statuses
+        status_counts = session.query(
+            ItemMaster.status,
+            func.count(ItemMaster.tag_id)
+        ).group_by(ItemMaster.status).all()
+        logger.debug(f"Status counts in ItemMaster: {status_counts}")
+
+        # Step 1: Base query without filters
+        base_query = session.query(
             ItemMaster.last_contract_num,
             func.count(ItemMaster.tag_id).label('total_items')
-        ).filter(
-            func.lower(ItemMaster.status).in_(['on rent', 'delivered']),  # Case-insensitive
+        ).group_by(ItemMaster.last_contract_num)
+        logger.debug(f"Base query SQL: {str(base_query)}")
+        base_results = base_query.all()
+        logger.debug(f"Base query results: {[(r.last_contract_num, r.total_items) for r in base_results]}")
+
+        # Step 2: Apply filters
+        contracts_query = base_query.filter(
+            ItemMaster.status.in_(['On Rent', 'Delivered']),
             ItemMaster.last_contract_num.isnot(None),
             ItemMaster.last_contract_num != '00000',
             ~func.trim(ItemMaster.last_contract_num).op('REGEXP')('^L[0-9]+$')
-        ).group_by(
-            ItemMaster.last_contract_num
         ).having(
             func.count(ItemMaster.tag_id) > 0
         )
 
         logger.debug(f"Contracts query SQL: {str(contracts_query)}")
-        contracts_query = contracts_query.all()
-        logger.info(f"Raw contracts query result: {[(c.last_contract_num, c.total_items) for c in contracts_query]}")
-        current_app.logger.info(f"Raw contracts query result: {[(c.last_contract_num, c.total_items) for c in contracts_query]}")
+        contracts_query_results = contracts_query.all()
+        logger.info(f"Raw contracts query result: {[(c.last_contract_num, c.total_items) for c in contracts_query_results]}")
+        current_app.logger.info(f"Raw contracts query result: {[(c.last_contract_num, c.total_items) for c in contracts_query_results]}")
 
         contracts = []
-        for contract_number, total_items in contracts_query:
+        for contract_number, total_items in contracts_query_results:
+            logger.debug(f"Processing contract: {contract_number}")
             latest_transaction = session.query(
                 Transaction.client_name,
                 Transaction.scan_date
@@ -81,10 +94,11 @@ def tab2_view():
 
             client_name = latest_transaction.client_name if latest_transaction else 'N/A'
             scan_date = latest_transaction.scan_date.isoformat() if latest_transaction and latest_transaction.scan_date else 'N/A'
+            logger.debug(f"Contract {contract_number} - Client: {client_name}, Scan Date: {scan_date}")
 
             items_on_contract = session.query(func.count(ItemMaster.tag_id)).filter(
                 ItemMaster.last_contract_num == contract_number,
-                func.lower(ItemMaster.status).in_(['on rent', 'delivered'])
+                ItemMaster.status.in_(['On Rent', 'Delivered'])
             ).scalar()
 
             total_items_inventory = session.query(func.count(ItemMaster.tag_id)).filter(
@@ -102,14 +116,32 @@ def tab2_view():
         contracts.sort(key=lambda x: x['contract_number'])
         logger.info(f"Fetched {len(contracts)} contracts for tab2: {[c['contract_number'] for c in contracts]}")
         current_app.logger.info(f"Fetched {len(contracts)} contracts for tab2: {[c['contract_number'] for c in contracts]}")
-        return render_template('tab2.html', contracts=contracts, cache_bust=int(time()))
+
+        # Force flush logs
+        for handler in logger.handlers:
+            handler.flush()
+        for handler in current_app.logger.handlers:
+            handler.flush()
+
+        return render_template('tab2.html', contracts=contracts, error=None, cache_bust=int(time()))
     except Exception as e:
         logger.error(f"Error rendering Tab 2: {str(e)}", exc_info=True)
         current_app.logger.error(f"Error rendering Tab 2: {str(e)}", exc_info=True)
+        # Force flush logs
+        for handler in logger.handlers:
+            handler.flush()
+        for handler in current_app.logger.handlers:
+            handler.flush()
         return render_template('tab2.html', contracts=[], error=str(e), cache_bust=int(time()))
     finally:
         if session:
+            # Rollback any uncommitted changes to ensure clean session state
+            try:
+                session.rollback()
+            except Exception as e:
+                logger.warning(f"Session rollback failed: {str(e)}")
             session.close()
+            logger.debug("Session closed for tab2_view")
 
 @tab2_bp.route('/tab/2/common_names')
 def tab2_common_names():
@@ -142,7 +174,7 @@ def tab2_common_names():
             on_contracts
         ).filter(
             ItemMaster.last_contract_num == contract_number,
-            func.lower(ItemMaster.status).in_(['on rent', 'delivered'])
+            ItemMaster.status.in_(['On Rent', 'Delivered'])
         ).group_by(
             ItemMaster.common_name
         )
@@ -210,6 +242,7 @@ def tab2_common_names():
         return jsonify({'error': f'Failed to fetch common names: {str(e)}'}), 500
     finally:
         if session:
+            session.rollback()
             session.close()
 
 @tab2_bp.route('/tab/2/data')
@@ -236,7 +269,7 @@ def tab2_data():
         query = session.query(ItemMaster).filter(
             ItemMaster.last_contract_num == contract_number,
             ItemMaster.common_name == common_name,
-            func.lower(ItemMaster.status).in_(['on rent', 'delivered'])
+            ItemMaster.status.in_(['On Rent', 'Delivered'])
         )
 
         # Apply sorting
@@ -295,6 +328,7 @@ def tab2_data():
         return jsonify({'error': 'Failed to fetch items'}), 500
     finally:
         if session:
+            session.rollback()
             session.close()
 
 @tab2_bp.route('/tab/2/full_items_by_rental_class')
@@ -343,4 +377,5 @@ def full_items_by_rental_class():
         return jsonify({'error': 'Failed to fetch full items'}), 500
     finally:
         if session:
+            session.rollback()
             session.close()
