@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, request, jsonify, current_app
 from .. import db, cache
 from ..models.db_models import Transaction, ItemMaster
-from sqlalchemy import func, desc, asc
+from sqlalchemy import func, desc, asc, text  # Added text import
 from time import time
 import logging
 import sys
@@ -29,7 +29,7 @@ logger.addHandler(console_handler)
 tab2_bp = Blueprint('tab2', __name__)
 
 # Version marker
-logger.info("Deployed tab2.py version: 2025-05-29-v7")
+logger.info("Deployed tab2.py version: 2025-05-29-v8")
 
 @tab2_bp.route('/tab/2')
 def tab2_view():
@@ -41,7 +41,7 @@ def tab2_view():
         current_app.logger.info("Starting new session for tab2")
 
         # Test database connection
-        result = session.execute("SELECT 1").fetchall()
+        result = session.execute(text("SELECT 1")).fetchall()  # Fixed with text()
         logger.info(f"Database connection test successful: {result}")
 
         # Debug: Fetch all contract numbers
@@ -66,7 +66,7 @@ def tab2_view():
 
         # Step 2: Apply filters
         contracts_query = base_query.filter(
-            ItemMaster.status.in_(['On Rent', 'Delivered']),
+            func.lower(ItemMaster.status).in_(['on rent', 'delivered']),  # Reintroduced case-insensitive filtering
             ItemMaster.last_contract_num.isnot(None),
             ItemMaster.last_contract_num != '00000',
             ~func.trim(ItemMaster.last_contract_num).op('REGEXP')('^L[0-9]+$')
@@ -98,7 +98,7 @@ def tab2_view():
 
             items_on_contract = session.query(func.count(ItemMaster.tag_id)).filter(
                 ItemMaster.last_contract_num == contract_number,
-                ItemMaster.status.in_(['On Rent', 'Delivered'])
+                func.lower(ItemMaster.status).in_(['on rent', 'delivered'])
             ).scalar()
 
             total_items_inventory = session.query(func.count(ItemMaster.tag_id)).filter(
@@ -164,7 +164,7 @@ def tab2_common_names():
         logger.info("Successfully created session for tab2_common_names")
 
         # Test database connection
-        session.execute("SELECT 1")
+        session.execute(text("SELECT 1"))  # Fixed with text()
         logger.info("Database connection test successful in tab2_common_names")
 
         # Define the query with the on_contracts alias
@@ -174,7 +174,7 @@ def tab2_common_names():
             on_contracts
         ).filter(
             ItemMaster.last_contract_num == contract_number,
-            ItemMaster.status.in_(['On Rent', 'Delivered'])
+            func.lower(ItemMaster.status).in_(['on rent', 'delivered'])
         ).group_by(
             ItemMaster.common_name
         )
@@ -269,7 +269,7 @@ def tab2_data():
         query = session.query(ItemMaster).filter(
             ItemMaster.last_contract_num == contract_number,
             ItemMaster.common_name == common_name,
-            ItemMaster.status.in_(['On Rent', 'Delivered'])
+            func.lower(ItemMaster.status).in_(['on rent', 'delivered'])
         )
 
         # Apply sorting
