@@ -1,9 +1,26 @@
-console.log('common.js version: 2025-05-29-v22 loaded');
+console.log('common.js version: 2025-05-29-v24 loaded');
 
 /**
  * Common.js: Shared utilities for all tabs.
  * Dependencies: None (self-contained for printing, formatting, and pagination).
+ * Note: Changes here affect all tabs. Modify with caution to avoid breaking functionality.
  */
+
+/**
+ * Global filter state
+ * Used by: Tabs 1, 2, 4, 5
+ */
+window.globalFilter = {
+    commonName: '',
+    contractNumber: ''
+};
+
+/**
+ * Global sorting state for common names and items
+ * Used by: Tabs 2, 4
+ */
+window.commonSortState = {};
+window.itemSortState = {};
 
 /**
  * Format ISO date strings into "Thurs, Aug 21 2025 4:55 pm"
@@ -41,6 +58,65 @@ function formatDate(isoDateString) {
  */
 function formatDateTime(dateTimeStr) {
     return formatDate(dateTimeStr);
+}
+
+/**
+ * Show loading indicator
+ * Used by: Tabs 1, 2, 4, 5
+ * Dependency: CSS (.loading-indicator)
+ */
+function showLoading(targetId) {
+    const container = document.getElementById(targetId);
+    if (!container) {
+        console.warn(`Container ${targetId} not found for loading indicator`);
+        return false;
+    }
+    const loadingDiv = document.createElement('div');
+    loadingDiv.id = `loading-${targetId}`;
+    loadingDiv.className = 'loading-indicator';
+    loadingDiv.textContent = 'Loading...';
+    loadingDiv.style.display = 'block';
+    container.appendChild(loadingDiv);
+    return true;
+}
+
+/**
+ * Hide loading indicator
+ * Used by: Tabs 1, 2, 4, 5
+ * Dependency: None
+ */
+function hideLoading(targetId) {
+    const loadingDiv = document.getElementById(`loading-${targetId}`);
+    if (loadingDiv) {
+        loadingDiv.remove();
+    }
+}
+
+/**
+ * Collapse section (common names or items level)
+ * Used by: Tabs 1, 2, 4, 5
+ * Dependency: sessionStorage
+ */
+function collapseSection(targetId) {
+    const section = document.getElementById(targetId);
+    if (section) {
+        section.classList.remove('expanded');
+        section.classList.add('collapsed');
+        section.style.display = 'none';
+        section.style.opacity = '0';
+        const collapseBtn = document.querySelector(`button[data-collapse-target="${targetId}"]`);
+        const expandBtn = collapseBtn ? collapseBtn.previousElementSibling : null;
+        if (expandBtn && collapseBtn) {
+            expandBtn.style.display = 'inline-block';
+            collapseBtn.style.display = 'none';
+        } else {
+            console.warn(`Expand/collapse buttons not found for ${targetId}`);
+        }
+        sessionStorage.removeItem(`expanded_${targetId}`);
+        sessionStorage.removeItem(`expanded_items_${targetId}`);
+    } else {
+        console.error(`Section ${targetId} not found for collapsing`);
+    }
 }
 
 /**
@@ -135,6 +211,618 @@ function renderPaginationControls(container, totalItems, currentPage, perPage, o
     nav.appendChild(ul);
     container.appendChild(nav);
 }
+
+/**
+ * Apply filter to a specific table (used for Tabs 2 and 4)
+ * Used by: Tabs 2, 4
+ * Dependency: window.globalFilter, DOM
+ */
+function applyFilterToTable(table) {
+    if (!table) {
+        console.warn('Table element is null, skipping applyFilterToTable');
+        return;
+    }
+
+    const rows = table.querySelectorAll('tbody tr:not(.expandable)') || [];
+    if (!rows.length) {
+        console.warn('No rows found in table, skipping applyFilterToTable');
+        return;
+    }
+
+    let visibleRows = 0;
+
+    if (!window.globalFilter.commonName && !window.globalFilter.contractNumber) {
+        rows.forEach(row => {
+            row.style.display = '';
+            visibleRows++;
+            const expandableRow = row.nextElementSibling;
+            if (expandableRow && expandableRow.classList.contains('expandable')) {
+                expandableRow.style.display = '';
+                const childTable = expandableRow.querySelector('.common-table, .item-table');
+                if (childTable) {
+                    applyFilterToTable(childTable);
+                }
+            }
+        });
+    } else {
+        rows.forEach(row => {
+            let showRow = true;
+
+            const contractCell = row.querySelector('td:nth-child(1)');
+            const commonNameCell = row.querySelector('td:nth-child(2)') || row.querySelector('td:nth-child(1)');
+            const contractValue = contractCell ? contractCell.textContent.toLowerCase() : '';
+            const commonNameValue = commonNameCell ? commonNameCell.textContent.toLowerCase() : '';
+
+            if (window.globalFilter.contractNumber && !contractValue.includes(window.globalFilter.contractNumber)) {
+                showRow = false;
+            }
+            if (window.globalFilter.commonName && !commonNameValue.includes(window.globalFilter.commonName)) {
+                showRow = false;
+            }
+
+            let hasMatchingChildren = false;
+            const expandableRow = row.nextElementSibling;
+            if (expandableRow && expandableRow.classList.contains('expandable') && expandableRow.classList.contains('expanded')) {
+                const childTable = expandableRow.querySelector('.common-table, .item-table');
+                if (childTable) {
+                    const childRows = childTable.querySelectorAll('tbody tr:not(.expandable)') || [];
+                    childRows.forEach(childRow => {
+                        let showChildRow = true;
+                        const childContractCell = childRow.querySelector('td:nth-child(1)');
+                        const childCommonNameCell = childRow.querySelector('td:nth-child(2)') || childRow.querySelector('td:nth-child(1)');
+                        const childContractValue = childContractCell ? childContractCell.textContent.toLowerCase() : '';
+                        const childCommonNameValue = childCommonNameCell ? childCommonNameCell.textContent.toLowerCase() : '';
+
+                        if (window.globalFilter.contractNumber && !childContractValue.includes(window.globalFilter.contractNumber)) {
+                            showChildRow = false;
+                        }
+                        if (window.globalFilter.commonName && !childCommonNameValue.includes(window.globalFilter.commonName)) {
+                            showChildRow = false;
+                        }
+
+                        childRow.style.display = showChildRow ? '' : 'none';
+                        if (showChildRow) hasMatchingChildren = true;
+                    });
+
+                    const visibleChildRows = Array.from(childRows).filter(r => r.style.display !== 'none').length;
+                    let childRowCountDiv = childTable.nextElementSibling;
+                    if (childRowCountDiv && !childRowCountDiv.classList.contains('row-count')) {
+                        childRowCountDiv = document.createElement('div');
+                        childRowCountDiv.className = 'row-count mt-2';
+                        childTable.insertAdjacentElement('afterend', childRowCountDiv);
+                    }
+                    if (childRowCountDiv) {
+                        childRowCountDiv.textContent = `Showing ${visibleChildRows} of ${childRows.length} rows`;
+                    }
+                }
+            }
+
+            if (showRow || hasMatchingChildren) {
+                row.style.display = '';
+                visibleRows++;
+                if (expandableRow) {
+                    expandableRow.style.display = '';
+                    if (hasMatchingChildren) {
+                        expandableRow.classList.remove('collapsed');
+                        expandableRow.classList.add('expanded');
+                        expandableRow.style.opacity = '1';
+                        const expandBtn = row.querySelector('.expand-btn');
+                        const collapseBtn = row.querySelector('.collapse-btn');
+                        if (expandBtn && collapseBtn) {
+                            expandBtn.style.display = 'none';
+                            collapseBtn.style.display = 'inline-block';
+                        }
+                    }
+                }
+            } else {
+                row.style.display = 'none';
+                if (expandableRow) {
+                    expandableRow.style.display = 'none';
+                    expandableRow.classList.remove('expanded');
+                    expandableRow.classList.add('collapsed');
+                    expandableRow.style.opacity = '0';
+                    const expandBtn = row.querySelector('.expand-btn');
+                    const collapseBtn = row.querySelector('.collapse-btn');
+                    if (expandBtn && collapseBtn) {
+                        expandBtn.style.display = 'inline-block';
+                        collapseBtn.style.display = 'none';
+                    }
+                }
+            }
+        });
+    }
+
+    let rowCountDiv = table.nextElementSibling;
+    while (rowCountDiv && !rowCountDiv.classList.contains('row-count') && !rowCountDiv.classList.contains('pagination-controls')) {
+        rowCountDiv = rowCountDiv.nextElementSibling;
+    }
+    if (!rowCountDiv || !rowCountDiv.classList.contains('row-count')) {
+        rowCountDiv = document.createElement('div');
+        rowCountDiv.className = 'row-count mt-2';
+        table.insertAdjacentElement('afterend', rowCountDiv);
+    }
+    rowCountDiv.textContent = `Showing ${visibleRows} of ${rows.length} rows`;
+}
+
+/**
+ * Apply filter to all levels for Tabs 2 and 4
+ * Used by: Tabs 2, 4
+ * Dependency: window.globalFilter, applyFilterToTable
+ */
+function applyFilterToAllLevelsTabs2And4() {
+    // Skip filtering for Tab 3 and non-tab pages
+    if (window.cachedTabNum === 3 || !window.location.pathname.match(/\/tab\/\d+/)) {
+        console.log('Skipping applyFilterToAllLevels for Tab 3 or non-tab page');
+        return;
+    }
+
+    const categoryTable = document.getElementById('category-table');
+    if (!categoryTable) {
+        console.warn('Category table not found, skipping filter application');
+        return;
+    }
+
+    const categoryRows = categoryTable.querySelectorAll('tbody tr:not(.expandable)') || [];
+    if (!categoryRows.length) {
+        console.warn('No category rows found in table, skipping filter application');
+        return;
+    }
+
+    let visibleCategoryRows = 0;
+
+    categoryRows.forEach(categoryRow => {
+        let showCategoryRow = false;
+        const contractCell = categoryRow.querySelector('td:nth-child(1)');
+        const contractValue = contractCell ? contractCell.textContent.toLowerCase() : '';
+        const expandableRow = categoryRow.nextElementSibling;
+        const subcatDiv = expandableRow ? expandableRow.querySelector('.expandable') : null;
+
+        if (window.globalFilter.contractNumber) {
+            if (contractValue.includes(window.globalFilter.contractNumber)) {
+                showCategoryRow = true;
+            }
+        } else {
+            showCategoryRow = true;
+        }
+
+        let hasMatchingItems = false;
+        if (subcatDiv && subcatDiv.classList.contains('expanded')) {
+            const commonTable = subcatDiv.querySelector('.common-table');
+            if (commonTable) {
+                const commonRows = commonTable.querySelectorAll('tbody tr:not(.expandable)') || [];
+                let visibleCommonRows = 0;
+
+                commonRows.forEach(commonRow => {
+                    let showCommonRow = false;
+                    const commonNameCell = commonRow.querySelector('td:nth-child(1)');
+                    const commonNameValue = commonNameCell ? commonNameCell.textContent.toLowerCase() : '';
+
+                    if (window.globalFilter.commonName) {
+                        if (commonNameValue.includes(window.globalFilter.commonName)) {
+                            showCommonRow = true;
+                        }
+                    } else {
+                        showCommonRow = true;
+                    }
+
+                    const commonExpandableRow = commonRow.nextElementSibling;
+                    let visibleItemRows = 0;
+                    if (commonExpandableRow && commonExpandableRow.classList.contains('expandable') && commonExpandableRow.classList.contains('expanded')) {
+                        const itemTable = commonExpandableRow.querySelector('.item-table');
+                        if (itemTable) {
+                            const itemRows = itemTable.querySelectorAll('tbody tr') || [];
+                            itemRows.forEach(itemRow => {
+                                let showItemRow = true;
+                                const itemCommonNameCell = itemRow.querySelector('td:nth-child(2)');
+                                const itemContractCell = itemRow.querySelector('td:nth-child(5)');
+                                const itemCommonNameValue = itemCommonNameCell ? itemCommonNameCell.textContent.toLowerCase() : '';
+                                const itemContractValue = itemContractCell ? itemContractCell.textContent.toLowerCase() : '';
+
+                                if (window.globalFilter.commonName && !itemCommonNameValue.includes(window.globalFilter.commonName)) {
+                                    showItemRow = false;
+                                }
+                                if (window.globalFilter.contractNumber && !itemContractValue.includes(window.globalFilter.contractNumber)) {
+                                    showItemRow = false;
+                                }
+
+                                itemRow.style.display = showItemRow ? '' : 'none';
+                                if (showItemRow) {
+                                    visibleItemRows++;
+                                    showCommonRow = true;
+                                    hasMatchingItems = true;
+                                }
+                            });
+
+                            let itemRowCountDiv = itemTable.nextElementSibling;
+                            if (itemRowCountDiv && !itemRowCountDiv.classList.contains('row-count')) {
+                                itemRowCountDiv = document.createElement('div');
+                                itemRowCountDiv.className = 'row-count mt-2';
+                                itemTable.insertAdjacentElement('afterend', itemRowCountDiv);
+                            }
+                            if (itemRowCountDiv) {
+                                itemRowCountDiv.textContent = `Showing ${visibleItemRows} of ${itemRows.length} rows`;
+                            }
+
+                            if (visibleItemRows > 0) {
+                                commonExpandableRow.classList.remove('collapsed');
+                                commonExpandableRow.classList.add('expanded');
+                                commonExpandableRow.style.display = 'block';
+                                commonExpandableRow.style.opacity = '1';
+                                const expandBtn = commonRow.querySelector('.expand-btn');
+                                const collapseBtn = commonRow.querySelector('.collapse-btn');
+                                if (expandBtn && collapseBtn) {
+                                    expandBtn.style.display = 'none';
+                                    collapseBtn.style.display = 'inline-block';
+                                }
+                            } else {
+                                commonExpandableRow.classList.remove('expanded');
+                                commonExpandableRow.classList.add('collapsed');
+                                commonExpandableRow.style.display = 'block';
+                                commonExpandableRow.style.opacity = '0';
+                                const expandBtn = commonRow.querySelector('.expand-btn');
+                                const collapseBtn = commonRow.querySelector('.collapse-btn');
+                                if (expandBtn && collapseBtn) {
+                                    expandBtn.style.display = 'inline-block';
+                                    collapseBtn.style.display = 'none';
+                                }
+                            }
+                        }
+                    }
+
+                    commonRow.style.display = showCommonRow ? '' : 'none';
+                    if (showCommonRow) visibleCommonRows++;
+                });
+
+                let commonRowCountDiv = commonTable.nextElementSibling;
+                if (commonRowCountDiv && !commonRowCountDiv.classList.contains('row-count')) {
+                    commonRowCountDiv = document.createElement('div');
+                    commonRowCountDiv.className = 'row-count mt-2';
+                    commonTable.insertAdjacentElement('afterend', commonRowCountDiv);
+                }
+                if (commonRowCountDiv) {
+                    commonRowCountDiv.textContent = `Showing ${visibleCommonRows} of ${commonRows.length} rows`;
+                }
+
+                if (visibleCommonRows > 0 || hasMatchingItems) {
+                    showCategoryRow = true;
+                    subcatDiv.classList.remove('collapsed');
+                    subcatDiv.classList.add('expanded');
+                    subcatDiv.style.display = 'block';
+                    subcatDiv.style.opacity = '1';
+                    const categoryExpandBtn = categoryRow.querySelector('.expand-btn');
+                    const categoryCollapseBtn = categoryRow.querySelector('.collapse-btn');
+                    if (categoryExpandBtn && categoryCollapseBtn) {
+                        categoryExpandBtn.style.display = 'none';
+                        categoryCollapseBtn.style.display = 'inline-block';
+                    }
+                } else {
+                    subcatDiv.classList.remove('expanded');
+                    subcatDiv.classList.add('collapsed');
+                    subcatDiv.style.display = 'block';
+                    subcatDiv.style.opacity = '0';
+                    const categoryExpandBtn = categoryRow.querySelector('.expand-btn');
+                    const categoryCollapseBtn = categoryRow.querySelector('.collapse-btn');
+                    if (categoryExpandBtn && categoryCollapseBtn) {
+                        categoryExpandBtn.style.display = 'inline-block';
+                        categoryCollapseBtn.style.display = 'none';
+                    }
+                }
+            }
+        }
+
+        if (!window.globalFilter.commonName && !window.globalFilter.contractNumber) {
+            showCategoryRow = true;
+            if (subcatDiv) {
+                subcatDiv.classList.remove('expanded');
+                subcatDiv.classList.add('collapsed');
+                subcatDiv.style.display = 'block';
+                subcatDiv.style.opacity = '0';
+                const categoryExpandBtn = categoryRow.querySelector('.expand-btn');
+                const categoryCollapseBtn = categoryRow.querySelector('.collapse-btn');
+                if (categoryExpandBtn && categoryCollapseBtn) {
+                    categoryExpandBtn.style.display = 'inline-block';
+                    categoryCollapseBtn.style.display = 'none';
+                }
+            }
+        }
+
+        categoryRow.style.display = showCategoryRow ? '' : 'none';
+        if (expandableRow) {
+            expandableRow.style.display = showCategoryRow ? '' : 'none';
+        }
+        if (showCategoryRow) visibleCategoryRows++;
+    });
+
+    let rowCountDiv = document.querySelector('.row-count');
+    if (!rowCountDiv) {
+        rowCountDiv = document.createElement('div');
+        rowCountDiv.className = 'row-count mt-2';
+        categoryTable.insertAdjacentElement('afterend', rowCountDiv);
+    }
+    rowCountDiv.textContent = `Showing ${visibleCategoryRows} of ${categoryRows.length} rows`;
+}
+
+/**
+ * Apply global filter function for Tabs 1, 2, 4, 5
+ * Used by: Tabs 1, 2, 4, 5
+ * Dependency: sessionStorage, applyFilterToAllLevelsTabs2And4 or tab-specific filtering
+ */
+window.applyGlobalFilter = function() {
+    // Skip global filter for Tab 3 and non-tab pages (e.g., /categories)
+    if (window.cachedTabNum === 3 || !window.location.pathname.match(/\/tab\/\d+/)) {
+        console.log('Skipping global filter application for Tab 3 or non-tab page');
+        return;
+    }
+
+    const commonNameInput = document.getElementById('commonNameFilter');
+    const contractNumberInput = document.getElementById('contractNumberFilter');
+    const commonName = commonNameInput ? commonNameInput.value.toLowerCase().trim() : '';
+    const contractNumber = contractNumberInput ? contractNumberInput.value.toLowerCase().trim() : '';
+
+    window.globalFilter = {
+        commonName: commonName,
+        contractNumber: contractNumber
+    };
+
+    // Save filter state to sessionStorage
+    sessionStorage.setItem('globalFilter', JSON.stringify(window.globalFilter));
+
+    // Apply filter based on the current tab
+    if (window.cachedTabNum === 1 && typeof applyFilterToAllLevelsTab1 === 'function') {
+        applyFilterToAllLevelsTab1();
+    } else if (window.cachedTabNum === 2 || window.cachedTabNum === 4) {
+        applyFilterToAllLevelsTabs2And4();
+    } else if (window.cachedTabNum === 5 && typeof applyFilterToAllLevelsTab5 === 'function') {
+        applyFilterToAllLevelsTab5();
+    }
+};
+
+/**
+ * Clear global filter function for Tabs 1, 2, 4, 5
+ * Used by: Tabs 1, 2, 4, 5
+ * Dependency: sessionStorage
+ */
+window.clearGlobalFilter = function() {
+    window.globalFilter = {
+        commonName: '',
+        contractNumber: ''
+    };
+
+    // Clear sessionStorage
+    sessionStorage.removeItem('globalFilter');
+
+    // Clear input fields
+    const commonNameInput = document.getElementById('commonNameFilter');
+    const contractNumberInput = document.getElementById('contractNumberFilter');
+    if (commonNameInput) commonNameInput.value = '';
+    if (contractNumberInput) contractNumberInput.value = '';
+
+    // Refresh the page to clear filters
+    window.location.reload();
+};
+
+/**
+ * Sort common names for Tabs 2 and 4
+ * Used by: Tabs 2, 4
+ * Dependency: window.commonSortState
+ */
+window.sortCommonNames = function(contractNumber, column, tabNum) {
+    const targetId = `common-${contractNumber}`;
+    if (!window.commonSortState[contractNumber]) {
+        window.commonSortState[contractNumber] = { column: '', direction: '' };
+    }
+
+    let direction = 'asc';
+    if (window.commonSortState[contractNumber].column === column) {
+        direction = window.commonSortState[contractNumber].direction === 'asc' ? 'desc' : 'asc';
+    }
+    window.commonSortState[contractNumber] = { column, direction };
+
+    const headers = document.querySelectorAll(`#${targetId} .common-table thead tr:first-child th`);
+    headers.forEach(header => {
+        const sortArrow = header.querySelector('.sort-arrow') || document.createElement('span');
+        sortArrow.className = 'sort-arrow';
+        if (!header.querySelector('.sort-arrow')) header.appendChild(sortArrow);
+        const headerColumn = header.textContent.trim().toLowerCase().replace(/\s+/g, '_');
+        if (headerColumn === column) {
+            sortArrow.textContent = direction === 'asc' ? '↑' : '↓';
+        } else {
+            sortArrow.textContent = '';
+        }
+    });
+
+    const url = `/tab/${tabNum}/common_names?contract_number=${encodeURIComponent(contractNumber)}&sort=${column}_${direction}`;
+    console.log(`Fetching sorted common names: ${url}`);
+
+    fetch(url)
+        .then(response => {
+            console.log(`Common names sort fetch status: ${response.status}`);
+            if (!response.ok) {
+                return response.text().then(text => {
+                    throw new Error(`Common names sort failed: ${response.status} - ${text}`);
+                });
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log('Sorted common names data:', data);
+            const targetElement = document.getElementById(targetId);
+            if (!targetElement) return;
+
+            const commonNames = data.common_names || [];
+            const totalCommonNames = data.total_common_names || 0;
+            const perPage = data.per_page || 10;
+            const currentPage = data.page || 1;
+
+            let html = `
+                <div class="subcategory-container">
+                    <table class="table table-bordered table-hover common-table">
+                        <thead class="thead-dark">
+                            <tr>
+                                <th onclick="window.sortCommonNames('${contractNumber}', 'common_name', ${tabNum})">Common Name <span class="sort-arrow"></span></th>
+                                <th onclick="window.sortCommonNames('${contractNumber}', 'on_contracts', ${tabNum})">Items on Contract <span class="sort-arrow"></span></th>
+                                <th onclick="window.sortCommonNames('${contractNumber}', 'total_items_inventory', ${tabNum})">Total Items in Inventory <span class="sort-arrow"></span></th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+
+            commonNames.forEach(common => {
+                const commonId = `${contractNumber}-${common.name.replace(/[^a-z0-9]/g, '_')}`;
+                const escapedCommonName = common.name.replace(/'/g, "\\'").replace(/"/g, '\\"');
+                html += `
+                    <tr>
+                        <td class="expandable-cell" onclick="window.expandItems('${contractNumber}', '${escapedCommonName}', 'items-${commonId}', 1, ${tabNum})">${common.name}</td>
+                        <td>${common.on_contracts}</td>
+                        <td>${common.is_hand_counted ? 'N/A' : common.total_items_inventory}</td>
+                        <td>
+                            <button class="btn btn-sm btn-secondary expand-btn" data-common-name="${escapedCommonName}" data-target-id="items-${commonId}" data-contract-number="${contractNumber}">Expand</button>
+                            <button class="btn btn-sm btn-secondary collapse-btn" data-collapse-target="items-${commonId}" style="display:none;">Collapse</button>
+                            <button class="btn btn-sm btn-info print-btn" data-print-level="Common Name" data-print-id="items-${commonId}" data-common-name="${escapedCommonName}" data-category="${contractNumber}">Print</button>
+                            <button class="btn btn-sm btn-info print-full-btn" data-common-name="${escapedCommonName}" data-category="${contractNumber}">Print Full List</button>
+                            <div id="loading-items-${commonId}" style="display:none;" class="loading-indicator">Loading...</div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td colspan="4">
+                            <div id="items-${commonId}" class="expandable collapsed item-level"></div>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            html += `</tbody></table></div>`;
+
+            if (totalCommonNames > perPage) {
+                const totalPages = Math.ceil(totalCommonNames / perPage);
+                html += `
+                    <div class="pagination-controls mt-2">
+                        <button class="btn btn-sm btn-secondary" onclick="window.expandCategory('', '${targetId}', '${contractNumber}', ${currentPage - 1}, ${tabNum})" ${currentPage === 1 ? 'disabled' : ''}>Previous</button>
+                        <span class="mx-2">Page ${currentPage} of ${totalPages}</span>
+                        <button class="btn btn-sm btn-secondary" onclick="window.expandCategory('', '${targetId}', '${contractNumber}', ${currentPage + 1}, ${tabNum})" ${currentPage === totalPages ? 'disabled' : ''}>Next</button>
+                    </div>
+                `;
+            }
+
+            targetElement.innerHTML = html;
+            const table = targetElement.querySelector('.common-table');
+            if (table) {
+                applyFilterToTable(table);
+            }
+        })
+        .catch(error => {
+            console.error('Common names sort error:', error.message);
+        });
+};
+
+/**
+ * Sort items for Tabs 2 and 4
+ * Used by: Tabs 2, 4
+ * Dependency: window.itemSortState
+ */
+window.sortItems = function(contractNumber, commonName, column, tabNum) {
+    const targetId = `items-${contractNumber}-${commonName.replace(/[^a-z0-9]/g, '_')}`;
+    if (!window.itemSortState[targetId]) {
+        window.itemSortState[targetId] = { column: '', direction: '' };
+    }
+
+    let direction = 'asc';
+    if (window.itemSortState[targetId].column === column) {
+        direction = window.itemSortState[targetId].direction === 'asc' ? 'desc' : 'asc';
+    }
+    window.itemSortState[targetId] = { column, direction };
+
+    const headers = document.querySelectorAll(`#${targetId} .item-table thead tr:first-child th`);
+    headers.forEach(header => {
+        const sortArrow = header.querySelector('.sort-arrow') || document.createElement('span');
+        sortArrow.className = 'sort-arrow';
+        if (!header.querySelector('.sort-arrow')) header.appendChild(sortArrow);
+        const headerColumn = header.textContent.trim().toLowerCase().replace(/\s+/g, '_');
+        if (headerColumn === column) {
+            sortArrow.textContent = direction === 'asc' ? '↑' : '↓';
+        } else {
+            sortArrow.textContent = '';
+        }
+    });
+
+    const url = `/tab/${tabNum}/data?contract_number=${encodeURIComponent(contractNumber)}&common_name=${encodeURIComponent(commonName)}&sort=${column}_${direction}`;
+    console.log(`Fetching sorted items: ${url}`);
+
+    fetch(url)
+        .then(response => {
+            console.log(`Items sort fetch status: ${response.status}`);
+            if (!response.ok) {
+                return response.text().then(text => {
+                    throw new Error(`Items sort failed: ${response.status} - ${text}`);
+                });
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log('Sorted items data:', data);
+            const targetElement = document.getElementById(targetId);
+            if (!targetElement) return;
+
+            const items = data.items || [];
+            const totalItems = data.total_items || 0;
+            const perPage = data.per_page || 10;
+            const currentPage = data.page || 1;
+
+            let html = `
+                <div class="item-level-wrapper ml-4">
+                    <table class="table table-bordered table-hover item-table">
+                        <thead class="thead-dark">
+                            <tr>
+                                <th onclick="window.sortItems('${contractNumber}', '${commonName}', 'tag_id', ${tabNum})">Tag ID <span class="sort-arrow"></span></th>
+                                <th onclick="window.sortItems('${contractNumber}', '${commonName}', 'common_name', ${tabNum})">Common Name <span class="sort-arrow"></span></th>
+                                <th onclick="window.sortItems('${contractNumber}', '${commonName}', 'bin_location', ${tabNum})">Bin Location <span class="sort-arrow"></span></th>
+                                <th onclick="window.sortItems('${contractNumber}', '${commonName}', 'status', ${tabNum})">Status <span class="sort-arrow"></span></th>
+                                <th onclick="window.sortItems('${contractNumber}', '${commonName}', 'last_contract_num', ${tabNum})">Last Contract <span class="sort-arrow"></span></th>
+                                <th onclick="window.sortItems('${contractNumber}', '${commonName}', 'last_scanned_date', ${tabNum})">Last Scanned Date <span class="sort-arrow"></span></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+
+            items.forEach(item => {
+                const formattedScanDate = formatDate(item.last_scanned_date);
+                html += `
+                    <tr>
+                        <td>${item.tag_id}</td>
+                        <td>${item.common_name}</td>
+                        <td>${item.bin_location || 'N/A'}</td>
+                        <td>${item.status}</td>
+                        <td>${item.last_contract_num || 'N/A'}</td>
+                        <td>${formattedScanDate}</td>
+                    </tr>
+                `;
+            });
+
+            html += `</tbody></table></div>`;
+
+            if (totalItems > perPage) {
+                const totalPages = Math.ceil(totalItems / perPage);
+                const escapedCommonName = commonName.replace(/'/g, "\\'").replace(/"/g, '\\"');
+                html += `
+                    <div class="pagination-controls mt-2 ml-4">
+                        <button class="btn btn-sm btn-secondary" onclick="window.expandItems('${contractNumber}', '${escapedCommonName}', '${targetId}', ${currentPage - 1}, ${tabNum})" ${currentPage === 1 ? 'disabled' : ''}>Previous</button>
+                        <span class="mx-2">Page ${currentPage} of ${totalPages}</span>
+                        <button class="btn btn-sm btn-secondary" onclick="window.expandItems('${contractNumber}', '${escapedCommonName}', '${targetId}', ${currentPage + 1}, ${tabNum})" ${currentPage === totalPages ? 'disabled' : ''}>Next</button>
+                    </div>
+                `;
+            }
+
+            targetElement.innerHTML = html;
+            const table = targetElement.querySelector('.item-table');
+            if (table) {
+                applyFilterToTable(table);
+            }
+        })
+        .catch(error => {
+            console.error('Items sort error:', error.message);
+        });
+};
 
 /**
  * Print a table (Contract, Common Name, or Item level)
@@ -320,7 +1008,6 @@ async function printTable(level, id, commonName = null, category = null, subcate
         <html>
             <head>
                 <title>Broadway Tent and Event - ${tabName} - ${level}</title>
-                <!-- Removed reference to non-existent style.css -->
                 <style>
                     body {
                         font-family: 'Roboto', sans-serif;
@@ -518,7 +1205,6 @@ async function printFullItemList(category, subcategory, commonName) {
         <html>
             <head>
                 <title>Broadway Tent and Event - ${tabName} - Full Item List</title>
-                <!-- Removed reference to non-existent style.css -->
                 <style>
                     body {
                         font-family: 'Roboto', sans-serif;

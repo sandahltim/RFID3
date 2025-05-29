@@ -1,10 +1,9 @@
-console.log('tab3.js version: 2025-05-28-v16 loaded');
+console.log('tab3.js version: 2025-05-29-v17 loaded');
 
 /**
  * Tab3.js: Logic for Tab 3 (Items in Service).
  * Dependencies: common.js for formatDate.
- * Updated 2025-05-28: Updated setupExpandCollapse for summary table expand/collapse.
- * No code removed from v15 to preserve all functionality (debounce, print tags, etc.).
+ * Updated 2025-05-29: Removed duplicate formatDate, now using common.js.
  */
 
 /**
@@ -389,7 +388,7 @@ function updateNotes(tagId) {
 
 /**
  * Handle expand/collapse functionality for summary table
- * Updated 2025-05-28: Handles expand-btn and collapse-btn for tab3-details sections
+ * Updated 2025-05-29: Handles expand-btn and collapse-btn for tab3-details sections
  */
 function setupExpandCollapse() {
     document.addEventListener('click', (event) => {
