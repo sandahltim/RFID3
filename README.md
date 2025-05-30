@@ -38,13 +38,13 @@ test_rfidpi/ RFID6(needs update)
 │   ├── js/
 │   │   ├── common.js
 │   │   ├── tab.js
+│   │   ├── home.js
 │   │   ├── tab1.js
 │   │   ├── tab2.js
 │   │   ├── tab3.js
 │   │   ├── tab4.js
 │   │   ├── tab5.js
-│   │   ├── expand_old.js
-│   │   └── htmx.min.js
+│   │   └── categories.js
 │   ├── lib/
 │   │   ├── htmx/
 │   │   │   └── htmx.min.js
@@ -803,8 +803,8 @@ test_rfidpi/ RFID6
 │   │   ├── tab3.js
 │   │   ├── tab4.js
 │   │   ├── tab5.js
-│   │   ├── common_old.js
-│   │   └── htmx.min.js
+│   │   ├── 
+│   │   └── 
 │   ├── lib/
 │   │   ├── htmx/
 │   │   │   └── htmx.min.js
