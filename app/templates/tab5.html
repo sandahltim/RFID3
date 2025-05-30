@@ -77,58 +77,5 @@
 function exportSoldItemsCSV() {
     window.location.href = '/tab/5/export_sold_items_csv';
 }
-
-function bulkUpdateItems() {
-    const selectedItems = document.querySelectorAll('.item-select:checked');
-    const tagIds = Array.from(selectedItems).map(checkbox => checkbox.value);
-    const newBinLocation = document.getElementById('bulk-bin-location').value;
-    const newStatus = document.getElementById('bulk-status').value;
-
-    if (tagIds.length === 0) {
-        alert('Please select at least one item to update.');
-        return;
-    }
-
-    if (!newBinLocation && !newStatus) {
-        alert('Please select a new bin location or status to update.');
-        return;
-    }
-
-    const payload = {
-        tag_ids: tagIds,
-        bin_location: newBinLocation || undefined,
-        status: newStatus || undefined
-    };
-
-    fetch('/tab/5/bulk_update_items', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(payload)
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.error) {
-            alert('Error: ' + data.error);
-        } else {
-            alert(data.message);
-            // Refresh the items table by re-expanding the common name section
-            const wrapper = document.querySelector('.item-level-wrapper');
-            if (wrapper) {
-                const category = wrapper.closest('tr')?.previousElementSibling?.querySelector('button[data-category]')?.getAttribute('data-category') ||
-                                 wrapper.closest('.common-level')?.querySelector('button[data-category]')?.getAttribute('data-category');
-                const subcategorySelect = document.querySelector(`select[data-category="${category}"]`);
-                if (subcategorySelect) {
-                    loadCommonNames(subcategorySelect);
-                }
-            }
-        }
-    })
-    .catch(error => {
-        console.error('Error during bulk update:', error);
-        alert('Failed to update items: ' + error.message);
-    });
-}
 </script>
 {% endblock %}
