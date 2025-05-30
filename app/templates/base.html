@@ -1,9 +1,8 @@
-<!-- base.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>{% block title %}{% endblock %}</title>
+    <title>{% block title %}RFID Dashboard{% endblock %}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='lib/bootstrap/bootstrap.min.css') }}">
     {% block head %}{% endblock %}
     {% block extra_head %}{% endblock %}
@@ -83,6 +82,8 @@
             <script src="{{ url_for('static', filename='js/tab5.js') }}"></script>
         {% elif request.path == '/categories' %}
             <script src="{{ url_for('static', filename='js/categories.js') }}"></script>
+        {% elif request.path == '/' %}
+            <script src="{{ url_for('static', filename='js/home.js') }}"></script>
         {% endif %}
     {% endblock %}
 </body>
