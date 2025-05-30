@@ -2,23 +2,23 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>{% block title %}Database Dashboard</title>
+    <title>{% block title %}RFID Dashboard{% endblock %}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='lib/bootstrap/bootstrap.min.css') }}">
     {% block head %}{% endblock %}
-    {% block extra_head %}{% %}
+    {% block extra_head %}{% endblock %}
 </head>
 <body>
     <nav class="navbar navbar-expand-lg navbar-light bg-light">
-        <a class="navbar-brand" href="#">RFID DASHBOARD</a>
+        <a class="navbar-brand" href="/">RFID DASHBOARD</a>
         <div class="collapse navbar-collapse">
             <ul class="navbar-nav mr-auto">
                 <li class="nav-item"><a class="nav-link" href="/">Home</a></li>
-                <li class="nav-item"><a class="nav-link" href="/tab/1">Rental</a></li>
-                <li class="nav-item"><a class="nav-link" href="/tab/2">Contracts</a></li>
+                <li class="nav-item"><a class="nav-link" href="/tab/1">Rental Inventory</a></li>
+                <li class="nav-item"><a class="nav-link" href="/tab/2">Open Contracts</a></li>
                 <li class="nav-item"><a class="nav-link" href="/tab/3">Service</a></li>
-                <li class="nav-item"><a class="nav-link" href="/tab/4">Laundry</a></li>
+                <li class="nav-item"><a class="nav-link" href="/tab/4">Laundry Contracts</a></li>
                 <li class="nav-item"><a class="nav-link" href="/tab/5">Resale</a></li>
-                <li class="nav-item"><a class="nav-link" href="/categories">Categories</a></li>
+                <li class="nav-item"><a class="nav-link" href="/categories">Manage Categories</a></li>
             </ul>
         </div>
     </nav>
