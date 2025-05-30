@@ -1,7 +1,6 @@
+<!-- home.html -->
 {% extends 'base.html' %}
-
 {% block title %}Home{% endblock %}
-
 {% block extra_head %}
 <style>
     .loading { color: #888; font-style: italic; }
@@ -22,73 +21,16 @@
         margin-bottom: 5px; 
     }
 </style>
-<script>
-    function triggerFullRefresh() {
-        const button = document.getElementById('full-refresh-btn');
-        button.disabled = true;
-        button.innerText = 'Refreshing...';
-        
-        fetch('/refresh/full', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            }
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.status === 'Full refresh triggered successfully') {
-                alert('Full refresh completed successfully');
-            } else {
-                alert('Error: ' + data.error);
-            }
-        })
-        .catch(error => {
-            console.error('Error during full refresh:', error);
-            alert('Failed to perform full refresh');
-        })
-        .finally(() => {
-            button.disabled = false;
-            button.innerText = 'Full Refresh';
-        });
-    }
-
-    function triggerIncrementalRefresh() {
-        const button = document.getElementById('incremental-refresh-btn');
-        button.disabled = true;
-        button.innerText = 'Refreshing...';
-        
-        fetch('/refresh/incremental', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            }
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.status === 'Incremental refresh triggered successfully') {
-                alert('Incremental refresh completed successfully');
-            } else {
-                alert('Error: ' + data.error);
-            }
-        })
-        .catch(error => {
-            console.error('Error during incremental refresh:', error);
-            alert('Failed to perform incremental refresh');
-        })
-        .finally(() => {
-            button.disabled = false;
-            button.innerText = 'Incremental Refresh';
-        });
-    }
-</script>
 {% endblock %}
-
+{% block scripts %}
+    {{ super() }}
+    <script src="{{ url_for('static', filename='js/home.js') }}"></script>
+{% endblock %}
 {% block content %}
 <h1>RFID Dashboard</h1>
 {% if error %}
     <div class="alert alert-danger">{{ error }}</div>
 {% else %}
-    <!-- Scannable Items Section at the Top -->
     <div class="row">
         <div class="col-md-12 scannable-items-section">
             <h3><strong>Scannable Items</strong></h3>
@@ -104,8 +46,6 @@
             </ul>
         </div>
     </div>
-
-    <!-- Existing Content Below -->
     <div class="row mb-3">
         <div class="col-md-12">
             <button id="full-refresh-btn" class="btn btn-primary" onclick="triggerFullRefresh()">Full Refresh</button>
@@ -135,7 +75,7 @@
         </div>
         <div class="col-md-6">
             <h4>Recent Scans</h4>
-            <table class="table table-bordered">
+            <table class="table table-bordered" id="recent-scans-table">
                 <thead>
                     <tr>
                         <th>Tag ID</th>
@@ -167,39 +107,27 @@
                 <tbody>
                     <tr>
                         <td>Rental Inventory</td>
-                        <td>
-                            <a href="/tab/1" class="btn btn-primary">View</a>
-                        </td>
+                        <td><a href="/tab/1" class="btn btn-primary">View</a></td>
                     </tr>
                     <tr>
                         <td>Open Contracts</td>
-                        <td>
-                            <a href="/tab/2" class="btn btn-primary">View</a>
-                        </td>
+                        <td><a href="/tab/2" class="btn btn-primary">View</a></td>
                     </tr>
                     <tr>
                         <td>Service</td>
-                        <td>
-                            <a href="/tab/3" class="btn btn-primary">View</a>
-                        </td>
+                        <td><a href="/tab/3" class="btn btn-primary">View</a></td>
                     </tr>
                     <tr>
                         <td>Laundry Contracts</td>
-                        <td>
-                            <a href="/tab/4" class="btn btn-primary">View</a>
-                        </td>
+                        <td><a href="/tab/4" class="btn btn-primary">View</a></td>
                     </tr>
                     <tr>
                         <td>Resale</td>
-                        <td>
-                            <a href="/tab/5" class="btn btn-primary">View</a>
-                        </td>
+                        <td><a href="/tab/5" class="btn btn-primary">View</a></td>
                     </tr>
                     <tr>
                         <td>Manage Categories</td>
-                        <td>
-                            <a href="{{ url_for('categories.manage_categories') }}" class="btn btn-primary">View</a>
-                        </td>
+                        <td><a href="{{ url_for('categories.manage_categories') }}" class="btn btn-primary">View</a></td>
                     </tr>
                 </tbody>
             </table>
