@@ -13,56 +13,51 @@ api_client = APIClient()
 
 def update_item_master(session, items):
     logger.info(f"Updating {len(items)} items in id_item_master")
-    batch_size = 50  # Reduced for Raspberry Pi performance
-    with session.no_autoflush:
-        for i in range(0, len(items), batch_size):
-            batch = items[i:i + batch_size]
-            for item in batch:
+    for item in items:
+        try:
+            tag_id = item.get('tag_id')
+            if not tag_id:
+                logger.warning(f"Skipping item with missing tag_id: {item}")
+                continue
+
+            db_item = session.query(ItemMaster).filter_by(tag_id=tag_id).first()
+            if not db_item:
+                db_item = ItemMaster(tag_id=tag_id)
+
+            db_item.serial_number = item.get('serial_number')
+            db_item.rental_class_num = item.get('rental_class_num')
+            db_item.client_name = item.get('client_name')
+            db_item.common_name = item.get('common_name')
+            db_item.quality = item.get('quality')
+            db_item.bin_location = item.get('bin_location')
+            raw_status = item.get('status')
+            logger.debug(f"Raw status for tag_id {tag_id}: {raw_status}")
+            status = raw_status if raw_status else 'Unknown'
+            db_item.status = status
+            logger.debug(f"Set status for tag_id {tag_id} to {status}")
+            db_item.last_contract_num = item.get('last_contract_num')
+            db_item.last_scanned_by = item.get('last_scanned_by')
+            db_item.notes = item.get('notes')
+            db_item.status_notes = item.get('status_notes')
+            longitude = item.get('long')
+            latitude = item.get('lat')
+            db_item.longitude = float(longitude) if longitude and longitude.strip() else None
+            db_item.latitude = float(latitude) if latitude and latitude.strip() else None
+            date_last_scanned = item.get('date_last_scanned')
+            if date_last_scanned and date_last_scanned != '0000-00-00 00:00:00':
                 try:
-                    tag_id = item.get('tag_id')
-                    if not tag_id:
-                        logger.warning(f"Skipping item with missing tag_id: {item}")
-                        continue
+                    db_item.date_last_scanned = datetime.strptime(date_last_scanned, '%Y-%m-%d %H:%M:%S')
+                except ValueError as e:
+                    logger.warning(f"Invalid date_last_scanned for tag_id {tag_id}: {date_last_scanned}. Setting to None. Error: {str(e)}")
+                    db_item.date_last_scanned = None
+            else:
+                db_item.date_last_scanned = None
 
-                    db_item = session.query(ItemMaster).filter_by(tag_id=tag_id).first()
-                    if not db_item:
-                        db_item = ItemMaster(tag_id=tag_id)
-
-                    db_item.serial_number = item.get('serial_number')
-                    db_item.rental_class_num = item.get('rental_class_num')
-                    db_item.client_name = item.get('client_name')
-                    db_item.common_name = item.get('common_name')
-                    db_item.quality = item.get('quality')
-                    db_item.bin_location = item.get('bin_location')
-                    raw_status = item.get('status')
-                    logger.debug(f"Raw status for tag_id {tag_id}: {raw_status}")
-                    status = raw_status if raw_status else 'Unknown'
-                    db_item.status = status
-                    logger.debug(f"Set status for tag_id {tag_id} to {status}")
-                    db_item.last_contract_num = item.get('last_contract_num')
-                    db_item.last_scanned_by = item.get('last_scanned_by')
-                    db_item.notes = item.get('notes')
-                    db_item.status_notes = item.get('status_notes')
-                    longitude = item.get('long')
-                    latitude = item.get('lat')
-                    db_item.longitude = float(longitude) if longitude and longitude.strip() else None
-                    db_item.latitude = float(latitude) if latitude and longitude.strip() else None
-                    date_last_scanned = item.get('date_last_scanned')
-                    if date_last_scanned and date_last_scanned != '0000-00-00 00:00:00':
-                        try:
-                            db_item.date_last_scanned = datetime.strptime(date_last_scanned, '%Y-%m-%d %H:%M:%S')
-                        except ValueError as e:
-                            logger.warning(f"Invalid date_last_scanned for tag_id {tag_id}: {date_last_scanned}. Setting to None. Error: {str(e)}")
-                            db_item.date_last_scanned = None
-                    else:
-                        db_item.date_last_scanned = None
-
-                    session.merge(db_item)
-                except Exception as e:
-                    logger.error(f"Error updating item {tag_id}: {str(e)}")
-                    session.rollback()
-                    raise
-            logger.debug(f"Processed batch {i // batch_size + 1} of {len(items) // batch_size + 1}")
+            session.merge(db_item)
+        except Exception as e:
+            logger.error(f"Error updating item {tag_id}: {str(e)}")
+            session.rollback()
+            raise
 
 def update_transactions(session, transactions):
     logger.info(f"Updating {len(transactions)} transactions in id_transactions")
@@ -178,7 +173,7 @@ def full_refresh():
                 logger.info(f"Fetched {len(transactions)} transactions")
                 logger.info(f"Fetched {len(seed_data)} items from seed data")
                 logger.debug(f"Item master data sample: {items[:5] if items else 'No items'}")
-                logger.debug(f"Transactions data sample: {transactions[:5] if items else 'No transactions'}")
+                logger.debug(f"Transactions data sample: {transactions[:5] if transactions else 'No transactions'}")
                 logger.debug(f"Seed data sample: {seed_data[:5] if seed_data else 'No seed data'}")
 
                 if not items:
