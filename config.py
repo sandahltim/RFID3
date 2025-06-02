@@ -27,7 +27,9 @@ SEED_URL = 'https://cs.iot.ptshome.com/api/v1/data/14223767938169215907'
 # Refresh intervals (seconds)
 FULL_REFRESH_INTERVAL = 1800  # 30 minutes
 INCREMENTAL_REFRESH_INTERVAL = 30  # 30 seconds
+INCREMENTAL_LOOKBACK_SECONDS = 1800  # Look back 30 minutes for incremental refresh
+INCREMENTAL_FALLBACK_SECONDS = 172800  # Fall back to 2 days if API filter fails
 
 # Logging
 LOG_FILE = os.path.join(BASE_DIR, 'logs', 'rfid_dashboard.log')
-#mariadbhash   *8226E019AE8D0D41243D07D91ABCD8E2F20358BC  root password    MySecureRootPass123
+# mariadbhash   *8226E019AE8D0D41243D07D91ABCD8E2F20358BC  root password    MySecureRootPass123
