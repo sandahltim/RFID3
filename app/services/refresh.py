@@ -1,8 +1,7 @@
 import logging
-import time
 from datetime import datetime, timedelta
 from sqlalchemy.exc import SQLAlchemyError, OperationalError
-from app.models.db_models import ItemMaster, Transaction, RentalClassMapping, SeedRentalClass, db
+from app.models.db_models import ItemMaster, Transaction, SeedRentalClass, db
 from app.services.api_client import APIClient
 from flask import Blueprint, jsonify, current_app
 
@@ -14,7 +13,7 @@ api_client = APIClient()
 
 def update_item_master(session, items):
     logger.info(f"Updating {len(items)} items in id_item_master")
-    batch_size = 100
+    batch_size = 50  # Reduced for Raspberry Pi performance
     with session.no_autoflush:
         for i in range(0, len(items), batch_size):
             batch = items[i:i + batch_size]
@@ -47,7 +46,7 @@ def update_item_master(session, items):
                     longitude = item.get('long')
                     latitude = item.get('lat')
                     db_item.longitude = float(longitude) if longitude and longitude.strip() else None
-                    db_item.latitude = float(latitude) if latitude and latitude.strip() else None
+                    db_item.latitude = float(latitude) if latitude and longitude.strip() else None
                     date_last_scanned = item.get('date_last_scanned')
                     if date_last_scanned and date_last_scanned != '0000-00-00 00:00:00':
                         try:
@@ -75,7 +74,6 @@ def update_transactions(session, transactions):
                 logger.warning(f"Skipping transaction with missing tag_id or scan_date: {transaction}")
                 continue
 
-            # Handle invalid scan_date
             if scan_date == '0000-00-00 00:00:00':
                 logger.warning(f"Invalid scan_date for tag_id {tag_id}: {scan_date}. Skipping transaction.")
                 continue
@@ -208,48 +206,43 @@ def full_refresh():
                 logger.error(f"Database error: {str(e)}")
                 raise
         except Exception as e:
-            logger.error(f"Full refresh failed: {str(e)}")
+            logger.error(f"Full refresh failed: {str(e)}", exc_info=True)
             session.rollback()
             raise
         finally:
             if session.is_active:
                 session.rollback()
-    logger.info("Clear API data and full refresh completed successfully")
+    logger.info("Full refresh completed successfully")
 
 def incremental_refresh():
     logger.info("Starting incremental refresh")
     session = db.session
     try:
-        since_date = datetime.utcnow() - timedelta(days=30)
+        since_date = datetime.utcnow() - timedelta(seconds=current_app.config['INCREMENTAL_LOOKBACK_SECONDS'])
+        logger.info(f"Checking for updates since: {since_date.strftime('%Y-%m-%d %H:%M:%S')}")
+
         logger.info(f"Fetching item master data with since_date: {since_date}")
-        items = api_client.get_item_master(since_date=since_date)
+        items = api_client.get_item_master(since_date=s prudent_date)
         logger.info(f"Fetched {len(items)} items from item master")
         logger.debug(f"Item master data sample: {items[:5] if items else 'No items'}")
         if not items:
-            logger.warning("No items fetched from item master API. Check API endpoint or authentication.")
+            logger.info("No new items fetched from item master API.")
 
         logger.info(f"Fetching transactions data with since_date: {since_date}")
         transactions = api_client.get_transactions(since_date=since_date)
         logger.info(f"Fetched {len(transactions)} transactions")
         logger.debug(f"Transactions data sample: {transactions[:5] if transactions else 'No transactions'}")
         if not transactions:
-            logger.warning("No transactions fetched from transactions API. Check API endpoint or authentication.")
-
-        logger.info(f"Fetching seed data with since_date: {since_date}")
-        seed_data = api_client.get_seed_data()
-        logger.info(f"Fetched {len(seed_data)} items from seed data")
-        logger.debug(f"Seed data sample: {seed_data[:5] if seed_data else 'No seed data'}")
-        if not seed_data:
-            logger.warning("No seed data fetched from seed API. Check API endpoint or authentication.")
+            logger.info("No new transactions fetched from transactions API.")
 
         update_item_master(session, items)
         update_transactions(session, transactions)
-        update_seed_data(session, seed_data)
+        logger.info("Skipping seed data refresh (handled in full refresh)")
 
         session.commit()
         logger.info("Incremental refresh completed successfully")
     except Exception as e:
-        logger.error(f"Incremental refresh failed: {str(e)}")
+        logger.error(f"Incremental refresh failed: {str(e)}", exc_info=True)
         session.rollback()
         raise
     finally:
@@ -258,22 +251,46 @@ def incremental_refresh():
 
 @refresh_bp.route('/full_refresh', methods=['POST'])
 def full_refresh_endpoint():
+    logger.info("Received request for full refresh via endpoint")
+    session = db.session
     try:
-        current_app.logger.info("Starting full refresh via endpoint")
+        logger.debug("Starting full refresh process")
         full_refresh()
-        current_app.logger.info("Full refresh completed successfully")
+        logger.info("Full refresh completed successfully")
         return jsonify({'status': 'success', 'message': 'Full refresh completed successfully'})
+    except OperationalError as e:
+        logger.error(f"Database error during full refresh: {str(e)}", exc_info=True)
+        session.rollback()
+        return jsonify({'status': 'error', 'message': f"Database error: {str(e)}"}), 500
     except Exception as e:
-        current_app.logger.error(f"Full refresh failed: {str(e)}")
+        logger.error(f"Full refresh failed: {str(e)}", exc_info=True)
+        session.rollback()
         return jsonify({'status': 'error', 'message': str(e)}), 500
+    finally:
+        if session.is_active:
+            session.rollback()
+        session.close()
+        logger.debug("Full refresh endpoint session closed")
 
 @refresh_bp.route('/clear_api_data', methods=['POST'])
 def clear_api_data():
+    logger.info("Received request for clear API data and refresh")
+    session = db.session
     try:
-        current_app.logger.info("Starting clear API data and refresh")
+        logger.debug("Starting clear API data and refresh process")
         full_refresh()
-        current_app.logger.info("Clear API data and refresh completed successfully")
+        logger.info("Clear API data and refresh completed successfully")
         return jsonify({'status': 'success', 'message': 'API data cleared and refreshed successfully'})
+    except OperationalError as e:
+        logger.error(f"Database error during clear API data: {str(e)}", exc_info=True)
+        session.rollback()
+        return jsonify({'status': 'error', 'message': f"Database error: {str(e)}"}), 500
     except Exception as e:
-        current_app.logger.error(f"Clear API data and refresh failed: {str(e)}")
+        logger.error(f"Clear API data and refresh failed: {str(e)}", exc_info=True)
+        session.rollback()
         return jsonify({'status': 'error', 'message': str(e)}), 500
+    finally:
+        if session.is_active:
+            session.rollback()
+        session.close()
+        logger.debug("Clear API data endpoint session closed")

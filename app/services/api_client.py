@@ -1,7 +1,7 @@
 import requests
 import time
 from datetime import datetime, timedelta
-from config import API_USERNAME, API_PASSWORD, LOGIN_URL, ITEM_MASTER_URL, TRANSACTION_URL, SEED_URL
+from config import API_USERNAME, API_PASSWORD, LOGIN_URL, ITEM_MASTER_URL, TRANSACTION_URL, SEED_URL, INCREMENTAL_FALLBACK_SECONDS
 import logging
 from urllib.parse import quote
 
@@ -115,23 +115,25 @@ class APIClient:
         """Fetch Item Master records, optionally filtered by since_date."""
         params = {}
         if since_date:
-            since_date = datetime.fromisoformat(since_date).strftime('%Y-%m-%d %H:%M:%S') if isinstance(since_date, str) else since_date.strftime('%Y-%m-%d %H:%M:%S')
-            logger.debug(f"Item master filter since_date: {since_date}")
-            filter_str = f"date_last_scanned,gt,'{since_date}'"
+            since_date_str = datetime.fromisoformat(since_date).strftime('%Y-%m-%d %H:%M:%S') if isinstance(since_date, str) else since_date.strftime('%Y-%m-%d %H:%M:%S')
+            logger.debug(f"Item master filter since_date: {since_date_str}")
+            filter_str = f"date_last_scanned,gt,'{since_date_str}'"
             logger.debug(f"Constructed filter string: {filter_str}")
             params['filter[gt]'] = filter_str
         
         try:
             data = self._make_request("14223767938169344381", params)
         except Exception as e:
-            logger.warning(f"Filter failed: {str(e)}. Fetching all data and filtering locally.")
+            logger.warning(f"Filter failed: {str(e)}. Fetching all data and filtering locally for last {INCREMENTAL_FALLBACK_SECONDS} seconds.")
             params.pop('filter[gt]', None)
             data = self._make_request("14223767938169344381")
             if since_date:
-                since_dt = datetime.strptime(since_date, '%Y-%m-%d %H:%M:%S')
+                since_dt = datetime.strptime(since_date_str, '%Y-%m-%d %H:%M:%S')
+                fallback_dt = datetime.utcnow() - timedelta(seconds=INCREMENTAL_FALLBACK_SECONDS)
                 data = [
                     item for item in data
-                    if item.get('date_last_scanned') and datetime.strptime(item['date_last_scanned'], '%Y-%m-%d %H:%M:%S') > since_dt
+                    if item.get('date_last_scanned') and 
+                    datetime.strptime(item['date_last_scanned'], '%Y-%m-%d %H:%M:%S') > max(since_dt, fallback_dt)
                 ]
         logger.debug(f"Item master data sample: {data[:5] if data else 'No data'}")
         return data
@@ -140,22 +142,24 @@ class APIClient:
         """Fetch transaction records, optionally filtered by since_date."""
         params = {}
         if since_date:
-            since_date = datetime.fromisoformat(since_date).strftime('%Y-%m-%d %H:%M:%S') if isinstance(since_date, str) else since_date.strftime('%Y-%m-%d %H:%M:%S')
-            logger.debug(f"Transactions filter since_date: {since_date}")
-            filter_str = f"date_updated,gt,'{since_date}'"
+            since_date_str = datetime.fromisoformat(since_date).strftime('%Y-%m-%d %H:%M:%S') if isinstance(since_date, str) else since_date.strftime('%Y-%m-%d %H:%M:%S')
+            logger.debug(f"Transactions filter since_date: {since_date_str}")
+            filter_str = f"date_updated,gt,'{since_date_str}'"
             logger.debug(f"Constructed filter string: {filter_str}")
             params['filter[gt]'] = filter_str
             try:
                 data = self._make_request("14223767938169346196", params)
             except Exception as e:
-                logger.warning(f"Filter failed: {str(e)}. Fetching all data and filtering locally.")
+                logger.warning(f"Filter failed: {str(e)}. Fetching all data and filtering locally for last {INCREMENTAL_FALLBACK_SECONDS} seconds.")
                 params.pop('filter[gt]', None)
                 data = self._make_request("14223767938169346196")
                 if since_date:
-                    since_dt = datetime.strptime(since_date, '%Y-%m-%d %H:%M:%S')
+                    since_dt = datetime.strptime(since_date_str, '%Y-%m-%d %H:%M:%S')
+                    fallback_dt = datetime.utcnow() - timedelta(seconds=INCREMENTAL_FALLBACK_SECONDS)
                     data = [
                         item for item in data
-                        if item.get('date_updated') and datetime.strptime(item['date_updated'], '%Y-%m-%d %H:%M:%S') > since_dt
+                        if item.get('date_updated') and 
+                        datetime.strptime(item['date_updated'], '%Y-%m-%d %H:%M:%S') > max(since_dt, fallback_dt)
                     ]
         else:
             data = self._make_request("14223767938169346196")

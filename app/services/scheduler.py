@@ -9,7 +9,7 @@ scheduler = BackgroundScheduler()
 def init_scheduler(app):
     redis_client = Redis.from_url(REDIS_URL)
     lock_key = "full_refresh_lock"
-    lock_timeout = 300
+    lock_timeout = 60  # Reduced from 300 seconds
 
     with app.app_context():
         if redis_client.setnx(lock_key, 1):
