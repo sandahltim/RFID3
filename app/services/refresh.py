@@ -222,7 +222,7 @@ def incremental_refresh():
         logger.info(f"Checking for updates since: {since_date.strftime('%Y-%m-%d %H:%M:%S')}")
 
         logger.info(f"Fetching item master data with since_date: {since_date}")
-        items = api_client.get_item_master(since_date=s prudent_date)
+        items = api_client.get_item_master(since_date=since_date)
         logger.info(f"Fetched {len(items)} items from item master")
         logger.debug(f"Item master data sample: {items[:5] if items else 'No items'}")
         if not items:
