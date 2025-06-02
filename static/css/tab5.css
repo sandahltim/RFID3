@@ -2,8 +2,8 @@
 
 /* Style for common name table rows */
 .common-name-row {
-    background-color: #e9ecef;
-    border-left: 3px solid #28a745;
+    background-color: var(--bte-light-gray);
+    border-left: 3px solid var(--bte-accent-green);
     margin-left: 2rem;
     padding: 1rem;
     display: table-row !important;
@@ -31,21 +31,12 @@
     transform: translateZ(0);
 }
 
-/* Highest specificity to override any conflicting styles */
-div.item-level-wrapper table.item-table th,
-div.item-level-wrapper table.item-table td,
-tr.common-name-row td table.common-table th,
-tr.common-name-row td table.common-table td {
-    color: #000000 !important;
-    font-family: 'Roboto', sans-serif !important;
-    font-weight: 500 !important;
-}
-
+/* Item-level wrapper */
 .item-level-wrapper {
     margin-left: 2rem;
-    background-color: #dee2e6;
+    background-color: var(--bte-white);
     padding: 1rem;
-    border-left: 3px solid #dc3545;
+    border-left: 3px solid var(--bte-accent-red);
     overflow-x: auto;
     overflow-y: visible;
     width: 100%;
@@ -100,7 +91,7 @@ tr.common-name-row td table.common-table td {
     text-align: center;
     vertical-align: middle;
     padding: 12px;
-    border: 1px solid #dee2e6;
+    border: 1px solid var(--bte-medium-gray);
     display: table-cell !important;
     visibility: visible !important;
     white-space: normal;
@@ -114,10 +105,12 @@ tr.common-name-row td table.common-table td {
     position: sticky;
     top: 0;
     z-index: 11;
-    background-color: #e9ecef;
-    border-bottom: 2px solid #dee2e6;
+    background: linear-gradient(90deg, var(--bte-royal-blue) 0%, #0047AB 100%);
+    color: var(--bte-white);
+    border-bottom: 2px solid var(--bte-gold);
 }
 
+/* Table body */
 .category-table tbody,
 .common-table tbody,
 .item-table tbody {
@@ -125,6 +118,18 @@ tr.common-name-row td table.common-table td {
     visibility: visible !important;
     z-index: 5;
     position: relative;
+}
+
+.category-table tbody tr:nth-child(odd),
+.common-table tbody tr:nth-child(odd),
+.item-table tbody tr:nth-child(odd) {
+    background-color: var(--bte-light-gray);
+}
+
+.category-table tbody tr:hover,
+.common-table tbody tr:hover,
+.item-table tbody tr:hover {
+    background-color: rgba(255, 193, 7, 0.3);
 }
 
 /* Column widths for category table */
@@ -145,7 +150,7 @@ tr.common-name-row td table.common-table td {
 
 /* Column widths for common names table */
 .common-table th:nth-child(1),
-.common-table td:nth-child(1) { width: 30%; white-space: normal; word-wrap: break-word; }
+.common-table td:nth-child(1) { width: 30%; white-space: nowrap; }
 .common-table th:nth-child(2),
 .common-table td:nth-child(2) { width: 10%; }
 .common-table th:nth-child(3),
@@ -185,6 +190,15 @@ tr.common-name-row td table.common-table td {
     width: 100%;
     box-sizing: border-box;
     padding: 5px;
+    border: 1px solid var(--bte-royal-blue);
+    border-radius: 4px;
+    transition: border-color 0.3s ease;
+}
+
+.subcategory-select:focus,
+.item-table select:focus {
+    border-color: var(--bte-gold);
+    outline: none;
 }
 
 /* Ensure parent rows and cells are visible */
@@ -204,6 +218,10 @@ tr.common-name-row td table.common-table td {
     display: flex;
     gap: 10px;
     flex-wrap: wrap;
+    background: var(--bte-white);
+    padding: 10px;
+    border-radius: 6px;
+    border: 1px solid var(--bte-medium-gray);
 }
 
 /* Item select checkbox for Tab 5 */
@@ -235,13 +253,26 @@ tr.common-name-row td table.common-table td {
 
 .pagination-controls button {
     margin: 0 5px;
+    background: linear-gradient(90deg, var(--bte-royal-blue) 0%, #0047AB 100%);
+    color: var(--bte-white);
+    border: none;
+    padding: 8px 12px;
+    border-radius: 4px;
+    transition: background 0.3s ease, transform 0.2s ease;
+}
+
+.pagination-controls button:hover {
+    background: linear-gradient(90deg, var(--bte-gold) 0%, #FFD54F 100%);
+    color: var(--bte-dark-gray);
+    transform: translateY(-2px);
 }
 
 /* Loading indicator */
 .loading-indicator {
     text-align: center;
     padding: 10px;
-    color: #666;
+    color: var(--bte-accent-red);
+    font-weight: bold;
 }
 
 /* Responsive adjustments for Tab 5 */

@@ -42,13 +42,14 @@
     font-size: 1.2rem;
     text-transform: uppercase;
     letter-spacing: 1px;
-    transition: color 0.3s ease, transform 0.2s ease;
     text-decoration: none;
     padding: 8px 12px;
+    transition: color 0.3s ease, transform 0.2s ease, background-color 0.3s ease;
 }
 
 .navbar-brand:hover, .navbar-nav .nav-link:hover {
     color: var(--bte-white) !important;
+    background-color: rgba(255, 193, 7, 0.2);
     transform: translateY(-2px);
 }
 
@@ -434,8 +435,14 @@ h4 {
     }
     .print-header {
         margin-bottom: 20px;
+        text-align: center;
     }
     .print-header h1, .print-header h2 {
         color: var(--bte-dark-gray) !important;
+        font-size: 12pt;
+    }
+    .print-header p {
+        font-size: 8pt;
+        color: var(--bte-dark-gray);
     }
 }
