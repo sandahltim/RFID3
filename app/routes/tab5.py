@@ -50,7 +50,7 @@ if not any(isinstance(h, logging.StreamHandler) for h in root_logger.handlers):
 tab5_bp = Blueprint('tab5', __name__)
 
 # Version marker
-logger.info("Deployed tab5.py version: 2025-05-19-v38")
+logger.info("Deployed tab5.py version: 2025-06-02-v39")
 
 def get_category_data(session, filter_query='', sort='', status_filter='', bin_filter=''):
     cache_key = f'tab5_view_data_{filter_query}_{sort}_{status_filter}_{bin_filter}'
@@ -713,96 +713,97 @@ def update_status():
 def update_items_async(app, tag_ids_to_update, current_time, scheduler):
     """
     Background task to update items' status to 'Sold' and sync with the external API.
-    Takes a list of tag_ids and fetches fresh ItemMaster objects to avoid session issues.
-    Includes retries for API calls and better error handling.
+    Processes items in batches to avoid memory issues and reduce lock contention.
+    Includes detailed error handling and logging for debugging JSON errors.
     """
     logger.info(f"Starting background update task for {len(tag_ids_to_update)} items")
     api_client = APIClient()
     updated_items = 0
     failed_items = []
+    batch_size = 50  # Process 50 items at a time
 
-    # Create a new session within the Flask application context
     with app.app_context():
-        try:
-            logger.debug("Creating new SQLAlchemy session for background thread")
-            session_factory = sessionmaker(bind=db.engine)
-            session = scoped_session(session_factory)
-            # Disable autoflush to prevent premature flushes
-            session.autoflush = False
-            logger.debug("Successfully created new session for background thread with autoflush disabled")
-        except Exception as e:
-            logger.error(f"Failed to create SQLAlchemy session in background thread: {str(e)}")
-            if scheduler and scheduler.running:
-                scheduler.resume()
-                logger.info("Scheduler resumed after session creation failure")
-            logger.info("Background update task aborted due to session creation failure")
-            return
+        session_factory = sessionmaker(bind=db.engine)
+        session = scoped_session(session_factory)
+        session.autoflush = False
+        logger.debug("Created new SQLAlchemy session for background thread")
 
         try:
-            # Retry token refresh to handle transient failures
+            # Authenticate API client with retries
             max_auth_retries = 3
             for auth_attempt in range(max_auth_retries):
                 try:
-                    logger.debug(f"Attempting token refresh, attempt {auth_attempt + 1}")
+                    logger.debug(f"Attempting API authentication, attempt {auth_attempt + 1}")
                     api_client.authenticate()
-                    logger.info("Forced token refresh before starting updates")
+                    logger.info("API authentication successful")
                     break
                 except Exception as e:
-                    logger.error(f"Token refresh failed on attempt {auth_attempt + 1}: {str(e)}")
+                    logger.error(f"API authentication failed on attempt {auth_attempt + 1}: {str(e)}")
                     if auth_attempt == max_auth_retries - 1:
-                        logger.error("Failed to authenticate after 3 attempts, aborting update task")
+                        logger.error("Failed to authenticate API after 3 attempts")
                         raise
-                    logger.info("Retrying token refresh after 5 seconds")
                     time.sleep(5)
 
-            for tag_id in tag_ids_to_update:
-                max_retries = 3
-                for attempt in range(max_retries):
-                    try:
-                        logger.debug(f"Processing tag_id {tag_id}: attempt {attempt + 1}")
-                        item = session.query(ItemMaster).filter_by(tag_id=tag_id).first()
-                        if not item:
-                            logger.warning(f"Item with tag_id {tag_id} not found in database, skipping")
-                            break
-                        logger.debug(f"Updating tag_id {tag_id}: current status={item.status}, date_last_scanned={item.date_last_scanned}")
-                        api_client.update_status(tag_id, 'Sold')
-                        item.status = 'Sold'
-                        item.date_last_scanned = current_time
-                        # Commit immediately to reduce lock contention
-                        session.commit()
-                        updated_items += 1
-                        logger.debug(f"Successfully updated tag_id {tag_id} to status 'Sold'")
-                        break
-                    except Exception as e:
-                        session.rollback()
-                        logger.error(f"Failed to update tag_id {tag_id} on attempt {attempt + 1}: {str(e)}")
-                        if attempt == max_retries - 1:
-                            failed_items.append((tag_id, str(e)))
-                        else:
-                            logger.info(f"Retrying update for tag_id {tag_id} after 5 seconds")
-                            time.sleep(5)
-                        continue
+            # Process items in batches
+            for i in range(0, len(tag_ids_to_update), batch_size):
+                batch_ids = tag_ids_to_update[i:i + batch_size]
+                logger.debug(f"Processing batch {i // batch_size + 1} with {len(batch_ids)} items")
 
-            logger.info(f"Updated {updated_items} items from resale/pack to Sold status in background task")
+                for tag_id in batch_ids:
+                    max_retries = 3
+                    for attempt in range(max_retries):
+                        try:
+                            logger.debug(f"Updating tag_id {tag_id}, attempt {attempt + 1}")
+                            item = session.query(ItemMaster).filter_by(tag_id=tag_id).first()
+                            if not item:
+                                logger.warning(f"Item with tag_id {tag_id} not found, skipping")
+                                break
+
+                            # Update via API
+                            try:
+                                api_client.update_status(tag_id, 'Sold')
+                                logger.debug(f"API update successful for tag_id {tag_id}")
+                            except Exception as api_e:
+                                logger.error(f"API update failed for tag_id {tag_id}: {str(api_e)}")
+                                raise
+
+                            # Update local database
+                            item.status = 'Sold'
+                            item.date_last_scanned = current_time
+                            session.commit()
+                            updated_items += 1
+                            logger.debug(f"Successfully updated tag_id {tag_id} to status 'Sold'")
+                            break
+                        except Exception as e:
+                            session.rollback()
+                            logger.error(f"Failed to update tag_id {tag_id} on attempt {attempt + 1}: {str(e)}", exc_info=True)
+                            if attempt == max_retries - 1:
+                                failed_items.append((tag_id, str(e)))
+                            else:
+                                logger.info(f"Retrying update for tag_id {tag_id} after 2 seconds")
+                                time.sleep(2)
+                            continue
+
+            logger.info(f"Background task completed: updated {updated_items} items, failed {len(failed_items)} items")
             if failed_items:
-                logger.warning(f"Failed to update {len(failed_items)} items: {failed_items}")
+                logger.warning(f"Failed items: {failed_items}")
+
         except Exception as e:
             session.rollback()
             logger.error(f"Critical error in background update task: {str(e)}", exc_info=True)
         finally:
             session.remove()
+            logger.debug("Closed background session")
             if scheduler and scheduler.running:
                 scheduler.resume()
-                logger.info("Scheduler resumed after background update task")
-            logger.info("Background update task completed")
+                logger.info("Scheduler resumed")
 
 @tab5_bp.route('/tab/5/update_resale_pack_to_sold', methods=['POST'])
 def update_resale_pack_to_sold():
     """
     Update items in ItemMaster with bin_location 'resale' or 'pack', status 'On Rent' or 'Delivered',
     and date_last_scanned more than 4 days ago to status 'Sold' via API PATCH.
-    Items with NULL date_last_scanned are ignored as they haven't been recently changed.
-    This operation is asynchronous to prevent Gunicorn timeouts.
+    Processes items in batches to avoid memory issues.
     """
     try:
         logger.info("Starting update_resale_pack_to_sold process")
@@ -810,15 +811,27 @@ def update_resale_pack_to_sold():
         current_time = datetime.now()
         four_days_ago = current_time - timedelta(days=4)
 
-        logger.debug("Querying items for update: bin_location in ['resale', 'pack'], status in ['On Rent', 'Delivered'], date_last_scanned < four_days_ago, and date_last_scanned is not NULL")
-        items_to_update = session.query(ItemMaster).filter(
-            func.lower(func.trim(func.replace(func.coalesce(ItemMaster.bin_location, ''), '\x00', ''))).in_(['resale', 'pack']),
-            ItemMaster.status.in_(['On Rent', 'Delivered']),
-            ItemMaster.date_last_scanned.isnot(None),
-            ItemMaster.date_last_scanned < four_days_ago
-        ).all()
+        # Query items in batches to avoid loading all into memory
+        batch_size = 100
+        offset = 0
+        tag_ids_to_update = []
 
-        tag_ids_to_update = [item.tag_id for item in items_to_update]
+        logger.debug("Querying items for update in batches")
+        while True:
+            items_batch = session.query(ItemMaster.tag_id).filter(
+                func.lower(func.trim(func.replace(func.coalesce(ItemMaster.bin_location, ''), '\x00', ''))).in_(['resale', 'pack']),
+                ItemMaster.status.in_(['On Rent', 'Delivered']),
+                ItemMaster.date_last_scanned.isnot(None),
+                ItemMaster.date_last_scanned < four_days_ago
+            ).offset(offset).limit(batch_size).all()
+
+            if not items_batch:
+                break
+
+            tag_ids_to_update.extend([item.tag_id for item in items_batch])
+            offset += batch_size
+            logger.debug(f"Fetched batch of {len(items_batch)} items, total so far: {len(tag_ids_to_update)}")
+
         logger.info(f"Found {len(tag_ids_to_update)} items to update")
 
         if not tag_ids_to_update:
@@ -829,21 +842,26 @@ def update_resale_pack_to_sold():
         scheduler = get_scheduler()
         if scheduler and scheduler.running:
             scheduler.pause()
-            logger.info("Paused scheduler to prevent conflicts during update")
+            logger.info("Paused scheduler for update")
 
         threading.Thread(
             target=update_items_async,
             args=(current_app._get_current_object(), tag_ids_to_update, current_time, scheduler),
             daemon=False
         ).start()
-        session.close()
 
-        logger.info("Started background task to update items")
-        return jsonify({'status': 'success', 'message': f'Started update for {len(tag_ids_to_update)} items. Updates are processing in the background.'})
-    except Exception as e:
-        session.rollback()
-        logger.error(f"Error initiating update_resale_pack_to_sold: {str(e)}", exc_info=True)
         session.close()
+        logger.info(f"Started background task to update {len(tag_ids_to_update)} items")
+        return jsonify({
+            'status': 'success',
+            'message': f'Started update for {len(tag_ids_to_update)} items. Updates are processing in the background.'
+        })
+
+    except Exception as e:
+        if 'session' in locals():
+            session.rollback()
+            session.close()
+        logger.error(f"Error initiating update_resale_pack_to_sold: {str(e)}", exc_info=True)
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 @tab5_bp.route('/tab/5/export_sold_items_csv')
