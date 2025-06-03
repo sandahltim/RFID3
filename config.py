@@ -27,7 +27,7 @@ SEED_URL = 'https://cs.iot.ptshome.com/api/v1/data/14223767938169215907'
 # Refresh intervals (seconds)
 FULL_REFRESH_INTERVAL = 1800  # 30 minutes
 INCREMENTAL_REFRESH_INTERVAL = 30  # 30 seconds
-INCREMENTAL_LOOKBACK_SECONDS = 1800  # Look back 30 minutes for incremental refresh
+INCREMENTAL_LOOKBACK_SECONDS = 300  # Look back 5 minutes for incremental refresh
 INCREMENTAL_FALLBACK_SECONDS = 172800  # Fall back to 2 days if API filter fails
 
 # Bulk update configuration

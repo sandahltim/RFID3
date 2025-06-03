@@ -12,9 +12,9 @@ import csv
 from io import StringIO
 import json
 import threading
-from ..settings import get_scheduler
 from sqlalchemy.orm import scoped_session, sessionmaker
 from config import BULK_UPDATE_BATCH_SIZE
+from ..services.scheduler import get_scheduler
 
 # Configure logging
 logger = logging.getLogger('tab5')
@@ -51,7 +51,7 @@ if not any(isinstance(h, logging.StreamHandler) for h in root_logger.handlers):
 tab5_bp = Blueprint('tab5', __name__)
 
 # Version marker
-logger.info("Deployed tab5.py version: 2025-06-02-v41")
+logger.info("Deployed tab5.py version: 2025-06-03-v42")
 
 def get_category_data(session, filter_query='', sort='', status_filter='', bin_filter=''):
     cache_key = f'tab5_view_data_{filter_query}_{sort}_{status_filter}_{bin_filter}'

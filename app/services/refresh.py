@@ -244,7 +244,7 @@ def incremental_refresh():
         session.close()
         logger.debug("Incremental refresh session closed")
 
-@refresh_bp.route('/full_refresh', methods=['POST'])
+@refresh_bp.route('/refresh/full', methods=['POST'])
 def full_refresh_endpoint():
     logger.info("Received request for full refresh via endpoint")
     session = db.session
@@ -266,6 +266,29 @@ def full_refresh_endpoint():
             session.rollback()
         session.close()
         logger.debug("Full refresh endpoint session closed")
+
+@refresh_bp.route('/refresh/incremental', methods=['POST'])
+def incremental_refresh_endpoint():
+    logger.info("Received request for incremental refresh via endpoint")
+    session = db.session
+    try:
+        logger.debug("Starting incremental refresh process")
+        incremental_refresh()
+        logger.info("Incremental refresh completed successfully")
+        return jsonify({'status': 'success', 'message': 'Incremental refresh completed successfully'})
+    except OperationalError as e:
+        logger.error(f"Database error during incremental refresh: {str(e)}", exc_info=True)
+        session.rollback()
+        return jsonify({'status': 'error', 'message': f"Database error: {str(e)}"}), 500
+    except Exception as e:
+        logger.error(f"Incremental refresh failed: {str(e)}", exc_info=True)
+        session.rollback()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+    finally:
+        if session.is_active:
+            session.rollback()
+        session.close()
+        logger.debug("Incremental refresh endpoint session closed")
 
 @refresh_bp.route('/clear_api_data', methods=['POST'])
 def clear_api_data():
