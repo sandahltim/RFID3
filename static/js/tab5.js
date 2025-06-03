@@ -3,7 +3,7 @@ console.log('tab5.js version: 2025-05-29-v6 loaded');
 /**
  * Tab5.js: Logic for Tab 5 (Resale/Rental Packs).
  * Dependencies: common.js (for formatDate, showLoading, hideLoading, collapseSection, printTable, printFullItemList).
- * Updated: Removed duplicate functions, now using common.js utilities.
+ * Updated: Added logging for debugging empty data.
  */
 
 /**
@@ -199,6 +199,7 @@ function applyFilterToAllLevelsTab5() {
  */
 function populateSubcategories() {
     const selects = document.querySelectorAll('.subcategory-select');
+    console.log(`populateSubcategories: Found ${selects.length} subcategory selects`);
     const promises = Array.from(selects).map(select => {
         const category = select.getAttribute('data-category');
         console.log(`Populating subcategories for ${category}`);
@@ -225,6 +226,7 @@ function populateSubcategories() {
                     });
                 } else {
                     select.innerHTML += '<option value="">No subcategories</option>';
+                    console.warn(`No subcategories returned for ${category}`);
                 }
             })
             .catch(error => console.error(`Subcategory error for ${category}: ${error.message}`));
@@ -259,6 +261,7 @@ function loadCommonNames(selectElement, page = 1) {
                 return response.json();
             })
             .then(data => {
+                console.log(`Subcat data for ${category}:`, data);
                 const totals = {
                     totalItems: data.subcategories.reduce((sum, subcat) => sum + (subcat.total_items || 0), 0),
                     itemsOnContracts: data.subcategories.reduce((sum, subcat) => sum + (subcat.items_on_contracts || 0), 0),
@@ -307,24 +310,24 @@ function loadCommonNames(selectElement, page = 1) {
                 headerRow.setAttribute('data-target-id', targetId);
                 headerRow.innerHTML = `
                     <td colspan="7">
-                        <table class="table table-bordered table-hover common-table" id="common-table-${targetId}" style="color: #000000 !important;">
+                        <table class="table table-bordered table-hover common-table" id="common-table-${targetId}">
                             <thead class="thead-dark">
                                 <tr>
-                                    <th style="color: #000000 !important;">Common Name</th>
-                                    <th style="color: #000000 !important;">Total Items</th>
-                                    <th style="color: #000000 !important;">Items on Contracts</th>
-                                    <th style="color: #000000 !important;">Items in Service</th>
-                                    <th style="color: #000000 !important;">Items Available</th>
-                                    <th style="color: #000000 !important;">Actions</th>
+                                    <th>Common Name</th>
+                                    <th>Total Items</th>
+                                    <th>Items on Contracts</th>
+                                    <th>Items in Service</th>
+                                    <th>Items Available</th>
+                                    <th>Actions</th>
                                 </tr>
                             </thead>
-                            <tbody style="min-height: 50px;">
+                            <tbody>
                                 <tr>
-                                    <td style="color: #000000 !important;">Loading...</td>
-                                    <td style="color: #000000 !important;">-</td>
-                                    <td style="color: #000000 !important;">-</td>
-                                    <td style="color: #000000 !important;">-</td>
-                                    <td style="color: #000000 !important;">-</td>
+                                    <td>Loading...</td>
+                                    <td>-</td>
+                                    <td>-</td>
+                                    <td>-</td>
+                                    <td>-</td>
                                     <td>-</td>
                                 </tr>
                             </tbody>
@@ -355,11 +358,11 @@ function loadCommonNames(selectElement, page = 1) {
                     const escapedName = item.name.replace(/'/g, "\\'").replace(/"/g, '\\"');
                     const commonRow = document.createElement('tr');
                     commonRow.innerHTML = `
-                        <td style="color: #000000 !important;">${item.name}</td>
-                        <td style="color: #000000 !important;">${item.total_items || '0'}</td>
-                        <td style="color: #000000 !important;">${item.items_on_contracts || '0'}</td>
-                        <td style="color: #000000 !important;">${item.items_in_service || '0'}</td>
-                        <td style="color: #000000 !important;">${item.items_available || '0'}</td>
+                        <td>${item.name}</td>
+                        <td>${item.total_items || '0'}</td>
+                        <td>${item.items_on_contracts || '0'}</td>
+                        <td>${item.items_in_service || '0'}</td>
+                        <td>${item.items_available || '0'}</td>
                         <td>
                             <div class="btn-group">
                                 <button class="btn btn-sm btn-secondary expand-btn" 
@@ -427,6 +430,7 @@ function loadCommonNames(selectElement, page = 1) {
                 }
             } else {
                 tableBody.innerHTML = `<tr><td colspan="7">No common names found.</td></tr>`;
+                console.warn(`No common names returned for category ${category}, subcategory ${subcategory}`);
             }
 
             sessionStorage.setItem(`expanded_${targetId}`, JSON.stringify({ category, subcategory, page }));
@@ -693,33 +697,32 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
     const itemTable = document.createElement('table');
     itemTable.className = 'table table-bordered table-hover item-table';
     itemTable.id = `item-table-${key}`;
-    itemTable.style.color = '#000000 !important';
     itemTable.innerHTML = `
         <thead class="thead-dark">
             <tr>
-                <th style="color: #000000 !important;">Select</th>
-                <th style="color: #000000 !important;">Tag ID</th>
-                <th style="color: #000000 !important;">Common Name</th>
-                <th style="color: #000000 !important;">Bin Location</th>
-                <th style="color: #000000 !important;">Status</th>
-                <th style="color: #000000 !important;">Last Contract</th>
-                <th style="color: #000000 !important;">Last Scanned Date</th>
-                <th style="color: #000000 !important;">Quality</th>
-                <th style="color: #000000 !important;">Notes</th>
-                <th style="color: #000000 !important;">Actions</th>
+                <th>Select</th>
+                <th>Tag ID</th>
+                <th>Common Name</th>
+                <th>Bin Location</th>
+                <th>Status</th>
+                <th>Last Contract</th>
+                <th>Last Scanned Date</th>
+                <th>Quality</th>
+                <th>Notes</th>
+                <th>Actions</th>
             </tr>
         </thead>
-        <tbody style="min-height: 50px;">
+        <tbody>
             <tr>
                 <td>-</td>
-                <td style="color: #000000 !important;">Loading...</td>
-                <td style="color: #000000 !important;">-</td>
+                <td>Loading...</td>
                 <td>-</td>
                 <td>-</td>
-                <td style="color: #000000 !important;">-</td>
-                <td style="color: #000000 !important;">-</td>
-                <td style="color: #000000 !important;">-</td>
-                <td style="color: #000000 !important;">-</td>
+                <td>-</td>
+                <td>-</td>
+                <td>-</td>
+                <td>-</td>
+                <td>-</td>
                 <td>-</td>
             </tr>
         </tbody>
@@ -755,8 +758,8 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                     row.setAttribute('data-item-id', item.tag_id);
                     row.innerHTML = `
                         <td><input type="checkbox" value="${item.tag_id}" class="item-select"></td>
-                        <td style="color: #000000 !important;">${item.tag_id}</td>
-                        <td style="color: #000000 !important;">${item.common_name}</td>
+                        <td>${item.tag_id}</td>
+                        <td>${item.common_name}</td>
                         <td>
                             <select id="bin-location-${item.tag_id}">
                                 <option value="" ${!item.bin_location ? 'selected' : ''}>Select Bin Location</option>
@@ -773,10 +776,10 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                                 <option value="Sold">Sold</option>
                             </select>
                         </td>
-                        <td style="color: #000000 !important;">${item.last_contract_num || 'N/A'}</td>
-                        <td style="color: #000000 !important;">${lastScanned}</td>
-                        <td style="color: #000000 !important;">${item.quality || 'N/A'}</td>
-                        <td style="color: #000000 !important;">${item.notes || 'N/A'}</td>
+                        <td>${item.last_contract_num || 'N/A'}</td>
+                        <td>${lastScanned}</td>
+                        <td>${item.quality || 'N/A'}</td>
+                        <td>${item.notes || 'N/A'}</td>
                         <td>
                             <button class="btn btn-sm btn-primary save-btn" 
                                     onclick="updateItem('${item.tag_id}', '${key}', '${category}', '${subcategory}', '${item.common_name}', '${targetId}')">Save</button>
@@ -849,6 +852,7 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                 wrapper.appendChild(bulkDiv);
             } else {
                 tbody.innerHTML = `<tr><td colspan="10">No items found.</td></tr>`;
+                console.warn(`No items returned for category ${category}, subcategory ${subcategory}, commonName ${commonName}`);
             }
 
             const parentRow = container.closest('tr.common-name-row').previousElementSibling;
@@ -928,8 +932,6 @@ function updateResalePackToSold() {
             if (data.status === 'success') {
                 console.log('Update successful:', data.message);
                 alert(data.message);
-                // Since updates are asynchronous, we can't immediately refresh the table
-                // Notify the user to check back later or manually refresh
                 setTimeout(() => {
                     if (confirm('Updates are processing in the background. Would you like to refresh the page now to check the status?')) {
                         window.location.reload();
@@ -1050,9 +1052,9 @@ document.addEventListener('DOMContentLoaded', function() {
             event.stopPropagation();
             const printLevel = printBtn.getAttribute('data-print-level');
             const printId = printBtn.getAttribute('data-print-id');
+            const commonName = printBtn.getAttribute('data-common-name');
             const category = printBtn.getAttribute('data-category');
             const subcategory = printBtn.getAttribute('data-subcategory');
-            const commonName = printBtn.getAttribute('data-common-name');
             printTable(printLevel, printId, commonName, category, subcategory);
             return;
         }
