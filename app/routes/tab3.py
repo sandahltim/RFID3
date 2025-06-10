@@ -585,13 +585,16 @@ def sync_to_pc():
         synced_items = []
         existing_tag_ids = csv_tag_ids.copy()
 
-        # Query ItemMaster for items
-        logger.debug("Querying ItemMaster for existing items")
+        # Query ItemMaster for 'Sold' items only
+        # Fix: Only select items with status='Sold' to avoid 'Ready to Rent' or other in-use items
+        logger.debug("Querying ItemMaster for 'Sold' items")
         try:
             sold_items = session.query(ItemMaster)\
-                .filter(ItemMaster.common_name == common_name,
-                        ItemMaster.bin_location.in_(['pack', 'resale']),
-                        ItemMaster.status == 'Sold')\
+                .filter(
+                    ItemMaster.common_name == common_name,
+                    ItemMaster.bin_location.in_(['pack', 'resale']),
+                    ItemMaster.status == 'Sold'
+                )\
                 .order_by(ItemMaster.date_updated.asc())\
                 .all()
             logger.debug(f"Found {len(sold_items)} 'Sold' items in ItemMaster for common_name={common_name}")
@@ -600,7 +603,7 @@ def sync_to_pc():
                 if len(synced_items) >= quantity:
                     break
                 if item.tag_id in existing_tag_ids:
-                    logger.debug(f"Skipping tag_id {item.tag_id} as it’s already in use")
+                    logger.debug(f"Skipping tag_id {item.tag_id} as it’s already in CSV")
                     continue
                 synced_items.append({
                     'tag_id': item.tag_id,
@@ -614,51 +617,22 @@ def sync_to_pc():
                 })
                 existing_tag_ids.add(item.tag_id)
                 logger.info(f"Added to synced_items: tag_id={item.tag_id}, common_name={item.common_name}, status={item.status}")
-
-            if len(synced_items) < quantity:
-                remaining_quantity = quantity - len(synced_items)
-                other_items = session.query(ItemMaster)\
-                    .filter(ItemMaster.common_name == common_name,
-                            ItemMaster.bin_location.in_(['pack', 'resale']),
-                            ItemMaster.status != 'Sold')\
-                    .order_by(ItemMaster.status.asc())\
-                    .all()
-                logger.debug(f"Found {len(other_items)} non-'Sold' items in ItemMaster")
-
-                for item in other_items:
-                    if len(synced_items) >= quantity:
-                        break
-                    if item.tag_id in existing_tag_ids:
-                        logger.debug(f"Skipping tag_id {item.tag_id} as it’s already in use")
-                        continue
-                    synced_items.append({
-                        'tag_id': item.tag_id,
-                        'common_name': item.common_name,
-                        'subcategory': 'Unknown',
-                        'short_common_name': item.common_name,
-                        'status': item.status,
-                        'bin_location': item.bin_location,
-                        'rental_class_num': item.rental_class_num,
-                        'is_new': False
-                    })
-                    existing_tag_ids.add(item.tag_id)
-                    logger.info(f"Added to synced_items: tag_id={item.tag_id}, common_name={item.common_name}, status={item.status}")
-
-                remaining_quantity = quantity - len(synced_items)
-                logger.debug(f"After non-Sold items, remaining_quantity={remaining_quantity}")
         except sqlalchemy.exc.DatabaseError as e:
             logger.error(f"Database error querying ItemMaster: {str(e)}", exc_info=True)
             return jsonify({'error': f"Database error querying ItemMaster: {str(e)}"}), 500
 
         # Generate new items if needed
+        # Fix: Removed query for non-'Sold' items to prevent selecting in-use items
         new_items = []
         if len(synced_items) < quantity:
             remaining_quantity = quantity - len(synced_items)
             logger.info(f"Generating {remaining_quantity} new items for common_name={common_name}")
 
             seed_entry = session.query(SeedRentalClass)\
-                .filter(SeedRentalClass.common_name == common_name,
-                        SeedRentalClass.bin_location.in_(['pack', 'resale']))\
+                .filter(
+                    SeedRentalClass.common_name == common_name,
+                    SeedRentalClass.bin_location.in_(['pack', 'resale'])
+                )\
                 .first()
             if not seed_entry:
                 logger.warning(f"No SeedRentalClass entry found for common_name={common_name} and bin_location in ['pack', 'resale']")
@@ -695,7 +669,7 @@ def sync_to_pc():
                     'common_name': common_name,
                     'subcategory': 'Unknown',
                     'short_common_name': common_name,
-                    'status': 'Ready to Rent',
+                    'status': 'Ready to Rent',  # New items start as Ready to Rent
                     'bin_location': bin_location,
                     'rental_class_num': rental_class_num,
                     'is_new': True
@@ -713,6 +687,7 @@ def sync_to_pc():
                 )
                 session.add(new_item)
                 new_items.append(new_item)
+                logger.info(f"Generated new item: tag_id={tag_id}, common_name={common_name}")
 
         if len(synced_items) > quantity:
             synced_items = synced_items[:quantity]
