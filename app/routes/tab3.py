@@ -55,7 +55,7 @@ if not os.path.exists(SHARED_DIR):
     os.chown(SHARED_DIR, pwd.getpwnam('tim').pw_uid, grp.getgrnam('tim').gr_gid)
 
 # Log deployment version
-logger.info("Deployed tab3.py version: 2025-05-28-v67")
+logger.info("Deployed tab3.py version: 2025-06-10-v68")
 
 # Helper function to normalize common_name by removing suffixes like (G1), (G2)
 def normalize_common_name(name):
@@ -85,7 +85,7 @@ def tab3_view():
         """
         status_result = session.execute(text(status_query))
         statuses = [row[0] for row in status_result.fetchall()]
-        logger.info(f"All statuses in id_item_master: {statuses}")
+        logger.info(f"All items in status: {statuses}")
 
         # Debug: Count items by status
         count_query = """
@@ -623,6 +623,7 @@ def sync_to_pc():
 
         # Generate new items if needed
         # Fix: Removed query for non-'Sold' items to prevent selecting in-use items
+        # Fix: Added no_autoflush and retry logic to handle lock timeouts
         new_items = []
         if len(synced_items) < quantity:
             remaining_quantity = quantity - len(synced_items)
@@ -641,53 +642,64 @@ def sync_to_pc():
             rental_class_num = seed_entry.rental_class_id
             bin_location = seed_entry.bin_location
 
-            for i in range(remaining_quantity):
-                max_tag_id = session.query(func.max(ItemMaster.tag_id))\
-                    .filter(ItemMaster.tag_id.startswith('425445'))\
-                    .scalar()
-
-                new_num = 1
-                if max_tag_id and len(max_tag_id) == 24 and max_tag_id.startswith('425445'):
-                    try:
-                        incremental_part = int(max_tag_id[6:], 16)
-                        new_num = incremental_part + 1
-                    except ValueError:
-                        logger.warning(f"Invalid incremental part in max_tag_id: {max_tag_id}, starting from 1")
-
-                while True:
-                    incremental_hex = format(new_num, 'x').zfill(18)
-                    tag_id = f"425445{incremental_hex}"
-                    if tag_id not in existing_tag_ids:
-                        break
-                    new_num += 1
-
-                if len(tag_id) != 24:
-                    raise ValueError(f"Generated tag_id {tag_id} must be 24 characters long")
-
-                synced_items.append({
-                    'tag_id': tag_id,
-                    'common_name': common_name,
-                    'subcategory': 'Unknown',
-                    'short_common_name': common_name,
-                    'status': 'Ready to Rent',  # New items start as Ready to Rent
-                    'bin_location': bin_location,
-                    'rental_class_num': rental_class_num,
-                    'is_new': True
-                })
-                existing_tag_ids.add(tag_id)
-
-                new_item = ItemMaster(
-                    tag_id=tag_id,
-                    common_name=common_name,
-                    rental_class_num=rental_class_num,
-                    bin_location=bin_location,
-                    status='Ready to Rent',
-                    date_created=datetime.now(),
-                    date_updated=datetime.now()
-                )
+            @retry(
+                stop=stop_after_attempt(3),
+                wait=wait_exponential(multiplier=1, min=1, max=10),
+                retry=retry_if_exception_type(sqlalchemy.exc.DatabaseError),
+                before_sleep=lambda retry_state: logger.debug(f"Retrying INSERT due to lock timeout, attempt {retry_state.attempt_number}")
+            )
+            def insert_new_item(new_item):
                 session.add(new_item)
-                new_items.append(new_item)
-                logger.info(f"Generated new item: tag_id={tag_id}, common_name={common_name}")
+                session.flush()
+
+            with session.no_autoflush:  # Prevent premature flush during max query
+                for i in range(remaining_quantity):
+                    max_tag_id = session.query(func.max(ItemMaster.tag_id))\
+                        .filter(ItemMaster.tag_id.startswith('425445'))\
+                        .scalar()
+
+                    new_num = 1
+                    if max_tag_id and len(max_tag_id) == 24 and max_tag_id.startswith('425445'):
+                        try:
+                            incremental_part = int(max_tag_id[6:], 16)
+                            new_num = incremental_part + 1
+                        except ValueError:
+                            logger.warning(f"Invalid incremental part in max_tag_id: {max_tag_id}, starting from 1")
+
+                    while True:
+                        incremental_hex = format(new_num, 'x').zfill(18)
+                        tag_id = f"425445{incremental_hex}"
+                        if tag_id not in existing_tag_ids:
+                            break
+                        new_num += 1
+
+                    if len(tag_id) != 24:
+                        raise ValueError(f"Generated tag_id {tag_id} must be 24 characters long")
+
+                    synced_items.append({
+                        'tag_id': tag_id,
+                        'common_name': common_name,
+                        'subcategory': 'Unknown',
+                        'short_common_name': common_name,
+                        'status': 'Ready to Rent',  # New items start as Ready to Rent
+                        'bin_location': bin_location,
+                        'rental_class_num': rental_class_num,
+                        'is_new': True
+                    })
+                    existing_tag_ids.add(tag_id)
+
+                    new_item = ItemMaster(
+                        tag_id=tag_id,
+                        common_name=common_name,
+                        rental_class_num=rental_class_num,
+                        bin_location=bin_location,
+                        status='Ready to Rent',
+                        date_created=datetime.now(),
+                        date_updated=datetime.now()
+                    )
+                    insert_new_item(new_item)  # Retry on lock timeout
+                    new_items.append(new_item)
+                    logger.info(f"Generated new item: tag_id={tag_id}, common_name={common_name}")
 
         if len(synced_items) > quantity:
             synced_items = synced_items[:quantity]
@@ -731,7 +743,6 @@ def sync_to_pc():
                 })
 
         if new_items:
-            session.flush()
             session.commit()
 
         logger.info(f"Successfully synced {len(synced_items)} items to CSV")
