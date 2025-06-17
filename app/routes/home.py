@@ -1,7 +1,8 @@
+# home.py version: 2025-06-17-v2
 from flask import Blueprint, render_template, current_app
 from .. import db
-from ..models.db_models import ItemMaster, Transaction
-from sqlalchemy import func, text
+from ..models.db_models import ItemMaster, Transaction, RefreshState
+from sqlalchemy import func
 from time import time
 import logging
 import sys
@@ -27,9 +28,6 @@ console_handler.setFormatter(formatter)
 logger.addHandler(console_handler)
 
 home_bp = Blueprint('home', __name__)
-
-# Version marker
-logger.info("Deployed home.py version: 2025-04-25-v1")
 
 @home_bp.route('/', endpoint='home')
 def home():
@@ -110,6 +108,12 @@ def home():
         logger.info(f"Recent scans sample: {[(item.tag_id, item.common_name, item.date_last_scanned) for item in recent_scans[:5]]}")
         current_app.logger.info(f"Recent scans sample: {[(item.tag_id, item.common_name, item.date_last_scanned) for item in recent_scans[:5]]}")
 
+        # Fetch last refresh state
+        refresh_state = session.query(RefreshState).first()
+        last_refresh = refresh_state.last_refresh if refresh_state else 'N/A'
+        refresh_type = refresh_state.state_type if refresh_state else 'N/A'
+        logger.info(f"Last refresh: {last_refresh}, Type: {refresh_type}")
+
         session.close()
         return render_template('home.html', 
                               total_items=total_items or 0,
@@ -118,11 +122,14 @@ def home():
                               items_available=items_available or 0,
                               status_counts=status_counts,
                               recent_scans=recent_scans,
+                              last_refresh=last_refresh,
+                              refresh_type=refresh_type,
                               cache_bust=int(time()))
     except Exception as e:
         logger.error(f"Error rendering home page: {str(e)}", exc_info=True)
         current_app.logger.error(f"Error rendering home page: {str(e)}", exc_info=True)
-        session.close()
+        if 'session' in locals():
+            session.close()
         return render_template('home.html', 
                               total_items=0,
                               items_on_rent=0,
@@ -130,4 +137,6 @@ def home():
                               items_available=0,
                               status_counts=[],
                               recent_scans=[],
+                              last_refresh='N/A',
+                              refresh_type='N/A',
                               cache_bust=int(time()))

@@ -1,3 +1,4 @@
+-- migrate_db.sql version: 2025-06-17-v2
 -- Drop existing tables if they exist
 DROP TABLE IF EXISTS id_transactions;
 DROP TABLE IF EXISTS id_item_master;
@@ -99,7 +100,8 @@ CREATE TABLE seed_rental_classes (
 -- Create refresh_state table
 CREATE TABLE refresh_state (
     id INT PRIMARY KEY AUTO_INCREMENT,
-    last_refresh VARCHAR(255) NOT NULL
+    last_refresh VARCHAR(255) NOT NULL,
+    state_type VARCHAR(50) NOT NULL DEFAULT 'full_refresh'
 );
 
 -- Create rental_class_mappings table

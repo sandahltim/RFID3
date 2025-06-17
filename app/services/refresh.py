@@ -1,23 +1,77 @@
+# refresh.py version: 2025-06-17-v2
 import logging
 from datetime import datetime, timedelta
 from sqlalchemy.exc import SQLAlchemyError, OperationalError
-from app.models.db_models import ItemMaster, Transaction, SeedRentalClass, db
+from app.models.db_models import ItemMaster, Transaction, SeedRentalClass, RefreshState, db
 from app.services.api_client import APIClient
 from flask import Blueprint, jsonify, current_app
+from config import INCREMENTAL_LOOKBACK_SECONDS
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('refresh')
+logger.setLevel(logging.INFO)
+
+# Remove existing handlers to avoid duplicates
+logger.handlers = []
+
+# File handler for rfid_dashboard.log
+file_handler = logging.FileHandler('/home/tim/test_rfidpi/logs/rfid_dashboard.log')
+file_handler.setLevel(logging.INFO)
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+file_handler.setFormatter(formatter)
+logger.addHandler(file_handler)
+
+# Console handler
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.INFO)
+console_handler.setFormatter(formatter)
+logger.addHandler(console_handler)
 
 refresh_bp = Blueprint('refresh', __name__)
 
 api_client = APIClient()
 
+def validate_date(date_str, field_name, tag_id):
+    """Validate date string and return datetime object or None."""
+    if not date_str or date_str == '0000-00-00 00:00:00':
+        logger.warning(f"Invalid {field_name} for tag_id {tag_id}: {date_str}. Setting to None.")
+        return None
+    try:
+        return datetime.strptime(date_str, '%Y-%m-%d %H:%M:%S')
+    except ValueError:
+        try:
+            return datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+        except ValueError as e:
+            logger.warning(f"Invalid {field_name} for tag_id {tag_id}: {date_str}. Error: {str(e)}. Setting to None.")
+            return None
+
+def update_refresh_state(state_type, timestamp):
+    """Update the refresh_state table with the latest refresh timestamp."""
+    session = db.session()
+    try:
+        refresh_state = session.query(RefreshState).first()
+        if not refresh_state:
+            refresh_state = RefreshState(last_refresh=timestamp.strftime('%Y-%m-%d %H:%M:%S'), state_type=state_type)
+            session.add(refresh_state)
+        else:
+            refresh_state.last_refresh = timestamp.strftime('%Y-%m-%d %H:%M:%S')
+            refresh_state.state_type = state_type
+        session.commit()
+        logger.info(f"Updated refresh state: {state_type} at {timestamp}")
+    except Exception as e:
+        logger.error(f"Error updating refresh state: {str(e)}", exc_info=True)
+        session.rollback()
+    finally:
+        session.close()
+
 def update_item_master(session, items):
     logger.info(f"Updating {len(items)} items in id_item_master")
+    skipped = 0
     for item in items:
         try:
             tag_id = item.get('tag_id')
             if not tag_id:
                 logger.warning(f"Skipping item with missing tag_id: {item}")
+                skipped += 1
                 continue
 
             db_item = session.query(ItemMaster).filter_by(tag_id=tag_id).first()
@@ -31,10 +85,8 @@ def update_item_master(session, items):
             db_item.quality = item.get('quality')
             db_item.bin_location = item.get('bin_location')
             raw_status = item.get('status')
-            logger.debug(f"Raw status for tag_id {tag_id}: {raw_status}")
             status = raw_status if raw_status else 'Unknown'
             db_item.status = status
-            logger.debug(f"Set status for tag_id {tag_id} to {status}")
             db_item.last_contract_num = item.get('last_contract_num')
             db_item.last_scanned_by = item.get('last_scanned_by')
             db_item.notes = item.get('notes')
@@ -43,46 +95,39 @@ def update_item_master(session, items):
             latitude = item.get('lat')
             db_item.longitude = float(longitude) if longitude and longitude.strip() else None
             db_item.latitude = float(latitude) if latitude and latitude.strip() else None
-            date_last_scanned = item.get('date_last_scanned')
-            if date_last_scanned and date_last_scanned != '0000-00-00 00:00:00':
-                try:
-                    db_item.date_last_scanned = datetime.strptime(date_last_scanned, '%Y-%m-%d %H:%M:%S')
-                except ValueError as e:
-                    logger.warning(f"Invalid date_last_scanned for tag_id {tag_id}: {date_last_scanned}. Setting to None. Error: {str(e)}")
-                    db_item.date_last_scanned = None
-            else:
-                db_item.date_last_scanned = None
+            db_item.date_last_scanned = validate_date(item.get('date_last_scanned'), 'date_last_scanned', tag_id)
+            db_item.date_created = validate_date(item.get('date_created'), 'date_created', tag_id)
+            db_item.date_updated = validate_date(item.get('date_updated'), 'date_updated', tag_id)
 
             session.merge(db_item)
         except Exception as e:
-            logger.error(f"Error updating item {tag_id}: {str(e)}")
+            logger.error(f"Error updating item {tag_id}: {str(e)}", exc_info=True)
             session.rollback()
             raise
+    logger.info(f"Skipped {skipped} items due to missing or invalid data")
 
 def update_transactions(session, transactions):
     logger.info(f"Updating {len(transactions)} transactions in id_transactions")
+    skipped = 0
     for transaction in transactions:
         try:
             tag_id = transaction.get('tag_id')
             scan_date = transaction.get('scan_date')
             if not tag_id or not scan_date:
                 logger.warning(f"Skipping transaction with missing tag_id or scan_date: {transaction}")
+                skipped += 1
                 continue
 
-            if scan_date == '0000-00-00 00:00:00':
-                logger.warning(f"Invalid scan_date for tag_id {tag_id}: {scan_date}. Skipping transaction.")
-                continue
-            try:
-                scan_date = datetime.strptime(scan_date, '%Y-%m-%d %H:%M:%S')
-            except ValueError as e:
-                logger.warning(f"Invalid scan_date for tag_id {tag_id}: {scan_date}. Skipping transaction. Error: {str(e)}")
+            scan_date_dt = validate_date(scan_date, 'scan_date', tag_id)
+            if not scan_date_dt:
+                skipped += 1
                 continue
 
             db_transaction = session.query(Transaction).filter_by(
-                tag_id=tag_id, scan_date=scan_date
+                tag_id=tag_id, scan_date=scan_date_dt
             ).first()
             if not db_transaction:
-                db_transaction = Transaction(tag_id=tag_id, scan_date=scan_date)
+                db_transaction = Transaction(tag_id=tag_id, scan_date=scan_date_dt)
 
             db_transaction.scan_type = transaction.get('scan_type')
             db_transaction.contract_number = transaction.get('contract_number')
@@ -118,24 +163,27 @@ def update_transactions(session, transactions):
             db_transaction.longitude = float(longitude) if longitude and longitude.strip() else None
             db_transaction.latitude = float(latitude) if latitude and latitude.strip() else None
             db_transaction.wet = to_bool(transaction.get('wet'))
-            db_transaction.service_required = to_bool(transaction.get('service_response'))
-            db_transaction.date_created = transaction.get('date_created')
-            db_transaction.date_updated = transaction.get('date_updated')
+            db_transaction.service_required = to_bool(transaction.get('service_required'))
+            db_transaction.date_created = validate_date(transaction.get('date_created'), 'date_created', tag_id)
+            db_transaction.date_updated = validate_date(transaction.get('date_updated'), 'date_updated', tag_id)
 
             session.merge(db_transaction)
         except Exception as e:
-            logger.error(f"Error updating transaction {tag_id} at {scan_date}: {str(e)}")
+            logger.error(f"Error updating transaction {tag_id} at {scan_date}: {str(e)}", exc_info=True)
             logger.debug(f"Raw transaction data: {transaction}")
             session.rollback()
             raise
+    logger.info(f"Skipped {skipped} transactions due to missing or invalid data")
 
 def update_seed_data(session, seed_data):
     logger.info(f"Updating {len(seed_data)} items in seed_rental_classes")
+    skipped = 0
     for item in seed_data:
         try:
             rental_class_id = item.get('rental_class_id')
             if not rental_class_id:
                 logger.warning(f"Skipping seed item with missing rental_class_id: {item}")
+                skipped += 1
                 continue
 
             db_seed = session.query(SeedRentalClass).filter_by(rental_class_id=rental_class_id).first()
@@ -147,13 +195,14 @@ def update_seed_data(session, seed_data):
 
             session.merge(db_seed)
         except Exception as e:
-            logger.error(f"Error updating seed item {rental_class_id}: {str(e)}")
+            logger.error(f"Error updating seed item {rental_class_id}: {str(e)}", exc_info=True)
             session.rollback()
             raise
+    logger.info(f"Skipped {skipped} seed items due to missing or invalid data")
 
 def full_refresh():
     logger.info("Starting full refresh")
-    session = db.session
+    session = db.session()
     max_retries = 3
     for attempt in range(max_retries):
         try:
@@ -186,6 +235,9 @@ def full_refresh():
                 update_item_master(session, items)
                 update_transactions(session, transactions)
                 update_seed_data(session, seed_data)
+
+            update_refresh_state('full_refresh', datetime.utcnow())
+            logger.info("Full refresh completed successfully")
             break
         except OperationalError as e:
             if "Deadlock" in str(e):
@@ -195,10 +247,10 @@ def full_refresh():
                     time.sleep(1)
                     continue
                 else:
-                    logger.error(f"Max retries reached for deadlock: {str(e)}")
+                    logger.error(f"Max retries reached for deadlock: {str(e)}", exc_info=True)
                     raise
             else:
-                logger.error(f"Database error: {str(e)}")
+                logger.error(f"Database error: {str(e)}", exc_info=True)
                 raise
         except Exception as e:
             logger.error(f"Full refresh failed: {str(e)}", exc_info=True)
@@ -207,13 +259,12 @@ def full_refresh():
         finally:
             if session.is_active:
                 session.rollback()
-    logger.info("Full refresh completed successfully")
 
 def incremental_refresh():
     logger.info("Starting incremental refresh")
-    session = db.session
+    session = db.session()
     try:
-        since_date = datetime.utcnow() - timedelta(seconds=current_app.config['INCREMENTAL_LOOKBACK_SECONDS'])
+        since_date = datetime.utcnow() - timedelta(seconds=INCREMENTAL_LOOKBACK_SECONDS)
         logger.info(f"Checking for updates since: {since_date.strftime('%Y-%m-%d %H:%M:%S')}")
 
         logger.info(f"Fetching item master data with since_date: {since_date}")
@@ -235,6 +286,7 @@ def incremental_refresh():
         logger.info("Skipping seed data refresh (handled in full refresh)")
 
         session.commit()
+        update_refresh_state('incremental_refresh', datetime.utcnow())
         logger.info("Incremental refresh completed successfully")
     except Exception as e:
         logger.error(f"Incremental refresh failed: {str(e)}", exc_info=True)
@@ -247,7 +299,7 @@ def incremental_refresh():
 @refresh_bp.route('/refresh/full', methods=['POST'])
 def full_refresh_endpoint():
     logger.info("Received request for full refresh via endpoint")
-    session = db.session
+    session = db.session()
     try:
         logger.debug("Starting full refresh process")
         full_refresh()
@@ -270,7 +322,7 @@ def full_refresh_endpoint():
 @refresh_bp.route('/refresh/incremental', methods=['POST'])
 def incremental_refresh_endpoint():
     logger.info("Received request for incremental refresh via endpoint")
-    session = db.session
+    session = db.session()
     try:
         logger.debug("Starting incremental refresh process")
         incremental_refresh()
@@ -293,7 +345,7 @@ def incremental_refresh_endpoint():
 @refresh_bp.route('/clear_api_data', methods=['POST'])
 def clear_api_data():
     logger.info("Received request for clear API data and refresh")
-    session = db.session
+    session = db.session()
     try:
         logger.debug("Starting clear API data and refresh process")
         full_refresh()

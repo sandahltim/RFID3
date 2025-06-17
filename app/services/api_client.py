@@ -1,19 +1,37 @@
+# api_client.py version: 2025-06-17-v2
 import requests
 import time
 from datetime import datetime, timedelta
-from config import API_USERNAME, API_PASSWORD, LOGIN_URL, ITEM_MASTER_URL, TRANSACTION_URL, SEED_URL, INCREMENTAL_FALLBACK_SECONDS
+from config import API_USERNAME, API_PASSWORD, LOGIN_URL, INCREMENTAL_FALLBACK_SECONDS
 import logging
 from urllib.parse import quote
 
 # Configure logging for API client
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('api_client')
+logger.setLevel(logging.INFO)
+
+# Remove existing handlers to avoid duplicates
+logger.handlers = []
+
+# File handler for rfid_dashboard.log
+file_handler = logging.FileHandler('/home/tim/test_rfidpi/logs/rfid_dashboard.log')
+file_handler.setLevel(logging.INFO)
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+file_handler.setFormatter(formatter)
+logger.addHandler(file_handler)
+
+# Console handler
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.INFO)
+console_handler.setFormatter(formatter)
+logger.addHandler(console_handler)
 
 class APIClient:
     def __init__(self):
         """Initialize API client with base URL and authentication."""
         self.base_url = "https://cs.iot.ptshome.com/api/v1/data/"
         self.auth_url = LOGIN_URL
-        self.item_master_endpoint = "14223767938169344381"  # Endpoint for Item Master operations
+        self.item_master_endpoint = "14223767938169344381"
         self.token = None
         self.token_expiry = None
         self.authenticate()
@@ -111,14 +129,27 @@ class APIClient:
         else:
             raise ValueError(f"Unsupported method: {method}")
 
+    def validate_date(self, date_str, field_name):
+        """Validate date string and return datetime object or None."""
+        if not date_str or date_str == '0000-00-00 00:00:00':
+            logger.warning(f"Invalid {field_name}: {date_str}. Returning None.")
+            return None
+        try:
+            return datetime.strptime(date_str, '%Y-%m-%d %H:%M:%S')
+        except ValueError:
+            try:
+                return datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+            except ValueError as e:
+                logger.warning(f"Invalid {field_name}: {date_str}. Error: {str(e)}. Returning None.")
+                return None
+
     def get_item_master(self, since_date=None):
         """Fetch Item Master records, optionally filtered by since_date."""
         params = {}
         if since_date:
-            since_date_str = datetime.fromisoformat(since_date).strftime('%Y-%m-%d %H:%M:%S') if isinstance(since_date, str) else since_date.strftime('%Y-%m-%d %H:%M:%S')
+            since_date_str = since_date.strftime('%Y-%m-%d %H:%M:%S') if isinstance(since_date, datetime) else since_date
             logger.debug(f"Item master filter since_date: {since_date_str}")
             filter_str = f"date_last_scanned,gt,'{since_date_str}'"
-            logger.debug(f"Constructed filter string: {filter_str}")
             params['filter[gt]'] = filter_str
         
         try:
@@ -128,24 +159,23 @@ class APIClient:
             params.pop('filter[gt]', None)
             data = self._make_request("14223767938169344381")
             if since_date:
-                since_dt = datetime.strptime(since_date_str, '%Y-%m-%d %H:%M:%S')
+                since_dt = self.validate_date(since_date_str, 'since_date')
                 fallback_dt = datetime.utcnow() - timedelta(seconds=INCREMENTAL_FALLBACK_SECONDS)
                 data = [
                     item for item in data
                     if item.get('date_last_scanned') and 
-                    datetime.strptime(item['date_last_scanned'], '%Y-%m-%d %H:%M:%S') > max(since_dt, fallback_dt)
+                    self.validate_date(item['date_last_scanned'], 'date_last_scanned') > max(since_dt, fallback_dt)
                 ]
         logger.debug(f"Item master data sample: {data[:5] if data else 'No data'}")
         return data
 
     def get_transactions(self, since_date=None):
-        """Fetch transaction records, optionally filtered by since_date."""
+        """Fetch transaction records, optionally filtered by scan_date."""
         params = {}
         if since_date:
-            since_date_str = datetime.fromisoformat(since_date).strftime('%Y-%m-%d %H:%M:%S') if isinstance(since_date, str) else since_date.strftime('%Y-%m-%d %H:%M:%S')
+            since_date_str = since_date.strftime('%Y-%m-%d %H:%M:%S') if isinstance(since_date, datetime) else since_date
             logger.debug(f"Transactions filter since_date: {since_date_str}")
-            filter_str = f"date_updated,gt,'{since_date_str}'"
-            logger.debug(f"Constructed filter string: {filter_str}")
+            filter_str = f"scan_date,gt,'{since_date_str}'"
             params['filter[gt]'] = filter_str
             try:
                 data = self._make_request("14223767938169346196", params)
@@ -154,12 +184,12 @@ class APIClient:
                 params.pop('filter[gt]', None)
                 data = self._make_request("14223767938169346196")
                 if since_date:
-                    since_dt = datetime.strptime(since_date_str, '%Y-%m-%d %H:%M:%S')
+                    since_dt = self.validate_date(since_date_str, 'since_date')
                     fallback_dt = datetime.utcnow() - timedelta(seconds=INCREMENTAL_FALLBACK_SECONDS)
                     data = [
                         item for item in data
-                        if item.get('date_updated') and 
-                        datetime.strptime(item['date_updated'], '%Y-%m-%d %H:%M:%S') > max(since_dt, fallback_dt)
+                        if item.get('scan_date') and 
+                        self.validate_date(item['scan_date'], 'scan_date') > max(since_dt, fallback_dt)
                     ]
         else:
             data = self._make_request("14223767938169346196")

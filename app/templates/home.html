@@ -1,61 +1,55 @@
-<!-- home.html -->
 {% extends 'base.html' %}
 {% block title %}Home{% endblock %}
 {% block extra_head %}
 <style>
-    .loading { color: #888; font-style: italic; }
-    .table-bordered th, .table-bordered td { border: 1px solid #dee2e6; }
-    .scannable-items-section { 
-        margin-top: 10px; 
-        padding-left: 240px; 
+    .refresh-btn {
+        margin: 5px;
     }
-    .scannable-items-section h3 { 
-        font-weight: bold; 
-        margin-bottom: 10px; 
-    }
-    .scannable-items-section ul { 
-        list-style-type: none; 
-        padding-left: 0; 
-    }
-    .scannable-items-section li { 
-        margin-bottom: 5px; 
+    .refresh-status {
+        font-style: italic;
+        color: #666;
+        margin-top: 10px;
     }
 </style>
 {% endblock %}
 {% block scripts %}
     {{ super() }}
-    <script src="{{ url_for('static', filename='js/home.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/home.js') }}?v={{ cache_bust }}"></script>
 {% endblock %}
 {% block content %}
-<h1>RFID Dashboard</h1>
+<h2>RFID Dashboard</h2>
+
 {% if error %}
     <div class="alert alert-danger">{{ error }}</div>
 {% else %}
     <div class="row">
-        <div class="col-md-12 scannable-items-section">
-            <h3><strong>Scannable Items</strong></h3>
+        <div class="col-md-6">
+            <h4>Scannable Items</h4>
             <ul>
-                <li><strong>All Linens (except Skirts, Spandex, Runners, and Sashes are hand entered)</strong></li>
-                <li><strong>All Concession Machines and Resale - No Sterno or Donuts</strong></li>
-                <li><strong>All AV and Sound</strong></li>
-                <li><strong>All Tent Tops - No Sidewall</strong></li>
-                <li><strong>Garden Chairs and Cocktail Table Tops</strong></li>
-                <li><strong>Fountains and Bev Dispensers</strong></li>
-                <li><strong>Dishes/Silverware Packs</strong></li>
-                <li><strong>Carpet Runners</strong></li>
+                <li>All Linens (except Skirts, Spandex, Runners, and Sashes are hand entered)</li>
+                <li>All Concession Machines and Resale - No Sterno or Donuts</li>
+                <li>All AV and Sound</li>
+                <li>All Tent Tops - No Sidewall</li>
+                <li>Garden Chairs and Cocktail Table Tops</li>
+                <li>Fountains and Bev Dispensers</li>
+                <li>Dishes/Silverware Packs</li>
+                <li>Carpet Runners</li>
             </ul>
         </div>
-    </div>
-    <div class="row mb-3">
-        <div class="col-md-12">
-            <button id="full-refresh-btn" class="btn btn-primary" onclick="triggerFullRefresh()">Full Refresh</button>
-            <button id="incremental-refresh-btn" class="btn btn-warning ml-2" onclick="triggerIncrementalRefresh()">Incremental Refresh</button>
+        <div class="col-md-6">
+            <h4>Refresh Data</h4>
+            <button id="full-refresh-btn" class="btn btn-primary refresh-btn">Full Refresh</button>
+            <button id="incremental-refresh-btn" class="btn btn-secondary refresh-btn">Incremental Refresh</button>
+            <div class="refresh-status">
+                Last Refresh: {{ last_refresh }} ({{ refresh_type }})
+            </div>
         </div>
     </div>
-    <div class="row">
+
+    <div class="row mt-4">
         <div class="col-md-6">
-            <h3>Total Items: {{ total_items }}</h3>
-            <h4>Status Breakdown</h4>
+            <h4>Total Items: {{ total_items }}</h4>
+            <h5>Status Breakdown</h5>
             <table class="table table-bordered">
                 <thead>
                     <tr>
@@ -75,7 +69,7 @@
         </div>
         <div class="col-md-6">
             <h4>Recent Scans</h4>
-            <table class="table table-bordered" id="recent-scans-table">
+            <table id="recent-scans-table" class="table table-bordered">
                 <thead>
                     <tr>
                         <th>Tag ID</th>
@@ -88,15 +82,17 @@
                     <tr>
                         <td>{{ item.tag_id }}</td>
                         <td>{{ item.common_name }}</td>
-                        <td>{{ item.date_last_scanned }}</td>
+                        <td>{{ item.date_last_scanned or 'N/A' }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
     </div>
-    <div class="row">
+
+    <div class="row mt-4">
         <div class="col-md-12">
+            <h4>Navigation</h4>
             <table class="table table-bordered">
                 <thead>
                     <tr>
@@ -105,30 +101,12 @@
                     </tr>
                 </thead>
                 <tbody>
-                    <tr>
-                        <td>Rental Inventory</td>
-                        <td><a href="/tab/1" class="btn btn-primary">View</a></td>
-                    </tr>
-                    <tr>
-                        <td>Open Contracts</td>
-                        <td><a href="/tab/2" class="btn btn-primary">View</a></td>
-                    </tr>
-                    <tr>
-                        <td>Service</td>
-                        <td><a href="/tab/3" class="btn btn-primary">View</a></td>
-                    </tr>
-                    <tr>
-                        <td>Laundry Contracts</td>
-                        <td><a href="/tab/4" class="btn btn-primary">View</a></td>
-                    </tr>
-                    <tr>
-                        <td>Resale</td>
-                        <td><a href="/tab/5" class="btn btn-primary">View</a></td>
-                    </tr>
-                    <tr>
-                        <td>Manage Categories</td>
-                        <td><a href="{{ url_for('categories.manage_categories') }}" class="btn btn-primary">View</a></td>
-                    </tr>
+                    <tr><td>Rental Inventory</td><td><a href="/tab/1" class="btn btn-secondary">View</a></td></tr>
+                    <tr><td>Open Contracts</td><td><a href="/tab/2" class="btn btn-secondary">View</a></td></tr>
+                    <tr><td>Service</td><td><a href="/tab/3" class="btn btn-secondary">View</a></td></tr>
+                    <tr><td>Laundry Contracts</td><td><a href="/tab/4" class="btn btn-secondary">View</a></td></tr>
+                    <tr><td>Resale</td><td><a href="/tab/5" class="btn btn-secondary">View</a></td></tr>
+                    <tr><td>Manage Categories</td><td><a href="/categories" class="btn btn-secondary">View</a></td></tr>
                 </tbody>
             </table>
         </div>
