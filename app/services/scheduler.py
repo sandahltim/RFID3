@@ -1,12 +1,31 @@
+# scheduler.py version: 2025-06-17-v2
 from apscheduler.schedulers.background import BackgroundScheduler
 from app.services.refresh import incremental_refresh, full_refresh
 from redis import Redis
 from config import REDIS_URL
 import time
 import logging
+import sys
 
 # Configure logging
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('scheduler')
+logger.setLevel(logging.INFO)
+
+# Remove existing handlers to avoid duplicates
+logger.handlers = []
+
+# File handler for rfid_dashboard.log
+file_handler = logging.FileHandler('/home/tim/test_rfidpi/logs/rfid_dashboard.log')
+file_handler.setLevel(logging.INFO)
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+file_handler.setFormatter(formatter)
+logger.addHandler(file_handler)
+
+# Console handler
+console_handler = logging.StreamHandler(sys.stdout)
+console_handler.setLevel(logging.INFO)
+console_handler.setFormatter(formatter)
+logger.addHandler(console_handler)
 
 scheduler = BackgroundScheduler()
 
@@ -22,14 +41,16 @@ def init_scheduler(app):
                 redis_client.expire(lock_key, lock_timeout)
                 logger.info("Triggering full refresh on startup")
                 full_refresh()
-                logger.info("Full refresh on startup completed")
+                logger.info("Full refresh on startup completed successfully")
             except Exception as e:
                 logger.error(f"Full refresh on startup failed: {str(e)}", exc_info=True)
+                raise
             finally:
                 redis_client.delete(lock_key)
         else:
             max_wait = 30
             waited = 0
+            logger.info("Full refresh lock exists, waiting for release")
             while redis_client.exists(lock_key) and waited < max_wait:
                 time.sleep(1)
                 waited += 1
@@ -39,18 +60,21 @@ def init_scheduler(app):
                         redis_client.expire(lock_key, lock_timeout)
                         logger.info("Triggering full refresh on startup (after wait)")
                         full_refresh()
-                        logger.info("Full refresh on startup completed")
+                        logger.info("Full refresh on startup completed successfully")
                     except Exception as e:
                         logger.error(f"Full refresh on startup failed: {str(e)}", exc_info=True)
+                        raise
                     finally:
                         redis_client.delete(lock_key)
+            else:
+                logger.warning("Full refresh lock not released, skipping startup refresh")
 
     def run_with_context():
         with app.app_context():
             try:
                 logger.info("Starting scheduled incremental refresh")
                 incremental_refresh()
-                logger.info("Scheduled incremental refresh completed")
+                logger.info("Scheduled incremental refresh completed successfully")
             except Exception as e:
                 logger.error(f"Scheduled incremental refresh failed: {str(e)}", exc_info=True)
                 raise
@@ -64,8 +88,17 @@ def init_scheduler(app):
         coalesce=True,
         max_instances=1
     )
-    scheduler.start()
-    logger.info("Background scheduler started for incremental refresh")
+    try:
+        scheduler.start()
+        logger.info("Background scheduler started for incremental refresh")
+    except Exception as e:
+        logger.error(f"Failed to start scheduler: {str(e)}", exc_info=True)
+        raise
+
+    # Ensure scheduler shuts down with the app
+    import atexit
+    atexit.register(lambda: scheduler.shutdown())
+    logger.info("Registered scheduler shutdown hook")
 
 def get_scheduler():
     logger.debug("Returning scheduler instance")

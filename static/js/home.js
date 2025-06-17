@@ -1,5 +1,5 @@
-// app/static/js/home.js
-console.log('home.js version: 2025-05-29-v1 loaded');
+// app/static/js/home.js version: 2025-06-17-v2
+console.log('home.js version: 2025-06-17-v2 loaded');
 
 function triggerFullRefresh() {
     const button = document.getElementById('full-refresh-btn');
@@ -12,15 +12,16 @@ function triggerFullRefresh() {
     })
     .then(response => response.json())
     .then(data => {
-        if (data.status === 'Full refresh triggered successfully') {
+        if (data.status === 'success') {
             alert('Full refresh completed successfully');
+            window.location.reload();
         } else {
-            alert('Error: ' + data.error);
+            alert('Error: ' + data.message);
         }
     })
     .catch(error => {
         console.error('Error during full refresh:', error);
-        alert('Failed to perform full refresh');
+        alert('Failed to perform full refresh: ' + error.message);
     })
     .finally(() => {
         button.disabled = false;
@@ -39,15 +40,16 @@ function triggerIncrementalRefresh() {
     })
     .then(response => response.json())
     .then(data => {
-        if (data.status === 'Incremental refresh triggered successfully') {
+        if (data.status === 'success') {
             alert('Incremental refresh completed successfully');
+            window.location.reload();
         } else {
-            alert('Error: ' + data.error);
+            alert('Error: ' + data.message);
         }
     })
     .catch(error => {
         console.error('Error during incremental refresh:', error);
-        alert('Failed to perform incremental refresh');
+        alert('Failed to perform incremental refresh: ' + error.message);
     })
     .finally(() => {
         button.disabled = false;
@@ -56,8 +58,12 @@ function triggerIncrementalRefresh() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    document.querySelectorAll('#recent-scans-table td:nth-child(3)').forEach(cell => {
-        const rawDate = cell.textContent.trim();
-        cell.textContent = formatDate(rawDate);
-    });
+    if (typeof formatDate === 'function') {
+        document.querySelectorAll('#recent-scans-table td:nth-child(3)').forEach(cell => {
+            const rawDate = cell.textContent.trim();
+            cell.textContent = formatDate(rawDate);
+        });
+    } else {
+        console.warn('formatDate function not found, skipping date formatting');
+    }
 });
