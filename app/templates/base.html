@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}{% endblock %}</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap.min.css') }}?v={{ cache_bust }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/font-awesome.min.css') }}?v={{ cache_bust }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='lib/bootstrap/bootstrap.min.css') }}?v={{ cache_bust }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='lib/bootstrap//font-awesome.min.css') }}?v={{ cache_bust }}">
     {% if request.path == '/tab/5' %}
         <link rel="stylesheet" href="{{ url_for('static', filename='css/tab5.css') }}?v={{ cache_bust }}">
     {% elif request.path == '/tab/1' %}
@@ -84,9 +84,9 @@
         {% endif %}
         {% block content %}{% endblock %}
     </div>
-    <script src="{{ url_for('static', filename='js/jquery.min.js') }}?v={{ cache_bust }}"></script>
-    <script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}?v={{ cache_bust }}"></script>
-    <script src="{{ url_for('static', filename='js/htmx.min.js') }}?v={{ cache_bust }}"></script>
+    <script src="{{ url_for('static', filename='lib/bootstrap/jquery.min.js') }}?v={{ cache_bust }}"></script>
+    <script src="{{ url_for('static', filename='lib/bootstrap//bootstrap.bundle.min.js') }}?v={{ cache_bust }}"></script>
+    <script src="{{ url_for('static', filename='lib/htmx/htmx.min.js') }}?v={{ cache_bust }}"></script>
     <script src="{{ url_for('static', filename='js/common.js') }}?v={{ cache_bust }}"></script>
     {% block scripts %}
         {% if request.path == '/tab/1' %}
