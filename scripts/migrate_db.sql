@@ -1,5 +1,5 @@
--- migrate_db.sql version: 2025-06-17-v2
--- Drop existing tables if they exist
+-- migrate_db.sql version: 2025-06-19-v2
+-- Drop existing tables if they exist (only for initial setup or reset)
 DROP TABLE IF EXISTS id_transactions;
 DROP TABLE IF EXISTS id_item_master;
 DROP TABLE IF EXISTS id_rfidtag;

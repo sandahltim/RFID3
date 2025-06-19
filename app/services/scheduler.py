@@ -1,4 +1,4 @@
-# scheduler.py version: 2025-06-17-v2
+# scheduler.py version: 2025-06-19-v1
 from apscheduler.schedulers.background import BackgroundScheduler
 from app.services.refresh import incremental_refresh, full_refresh
 from redis import Redis

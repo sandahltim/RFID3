@@ -1,3 +1,4 @@
+# update_rental_class_mappings.py version: 2025-06-19-v1
 import sys
 import os
 
