@@ -1,4 +1,4 @@
-# config.py version: 2025-06-19-v3
+# config.py version: 2025-06-19-v4
 import os
 
 # Base directory
@@ -11,7 +11,7 @@ DB_CONFIG = {
     'password': 'rfid_user_password',  # Change this to a secure password
     'database': 'rfid_inventory',
     'charset': 'utf8mb4',
-    'collation': 'utf8mb4_unicode_ci'  # Changed from utf8mb4_general_ci to support older MariaDB
+    'collation': 'utf8mb4_unicode_ci'  # Changed to compatible collation for MariaDB 10.11
 }
 
 # Redis configuration
