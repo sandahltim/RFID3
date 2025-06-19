@@ -8,7 +8,7 @@
 <div class="container">
     <h1>Manage Categories</h1>
     <div class="mb-3">
-        <button class="btn btn-primary" onclick="confirmSaveMappings()">Save Mappings</button>
+        <button class="btn btn-primary" onclick="window.categories.confirmSaveMappings()">Save Mappings</button>
     </div>
     <table id="mappings-table" class="table table-bordered">
         <thead>
@@ -30,15 +30,15 @@
                 <td>{{ mapping.common_name | default('N/A') }}</td>
                 <td><input type="text" class="form-control short-common-name-input" value="{{ mapping.short_common_name | default('') }}"></td>
                 <td>
-                    <button class="btn btn-danger btn-sm remove-btn" onclick="removeMappingRow(this)">Remove</button>
+                    <button class="btn btn-danger btn-sm remove-btn" onclick="window.categories.removeMappingRow(this)">Remove</button>
                 </td>
             </tr>
             {% endfor %}
         </tbody>
     </table>
     <div class="mb-3">
-        <button class="btn btn-secondary" onclick="addMappingRow()">Add Mapping</button>
-        <button class="btn btn-primary" onclick="confirmSaveMappings()">Save Mappings</button>
+        <button class="btn btn-secondary" onclick="window.categories.addMappingRow()">Add Mapping</button>
+        <button class="btn btn-primary" onclick="window.categories.confirmSaveMappings()">Save Mappings</button>
     </div>
 </div>
 {% endblock %}
