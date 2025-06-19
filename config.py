@@ -1,4 +1,4 @@
-# config.py version: 2025-06-17-v2
+# config.py version: 2025-06-19-v3
 import os
 
 # Base directory
@@ -11,7 +11,7 @@ DB_CONFIG = {
     'password': 'rfid_user_password',  # Change this to a secure password
     'database': 'rfid_inventory',
     'charset': 'utf8mb4',
-    'collation': 'utf8mb4_general_ci'
+    'collation': 'utf8mb4_unicode_ci'  # Changed from utf8mb4_general_ci to support older MariaDB
 }
 
 # Redis configuration
@@ -36,4 +36,3 @@ BULK_UPDATE_BATCH_SIZE = 50  # Batch size for bulk updates in tab5.py
 
 # Logging
 LOG_FILE = os.path.join(BASE_DIR, 'logs', 'rfid_dashboard.log')
-# mariadbhash   *8226E019AE8D0D41243D07D91ABCD8E2F20358BC  root password    MySecureRootPass123
