@@ -1,11 +1,15 @@
--- migrate_db.sql version: 2025-06-19-v2
--- Drop existing tables if they exist (only for initial setup or reset)
+-- scripts/migrate_db.sql
+-- migrate_db.sql version: 2025-06-19-v3
+
+-- Drop existing tables if they exist
 DROP TABLE IF EXISTS id_transactions;
 DROP TABLE IF EXISTS id_item_master;
 DROP TABLE IF EXISTS id_rfidtag;
 DROP TABLE IF EXISTS seed_rental_classes;
 DROP TABLE IF EXISTS refresh_state;
 DROP TABLE IF EXISTS rental_class_mappings;
+DROP TABLE IF EXISTS id_hand_counted_items;
+DROP TABLE IF EXISTS user_rental_class_mappings;
 
 -- Create id_transactions table
 CREATE TABLE id_transactions (
@@ -100,13 +104,35 @@ CREATE TABLE seed_rental_classes (
 -- Create refresh_state table
 CREATE TABLE refresh_state (
     id INT PRIMARY KEY AUTO_INCREMENT,
-    last_refresh VARCHAR(255) NOT NULL,
-    state_type VARCHAR(50) NOT NULL DEFAULT 'full_refresh'
+    last_refresh DATETIME,  -- Changed to DATETIME
+    state_type VARCHAR(50)  -- Added state_type
 );
 
 -- Create rental_class_mappings table
 CREATE TABLE rental_class_mappings (
     rental_class_id VARCHAR(50) PRIMARY KEY,
     category VARCHAR(100) NOT NULL,
-    subcategory VARCHAR(100) NOT NULL
+    subcategory VARCHAR(100) NOT NULL,
+    short_common_name VARCHAR(50)
+);
+
+-- Create id_hand_counted_items table
+CREATE TABLE id_hand_counted_items (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    contract_number VARCHAR(50) NOT NULL,
+    item_name VARCHAR(255) NOT NULL,
+    quantity INT NOT NULL,
+    action VARCHAR(50) NOT NULL,
+    timestamp DATETIME NOT NULL,
+    user VARCHAR(50) NOT NULL
+);
+
+-- Create user_rental_class_mappings table
+CREATE TABLE user_rental_class_mappings (
+    rental_class_id VARCHAR(50) PRIMARY KEY,
+    category VARCHAR(100) NOT NULL,
+    subcategory VARCHAR(100) NOT NULL,
+    short_common_name VARCHAR(50),
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NOT NULL
 );

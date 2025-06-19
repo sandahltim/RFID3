@@ -1,5 +1,6 @@
-// app/static/js/home.js version: 2025-06-19-v2
-console.log('home.js version: 2025-06-19-v2 loaded');
+// app/static/js/home.js
+// home.js version: 2025-06-19-v3
+console.log('home.js version: 2025-06-19-v3 loaded');
 
 function triggerFullRefresh() {
     const button = document.getElementById('full-refresh-btn');
@@ -62,15 +63,24 @@ async function fetchRefreshStatus() {
         const response = await fetch('/refresh/status');
         const data = await response.json();
         if (data.status === 'success') {
+            const lastRefresh = data.last_refresh || 'N/A';
+            const refreshType = data.refresh_type || 'N/A';
+            const formattedDate = lastRefresh !== 'N/A' ? formatDate(lastRefresh) : 'N/A';
             document.getElementById('refresh-status').innerText = 
-                `Last Refresh: ${data.last_refresh} (${data.refresh_type})`;
+                `Last Refresh: ${formattedDate} (${refreshType})`;
         } else {
             console.error('Error fetching refresh status:', data.message);
+            document.getElementById('refresh-status').innerText = 'Last Refresh: Error fetching status';
         }
     } catch (error) {
         console.error('Error fetching refresh status:', error);
         document.getElementById('refresh-status').innerText = 'Last Refresh: Error fetching status';
     }
+}
+
+function startStatusPolling() {
+    fetchRefreshStatus();
+    setInterval(fetchRefreshStatus, 30000); // Poll every 30 seconds
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -82,5 +92,5 @@ document.addEventListener('DOMContentLoaded', () => {
     } else {
         console.warn('formatDate function not found, skipping date formatting');
     }
-    fetchRefreshStatus();
+    startStatusPolling();
 });
