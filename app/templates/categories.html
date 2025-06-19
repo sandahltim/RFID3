@@ -1,30 +1,44 @@
-<!-- categories.html -->
 {% extends "base.html" %}
 {% block title %}Manage Categories{% endblock %}
 {% block scripts %}
     {{ super() }}
-    <script src="{{ url_for('static', filename='js/categories.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/categories.js') }}?v={{ cache_bust }}"></script>
 {% endblock %}
 {% block content %}
+<div class="container">
     <h1>Manage Categories</h1>
-    <div style="position: sticky; top: 0; background-color: white; padding: 10px 0; z-index: 1000; border-bottom: 1px solid #dee2e6;">
-        <button class="btn btn-success" onclick="confirmSaveMappings()">Save Mappings</button>
+    <div class="mb-3">
+        <button class="btn btn-primary" onclick="confirmSaveMappings()">Save Mappings</button>
     </div>
-    <div id="category-mappings">
-        <table class="table table-bordered">
-            <thead>
-                <tr>
-                    <th>Category</th>
-                    <th>Subcategory</th>
-                    <th>Rental Class ID</th>
-                    <th>Common Name</th>
-                    <th>Short Common Name</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody id="mappings-table"></tbody>
-        </table>
-        <button class="btn btn-primary" onclick="addMappingRow()">Add Mapping</button>
-        <button class="btn btn-success" onclick="confirmSaveMappings()">Save Mappings</button>
+    <table id="mappings-table" class="table table-bordered">
+        <thead>
+            <tr>
+                <th>Category</th>
+                <th>Subcategory</th>
+                <th>Rental Class ID</th>
+                <th>Common Name</th>
+                <th>Short Common Name</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for mapping in categories %}
+            <tr>
+                <td><input type="text" class="form-control category-input" value="{{ mapping.category | default('') }}"></td>
+                <td><input type="text" class="form-control subcategory-input" value="{{ mapping.subcategory | default('') }}"></td>
+                <td><input type="text" class="form-control rental-class-id-input" value="{{ mapping.rental_class_id | default('') }}"></td>
+                <td>{{ mapping.common_name | default('N/A') }}</td>
+                <td><input type="text" class="form-control short-common-name-input" value="{{ mapping.short_common_name | default('') }}"></td>
+                <td>
+                    <button class="btn btn-danger btn-sm remove-btn" onclick="removeMappingRow(this)">Remove</button>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <div class="mb-3">
+        <button class="btn btn-secondary" onclick="addMappingRow()">Add Mapping</button>
+        <button class="btn btn-primary" onclick="confirmSaveMappings()">Save Mappings</button>
     </div>
+</div>
 {% endblock %}
