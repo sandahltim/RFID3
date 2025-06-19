@@ -1,114 +1,105 @@
 {% extends 'base.html' %}
 {% block title %}Home{% endblock %}
 {% block extra_head %}
-<style>
-    .refresh-btn {
-        margin: 5px;
-    }
-    .refresh-status {
-        font-style: italic;
-        color: #666;
-        margin-top: 10px;
-    }
-</style>
 {% endblock %}
 {% block scripts %}
     {{ super() }}
-    <script src="{{ url_for('static', filename='js/home.js') }}?v={{ cache_bust }}"></script>
 {% endblock %}
 {% block content %}
-<h2>RFID Dashboard</h2>
+<h1>RFID Dashboard</h1>
 
 {% if error %}
     <div class="alert alert-danger">{{ error }}</div>
 {% else %}
-    <div class="row">
-        <div class="col-md-6">
-            <h4>Scannable Items</h4>
-            <ul>
-                <li>All Linens (except Skirts, Spandex, Runners, and Sashes are hand entered)</li>
-                <li>All Concession Machines and Resale - No Sterno or Donuts</li>
-                <li>All AV and Sound</li>
-                <li>All Tent Tops - No Sidewall</li>
-                <li>Garden Chairs and Cocktail Table Tops</li>
-                <li>Fountains and Bev Dispensers</li>
-                <li>Dishes/Silverware Packs</li>
-                <li>Carpet Runners</li>
-            </ul>
-        </div>
-        <div class="col-md-6">
-            <h4>Refresh Data</h4>
-            <button id="full-refresh-btn" class="btn btn-primary refresh-btn">Full Refresh</button>
-            <button id="incremental-refresh-btn" class="btn btn-secondary refresh-btn">Incremental Refresh</button>
-            <div class="refresh-status">
-                Last Refresh: {{ last_refresh }} ({{ refresh_type }})
+    <div class="container">
+        <div class="row">
+            <div class="col-md-6">
+                <h3>Scannable Items</h3>
+                <ul>
+                    <li>All Linens (except Skirts, Spandex, Runners, and Sashes are hand entered)</li>
+                    <li>All Concession Machines and Resale - No Sterno or Donuts</li>
+                    <li>All AV and Sound</li>
+                    <li>All Tent Tops - No Sidewall</li>
+                    <li>Garden Chairs and Cocktail Table Tops</li>
+                    <li>Fountains and Bev Dispensers</li>
+                    <li>Dishes/Silverware Packs</li>
+                    <li>Carpet Runners</li>
+                </ul>
+            </div>
+            <div class="col-md-6">
+                <h3>Refresh Data</h3>
+                <button id="full-refresh-btn" class="btn btn-primary" onclick="triggerFullRefresh()">Full Refresh</button>
+                <button id="incremental-refresh-btn" class="btn btn-secondary" onclick="triggerIncrementalRefresh()">Incremental Refresh</button>
+                <p id="refresh-status">
+                    Last Refresh: {{ last_refresh | format_date if last_refresh != 'N/A' else 'N/A' }} ({{ refresh_type | default('N/A') }})
+                </p>
             </div>
         </div>
-    </div>
 
-    <div class="row mt-4">
-        <div class="col-md-6">
-            <h4>Total Items: {{ total_items }}</h4>
-            <h5>Status Breakdown</h5>
-            <table class="table table-bordered">
-                <thead>
-                    <tr>
-                        <th>Status</th>
-                        <th>Count</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for status, count in status_counts %}
-                    <tr>
-                        <td>{{ status or 'Unknown' }}</td>
-                        <td>{{ count }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+        <div class="row mt-4">
+            <div class="col-md-6">
+                <h3>Total Items: {{ total_items | default(0) }}</h3>
+                <h4>Status Breakdown</h4>
+                <table id="status-breakdown-table" class="table table-bordered">
+                    <thead>
+                        <tr>
+                            <th>Status</th>
+                            <th>Count</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for status, count in status_counts %}
+                            <tr>
+                                <td>{{ status | default('Unknown') }}</td>
+                                <td>{{ count }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <div class="col-md-6">
+                <h4>Recent Scans</h4>
+                <table id="recent-scans-table" class="table table-bordered">
+                    <thead>
+                        <tr>
+                            <th>Tag ID</th>
+                            <th>Common Name</th>
+                            <th>Last Scanned</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in recent_scans %}
+                            <tr>
+                                <td>{{ item.tag_id }}</td>
+                                <td>{{ item.common_name }}</td>
+                                <td>{{ item.date_last_scanned | format_date if item.date_last_scanned else 'N/A' }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
         </div>
-        <div class="col-md-6">
-            <h4>Recent Scans</h4>
-            <table id="recent-scans-table" class="table table-bordered">
-                <thead>
-                    <tr>
-                        <th>Tag ID</th>
-                        <th>Common Name</th>
-                        <th>Last Scanned</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for item in recent_scans %}
-                    <tr>
-                        <td>{{ item.tag_id }}</td>
-                        <td>{{ item.common_name }}</td>
-                        <td>{{ item.date_last_scanned or 'N/A' }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </div>
 
-    <div class="row mt-4">
-        <div class="col-md-12">
-            <h4>Navigation</h4>
-            <table class="table table-bordered">
-                <thead>
-                    <tr>
-                        <th>Tab</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr><td>Rental Inventory</td><td><a href="/tab/1" class="btn btn-secondary">View</a></td></tr>
-                    <tr><td>Open Contracts</td><td><a href="/tab/2" class="btn btn-secondary">View</a></td></tr>
-                    <tr><td>Service</td><td><a href="/tab/3" class="btn btn-secondary">View</a></td></tr>
-                    <tr><td>Laundry Contracts</td><td><a href="/tab/4" class="btn btn-secondary">View</a></td></tr>
-                    <tr><td>Resale</td><td><a href="/tab/5" class="btn btn-secondary">View</a></td></tr>
-                    <tr><td>Manage Categories</td><td><a href="/categories" class="btn btn-secondary">View</a></td></tr>
-                </tbody>
-            </table>
+        <div class="row mt-4">
+            <div class="col-md-12">
+                <h3>Navigation</h3>
+                <table class="table table-bordered">
+                    <thead>
+                        <tr>
+                            <th>Tab</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>Rental Inventory</td><td><a href="/tab/1" class="btn btn-sm btn-primary">View</a></td></tr>
+                        <tr><td>Open Contracts</td><td><a href="/tab/2" class="btn btn-sm btn-primary">View</a></td></tr>
+                        <tr><td>Service</td><td><a href="/tab/3" class="btn btn-sm btn-primary">View</a></td></tr>
+                        <tr><td>Laundry Contracts</td><td><a href="/tab/4" class="btn btn-sm btn-primary">View</a></td></tr>
+                        <tr><td>Resale</td><td><a href="/tab/5" class="btn btn-sm btn-primary">View</a></td></tr>
+                        <tr><td>Manage Categories</td><td><a href="/categories" class="btn btn-sm btn-primary">View</a></td></tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
 {% endif %}

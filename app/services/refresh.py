@@ -1,11 +1,12 @@
-# refresh.py version: 2025-06-19-v3
+# app/services/refresh.py
+# refresh.py version: 2025-06-19-v4
 import logging
 from datetime import datetime, timedelta
 from sqlalchemy.exc import SQLAlchemyError, OperationalError
 from app.models.db_models import ItemMaster, Transaction, SeedRentalClass, RefreshState, db
 from app.services.api_client import APIClient
 from flask import Blueprint, jsonify, current_app
-from config import INICREMENTAL_LOOKBACK_SECONDS
+from config import INCREMENTAL_LOOKBACK_SECONDS  # Fixed typo
 
 logger = logging.getLogger('refresh')
 logger.setLevel(logging.INFO)

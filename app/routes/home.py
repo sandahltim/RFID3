@@ -1,4 +1,5 @@
-# home.py version: 2025-06-19-v1
+# app/routes/home.py
+# home.py version: 2025-06-19-v2
 from flask import Blueprint, render_template, current_app
 from .. import db
 from ..models.db_models import ItemMaster, Transaction, RefreshState
@@ -6,6 +7,7 @@ from sqlalchemy import func
 from time import time
 import logging
 import sys
+from datetime import datetime
 
 # Configure logging
 logger = logging.getLogger('home')
@@ -36,12 +38,12 @@ def home():
         logger.info("Starting new session for home")
         current_app.logger.info("Starting new session for home")
 
-        # Total items (all items in id_item_master)
+        # Total items
         total_items = session.query(func.count(ItemMaster.tag_id)).scalar()
         logger.info(f"Total items: {total_items}")
         current_app.logger.info(f"Total items: {total_items}")
 
-        # Log distinct status values to debug
+        # Status counts
         status_counts = session.query(
             ItemMaster.status,
             func.count(ItemMaster.tag_id).label('count')
@@ -49,14 +51,14 @@ def home():
         logger.info(f"Status counts in id_item_master: {[(status, count) for status, count in status_counts]}")
         current_app.logger.info(f"Status counts in id_item_master: {[(status, count) for status, count in status_counts]}")
 
-        # Items on rent (status = 'On Rent' or 'Delivered')
+        # Items on rent
         items_on_rent = session.query(func.count(ItemMaster.tag_id)).filter(
             ItemMaster.status.in_(['On Rent', 'Delivered'])
         ).scalar()
         logger.info(f"Items on rent: {items_on_rent}")
         current_app.logger.info(f"Items on rent: {items_on_rent}")
 
-        # Items in service logic
+        # Items in service
         subquery = session.query(
             Transaction.tag_id,
             Transaction.scan_date,
@@ -67,7 +69,6 @@ def home():
             Transaction.scan_date.desc()
         ).subquery()
 
-        # Log service_required counts to debug
         service_required_counts = session.query(
             subquery.c.service_required,
             func.count(subquery.c.tag_id).label('count')
@@ -87,30 +88,30 @@ def home():
         logger.info(f"Items in service: {items_in_service}")
         current_app.logger.info(f"Items in service: {items_in_service}")
 
-        # Items available (status = 'Ready to Rent')
+        # Items available
         items_available = session.query(func.count(ItemMaster.tag_id)).filter(
             ItemMaster.status == 'Ready to Rent'
         ).scalar()
         logger.info(f"Items available: {items_available}")
         current_app.logger.info(f"Items available: {items_available}")
 
-        # Fetch status breakdown for template
+        # Status breakdown
         status_breakdown = session.query(
             ItemMaster.status,
             func.count(ItemMaster.tag_id).label('count')
         ).group_by(ItemMaster.status).all()
         status_counts = [(status or 'Unknown', count) for status, count in status_breakdown]
 
-        # Fetch recent scans for template
+        # Recent scans
         recent_scans = session.query(ItemMaster).order_by(
             ItemMaster.date_last_scanned.desc()
         ).limit(10).all()
         logger.info(f"Recent scans sample: {[(item.tag_id, item.common_name, item.date_last_scanned) for item in recent_scans[:5]]}")
         current_app.logger.info(f"Recent scans sample: {[(item.tag_id, item.common_name, item.date_last_scanned) for item in recent_scans[:5]]}")
 
-        # Fetch last refresh state
+        # Last refresh state
         refresh_state = session.query(RefreshState).first()
-        last_refresh = refresh_state.last_refresh if refresh_state else 'N/A'
+        last_refresh = refresh_state.last_refresh.strftime('%Y-%m-%d %H:%M:%S') if refresh_state and refresh_state.last_refresh else 'N/A'
         refresh_type = refresh_state.state_type if refresh_state else 'N/A'
         logger.info(f"Last refresh: {last_refresh}, Type: {refresh_type}")
 

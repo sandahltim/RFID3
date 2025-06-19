@@ -1,4 +1,5 @@
-# __init__.py version: 2025-06-19-v1
+# app/__init__.py
+# __init__.py version: 2025-06-19-v2
 import os
 import logging
 from logging.handlers import RotatingFileHandler
@@ -38,7 +39,7 @@ def create_app():
     try:
         app.config['SQLALCHEMY_DATABASE_URI'] = (
             f"mysql+mysqlconnector://{DB_CONFIG['user']}:{DB_CONFIG['password']}@"
-            f"{DB_CONFIG['host']}/{DB_CONFIG['database']}?charset={DB_CONFIG['charset']}"
+            f"{DB_CONFIG['host']}/{DB_CONFIG['database']}?charset={DB_CONFIG['charset']}&collation={DB_CONFIG['collation']}"
         )
         app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
         app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
@@ -84,7 +85,6 @@ def create_app():
         from app.routes.health import health_bp
         from app.services.refresh import refresh_bp
         from app.routes.tabs import tabs_bp
-        from app.services.refresh_status import refresh_status_bp
 
         app.register_blueprint(home_bp)
         app.register_blueprint(tab1_bp)
@@ -96,7 +96,6 @@ def create_app():
         app.register_blueprint(health_bp)
         app.register_blueprint(refresh_bp)
         app.register_blueprint(tabs_bp)
-        app.register_blueprint(refresh_status_bp)
         app.logger.info("Blueprints registered successfully")
     except Exception as e:
         app.logger.error(f"Failed to register blueprints: {str(e)}", exc_info=True)

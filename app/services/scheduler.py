@@ -1,4 +1,5 @@
-# scheduler.py version: 2025-06-19-v1
+# app/services/scheduler.py
+# scheduler.py version: 2025-06-19-v2
 from apscheduler.schedulers.background import BackgroundScheduler
 from app.services.refresh import incremental_refresh, full_refresh
 from redis import Redis
@@ -9,21 +10,21 @@ import sys
 
 # Configure logging
 logger = logging.getLogger('scheduler')
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG)  # Changed to DEBUG for detailed logging
 
 # Remove existing handlers to avoid duplicates
 logger.handlers = []
 
 # File handler for rfid_dashboard.log
 file_handler = logging.FileHandler('/home/tim/test_rfidpi/logs/rfid_dashboard.log')
-file_handler.setLevel(logging.INFO)
+file_handler.setLevel(logging.DEBUG)
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 file_handler.setFormatter(formatter)
 logger.addHandler(file_handler)
 
 # Console handler
 console_handler = logging.StreamHandler(sys.stdout)
-console_handler.setLevel(logging.INFO)
+console_handler.setLevel(logging.DEBUG)
 console_handler.setFormatter(formatter)
 logger.addHandler(console_handler)
 
@@ -36,6 +37,7 @@ def init_scheduler(app):
     lock_timeout = 60  # Seconds
 
     with app.app_context():
+        logger.debug("Checking for full refresh lock")
         if redis_client.setnx(lock_key, 1):
             try:
                 redis_client.expire(lock_key, lock_timeout)
@@ -54,6 +56,7 @@ def init_scheduler(app):
             while redis_client.exists(lock_key) and waited < max_wait:
                 time.sleep(1)
                 waited += 1
+                logger.debug(f"Waiting for lock release, elapsed: {waited}s")
             if not redis_client.exists(lock_key):
                 if redis_client.setnx(lock_key, 1):
                     try:
@@ -72,13 +75,14 @@ def init_scheduler(app):
     def run_with_context():
         with app.app_context():
             try:
-                logger.info("Starting scheduled incremental refresh")
+                logger.debug("Starting scheduled incremental refresh")
                 incremental_refresh()
                 logger.info("Scheduled incremental refresh completed successfully")
             except Exception as e:
                 logger.error(f"Scheduled incremental refresh failed: {str(e)}", exc_info=True)
                 raise
 
+    logger.debug("Adding incremental refresh job to scheduler")
     scheduler.add_job(
         func=run_with_context,
         trigger='interval',
@@ -89,6 +93,7 @@ def init_scheduler(app):
         max_instances=1
     )
     try:
+        logger.debug("Starting scheduler")
         scheduler.start()
         logger.info("Background scheduler started for incremental refresh")
     except Exception as e:
