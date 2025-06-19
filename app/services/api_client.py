@@ -1,4 +1,4 @@
-# api_client.py version: 2025-06-17-v2
+# api_client.py version: 2025-06-19-v1
 import requests
 import time
 from datetime import datetime, timedelta
@@ -131,8 +131,7 @@ class APIClient:
 
     def validate_date(self, date_str, field_name):
         """Validate date string and return datetime object or None."""
-        if not date_str or date_str == '0000-00-00 00:00:00':
-            logger.warning(f"Invalid {field_name}: {date_str}. Returning None.")
+        if date_str is None or date_str == '0000-00-00 00:00:00':
             return None
         try:
             return datetime.strptime(date_str, '%Y-%m-%d %H:%M:%S')
@@ -160,12 +159,14 @@ class APIClient:
             data = self._make_request("14223767938169344381")
             if since_date:
                 since_dt = self.validate_date(since_date_str, 'since_date')
-                fallback_dt = datetime.utcnow() - timedelta(seconds=INCREMENTAL_FALLBACK_SECONDS)
-                data = [
-                    item for item in data
-                    if item.get('date_last_scanned') and 
-                    self.validate_date(item['date_last_scanned'], 'date_last_scanned') > max(since_dt, fallback_dt)
-                ]
+                if since_dt:
+                    fallback_dt = datetime.utcnow() - timedelta(seconds=INCREMENTAL_FALLBACK_SECONDS)
+                    data = [
+                        item for item in data
+                        if item.get('date_last_scanned') and 
+                        self.validate_date(item['date_last_scanned'], 'date_last_scanned') and
+                        self.validate_date(item['date_last_scanned'], 'date_last_scanned') > max(since_dt, fallback_dt)
+                    ]
         logger.debug(f"Item master data sample: {data[:5] if data else 'No data'}")
         return data
 
@@ -185,12 +186,14 @@ class APIClient:
                 data = self._make_request("14223767938169346196")
                 if since_date:
                     since_dt = self.validate_date(since_date_str, 'since_date')
-                    fallback_dt = datetime.utcnow() - timedelta(seconds=INCREMENTAL_FALLBACK_SECONDS)
-                    data = [
-                        item for item in data
-                        if item.get('scan_date') and 
-                        self.validate_date(item['scan_date'], 'scan_date') > max(since_dt, fallback_dt)
-                    ]
+                    if since_dt:
+                        fallback_dt = datetime.utcnow() - timedelta(seconds=INCREMENTAL_FALLBACK_SECONDS)
+                        data = [
+                            item for item in data
+                            if item.get('scan_date') and 
+                            self.validate_date(item['scan_date'], 'scan_date') and
+                            self.validate_date(item['scan_date'], 'scan_date') > max(since_dt, fallback_dt)
+                        ]
         else:
             data = self._make_request("14223767938169346196")
         logger.debug(f"Transactions data sample: {data[:5] if data else 'No data'}")
@@ -204,7 +207,7 @@ class APIClient:
         return data
 
     def update_bin_location(self, tag_id, bin_location):
-        """Update an item's bin location and date_last_scanned via API PATCH."""
+        """Update an item's bin_location and date_last_scanned via API PATCH."""
         if not tag_id or not bin_location:
             raise ValueError("tag_id and bin_location are required")
 

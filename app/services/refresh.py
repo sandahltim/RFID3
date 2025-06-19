@@ -1,11 +1,11 @@
-# refresh.py version: 2025-06-17-v2
+# refresh.py version: 2025-06-19-v3
 import logging
 from datetime import datetime, timedelta
 from sqlalchemy.exc import SQLAlchemyError, OperationalError
 from app.models.db_models import ItemMaster, Transaction, SeedRentalClass, RefreshState, db
 from app.services.api_client import APIClient
 from flask import Blueprint, jsonify, current_app
-from config import INCREMENTAL_LOOKBACK_SECONDS
+from config import INICREMENTAL_LOOKBACK_SECONDS
 
 logger = logging.getLogger('refresh')
 logger.setLevel(logging.INFO)
@@ -32,8 +32,7 @@ api_client = APIClient()
 
 def validate_date(date_str, field_name, tag_id):
     """Validate date string and return datetime object or None."""
-    if not date_str or date_str == '0000-00-00 00:00:00':
-        logger.warning(f"Invalid {field_name} for tag_id {tag_id}: {date_str}. Setting to None.")
+    if date_str is None or date_str == '0000-00-00 00:00:00':
         return None
     try:
         return datetime.strptime(date_str, '%Y-%m-%d %H:%M:%S')
@@ -94,7 +93,7 @@ def update_item_master(session, items):
             longitude = item.get('long')
             latitude = item.get('lat')
             db_item.longitude = float(longitude) if longitude and longitude.strip() else None
-            db_item.latitude = float(latitude) if latitude and latitude.strip() else None
+            db_item.latitude = float(latitude) if latitude and longitude.strip() else None
             db_item.date_last_scanned = validate_date(item.get('date_last_scanned'), 'date_last_scanned', tag_id)
             db_item.date_created = validate_date(item.get('date_created'), 'date_created', tag_id)
             db_item.date_updated = validate_date(item.get('date_updated'), 'date_updated', tag_id)
@@ -161,7 +160,7 @@ def update_transactions(session, transactions):
             longitude = transaction.get('long')
             latitude = transaction.get('lat')
             db_transaction.longitude = float(longitude) if longitude and longitude.strip() else None
-            db_transaction.latitude = float(latitude) if latitude and latitude.strip() else None
+            db_transaction.latitude = float(latitude) if latitude and longitude.strip() else None
             db_transaction.wet = to_bool(transaction.get('wet'))
             db_transaction.service_required = to_bool(transaction.get('service_required'))
             db_transaction.date_created = validate_date(transaction.get('date_created'), 'date_created', tag_id)
@@ -364,3 +363,29 @@ def clear_api_data():
             session.rollback()
         session.close()
         logger.debug("Clear API data endpoint session closed")
+
+@refresh_bp.route('/refresh/status', methods=['GET'])
+def get_refresh_status():
+    """Fetch the latest refresh status from the refresh_state table."""
+    session = db.session()
+    try:
+        logger.info("Fetching refresh status")
+        refresh_state = session.query(RefreshState).first()
+        if refresh_state:
+            return jsonify({
+                'status': 'success',
+                'last_refresh': refresh_state.last_refresh,
+                'refresh_type': refresh_state.state_type
+            })
+        else:
+            logger.info("No refresh state found")
+            return jsonify({
+                'status': 'success',
+                'last_refresh': 'N/A',
+                'refresh_type': 'N/A'
+            })
+    except Exception as e:
+        logger.error(f"Error fetching refresh status: {str(e)}", exc_info=True)
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+    finally:
+        session.close()

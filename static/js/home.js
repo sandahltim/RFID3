@@ -1,5 +1,5 @@
-// app/static/js/home.js version: 2025-06-17-v2
-console.log('home.js version: 2025-06-17-v2 loaded');
+// app/static/js/home.js version: 2025-06-19-v2
+console.log('home.js version: 2025-06-19-v2 loaded');
 
 function triggerFullRefresh() {
     const button = document.getElementById('full-refresh-btn');
@@ -14,7 +14,7 @@ function triggerFullRefresh() {
     .then(data => {
         if (data.status === 'success') {
             alert('Full refresh completed successfully');
-            window.location.reload();
+            fetchRefreshStatus();
         } else {
             alert('Error: ' + data.message);
         }
@@ -42,7 +42,7 @@ function triggerIncrementalRefresh() {
     .then(data => {
         if (data.status === 'success') {
             alert('Incremental refresh completed successfully');
-            window.location.reload();
+            fetchRefreshStatus();
         } else {
             alert('Error: ' + data.message);
         }
@@ -57,6 +57,22 @@ function triggerIncrementalRefresh() {
     });
 }
 
+async function fetchRefreshStatus() {
+    try {
+        const response = await fetch('/refresh/status');
+        const data = await response.json();
+        if (data.status === 'success') {
+            document.getElementById('refresh-status').innerText = 
+                `Last Refresh: ${data.last_refresh} (${data.refresh_type})`;
+        } else {
+            console.error('Error fetching refresh status:', data.message);
+        }
+    } catch (error) {
+        console.error('Error fetching refresh status:', error);
+        document.getElementById('refresh-status').innerText = 'Last Refresh: Error fetching status';
+    }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     if (typeof formatDate === 'function') {
         document.querySelectorAll('#recent-scans-table td:nth-child(3)').forEach(cell => {
@@ -66,4 +82,5 @@ document.addEventListener('DOMContentLoaded', () => {
     } else {
         console.warn('formatDate function not found, skipping date formatting');
     }
+    fetchRefreshStatus();
 });

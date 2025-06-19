@@ -1,3 +1,4 @@
+-- migrate_short_common_name.sql version: 2025-06-19-v1
 -- Add short_common_name column to rental_class_mappings table
 ALTER TABLE rental_class_mappings
 ADD COLUMN short_common_name VARCHAR(50);
