@@ -1,5 +1,5 @@
 # app/services/scheduler.py
-# scheduler.py version: 2025-06-19-v2
+# scheduler.py version: 2025-06-20-v3
 from apscheduler.schedulers.background import BackgroundScheduler
 from app.services.refresh import incremental_refresh, full_refresh
 from redis import Redis
@@ -34,7 +34,7 @@ def init_scheduler(app):
     logger.info("Initializing background scheduler")
     redis_client = Redis.from_url(REDIS_URL)
     lock_key = "full_refresh_lock"
-    lock_timeout = 60  # Seconds
+    lock_timeout = 120  # Increased to 120 seconds for longer refresh
 
     with app.app_context():
         logger.debug("Checking for full refresh lock")
@@ -46,9 +46,9 @@ def init_scheduler(app):
                 logger.info("Full refresh on startup completed successfully")
             except Exception as e:
                 logger.error(f"Full refresh on startup failed: {str(e)}", exc_info=True)
-                raise
             finally:
                 redis_client.delete(lock_key)
+                logger.debug("Released full refresh lock")
         else:
             max_wait = 30
             waited = 0
@@ -66,11 +66,11 @@ def init_scheduler(app):
                         logger.info("Full refresh on startup completed successfully")
                     except Exception as e:
                         logger.error(f"Full refresh on startup failed: {str(e)}", exc_info=True)
-                        raise
                     finally:
                         redis_client.delete(lock_key)
+                        logger.debug("Released full refresh lock")
             else:
-                logger.warning("Full refresh lock not released, skipping startup refresh")
+                logger.warning("Full refresh lock not released after 30s, skipping startup refresh")
 
     def run_with_context():
         with app.app_context():

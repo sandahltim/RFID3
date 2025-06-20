@@ -1,5 +1,5 @@
 # app/services/refresh.py
-# refresh.py version: 2025-06-20-v7
+# refresh.py version: 2025-06-20-v8
 import logging
 import traceback
 from datetime import datetime, timedelta
@@ -68,7 +68,7 @@ def update_refresh_state(state_type, timestamp):
 def update_item_master(session, items):
     logger.info(f"Updating {len(items)} items in id_item_master")
     skipped = 0
-    with session.no_autoflush():  # Prevent premature flush during updates
+    def update_items():
         for item in items:
             try:
                 tag_id = item.get('tag_id')
@@ -107,6 +107,8 @@ def update_item_master(session, items):
                 logger.error(f"Error updating item {tag_id}: {str(e)}", exc_info=True)
                 session.rollback()
                 raise
+    with session.no_autoflush():  # Prevent premature flush during updates
+        update_items()
     logger.info(f"Skipped {skipped} items due to missing or invalid data")
 
 def update_transactions(session, transactions):
