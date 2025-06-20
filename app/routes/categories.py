@@ -1,5 +1,5 @@
 # app/routes/categories.py
-# categories.py version: 2025-06-20-v24
+# categories.py version: 2025-06-20-v25
 from flask import Blueprint, render_template, request, jsonify, current_app
 from .. import db, cache
 from ..models.db_models import RentalClassMapping, UserRentalClassMapping, SeedRentalClass
@@ -45,7 +45,7 @@ if not any(isinstance(h, logging.StreamHandler) for h in root_logger.handlers):
 categories_bp = Blueprint('categories', __name__)
 
 # Version check to ensure correct deployment
-logger.info("Deployed categories.py version: 2025-06-20-v24")
+logger.info("Deployed categories.py version: 2025-06-20-v25")
 
 def build_common_name_dict(seed_data):
     """Build a dictionary mapping rental_class_id to common_name from seed_data."""
@@ -97,19 +97,23 @@ def manage_categories():
             user_mappings = []
 
         # Merge mappings, prioritizing user mappings
-        mappings_dict = {
-            m.rental_class_id: {
+        mappings_dict = {}
+        for m in base_mappings:
+            normalized_id = str(m.rental_class_id).strip()
+            mappings_dict[normalized_id] = {
                 'category': m.category,
                 'subcategory': m.subcategory,
                 'short_common_name': m.short_common_name or 'N/A'
-            } for m in base_mappings
-        }
+            }
+            logger.debug(f"Added base mapping: rental_class_id={normalized_id}, category={m.category}, subcategory={m.subcategory}")
         for um in user_mappings:
-            mappings_dict[um.rental_class_id] = {
+            normalized_id = str(um.rental_class_id).strip()
+            mappings_dict[normalized_id] = {
                 'category': um.category,
                 'subcategory': um.subcategory,
                 'short_common_name': um.short_common_name or 'N/A'
             }
+            logger.debug(f"Added user mapping: rental_class_id={normalized_id}, category={um.category}, subcategory={um.subcategory}")
         logger.debug(f"Merged mappings into dictionary with {len(mappings_dict)} entries")
 
         # Fetch seed data from cache or database
@@ -177,8 +181,8 @@ def manage_categories():
                 logger.info("Fetched seed data and cached")
                 current_app.logger.info("Fetched seed data and cached")
             except Exception as cache_error:
-                logger.error(f"Error caching seed data: {str(cache_error)}. Data will be fetched on next request.", exc_info=True)
-                current_app.logger.error(f"Error caching seed data: {str(cache_error)}. Data will be fetched on next request.", exc_info=True)
+                logger.error(f"Error caching seed_data: {str(cache_error)}. Data will be fetched on next request.", exc_info=True)
+                current_app.logger.error(f"Error caching seed_data: {str(cache_error)}. Data will be fetched on next request.", exc_info=True)
 
         categories.sort(key=lambda x: (x['category'] or '', x['subcategory'] or '', x['rental_class_id'] or ''))
         logger.info(f"Fetched {len(categories)} category mappings")
@@ -221,19 +225,23 @@ def get_mappings():
             user_mappings = []
 
         # Merge mappings, prioritizing user mappings
-        mappings_dict = {
-            m.rental_class_id: {
+        mappings_dict = {}
+        for m in base_mappings:
+            normalized_id = str(m.rental_class_id).strip()
+            mappings_dict[normalized_id] = {
                 'category': m.category,
                 'subcategory': m.subcategory,
                 'short_common_name': m.short_common_name or 'N/A'
-            } for m in base_mappings
-        }
+            }
+            logger.debug(f"Added base mapping: rental_class_id={normalized_id}, category={m.category}, subcategory={m.subcategory}")
         for um in user_mappings:
-            mappings_dict[um.rental_class_id] = {
+            normalized_id = str(um.rental_class_id).strip()
+            mappings_dict[normalized_id] = {
                 'category': um.category,
                 'subcategory': um.subcategory,
                 'short_common_name': um.short_common_name or 'N/A'
             }
+            logger.debug(f"Added user mapping: rental_class_id={normalized_id}, category={um.category}, subcategory={um.subcategory}")
         logger.debug(f"Merged mappings into dictionary with {len(mappings_dict)} entries")
 
         # Fetch seed data from cache or database

@@ -1,5 +1,5 @@
 # app/services/refresh.py
-# refresh.py version: 2025-06-20-v6
+# refresh.py version: 2025-06-20-v7
 import logging
 import traceback
 from datetime import datetime, timedelta
@@ -68,44 +68,45 @@ def update_refresh_state(state_type, timestamp):
 def update_item_master(session, items):
     logger.info(f"Updating {len(items)} items in id_item_master")
     skipped = 0
-    for item in items:
-        try:
-            tag_id = item.get('tag_id')
-            if not tag_id:
-                logger.warning(f"Skipping item with missing tag_id: {item}")
-                skipped += 1
-                continue
+    with session.no_autoflush():  # Prevent premature flush during updates
+        for item in items:
+            try:
+                tag_id = item.get('tag_id')
+                if not tag_id:
+                    logger.warning(f"Skipping item with missing tag_id: {item}")
+                    skipped += 1
+                    continue
 
-            db_item = session.query(ItemMaster).filter_by(tag_id=tag_id).first()
-            if not db_item:
-                db_item = ItemMaster(tag_id=tag_id)
+                db_item = session.query(ItemMaster).filter_by(tag_id=tag_id).first()
+                if not db_item:
+                    db_item = ItemMaster(tag_id=tag_id)
 
-            db_item.serial_number = item.get('serial_number')
-            db_item.rental_class_num = item.get('rental_class_num')
-            db_item.client_name = item.get('client_name')
-            db_item.common_name = item.get('common_name', 'Unknown')
-            db_item.quality = item.get('quality')
-            db_item.bin_location = item.get('bin_location')
-            raw_status = item.get('status')
-            status = raw_status if raw_status else 'Unknown'
-            db_item.status = status
-            db_item.last_contract_num = item.get('last_contract_num')
-            db_item.last_scanned_by = item.get('last_scanned_by')
-            db_item.notes = item.get('notes')
-            db_item.status_notes = item.get('status_notes')
-            longitude = item.get('long')
-            latitude = item.get('lat')
-            db_item.longitude = float(longitude) if longitude and longitude.strip() else None
-            db_item.latitude = float(latitude) if latitude and longitude.strip() else None
-            db_item.date_last_scanned = validate_date(item.get('date_last_scanned'), 'date_last_scanned', tag_id)
-            db_item.date_created = validate_date(item.get('date_created'), 'date_created', tag_id)
-            db_item.date_updated = validate_date(item.get('date_updated'), 'date_updated', tag_id)
+                db_item.serial_number = item.get('serial_number')
+                db_item.rental_class_num = item.get('rental_class_num')
+                db_item.client_name = item.get('client_name')
+                db_item.common_name = item.get('common_name', 'Unknown')
+                db_item.quality = item.get('quality')
+                db_item.bin_location = item.get('bin_location')
+                raw_status = item.get('status')
+                status = raw_status if raw_status else 'Unknown'
+                db_item.status = status
+                db_item.last_contract_num = item.get('last_contract_num')
+                db_item.last_scanned_by = item.get('last_scanned_by')
+                db_item.notes = item.get('notes')
+                db_item.status_notes = item.get('status_notes')
+                longitude = item.get('long')
+                latitude = item.get('lat')
+                db_item.longitude = float(longitude) if longitude and longitude.strip() else None
+                db_item.latitude = float(latitude) if latitude and longitude.strip() else None
+                db_item.date_last_scanned = validate_date(item.get('date_last_scanned'), 'date_last_scanned', tag_id)
+                db_item.date_created = validate_date(item.get('date_created'), 'date_created', tag_id)
+                db_item.date_updated = validate_date(item.get('date_updated'), 'date_updated', tag_id)
 
-            session.merge(db_item)
-        except Exception as e:
-            logger.error(f"Error updating item {tag_id}: {str(e)}", exc_info=True)
-            session.rollback()
-            raise
+                session.merge(db_item)
+            except Exception as e:
+                logger.error(f"Error updating item {tag_id}: {str(e)}", exc_info=True)
+                session.rollback()
+                raise
     logger.info(f"Skipped {skipped} items due to missing or invalid data")
 
 def update_transactions(session, transactions):
