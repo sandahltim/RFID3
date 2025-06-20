@@ -118,6 +118,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const expandBtn = event.target.closest('.expand-btn');
 
             if (printBtn) {
+                event.preventDefault();
+                event.stopPropagation();
                 const level = printBtn.getAttribute('data-print-level');
                 const id = printBtn.getAttribute('data-print-id');
                 const commonName = printBtn.getAttribute('data-common-name');
@@ -127,6 +129,8 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             if (printFullBtn) {
+                event.preventDefault();
+                event.stopPropagation();
                 const commonName = printFullBtn.getAttribute('data-common-name');
                 const category = printFullBtn.getAttribute('data-category');
                 const subcategory = printFullBtn.getAttribute('data-subcategory');
