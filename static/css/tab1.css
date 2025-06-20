@@ -2,8 +2,8 @@
 
 /* Style for common name table rows */
 .common-name-row {
-    background-color: #e9ecef;
-    border-left: 3px solid #28a745;
+    background-color: var(--bte-light-gray);
+    border-left: 3px solid var(--bte-accent-green);
     margin-left: 2rem;
     padding: 1rem;
     display: table-row !important;
@@ -35,16 +35,16 @@ div.item-level-wrapper table.item-table th,
 div.item-level-wrapper table.item-table td,
 tr.common-name-row td table.common-table th,
 tr.common-name-row td table.common-table td {
-    color: #000000 !important;
+    color: var(--bte-dark-gray) !important;
     font-family: 'Roboto', sans-serif !important;
     font-weight: 500 !important;
 }
 
 .item-level-wrapper {
     margin-left: 2rem;
-    background-color: #dee2e6;
+    background-color: var(--bte-medium-gray);
     padding: 1rem;
-    border-left: 3px solid #dc3545;
+    border-left: 3px solid var(--bte-accent-red);
     overflow-x: auto;
     overflow-y: visible;
     width: 100%;
@@ -104,7 +104,7 @@ tr.common-name-row td table.common-table td {
     text-align: center;
     vertical-align: middle;
     padding: 12px;
-    border: 1px solid #dee2e6;
+    border: 1px solid var(--bte-medium-gray);
     display: table-cell !important;
     visibility: visible !important;
     white-space: normal;
@@ -116,18 +116,20 @@ tr.common-name-row td table.common-table td {
 .common-table thead th,
 .item-table thead th {
     position: sticky;
-    top: 0;
-    z-index: 11;
-    background-color: #e9ecef;
-    border-bottom: 2px solid #dee2e6;
+    top: 60px; /* Adjusted to clear the h2 header */
+    z-index: 5; /* Below h2 z-index: 10 */
+    background-color: var(--bte-white);
+    border-bottom: 2px solid var(--bte-gold);
+    color: var(--bte-royal-blue);
 }
 
+/* Ensure table content stays below sticky headers */
 .category-table tbody,
 .common-table tbody,
 .item-table tbody {
     display: table-row-group !important;
     visibility: visible !important;
-    z-index: 5;
+    z-index: 1;
     position: relative;
 }
 
@@ -205,7 +207,7 @@ tr.common-name-row td table.common-table td {
 }
 
 .editable:hover {
-    background-color: #e9ecef;
+    background-color: rgba(255, 193, 7, 0.2);
 }
 
 /* Style for dropdown menus (Tab 1) */
@@ -214,8 +216,8 @@ tr.common-name-row td table.common-table td {
     position: absolute;
     z-index: 1000;
     min-width: 150px;
-    background-color: #fff;
-    border: 1px solid #dee2e6;
+    background-color: var(--bte-white);
+    border: 1px solid var(--bte-medium-gray);
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
@@ -227,15 +229,15 @@ tr.common-name-row td table.common-table td {
     padding: 0.25rem 1rem;
     cursor: pointer;
     display: block;
-    color: #333;
+    color: var(--bte-dark-gray);
 }
 
 .dropdown-item:hover {
-    background-color: #f8f9fa;
+    background-color: var(--bte-light-gray);
 }
 
 .dropdown-item[disabled], .dropdown-item[style*="pointer-events: none"] {
-    color: #ccc;
+    color: var(--bte-medium-gray);
     cursor: not-allowed;
 }
 
@@ -270,12 +272,4 @@ tr.common-name-row td table.common-table td {
         padding: 0.5rem;
         font-size: 0.9rem;
     }
-}
-
-/* Adjust filter and table alignment */
-.container {
-    padding-top: 0; /* Override base.css padding-top to reduce gap */
-}
-.category-table {
-    margin-top: -36px; /* Adjust to fully close the gap with filter mt-4 (16px) */
 }

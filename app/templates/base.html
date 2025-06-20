@@ -1,88 +1,33 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    {% if request.path == '/tab/5' %}
-        <link rel="stylesheet" href="{{ url_for('static', filename='css/tab5.css') }}">
-    {% elif request.path == '/tab/1' %}
-        <link rel="stylesheet" href="{{ url_for('static', filename='css/tab1.css') }}">
-    {% elif request.path in ['/tab/2', '/tab/4'] %}
-        <link rel="stylesheet" href="{{ url_for('static', filename='css/tab2_4.css') }}">
-    {% endif %}
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}RFID Dashboard{% endblock %}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='lib/bootstrap/bootstrap.min.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}">
     {% block head %}{% endblock %}
     {% block extra_head %}{% endblock %}
 </head>
 <body>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
-        <div class="container-fluid">
-            <a class="navbar-brand" href="{{ url_for('home.home') }}">RFID DASHBOARD</a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav">
-                    <li class="nav-item"><a class="nav-link" href="{{ url_for('home.home') }}">Home</a></li>
-                    <li class="nav-item"><a class="nav-link" href="{{ url_for('tab1.tab1_view') }}">Rental Inventory</a></li>
-                    <li class="nav-item"><a class="nav-link" href="{{ url_for('tab2.tab2_view') }}">Open Contracts</a></li>
-                    <li class="nav-item"><a class="nav-link" href="{{ url_for('tab3.tab3_view') }}">Service</a></li>
-                    <li class="nav-item"><a class="nav-link" href="{{ url_for('tab4.tab4_view') }}">Laundry Contracts</a></li>
-                    <li class="nav-item"><a class="nav-link" href="{{ url_for('tab5.tab5_view') }}">Resale</a></li>
-                    <li class="nav-item"><a class="nav-link" href="{{ url_for('categories.manage_categories') }}">Manage Categories</a></li>
-                </ul>
-            </div>
+    <nav class="navbar navbar-expand-lg">
+        <a class="navbar-brand" href="{{ url_for('home.home_view') }}">RFID DASHBOARD</a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <ul class="navbar-nav">
+                <li class="nav-item"><a class="nav-link" href="{{ url_for('home.home_view') }}">Home</a></li>
+                <li class="nav-item"><a class="nav-link" href="{{ url_for('tab1.tab1_view') }}">Rental Inventory</a></li>
+                <li class="nav-item"><a class="nav-link" href="{{ url_for('tab2.tab2_view') }}">Open Contracts</a></li>
+                <li class="nav-item"><a class="nav-link" href="{{ url_for('tab3.tab3_view') }}">Service</a></li>
+                <li class="nav-item"><a class="nav-link" href="{{ url_for('tab4.tab4_view') }}">Laundry Contracts</a></li>
+                <li class="nav-item"><a class="nav-link" href="{{ url_for('tab5.tab5_view') }}">Resale</a></li>
+                <li class="nav-item"><a class="nav-link" href="{{ url_for('categories.manage_categories') }}">Manage Categories</a></li>
+            </ul>
         </div>
     </nav>
 
-    {% if request.path in ['/tab/1', '/tab/2', '/tab/4', '/tab/5'] %}
-    <div class="container mt-4">
-        <div class="card">
-            <div class="card-header">
-                Filters
-            </div>
-            <div class="card-body">
-                <div class="row">
-                    <div class="col-md-3">
-                        <label for="commonNameFilter" class="form-label">Filter by Common Name:</label>
-                        <input type="text" class="form-control" id="commonNameFilter" placeholder="Enter common name">
-                    </div>
-                    {% if request.path in ['/tab/2', '/tab/4'] %}
-                    <div class="col-md-3">
-                        <label for="contractNumberFilter" class="form-label">Filter by Contract Number:</label>
-                        <input type="text" class="form-control" id="contractNumberFilter" placeholder="Enter contract number">
-                    </div>
-                    {% endif %}
-                    <div class="col-md-3">
-                        <label for="statusFilter" class="form-label">Filter by Status:</label>
-                        <select class="form-select" id="statusFilter">
-                            <option value="">All Statuses</option>
-                            <option value="ready to rent">Ready to Rent</option>
-                            <option value="on rent">On Rent</option>
-                            <option value="delivered">Delivered</option>
-                            <option value="sold">Sold</option>
-                        </select>
-                    </div>
-                    <div class="col-md-3">
-                        <label for="binFilter" class="form-label">Filter by Bin Location:</label>
-                        <select class="form-select" id="binFilter">
-                            <option value="">All Bins</option>
-                            <option value="resale">Resale</option>
-                            <option value="sold">Sold</option>
-                            <option value="pack">Pack</option>
-                            <option value="burst">Burst</option>
-                        </select>
-                    </div>
-                </div>
-                <div class="row mt-3">
-                    <div class="col-md-6">
-                        <button class="btn btn-primary" onclick="window.applyGlobalFilter()">Apply Filters</button>
-                        <button class="btn btn-secondary" onclick="window.clearGlobalFilter()">Clear Filters</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    {% endif %}
     {% block content %}{% endblock %}
 
     <script src="{{ url_for('static', filename='lib/bootstrap/bootstrap.bundle.min.js') }}"></script>
@@ -104,6 +49,7 @@
             <script src="{{ url_for('static', filename='js/home.js') }}"></script>
         {% endif %}
         <script src="{{ url_for('static', filename='js/common.js') }}"></script>
+        <script src="{{ url_for('static', filename='js/tab.js') }}"></script>
     {% endblock %}
 </body>
 </html>
