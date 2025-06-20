@@ -1,17 +1,17 @@
 [Unit]
 Description=RFID Dashboard Flask App
-After=network.target
+After=network.target mariadb.service
 
 [Service]
 User=tim
 Group=www-data
 WorkingDirectory=/home/tim/test_rfidpi
 Environment="PATH=/home/tim/test_rfidpi/venv/bin"
-ExecStart=/home/tim/test_rfidpi/venv/bin/gunicorn --workers 4 --threads 2 --timeout 180 --bind 127.0.0.1:3608 --error-logfile /home/tim/test_rfidpi/logs/gunicorn_error.log --access-logfile /home/tim/test_rfidpi/logs/gunicorn_access.log run:app
+ExecStart=/home/tim/test_rfidpi/venv/bin/gunicorn --workers 4 --threads 2 --timeout 300 --bind 127.0.0.1:3608 --error-logfile /home/tim/test_rfidpi/logs/gunicorn_error.log --access-logfile /home/tim/test_rfidpi/logs/gunicorn_access.log run:app
 ExecStop=/bin/kill -s KILL $MAINPID
 Restart=always
 KillMode=mixed
-TimeoutStopSec=20
+TimeoutStopSec=30
 
 [Install]
 WantedBy=multi-user.target
