@@ -91,13 +91,11 @@ app = create_app()
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=3607, debug=True)
 
-###start.sh
 #!/bin/bash
 source /home/tim/test_rfidpi/venv/bin/activate
-exec gunicorn --workers 1 --bind 0.0.0.0:3607 --chdir /home/tim/test_rfidpi run:app
+exec gunicorn --workers 3 --timeout 300 --bind 127.0.0.1:3608 --chdir /home/tim/test_rfidpi run:app
 
-
-rfid_dash_dev.service
+### rfid_dash_dev.service
 [Unit]
 Description=RFID Dashboard Flask App
 After=network.target
@@ -107,7 +105,7 @@ User=tim
 Group=www-data
 WorkingDirectory=/home/tim/test_rfidpi
 Environment="PATH=/home/tim/test_rfidpi/venv/bin"
-ExecStart=/home/tim/test_rfidpi/venv/bin/gunicorn --workers 1 --bind 0.0.0.0:8000 --error-logfile /home/tim/test_rfidpi/logs/gunicorn_error.log --access-logfile /home/tim/test_rfidpi/logs/gunicorn_access.log run:app
+ExecStart=/home/tim/test_rfidpi/venv/bin/gunicorn --workers 4 --threads 2 --timeout 180 --bind 127.0.0.1:3608 --error-logfile /home/tim/test_rfidpi/logs/gunicorn_error.log --access-logfile /home/tim/test_rfidpi/logs/gunicorn_access.log run:app
 ExecStop=/bin/kill -s KILL $MAINPID
 Restart=always
 KillMode=mixed
@@ -173,6 +171,9 @@ sudo chown tim:tim /home/tim/test_rfidpi/logs
 sudo chmod 750 /home/tim/test_rfidpi/logs
 
 ### migrate_db.sql
+-- scripts/migrate_db.sql
+-- migrate_db.sql version: 2025-06-19-v3
+
 -- Drop existing tables if they exist
 DROP TABLE IF EXISTS id_transactions;
 DROP TABLE IF EXISTS id_item_master;
@@ -180,6 +181,8 @@ DROP TABLE IF EXISTS id_rfidtag;
 DROP TABLE IF EXISTS seed_rental_classes;
 DROP TABLE IF EXISTS refresh_state;
 DROP TABLE IF EXISTS rental_class_mappings;
+DROP TABLE IF EXISTS id_hand_counted_items;
+DROP TABLE IF EXISTS user_rental_class_mappings;
 
 -- Create id_transactions table
 CREATE TABLE id_transactions (
@@ -274,21 +277,44 @@ CREATE TABLE seed_rental_classes (
 -- Create refresh_state table
 CREATE TABLE refresh_state (
     id INT PRIMARY KEY AUTO_INCREMENT,
-    last_refresh VARCHAR(255) NOT NULL
+    last_refresh DATETIME,  -- Changed to DATETIME
+    state_type VARCHAR(50)  -- Added state_type
 );
 
 -- Create rental_class_mappings table
 CREATE TABLE rental_class_mappings (
     rental_class_id VARCHAR(50) PRIMARY KEY,
     category VARCHAR(100) NOT NULL,
-    subcategory VARCHAR(100) NOT NULL
+    subcategory VARCHAR(100) NOT NULL,
+    short_common_name VARCHAR(50)
+);
+
+-- Create id_hand_counted_items table
+CREATE TABLE id_hand_counted_items (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    contract_number VARCHAR(50) NOT NULL,
+    item_name VARCHAR(255) NOT NULL,
+    quantity INT NOT NULL,
+    action VARCHAR(50) NOT NULL,
+    timestamp DATETIME NOT NULL,
+    user VARCHAR(50) NOT NULL
+);
+
+-- Create user_rental_class_mappings table
+CREATE TABLE user_rental_class_mappings (
+    rental_class_id VARCHAR(50) PRIMARY KEY,
+    category VARCHAR(100) NOT NULL,
+    subcategory VARCHAR(100) NOT NULL,
+    short_common_name VARCHAR(50),
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NOT NULL
 );
 
 
 
 
-
 ### config.py
+# config.py version: 2025-06-19-v4
 import os
 
 # Base directory
@@ -300,7 +326,8 @@ DB_CONFIG = {
     'user': 'rfid_user',
     'password': 'rfid_user_password',  # Change this to a secure password
     'database': 'rfid_inventory',
-    'charset': 'utf8mb4'
+    'charset': 'utf8mb4',
+    'collation': 'utf8mb4_unicode_ci'  # Changed to compatible collation for MariaDB 10.11
 }
 
 # Redis configuration
@@ -317,6 +344,14 @@ SEED_URL = 'https://cs.iot.ptshome.com/api/v1/data/14223767938169215907'
 # Refresh intervals (seconds)
 FULL_REFRESH_INTERVAL = 1800  # 30 minutes
 INCREMENTAL_REFRESH_INTERVAL = 30  # 30 seconds
+INCREMENTAL_LOOKBACK_SECONDS = 2592000  # Look back 30 days for incremental refresh
+INCREMENTAL_FALLBACK_SECONDS = 172800  # Fall back to 2 days if API filter fails
+
+# Bulk update configuration
+BULK_UPDATE_BATCH_SIZE = 50  # Batch size for bulk updates in tab5.py
+
+# Logging
+LOG_FILE = os.path.join(BASE_DIR, 'logs', 'rfid_dashboard.log')
 
 # Logging
 LOG_FILE = os.path.join(BASE_DIR, 'logs', 'rfid_dashboard.log')
@@ -324,23 +359,25 @@ LOG_FILE = os.path.join(BASE_DIR, 'logs', 'rfid_dashboard.log')
 
 
 ### db_models.py
-from app import db  # Import db from app/__init__.py
+# app/models/db_models.py
+# db_models.py version: 2025-06-19-v2
+from app import db
 from datetime import datetime
 
 class ItemMaster(db.Model):
     __tablename__ = 'id_item_master'
 
-    tag_id = db.Column(db.String(50), primary_key=True)
-    uuid_accounts_fk = db.Column(db.String(50))
-    serial_number = db.Column(db.String(50))
-    client_name = db.Column(db.String(100))
-    rental_class_num = db.Column(db.String(50))
+    tag_id = db.Column(db.String(255), primary_key=True)
+    uuid_accounts_fk = db.Column(db.String(255))
+    serial_number = db.Column(db.String(255))
+    client_name = db.Column(db.String(255))
+    rental_class_num = db.Column(db.String(255))
     common_name = db.Column(db.String(255))
     quality = db.Column(db.String(50))
-    bin_location = db.Column(db.String(50))
+    bin_location = db.Column(db.String(255))
     status = db.Column(db.String(50))
-    last_contract_num = db.Column(db.String(50))
-    last_scanned_by = db.Column(db.String(50))
+    last_contract_num = db.Column(db.String(255))
+    last_scanned_by = db.Column(db.String(255))
     notes = db.Column(db.Text)
     status_notes = db.Column(db.Text)
     longitude = db.Column(db.DECIMAL(9, 6))
@@ -374,16 +411,17 @@ class ItemMaster(db.Model):
 class Transaction(db.Model):
     __tablename__ = 'id_transactions'
 
-    contract_number = db.Column(db.String(50))
-    tag_id = db.Column(db.String(50), primary_key=True)
-    scan_type = db.Column(db.String(50))
-    scan_date = db.Column(db.DateTime, primary_key=True)
-    client_name = db.Column(db.String(100))
-    common_name = db.Column(db.String(255))
-    bin_location = db.Column(db.String(50))
+    id = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
+    contract_number = db.Column(db.String(255))
+    tag_id = db.Column(db.String(255), nullable=False)
+    scan_type = db.Column(db.String(50), nullable=False)
+    scan_date = db.Column(db.DateTime, nullable=False)
+    client_name = db.Column(db.String(255))
+    common_name = db.Column(db.String(255), nullable=False)
+    bin_location = db.Column(db.String(255))
     status = db.Column(db.String(50))
-    scan_by = db.Column(db.String(50))
-    location_of_repair = db.Column(db.String(50))
+    scan_by = db.Column(db.String(255))
+    location_of_repair = db.Column(db.String(255))
     quality = db.Column(db.String(50))
     dirty_or_mud = db.Column(db.Boolean)
     leaves = db.Column(db.Boolean)
@@ -399,9 +437,9 @@ class Transaction(db.Model):
     buckle = db.Column(db.Boolean)
     date_created = db.Column(db.DateTime)
     date_updated = db.Column(db.DateTime)
-    uuid_accounts_fk = db.Column(db.String(50))
-    serial_number = db.Column(db.String(50))
-    rental_class_num = db.Column(db.String(50))
+    uuid_accounts_fk = db.Column(db.String(255))
+    serial_number = db.Column(db.String(255))
+    rental_class_num = db.Column(db.String(255))
     longitude = db.Column(db.DECIMAL(9, 6))
     latitude = db.Column(db.DECIMAL(9, 6))
     wet = db.Column(db.Boolean)
@@ -411,14 +449,16 @@ class Transaction(db.Model):
 class SeedRentalClass(db.Model):
     __tablename__ = 'seed_rental_classes'
 
-    rental_class_id = db.Column(db.String(50), primary_key=True)
+    rental_class_id = db.Column(db.String(255), primary_key=True)
     common_name = db.Column(db.String(255))
+    bin_location = db.Column(db.String(255))
 
 class RefreshState(db.Model):
     __tablename__ = 'refresh_state'
 
     id = db.Column(db.Integer, primary_key=True)
-    last_refresh = db.Column(db.String(50))
+    last_refresh = db.Column(db.DateTime)  # Changed to DateTime
+    state_type = db.Column(db.String(50))  # Added state_type
 
 class RentalClassMapping(db.Model):
     __tablename__ = 'rental_class_mappings'
@@ -426,32 +466,32 @@ class RentalClassMapping(db.Model):
     rental_class_id = db.Column(db.String(50), primary_key=True)
     category = db.Column(db.String(100), nullable=False)
     subcategory = db.Column(db.String(100), nullable=False)
-    short_common_name = db.Column(db.String(50))  # Added for short common name
+    short_common_name = db.Column(db.String(50))
 
-# Added on 2025-04-21 to track hand-counted items for contracts
 class HandCountedItems(db.Model):
     __tablename__ = 'id_hand_counted_items'
 
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    contract_number = db.Column(db.String(50), nullable=False)  # Links to the contract
-    item_name = db.Column(db.String(255), nullable=False)      # e.g., "Napkins"
-    quantity = db.Column(db.Integer, nullable=False)           # Number of items
-    action = db.Column(db.String(50), nullable=False)          # "Added" or "Removed"
-    timestamp = db.Column(db.DateTime, nullable=False)         # When the action occurred
-    user = db.Column(db.String(50), nullable=False)            # Who performed the action
+    contract_number = db.Column(db.String(50), nullable=False)
+    item_name = db.Column(db.String(255), nullable=False)
+    quantity = db.Column(db.Integer, nullable=False)
+    action = db.Column(db.String(50), nullable=False)
+    timestamp = db.Column(db.DateTime, nullable=False)
+    user = db.Column(db.String(50), nullable=False)
 
-# Added on 2025-04-23 to store user-defined rental class mappings
 class UserRentalClassMapping(db.Model):
     __tablename__ = 'user_rental_class_mappings'
 
     rental_class_id = db.Column(db.String(50), primary_key=True)
     category = db.Column(db.String(100), nullable=False)
     subcategory = db.Column(db.String(100), nullable=False)
-    short_common_name = db.Column(db.String(50))  # Added for short common name
+    short_common_name = db.Column(db.String(50))
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 ###__init__.py
+# app/__init__.py
+# __init__.py version: 2025-06-19-v2
 import os
 import logging
 from logging.handlers import RotatingFileHandler
@@ -491,7 +531,7 @@ def create_app():
     try:
         app.config['SQLALCHEMY_DATABASE_URI'] = (
             f"mysql+mysqlconnector://{DB_CONFIG['user']}:{DB_CONFIG['password']}@"
-            f"{DB_CONFIG['host']}/{DB_CONFIG['database']}?charset={DB_CONFIG['charset']}"
+            f"{DB_CONFIG['host']}/{DB_CONFIG['database']}?charset={DB_CONFIG['charset']}&collation={DB_CONFIG['collation']}"
         )
         app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
         app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
@@ -564,6 +604,544 @@ def create_app():
 
     app.logger.info("Application startup completed successfully")
     return app
+
+### bulk_update_mappings.py
+import sys
+import os
+import csv
+from datetime import datetime
+
+# Add the project directory to the Python path
+project_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.append(project_dir)
+
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.exc import IntegrityError
+from app.models.db_models import UserRentalClassMapping
+from config import DB_CONFIG
+import logging
+
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# File handler for script-specific log
+log_dir = os.path.join(project_dir, 'logs')
+if not os.path.exists(log_dir):
+    os.makedirs(log_dir)
+file_handler = logging.FileHandler(os.path.join(log_dir, 'bulk_update_mappings.log'))
+file_handler.setLevel(logging.INFO)
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+file_handler.setFormatter(formatter)
+logger.addHandler(file_handler)
+
+# Console handler
+console_handler = logging.StreamHandler(sys.stdout)
+console_handler.setLevel(logging.INFO)
+console_handler.setFormatter(formatter)
+logger.addHandler(console_handler)
+
+# Database connection
+try:
+    db_url = f"mysql+mysqlconnector://{DB_CONFIG['user']}:{DB_CONFIG['password']}@{DB_CONFIG['host']}/{DB_CONFIG['database']}?charset={DB_CONFIG['charset']}"
+    engine = create_engine(db_url)
+    Session = sessionmaker(bind=engine)
+    session = Session()
+    logger.info("Successfully connected to the database")
+except Exception as e:
+    logger.error(f"Failed to connect to the database: {str(e)}")
+    sys.exit(1)
+
+# Path to the CSV file
+csv_file_path = os.path.join(project_dir, 'seeddata_20250425155406.csv')
+
+def bulk_update_mappings():
+    try:
+        # Verify the CSV file exists
+        if not os.path.exists(csv_file_path):
+            logger.error(f"CSV file not found at: {csv_file_path}")
+            raise FileNotFoundError(f"CSV file not found at: {csv_file_path}")
+
+        # Read the CSV file and deduplicate mappings
+        mappings_dict = {}
+        row_count = 0
+        with open(csv_file_path, 'r', encoding='utf-8') as csvfile:
+            reader = csv.DictReader(csvfile)
+            logger.info("Starting to read CSV file")
+            
+            # Verify expected columns
+            expected_columns = {'rental_class_id', 'Cat', 'SubCat'}
+            if not expected_columns.issubset(reader.fieldnames):
+                logger.error(f"CSV file missing required columns. Expected: {expected_columns}, Found: {reader.fieldnames}")
+                raise ValueError(f"CSV file missing required columns: {expected_columns}")
+
+            for row in reader:
+                row_count += 1
+                try:
+                    rental_class_id = row.get('rental_class_id', '').strip()
+                    category = row.get('Cat', '').strip()
+                    subcategory = row.get('SubCat', '').strip()
+
+                    # Skip rows with missing rental_class_id, category, or subcategory
+                    if not rental_class_id or not category or not subcategory:
+                        logger.debug(f"Skipping row {row_count} with missing data: rental_class_id={rental_class_id}, category={category}, subcategory={subcategory}")
+                        continue
+
+                    # Deduplicate: Keep the first occurrence of rental_class_id
+                    if rental_class_id in mappings_dict:
+                        logger.warning(f"Duplicate rental_class_id found at row {row_count}: {rental_class_id}. Keeping the first occurrence.")
+                        continue
+
+                    mappings_dict[rental_class_id] = {
+                        'rental_class_id': rental_class_id,
+                        'category': category,
+                        'subcategory': subcategory
+                    }
+                    logger.debug(f"Processed valid row {row_count}: {mappings_dict[rental_class_id]}")
+                except Exception as row_error:
+                    logger.error(f"Error processing row {row_count}: {str(row_error)}", exc_info=True)
+                    continue
+
+        mappings = list(mappings_dict.values())
+        logger.info(f"Processed {row_count} total rows from CSV, {len(mappings)} unique mappings found")
+
+        # Clear existing user mappings
+        deleted_count = session.query(UserRentalClassMapping).delete()
+        logger.info(f"Deleted {deleted_count} existing user mappings")
+
+        # Insert new user mappings one at a time to handle errors gracefully
+        inserted_count = 0
+        for mapping in mappings:
+            try:
+                user_mapping = UserRentalClassMapping(
+                    rental_class_id=mapping['rental_class_id'],
+                    category=mapping['category'],
+                    subcategory=mapping['subcategory'],
+                    created_at=datetime.utcnow(),
+                    updated_at=datetime.utcnow()
+                )
+                session.add(user_mapping)
+                session.commit()  # Commit each insert individually
+                inserted_count += 1
+                logger.debug(f"Inserted mapping: {mapping}")
+            except IntegrityError as integrity_error:
+                logger.error(f"Integrity error for mapping {mapping}: {str(integrity_error)}")
+                session.rollback()
+                continue
+            except Exception as insert_error:
+                logger.error(f"Error inserting mapping {mapping}: {str(insert_error)}", exc_info=True)
+                session.rollback()
+                continue
+
+        logger.info(f"Successfully inserted {inserted_count} mappings into user_rental_class_mappings")
+
+    except Exception as e:
+        logger.error(f"Error during bulk update: {str(e)}", exc_info=True)
+        session.rollback()
+        raise
+    finally:
+        session.close()
+        logger.info("Database session closed")
+
+if __name__ == "__main__":
+    logger.info("Starting bulk update of rental class mappings")
+    try:
+        bulk_update_mappings()
+        logger.info("Bulk update completed successfully")
+    except Exception as main_error:
+        logger.error(f"Script failed: {str(main_error)}", exc_info=True)
+        sys.exit(1)
+
+
+### fix_collation.sql
+-- scripts/fix_collation.sql
+ALTER DATABASE rfid_inventory
+    CHARACTER SET utf8mb4
+    COLLATE utf8mb4_unicode_ci;
+
+ALTER TABLE rfid_inventory.rental_class_mappings
+    CONVERT TO CHARACTER SET utf8mb4
+    COLLATE utf8mb4_unicode_ci;
+
+### migrate_db.sql
+-- scripts/migrate_db.sql
+-- migrate_db.sql version: 2025-06-19-v3
+
+-- Drop existing tables if they exist
+DROP TABLE IF EXISTS id_transactions;
+DROP TABLE IF EXISTS id_item_master;
+DROP TABLE IF EXISTS id_rfidtag;
+DROP TABLE IF EXISTS seed_rental_classes;
+DROP TABLE IF EXISTS refresh_state;
+DROP TABLE IF EXISTS rental_class_mappings;
+DROP TABLE IF EXISTS id_hand_counted_items;
+DROP TABLE IF EXISTS user_rental_class_mappings;
+
+-- Create id_transactions table
+CREATE TABLE id_transactions (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    contract_number VARCHAR(255),
+    tag_id VARCHAR(255) NOT NULL,
+    scan_type VARCHAR(50) NOT NULL,
+    scan_date DATETIME NOT NULL,
+    client_name VARCHAR(255),
+    common_name VARCHAR(255) NOT NULL,
+    bin_location VARCHAR(255),
+    status VARCHAR(50),
+    scan_by VARCHAR(255),
+    location_of_repair VARCHAR(255),
+    quality VARCHAR(50),
+    dirty_or_mud BOOLEAN,
+    leaves BOOLEAN,
+    oil BOOLEAN,
+    mold BOOLEAN,
+    stain BOOLEAN,
+    oxidation BOOLEAN,
+    other TEXT,
+    rip_or_tear BOOLEAN,
+    sewing_repair_needed BOOLEAN,
+    grommet BOOLEAN,
+    rope BOOLEAN,
+    buckle BOOLEAN,
+    date_created DATETIME,
+    date_updated DATETIME,
+    uuid_accounts_fk VARCHAR(255),
+    serial_number VARCHAR(255),
+    rental_class_num VARCHAR(255),
+    longitude DECIMAL(9,6),
+    latitude DECIMAL(9,6),
+    wet BOOLEAN,
+    service_required BOOLEAN,
+    notes TEXT
+);
+
+-- Create id_item_master table
+CREATE TABLE id_item_master (
+    tag_id VARCHAR(255) PRIMARY KEY,
+    uuid_accounts_fk VARCHAR(255),
+    serial_number VARCHAR(255),
+    client_name VARCHAR(255),
+    rental_class_num VARCHAR(255),
+    common_name VARCHAR(255),
+    quality VARCHAR(50),
+    bin_location VARCHAR(255),
+    status VARCHAR(50),
+    last_contract_num VARCHAR(255),
+    last_scanned_by VARCHAR(255),
+    notes TEXT,
+    status_notes TEXT,
+    longitude DECIMAL(9,6),
+    latitude DECIMAL(9,6),
+    date_last_scanned DATETIME,
+    date_created DATETIME,
+    date_updated DATETIME
+);
+
+-- Create id_rfidtag table
+CREATE TABLE id_rfidtag (
+    tag_id VARCHAR(255) PRIMARY KEY,
+    uuid_accounts_fk VARCHAR(255),
+    category VARCHAR(255),
+    serial_number VARCHAR(255),
+    client_name VARCHAR(255),
+    rental_class_num VARCHAR(255),
+    common_name VARCHAR(255),
+    quality VARCHAR(50),
+    bin_location VARCHAR(255),
+    status VARCHAR(50),
+    last_contract_num VARCHAR(255),
+    last_scanned_by VARCHAR(255),
+    notes TEXT,
+    status_notes TEXT,
+    longitude DECIMAL(9,6),
+    latitude DECIMAL(9,6),
+    date_last_scanned DATETIME,
+    date_created DATETIME,
+    date_updated DATETIME
+);
+
+-- Create seed_rental_classes table
+CREATE TABLE seed_rental_classes (
+    rental_class_id VARCHAR(255) PRIMARY KEY,
+    common_name VARCHAR(255),
+    bin_location VARCHAR(255)
+);
+
+-- Create refresh_state table
+CREATE TABLE refresh_state (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    last_refresh DATETIME,  -- Changed to DATETIME
+    state_type VARCHAR(50)  -- Added state_type
+);
+
+-- Create rental_class_mappings table
+CREATE TABLE rental_class_mappings (
+    rental_class_id VARCHAR(50) PRIMARY KEY,
+    category VARCHAR(100) NOT NULL,
+    subcategory VARCHAR(100) NOT NULL,
+    short_common_name VARCHAR(50)
+);
+
+-- Create id_hand_counted_items table
+CREATE TABLE id_hand_counted_items (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    contract_number VARCHAR(50) NOT NULL,
+    item_name VARCHAR(255) NOT NULL,
+    quantity INT NOT NULL,
+    action VARCHAR(50) NOT NULL,
+    timestamp DATETIME NOT NULL,
+    user VARCHAR(50) NOT NULL
+);
+
+-- Create user_rental_class_mappings table
+CREATE TABLE user_rental_class_mappings (
+    rental_class_id VARCHAR(50) PRIMARY KEY,
+    category VARCHAR(100) NOT NULL,
+    subcategory VARCHAR(100) NOT NULL,
+    short_common_name VARCHAR(50),
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NOT NULL
+);
+
+### migrate_hand_counted_items.sql
+-- Migration script to add the HandCountedItems table
+-- Added on 2025-04-21 for tracking hand-counted items on contracts
+
+CREATE TABLE IF NOT EXISTS id_hand_counted_items (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    contract_number VARCHAR(50) NOT NULL,
+    item_name VARCHAR(255) NOT NULL,
+    quantity INT NOT NULL,
+    action VARCHAR(50) NOT NULL,
+    timestamp DATETIME NOT NULL,
+    user VARCHAR(50) NOT NULL
+);
+
+-- Add indexes for faster lookups
+CREATE INDEX idx_hand_counted_items_contract_number ON id_hand_counted_items (contract_number);
+CREATE INDEX idx_hand_counted_items_timestamp ON id_hand_counted_items (timestamp);
+
+
+### migrate_short_common_name.sql
+-- migrate_short_common_name.sql version: 2025-06-19-v1
+-- Add short_common_name column to rental_class_mappings table
+ALTER TABLE rental_class_mappings
+ADD COLUMN short_common_name VARCHAR(50);
+
+-- Add short_common_name column to user_rental_class_mappings table
+ALTER TABLE user_rental_class_mappings
+ADD COLUMN short_common_name VARCHAR(50);
+
+-- Populate short_common_name in rental_class_mappings by truncating common_name to 20 characters
+UPDATE rental_class_mappings rcm
+JOIN seed_rental_classes src ON rcm.rental_class_id = src.rental_class_id
+SET rcm.short_common_name = LEFT(src.common_name, 20);
+
+-- Populate short_common_name in user_rental_class_mappings by truncating common_name to 20 characters
+UPDATE user_rental_class_mappings urcm
+JOIN seed_rental_classes src ON urcm.rental_class_id = src.rental_class_id
+SET urcm.short_common_name = LEFT(src.common_name, 20);
+
+### migrate_user_mappings.sql
+-- Migration script to add the user_rental_class_mappings table
+-- Added on 2025-04-23 to store user-defined mappings separately
+
+CREATE TABLE IF NOT EXISTS user_rental_class_mappings (
+    rental_class_id VARCHAR(50) PRIMARY KEY,
+    category VARCHAR(100) NOT NULL,
+    subcategory VARCHAR(100) NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- Add indexes for faster lookups
+CREATE INDEX idx_user_rental_class_mappings_rental_class_id ON user_rental_class_mappings (rental_class_id);
+
+### migrate_user_rental_class_mappings.sql
+-- migrate_user_rental_class_mappings.sql version: 2025-06-19-v1
+-- Migration script to add the user_rental_class_mappings table
+-- Added on 2025-04-23 to store user-defined mappings separately
+
+CREATE TABLE IF NOT EXISTS user_rental_class_mappings (
+    rental_class_id VARCHAR(50) PRIMARY KEY,
+    category VARCHAR(100) NOT NULL,
+    subcategory VARCHAR(100) NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- Add indexes for faster lookups
+CREATE INDEX idx_user_rental_class_mappings_rental_class_id ON user_rental_class_mappings (rental_class_id);
+
+
+### setup_samba.sh
+#!/bin/bash
+# setup_samba.sh
+# Configures Samba server for RFIDShare on Raspberry Pi and ensures shared directory exists
+# Created: 2025-05-20
+# Updated: 2025-05-20
+# Usage: Run as root or with sudo
+# chmod +x setup_samba.sh && sudo ./setup_samba.sh
+
+# Exit on error
+set -e
+
+# Log file
+LOG_FILE="/home/tim/test_rfidpi/logs/samba_setup.log"
+mkdir -p /home/tim/test_rfidpi/logs
+touch $LOG_FILE
+chown tim:tim $LOG_FILE
+chmod 640 $LOG_FILE
+exec 1>>$LOG_FILE 2>&1
+echo "$(date '+%Y-%m-%d %H:%M:%S') - Starting Samba setup"
+
+# Ensure Samba is installed
+if ! command -v smbd >/dev/null; then
+    echo "Installing Samba..."
+    apt update
+    apt install -y samba samba-common-bin
+else
+    echo "Samba already installed"
+fi
+
+# Create shared directory
+SHARED_DIR="/home/tim/test_rfidpi/shared"
+echo "Creating shared directory: $SHARED_DIR"
+mkdir -p $SHARED_DIR
+chown tim:tim $SHARED_DIR
+chmod 770 $SHARED_DIR
+
+# Verify Samba configuration includes RFIDShare
+if ! grep -q "\[RFIDShare\]" /etc/samba/smb.conf; then
+    echo "Adding RFIDShare configuration to smb.conf"
+    # Backup existing Samba configuration
+    if [ -f /etc/samba/smb.conf ]; then
+        echo "Backing up existing smb.conf"
+        cp /etc/samba/smb.conf /etc/samba/smb.conf.bak
+    fi
+    # Append RFIDShare configuration
+    cat << EOF >> /etc/samba/smb.conf
+[RFIDShare]
+path = /home/tim/test_rfidpi/shared
+writable = yes
+browsable = yes
+guest ok = no
+valid users = tim
+create mask = 0660
+directory mask = 0770
+EOF
+else
+    echo "RFIDShare configuration already exists in smb.conf"
+fi
+
+# Ensure Samba user 'tim' exists
+if ! pdbedit -L | grep -q "^tim:"; then
+    echo "Setting up Samba user 'tim'"
+    (echo "rfid_samba_pass"; echo "rfid_samba_pass") | smbpasswd -a tim
+else
+    echo "Samba user 'tim' already exists"
+fi
+
+# Enable and restart Samba services
+echo "Restarting Samba services"
+systemctl enable smbd
+systemctl enable nmbd
+systemctl restart smbd
+systemctl restart nmbd
+
+# Open firewall ports for Samba (if ufw is enabled)
+if command -v ufw >/dev/null; then
+    echo "Configuring firewall for Samba"
+    ufw allow Samba
+fi
+
+# Test Samba configuration
+echo "Testing Samba configuration"
+testparm -s
+
+# Set ownership and permissions for log directory
+echo "Setting log directory permissions"
+chown -R tim:tim /home/tim/test_rfidpi/logs
+chmod -R 750 /home/tim/test_rfidpi/logs
+
+echo "$(date '+%Y-%m-%d %H:%M:%S') - Samba setup completed successfully"
+
+### update_rental_class_mappings.py
+# update_rental_class_mappings.py version: 2025-06-19-v1
+import sys
+import os
+
+# Add the project directory to the Python path
+project_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.append(project_dir)
+
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from app.models.db_models import RentalClassMapping
+from config import DB_CONFIG
+import logging
+
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Database connection
+try:
+    db_url = f"mysql+mysqlconnector://{DB_CONFIG['user']}:{DB_CONFIG['password']}@{DB_CONFIG['host']}/{DB_CONFIG['database']}?charset={DB_CONFIG['charset']}"
+    engine = create_engine(db_url)
+    Session = sessionmaker(bind=engine)
+    session = Session()
+except Exception as e:
+    logger.error(f"Failed to connect to the database: {str(e)}")
+    sys.exit(1)
+
+# Data to upsert (using rental_class_id values from seed data)
+data = [
+    {"rental_class_id": "61885", "category": "Round Linen", "subcategory": "108 in"},
+    {"rental_class_id": "61914", "category": "Round Linen", "subcategory": "108 in"},
+    {"rental_class_id": "61890", "category": "Round Linen", "subcategory": "108 in"},
+    {"rental_class_id": "61886", "category": "Round Linen", "subcategory": "108 in"},
+    {"rental_class_id": "61908", "category": "Round Linen", "subcategory": "108 in"},
+]
+
+try:
+    for entry in data:
+        rental_class_id = entry['rental_class_id']
+        category = entry['category']
+        subcategory = entry['subcategory']
+
+        # Check if the record exists
+        existing_mapping = session.query(RentalClassMapping).filter_by(rental_class_id=rental_class_id).first()
+
+        if existing_mapping:
+            # Update existing record
+            existing_mapping.category = category
+            existing_mapping.subcategory = subcategory
+            logger.info(f"Updated rental_class_id {rental_class_id} with category '{category}' and subcategory '{subcategory}'")
+        else:
+            # Insert new record
+            new_mapping = RentalClassMapping(
+                rental_class_id=rental_class_id,
+                category=category,
+                subcategory=subcategory
+            )
+            session.add(new_mapping)
+            logger.info(f"Inserted rental_class_id {rental_class_id} with category '{category}' and subcategory '{subcategory}'")
+
+    # Commit the transaction
+    session.commit()
+    logger.info("Successfully updated rental class mappings")
+
+except Exception as e:
+    logger.error(f"Error updating rental class mappings: {str(e)}")
+    session.rollback()
+    raise
+finally:
+    session.close()
+    logger.info("Database session closed")
+
+
 
 
 ### Not all items will have Category or Subcategory assigned until assigned by user.
