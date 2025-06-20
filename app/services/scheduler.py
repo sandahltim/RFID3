@@ -108,3 +108,4 @@ def init_scheduler(app):
 def get_scheduler():
     logger.debug("Returning scheduler instance")
     return scheduler
+    

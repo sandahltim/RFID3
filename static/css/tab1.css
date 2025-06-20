@@ -92,6 +92,7 @@ tr.common-name-row td table.common-table td {
     display: table !important;
     visibility: visible !important;
     table-layout: auto;
+    margin-top: 0; /* Remove any inherited margin */
 }
 
 /* Ensure headers and cells are centered */
@@ -116,8 +117,8 @@ tr.common-name-row td table.common-table td {
 .common-table thead th,
 .item-table thead th {
     position: sticky;
-    top: 60px; /* Adjusted to clear the h2 header */
-    z-index: 5; /* Below h2 z-index: 10 */
+    top: 80px; /* Increased to clear the h2 header with padding */
+    z-index: 5;
     background-color: var(--bte-white);
     border-bottom: 2px solid var(--bte-gold);
     color: var(--bte-royal-blue);
