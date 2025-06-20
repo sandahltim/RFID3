@@ -1,12 +1,12 @@
 # app/services/refresh.py
-# refresh.py version: 2025-06-19-v4
+# refresh.py version: 2025-06-20-v5
 import logging
 from datetime import datetime, timedelta
 from sqlalchemy.exc import SQLAlchemyError, OperationalError
 from app.models.db_models import ItemMaster, Transaction, SeedRentalClass, RefreshState, db
 from app.services.api_client import APIClient
 from flask import Blueprint, jsonify, current_app
-from config import INCREMENTAL_LOOKBACK_SECONDS  # Fixed typo
+from config import INCREMENTAL_LOOKBACK_SECONDS
 
 logger = logging.getLogger('refresh')
 logger.setLevel(logging.INFO)
@@ -34,6 +34,7 @@ api_client = APIClient()
 def validate_date(date_str, field_name, tag_id):
     """Validate date string and return datetime object or None."""
     if date_str is None or date_str == '0000-00-00 00:00:00':
+        logger.debug(f"Null or invalid {field_name} for tag_id {tag_id}: {date_str}, returning None")
         return None
     try:
         return datetime.strptime(date_str, '%Y-%m-%d %H:%M:%S')
@@ -41,7 +42,7 @@ def validate_date(date_str, field_name, tag_id):
         try:
             return datetime.fromisoformat(date_str.replace('Z', '+00:00'))
         except ValueError as e:
-            logger.warning(f"Invalid {field_name} for tag_id {tag_id}: {date_str}. Error: {str(e)}. Setting to None.")
+            logger.warning(f"Invalid {field_name} for tag_id {tag_id}: {date_str}. Error: {str(e)}. Returning None.")
             return None
 
 def update_refresh_state(state_type, timestamp):
@@ -81,7 +82,7 @@ def update_item_master(session, items):
             db_item.serial_number = item.get('serial_number')
             db_item.rental_class_num = item.get('rental_class_num')
             db_item.client_name = item.get('client_name')
-            db_item.common_name = item.get('common_name')
+            db_item.common_name = item.get('common_name', 'Unknown')
             db_item.quality = item.get('quality')
             db_item.bin_location = item.get('bin_location')
             raw_status = item.get('status')
@@ -120,6 +121,7 @@ def update_transactions(session, transactions):
 
             scan_date_dt = validate_date(scan_date, 'scan_date', tag_id)
             if not scan_date_dt:
+                logger.warning(f"Skipping transaction with invalid scan_date for tag_id {tag_id}: {scan_date}")
                 skipped += 1
                 continue
 
@@ -129,12 +131,12 @@ def update_transactions(session, transactions):
             if not db_transaction:
                 db_transaction = Transaction(tag_id=tag_id, scan_date=scan_date_dt)
 
-            db_transaction.scan_type = transaction.get('scan_type')
+            db_transaction.scan_type = transaction.get('scan_type', 'Unknown')
             db_transaction.contract_number = transaction.get('contract_number')
             db_transaction.client_name = transaction.get('client_name')
             db_transaction.notes = transaction.get('notes')
             db_transaction.rental_class_num = transaction.get('rental_class_id')
-            db_transaction.common_name = transaction.get('common_name')
+            db_transaction.common_name = transaction.get('common_name', 'Unknown')
             db_transaction.serial_number = transaction.get('serial_number')
             db_transaction.location_of_repair = transaction.get('location_of_repair')
             db_transaction.quality = transaction.get('quality')
@@ -190,7 +192,7 @@ def update_seed_data(session, seed_data):
             if not db_seed:
                 db_seed = SeedRentalClass(rental_class_id=rental_class_id)
 
-            db_seed.common_name = item.get('common_name')
+            db_seed.common_name = item.get('common_name', 'Unknown')
             db_seed.bin_location = item.get('bin_location')
 
             session.merge(db_seed)

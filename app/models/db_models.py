@@ -1,5 +1,5 @@
 # app/models/db_models.py
-# db_models.py version: 2025-06-19-v2
+# db_models.py version: 2025-06-20-v3
 from app import db
 from datetime import datetime
 
@@ -84,6 +84,52 @@ class Transaction(db.Model):
     wet = db.Column(db.Boolean)
     service_required = db.Column(db.Boolean)
     notes = db.Column(db.Text)
+
+class RFIDTag(db.Model):
+    __tablename__ = 'id_rfidtag'
+
+    tag_id = db.Column(db.String(255), primary_key=True)
+    uuid_accounts_fk = db.Column(db.String(255))
+    category = db.Column(db.String(255))
+    serial_number = db.Column(db.String(255))
+    client_name = db.Column(db.String(255))
+    rental_class_num = db.Column(db.String(255))
+    common_name = db.Column(db.String(255))
+    quality = db.Column(db.String(50))
+    bin_location = db.Column(db.String(255))
+    status = db.Column(db.String(50))
+    last_contract_num = db.Column(db.String(255))
+    last_scanned_by = db.Column(db.String(255))
+    notes = db.Column(db.Text)
+    status_notes = db.Column(db.Text)
+    longitude = db.Column(db.DECIMAL(9, 6))
+    latitude = db.Column(db.DECIMAL(9, 6))
+    date_last_scanned = db.Column(db.DateTime)
+    date_created = db.Column(db.DateTime)
+    date_updated = db.Column(db.DateTime)
+
+    def to_dict(self):
+        return {
+            'tag_id': self.tag_id,
+            'uuid_accounts_fk': self.uuid_accounts_fk,
+            'category': self.category,
+            'serial_number': self.serial_number,
+            'client_name': self.client_name,
+            'rental_class_num': self.rental_class_num,
+            'common_name': self.common_name,
+            'quality': self.quality,
+            'bin_location': self.bin_location,
+            'status': self.status,
+            'last_contract_num': self.last_contract_num,
+            'last_scanned_by': self.last_scanned_by,
+            'notes': self.notes,
+            'status_notes': self.status_notes,
+            'longitude': float(self.longitude) if self.longitude else None,
+            'latitude': float(self.latitude) if self.latitude else None,
+            'date_last_scanned': self.date_last_scanned.isoformat() if self.date_last_scanned else None,
+            'date_created': self.date_created.isoformat() if self.date_created else None,
+            'date_updated': self.date_updated.isoformat() if self.date_updated else None
+        }
 
 class SeedRentalClass(db.Model):
     __tablename__ = 'seed_rental_classes'
