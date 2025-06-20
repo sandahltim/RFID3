@@ -10,7 +10,7 @@ import sys
 
 # Configure logging
 logger = logging.getLogger('scheduler')
-logger.setLevel(logging.DEBUG)  # Changed to DEBUG for detailed logging
+logger.setLevel(logging.DEBUG)
 
 # Remove existing handlers to avoid duplicates
 logger.handlers = []
@@ -34,7 +34,7 @@ def init_scheduler(app):
     logger.info("Initializing background scheduler")
     redis_client = Redis.from_url(REDIS_URL)
     lock_key = "full_refresh_lock"
-    lock_timeout = 120  # Increased to 120 seconds for longer refresh
+    lock_timeout = 120
 
     with app.app_context():
         logger.debug("Checking for full refresh lock")
@@ -90,7 +90,7 @@ def init_scheduler(app):
         id='incremental_refresh',
         replace_existing=True,
         coalesce=True,
-        max_instances=1
+        max_instances=2  # Increased to allow more concurrent runs
     )
     try:
         logger.debug("Starting scheduler")
@@ -108,4 +108,3 @@ def init_scheduler(app):
 def get_scheduler():
     logger.debug("Returning scheduler instance")
     return scheduler
-    
