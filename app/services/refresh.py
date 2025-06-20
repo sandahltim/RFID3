@@ -12,8 +12,6 @@ import time
 
 logger = logging.getLogger('refresh')
 logger.setLevel(logging.INFO)
-
-# Remove existing handlers to avoid duplicates
 if not logger.handlers:
     # File handler for rfid_dashboard.log
     file_handler = logging.FileHandler('/home/tim/test_rfidpi/logs/rfid_dashboard.log')
@@ -43,7 +41,7 @@ def validate_date(date_str, field_name, tag_id):
         try:
             return datetime.fromisoformat(date_str.replace('Z', '+00:00'))
         except ValueError as e:
-            logger.warning(f"Invalid {field_name} for tag_id {tag_id}: {date_str}. Error: {str(e)}. Returning None.")
+            logger.warning(f"Invalid {field_name} for tag_id {tag_id}: {date_str}. Error: {str(e)}. Returning None. Raw data: {traceback.format_exc()}")
             return None
 
 def update_refresh_state(state_type, timestamp):
@@ -253,7 +251,7 @@ def full_refresh():
                 if attempt < max_retries - 1:
                     logger.warning(f"Deadlock detected, retrying ({attempt + 1}/{max_retries})")
                     session.rollback()
-                    time.sleep(2 ** attempt)  # Exponential backoff
+                    time.sleep(2 ** attempt)
                     continue
                 else:
                     logger.error(f"Max retries reached for deadlock: {str(e)}", exc_info=True)
@@ -275,7 +273,7 @@ def incremental_refresh():
     max_retries = 3
     for attempt in range(max_retries):
         try:
-            with session.no_autoflush:  # Prevent premature autoflush for the entire function
+            with session.no_autoflush:
                 since_date = datetime.utcnow() - timedelta(seconds=INCREMENTAL_LOOKBACK_SECONDS)
                 logger.info(f"Checking for updates since: {since_date.strftime('%Y-%m-%d %H:%M:%S')}")
 
@@ -306,7 +304,7 @@ def incremental_refresh():
                 if attempt < max_retries - 1:
                     logger.warning(f"Database lock/timeout detected, retrying ({attempt + 1}/{max_retries})")
                     session.rollback()
-                    time.sleep(2 ** attempt)  # Exponential backoff
+                    time.sleep(2 ** attempt)
                     continue
                 else:
                     logger.error(f"Max retries reached for lock/timeout: {str(e)}", exc_info=True)
