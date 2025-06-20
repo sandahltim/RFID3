@@ -1,5 +1,5 @@
 # app/services/scheduler.py
-# scheduler.py version: 2025-06-20-v5
+# scheduler.py version: 2025-06-20-v6
 from apscheduler.schedulers.background import BackgroundScheduler
 from app.services.refresh import incremental_refresh, full_refresh
 from redis import Redis
@@ -7,9 +7,10 @@ from config import REDIS_URL
 import time
 import logging
 import sys
+import os
 
-# Configure logging (module-level to avoid duplicates)
-logger = logging.getLogger('scheduler')
+# Configure logging with process ID to avoid duplicates
+logger = logging.getLogger(f'scheduler_{os.getpid()}')
 logger.setLevel(logging.DEBUG)
 if not logger.handlers:
     # File handler for rfid_dashboard.log
@@ -31,9 +32,23 @@ def init_scheduler(app):
     logger.info("Initializing background scheduler")
     redis_client = Redis.from_url(REDIS_URL)
     lock_key = "full_refresh_lock"
-    lock_timeout = 300  # Increased to 300 seconds
+    lock_timeout = 300
+
+    def retry_database_connection():
+        max_retries = 5
+        for attempt in range(max_retries):
+            try:
+                with app.app_context():
+                    db.session.execute("SELECT 1")
+                    return
+            except Exception as e:
+                logger.warning(f"Database connection failed, retrying ({attempt + 1}/{max_retries}): {str(e)}")
+                time.sleep(2 ** attempt)
+        logger.error("Failed to establish database connection after retries")
+        raise Exception("Database connection failed")
 
     with app.app_context():
+        retry_database_connection()
         logger.debug("Checking for full refresh lock")
         if redis_client.setnx(lock_key, 1):
             try:
@@ -47,7 +62,7 @@ def init_scheduler(app):
                 redis_client.delete(lock_key)
                 logger.debug("Released full refresh lock")
         else:
-            max_wait = 120  # Increased to 120 seconds
+            max_wait = 120
             waited = 0
             logger.info("Full refresh lock exists, waiting for release")
             while redis_client.exists(lock_key) and waited < max_wait:
@@ -68,12 +83,12 @@ def init_scheduler(app):
                         logger.debug("Released full refresh lock")
             else:
                 logger.warning("Full refresh lock not released after 120s, forcing release and skipping startup refresh")
-                redis_client.delete(lock_key)  # Force release if stuck
-                logger.debug("Forced release of full refresh lock")
+                redis_client.delete(lock_key)
 
     def run_with_context():
         with app.app_context():
             try:
+                retry_database_connection()
                 logger.debug("Starting scheduled incremental refresh")
                 incremental_refresh()
                 logger.info("Scheduled incremental refresh completed successfully")

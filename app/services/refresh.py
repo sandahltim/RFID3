@@ -1,5 +1,5 @@
 # app/services/refresh.py
-# refresh.py version: 2025-06-20-v9
+# refresh.py version: 2025-06-20-v10
 import logging
 import traceback
 from datetime import datetime, timedelta
@@ -9,8 +9,9 @@ from app.services.api_client import APIClient
 from flask import Blueprint, jsonify, current_app
 from config import INCREMENTAL_LOOKBACK_SECONDS
 import time
+import os
 
-logger = logging.getLogger('refresh')
+logger = logging.getLogger(f'refresh_{os.getpid()}')
 logger.setLevel(logging.INFO)
 if not logger.handlers:
     # File handler for rfid_dashboard.log
@@ -31,7 +32,7 @@ refresh_bp = Blueprint('refresh', __name__)
 api_client = APIClient()
 
 def validate_date(date_str, field_name, tag_id):
-    """Validate date string and return datetime object or None."""
+    """Validate date string and return datetime object or None with enhanced handling."""
     if date_str is None or date_str == '0000-00-00 00:00:00':
         logger.debug(f"Null or invalid {field_name} for tag_id {tag_id}: {date_str}, returning None")
         return None
@@ -41,7 +42,11 @@ def validate_date(date_str, field_name, tag_id):
         try:
             return datetime.fromisoformat(date_str.replace('Z', '+00:00'))
         except ValueError as e:
-            logger.warning(f"Invalid {field_name} for tag_id {tag_id}: {date_str}. Error: {str(e)}. Returning None. Raw data: {traceback.format_exc()}")
+            # Check if it's a hexadecimal or non-date string
+            if all(c in '0123456789ABCDEFabcdef' for c in date_str):
+                logger.warning(f"Possible hexadecimal {field_name} for tag_id {tag_id}: {date_str}. Returning None.")
+            else:
+                logger.warning(f"Invalid {field_name} for tag_id {tag_id}: {date_str}. Error: {str(e)}. Returning None.")
             return None
 
 def update_refresh_state(state_type, timestamp):
@@ -105,7 +110,6 @@ def update_item_master(session, items):
                 logger.error(f"Error updating item {tag_id}: {str(e)}", exc_info=True)
                 session.rollback()
                 raise
-    # Ensure session is active before using no_autoflush
     if session.is_active:
         with session.no_autoflush:
             update_items()

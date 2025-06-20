@@ -1,5 +1,5 @@
 # app/routes/home.py
-# home.py version: 2025-06-19-v2
+# home.py version: 2025-06-19-v3
 from flask import Blueprint, render_template, current_app
 from .. import db
 from ..models.db_models import ItemMaster, Transaction, RefreshState
@@ -8,9 +8,10 @@ from time import time
 import logging
 import sys
 from datetime import datetime
+import os
 
-# Configure logging (module-level to avoid duplicates)
-logger = logging.getLogger('home')
+# Configure logging with process ID to avoid duplicates
+logger = logging.getLogger(f'home_{os.getpid()}')
 logger.setLevel(logging.INFO)
 if not logger.handlers:
     # File handler for rfid_dashboard.log
