@@ -8,6 +8,7 @@ from app.models.db_models import ItemMaster, Transaction, SeedRentalClass, Refre
 from app.services.api_client import APIClient
 from flask import Blueprint, jsonify, current_app
 from config import INCREMENTAL_LOOKBACK_SECONDS
+import time
 
 logger = logging.getLogger('refresh')
 logger.setLevel(logging.INFO)
@@ -107,9 +108,10 @@ def update_item_master(session, items):
                 logger.error(f"Error updating item {tag_id}: {str(e)}", exc_info=True)
                 session.rollback()
                 raise
-    # Correct usage of no_autoflush as a context manager
-    with session.no_autoflush:
-        update_items()
+    # Ensure session is active before using no_autoflush
+    if session.is_active:
+        with session.no_autoflush:
+            update_items()
     logger.info(f"Skipped {skipped} items due to missing or invalid data")
 
 def update_transactions(session, transactions):
