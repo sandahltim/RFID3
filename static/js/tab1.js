@@ -477,6 +477,7 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
             container.style.display = 'block';
             container.style.opacity = '1';
             container.style.visibility = 'visible';
+            wrapper.classList.remove('collapsed'); // Ensure wrapper is visible on expand
 
             applyFilterWithRetryTab1(`item-table-${key}`, 'item');
         })
@@ -696,7 +697,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
             const expandBtn = collapseBtn.parentElement.querySelector(`.expand-items-btn[data-target-id="${targetId}"]`);
+            const wrapper = container.querySelector('.item-level-wrapper');
             collapseSection(targetId);
+            if (wrapper) {
+                wrapper.classList.add('collapsed');
+            }
             container.style.minHeight = '0';
             container.style.padding = '0';
             if (expandBtn && collapseBtn) {
