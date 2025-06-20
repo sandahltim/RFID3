@@ -1,4 +1,4 @@
-# config.py version: 2025-06-19-v4
+# config.py version: 2025-06-20-v5
 import os
 
 # Base directory
@@ -11,7 +11,7 @@ DB_CONFIG = {
     'password': 'rfid_user_password',  # Change this to a secure password
     'database': 'rfid_inventory',
     'charset': 'utf8mb4',
-    'collation': 'utf8mb4_unicode_ci'  # Changed to compatible collation for MariaDB 10.11
+    'collation': 'utf8mb4_unicode_ci'  # Explicitly set to match table collation
 }
 
 # Redis configuration
@@ -36,3 +36,12 @@ BULK_UPDATE_BATCH_SIZE = 50  # Batch size for bulk updates in tab5.py
 
 # Logging
 LOG_FILE = os.path.join(BASE_DIR, 'logs', 'rfid_dashboard.log')
+
+# SQLAlchemy configuration
+SQLALCHEMY_ENGINE_OPTIONS = {
+    'pool_size': 10,
+    'max_overflow': 20,
+    'pool_timeout': 30,
+    'pool_recycle': 1800,  # Recycle connections every 30 minutes
+    'connect_args': {'charset': 'utf8mb4', 'collation': 'utf8mb4_unicode_ci'}  # Explicit connection settings
+}
