@@ -1,5 +1,5 @@
 # app/routes/categories.py
-# categories.py version: 2025-06-20-v23
+# categories.py version: 2025-06-20-v24
 from flask import Blueprint, render_template, request, jsonify, current_app
 from .. import db, cache
 from ..models.db_models import RentalClassMapping, UserRentalClassMapping, SeedRentalClass
@@ -45,7 +45,7 @@ if not any(isinstance(h, logging.StreamHandler) for h in root_logger.handlers):
 categories_bp = Blueprint('categories', __name__)
 
 # Version check to ensure correct deployment
-logger.info("Deployed categories.py version: 2025-06-20-v23")
+logger.info("Deployed categories.py version: 2025-06-20-v24")
 
 def build_common_name_dict(seed_data):
     """Build a dictionary mapping rental_class_id to common_name from seed_data."""
@@ -115,9 +115,15 @@ def manage_categories():
         # Fetch seed data from cache or database
         cache_key = 'seed_rental_classes'
         logger.debug(f"Checking cache for key: {cache_key}")
-        seed_data = cache.get(cache_key)
+        try:
+            seed_data = cache.get(cache_key)
+        except Exception as cache_error:
+            logger.error(f"Cache error for key {cache_key}: {str(cache_error)}. Bypassing cache.", exc_info=True)
+            current_app.logger.error(f"Cache error for key {cache_key}: {str(cache_error)}. Bypassing cache.", exc_info=True)
+            seed_data = None
+
         if seed_data is None:
-            logger.info("Seed data not found in cache, fetching from database")
+            logger.info("Seed data not found in cache or cache failed, fetching from database")
             try:
                 seed_data = session.query(SeedRentalClass).all()
                 seed_data = [{'rental_class_id': s.rental_class_id, 'common_name': s.common_name or 'Unknown', 'bin_location': s.bin_location} for s in seed_data]
@@ -171,8 +177,8 @@ def manage_categories():
                 logger.info("Fetched seed data and cached")
                 current_app.logger.info("Fetched seed data and cached")
             except Exception as cache_error:
-                logger.error(f"Error caching seed data: {str(cache_error)}", exc_info=True)
-                current_app.logger.error(f"Error caching seed data: {str(cache_error)}", exc_info=True)
+                logger.error(f"Error caching seed data: {str(cache_error)}. Data will be fetched on next request.", exc_info=True)
+                current_app.logger.error(f"Error caching seed data: {str(cache_error)}. Data will be fetched on next request.", exc_info=True)
 
         categories.sort(key=lambda x: (x['category'] or '', x['subcategory'] or '', x['rental_class_id'] or ''))
         logger.info(f"Fetched {len(categories)} category mappings")
@@ -236,12 +242,12 @@ def get_mappings():
         try:
             seed_data = cache.get(cache_key)
         except Exception as cache_error:
-            logger.error(f"Failed to fetch cache for key {cache_key}: {str(cache_error)}", exc_info=True)
-            current_app.logger.error(f"Failed to fetch cache for key {cache_key}: {str(cache_error)}", exc_info=True)
+            logger.error(f"Cache error for key {cache_key}: {str(cache_error)}. Bypassing cache.", exc_info=True)
+            current_app.logger.error(f"Cache error for key {cache_key}: {str(cache_error)}. Bypassing cache.", exc_info=True)
             seed_data = None
 
         if seed_data is None:
-            logger.info("Seed data not found in cache, fetching from database")
+            logger.info("Seed data not found in cache or cache failed, fetching from database")
             try:
                 seed_data = session.query(SeedRentalClass).all()
                 seed_data = [{'rental_class_id': s.rental_class_id, 'common_name': s.common_name or 'Unknown', 'bin_location': s.bin_location} for s in seed_data]
@@ -295,8 +301,8 @@ def get_mappings():
                 logger.info("Fetched seed data and cached")
                 current_app.logger.info("Fetched seed data and cached")
             except Exception as cache_error:
-                logger.error(f"Error caching seed data: {str(cache_error)}", exc_info=True)
-                current_app.logger.error(f"Error caching seed data: {str(cache_error)}", exc_info=True)
+                logger.error(f"Error caching seed_data: {str(cache_error)}. Data will be fetched on next request.", exc_info=True)
+                current_app.logger.error(f"Error caching seed_data: {str(cache_error)}. Data will be fetched on next request.", exc_info=True)
 
         categories.sort(key=lambda x: (x['category'] or '', x['subcategory'] or '', x['rental_class_id'] or ''))
         logger.info(f"Returning {len(categories)} category mappings")

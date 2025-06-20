@@ -1,6 +1,7 @@
 # app/services/refresh.py
-# refresh.py version: 2025-06-20-v5
+# refresh.py version: 2025-06-20-v6
 import logging
+import traceback
 from datetime import datetime, timedelta
 from sqlalchemy.exc import SQLAlchemyError, OperationalError
 from app.models.db_models import ItemMaster, Transaction, SeedRentalClass, RefreshState, db
@@ -216,8 +217,9 @@ def full_refresh():
                 logger.info(f"Deleted {deleted_transactions} transactions from id_transactions")
                 logger.info(f"Deleted {deleted_seed} items from seed_rental_classes")
 
-                items = api_client.get_item_master()
-                transactions = api_client.get_transactions()
+                # Fetch all items without date filter initially
+                items = api_client.get_item_master(since_date=None)
+                transactions = api_client.get_transactions(since_date=None)
                 seed_data = api_client.get_seed_data()
 
                 logger.info(f"Fetched {len(items)} items from item master")
@@ -255,7 +257,7 @@ def full_refresh():
                 logger.error(f"Database error: {str(e)}", exc_info=True)
                 raise
         except Exception as e:
-            logger.error(f"Full refresh failed: {str(e)}", exc_info=True)
+            logger.error(f"Full refresh failed: {str(e)}\n{traceback.format_exc()}")
             session.rollback()
             raise
         finally:
@@ -291,7 +293,7 @@ def incremental_refresh():
         update_refresh_state('incremental_refresh', datetime.utcnow())
         logger.info("Incremental refresh completed successfully")
     except Exception as e:
-        logger.error(f"Incremental refresh failed: {str(e)}", exc_info=True)
+        logger.error(f"Incremental refresh failed: {str(e)}\n{traceback.format_exc()}")
         session.rollback()
         raise
     finally:
@@ -308,11 +310,11 @@ def full_refresh_endpoint():
         logger.info("Full refresh completed successfully")
         return jsonify({'status': 'success', 'message': 'Full refresh completed successfully'})
     except OperationalError as e:
-        logger.error(f"Database error during full refresh: {str(e)}", exc_info=True)
+        logger.error(f"Database error during full refresh: {str(e)}\n{traceback.format_exc()}")
         session.rollback()
         return jsonify({'status': 'error', 'message': f"Database error: {str(e)}"}), 500
     except Exception as e:
-        logger.error(f"Full refresh failed: {str(e)}", exc_info=True)
+        logger.error(f"Full refresh failed: {str(e)}\n{traceback.format_exc()}")
         session.rollback()
         return jsonify({'status': 'error', 'message': str(e)}), 500
     finally:
@@ -331,11 +333,11 @@ def incremental_refresh_endpoint():
         logger.info("Incremental refresh completed successfully")
         return jsonify({'status': 'success', 'message': 'Incremental refresh completed successfully'})
     except OperationalError as e:
-        logger.error(f"Database error during incremental refresh: {str(e)}", exc_info=True)
+        logger.error(f"Database error during incremental refresh: {str(e)}\n{traceback.format_exc()}")
         session.rollback()
         return jsonify({'status': 'error', 'message': f"Database error: {str(e)}"}), 500
     except Exception as e:
-        logger.error(f"Incremental refresh failed: {str(e)}", exc_info=True)
+        logger.error(f"Incremental refresh failed: {str(e)}\n{traceback.format_exc()}")
         session.rollback()
         return jsonify({'status': 'error', 'message': str(e)}), 500
     finally:
@@ -354,11 +356,11 @@ def clear_api_data():
         logger.info("Clear API data and refresh completed successfully")
         return jsonify({'status': 'success', 'message': 'API data cleared and refreshed successfully'})
     except OperationalError as e:
-        logger.error(f"Database error during clear API data: {str(e)}", exc_info=True)
+        logger.error(f"Database error during clear API data: {str(e)}\n{traceback.format_exc()}")
         session.rollback()
         return jsonify({'status': 'error', 'message': f"Database error: {str(e)}"}), 500
     except Exception as e:
-        logger.error(f"Clear API data and refresh failed: {str(e)}", exc_info=True)
+        logger.error(f"Clear API data and refresh failed: {str(e)}\n{traceback.format_exc()}")
         session.rollback()
         return jsonify({'status': 'error', 'message': str(e)}), 500
     finally:
@@ -388,7 +390,7 @@ def get_refresh_status():
                 'refresh_type': 'N/A'
             })
     except Exception as e:
-        logger.error(f"Error fetching refresh status: {str(e)}", exc_info=True)
+        logger.error(f"Error fetching refresh status: {str(e)}\n{traceback.format_exc()}")
         return jsonify({'status': 'error', 'message': str(e)}), 500
     finally:
         session.close()
