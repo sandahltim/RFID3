@@ -1,5 +1,5 @@
 # app/services/refresh.py
-# refresh.py version: 2025-06-20-v8
+# refresh.py version: 2025-06-20-v9
 import logging
 import traceback
 from datetime import datetime, timedelta
@@ -14,20 +14,19 @@ logger = logging.getLogger('refresh')
 logger.setLevel(logging.INFO)
 
 # Remove existing handlers to avoid duplicates
-logger.handlers = []
+if not logger.handlers:
+    # File handler for rfid_dashboard.log
+    file_handler = logging.FileHandler('/home/tim/test_rfidpi/logs/rfid_dashboard.log')
+    file_handler.setLevel(logging.INFO)
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    file_handler.setFormatter(formatter)
+    logger.addHandler(file_handler)
 
-# File handler for rfid_dashboard.log
-file_handler = logging.FileHandler('/home/tim/test_rfidpi/logs/rfid_dashboard.log')
-file_handler.setLevel(logging.INFO)
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-file_handler.setFormatter(formatter)
-logger.addHandler(file_handler)
-
-# Console handler
-console_handler = logging.StreamHandler()
-console_handler.setLevel(logging.INFO)
-console_handler.setFormatter(formatter)
-logger.addHandler(console_handler)
+    # Console handler
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(logging.INFO)
+    console_handler.setFormatter(formatter)
+    logger.addHandler(console_handler)
 
 refresh_bp = Blueprint('refresh', __name__)
 
@@ -254,7 +253,7 @@ def full_refresh():
                 if attempt < max_retries - 1:
                     logger.warning(f"Deadlock detected, retrying ({attempt + 1}/{max_retries})")
                     session.rollback()
-                    time.sleep(1)
+                    time.sleep(2 ** attempt)  # Exponential backoff
                     continue
                 else:
                     logger.error(f"Max retries reached for deadlock: {str(e)}", exc_info=True)
@@ -273,38 +272,55 @@ def full_refresh():
 def incremental_refresh():
     logger.info("Starting incremental refresh")
     session = db.session()
-    try:
-        since_date = datetime.utcnow() - timedelta(seconds=INCREMENTAL_LOOKBACK_SECONDS)
-        logger.info(f"Checking for updates since: {since_date.strftime('%Y-%m-%d %H:%M:%S')}")
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            with session.no_autoflush:  # Prevent premature autoflush for the entire function
+                since_date = datetime.utcnow() - timedelta(seconds=INCREMENTAL_LOOKBACK_SECONDS)
+                logger.info(f"Checking for updates since: {since_date.strftime('%Y-%m-%d %H:%M:%S')}")
 
-        logger.info(f"Fetching item master data with since_date: {since_date}")
-        items = api_client.get_item_master(since_date=since_date)
-        logger.info(f"Fetched {len(items)} items from item master")
-        logger.debug(f"Item master data sample: {items[:5] if items else 'No items'}")
-        if not items:
-            logger.info("No new items fetched from item master API.")
+                logger.info(f"Fetching item master data with since_date: {since_date}")
+                items = api_client.get_item_master(since_date=since_date)
+                logger.info(f"Fetched {len(items)} items from item master")
+                logger.debug(f"Item master data sample: {items[:5] if items else 'No items'}")
+                if not items:
+                    logger.info("No new items fetched from item master API.")
 
-        logger.info(f"Fetching transactions data with since_date: {since_date}")
-        transactions = api_client.get_transactions(since_date=since_date)
-        logger.info(f"Fetched {len(transactions)} transactions")
-        logger.debug(f"Transactions data sample: {transactions[:5] if transactions else 'No transactions'}")
-        if not transactions:
-            logger.info("No new transactions fetched from transactions API.")
+                logger.info(f"Fetching transactions data with since_date: {since_date}")
+                transactions = api_client.get_transactions(since_date=since_date)
+                logger.info(f"Fetched {len(transactions)} transactions")
+                logger.debug(f"Transactions data sample: {transactions[:5] if transactions else 'No transactions'}")
+                if not transactions:
+                    logger.info("No new transactions fetched from transactions API.")
 
-        update_item_master(session, items)
-        update_transactions(session, transactions)
-        logger.info("Skipping seed data refresh (handled in full refresh)")
+                update_item_master(session, items)
+                update_transactions(session, transactions)
+                logger.info("Skipping seed data refresh (handled in full refresh)")
 
-        session.commit()
-        update_refresh_state('incremental_refresh', datetime.utcnow())
-        logger.info("Incremental refresh completed successfully")
-    except Exception as e:
-        logger.error(f"Incremental refresh failed: {str(e)}\n{traceback.format_exc()}")
-        session.rollback()
-        raise
-    finally:
-        session.close()
-        logger.debug("Incremental refresh session closed")
+                session.commit()
+                update_refresh_state('incremental_refresh', datetime.utcnow())
+                logger.info("Incremental refresh completed successfully")
+                break
+        except OperationalError as e:
+            if "Lock wait timeout" in str(e) or "Deadlock" in str(e):
+                if attempt < max_retries - 1:
+                    logger.warning(f"Database lock/timeout detected, retrying ({attempt + 1}/{max_retries})")
+                    session.rollback()
+                    time.sleep(2 ** attempt)  # Exponential backoff
+                    continue
+                else:
+                    logger.error(f"Max retries reached for lock/timeout: {str(e)}", exc_info=True)
+                    raise
+            else:
+                logger.error(f"Database error: {str(e)}", exc_info=True)
+                raise
+        except Exception as e:
+            logger.error(f"Incremental refresh failed: {str(e)}\n{traceback.format_exc()}")
+            session.rollback()
+            raise
+        finally:
+            session.close()
+            logger.debug("Incremental refresh session closed")
 
 @refresh_bp.route('/refresh/full', methods=['POST'])
 def full_refresh_endpoint():

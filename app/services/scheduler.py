@@ -1,5 +1,5 @@
 # app/services/scheduler.py
-# scheduler.py version: 2025-06-20-v3
+# scheduler.py version: 2025-06-20-v4
 from apscheduler.schedulers.background import BackgroundScheduler
 from app.services.refresh import incremental_refresh, full_refresh
 from redis import Redis
@@ -13,20 +13,19 @@ logger = logging.getLogger('scheduler')
 logger.setLevel(logging.DEBUG)
 
 # Remove existing handlers to avoid duplicates
-logger.handlers = []
+if not logger.handlers:
+    # File handler for rfid_dashboard.log
+    file_handler = logging.FileHandler('/home/tim/test_rfidpi/logs/rfid_dashboard.log')
+    file_handler.setLevel(logging.DEBUG)
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    file_handler.setFormatter(formatter)
+    logger.addHandler(file_handler)
 
-# File handler for rfid_dashboard.log
-file_handler = logging.FileHandler('/home/tim/test_rfidpi/logs/rfid_dashboard.log')
-file_handler.setLevel(logging.DEBUG)
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-file_handler.setFormatter(formatter)
-logger.addHandler(file_handler)
-
-# Console handler
-console_handler = logging.StreamHandler(sys.stdout)
-console_handler.setLevel(logging.DEBUG)
-console_handler.setFormatter(formatter)
-logger.addHandler(console_handler)
+    # Console handler
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setLevel(logging.DEBUG)
+    console_handler.setFormatter(formatter)
+    logger.addHandler(console_handler)
 
 scheduler = BackgroundScheduler()
 
@@ -34,7 +33,7 @@ def init_scheduler(app):
     logger.info("Initializing background scheduler")
     redis_client = Redis.from_url(REDIS_URL)
     lock_key = "full_refresh_lock"
-    lock_timeout = 120
+    lock_timeout = 300  # Increased to 300 seconds to handle longer transactions
 
     with app.app_context():
         logger.debug("Checking for full refresh lock")
@@ -50,7 +49,7 @@ def init_scheduler(app):
                 redis_client.delete(lock_key)
                 logger.debug("Released full refresh lock")
         else:
-            max_wait = 30
+            max_wait = 60  # Increased to 60 seconds
             waited = 0
             logger.info("Full refresh lock exists, waiting for release")
             while redis_client.exists(lock_key) and waited < max_wait:
@@ -70,7 +69,7 @@ def init_scheduler(app):
                         redis_client.delete(lock_key)
                         logger.debug("Released full refresh lock")
             else:
-                logger.warning("Full refresh lock not released after 30s, skipping startup refresh")
+                logger.warning("Full refresh lock not released after 60s, skipping startup refresh")
 
     def run_with_context():
         with app.app_context():
@@ -86,11 +85,11 @@ def init_scheduler(app):
     scheduler.add_job(
         func=run_with_context,
         trigger='interval',
-        seconds=30,
+        seconds=60,  # Increased to 60 seconds to reduce load
         id='incremental_refresh',
         replace_existing=True,
         coalesce=True,
-        max_instances=2  # Increased to allow more concurrent runs
+        max_instances=1
     )
     try:
         logger.debug("Starting scheduler")
