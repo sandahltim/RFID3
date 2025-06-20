@@ -1394,6 +1394,7 @@ test_rfidpi/ RFID6
 │   ├── update_rental_class_mappings.py
 │   ├── migrate_hand_counted_items.sql
 │   ├── setup_mariadb.sh
+│   └── and others...
 ├── run.py
 ├── config.py
 ├── logs/

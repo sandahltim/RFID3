@@ -36,13 +36,13 @@ RFID Dashboard
                 Full Refresh
                 Incremental Refresh
                 
-                    Last Refresh: {{ last_refresh if last_refresh != 'N/A' else 'N/A' }} ({{ refresh_type | default('N/A') }})
+                    Last Refresh: <p id="refresh-status">{{ last_refresh if last_refresh != 'N/A' else 'N/A' }} ({{ refresh_type | default('N/A') }})</p>
                     <script>
                         document.addEventListener('DOMContentLoaded', () => {
                             const lastRefreshElement = document.querySelector('#refresh-status');
                             if (lastRefreshElement && typeof formatDate === 'function') {
-                                const rawDate = lastRefreshElement.textContent.trim();
-                                lastRefreshElement.textContent = formatDate(rawDate);
+                                const rawDate = lastRefreshElement.textContent.trim().split(' (')[0];
+                                lastRefreshElement.textContent = formatDate(rawDate) + ' (' + lastRefreshElement.textContent.split(' (')[1] || '';
                             }
                         });
                     </script>
