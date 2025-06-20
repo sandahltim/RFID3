@@ -267,3 +267,11 @@ tr.common-name-row td table.common-table td {
         font-size: 0.9rem;
     }
 }
+
+/* Adjust filter and table alignment */
+.container {
+    padding-top: 0; /* Override base.css padding-top to reduce gap */
+}
+.category-table {
+    margin-top: -20px; /* Pull table up to close the gap */
+}

@@ -442,6 +442,24 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                     `;
                 }
                 wrapper.appendChild(paginationDiv);
+
+                // Add print buttons
+                const printDiv = document.createElement('div');
+                printDiv.className = 'btn-group mt-2';
+                const escapedCommonName = commonName.replace(/'/g, "\\'").replace(/"/g, '\\"');
+                printDiv.innerHTML = `
+                    <button class="btn btn-sm btn-info print-btn" 
+                            data-print-level="Common Name" 
+                            data-print-id="item-table-${key}" 
+                            data-common-name="${escapedCommonName}" 
+                            data-category="${category}" 
+                            data-subcategory="${subcategory}">Print Aggregate</button>
+                    <button class="btn btn-sm btn-info print-full-btn" 
+                            data-common-name="${escapedCommonName}" 
+                            data-category="${category}" 
+                            data-subcategory="${subcategory}">Print Full List</button>
+                `;
+                wrapper.appendChild(printDiv);
             } else {
                 tbody.innerHTML = `<tr><td colspan="8">No items found.</td></tr>`;
             }
@@ -679,6 +697,8 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             const expandBtn = collapseBtn.parentElement.querySelector(`.expand-items-btn[data-target-id="${targetId}"]`);
             collapseSection(targetId);
+            container.style.minHeight = '0';
+            container.style.padding = '0';
             if (expandBtn && collapseBtn) {
                 expandBtn.style.display = 'inline-block';
                 collapseBtn.style.display = 'none';
@@ -693,6 +713,30 @@ document.addEventListener('DOMContentLoaded', function() {
             const tagId = saveBtn.closest('tr').getAttribute('data-item-id');
             console.log('Save button clicked:', tagId);
             saveChanges(tagId);
+            return;
+        }
+
+        const printBtn = event.target.closest('.print-btn');
+        if (printBtn) {
+            event.preventDefault();
+            event.stopPropagation();
+            const level = printBtn.getAttribute('data-print-level');
+            const id = printBtn.getAttribute('data-print-id');
+            const commonName = printBtn.getAttribute('data-common-name');
+            const category = printBtn.getAttribute('data-category');
+            const subcategory = printBtn.getAttribute('data-subcategory');
+            printTable(level, id, commonName, category, subcategory);
+            return;
+        }
+
+        const printFullBtn = event.target.closest('.print-full-btn');
+        if (printFullBtn) {
+            event.preventDefault();
+            event.stopPropagation();
+            const commonName = printFullBtn.getAttribute('data-common-name');
+            const category = printFullBtn.getAttribute('data-category');
+            const subcategory = printFullBtn.getAttribute('data-subcategory');
+            printFullItemList(category, subcategory, commonName);
             return;
         }
     }

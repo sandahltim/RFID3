@@ -1,112 +1,102 @@
 {% extends 'base.html' %}
 {% block title %}Home{% endblock %}
 {% block extra_head %}
+    <style>
+        .refresh-section .btn { margin-right: 10px; }
+        .status-breakdown, .recent-scans { margin-top: 20px; }
+    </style>
 {% endblock %}
 {% block scripts %}
     {{ super() }}
 {% endblock %}
 {% block content %}
-RFID Dashboard
+<div class="container mt-4">
+    {% if error %}
+        <div class="alert alert-danger" role="alert">{{ error }}</div>
+    {% else %}
+        <div class="card">
+            <div class="card-header">
+                <h2>RFID Dashboard</h2>
+            </div>
+            <div class="card-body">
+                <div class="card mb-3">
+                    <div class="card-header">Scannable Items</div>
+                    <div class="card-body">
+                        <ul class="list-group">
+                            <li class="list-group-item">All Linens (except Skirts, Spandex, Runners, and Sashes are hand entered)</li>
+                            <li class="list-group-item">All Concession Machines and Resale - No Sterno or Donuts</li>
+                            <li class="list-group-item">All AV and Sound</li>
+                            <li class="list-group-item">All Tent Tops - No Sidewall</li>
+                            <li class="list-group-item">Garden Chairs and Cocktail Table Tops</li>
+                            <li class="list-group-item">Fountains and Bev Dispensers</li>
+                            <li class="list-group-item">Dishes/Silverware Packs</li>
+                            <li class="list-group-item">Carpet Runners</li>
+                        </ul>
+                    </div>
+                </div>
 
+                <div class="card mb-3 refresh-section">
+                    <div class="card-header">Refresh Data</div>
+                    <div class="card-body">
+                        <button id="full-refresh-btn" class="btn btn-primary" onclick="triggerFullRefresh()">Full Refresh</button>
+                        <button id="incremental-refresh-btn" class="btn btn-secondary" onclick="triggerIncrementalRefresh()">Incremental Refresh</button>
+                        <p id="refresh-status">Last Refresh: {{ last_refresh if last_refresh != 'N/A' else 'N/A' }} ({{ refresh_type | default('N/A') }})</p>
+                    </div>
+                </div>
 
-{% if error %}
-    {{ error }}
+                <div class="card mb-3">
+                    <div class="card-header">Total Items: {{ total_items | default(0) }}</div>
+                    <div class="card-body status-breakdown">
+                        <h4>Status Breakdown</h4>
+                        <table class="table table-bordered">
+                            <thead>
+                                <tr><th>Status</th><th>Count</th></tr>
+                            </thead>
+                            <tbody>
+                                {% for status, count in status_counts %}
+                                    <tr><td>{{ status | default('Unknown') }}</td><td>{{ count }}</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
 
-{% else %}
-    
-        
-            
-                Scannable Items
+                <div class="card mb-3">
+                    <div class="card-header">Recent Scans</div>
+                    <div class="card-body recent-scans">
+                        <table class="table table-bordered">
+                            <thead>
+                                <tr><th>Tag ID</th><th>Common Name</th><th>Last Scanned</th></tr>
+                            </thead>
+                            <tbody>
+                                {% for item in recent_scans %}
+                                    <tr><td>{{ item.tag_id }}</td><td>{{ item.common_name }}</td><td>{{ item.date_last_scanned | default('N/A') }}</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
 
-                	All Linens (except Skirts, Spandex, Runners, and Sashes are hand entered)
-	All Concession Machines and Resale - No Sterno or Donuts
-	All AV and Sound
-	All Tent Tops - No Sidewall
-	Garden Chairs and Cocktail Table Tops
-	Fountains and Bev Dispensers
-	Dishes/Silverware Packs
-	Carpet Runners
-
-
-            
-
-            
-                Refresh Data
-
-                Full Refresh
-                Incremental Refresh
-                
-                    Last Refresh: <p id="refresh-status">{{ last_refresh if last_refresh != 'N/A' else 'N/A' }} ({{ refresh_type | default('N/A') }})</p>
-                    <script>
-                        document.addEventListener('DOMContentLoaded', () => {
-                            const lastRefreshElement = document.querySelector('#refresh-status');
-                            if (lastRefreshElement && typeof formatDate === 'function') {
-                                const rawDate = lastRefreshElement.textContent.trim().split(' (')[0];
-                                lastRefreshElement.textContent = formatDate(rawDate) + ' (' + lastRefreshElement.textContent.split(' (')[1] || '';
-                            }
-                        });
-                    </script>
-                
-
-            
-
-        
-
-
-        
-            
-                Total Items: {{ total_items | default(0) }}
-
-                Status Breakdown
-
-                	Status	Count
-
-
-                        {% for status, count in status_counts %}
-                            	{{ status | default('Unknown') }}	{{ count }}
-
-
-                        {% endfor %}
-                    
-                
-            
-
-            
-                Recent Scans
-
-                	Tag ID	Common Name	Last Scanned
-
-
-                        {% for item in recent_scans %}
-                            	{{ item.tag_id }}	{{ item.common_name }}	{{ item.date_last_scanned | default('N/A') }}
-
-
-                        {% endfor %}
-                    
-                
-            
-
-        
-
-
-        
-            
-                Navigation
-
-                	Tab	Actions
-	Rental Inventory	View
-	Open Contracts	View
-	Service	View
-	Laundry Contracts	View
-	Resale	View
-	Manage Categories	View
-
-
-            
-
-        
-
-    
-
-{% endif %}
+                <div class="card">
+                    <div class="card-header">Navigation</div>
+                    <div class="card-body">
+                        <table class="table table-bordered">
+                            <thead>
+                                <tr><th>Tab</th><th>Actions</th></tr>
+                            </thead>
+                            <tbody>
+                                <tr><td>Rental Inventory</td><td><a href="{{ url_for('tab1.tab1_view') }}" class="btn btn-link">View</a></td></tr>
+                                <tr><td>Open Contracts</td><td><a href="{{ url_for('tab2.tab2_view') }}" class="btn btn-link">View</a></td></tr>
+                                <tr><td>Service</td><td><a href="{{ url_for('tab3.tab3_view') }}" class="btn btn-link">View</a></td></tr>
+                                <tr><td>Laundry Contracts</td><td><a href="{{ url_for('tab4.tab4_view') }}" class="btn btn-link">View</a></td></tr>
+                                <tr><td>Resale</td><td><a href="{{ url_for('tab5.tab5_view') }}" class="btn btn-link">View</a></td></tr>
+                                <tr><td>Manage Categories</td><td><a href="{{ url_for('categories.manage_categories') }}" class="btn btn-link">View</a></td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+</div>
 {% endblock %}
