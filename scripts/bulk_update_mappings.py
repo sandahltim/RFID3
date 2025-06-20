@@ -1,3 +1,5 @@
+# scripts/bulk_update_mappings.py
+# bulk_update_mappings.py version: 2025-06-20-v2
 import sys
 import os
 import csv
@@ -11,7 +13,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.exc import IntegrityError
 from app.models.db_models import UserRentalClassMapping
-from config import DB_CONFIG
+from config import DB_CONFIG, SQLALCHEMY_ENGINE_OPTIONS
 import logging
 
 # Set up logging
@@ -36,8 +38,8 @@ logger.addHandler(console_handler)
 
 # Database connection
 try:
-    db_url = f"mysql+mysqlconnector://{DB_CONFIG['user']}:{DB_CONFIG['password']}@{DB_CONFIG['host']}/{DB_CONFIG['database']}?charset={DB_CONFIG['charset']}"
-    engine = create_engine(db_url)
+    db_url = f"mysql+mysqlconnector://{DB_CONFIG['user']}:{DB_CONFIG['password']}@{DB_CONFIG['host']}/{DB_CONFIG['database']}?charset={DB_CONFIG['charset']}&collation={DB_CONFIG['collation']}"
+    engine = create_engine(db_url, **SQLALCHEMY_ENGINE_OPTIONS)
     Session = sessionmaker(bind=engine)
     session = Session()
     logger.info("Successfully connected to the database")
