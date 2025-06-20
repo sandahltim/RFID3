@@ -9,25 +9,22 @@ import logging
 import sys
 from datetime import datetime
 
-# Configure logging
+# Configure logging (module-level to avoid duplicates)
 logger = logging.getLogger('home')
 logger.setLevel(logging.INFO)
+if not logger.handlers:
+    # File handler for rfid_dashboard.log
+    file_handler = logging.FileHandler('/home/tim/test_rfidpi/logs/rfid_dashboard.log')
+    file_handler.setLevel(logging.INFO)
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    file_handler.setFormatter(formatter)
+    logger.addHandler(file_handler)
 
-# Remove existing handlers to avoid duplicates
-logger.handlers = []
-
-# File handler for rfid_dashboard.log
-file_handler = logging.FileHandler('/home/tim/test_rfidpi/logs/rfid_dashboard.log')
-file_handler.setLevel(logging.INFO)
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-file_handler.setFormatter(formatter)
-logger.addHandler(file_handler)
-
-# Console handler
-console_handler = logging.StreamHandler(sys.stdout)
-console_handler.setLevel(logging.INFO)
-console_handler.setFormatter(formatter)
-logger.addHandler(console_handler)
+    # Console handler
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setLevel(logging.INFO)
+    console_handler.setFormatter(formatter)
+    logger.addHandler(console_handler)
 
 home_bp = Blueprint('home', __name__)
 
@@ -141,4 +138,3 @@ def home():
                               last_refresh='N/A',
                               refresh_type='N/A',
                               cache_bust=int(time()))
-                              
