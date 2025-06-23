@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, request, jsonify, current_app
 from .. import db, cache
 from ..models.db_models import Transaction, ItemMaster
-from sqlalchemy import func, desc, asc, text  # Added text import
+from sqlalchemy import func, desc, asc, text
 from time import time
 import logging
 import sys
@@ -29,7 +29,7 @@ logger.addHandler(console_handler)
 tab2_bp = Blueprint('tab2', __name__)
 
 # Version marker
-logger.info("Deployed tab2.py version: 2025-05-29-v8")
+logger.info("Deployed tab2.py version: 2025-05-29-v9")
 
 @tab2_bp.route('/tab/2')
 def tab2_view():
@@ -41,7 +41,7 @@ def tab2_view():
         current_app.logger.info("Starting new session for tab2")
 
         # Test database connection
-        result = session.execute(text("SELECT 1")).fetchall()  # Fixed with text()
+        result = session.execute(text("SELECT 1")).fetchall()
         logger.info(f"Database connection test successful: {result}")
 
         # Debug: Fetch all contract numbers
@@ -64,15 +64,29 @@ def tab2_view():
         base_results = base_query.all()
         logger.debug(f"Base query results: {[(r.last_contract_num, r.total_items) for r in base_results]}")
 
-        # Step 2: Apply filters
-        contracts_query = base_query.filter(
-            func.lower(ItemMaster.status).in_(['on rent', 'delivered']),  # Reintroduced case-insensitive filtering
+        # Get sort parameter
+        sort = request.args.get('sort', 'contract_number_asc')
+        sort_column, sort_direction = sort.split('_')
+        sort_direction = asc if sort_direction == 'asc' else desc
+
+        # Step 2: Apply filters and sorting
+        contracts_query = base_query.join(
+            Transaction, ItemMaster.last_contract_num == Transaction.contract_number
+        ).filter(
+            func.lower(ItemMaster.status).in_(['on rent', 'delivered']),
             ItemMaster.last_contract_num.isnot(None),
             ItemMaster.last_contract_num != '00000',
             ~func.trim(ItemMaster.last_contract_num).op('REGEXP')('^L[0-9]+$')
         ).having(
             func.count(ItemMaster.tag_id) > 0
         )
+
+        if sort_column == 'contract_number':
+            contracts_query = contracts_query.order_by(sort_direction(ItemMaster.last_contract_num))
+        elif sort_column == 'client_name':
+            contracts_query = contracts_query.order_by(sort_direction(Transaction.client_name))
+        elif sort_column == 'scan_date':
+            contracts_query = contracts_query.order_by(sort_direction(func.max(Transaction.scan_date)))
 
         logger.debug(f"Contracts query SQL: {str(contracts_query)}")
         contracts_query_results = contracts_query.all()
@@ -113,7 +127,7 @@ def tab2_view():
                 'total_items_inventory': total_items_inventory or 0
             })
 
-        contracts.sort(key=lambda x: x['contract_number'])
+        contracts.sort(key=lambda x: x['contract_number'])  # Fallback sort for consistency
         logger.info(f"Fetched {len(contracts)} contracts for tab2: {[c['contract_number'] for c in contracts]}")
         current_app.logger.info(f"Fetched {len(contracts)} contracts for tab2: {[c['contract_number'] for c in contracts]}")
 
@@ -123,7 +137,7 @@ def tab2_view():
         for handler in current_app.logger.handlers:
             handler.flush()
 
-        return render_template('tab2.html', contracts=contracts, error=None, cache_bust=int(time()))
+        return render_template('tab2.html', contracts=contracts, error=None, sort=sort, cache_bust=int(time()))
     except Exception as e:
         logger.error(f"Error rendering Tab 2: {str(e)}", exc_info=True)
         current_app.logger.error(f"Error rendering Tab 2: {str(e)}", exc_info=True)
@@ -135,7 +149,6 @@ def tab2_view():
         return render_template('tab2.html', contracts=[], error=str(e), cache_bust=int(time()))
     finally:
         if session:
-            # Rollback any uncommitted changes to ensure clean session state
             try:
                 session.rollback()
             except Exception as e:
@@ -164,7 +177,7 @@ def tab2_common_names():
         logger.info("Successfully created session for tab2_common_names")
 
         # Test database connection
-        session.execute(text("SELECT 1"))  # Fixed with text()
+        session.execute(text("SELECT 1"))
         logger.info("Database connection test successful in tab2_common_names")
 
         # Define the query with the on_contracts alias
