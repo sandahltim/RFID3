@@ -27,43 +27,44 @@ logger.addHandler(console_handler)
 tabs_bp = Blueprint('tabs', __name__)
 
 # Version marker
-logger.info("Deployed tabs.py version: 2025-04-25-v2")
+logger.info("Deployed tabs.py version: 2025-06-23-v3 at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
 
 @tabs_bp.route('/tab/<int:tab_num>')
 def tab_view(tab_num):
     # Route to redirect to the appropriate tab view based on tab number
-    # Updated on 2025-04-23 to include Tab 5 (Resale/Rental Packs)
-    logger.info(f"Routing request for /tab/{tab_num}")
-    current_app.logger.info(f"Routing request for /tab/{tab_num}")
+    # Updated on 2025-06-23 to ensure proper routing
+    logger.info(f"Routing request for /tab/{tab_num} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+    current_app.logger.info(f"Routing request for /tab/{tab_num} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
     if tab_num == 1:
-        logger.info("Redirecting to tab1.tab1_view")
-        current_app.logger.info("Redirecting to tab1.tab1_view")
+        logger.info("Redirecting to tab1.tab1_view at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+        current_app.logger.info("Redirecting to tab1.tab1_view at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
         return redirect(url_for('tab1.tab1_view'))
     elif tab_num == 2:
-        logger.info("Redirecting to tab2.tab2_view")
-        current_app.logger.info("Redirecting to tab2.tab2_view")
+        logger.info("Redirecting to tab2.tab2_view at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+        current_app.logger.info("Redirecting to tab2.tab2_view at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
         return redirect(url_for('tab2.tab2_view'))
     elif tab_num == 3:
-        logger.info("Redirecting to tab3.tab3_view")
-        current_app.logger.info("Redirecting to tab3.tab3_view")
+        logger.info("Redirecting to tab3.tab3_view at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+        current_app.logger.info("Redirecting to tab3.tab3_view at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
         return redirect(url_for('tab3.tab3_view'))
     elif tab_num == 4:
-        logger.info("Redirecting to tab4.tab4_view")
-        current_app.logger.info("Redirecting to tab4.tab4_view")
+        logger.info("Redirecting to tab4.tab4_view at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+        current_app.logger.info("Redirecting to tab4.tab4_view at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
         return redirect(url_for('tab4.tab4_view'))
     elif tab_num == 5:
-        logger.info("Redirecting to tab5.tab5_view")
-        current_app.logger.info("Redirecting to tab5.tab5_view")
+        logger.info("Redirecting to tab5.tab5_view at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+        current_app.logger.info("Redirecting to tab5.tab5_view at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
         return redirect(url_for('tab5.tab5_view'))
     else:
-        logger.warning(f"Tab {tab_num} not implemented")
-        current_app.logger.warning(f"Tab {tab_num} not implemented")
+        logger.warning(f"Tab {tab_num} not implemented at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+        current_app.logger.warning(f"Tab {tab_num} not implemented at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
         return jsonify({'error': 'Tab not implemented'}), 404
 
 @tabs_bp.route('/tab/<int:tab_num>/categories')
 def tab_categories(tab_num):
     # Route to redirect to the appropriate tab categories endpoint
-    # Updated on 2025-04-23 to include Tab 5 (Resale/Rental Packs)
+    # Updated on 2025-06-23 to ensure proper routing
+    logger.info(f"Routing categories request for /tab/{tab_num} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
     if tab_num == 1:
         return redirect(url_for('tab1.tab1_categories'))
     elif tab_num == 2:
@@ -80,7 +81,8 @@ def tab_categories(tab_num):
 @tabs_bp.route('/tab/<int:tab_num>/subcat_data')
 def subcat_data(tab_num):
     # Route to redirect to the appropriate tab subcategory data endpoint
-    # Updated on 2025-04-23 to include Tab 5 (Resale/Rental Packs)
+    # Updated on 2025-06-23 to ensure proper routing
+    logger.info(f"Routing subcat_data request for /tab/{tab_num} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
     if tab_num == 1:
         return redirect(url_for('tab1.tab1_subcat_data'))
     elif tab_num == 2:
@@ -97,7 +99,8 @@ def subcat_data(tab_num):
 @tabs_bp.route('/tab/<int:tab_num>/common_names')
 def common_names(tab_num):
     # Route to redirect to the appropriate tab common names endpoint
-    # Updated on 2025-04-23 to include Tab 5 (Resale/Rental Packs)
+    # Updated on 2025-06-23 to ensure proper routing
+    logger.info(f"Routing common_names request for /tab/{tab_num} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
     if tab_num == 1:
         return redirect(url_for('tab1.tab1_common_names'))
     elif tab_num == 2:
@@ -114,7 +117,8 @@ def common_names(tab_num):
 @tabs_bp.route('/tab/<int:tab_num>/data')
 def tab_data(tab_num):
     # Route to redirect to the appropriate tab data endpoint
-    # Updated on 2025-04-23 to include Tab 5 (Resale/Rental Packs)
+    # Updated on 2025-06-23 to ensure proper routing
+    logger.info(f"Routing data request for /tab/{tab_num} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
     if tab_num == 1:
         return redirect(url_for('tab1.tab1_data'))
     elif tab_num == 2:

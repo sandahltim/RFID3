@@ -3,41 +3,22 @@
 {% block title %}Resale/Rental Packs{% endblock %}
 
 {% block extra_head %}
-<script>
-    window.cachedTabNum = 5; // Set tab number
-</script>
-<style>
-    .filter-row {
-        margin-bottom: 20px;
-        display: flex;
-        flex-wrap: wrap;
-        gap: 10px;
-        align-items: center;
-    }
-    .filter-row select,
-    .filter-row button {
-        margin-right: 10px;
-        max-width: 200px;
-    }
-    .table th, .table td {
-        vertical-align: middle;
-    }
-    .btn-group .btn {
-        margin-right: 5px;
-    }
-</style>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/tab5.css') }}">
 {% endblock %}
 
 {% block content %}
-<div class="mt-4">
-    <h2>Resale/Rental Packs</h2>
+    <h2 class="tab-title">Resale/Rental Packs</h2>
 
-    <div class="filter-row">
-        <button class="btn btn-primary" onclick="updateResalePackToSold()">Update Resale/Pack to Sold</button>
-        <button class="btn btn-primary" onclick="exportSoldItemsCSV()">Export Sold Items CSV</button>
+    <div class="card">
+        <div class="card-body">
+            <div class="btn-group">
+                <button class="btn btn-primary" onclick="updateResalePackToSold()">Update Resale/Pack to Sold</button>
+                <a class="btn btn-success" href="{{ url_for('tab5.export_sold_items_csv') }}">Export Sold Items CSV</a>
+            </div>
+        </div>
     </div>
 
-    <table id="category-table" class="table table-bordered table-hover">
+    <table class="table table-bordered table-hover category-table" id="category-table">
         <thead class="thead-dark">
             <tr>
                 <th>Category</th>
@@ -49,33 +30,25 @@
                 <th>Actions</th>
             </tr>
         </thead>
-        <tbody id="category-rows">
+        <tbody>
             {% for category in categories %}
-            <tr class="category-row" id="category-{{ category.cat_id }}">
-                <td>{{ category.category }}</td>
-                <td>
-                    <select class="subcategory-select form-control" data-category="{{ category.category }}" onchange="loadCommonNames(this)">
-                        <option value="">Select a subcategory</option>
-                    </select>
-                </td>
-                <td>{{ category.total_items }}</td>
-                <td>{{ category.items_on_contracts }}</td>
-                <td>{{ category.items_in_service }}</td>
-                <td>{{ category.items_available }}</td>
-                <td>
-                    <div class="btn-group">
-                        <button class="btn btn-sm btn-info print-btn" data-print-level="Category" data-print-id="category-{{ category.cat_id }}" data-category="{{ category.category }}">Print</button>
-                    </div>
-                </td>
-            </tr>
+                <tr class="category-row">
+                    <td>{{ category.category }}</td>
+                    <td>
+                        <select class="subcategory-select" data-category="{{ category.category }}" onchange="loadCommonNames(this)">
+                            <option value="">Select a subcategory</option>
+                        </select>
+                    </td>
+                    <td>{{ category.total_items }}</td>
+                    <td>{{ category.items_on_contracts }}</td>
+                    <td>{{ category.items_in_service }}</td>
+                    <td>{{ category.items_available }}</td>
+                    <td>
+                        <button class="btn btn-sm btn-info print-btn" data-print-level="Contract" data-print-id="category-{{ category.cat_id }}">Print</button>
+                    </td>
+                </tr>
             {% endfor %}
         </tbody>
     </table>
-</div>
 
-<script>
-function exportSoldItemsCSV() {
-    window.location.href = '/tab/5/export_sold_items_csv';
-}
-</script>
 {% endblock %}
