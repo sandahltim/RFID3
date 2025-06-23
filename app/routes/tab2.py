@@ -29,7 +29,7 @@ logger.addHandler(console_handler)
 tab2_bp = Blueprint('tab2', __name__)
 
 # Version marker
-logger.info("Deployed tab2.py version: 2025-05-29-v9")
+logger.info("Deployed tab2.py version: 2025-05-29-v10")
 
 @tab2_bp.route('/tab/2')
 def tab2_view():
@@ -64,9 +64,13 @@ def tab2_view():
         base_results = base_query.all()
         logger.debug(f"Base query results: {[(r.last_contract_num, r.total_items) for r in base_results]}")
 
-        # Get sort parameter
+        # Get and validate sort parameter
         sort = request.args.get('sort', 'contract_number_asc')
-        sort_column, sort_direction = sort.split('_')
+        sort_parts = sort.split('_')
+        if len(sort_parts) != 2 or sort_parts[1] not in ['asc', 'desc']:
+            sort_column, sort_direction = 'contract_number', 'asc'
+        else:
+            sort_column, sort_direction = sort_parts[0], sort_parts[1]
         sort_direction = asc if sort_direction == 'asc' else desc
 
         # Step 2: Apply filters and sorting

@@ -1,19 +1,38 @@
-console.log('tab2.js version: 2025-05-29-v7 loaded');
+console.log('tab2.js version: 2025-05-29-v8 loaded');
 
 /**
  * Tab2.js: Logic for Tab 2 (Open Contracts).
  * Dependencies: common.js (for formatDate, showLoading, hideLoading, collapseSection, applyFilterToTable, sortCommonNames, sortItems).
- * Updated: Added sorting for Contract Number, Customer Name, and Last Scanned Date.
+ * Updated: Added sorting for Contract Number, Customer Name, and Last Scanned Date with state management.
  */
 
 window.sortContracts = function(column) {
-    let sort = column + '_asc';
-    const currentSort = new URLSearchParams(window.location.search).get('sort');
-    if (currentSort && currentSort.startsWith(column + '_')) {
-        sort = currentSort.endsWith('asc') ? column + '_desc' : column + '_asc';
-    }
+    let currentSort = new URLSearchParams(window.location.search).get('sort') || 'contract_number_asc';
+    let [currentColumn, currentDirection] = currentSort.split('_');
+    let direction = (currentColumn === column && currentDirection === 'asc') ? 'desc' : 'asc';
+    let sort = `${column}_${direction}`;
     window.location.href = `/tab/2?sort=${sort}`;
 };
+
+// Update sort arrow based on current sort state
+function updateSortArrows() {
+    const headers = document.querySelectorAll('#category-table thead th');
+    const currentSort = new URLSearchParams(window.location.search).get('sort') || 'contract_number_asc';
+    const [currentColumn, currentDirection] = currentSort.split('_');
+
+    headers.forEach(header => {
+        const column = header.getAttribute('onclick')?.match(/'(\w+)'/)?.[1];
+        const sortArrow = header.querySelector('.sort-arrow') || document.createElement('span');
+        sortArrow.className = 'sort-arrow';
+        if (!header.querySelector('.sort-arrow')) header.appendChild(sortArrow);
+
+        if (column === currentColumn) {
+            sortArrow.textContent = currentDirection === 'asc' ? '↑' : '↓';
+        } else {
+            sortArrow.textContent = '';
+        }
+    });
+}
 
 // Expand category for Tab 2
 window.expandCategory = function(category, targetId, contractNumber, page = 1, tabNum = 2) {
@@ -324,6 +343,9 @@ document.addEventListener('DOMContentLoaded', function() {
             timestampCell.textContent = formattedDate;
         }
     });
+
+    // Update sort arrows on load
+    updateSortArrows();
 
     // Clean up outdated sessionStorage keys
     Object.keys(sessionStorage).forEach(key => {
