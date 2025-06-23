@@ -29,7 +29,7 @@ logger.addHandler(console_handler)
 tab2_bp = Blueprint('tab2', __name__)
 
 # Version marker
-logger.info("Deployed tab2.py version: 2025-05-29-v10")
+logger.info("Deployed tab2.py version: 2025-05-29-v11")
 
 @tab2_bp.route('/tab/2')
 def tab2_view():
@@ -64,19 +64,9 @@ def tab2_view():
         base_results = base_query.all()
         logger.debug(f"Base query results: {[(r.last_contract_num, r.total_items) for r in base_results]}")
 
-        # Get and validate sort parameter
-        sort = request.args.get('sort', 'contract_number_asc')
-        sort_parts = sort.split('_')
-        if len(sort_parts) != 2 or sort_parts[1] not in ['asc', 'desc']:
-            sort_column, sort_direction = 'contract_number', 'asc'
-        else:
-            sort_column, sort_direction = sort_parts[0], sort_parts[1]
-        sort_direction = asc if sort_direction == 'asc' else desc
-
-        # Step 2: Apply filters and sorting
-        contracts_query = base_query.join(
-            Transaction, ItemMaster.last_contract_num == Transaction.contract_number
-        ).filter(
+        # Get and validate sort parameter (default to no sort for initial load)
+        sort = request.args.get('sort', None)
+        contracts_query = base_query.filter(
             func.lower(ItemMaster.status).in_(['on rent', 'delivered']),
             ItemMaster.last_contract_num.isnot(None),
             ItemMaster.last_contract_num != '00000',
@@ -85,14 +75,6 @@ def tab2_view():
             func.count(ItemMaster.tag_id) > 0
         )
 
-        if sort_column == 'contract_number':
-            contracts_query = contracts_query.order_by(sort_direction(ItemMaster.last_contract_num))
-        elif sort_column == 'client_name':
-            contracts_query = contracts_query.order_by(sort_direction(Transaction.client_name))
-        elif sort_column == 'scan_date':
-            contracts_query = contracts_query.order_by(sort_direction(func.max(Transaction.scan_date)))
-
-        logger.debug(f"Contracts query SQL: {str(contracts_query)}")
         contracts_query_results = contracts_query.all()
         logger.info(f"Raw contracts query result: {[(c.last_contract_num, c.total_items) for c in contracts_query_results]}")
         current_app.logger.info(f"Raw contracts query result: {[(c.last_contract_num, c.total_items) for c in contracts_query_results]}")
@@ -131,7 +113,7 @@ def tab2_view():
                 'total_items_inventory': total_items_inventory or 0
             })
 
-        contracts.sort(key=lambda x: x['contract_number'])  # Fallback sort for consistency
+        contracts.sort(key=lambda x: x['contract_number'])  # Default sort for initial load
         logger.info(f"Fetched {len(contracts)} contracts for tab2: {[c['contract_number'] for c in contracts]}")
         current_app.logger.info(f"Fetched {len(contracts)} contracts for tab2: {[c['contract_number'] for c in contracts]}")
 
@@ -141,7 +123,7 @@ def tab2_view():
         for handler in current_app.logger.handlers:
             handler.flush()
 
-        return render_template('tab2.html', contracts=contracts, error=None, sort=sort, cache_bust=int(time()))
+        return render_template('tab2.html', contracts=contracts, error=None, sort=None, cache_bust=int(time()))
     except Exception as e:
         logger.error(f"Error rendering Tab 2: {str(e)}", exc_info=True)
         current_app.logger.error(f"Error rendering Tab 2: {str(e)}", exc_info=True)
@@ -159,6 +141,101 @@ def tab2_view():
                 logger.warning(f"Session rollback failed: {str(e)}")
             session.close()
             logger.debug("Session closed for tab2_view")
+
+@tab2_bp.route('/tab/2/sort_contracts')
+def sort_contracts():
+    session = None
+    try:
+        session = db.session()
+        logger.info("Starting new session for sort_contracts")
+
+        # Get and validate sort parameter
+        sort = request.args.get('sort', 'contract_number_asc')
+        sort_parts = sort.split('_')
+        if len(sort_parts) != 2 or sort_parts[1] not in ['asc', 'desc']:
+            sort_column, sort_direction = 'contract_number', 'asc'
+        else:
+            sort_column, sort_direction = sort_parts[0], sort_parts[1]
+        sort_direction = asc if sort_direction == 'asc' else desc
+
+        # Step 1: Base query
+        base_query = session.query(
+            ItemMaster.last_contract_num,
+            func.count(ItemMaster.tag_id).label('total_items')
+        ).group_by(ItemMaster.last_contract_num)
+
+        # Apply filters
+        contracts_query = base_query.join(
+            Transaction, ItemMaster.last_contract_num == Transaction.contract_number
+        ).filter(
+            func.lower(ItemMaster.status).in_(['on rent', 'delivered']),
+            ItemMaster.last_contract_num.isnot(None),
+            ItemMaster.last_contract_num != '00000',
+            ~func.trim(ItemMaster.last_contract_num).op('REGEXP')('^L[0-9]+$')
+        ).having(
+            func.count(ItemMaster.tag_id) > 0
+        )
+
+        # Apply sorting only to top layer
+        if sort_column == 'contract_number':
+            contracts_query = contracts_query.order_by(sort_direction(ItemMaster.last_contract_num))
+        elif sort_column == 'client_name':
+            contracts_query = contracts_query.order_by(sort_direction(Transaction.client_name))
+        elif sort_column == 'scan_date':
+            contracts_query = contracts_query.order_by(sort_direction(func.max(Transaction.scan_date)))
+
+        contracts_query_results = contracts_query.all()
+        logger.info(f"Sorted contracts query result: {[(c.last_contract_num, c.total_items) for c in contracts_query_results]}")
+        current_app.logger.info(f"Sorted contracts query result: {[(c.last_contract_num, c.total_items) for c in contracts_query_results]}")
+
+        contracts = []
+        for contract_number, total_items in contracts_query_results:
+            logger.debug(f"Processing contract: {contract_number}")
+            latest_transaction = session.query(
+                Transaction.client_name,
+                Transaction.scan_date
+            ).filter(
+                Transaction.contract_number == contract_number,
+                Transaction.scan_type == 'Rental'
+            ).order_by(
+                desc(Transaction.scan_date)
+            ).first()
+
+            client_name = latest_transaction.client_name if latest_transaction else 'N/A'
+            scan_date = latest_transaction.scan_date.isoformat() if latest_transaction and latest_transaction.scan_date else 'N/A'
+            logger.debug(f"Contract {contract_number} - Client: {client_name}, Scan Date: {scan_date}")
+
+            items_on_contract = session.query(func.count(ItemMaster.tag_id)).filter(
+                ItemMaster.last_contract_num == contract_number,
+                func.lower(ItemMaster.status).in_(['on rent', 'delivered'])
+            ).scalar()
+
+            total_items_inventory = session.query(func.count(ItemMaster.tag_id)).filter(
+                ItemMaster.last_contract_num == contract_number
+            ).scalar()
+
+            contracts.append({
+                'contract_number': contract_number,
+                'client_name': client_name,
+                'scan_date': scan_date,
+                'items_on_contract': items_on_contract or 0,
+                'total_items_inventory': total_items_inventory or 0
+            })
+
+        logger.info(f"Returned {len(contracts)} sorted contracts for tab2")
+        return jsonify({'contracts': contracts, 'sort': sort})
+    except Exception as e:
+        logger.error(f"Error sorting contracts: {str(e)}", exc_info=True)
+        current_app.logger.error(f"Error sorting contracts: {str(e)}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+    finally:
+        if session:
+            try:
+                session.rollback()
+            except Exception as e:
+                logger.warning(f"Session rollback failed: {str(e)}")
+            session.close()
+            logger.debug("Session closed for sort_contracts")
 
 @tab2_bp.route('/tab/2/common_names')
 def tab2_common_names():
@@ -196,7 +273,7 @@ def tab2_common_names():
             ItemMaster.common_name
         )
 
-        # Apply sorting
+        # Apply sorting (unchanged for nested layers)
         if sort == 'name_asc':
             common_names_query = common_names_query.order_by(asc(func.lower(ItemMaster.common_name)))
         elif sort == 'name_desc':
@@ -289,7 +366,7 @@ def tab2_data():
             func.lower(ItemMaster.status).in_(['on rent', 'delivered'])
         )
 
-        # Apply sorting
+        # Apply sorting (unchanged for nested layers)
         if sort == 'tag_id_asc':
             query = query.order_by(asc(ItemMaster.tag_id))
         elif sort == 'tag_id_desc':
