@@ -1,5 +1,5 @@
 # app/services/scheduler.py
-# scheduler.py version: 2025-06-20-v7
+# scheduler.py version: 2025-06-20-v8
 from apscheduler.schedulers.background import BackgroundScheduler
 from app.services.refresh import incremental_refresh, full_refresh
 from redis import Redis
@@ -40,16 +40,19 @@ def init_scheduler(app):
         for attempt in range(max_retries):
             try:
                 with app.app_context():
-                    db.session.execute("SELECT 1")
-                    return
+                    db.session.execute("SELECT 1").scalar()  # Use scalar to get a result
+                    return True
             except Exception as e:
                 logger.warning(f"Database connection failed, retrying ({attempt + 1}/{max_retries}): {str(e)}")
                 time.sleep(2 ** attempt)
         logger.error("Failed to establish database connection after retries")
-        raise Exception("Database connection failed")
+        return False
 
     with app.app_context():
-        retry_database_connection()
+        if not retry_database_connection():
+            logger.warning("Skipping scheduler initialization due to database connection failure")
+            return
+
         logger.debug("Checking for full refresh lock")
         if redis_client.setnx(lock_key, 1):
             try:
@@ -88,14 +91,12 @@ def init_scheduler(app):
 
     def run_with_context():
         with app.app_context():
-            try:
-                retry_database_connection()
+            if retry_database_connection():
                 logger.debug("Starting scheduled incremental refresh")
                 incremental_refresh()
                 logger.info("Scheduled incremental refresh completed successfully")
-            except Exception as e:
-                logger.error(f"Scheduled incremental refresh failed: {str(e)}", exc_info=True)
-                raise
+            else:
+                logger.error("Skipping incremental refresh due to database connection failure")
 
     logger.debug("Adding incremental refresh job to scheduler")
     scheduler.add_job(
