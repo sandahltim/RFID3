@@ -7,7 +7,8 @@ User=tim
 Group=www-data
 WorkingDirectory=/home/tim/test_rfidpi
 Environment="PATH=/home/tim/test_rfidpi/venv/bin"
-ExecStart=/home/tim/test_rfidpi/venv/bin/gunicorn --workers 4 --threads 2 --timeout 300 --bind 127.0.0.1:3608 --error-logfile /home/tim/test_rfidpi/logs/gunicorn_error.log --access-logfile /home/tim/test_rfidpi/logs/gunicorn_access.log run:app
+ExecStartPre=/bin/sh -c "while ! mysqladmin ping -h127.0.0.1 --silent; do sleep 1; done"  # Wait for MySQL
+ExecStart=/home/tim/test_rfidpi/venv/bin/gunicorn --workers 2 --threads 2 --timeout 600 --bind 127.0.0.1:3608 --error-logfile /home/tim/test_rfidpi/logs/gunicorn_error.log --access-logfile /home/tim/test_rfidpi/logs/gunicorn_access.log run:app
 ExecStop=/bin/kill -s KILL $MAINPID
 Restart=always
 KillMode=mixed
