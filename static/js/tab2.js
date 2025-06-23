@@ -1,9 +1,9 @@
-console.log('tab2.js version: 2025-05-29-v5 loaded');
+console.log('tab2.js version: 2025-05-29-v6 loaded');
 
 /**
  * Tab2.js: Logic for Tab 2 (Open Contracts).
  * Dependencies: common.js (for formatDate, showLoading, hideLoading, collapseSection, applyFilterToTable, sortCommonNames, sortItems).
- * Updated: Fixed Expand/Collapse toggle, sanitized IDs, improved button state management.
+ * Updated: Fixed Expand/Collapse toggle for top level, sanitized IDs, prevented double invocation.
  */
 
 // Expand category for Tab 2
@@ -31,7 +31,8 @@ window.expandCategory = function(category, targetId, contractNumber, page = 1, t
     }
 
     const loadingSuccess = showLoading(targetId);
-    const url = `/tab/2/common_names?contract_number=${encodeURIComponent(contractNumber.trim())}&page=${page}`;
+    const sanitizedContractNumber = contractNumber.trim().replace(/[^a-z0-9]/g, '_').substring(0, 50); // Sanitize and limit length
+    const url = `/tab/2/common_names?contract_number=${encodeURIComponent(sanitizedContractNumber)}&page=${page}`;
     console.log(`Fetching common names: ${url}`);
 
     fetch(url)
@@ -62,9 +63,9 @@ window.expandCategory = function(category, targetId, contractNumber, page = 1, t
                     <table class="table table-bordered table-hover common-table">
                         <thead class="thead-dark">
                             <tr>
-                                <th onclick="window.sortCommonNames('${contractNumber.trim()}', 'common_name', 2)">Common Name <span class="sort-arrow"></span></th>
-                                <th onclick="window.sortCommonNames('${contractNumber.trim()}', 'on_contracts', 2)">Items on Contract <span class="sort-arrow"></span></th>
-                                <th onclick="window.sortCommonNames('${contractNumber.trim()}', 'total_items_inventory', 2)">Total Items in Inventory <span class="sort-arrow"></span></th>
+                                <th onclick="window.sortCommonNames('${sanitizedContractNumber}', 'common_name', 2)">Common Name <span class="sort-arrow"></span></th>
+                                <th onclick="window.sortCommonNames('${sanitizedContractNumber}', 'on_contracts', 2)">Items on Contract <span class="sort-arrow"></span></th>
+                                <th onclick="window.sortCommonNames('${sanitizedContractNumber}', 'total_items_inventory', 2)">Total Items in Inventory <span class="sort-arrow"></span></th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
@@ -72,18 +73,18 @@ window.expandCategory = function(category, targetId, contractNumber, page = 1, t
             `;
 
             commonNames.forEach(common => {
-                const commonId = `${contractNumber.trim()}-${common.name.replace(/[^a-z0-9]/g, '_').substring(0, 50)}`; // Limit length to avoid invalid IDs
+                const commonId = `${sanitizedContractNumber}-${common.name.replace(/[^a-z0-9]/g, '_').substring(0, 50)}`; // Sanitize and limit
                 const escapedCommonName = common.name.replace(/'/g, "\\'").replace(/"/g, '\\"');
                 html += `
                     <tr>
-                        <td class="expandable-cell" onclick="window.expandItems('${contractNumber.trim()}', '${escapedCommonName}', 'items-${commonId}', 1, 2)">${common.name}</td>
+                        <td class="expandable-cell" onclick="window.expandItems('${sanitizedContractNumber}', '${escapedCommonName}', 'items-${commonId}', 1, 2)">${common.name}</td>
                         <td>${common.on_contracts}</td>
                         <td>${common.is_hand_counted ? 'N/A' : common.total_items_inventory}</td>
                         <td>
-                            <button class="btn btn-sm btn-secondary expand-btn" data-common-name="${escapedCommonName}" data-target-id="items-${commonId}" data-contract-number="${contractNumber.trim()}" style="display: ${targetElement.querySelector(`#items-${commonId}`)?.classList.contains('expanded') ? 'none' : 'inline-block'};">Expand</button>
-                            <button class="btn btn-sm btn-secondary collapse-btn" data-collapse-target="items-${commonId}" style="display: ${targetElement.querySelector(`#items-${commonId}`)?.classList.contains('expanded') ? 'inline-block' : 'none'};">Collapse</button>
-                            <button class="btn btn-sm btn-info print-btn" data-print-level="Common Name" data-print-id="items-${commonId}" data-common-name="${escapedCommonName}" data-category="${contractNumber.trim()}">Print</button>
-                            <button class="btn btn-sm btn-info print-full-btn" data-common-name="${escapedCommonName}" data-category="${contractNumber.trim()}">Print Full List</button>
+                            <button class="btn btn-sm btn-secondary expand-btn" data-common-name="${escapedCommonName}" data-target-id="items-${commonId}" data-contract-number="${sanitizedContractNumber}">Expand</button>
+                            <button class="btn btn-sm btn-secondary collapse-btn" data-collapse-target="items-${commonId}" style="display:none;">Collapse</button>
+                            <button class="btn btn-sm btn-info print-btn" data-print-level="Common Name" data-print-id="items-${commonId}" data-common-name="${escapedCommonName}" data-category="${sanitizedContractNumber}">Print</button>
+                            <button class="btn btn-sm btn-info print-full-btn" data-common-name="${escapedCommonName}" data-category="${sanitizedContractNumber}">Print Full List</button>
                             <div id="loading-items-${commonId}" style="display:none;" class="loading-indicator">Loading...</div>
                         </td>
                     </tr>
@@ -102,9 +103,9 @@ window.expandCategory = function(category, targetId, contractNumber, page = 1, t
                 const escapedCategory = category ? category.replace(/'/g, "\\'").replace(/"/g, '\\"') : '';
                 html += `
                     <div class="pagination-controls mt-2">
-                        <button class="btn btn-sm btn-secondary" onclick="window.expandCategory('${escapedCategory}', '${targetId}', '${contractNumber.trim()}', ${currentPage - 1}, 2)" ${currentPage === 1 ? 'disabled' : ''}>Previous</button>
+                        <button class="btn btn-sm btn-secondary" onclick="window.expandCategory('${escapedCategory}', '${targetId}', '${sanitizedContractNumber}', ${currentPage - 1}, 2)" ${currentPage === 1 ? 'disabled' : ''}>Previous</button>
                         <span class="mx-2">Page ${currentPage} of ${totalPages}</span>
-                        <button class="btn btn-sm btn-secondary" onclick="window.expandCategory('${escapedCategory}', '${targetId}', '${contractNumber.trim()}', ${currentPage + 1}, 2)" ${currentPage === totalPages ? 'disabled' : ''}>Next</button>
+                        <button class="btn btn-sm btn-secondary" onclick="window.expandCategory('${escapedCategory}', '${targetId}', '${sanitizedContractNumber}', ${currentPage + 1}, 2)" ${currentPage === totalPages ? 'disabled' : ''}>Next</button>
                     </div>
                 `;
             }
@@ -177,7 +178,8 @@ window.expandItems = function(contractNumber, commonName, targetId, page = 1, ta
     const loadingSuccess = showLoading(`loading-items-${commonId}`);
     targetElement.innerHTML = '';
 
-    const url = `/tab/2/data?contract_number=${encodeURIComponent(contractNumber.trim())}&common_name=${encodeURIComponent(commonName)}&page=${page}`;
+    const sanitizedContractNumber = contractNumber.trim().replace(/[^a-z0-9]/g, '_').substring(0, 50);
+    const url = `/tab/2/data?contract_number=${encodeURIComponent(sanitizedContractNumber)}&common_name=${encodeURIComponent(commonName)}&page=${page}`;
     console.log(`Fetching items: ${url}`);
 
     fetch(url)
@@ -208,12 +210,12 @@ window.expandItems = function(contractNumber, commonName, targetId, page = 1, ta
                     <table class="table table-bordered table-hover item-table">
                         <thead class="thead-dark">
                             <tr>
-                                <th onclick="window.sortItems('${contractNumber.trim()}', '${commonName}', 'tag_id', 2)">Tag ID <span class="sort-arrow"></span></th>
-                                <th onclick="window.sortItems('${contractNumber.trim()}', '${commonName}', 'common_name', 2)">Common Name <span class="sort-arrow"></span></th>
-                                <th onclick="window.sortItems('${contractNumber.trim()}', '${commonName}', 'bin_location', 2)">Bin Location <span class="sort-arrow"></span></th>
-                                <th onclick="window.sortItems('${contractNumber.trim()}', '${commonName}', 'status', 2)">Status <span class="sort-arrow"></span></th>
-                                <th onclick="window.sortItems('${contractNumber.trim()}', '${commonName}', 'last_contract_num', 2)">Last Contract <span class="sort-arrow"></span></th>
-                                <th onclick="window.sortItems('${contractNumber.trim()}', '${commonName}', 'last_scanned_date', 2)">Last Scanned Date <span class="sort-arrow"></span></th>
+                                <th onclick="window.sortItems('${sanitizedContractNumber}', '${commonName}', 'tag_id', 2)">Tag ID <span class="sort-arrow"></span></th>
+                                <th onclick="window.sortItems('${sanitizedContractNumber}', '${commonName}', 'common_name', 2)">Common Name <span class="sort-arrow"></span></th>
+                                <th onclick="window.sortItems('${sanitizedContractNumber}', '${commonName}', 'bin_location', 2)">Bin Location <span class="sort-arrow"></span></th>
+                                <th onclick="window.sortItems('${sanitizedContractNumber}', '${commonName}', 'status', 2)">Status <span class="sort-arrow"></span></th>
+                                <th onclick="window.sortItems('${sanitizedContractNumber}', '${commonName}', 'last_contract_num', 2)">Last Contract <span class="sort-arrow"></span></th>
+                                <th onclick="window.sortItems('${sanitizedContractNumber}', '${commonName}', 'last_scanned_date', 2)">Last Scanned Date <span class="sort-arrow"></span></th>
                             </tr>
                         </thead>
                         <tbody>
@@ -240,9 +242,9 @@ window.expandItems = function(contractNumber, commonName, targetId, page = 1, ta
                 const escapedCommonName = commonName.replace(/'/g, "\\'").replace(/"/g, '\\"');
                 html += `
                     <div class="pagination-controls mt-2 ml-4">
-                        <button class="btn btn-sm btn-secondary" onclick="window.expandItems('${contractNumber.trim()}', '${escapedCommonName}', '${targetId}', ${currentPage - 1}, 2)" ${currentPage === 1 ? 'disabled' : ''}>Previous</button>
+                        <button class="btn btn-sm btn-secondary" onclick="window.expandItems('${sanitizedContractNumber}', '${escapedCommonName}', '${targetId}', ${currentPage - 1}, 2)" ${currentPage === 1 ? 'disabled' : ''}>Previous</button>
                         <span class="mx-2">Page ${currentPage} of ${totalPages}</span>
-                        <button class="btn btn-sm btn-secondary" onclick="window.expandItems('${contractNumber.trim()}', '${escapedCommonName}', '${targetId}', ${currentPage + 1}, 2)" ${currentPage === totalPages ? 'disabled' : ''}>Next</button>
+                        <button class="btn btn-sm btn-secondary" onclick="window.expandItems('${sanitizedContractNumber}', '${escapedCommonName}', '${targetId}', ${currentPage + 1}, 2)" ${currentPage === totalPages ? 'disabled' : ''}>Next</button>
                     </div>
                 `;
             }
@@ -271,7 +273,7 @@ window.expandItems = function(contractNumber, commonName, targetId, page = 1, ta
                 applyFilterToTable(table);
             }
 
-            sessionStorage.setItem(`expanded_items_${targetId}`, JSON.stringify({ contractNumber, commonName, page }));
+            sessionStorage.setItem(`expanded_items_${targetId}`, JSON.stringify({ contractNumber: sanitizedContractNumber, commonName, page }));
         })
         .catch(error => {
             console.error('Items error:', error.message);
@@ -355,7 +357,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (commonName) {
                 console.log(`Expanding items for ${contractNumber}, ${commonName}`);
                 window.expandItems(contractNumber, commonName, targetId, 1, 2);
-            } else if (contractNumber) {
+            } else if (contractNumber && window.cachedTabNum === 2) { // Restrict to Tab 2
                 console.log(`Expanding category for ${contractNumber}`);
                 window.expandCategory(category, targetId, contractNumber, 1, 2);
             }
