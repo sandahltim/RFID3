@@ -36,7 +36,7 @@ logger.addHandler(main_file_handler)
 tab4_bp = Blueprint('tab4', __name__)
 
 # Version marker
-logger.info("Deployed tab4.py version: 2025-05-06-v34")
+logger.info("Deployed tab4.py version: 2025-05-06-v35")
 
 @tab4_bp.route('/tab/4')
 def tab4_view():
@@ -213,7 +213,7 @@ def tab4_view():
                 continue
             contracts.append(contract)
 
-        contracts.sort(key=lambda x: x['contract_number'])
+        contracts.sort(key=lambda x: x['contract_number'])  # Default sort for initial load
         logger.info(f"Fetched {len(contracts)} contracts for tab4: {[c['contract_number'] for c in contracts]}")
         current_app.logger.info(f"Fetched {len(contracts)} contracts for tab4: {[c['contract_number'] for c in contracts]}")
         session.close()
@@ -395,7 +395,7 @@ def tab4_common_names():
     contract_number = request.args.get('contract_number')
     page = int(request.args.get('page', 1))
     per_page = 10
-    sort = request.args.get('sort', '')
+    sort = request.args.get('sort', '')  # Keep for compatibility, but ignore unless explicitly needed
     fetch_all = request.args.get('all', 'false').lower() == 'true'
 
     logger.info(f"Fetching common names for contract_number={contract_number}, page={page}, sort={sort}, fetch_all={fetch_all}")
@@ -419,20 +419,6 @@ def tab4_common_names():
         ).group_by(
             ItemMaster.common_name
         )
-
-        # Apply sorting
-        if sort == 'name_asc':
-            common_names_query = common_names_query.order_by(asc(func.lower(ItemMaster.common_name)))
-        elif sort == 'name_desc':
-            common_names_query = common_names_query.order_by(desc(func.lower(ItemMaster.common_name)))
-        elif sort == 'on_contracts_asc':
-            common_names_query = common_names_query.order_by(asc('on_contracts'))
-        elif sort == 'on_contracts_desc':
-            common_names_query = common_names_query.order_by(desc('on_contracts'))
-        elif sort == 'total_items_inventory_asc':
-            common_names_query = common_names_query.order_by(asc('total_items_inventory'))
-        elif sort == 'total_items_inventory_desc':
-            common_names_query = common_names_query.order_by(desc('total_items_inventory'))
 
         common_names_all = common_names_query.all()
 
@@ -506,30 +492,7 @@ def tab4_common_names():
 
         common_names_list = list(common_names.values())
 
-        # Apply sorting for computed fields if necessary
-        if sort in ['total_items_inventory_asc', 'total_items_inventory_desc']:
-            sort_field = sort.split('_')[0]
-            sort_direction = sort.split('_')[-1]
-            common_names_list.sort(
-                key=lambda x: x[sort_field],
-                reverse=(sort_direction == 'desc')
-            )
-        elif sort in ['name_asc', 'name_desc']:
-            sort_field = 'name'
-            sort_direction = sort.split('_')[-1]
-            common_names_list.sort(
-                key=lambda x: x[sort_field].lower(),
-                reverse=(sort_direction == 'desc')
-            )
-        elif sort in ['on_contracts_asc', 'on_contracts_desc']:
-            sort_field = 'on_contracts'
-            sort_direction = sort.split('_')[-1]
-            common_names_list.sort(
-                key=lambda x: x[sort_field],
-                reverse=(sort_direction == 'desc')
-            )
-
-        # Handle pagination or fetch all
+        # Handle pagination or fetch all (no sorting applied)
         if fetch_all:
             paginated_common_names = common_names_list
             total_common_names = len(common_names_list)
@@ -563,7 +526,7 @@ def tab4_data():
     common_name = request.args.get('common_name')
     page = int(request.args.get('page', 1))
     per_page = 10
-    sort = request.args.get('sort', '')
+    sort = request.args.get('sort', '')  # Keep for compatibility, but ignore
 
     logger.info(f"Fetching items for contract_number={contract_number}, common_name={common_name}, page={page}, sort={sort}")
     current_app.logger.info(f"Fetching items for top level contract_number={contract_number}, common_name={common_name}, page={page}, sort={sort}")
@@ -594,16 +557,6 @@ def tab4_data():
                 HandCountedItems.action == 'Added'
             )
 
-            # Apply sorting (limited for hand-counted items)
-            if sort == 'tag_id_asc':
-                query = query.order_by(asc(HandCountedItems.id))
-            elif sort == 'tag_id_desc':
-                query = query.order_by(desc(HandCountedItems.id))
-            elif sort == 'last_scanned_date_asc':
-                query = query.order_by(asc(HandCountedItems.timestamp))
-            elif sort == 'last_scanned_date_desc':
-                query = query.order_by(desc(HandCountedItems.timestamp))
-
             total_items = query.count()
             items = query.offset((page - 1) * per_page).limit(per_page).all()
 
@@ -623,32 +576,6 @@ def tab4_data():
                 ItemMaster.common_name == common_name,
                 ItemMaster.status.in_(['On Rent', 'Delivered'])
             )
-
-            # Apply sorting
-            if sort == 'tag_id_asc':
-                query = query.order_by(asc(ItemMaster.tag_id))
-            elif sort == 'tag_id_desc':
-                query = query.order_by(desc(ItemMaster.tag_id))
-            elif sort == 'common_name_asc':
-                query = query.order_by(asc(func.lower(ItemMaster.common_name)))
-            elif sort == 'common_name_desc':
-                query = query.order_by(desc(func.lower(ItemMaster.common_name)))
-            elif sort == 'bin_location_asc':
-                query = query.order_by(asc(func.lower(func.coalesce(ItemMaster.bin_location, ''))))
-            elif sort == 'bin_location_desc':
-                query = query.order_by(desc(func.lower(func.coalesce(ItemMaster.bin_location, ''))))
-            elif sort == 'status_asc':
-                query = query.order_by(asc(func.lower(ItemMaster.status)))
-            elif sort == 'status_desc':
-                query = query.order_by(desc(func.lower(ItemMaster.status)))
-            elif sort == 'last_contract_asc':
-                query = query.order_by(asc(func.lower(func.coalesce(ItemMaster.last_contract_num, ''))))
-            elif sort == 'last_contract_desc':
-                query = query.order_by(desc(func.lower(func.coalesce(ItemMaster.last_contract_num, ''))))
-            elif sort == 'last_scanned_date_asc':
-                query = query.order_by(asc(ItemMaster.date_last_scanned))
-            elif sort == 'last_scanned_date_desc':
-                query = query.order_by(desc(ItemMaster.date_last_scanned))
 
             total_items = query.count()
             items = query.offset((page - 1) * per_page).limit(per_page).all()

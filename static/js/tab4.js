@@ -1,9 +1,9 @@
-console.log('tab4.js version: 2025-05-29-v4 loaded');
+console.log('tab4.js version: 2025-05-29-v5 loaded');
 
 /**
  * Tab4.js: Logic for Tab 4 (Laundry Contracts).
- * Dependencies: common.js (for formatDate, showLoading, hideLoading, collapseSection, applyFilterToTable, sortCommonNames, sortItems).
- * Updated: Removed duplicate functions, now using common.js utilities.
+ * Dependencies: common.js (for formatDate, showLoading, hideLoading, collapseSection, applyFilterToTable).
+ * Updated: Aligned with Tab 2 structure, removed sorting, integrated hand-counted items.
  */
 
 // Expand category for Tab 4
@@ -13,6 +13,20 @@ window.expandCategory = function(category, targetId, contractNumber, page = 1, t
     const targetElement = document.getElementById(targetId);
     if (!targetElement) {
         console.error(`Target ${targetId} not found`);
+        return;
+    }
+
+    const parentRow = targetElement.closest('tr').previousElementSibling;
+    const expandBtn = parentRow.querySelector('.expand-btn');
+    const collapseBtn = parentRow.querySelector('.collapse-btn');
+
+    if (targetElement.classList.contains('expanded') && page === 1) {
+        console.log(`Collapsing ${targetId}`);
+        collapseSection(targetId);
+        if (expandBtn && collapseBtn) {
+            expandBtn.style.display = 'inline-block';
+            collapseBtn.style.display = 'none';
+        }
         return;
     }
 
@@ -48,9 +62,9 @@ window.expandCategory = function(category, targetId, contractNumber, page = 1, t
                     <table class="table table-bordered table-hover common-table">
                         <thead class="thead-dark">
                             <tr>
-                                <th onclick="window.sortCommonNames('${contractNumber}', 'common_name', 4)">Common Name <span class="sort-arrow"></span></th>
-                                <th onclick="window.sortCommonNames('${contractNumber}', 'on_contracts', 4)">Items on Contract <span class="sort-arrow"></span></th>
-                                <th onclick="window.sortCommonNames('${contractNumber}', 'total_items_inventory', 4)">Total Items in Inventory <span class="sort-arrow"></span></th>
+                                <th>Common Name</th>
+                                <th>Items on Contract</th>
+                                <th>Total Items in Inventory</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
@@ -102,6 +116,11 @@ window.expandCategory = function(category, targetId, contractNumber, page = 1, t
             targetElement.style.opacity = '1';
             targetElement.style.visibility = 'visible';
 
+            if (expandBtn && collapseBtn) {
+                expandBtn.style.display = 'none';
+                collapseBtn.style.display = 'inline-block';
+            }
+
             console.log('Common names container styles:', {
                 classList: targetElement.classList.toString(),
                 display: targetElement.style.display,
@@ -140,9 +159,17 @@ window.expandItems = function(contractNumber, commonName, targetId, page = 1, ta
         return;
     }
 
+    const parentRow = targetElement.closest('tr').previousElementSibling;
+    const expandBtn = parentRow.querySelector('.expand-btn');
+    const collapseBtn = parentRow.querySelector('.collapse-btn');
+
     if (targetElement.classList.contains('expanded') && page === 1) {
         console.log(`Collapsing ${targetId}`);
         collapseSection(targetId);
+        if (expandBtn && collapseBtn) {
+            expandBtn.style.display = 'inline-block';
+            collapseBtn.style.display = 'none';
+        }
         return;
     }
 
@@ -181,12 +208,12 @@ window.expandItems = function(contractNumber, commonName, targetId, page = 1, ta
                     <table class="table table-bordered table-hover item-table">
                         <thead class="thead-dark">
                             <tr>
-                                <th onclick="window.sortItems('${contractNumber}', '${commonName}', 'tag_id', 4)">Tag ID <span class="sort-arrow"></span></th>
-                                <th onclick="window.sortItems('${contractNumber}', '${commonName}', 'common_name', 4)">Common Name <span class="sort-arrow"></span></th>
-                                <th onclick="window.sortItems('${contractNumber}', '${commonName}', 'bin_location', 4)">Bin Location <span class="sort-arrow"></span></th>
-                                <th onclick="window.sortItems('${contractNumber}', '${commonName}', 'status', 4)">Status <span class="sort-arrow"></span></th>
-                                <th onclick="window.sortItems('${contractNumber}', '${commonName}', 'last_contract_num', 4)">Last Contract <span class="sort-arrow"></span></th>
-                                <th onclick="window.sortItems('${contractNumber}', '${commonName}', 'last_scanned_date', 4)">Last Scanned Date <span class="sort-arrow"></span></th>
+                                <th>Tag ID</th>
+                                <th>Common Name</th>
+                                <th>Bin Location</th>
+                                <th>Status</th>
+                                <th>Last Contract</th>
+                                <th>Last Scanned Date</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -227,6 +254,11 @@ window.expandItems = function(contractNumber, commonName, targetId, page = 1, ta
             targetElement.style.opacity = '1';
             targetElement.style.visibility = 'visible';
 
+            if (expandBtn && collapseBtn) {
+                expandBtn.style.display = 'none';
+                collapseBtn.style.display = 'inline-block';
+            }
+
             console.log('Items container styles:', {
                 classList: targetElement.classList.toString(),
                 display: targetElement.style.display,
@@ -255,92 +287,7 @@ window.expandItems = function(contractNumber, commonName, targetId, page = 1, ta
         });
 };
 
-// Load global filter from sessionStorage on page load
-document.addEventListener('DOMContentLoaded', function() {
-    // Set window.cachedTabNum
-    if (!window.cachedTabNum) {
-        const pathMatch = window.location.pathname.match(/\/tab\/(\d+)/);
-        window.cachedTabNum = pathMatch ? parseInt(pathMatch[1], 10) : (window.location.pathname === '/' ? 1 : null);
-        console.log('tab4.js: Set window.cachedTabNum:', window.cachedTabNum);
-    } else {
-        console.log('tab4.js: window.cachedTabNum already set:', window.cachedTabNum);
-    }
-
-    if (window.cachedTabNum !== 4) {
-        console.log(`Tab ${window.cachedTabNum} detected, skipping tab4.js`);
-        return;
-    }
-
-    // Clean up outdated sessionStorage keys
-    Object.keys(sessionStorage).forEach(key => {
-        if (key.startsWith('expanded_') || key.startsWith('expanded_common_') || key.startsWith('expanded_items_')) {
-            try {
-                const state = JSON.parse(sessionStorage.getItem(key));
-                const targetId = key.replace(/^(expanded_|expanded_common_|expanded_items_)/, '');
-                if (!document.getElementById(targetId) && !document.getElementById(`common-${targetId}`) && !document.getElementById(`items-${targetId}`)) {
-                    console.log(`Removing outdated sessionStorage: ${key}`);
-                    sessionStorage.removeItem(key);
-                }
-            } catch (e) {
-                console.error('Error parsing sessionStorage:', key, e.message);
-                sessionStorage.removeItem(key);
-            }
-        }
-    });
-
-    // Attach event listeners
-    document.removeEventListener('click', handleClick);
-    console.log('Attaching click event listener');
-    document.addEventListener('click', handleClick);
-
-    function handleClick(event) {
-        const expandBtn = event.target.closest('.expand-btn');
-        if (expandBtn) {
-            event.stopPropagation();
-            console.log('Expand button clicked:', {
-                category: expandBtn.getAttribute('data-category'),
-                commonName: expandBtn.getAttribute('data-common-name'),
-                targetId: expandBtn.getAttribute('data-target-id'),
-                contractNumber: expandBtn.getAttribute('data-contract-number')
-            });
-
-            const category = expandBtn.getAttribute('data-category');
-            const commonName = expandBtn.getAttribute('data-common-name');
-            const targetId = expandBtn.getAttribute('data-target-id');
-            const contractNumber = expandBtn.getAttribute('data-contract-number');
-
-            if (commonName) {
-                console.log(`Expanding items for ${contractNumber}, ${commonName}`);
-                window.expandItems(contractNumber, commonName, targetId, 1, 4);
-            }
-            return;
-        }
-
-        const collapseBtn = event.target.closest('.collapse-btn');
-        if (collapseBtn) {
-            event.stopPropagation();
-            console.log(`Collapsing ${collapseBtn.getAttribute('data-collapse-target')}`);
-            collapseSection(collapseBtn.getAttribute('data-collapse-target'));
-            return;
-        }
-    }
-
-    // HTMX event listener for hand-counted items
-    document.body.addEventListener('htmx:afterSwap', function(event) {
-        const target = event.target;
-        if (target.id === 'hand-counted-items') {
-            const rows = target.querySelectorAll('tr');
-            rows.forEach(row => {
-                const timestampCell = row.querySelector('td:nth-child(5)');
-                if (timestampCell) {
-                    const rawDate = timestampCell.textContent.trim();
-                    const formattedDate = formatDate(rawDate);
-                    timestampCell.textContent = formattedDate;
-                }
-            });
-        }
-    });
-});
+// Hand-counted items functions
 function formatDate(isoDateString) {
     if (!isoDateString || isoDateString === 'N/A') return 'N/A';
     try {
@@ -580,7 +527,7 @@ function addContractToTable(contractNumber) {
                     <button class="btn btn-sm btn-secondary expand-btn" data-contract-number="${contractNumber}" data-target-id="common-${contractNumber}">Expand</button>
                     <button class="btn btn-sm btn-secondary collapse-btn" data-collapse-target="common-${contractNumber}" style="display:none;">Collapse</button>
                     <button class="btn btn-sm btn-info print-btn" data-print-level="Contract" data-print-id="common-${contractNumber}" data-contract-number="${contractNumber}">Print</button>
-                    <div id="loading-${contractNumber}" style="display:none;" class="loading">Loading...</div>
+                    <div id="loading-${contractNumber}" style="display:none;" class="loading-indicator">Loading...</div>
                 </td>
             </tr>
             <tr>
@@ -631,8 +578,34 @@ function refreshCommonNames(contractNumber) {
     }
 }
 
+// Load global filter from sessionStorage on page load and format timestamps
 document.addEventListener('DOMContentLoaded', function() {
-    if (window.cachedTabNum !== 4) return;
+    // Set window.cachedTabNum
+    if (!window.cachedTabNum) {
+        const pathMatch = window.location.pathname.match(/\/tab\/(\d+)/);
+        window.cachedTabNum = pathMatch ? parseInt(pathMatch[1], 10) : (window.location.pathname === '/' ? 1 : null);
+        console.log('tab4.js: Set window.cachedTabNum:', window.cachedTabNum);
+    } else {
+        console.log('tab4.js: window.cachedTabNum already set:', window.cachedTabNum);
+    }
+
+    if (window.cachedTabNum !== 4) {
+        console.log(`Tab ${window.cachedTabNum} detected, skipping tab4.js`);
+        return;
+    }
+
+    // Format timestamps in the contract table
+    const contractRows = document.querySelectorAll('#category-rows tr:not(.expandable)');
+    contractRows.forEach(row => {
+        const timestampCell = row.querySelector('td:nth-child(6)'); // Last Scanned Date column
+        if (timestampCell) {
+            const rawDate = timestampCell.textContent.trim();
+            const formattedDate = formatDate(rawDate);
+            timestampCell.textContent = formattedDate;
+        }
+    });
+
+    // Load hand-counted contracts
     fetch('/tab/4/hand_counted_contracts')
         .then(response => response.json())
         .then(data => {
@@ -645,25 +618,92 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         })
         .catch(error => console.error('Error fetching hand-counted contracts:', error));
-    document.querySelectorAll('#category-rows tr').forEach(row => {
-        const scanDateCell = row.querySelector('td.date-last-scanned');
-        if (scanDateCell) {
-            const rawDate = scanDateCell.textContent.trim();
-            scanDateCell.textContent = formatDate(rawDate);
+
+    // Attach event listeners
+    document.removeEventListener('click', handleClick);
+    console.log('Attaching click event listener');
+    document.addEventListener('click', handleClick);
+
+    function handleClick(event) {
+        const expandBtn = event.target.closest('.expand-btn');
+        if (expandBtn) {
+            event.stopPropagation();
+            console.log('Expand button clicked:', {
+                category: expandBtn.getAttribute('data-category'),
+                commonName: expandBtn.getAttribute('data-common-name'),
+                targetId: expandBtn.getAttribute('data-target-id'),
+                contractNumber: expandBtn.getAttribute('data-contract-number')
+            });
+
+            const category = expandBtn.getAttribute('data-category');
+            const commonName = expandBtn.getAttribute('data-common-name');
+            const targetId = expandBtn.getAttribute('data-target-id');
+            const contractNumber = expandBtn.getAttribute('data-contract-number');
+
+            if (commonName) {
+                console.log(`Expanding items for ${contractNumber}, ${commonName}`);
+                window.expandItems(contractNumber, commonName, targetId, 1, 4);
+            } else if (contractNumber && window.cachedTabNum === 4) {
+                console.log(`Expanding category for ${contractNumber}`);
+                window.expandCategory(category, targetId, contractNumber, 1, 4);
+            }
+            return;
+        }
+
+        const collapseBtn = event.target.closest('.collapse-btn');
+        if (collapseBtn) {
+            event.stopPropagation();
+            console.log(`Collapsing ${collapseBtn.getAttribute('data-collapse-target')}`);
+            collapseSection(collapseBtn.getAttribute('data-collapse-target'));
+            const parentRow = document.querySelector(`[data-target-id="${collapseBtn.getAttribute('data-collapse-target')}"]`)?.closest('tr');
+            if (parentRow) {
+                const expandBtn = parentRow.querySelector('.expand-btn');
+                const collapseBtn = parentRow.querySelector('.collapse-btn');
+                if (expandBtn && collapseBtn) {
+                    expandBtn.style.display = 'inline-block';
+                    collapseBtn.style.display = 'none';
+                }
+            }
+            return;
+        }
+
+        const printBtn = event.target.closest('.print-btn');
+        if (printBtn) {
+            event.preventDefault();
+            event.stopPropagation();
+            const level = printBtn.getAttribute('data-print-level');
+            const id = printBtn.getAttribute('data-print-id');
+            const commonName = printBtn.getAttribute('data-common-name');
+            const category = printBtn.getAttribute('data-category');
+            const subcategory = printBtn.getAttribute('data-subcategory');
+            printTable(level, id, commonName, category, subcategory);
+            return;
+        }
+
+        const printFullBtn = event.target.closest('.print-full-btn');
+        if (printFullBtn) {
+            event.preventDefault();
+            event.stopPropagation();
+            const commonName = printFullBtn.getAttribute('data-common-name');
+            const category = printFullBtn.getAttribute('data-category');
+            const subcategory = printFullBtn.getAttribute('data-subcategory');
+            printFullItemList(category, subcategory, commonName);
+            return;
+        }
+    }
+
+    // HTMX event listener for hand-counted items
+    document.body.addEventListener('htmx:afterSwap', function(event) {
+        const target = event.target;
+        if (target.id === 'hand-counted-items') {
+            const rows = target.querySelectorAll('tr');
+            rows.forEach(row => {
+                const timestampCell = row.querySelector('td:nth-child(5)');
+                if (timestampCell) {
+                    const rawDate = timestampCell.textContent.trim();
+                    timestampCell.textContent = formatDate(rawDate);
+                }
+            });
         }
     });
-});
-
-document.body.addEventListener('htmx:afterSwap', function(event) {
-    const target = event.target;
-    if (target.id === 'hand-counted-items') {
-        const rows = target.querySelectorAll('tr');
-        rows.forEach(row => {
-            const timestampCell = row.querySelector('td:nth-child(5)');
-            if (timestampCell) {
-                const rawDate = timestampCell.textContent.trim();
-                timestampCell.textContent = formatDate(rawDate);
-            }
-        });
-    }
 });

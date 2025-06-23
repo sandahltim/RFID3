@@ -2,100 +2,112 @@
 
 {% block head %}
 {{ super() }}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/tab2_4.css') }}">
 {% endblock %}
 
 {% block content %}
-<div class="mt-0">
-    <h2>Laundry Contracts</h2>
-    <div class="category-table-wrapper">
-        <table class="category-table" id="category-table">
-            <thead id="category-table-header">
+    <h2 class="tab-title">Laundry Contracts</h2>
+
+    {% if error %}
+        <div class="alert alert-danger" role="alert">
+            Error loading contracts: {{ error }}
+        </div>
+    {% endif %}
+
+    <table class="table table-bordered table-hover category-table" id="category-table">
+        <thead class="thead-dark">
+            <tr>
+                <th>Contract Number</th>
+                <th>Customer Name</th>
+                <th>Items on Contract</th>
+                <th>Total Items in Inventory</th>
+                <th>Hand-Counted Entries</th>
+                <th>Last Scanned Date</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody id="category-rows">
+            {% if contracts %}
+                {% for contract in contracts %}
+                    <tr>
+                        <td>{{ contract.contract_number }}</td>
+                        <td>{{ contract.client_name }}</td>
+                        <td>{{ contract.items_on_contract }}</td>
+                        <td>{{ contract.total_items_inventory }}</td>
+                        <td>{{ contract.hand_counted_items }}</td>
+                        <td>{{ contract.scan_date }}</td>
+                        <td>
+                            <button class="btn btn-sm btn-secondary expand-btn" data-target-id="common-{{ contract.contract_number|replace(' ', '_') }}" data-contract-number="{{ contract.contract_number }}">Expand</button>
+                            <button class="btn btn-sm btn-secondary collapse-btn" data-collapse-target="common-{{ contract.contract_number|replace(' ', '_') }}" style="display:none;">Collapse</button>
+                            <button class="btn btn-sm btn-info print-btn" data-print-level="Contract" data-print-id="common-{{ contract.contract_number|replace(' ', '_') }}" data-contract-number="{{ contract.contract_number }}">Print</button>
+                            <div id="loading-common-{{ contract.contract_number|replace(' ', '_') }}" style="display:none;" class="loading-indicator">Loading...</div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td colspan="7">
+                            <div id="common-{{ contract.contract_number|replace(' ', '_') }}" class="expandable collapsed subcategory-container"></div>
+                        </td>
+                    </tr>
+                {% endfor %}
+            {% else %}
                 <tr>
-                    <th>Contract Number <span class="sort-arrow"></span></th>
-                    <th>Customer Name <span class="sort-arrow"></span></th>
-                    <th>Items on Contract <span class="sort-arrow"></span></th>
-                    <th>Total Items in Inventory <span class="sort-arrow"></span></th>
-                    <th>Hand-Counted Entries <span class="sort-arrow"></span></th>
-                    <th>Last Scanned Date <span class="sort-arrow"></span></th>
-                    <th>Actions</th>
+                    <td colspan="7">No laundry contracts found. Please try refreshing or check data synchronization.</td>
+                </tr>
+            {% endif %}
+        </tbody>
+    </table>
+
+    <h4>Hand-Counted Items</h4>
+    <div class="card">
+        <div class="card-body">
+            <form id="hand-counted-form">
+                <div class="form-group">
+                    <label for="hand-counted-contract-number">Select Contract Number:</label>
+                    <select id="hand-counted-contract-number" class="form-control" onchange="updateItemDropdown()">
+                        <option value="">Select Contract...</option>
+                    </select>
+                    <input type="text" id="new-contract-number" class="form-control mt-2" placeholder="Enter New Contract" style="display:none;">
+                    <button type="button" class="btn btn-sm btn-secondary mt-2" onclick="toggleNewContractInput()">Toggle New Contract</button>
+                </div>
+                <div class="form-group">
+                    <label for="hand-counted-item-name">Select Item:</label>
+                    <select id="hand-counted-item-name" class="form-control">
+                        <option value="">Select Item...</option>
+                    </select>
+                    <input type="text" id="new-item-name" class="form-control mt-2" placeholder="Enter New Item" style="display:none;">
+                    <button type="button" class="btn btn-sm btn-secondary mt-2" onclick="toggleNewItemInput()">Toggle New Item</button>
+                </div>
+                <div class="form-group">
+                    <label for="hand-counted-quantity">Quantity:</label>
+                    <input type="number" id="hand-counted-quantity" class="form-control" min="1" required>
+                </div>
+                <div class="form-group">
+                    <label for="hand-counted-employee">Employee Name:</label>
+                    <input type="text" id="hand-counted-employee" class="form-control" required>
+                </div>
+                <div class="btn-group">
+                    <button type="button" class="btn btn-sm btn-success" onclick="addHandCountedItem()">Add</button>
+                    <button type="button" class="btn btn-sm btn-danger" onclick="removeHandCountedItem()">Remove</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="hand-counted-items" class="mt-4">
+        <table class="table table-bordered table-hover">
+            <thead class="thead-dark">
+                <tr>
+                    <th>Contract Number</th>
+                    <th>Item Name</th>
+                    <th>Quantity</th>
+                    <th>Action</th>
+                    <th>Timestamp</th>
+                    <th>User</th>
                 </tr>
             </thead>
-            <tbody id="category-rows">
-                {% for contract in contracts %}
-                <tr data-contract-number="{{ contract.contract_number }}">
-                    <td class="expandable-cell" onclick="window.expandCategory('{{ contract.contract_number | urlencode | replace('\'', '\\\'') | replace('\"', '\\\"') }}', 'common-{{ contract.contract_number }}', '{{ contract.contract_number }}')">
-                        {{ contract.contract_number }}
-                    </td>
-                    <td>{{ contract.client_name }}</td>
-                    <td id="items-on-contract-{{ contract.contract_number }}">{{ contract.items_on_contract }}</td>
-                    <td>{{ contract.total_items_inventory }}</td>
-                    <td id="hand-counted-entries-{{ contract.contract_number }}">{{ contract.hand_counted_items }}</td>
-                    <td class="date-last-scanned">{{ contract.scan_date }}</td>
-                    <td>
-                        <button class="btn btn-sm btn-secondary expand-btn" data-contract-number="{{ contract.contract_number }}" data-target-id="common-{{ contract.contract_number }}">Expand</button>
-                        <button class="btn btn-sm btn-secondary collapse-btn" data-collapse-target="common-{{ contract.contract_number }}" style="display:none;">Collapse</button>
-                        <button class="btn btn-sm btn-info print-btn" data-print-level="Contract" data-print-id="common-{{ contract.contract_number }}" data-contract-number="{{ contract.contract_number }}">Print</button>
-                        <div id="loading-{{ contract.contract_number }}" style="display:none;" class="loading">Loading...</div>
-                    </td>
-                </tr>
-                <tr>
-                    <td colspan="7">
-                        <div id="common-{{ contract.contract_number }}" class="expandable collapsed"></div>
-                    </td>
-                </tr>
-                {% endfor %}
+            <tbody>
+                {% include '_hand_counted_item.html' %}
             </tbody>
         </table>
     </div>
 
-    <h4>Hand-Counted Items</h4>
-    <div class="row mb-3">
-        <div class="col">
-            <select class="form-control" id="hand-counted-contract-number" onchange="updateItemDropdown()">
-                <option value="">Select Contract Number...</option>
-            </select>
-            <input type="text" class="form-control mt-2" id="new-contract-number" placeholder="Or enter new contract number" style="display: none;">
-            <button class="btn btn-sm btn-secondary mt-1" onclick="toggleNewContractInput()">Enter New Contract</button>
-        </div>
-        <div class="col">
-            <select class="form-control" id="hand-counted-item-name">
-                <option value="">Select Item...</option>
-            </select>
-            <input type="text" class="form-control mt-2" id="new-item-name" placeholder="Or enter new item name" style="display: none;">
-            <button class="btn btn-sm btn-secondary mt-1" onclick="toggleNewItemInput()">Enter New Item</button>
-        </div>
-        <div class="col">
-            <input type="number" class="form-control" id="hand-counted-quantity" placeholder="Quantity" min="1">
-        </div>
-        <div class="col">
-            <input type="text" class="form-control" id="hand-counted-employee" placeholder="Employee Name">
-        </div>
-        <div class="col">
-            <button class="btn btn-success" onclick="addHandCountedItem()">Add</button>
-            <button class="btn btn-danger" onclick="removeHandCountedItem()">Remove</button>
-        </div>
-    </div>
-    <div class="row mb-3">
-        <div class="col">
-            <input type="text" class="form-control" placeholder="Filter by Contract Number" id="hand-counted-filter" oninput="filterHandCountedItems()">
-        </div>
-    </div>
-    <table class="table table-bordered">
-        <thead>
-            <tr>
-                <th>Contract Number</th>
-                <th>Item Name</th>
-                <th>Quantity</th>
-                <th>Action</th>
-                <th>Timestamp</th>
-                <th>User</th>
-            </tr>
-        </thead>
-        <tbody id="hand-counted-items" 
-               hx-get="{{ url_for('tab4.tab4_hand_counted_items') }}"
-               hx-trigger="load, refreshTab from:body">
-        </tbody>
-    </table>
-</div>
 {% endblock %}
