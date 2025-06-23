@@ -1,5 +1,5 @@
 # app/services/scheduler.py
-# scheduler.py version: 2025-06-20-v8
+# scheduler.py version: 2025-06-20-v9
 from apscheduler.schedulers.background import BackgroundScheduler
 from app.services.refresh import incremental_refresh, full_refresh
 from redis import Redis
@@ -9,6 +9,7 @@ import logging
 import sys
 import os
 from .. import db  # Import db from the application package
+from sqlalchemy.sql import text
 
 # Configure logging with process ID to avoid duplicates
 logger = logging.getLogger(f'scheduler_{os.getpid()}')
@@ -40,7 +41,7 @@ def init_scheduler(app):
         for attempt in range(max_retries):
             try:
                 with app.app_context():
-                    db.session.execute("SELECT 1").scalar()  # Use scalar to get a result
+                    db.session.execute(text("SELECT 1")).scalar()  # Use text() for SQL expression
                     return True
             except Exception as e:
                 logger.warning(f"Database connection failed, retrying ({attempt + 1}/{max_retries}): {str(e)}")
