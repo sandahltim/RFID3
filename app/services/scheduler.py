@@ -1,5 +1,5 @@
 # app/services/scheduler.py
-# scheduler.py version: 2025-06-20-v6
+# scheduler.py version: 2025-06-20-v7
 from apscheduler.schedulers.background import BackgroundScheduler
 from app.services.refresh import incremental_refresh, full_refresh
 from redis import Redis
@@ -8,11 +8,12 @@ import time
 import logging
 import sys
 import os
+from .. import db  # Import db from the application package
 
 # Configure logging with process ID to avoid duplicates
 logger = logging.getLogger(f'scheduler_{os.getpid()}')
 logger.setLevel(logging.DEBUG)
-if not logger.handlers:
+if not logger.handlers and os.getpid() == os.getppid():  # Initialize only in main process
     # File handler for rfid_dashboard.log
     file_handler = logging.FileHandler('/home/tim/test_rfidpi/logs/rfid_dashboard.log')
     file_handler.setLevel(logging.DEBUG)
