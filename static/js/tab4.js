@@ -1,9 +1,9 @@
-console.log('tab4.js version: 2025-05-29-v5 loaded');
+console.log('tab4.js version: 2025-05-29-v6 loaded at 2025-06-23 14:30:00 CDT');
 
 /**
  * Tab4.js: Logic for Tab 4 (Laundry Contracts).
  * Dependencies: common.js (for formatDate, showLoading, hideLoading, collapseSection, applyFilterToTable).
- * Updated: Aligned with Tab 2 structure, removed sorting, integrated hand-counted items.
+ * Updated: Fixed hand-counted items errors, removed tab.js interference, ensured expand/collapse consistency.
  */
 
 // Expand category for Tab 4
@@ -12,7 +12,7 @@ window.expandCategory = function(category, targetId, contractNumber, page = 1, t
 
     const targetElement = document.getElementById(targetId);
     if (!targetElement) {
-        console.error(`Target ${targetId} not found`);
+        console.error(`Target ${targetId} not found at 2025-06-23 14:30:00 CDT`);
         return;
     }
 
@@ -21,7 +21,7 @@ window.expandCategory = function(category, targetId, contractNumber, page = 1, t
     const collapseBtn = parentRow.querySelector('.collapse-btn');
 
     if (targetElement.classList.contains('expanded') && page === 1) {
-        console.log(`Collapsing ${targetId}`);
+        console.log(`Collapsing ${targetId} at 2025-06-23 14:30:00 CDT`);
         collapseSection(targetId);
         if (expandBtn && collapseBtn) {
             expandBtn.style.display = 'inline-block';
@@ -32,14 +32,14 @@ window.expandCategory = function(category, targetId, contractNumber, page = 1, t
 
     const loadingSuccess = showLoading(targetId);
     const url = `/tab/4/common_names?contract_number=${encodeURIComponent(contractNumber)}&page=${page}`;
-    console.log(`Fetching common names: ${url}`);
+    console.log(`Fetching common names: ${url} at 2025-06-23 14:30:00 CDT`);
 
     fetch(url)
         .then(response => {
-            console.log(`Common names fetch status: ${response.status}`);
+            console.log(`Common names fetch status: ${response.status} at 2025-06-23 14:30:00 CDT`);
             if (!response.ok) {
                 return response.text().then(text => {
-                    throw new Error(`Common names fetch failed: ${response.status} - ${text}`);
+                    throw new Error(`Common names fetch failed: ${response.status} - ${text} at 2025-06-23 14:30:00 CDT`);
                 });
             }
             return response.json();
@@ -155,7 +155,7 @@ window.expandItems = function(contractNumber, commonName, targetId, page = 1, ta
 
     const targetElement = document.getElementById(targetId);
     if (!targetElement) {
-        console.error(`Target ${targetId} not found`);
+        console.error(`Target ${targetId} not found at 2025-06-23 14:30:00 CDT`);
         return;
     }
 
@@ -164,7 +164,7 @@ window.expandItems = function(contractNumber, commonName, targetId, page = 1, ta
     const collapseBtn = parentRow.querySelector('.collapse-btn');
 
     if (targetElement.classList.contains('expanded') && page === 1) {
-        console.log(`Collapsing ${targetId}`);
+        console.log(`Collapsing ${targetId} at 2025-06-23 14:30:00 CDT`);
         collapseSection(targetId);
         if (expandBtn && collapseBtn) {
             expandBtn.style.display = 'inline-block';
@@ -178,14 +178,14 @@ window.expandItems = function(contractNumber, commonName, targetId, page = 1, ta
     targetElement.innerHTML = '';
 
     const url = `/tab/4/data?contract_number=${encodeURIComponent(contractNumber)}&common_name=${encodeURIComponent(commonName)}&page=${page}`;
-    console.log(`Fetching items: ${url}`);
+    console.log(`Fetching items: ${url} at 2025-06-23 14:30:00 CDT`);
 
     fetch(url)
         .then(response => {
-            console.log(`Items fetch status: ${response.status}`);
+            console.log(`Items fetch status: ${response.status} at 2025-06-23 14:30:00 CDT`);
             if (!response.ok) {
                 return response.text().then(text => {
-                    throw new Error(`Items fetch failed: ${response.status} - ${text}`);
+                    throw new Error(`Items fetch failed: ${response.status} - ${text} at 2025-06-23 14:30:00 CDT`);
                 });
             }
             return response.json();
@@ -315,12 +315,12 @@ function refreshTab() {
 }
 
 function filterHandCountedItems() {
-    const contractNumber = document.getElementById('hand-counted-filter').value;
+    const contractNumber = document.getElementById('hand-counted-contract-number').value;
     const url = contractNumber ? `/tab/4/hand_counted_items?contract_number=${encodeURIComponent(contractNumber)}` : '/tab/4/hand_counted_items';
     if (typeof htmx !== 'undefined') {
         htmx.ajax('GET', url, '#hand-counted-items');
     } else {
-        console.warn('HTMX not available, using fallback fetch');
+        console.warn('HTMX not available, using fallback fetch at 2025-06-23 14:30:00 CDT');
         fetch(url)
             .then(response => response.text())
             .then(html => {
@@ -339,7 +339,7 @@ function filterHandCountedItems() {
             })
             .catch(error => {
                 console.error('Error fetching hand-counted items:', error);
-                document.getElementById('hand-counted-items').innerHTML = '<tr><td colspan="6">Error loading hand-counted items.</td></tr>';
+                document.getElementById('hand-counted-items').innerHTML = '<tr><td colspan="6">Error loading hand-counted items at 2025-06-23 14:30:00 CDT.</td></tr>';
             });
     }
 }
@@ -388,7 +388,7 @@ function updateItemDropdown() {
                     itemDropdown.appendChild(option);
                 });
             })
-            .catch(error => console.error('Error fetching hand-counted items:', error));
+            .catch(error => console.error('Error fetching hand-counted items at 2025-06-23 14:30:00 CDT:', error));
     }
 }
 
@@ -404,11 +404,11 @@ function addHandCountedItem() {
     const quantity = parseInt(quantityInput.value);
     const employeeName = employeeInput.value;
     if (!contractNumber || !itemName || !quantity || quantity < 1 || !employeeName) {
-        alert('Please fill in all fields: Contract Number, Item Name, Quantity (positive number), and Employee Name.');
+        alert('Please fill in all fields: Contract Number, Item Name, Quantity (positive number), and Employee Name at 2025-06-23 14:30:00 CDT.');
         return;
     }
     if (!contractNumber.startsWith('L')) {
-        alert('Contract Number must start with "L" for Laundry Contracts.');
+        alert('Contract Number must start with "L" for Laundry Contracts at 2025-06-23 14:30:00 CDT.');
         return;
     }
     fetch('/tab/4/add_hand_counted_item', {
@@ -423,7 +423,7 @@ function addHandCountedItem() {
         })
     })
     .then(response => {
-        if (!response.ok) throw new Error('Network response was not ok');
+        if (!response.ok) throw new Error('Network response was not ok at 2025-06-23 14:30:00 CDT');
         return response.json();
     })
     .then(data => {
@@ -444,8 +444,8 @@ function addHandCountedItem() {
         }
     })
     .catch(error => {
-        console.error('Error adding hand-counted item:', error);
-        alert('Failed to add item. Please try again.');
+        console.error('Error adding hand-counted item at 2025-06-23 14:30:00 CDT:', error);
+        alert('Failed to add item. Please try again at 2025-06-23 14:30:00 CDT.');
         addContractToTable(contractNumber);
         updateContractCounts(contractNumber);
         refreshCommonNames(contractNumber);
@@ -464,7 +464,7 @@ function removeHandCountedItem() {
     const quantity = parseInt(quantityInput.value);
     const employeeName = employeeInput.value;
     if (!contractNumber || !itemName || !quantity || quantity < 1 || !employeeName) {
-        alert('Please fill in all fields: Contract Number, Item Name, Quantity (positive number), and Employee Name.');
+        alert('Please fill in all fields: Contract Number, Item Name, Quantity (positive number), and Employee Name at 2025-06-23 14:30:00 CDT.');
         return;
     }
     fetch('/tab/4/remove_hand_counted_item', {
@@ -479,7 +479,7 @@ function removeHandCountedItem() {
         })
     })
     .then(response => {
-        if (!response.ok) throw new Error('Network response was not ok');
+        if (!response.ok) throw new Error('Network response was not ok at 2025-06-23 14:30:00 CDT');
         return response.json();
     })
     .then(data => {
@@ -500,8 +500,8 @@ function removeHandCountedItem() {
         }
     })
     .catch(error => {
-        console.error('Error removing hand-counted item:', error);
-        alert('Failed to remove item. Please try again.');
+        console.error('Error removing hand-counted item at 2025-06-23 14:30:00 CDT:', error);
+        alert('Failed to remove item. Please try again at 2025-06-23 14:30:00 CDT.');
         addContractToTable(contractNumber);
         updateContractCounts(contractNumber);
         refreshCommonNames(contractNumber);
@@ -512,7 +512,7 @@ function addContractToTable(contractNumber) {
     const tbody = document.getElementById('category-rows');
     const existingRow = tbody.querySelector(`tr[data-contract-number="${contractNumber}"]`);
     if (!existingRow) {
-        console.log(`Adding new contract row for ${contractNumber}`);
+        console.log(`Adding new contract row for ${contractNumber} at 2025-06-23 14:30:00 CDT`);
         const newRowHtml = `
             <tr data-contract-number="${contractNumber}">
                 <td class="expandable-cell" onclick="window.expandCategory('${encodeURIComponent(contractNumber).replace(/'/g, "\\'").replace(/"/g, '\\"')}', 'common-${contractNumber}', '${contractNumber}')">
@@ -543,7 +543,7 @@ function addContractToTable(contractNumber) {
 function updateContractCounts(contractNumber) {
     fetch(`/tab/4/contract_items_count?contract_number=${encodeURIComponent(contractNumber)}`)
         .then(response => {
-            if (!response.ok) throw new Error('Failed to fetch Items on Contract');
+            if (!response.ok) throw new Error('Failed to fetch Items on Contract at 2025-06-23 14:30:00 CDT');
             return response.json();
         })
         .then(data => {
@@ -552,10 +552,10 @@ function updateContractCounts(contractNumber) {
                 currentCountElement.textContent = data.total_items || 0;
             }
         })
-        .catch(error => console.error('Error updating Items on Contract count:', error));
+        .catch(error => console.error('Error updating Items on Contract count at 2025-06-23 14:30:00 CDT:', error));
     fetch(`/tab/4/hand_counted_entries?contract_number=${encodeURIComponent(contractNumber)}`)
         .then(response => {
-            if (!response.ok) throw new Error('Failed to fetch Hand-Counted Entries');
+            if (!response.ok) throw new Error('Failed to fetch Hand-Counted Entries at 2025-06-23 14:30:00 CDT');
             return response.json();
         })
         .then(data => {
@@ -564,7 +564,7 @@ function updateContractCounts(contractNumber) {
                 handCountedElement.textContent = data.hand_counted_entries || 0;
             }
         })
-        .catch(error => console.error('Error updating Hand-Counted Entries count:', error));
+        .catch(error => console.error('Error updating Hand-Counted Entries count at 2025-06-23 14:30:00 CDT:', error));
 }
 
 function refreshCommonNames(contractNumber) {
@@ -590,7 +590,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     if (window.cachedTabNum !== 4) {
-        console.log(`Tab ${window.cachedTabNum} detected, skipping tab4.js`);
+        console.log(`Tab ${window.cachedTabNum} detected, skipping tab4.js at 2025-06-23 14:30:00 CDT`);
         return;
     }
 
@@ -617,18 +617,18 @@ document.addEventListener('DOMContentLoaded', function() {
                 contractDropdown.appendChild(option);
             });
         })
-        .catch(error => console.error('Error fetching hand-counted contracts:', error));
+        .catch(error => console.error('Error fetching hand-counted contracts at 2025-06-23 14:30:00 CDT:', error));
 
     // Attach event listeners
     document.removeEventListener('click', handleClick);
-    console.log('Attaching click event listener');
+    console.log('Attaching click event listener at 2025-06-23 14:30:00 CDT');
     document.addEventListener('click', handleClick);
 
     function handleClick(event) {
         const expandBtn = event.target.closest('.expand-btn');
         if (expandBtn) {
             event.stopPropagation();
-            console.log('Expand button clicked:', {
+            console.log('Expand button clicked at 2025-06-23 14:30:00 CDT:', {
                 category: expandBtn.getAttribute('data-category'),
                 commonName: expandBtn.getAttribute('data-common-name'),
                 targetId: expandBtn.getAttribute('data-target-id'),
@@ -641,10 +641,10 @@ document.addEventListener('DOMContentLoaded', function() {
             const contractNumber = expandBtn.getAttribute('data-contract-number');
 
             if (commonName) {
-                console.log(`Expanding items for ${contractNumber}, ${commonName}`);
+                console.log(`Expanding items for ${contractNumber}, ${commonName} at 2025-06-23 14:30:00 CDT`);
                 window.expandItems(contractNumber, commonName, targetId, 1, 4);
             } else if (contractNumber && window.cachedTabNum === 4) {
-                console.log(`Expanding category for ${contractNumber}`);
+                console.log(`Expanding category for ${contractNumber} at 2025-06-23 14:30:00 CDT`);
                 window.expandCategory(category, targetId, contractNumber, 1, 4);
             }
             return;
@@ -653,7 +653,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const collapseBtn = event.target.closest('.collapse-btn');
         if (collapseBtn) {
             event.stopPropagation();
-            console.log(`Collapsing ${collapseBtn.getAttribute('data-collapse-target')}`);
+            console.log(`Collapsing ${collapseBtn.getAttribute('data-collapse-target')} at 2025-06-23 14:30:00 CDT`);
             collapseSection(collapseBtn.getAttribute('data-collapse-target'));
             const parentRow = document.querySelector(`[data-target-id="${collapseBtn.getAttribute('data-collapse-target')}"]`)?.closest('tr');
             if (parentRow) {

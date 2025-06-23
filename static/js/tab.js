@@ -1,20 +1,20 @@
-console.log('tab.js version: 2025-05-29-v6 loaded');
+console.log('tab.js version: 2025-05-29-v8 loaded');
 
 /**
  * Tab.js: Initializes tab-specific logic and handles printing.
  * Dependencies: common.js (for formatDateTime, printTable, renderPaginationControls).
- * Updated: Prevented handling of Tab 2 expands to avoid double invocation.
+ * Updated: Refined logging, restricted expand handling to Tabs 1, 3, 5, avoiding interference with Tab 2 and 4.
  */
 
 /**
  * Format ISO date strings for consistency (fallback if common.js is not loaded)
  */
 function formatDateTime(dateTimeStr) {
-    console.log(`formatDateTime: dateTimeStr=${dateTimeStr}`);
+    console.log(`formatDateTime: Processing ${dateTimeStr}`);
     if (typeof formatDate === 'function') {
         return formatDate(dateTimeStr);
     }
-    console.warn('formatDate not found, using fallback');
+    console.warn('formatDate not available, using fallback');
     if (!dateTimeStr || dateTimeStr === 'N/A') return 'N/A';
     try {
         const date = new Date(dateTimeStr);
@@ -29,13 +29,13 @@ function formatDateTime(dateTimeStr) {
             hour12: true
         });
     } catch (error) {
-        console.error('Error formatting date:', dateTimeStr, error);
+        console.error('formatDateTime error:', error);
         return 'N/A';
     }
 }
 
 /**
- * Fetch paginated data for expandable sections (Tabs 1, 2, 4, 5)
+ * Fetch paginated data for expandable sections (Tabs 1, 3, 5)
  */
 async function fetchExpandableData(tabNum, contractNumber, page, perPage) {
     console.log(`fetchExpandableData: tabNum=${tabNum}, contractNumber=${contractNumber}, page=${page}, perPage=${perPage}`);
@@ -43,13 +43,13 @@ async function fetchExpandableData(tabNum, contractNumber, page, perPage) {
     try {
         const response = await fetch(url);
         if (!response.ok) {
-            throw new Error(`Failed to fetch expandable data: ${response.status}`);
+            throw new Error(`fetchExpandableData failed: ${response.status}`);
         }
         const data = await response.json();
-        console.log(`fetchExpandableData: Data received`, data);
+        console.log('fetchExpandableData: Data received', data);
         return data;
     } catch (error) {
-        console.error(`Error fetching expandable data for tab ${tabNum}:`, error);
+        console.error('fetchExpandableData error:', error);
         return { common_names: [], total_items: 0 };
     }
 }
@@ -61,7 +61,7 @@ function updateExpandableTable(tableId, data, page, perPage, tabNum, contractNum
     console.log(`updateExpandableTable: tableId=${tableId}, page=${page}, perPage=${perPage}, tabNum=${tabNum}, contractNumber=${contractNumber}`);
     const table = document.getElementById(tableId);
     if (!table) {
-        console.warn(`Table not found: ${tableId}`);
+        console.warn(`updateExpandableTable: Table not found ${tableId}`);
         return;
     }
 
@@ -84,7 +84,7 @@ function updateExpandableTable(tableId, data, page, perPage, tabNum, contractNum
             });
         }
     } else {
-        console.error('renderPaginationControls is not defined');
+        console.error('updateExpandableTable: renderPaginationControls not defined');
     }
 }
 
@@ -105,7 +105,7 @@ document.addEventListener('DOMContentLoaded', () => {
             tabNum = 1;
             console.log('Home page detected, setting tabNum=1');
         } else {
-            console.warn('No tab number found in URL, using default tab number 1.');
+            console.warn('No tab number found in URL, using default tab number 1');
             tabNum = 1;
         }
         window.cachedTabNum = tabNum;
@@ -137,8 +137,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 printFullItemList(category, subcategory, commonName);
             }
 
-            // Handle expandable sections for Tabs 1, 3, 4, 5 (skip Tab 2)
-            if (expandBtn && tabNum !== 2) {
+            // Handle expandable sections for Tabs 1, 3, 5 only
+            if (expandBtn && [1, 3, 5].includes(tabNum)) {
                 console.log('Expand button clicked:', {
                     contractNumber: expandBtn.getAttribute('data-contract-number'),
                     targetId: expandBtn.getAttribute('data-target-id')
@@ -147,7 +147,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const nextRow = row.nextElementSibling;
                 const expandable = nextRow.querySelector('.expandable');
                 if (!expandable) {
-                    console.warn('Expandable section not found for row');
+                    console.warn('Expandable section not found');
                     return;
                 }
 
@@ -155,7 +155,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const targetId = expandBtn.getAttribute('data-target-id');
 
                 if (!contractNumber || !targetId) {
-                    console.warn('Contract number or target ID missing for expandable section');
+                    console.warn('Contract number or target ID missing');
                     return;
                 }
 
@@ -163,10 +163,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     expandable.classList.remove('collapsed');
                     expandable.classList.add('expanded');
 
-                    // For other tabs, fetch data and update table
                     const tableId = expandable.querySelector('.common-table')?.id;
                     if (!tableId) {
-                        console.warn('Table ID not found in expandable section; proceeding without it');
+                        console.warn('Table ID not found in expandable section');
                     }
                     fetchExpandableData(tabNum, contractNumber, 1, 20).then(data => {
                         if (tableId) {
@@ -182,6 +181,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     } catch (error) {
-        console.error('Error initializing tab.js:', error);
+        console.error('Initialization error:', error);
     }
 });

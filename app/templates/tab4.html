@@ -62,7 +62,7 @@
             <form id="hand-counted-form">
                 <div class="form-group">
                     <label for="hand-counted-contract-number">Select Contract Number:</label>
-                    <select id="hand-counted-contract-number" class="form-control" onchange="updateItemDropdown()">
+                    <select id="hand-counted-contract-number" class="form-control" onchange="filterHandCountedItems()">
                         <option value="">Select Contract...</option>
                     </select>
                     <input type="text" id="new-contract-number" class="form-control mt-2" placeholder="Enter New Contract" style="display:none;">
@@ -92,7 +92,7 @@
         </div>
     </div>
 
-    <div id="hand-counted-items" class="mt-4">
+    <div id="hand-counted-items" class="mt-4" hx-get="/tab/4/hand_counted_items" hx-trigger="load">
         <table class="table table-bordered table-hover">
             <thead class="thead-dark">
                 <tr>
