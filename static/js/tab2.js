@@ -1,10 +1,19 @@
-console.log('tab2.js version: 2025-05-29-v6 loaded');
+console.log('tab2.js version: 2025-05-29-v7 loaded');
 
 /**
  * Tab2.js: Logic for Tab 2 (Open Contracts).
  * Dependencies: common.js (for formatDate, showLoading, hideLoading, collapseSection, applyFilterToTable, sortCommonNames, sortItems).
- * Updated: Fixed Expand/Collapse toggle for top level, sanitized IDs, prevented double invocation.
+ * Updated: Added sorting for Contract Number, Customer Name, and Last Scanned Date.
  */
+
+window.sortContracts = function(column) {
+    let sort = column + '_asc';
+    const currentSort = new URLSearchParams(window.location.search).get('sort');
+    if (currentSort && currentSort.startsWith(column + '_')) {
+        sort = currentSort.endsWith('asc') ? column + '_desc' : column + '_asc';
+    }
+    window.location.href = `/tab/2?sort=${sort}`;
+};
 
 // Expand category for Tab 2
 window.expandCategory = function(category, targetId, contractNumber, page = 1, tabNum = 2) {
@@ -31,7 +40,7 @@ window.expandCategory = function(category, targetId, contractNumber, page = 1, t
     }
 
     const loadingSuccess = showLoading(targetId);
-    const sanitizedContractNumber = contractNumber.trim().replace(/[^a-z0-9]/g, '_').substring(0, 50); // Sanitize and limit length
+    const sanitizedContractNumber = contractNumber.trim().replace(/[^a-z0-9]/g, '_').substring(0, 50);
     const url = `/tab/2/common_names?contract_number=${encodeURIComponent(sanitizedContractNumber)}&page=${page}`;
     console.log(`Fetching common names: ${url}`);
 
@@ -73,7 +82,7 @@ window.expandCategory = function(category, targetId, contractNumber, page = 1, t
             `;
 
             commonNames.forEach(common => {
-                const commonId = `${sanitizedContractNumber}-${common.name.replace(/[^a-z0-9]/g, '_').substring(0, 50)}`; // Sanitize and limit
+                const commonId = `${sanitizedContractNumber}-${common.name.replace(/[^a-z0-9]/g, '_').substring(0, 50)}`;
                 const escapedCommonName = common.name.replace(/'/g, "\\'").replace(/"/g, '\\"');
                 html += `
                     <tr>
@@ -357,7 +366,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (commonName) {
                 console.log(`Expanding items for ${contractNumber}, ${commonName}`);
                 window.expandItems(contractNumber, commonName, targetId, 1, 2);
-            } else if (contractNumber && window.cachedTabNum === 2) { // Restrict to Tab 2
+            } else if (contractNumber && window.cachedTabNum === 2) {
                 console.log(`Expanding category for ${contractNumber}`);
                 window.expandCategory(category, targetId, contractNumber, 1, 2);
             }

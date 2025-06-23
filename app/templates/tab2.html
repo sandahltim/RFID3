@@ -16,11 +16,11 @@
     	<table class="table table-bordered table-hover category-table" id="category-table">
             <thead class="thead-dark">
                 <tr>
-                    <th>Contract Number</th>
-                    <th>Customer Name</th>
+                    <th onclick="window.sortContracts('contract_number')">Contract Number <span class="sort-arrow"></span></th>
+                    <th onclick="window.sortContracts('client_name')">Customer Name <span class="sort-arrow"></span></th>
                     <th>Items on Contract</th>
                     <th>Total Items in Inventory</th>
-                    <th>Last Scanned Date</th>
+                    <th onclick="window.sortContracts('scan_date')">Last Scanned Date <span class="sort-arrow"></span></th>
                     <th>Actions</th>
                 </tr>
             </thead>
