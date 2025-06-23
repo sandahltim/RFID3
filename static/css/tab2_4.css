@@ -9,6 +9,7 @@
     visibility: visible !important;
     margin-bottom: 20px;
     background-color: #ffffff;
+    font-family: 'Roboto', sans-serif;
 }
 
 /* Center headers and cells with improved spacing */
@@ -21,6 +22,7 @@
     display: table-cell !important;
     visibility: visible !important;
     white-space: nowrap;
+    font-size: 0.95rem;
 }
 
 /* Enhance header readability */
@@ -58,6 +60,7 @@
     border-left: 4px solid #007bff;
     padding-left: 15px;
     background-color: #f8f9fa;
+    font-family: 'Roboto', sans-serif;
 }
 
 /* Common table styling (aligned with category-table) */
@@ -67,6 +70,7 @@
     border-collapse: collapse;
     border: 1px solid #dee2e6;
     background-color: #ffffff;
+    font-family: 'Roboto', sans-serif;
 }
 
 .common-table thead th {
@@ -79,6 +83,7 @@
 .common-table td {
     padding: 10px;
     border: 1px solid #dee2e6;
+    font-size: 0.95rem;
 }
 
 /* Item level wrapper styling */
@@ -88,6 +93,7 @@
     border-left: 4px solid #28a745;
     padding-left: 15px;
     background-color: #f1f3f5;
+    font-family: 'Roboto', sans-serif;
 }
 
 .item-table {
@@ -95,6 +101,7 @@
     margin-top: 5px;
     border-collapse: collapse;
     border: 1px solid #dee2e6;
+    font-family: 'Roboto', sans-serif;
 }
 
 .item-table thead th {
@@ -107,6 +114,16 @@
 .item-table td {
     padding: 8px;
     border: 1px solid #dee2e6;
+    font-size: 0.9rem;
+}
+
+/* Title styling */
+.tab-title {
+    font-family: 'Roboto', sans-serif;
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-bottom: 20px;
+    color: #333;
 }
 
 /* Responsive adjustments for tablet/phone */
@@ -118,7 +135,7 @@
     .item-table th,
     .item-table td {
         padding: 8px 10px;
-        font-size: 0.9rem;
+        font-size: 0.85rem;
     }
 
     .category-table th:nth-child(1),
@@ -157,6 +174,10 @@
     .item-table {
         width: 100%;
     }
+
+    .tab-title {
+        font-size: 1.2rem;
+    }
 }
 
 /* Loading indicator */
@@ -165,6 +186,7 @@
     padding: 10px;
     color: #007bff;
     font-style: italic;
+    font-family: 'Roboto', sans-serif;
 }
 
 /* Pagination controls */
@@ -175,4 +197,10 @@
 
 .pagination-controls button {
     margin: 0 5px;
+    font-family: 'Roboto', sans-serif;
+}
+
+/* Sort arrow */
+.sort-arrow {
+    margin-left: 5px;
 }

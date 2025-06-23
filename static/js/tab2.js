@@ -1,32 +1,37 @@
-console.log('tab2.js version: 2025-05-29-v9 loaded');
+console.log('tab2.js version: 2025-05-29-v10 loaded');
 
 /**
  * Tab2.js: Logic for Tab 2 (Open Contracts).
  * Dependencies: common.js (for formatDate, showLoading, hideLoading, collapseSection, applyFilterToTable, sortCommonNames, sortItems).
- * Updated: Added client-side sorting for top layer only, fixed visual update.
+ * Updated: Fixed sorting for top layer only, added font and title styling, debounced sort clicks.
  */
 
-window.sortContracts = function(column) {
-    let currentSort = sessionStorage.getItem('tab2Sort') || 'contract_number_asc';
-    let [currentColumn, currentDirection] = currentSort.split('_');
-    let direction = (currentColumn === column && currentDirection === 'asc') ? 'desc' : 'asc';
-    let sort = `${column}_${direction}`;
+let sortTimeout;
 
-    fetch(`/tab/2/sort_contracts?sort=${sort}`)
-        .then(response => {
-            if (!response.ok) throw new Error('Failed to fetch sorted contracts');
-            return response.json();
-        })
-        .then(data => {
-            if (data.error) throw new Error(data.error);
-            sessionStorage.setItem('tab2Sort', sort);
-            renderContracts(data.contracts, sort);
-            updateSortArrows(sort);
-        })
-        .catch(error => console.error('Sort error:', error));
+window.sortContracts = function(column) {
+    if (sortTimeout) clearTimeout(sortTimeout); // Debounce
+    sortTimeout = setTimeout(() => {
+        let currentSort = sessionStorage.getItem('tab2Sort') || 'contract_number_asc';
+        let [currentColumn, currentDirection] = currentSort.split('_');
+        let direction = (currentColumn === column && currentDirection === 'asc') ? 'desc' : 'asc';
+        let sort = `${column}_${direction}`;
+
+        fetch(`/tab/2/sort_contracts?sort=${sort}`)
+            .then(response => {
+                if (!response.ok) throw new Error('Failed to fetch sorted contracts');
+                return response.json();
+            })
+            .then(data => {
+                if (data.error) throw new Error(data.error);
+                sessionStorage.setItem('tab2Sort', sort);
+                renderContracts(data.contracts);
+                updateSortArrows(sort);
+            })
+            .catch(error => console.error('Sort error:', error));
+    }, 300); // 300ms debounce
 };
 
-function renderContracts(contracts, sort) {
+function renderContracts(contracts) {
     const tbody = document.getElementById('category-rows');
     if (!tbody) return;
 

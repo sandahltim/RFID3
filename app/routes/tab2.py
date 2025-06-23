@@ -473,3 +473,4 @@ def full_items_by_rental_class():
         if session:
             session.rollback()
             session.close()
+            
