@@ -1,9 +1,9 @@
-console.log('tab.js version: 2025-05-29-v5 loaded');
+console.log('tab.js version: 2025-05-29-v6 loaded');
 
 /**
  * Tab.js: Initializes tab-specific logic and handles printing.
  * Dependencies: common.js (for formatDateTime, printTable, renderPaginationControls).
- * Updated: Bypassed tableId check for Tab 2 to fix expand functionality.
+ * Updated: Prevented handling of Tab 2 expands to avoid double invocation.
  */
 
 /**
@@ -137,8 +137,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 printFullItemList(category, subcategory, commonName);
             }
 
-            // Handle expandable sections for Tabs 1, 2, 4, 5 (not Tab 3)
-            if (expandBtn && tabNum !== 3) {
+            // Handle expandable sections for Tabs 1, 3, 4, 5 (skip Tab 2)
+            if (expandBtn && tabNum !== 2) {
                 console.log('Expand button clicked:', {
                     contractNumber: expandBtn.getAttribute('data-contract-number'),
                     targetId: expandBtn.getAttribute('data-target-id')
@@ -163,24 +163,18 @@ document.addEventListener('DOMContentLoaded', () => {
                     expandable.classList.remove('collapsed');
                     expandable.classList.add('expanded');
 
-                    // For Tab 2 and Tab 4, call expandCategory directly since the table is created dynamically
-                    if ((tabNum === 2 || tabNum === 4) && typeof window.expandCategory === 'function') {
-                        console.log(`Calling expandCategory for Tab ${tabNum}: targetId=${targetId}, contractNumber=${contractNumber}`);
-                        window.expandCategory('', targetId, contractNumber, 1, tabNum);
-                    } else {
-                        // For other tabs, fetch data and update table
-                        const tableId = expandable.querySelector('.common-table')?.id;
-                        if (!tableId) {
-                            console.warn('Table ID not found in expandable section; proceeding without it');
-                        }
-                        fetchExpandableData(tabNum, contractNumber, 1, 20).then(data => {
-                            if (tableId) {
-                                updateExpandableTable(tableId, data, 1, 20, tabNum, contractNumber);
-                            } else {
-                                console.log('No table ID; expandable content should be populated by tab-specific script');
-                            }
-                        });
+                    // For other tabs, fetch data and update table
+                    const tableId = expandable.querySelector('.common-table')?.id;
+                    if (!tableId) {
+                        console.warn('Table ID not found in expandable section; proceeding without it');
                     }
+                    fetchExpandableData(tabNum, contractNumber, 1, 20).then(data => {
+                        if (tableId) {
+                            updateExpandableTable(tableId, data, 1, 20, tabNum, contractNumber);
+                        } else {
+                            console.log('No table ID; expandable content should be populated by tab-specific script');
+                        }
+                    });
                 } else {
                     expandable.classList.remove('expanded');
                     expandable.classList.add('collapsed');
