@@ -1,24 +1,76 @@
-console.log('tab2.js version: 2025-05-29-v8 loaded');
+console.log('tab2.js version: 2025-05-29-v9 loaded');
 
 /**
  * Tab2.js: Logic for Tab 2 (Open Contracts).
  * Dependencies: common.js (for formatDate, showLoading, hideLoading, collapseSection, applyFilterToTable, sortCommonNames, sortItems).
- * Updated: Added sorting for Contract Number, Customer Name, and Last Scanned Date with state management.
+ * Updated: Added client-side sorting for top layer only, fixed visual update.
  */
 
 window.sortContracts = function(column) {
-    let currentSort = new URLSearchParams(window.location.search).get('sort') || 'contract_number_asc';
+    let currentSort = sessionStorage.getItem('tab2Sort') || 'contract_number_asc';
     let [currentColumn, currentDirection] = currentSort.split('_');
     let direction = (currentColumn === column && currentDirection === 'asc') ? 'desc' : 'asc';
     let sort = `${column}_${direction}`;
-    window.location.href = `/tab/2?sort=${sort}`;
+
+    fetch(`/tab/2/sort_contracts?sort=${sort}`)
+        .then(response => {
+            if (!response.ok) throw new Error('Failed to fetch sorted contracts');
+            return response.json();
+        })
+        .then(data => {
+            if (data.error) throw new Error(data.error);
+            sessionStorage.setItem('tab2Sort', sort);
+            renderContracts(data.contracts, sort);
+            updateSortArrows(sort);
+        })
+        .catch(error => console.error('Sort error:', error));
 };
 
-// Update sort arrow based on current sort state
-function updateSortArrows() {
+function renderContracts(contracts, sort) {
+    const tbody = document.getElementById('category-rows');
+    if (!tbody) return;
+
+    tbody.innerHTML = '';
+    contracts.forEach(contract => {
+        const sanitizedId = `common-${contract.contract_number.replace(' ', '_')}`;
+        let html = `
+            <tr>
+                <td>${contract.contract_number}</td>
+                <td>${contract.client_name}</td>
+                <td>${contract.items_on_contract}</td>
+                <td>${contract.total_items_inventory}</td>
+                <td>${contract.scan_date}</td>
+                <td>
+                    <button class="btn btn-sm btn-secondary expand-btn" data-target-id="${sanitizedId}" data-contract-number="${contract.contract_number}">Expand</button>
+                    <button class="btn btn-sm btn-secondary collapse-btn" data-collapse-target="${sanitizedId}" style="display:none;">Collapse</button>
+                    <button class="btn btn-sm btn-info print-btn" data-print-level="Contract" data-print-id="${sanitizedId}" data-category="${contract.contract_number}">Print</button>
+                    <div id="loading-${sanitizedId}" style="display:none;" class="loading-indicator">Loading...</div>
+                </td>
+            </tr>
+            <tr>
+                <td colspan="6">
+                    <div id="${sanitizedId}" class="expandable collapsed subcategory-container"></div>
+                </td>
+            </tr>
+        `;
+        tbody.innerHTML += html;
+    });
+
+    // Reformat timestamps
+    const contractRows = tbody.querySelectorAll('tr:not(.expandable)');
+    contractRows.forEach(row => {
+        const timestampCell = row.querySelector('td:nth-child(5)');
+        if (timestampCell) {
+            const rawDate = timestampCell.textContent.trim();
+            const formattedDate = formatDate(rawDate);
+            timestampCell.textContent = formattedDate;
+        }
+    });
+}
+
+function updateSortArrows(currentSort) {
     const headers = document.querySelectorAll('#category-table thead th');
-    const currentSort = new URLSearchParams(window.location.search).get('sort') || 'contract_number_asc';
-    const [currentColumn, currentDirection] = currentSort.split('_');
+    const [currentColumn, currentDirection] = (currentSort || 'contract_number_asc').split('_');
 
     headers.forEach(header => {
         const column = header.getAttribute('onclick')?.match(/'(\w+)'/)?.[1];
@@ -345,7 +397,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // Update sort arrows on load
-    updateSortArrows();
+    updateSortArrows(sessionStorage.getItem('tab2Sort'));
 
     // Clean up outdated sessionStorage keys
     Object.keys(sessionStorage).forEach(key => {
