@@ -1,34 +1,31 @@
-console.log('tab5.js version: 2025-05-29-v6 loaded');
+console.log('tab5.js version: 2025-06-25-v9 loaded');
 
 /**
  * Tab5.js: Logic for Tab 5 (Resale/Rental Packs).
  * Dependencies: common.js (for formatDate, showLoading, hideLoading, collapseSection, printTable, printFullItemList).
- * Updated: Added logging for debugging empty data.
+ * Updated: 2025-06-25-v9
+ * - Fixed DOMContentLoaded to check both window.location.pathname and window.cachedTabNum to prevent skipping initialization.
+ * - Added detailed timestamps to console logs for debugging subcategory population issue.
+ * - Preserved all original functionality (bulk updates, CSV export, pagination).
  */
 
-/**
- * Apply filter to all levels for Tab 5
- * Specific to Tab 5, uses globalFilter
- */
 function applyFilterToAllLevelsTab5() {
-    console.log('applyFilterToAllLevelsTab5: Starting');
-    // Skip filtering for Tab 3 and non-tab pages
+    console.log(`applyFilterToAllLevelsTab5: Starting at ${new Date().toISOString()}`);
     if (window.cachedTabNum === 3 || !window.location.pathname.match(/\/tab\/\d+/)) {
-        console.log('Skipping applyFilterToAllLevels for Tab 3 or non-tab page');
+        console.log(`Skipping applyFilterToAllLevels for Tab 3 or non-tab page at ${new Date().toISOString()}`);
         return;
     }
 
-    // For Tabs 1 and 5
     if (window.cachedTabNum === 1 || window.cachedTabNum === 5) {
         const categoryTable = document.getElementById('category-table');
         if (!categoryTable) {
-            console.warn('Category table not found, skipping filter application');
+            console.warn(`Category table not found, skipping filter application at ${new Date().toISOString()}`);
             return;
         }
 
         const categoryRows = categoryTable.querySelectorAll('.category-row') || [];
         if (!categoryRows.length) {
-            console.warn('No category rows found in table, skipping filter application');
+            console.warn(`No category rows found in table, skipping filter application at ${new Date().toISOString()}`);
             return;
         }
 
@@ -36,7 +33,7 @@ function applyFilterToAllLevelsTab5() {
 
         categoryRows.forEach(categoryRow => {
             let showCategoryRow = true;
-            const categoryCell = categoryRow.querySelector('td:nth-child(1)'); // Category column
+            const categoryCell = categoryRow.querySelector('td:nth-child(1)');
             const categoryValue = categoryCell ? categoryCell.textContent.toLowerCase() : '';
             const normalizedCategoryValue = categoryValue.toLowerCase().replace(/\s+/g, '_');
             const subcatSelect = categoryRow.querySelector('.subcategory-select');
@@ -49,7 +46,7 @@ function applyFilterToAllLevelsTab5() {
             if (selectedValue) {
                 const commonTables = categoryRow.parentNode.querySelectorAll(`.common-name-row[data-target-id^="common-${normalizedCategoryValue}"] .common-table`);
                 if (!commonTables.length) {
-                    console.warn(`Common tables not found for category ${categoryValue} (normalized: ${normalizedCategoryValue})`);
+                    console.warn(`Common tables not found for category ${categoryValue} (normalized: ${normalizedCategoryValue}) at ${new Date().toISOString()}`);
                     return;
                 }
 
@@ -62,7 +59,7 @@ function applyFilterToAllLevelsTab5() {
                         if (index % 2 !== 0) return;
 
                         let showCommonRow = true;
-                        const commonNameCell = commonRow.querySelector('td:nth-child(1)'); // Common Name column
+                        const commonNameCell = commonRow.querySelector('td:nth-child(1)');
                         const commonNameValue = commonNameCell ? commonNameCell.textContent.toLowerCase() : '';
 
                         if (window.globalFilter.commonName && !commonNameValue.includes(window.globalFilter.commonName)) {
@@ -194,19 +191,21 @@ function applyFilterToAllLevelsTab5() {
     }
 }
 
-/**
- * Populate subcategories for Tab 5
- */
 function populateSubcategories() {
+    console.log(`populateSubcategories: Starting at ${new Date().toISOString()}`);
     const selects = document.querySelectorAll('.subcategory-select');
-    console.log(`populateSubcategories: Found ${selects.length} subcategory selects`);
+    console.log(`populateSubcategories: Found ${selects.length} subcategory selects at ${new Date().toISOString()}`);
     const promises = Array.from(selects).map(select => {
         const category = select.getAttribute('data-category');
-        console.log(`Populating subcategories for ${category}`);
+        console.log(`Populating subcategories for ${category} at ${new Date().toISOString()}`);
+        if (!category) {
+            console.error(`Missing data-category attribute for select element at ${new Date().toISOString()}`, select);
+            return Promise.resolve();
+        }
         const url = `/tab/5/subcat_data?category=${encodeURIComponent(category)}`;
         return fetch(url)
             .then(response => {
-                console.log(`Subcategory fetch status for ${category}: ${response.status}`);
+                console.log(`Subcategory fetch status for ${category}: ${response.status} at ${new Date().toISOString()}`);
                 if (!response.ok) {
                     return response.text().then(text => {
                         throw new Error(`Subcategory fetch failed: ${response.status} - ${text}`);
@@ -215,7 +214,7 @@ function populateSubcategories() {
                 return response.json();
             })
             .then(data => {
-                console.log(`Subcategory data for ${category}:`, data);
+                console.log(`Subcategory data for ${category}:`, data, `at ${new Date().toISOString()}`);
                 select.innerHTML = '<option value="">Select a subcategory</option>';
                 if (data.subcategories && data.subcategories.length > 0) {
                     data.subcategories.forEach(subcat => {
@@ -226,33 +225,31 @@ function populateSubcategories() {
                     });
                 } else {
                     select.innerHTML += '<option value="">No subcategories</option>';
-                    console.warn(`No subcategories returned for ${category}`);
+                    console.warn(`No subcategories returned for ${category} at ${new Date().toISOString()}`);
                 }
             })
-            .catch(error => console.error(`Subcategory error for ${category}: ${error.message}`));
+            .catch(error => console.error(`Subcategory error for ${category}: ${error.message} at ${new Date().toISOString()}`));
     });
 
-    Promise.all(promises).catch(error => console.error('Error populating subcategories:', error));
+    return Promise.all(promises).catch(error => console.error('Error populating subcategories:', error, `at ${new Date().toISOString()}`));
 }
 
-/**
- * Load common names for Tab 5
- */
 function loadCommonNames(selectElement, page = 1) {
+    console.log(`loadCommonNames: Starting at ${new Date().toISOString()}`, { selectElement, page });
     const subcategory = selectElement.value;
     const category = selectElement.getAttribute('data-category');
     const targetId = `common-${category.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
     const categoryRow = selectElement.closest('tr');
     const tbody = categoryRow.closest('tbody');
 
-    console.log('loadCommonNames:', { subcategory, category, targetId, page });
+    console.log(`loadCommonNames: Parameters`, { subcategory, category, targetId, page }, `at ${new Date().toISOString()}`);
 
     if (!subcategory && page === 1) {
-        console.log('No subcategory, collapsing');
+        console.log(`No subcategory, collapsing at ${new Date().toISOString()}`);
         const url = `/tab/5/subcat_data?category=${encodeURIComponent(category)}`;
         fetch(url)
             .then(response => {
-                console.log(`Subcat fetch status: ${response.status}`);
+                console.log(`Subcat fetch status: ${response.status} at ${new Date().toISOString()}`);
                 if (!response.ok) {
                     return response.text().then(text => {
                         throw new Error(`Subcat fetch failed: ${response.status} - ${text}`);
@@ -261,7 +258,7 @@ function loadCommonNames(selectElement, page = 1) {
                 return response.json();
             })
             .then(data => {
-                console.log(`Subcat data for ${category}:`, data);
+                console.log(`Subcat data for ${category}:`, data, `at ${new Date().toISOString()}`);
                 const totals = {
                     totalItems: data.subcategories.reduce((sum, subcat) => sum + (subcat.total_items || 0), 0),
                     itemsOnContracts: data.subcategories.reduce((sum, subcat) => sum + (subcat.items_on_contracts || 0), 0),
@@ -272,14 +269,14 @@ function loadCommonNames(selectElement, page = 1) {
                 categoryRow.cells[3].textContent = totals.itemsOnContracts || '0';
                 categoryRow.cells[4].textContent = totals.itemsInService || '0';
                 categoryRow.cells[5].textContent = totals.itemsAvailable || '0';
-                console.log('Category totals:', totals);
+                console.log(`Category totals:`, totals, `at ${new Date().toISOString()}`);
             })
-            .catch(error => console.error('Error resetting totals:', error.message));
+            .catch(error => console.error(`Error resetting totals: ${error.message} at ${new Date().toISOString()}`));
         return;
     }
 
     if (!category || !subcategory || !targetId) {
-        console.error('loadCommonNames: Invalid parameters', { category, subcategory, targetId });
+        console.error(`loadCommonNames: Invalid parameters`, { category, subcategory, targetId }, `at ${new Date().toISOString()}`);
         return;
     }
 
@@ -288,11 +285,11 @@ function loadCommonNames(selectElement, page = 1) {
     if (loadingDiv) loadingDiv.style.display = 'block';
 
     const url = `/tab/5/common_names?category=${encodeURIComponent(category)}&subcategory=${encodeURIComponent(subcategory)}&page=${page}`;
-    console.log(`Fetching common names: ${url}`);
+    console.log(`Fetching common names: ${url} at ${new Date().toISOString()}`);
 
     fetch(url)
         .then(response => {
-            console.log(`Common names fetch status: ${response.status}`);
+            console.log(`Common names fetch status: ${response.status} at ${new Date().toISOString()}`);
             if (!response.ok) {
                 return response.text().then(text => {
                     throw new Error(`Common names fetch failed: ${response.status} - ${text}`);
@@ -301,7 +298,7 @@ function loadCommonNames(selectElement, page = 1) {
             return response.json();
         })
         .then(data => {
-            console.log('Common names data:', data);
+            console.log(`Common names data:`, data, `at ${new Date().toISOString()}`);
 
             let headerRow = categoryRow.parentNode.querySelector(`tr.common-name-row[data-target-id="${targetId}"] .common-table`);
             if (!headerRow) {
@@ -347,7 +344,7 @@ function loadCommonNames(selectElement, page = 1) {
                     itemsInService: data.common_names.reduce((sum, item) => sum + (item.items_in_service || 0), 0),
                     itemsAvailable: data.common_names.reduce((sum, item) => sum + (item.items_available || 0), 0)
                 };
-                console.log('Common name totals:', totals);
+                console.log(`Common name totals:`, totals, `at ${new Date().toISOString()}`);
                 categoryRow.cells[2].textContent = totals.totalItems || '0';
                 categoryRow.cells[3].textContent = totals.itemsOnContracts || '0';
                 categoryRow.cells[4].textContent = totals.itemsInService || '0';
@@ -423,20 +420,20 @@ function loadCommonNames(selectElement, page = 1) {
 
                 const commonTable = document.getElementById(`common-table-${targetId}`);
                 if (commonTable) {
-                    console.log('Common table styles:', {
+                    console.log(`Common table styles:`, {
                         display: commonTable.style.display,
                         visibility: window.getComputedStyle(commonTable).visibility
-                    });
+                    }, `at ${new Date().toISOString()}`);
                 }
             } else {
                 tableBody.innerHTML = `<tr><td colspan="7">No common names found.</td></tr>`;
-                console.warn(`No common names returned for category ${category}, subcategory ${subcategory}`);
+                console.warn(`No common names returned for category ${category}, subcategory ${subcategory} at ${new Date().toISOString()}`);
             }
 
             sessionStorage.setItem(`expanded_${targetId}`, JSON.stringify({ category, subcategory, page }));
         })
         .catch(error => {
-            console.error('Common names error:', error.message);
+            console.error(`Common names error: ${error.message} at ${new Date().toISOString()}`);
             tableBody.innerHTML = `<tr><td colspan="7">Error: ${error.message}</td></tr>`;
         })
         .finally(() => {
@@ -446,10 +443,8 @@ function loadCommonNames(selectElement, page = 1) {
         });
 }
 
-/**
- * Bulk update common name for Tab 5
- */
 function bulkUpdateCommonName(category, subcategory, targetId, key) {
+    console.log(`bulkUpdateCommonName: Starting at ${new Date().toISOString()}`, { category, subcategory, targetId, key });
     const binLocation = document.getElementById(`bulk-bin-location-${key}`)?.value;
     const status = document.getElementById(`bulk-status-${key}`)?.value;
 
@@ -461,7 +456,7 @@ function bulkUpdateCommonName(category, subcategory, targetId, key) {
     const commonTable = document.getElementById(`common-table-${key}`);
     const commonName = commonTable?.querySelector('tbody tr td:first-child')?.textContent;
     if (!commonName) {
-        console.error('Common name not found for bulk update');
+        console.error(`Common name not found for bulk update at ${new Date().toISOString()}`);
         alert('Error: Common name not found.');
         return;
     }
@@ -479,7 +474,7 @@ function bulkUpdateCommonName(category, subcategory, targetId, key) {
         })
     })
         .then(response => {
-            console.log(`Bulk update status: ${response.status}`);
+            console.log(`Bulk update status: ${response.status} at ${new Date().toISOString()}`);
             if (!response.ok) {
                 return response.text().then(text => {
                     throw new Error(`Bulk update failed: ${response.status} - ${text}`);
@@ -489,27 +484,25 @@ function bulkUpdateCommonName(category, subcategory, targetId, key) {
         })
         .then(data => {
             if (data.error) {
-                console.error('Bulk update error:', data.error);
+                console.error(`Bulk update error: ${data.error} at ${new Date().toISOString()}`);
                 alert('Failed to bulk update: ' + data.error);
             } else {
-                console.log('Bulk update successful');
+                console.log(`Bulk update successful at ${new Date().toISOString()}`);
                 alert('Bulk update successful!');
                 loadItems(category, subcategory, commonName, targetId);
             }
         })
         .catch(error => {
-            console.error('Bulk update error:', error.message);
+            console.error(`Bulk update error: ${error.message} at ${new Date().toISOString()}`);
             alert('Error: ' + error.message);
         });
 }
 
-/**
- * Bulk update selected items for Tab 5
- */
 function bulkUpdateSelectedItems(key) {
+    console.log(`bulkUpdateSelectedItems: Starting at ${new Date().toISOString()}`, { key });
     const itemTable = document.getElementById(`item-table-${key}`);
     if (!itemTable) {
-        console.error(`Item table ${key} not found`);
+        console.error(`Item table ${key} not found at ${new Date().toISOString()}`);
         alert('Error: Item table not found.');
         return;
     }
@@ -541,7 +534,7 @@ function bulkUpdateSelectedItems(key) {
         })
     })
         .then(response => {
-            console.log(`Bulk update selected status: ${response.status}`);
+            console.log(`Bulk update selected status: ${response.status} at ${new Date().toISOString()}`);
             if (!response.ok) {
                 return response.text().then(text => {
                     throw new Error(`Bulk update failed: ${response.status} - ${text}`);
@@ -551,10 +544,10 @@ function bulkUpdateSelectedItems(key) {
         })
         .then(data => {
             if (data.error) {
-                console.error('Bulk update error:', data.error);
+                console.error(`Bulk update error: ${data.error} at ${new Date().toISOString()}`);
                 alert('Failed to bulk update: ' + data.error);
             } else {
-                console.log('Bulk update successful');
+                console.log(`Bulk update successful at ${new Date().toISOString()}`);
                 alert('Bulk update successful!');
                 const category = document.querySelector(`#item-table-${key}`)?.closest('.common-level')?.querySelector('button[data-category]')?.getAttribute('data-category') ||
                                  document.querySelector(`#item-table-${key}`)?.closest('tr')?.previousElementSibling?.querySelector('button[data-category]')?.getAttribute('data-category');
@@ -565,21 +558,19 @@ function bulkUpdateSelectedItems(key) {
                 if (category && subcategory && commonName && targetId) {
                     loadItems(category, subcategory, commonName, targetId);
                 } else {
-                    console.warn('Missing parameters for reload:', { category, subcategory, commonName, targetId });
+                    console.warn(`Missing parameters for reload:`, { category, subcategory, commonName, targetId }, `at ${new Date().toISOString()}`);
                     window.location.reload();
                 }
             }
         })
         .catch(error => {
-            console.error('Bulk update error:', error.message);
+            console.error(`Bulk update error: ${error.message} at ${new Date().toISOString()}`);
             alert('Error: ' + error.message);
         });
 }
 
-/**
- * Update bulk field for Tab 5
- */
 function updateBulkField(key, field) {
+    console.log(`updateBulkField: Starting at ${new Date().toISOString()}`, { key, field });
     const select = document.getElementById(`bulk-${field}-${key}`);
     if (select && select.value) {
         const otherField = field === 'bin_location' ? 'status' : 'bin_location';
@@ -588,10 +579,8 @@ function updateBulkField(key, field) {
     }
 }
 
-/**
- * Update individual item for Tab 5
- */
 function updateItem(tagId, key, category, subcategory, commonName, targetId) {
+    console.log(`updateItem: Starting at ${new Date().toISOString()}`, { tagId, key, category, subcategory, commonName, targetId });
     const binLocation = document.getElementById(`bin-location-${tagId}`)?.value;
     const status = document.getElementById(`status-${tagId}`)?.value;
 
@@ -611,7 +600,7 @@ function updateItem(tagId, key, category, subcategory, commonName, targetId) {
                 body: JSON.stringify({ tag_id: tagId, bin_location: binLocation })
             })
             .then(response => {
-                console.log(`Bin location update status for ${tagId}: ${response.status}`);
+                console.log(`Bin location update status for ${tagId}: ${response.status} at ${new Date().toISOString()}`);
                 if (!response.ok) {
                     return response.text().then(text => {
                         throw new Error(`Bin location update failed: ${response.status} - ${text}`);
@@ -635,7 +624,7 @@ function updateItem(tagId, key, category, subcategory, commonName, targetId) {
                 body: JSON.stringify({ tag_id: tagId, status })
             })
             .then(response => {
-                console.log(`Status update status for ${tagId}: ${response.status}`);
+                console.log(`Status update status for ${tagId}: ${response.status} at ${new Date().toISOString()}`);
                 if (!response.ok) {
                     return response.text().then(text => {
                         throw new Error(`Status update failed: ${response.status} - ${text}`);
@@ -652,35 +641,32 @@ function updateItem(tagId, key, category, subcategory, commonName, targetId) {
 
     Promise.all(promises)
         .then(results => {
-            console.log('Update successful');
+            console.log(`Update successful at ${new Date().toISOString()}`);
             alert('Update successful!');
             loadItems(category, subcategory, commonName, targetId);
         })
         .catch(error => {
-            console.error('Update error:', error.message);
+            console.error(`Update error: ${error.message} at ${new Date().toISOString()}`);
             alert('Error: ' + error.message);
         });
 }
 
-/**
- * Load items for Tab 5
- */
 function loadItems(category, subcategory, commonName, targetId, page = 1) {
-    console.log('loadItems:', { category, subcategory, commonName, targetId, page });
+    console.log(`loadItems: Starting at ${new Date().toISOString()}`, { category, subcategory, commonName, targetId, page });
 
     if (!category || !subcategory || !commonName || !targetId) {
-        console.error('loadItems: Invalid parameters', { category, subcategory, commonName, targetId });
+        console.error(`loadItems: Invalid parameters`, { category, subcategory, commonName, targetId }, `at ${new Date().toISOString()}`);
         return;
     }
 
     const container = document.getElementById(targetId);
     if (!container) {
-        console.error(`Container ${targetId} not found`);
+        console.error(`Container ${targetId} not found at ${new Date().toISOString()}`);
         return;
     }
 
     if (container.classList.contains('loading')) {
-        console.log(`Container ${targetId} already loading`);
+        console.log(`Container ${targetId} already loading at ${new Date().toISOString()}`);
         return;
     }
     container.classList.add('loading');
@@ -730,11 +716,11 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
     wrapper.appendChild(itemTable);
 
     const url = `/tab/5/data?common_name=${encodeURIComponent(commonName)}&page=${page}&subcategory=${encodeURIComponent(subcategory)}&category=${encodeURIComponent(category)}`;
-    console.log(`Fetching items: ${url}`);
+    console.log(`Fetching items: ${url} at ${new Date().toISOString()}`);
 
     fetch(url)
         .then(response => {
-            console.log(`Items fetch status: ${response.status}`);
+            console.log(`Items fetch status: ${response.status} at ${new Date().toISOString()}`);
             if (!response.ok) {
                 return response.text().then(text => {
                     throw new Error(`Items fetch failed: ${response.status} - ${text}`);
@@ -743,7 +729,7 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
             return response.json();
         })
         .then(data => {
-            console.log('Items data:', data);
+            console.log(`Items data:`, data, `at ${new Date().toISOString()}`);
             const tbody = itemTable.querySelector('tbody');
             tbody.innerHTML = '';
 
@@ -752,7 +738,6 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                     const lastScanned = formatDate(item.last_scanned_date);
                     const currentStatus = item.status || 'N/A';
                     const canSetReadyToRent = currentStatus === 'On Rent' || currentStatus === 'Delivered';
-                    // Make bin_location comparison case-insensitive
                     const binLocationLower = item.bin_location ? item.bin_location.toLowerCase() : '';
                     const row = document.createElement('tr');
                     row.setAttribute('data-item-id', item.tag_id);
@@ -852,7 +837,7 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                 wrapper.appendChild(bulkDiv);
             } else {
                 tbody.innerHTML = `<tr><td colspan="10">No items found.</td></tr>`;
-                console.warn(`No items returned for category ${category}, subcategory ${subcategory}, commonName ${commonName}`);
+                console.warn(`No items returned for category ${category}, subcategory ${subcategory}, commonName ${commonName} at ${new Date().toISOString()}`);
             }
 
             const parentRow = container.closest('tr.common-name-row').previousElementSibling;
@@ -863,10 +848,10 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                     expandBtn.style.display = 'none';
                     collapseBtn.style.display = 'inline-block';
                 } else {
-                    console.warn(`Expand/Collapse buttons not found for ${targetId}`);
+                    console.warn(`Expand/Collapse buttons not found for ${targetId} at ${new Date().toISOString()}`);
                 }
             } else {
-                console.warn(`Parent row not found for ${targetId}`);
+                console.warn(`Parent row not found for ${targetId} at ${new Date().toISOString()}`);
             }
 
             container.classList.remove('collapsed');
@@ -875,22 +860,22 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
             container.style.opacity = '1';
             container.style.visibility = 'visible';
 
-            console.log('Container styles:', {
+            console.log(`Container styles:`, {
                 classList: container.classList.toString(),
                 display: container.style.display,
                 opacity: container.style.opacity,
                 visibility: window.getComputedStyle(container).visibility
-            });
+            }, `at ${new Date().toISOString()}`);
 
             if (itemTable) {
-                console.log('Item table styles:', {
+                console.log(`Item table styles:`, {
                     display: itemTable.style.display,
                     visibility: window.getComputedStyle(itemTable).visibility
-                });
+                }, `at ${new Date().toISOString()}`);
             }
         })
         .catch(error => {
-            console.error('Items error:', error.message);
+            console.error(`Items error: ${error.message} at ${new Date().toISOString()}`);
             const tbody = itemTable.querySelector('tbody');
             tbody.innerHTML = `<tr><td colspan="10">Error: ${error.message}</td></tr>`;
             container.classList.remove('collapsed');
@@ -907,12 +892,10 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
         });
 }
 
-/**
- * Update resale/pack items to sold status for Tab 5
- */
 function updateResalePackToSold() {
+    console.log(`updateResalePackToSold: Starting at ${new Date().toISOString()}`);
     if (confirm('Are you sure you want to update all items with bin_location "resale" or "pack", status "On Rent" or "Delivered", and last scanned more than 4 days ago to status "Sold"?')) {
-        console.log('Updating resale/pack items to sold status');
+        console.log(`Updating resale/pack items to sold status at ${new Date().toISOString()}`);
         fetch('/tab/5/update_resale_pack_to_sold', {
             method: 'POST',
             headers: {
@@ -920,7 +903,7 @@ function updateResalePackToSold() {
             }
         })
         .then(response => {
-            console.log(`Update resale/pack to sold status: ${response.status}`);
+            console.log(`Update resale/pack to sold status: ${response.status} at ${new Date().toISOString()}`);
             if (!response.ok) {
                 return response.text().then(text => {
                     throw new Error(`Update failed: ${response.status} - ${text}`);
@@ -930,7 +913,7 @@ function updateResalePackToSold() {
         })
         .then(data => {
             if (data.status === 'success') {
-                console.log('Update successful:', data.message);
+                console.log(`Update successful: ${data.message} at ${new Date().toISOString()}`);
                 alert(data.message);
                 setTimeout(() => {
                     if (confirm('Updates are processing in the background. Would you like to refresh the page now to check the status?')) {
@@ -938,45 +921,49 @@ function updateResalePackToSold() {
                     }
                 }, 2000);
             } else {
-                console.error('Update failed:', data.message);
+                console.error(`Update failed: ${data.message} at ${new Date().toISOString()}`);
                 alert('Error: ' + data.message);
             }
         })
         .catch(error => {
-            console.error('Error updating items:', error.message);
+            console.error(`Error updating items: ${error.message} at ${new Date().toISOString()}`);
             alert('Failed to update items: ' + error.message);
         });
     }
 }
 
-/**
- * Event listener for Tab 5
- */
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('tab5.js: DOMContentLoaded');
+    console.log(`tab5.js: DOMContentLoaded at ${new Date().toISOString()}`);
+    const isTab5 = window.location.pathname.match(/\/tab\/5\b/);
+    console.log(`isTab5: ${isTab5}, window.cachedTabNum: ${window.cachedTabNum}, pathname: ${window.location.pathname} at ${new Date().toISOString()}`);
 
-    if (window.cachedTabNum !== 5) {
-        console.log('Not Tab 5, skipping');
+    if (!isTab5 && window.cachedTabNum !== 5) {
+        console.log(`Not Tab 5, skipping at ${new Date().toISOString()}`);
         return;
     }
 
-    populateSubcategories();
-
-    document.removeEventListener('click', handleClick);
-    document.addEventListener('click', handleClick);
+    console.log(`Initializing Tab 5 at ${new Date().toISOString()}`);
+    populateSubcategories().then(() => {
+        console.log(`Subcategories populated successfully at ${new Date().toISOString()}`);
+        document.removeEventListener('click', handleClick);
+        document.addEventListener('click', handleClick);
+    }).catch(error => {
+        console.error(`Error during subcategory population: ${error.message} at ${new Date().toISOString()}`);
+    });
 
     function handleClick(event) {
+        console.log(`handleClick: Event triggered at ${new Date().toISOString()}`);
         const expandBtn = event.target.closest('.expand-btn');
         if (expandBtn) {
             event.preventDefault();
             event.stopPropagation();
-            console.log('Expand button clicked:', {
+            console.log(`Expand button clicked:`, {
                 category: expandBtn.getAttribute('data-category'),
                 subcategory: expandBtn.getAttribute('data-subcategory'),
                 commonName: expandBtn.getAttribute('data-common-name'),
                 targetId: expandBtn.getAttribute('data-target-id'),
                 isExpanded: expandBtn.getAttribute('data-expanded')
-            });
+            }, `at ${new Date().toISOString()}`);
 
             const category = expandBtn.getAttribute('data-category');
             const subcategory = expandBtn.getAttribute('data-subcategory');
@@ -985,20 +972,20 @@ document.addEventListener('DOMContentLoaded', function() {
             const isExpanded = expandBtn.getAttribute('data-expanded') === 'true';
 
             if (!targetId || !category) {
-                console.error('Missing attributes on expand button');
+                console.error(`Missing attributes on expand button at ${new Date().toISOString()}`);
                 return;
             }
 
             const container = document.getElementById(targetId);
             if (!container) {
-                console.error(`Container ${targetId} not found`);
+                console.error(`Container ${targetId} not found at ${new Date().toISOString()}`);
                 return;
             }
 
             const collapseBtn = expandBtn.parentElement.querySelector(`.collapse-btn[data-collapse-target="${targetId}"]`);
 
             if (isExpanded) {
-                console.log(`Collapsing ${targetId}`);
+                console.log(`Collapsing ${targetId} at ${new Date().toISOString()}`);
                 if (commonName) {
                     collapseSection(targetId);
                 }
@@ -1010,7 +997,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             } else {
                 if (commonName && subcategory) {
-                    console.log(`Loading items for ${commonName}`);
+                    console.log(`Loading items for ${commonName} at ${new Date().toISOString()}`);
                     loadItems(category, subcategory, commonName, targetId);
                     if (expandBtn && collapseBtn) {
                         expandBtn.style.display = 'none';
@@ -1027,10 +1014,10 @@ document.addEventListener('DOMContentLoaded', function() {
             event.preventDefault();
             event.stopPropagation();
             const targetId = collapseBtn.getAttribute('data-collapse-target');
-            console.log(`Collapsing ${targetId}`);
+            console.log(`Collapsing ${targetId} at ${new Date().toISOString()}`);
             const container = document.getElementById(targetId);
             if (!container) {
-                console.error(`Container ${targetId} not found`);
+                console.error(`Container ${targetId} not found at ${new Date().toISOString()}`);
                 return;
             }
             const expandBtn = collapseBtn.parentElement.querySelector(`.expand-btn[data-target-id="${targetId}"]`);
