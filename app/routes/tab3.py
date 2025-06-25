@@ -1,3 +1,5 @@
+# app/routes/tab3.py
+# tab3.py version: 2025-06-25-v69
 from flask import Blueprint, render_template, request, jsonify, current_app
 from .. import db
 from ..models.db_models import ItemMaster, Transaction, RentalClassMapping, UserRentalClassMapping, SeedRentalClass
@@ -21,7 +23,7 @@ logger = logging.getLogger('tab3')
 logger.setLevel(logging.DEBUG)
 logger.handlers = []
 
-tab3_log_file = '/home/tim/test_rfidpi/logs/tab3.log'
+tab3_log_file = '/home/tim/test_rfidpi/logs/rfid_dashboard.log'
 try:
     if not os.path.exists(tab3_log_file):
         open(tab3_log_file, 'a').close()
@@ -55,7 +57,7 @@ if not os.path.exists(SHARED_DIR):
     os.chown(SHARED_DIR, pwd.getpwnam('tim').pw_uid, grp.getgrnam('tim').gr_gid)
 
 # Log deployment version
-logger.info("Deployed tab3.py version: 2025-06-10-v68")
+logger.info("Deployed tab3.py version: 2025-06-25-v69")
 
 # Helper function to normalize common_name by removing suffixes like (G1), (G2)
 def normalize_common_name(name):
@@ -64,10 +66,16 @@ def normalize_common_name(name):
     # Remove suffixes like (G1), (G2), etc.
     return re.sub(r'\s*\(G[0-9]+\)$', '', name).strip()
 
+# Helper function to normalize rental_class_id for consistent lookup
+def normalize_rental_class_id(rental_class_id):
+    if not rental_class_id:
+        return 'N/A'
+    return str(rental_class_id).strip().upper()
+
 @tab3_bp.route('/tab/3')
 def tab3_view():
     # Log entry into endpoint
-    logger.debug("Entering /tab/3 endpoint")
+    logger.debug("Entering /tab/3 endpoint at %s", datetime.now())
     session = None
     try:
         session = db.session()
@@ -219,7 +227,7 @@ def tab3_view():
                 'bin_location': row[3] or 'N/A',
                 'last_contract_num': row[4] or 'N/A',
                 'date_last_scanned': row[5].isoformat() if row[5] else 'N/A',
-                'rental_class_num': str(row[6]).strip().upper() if row[6] else 'N/A',
+                'rental_class_num': normalize_rental_class_id(row[6]),
                 'notes': row[7] or ''
             }
             for row in detail_rows
@@ -440,7 +448,7 @@ def tab3_view():
 def get_csv_contents():
     # Fetch and return CSV contents
     try:
-        logger.debug("Entering /tab/3/csv_contents endpoint")
+        logger.debug("Entering /tab/3/csv_contents endpoint at %s", datetime.now())
         if not os.path.exists(CSV_FILE_PATH):
             logger.info("CSV file does not exist")
             return jsonify({'items': [], 'count': 0}), 200
@@ -474,7 +482,7 @@ def remove_csv_item():
     # Remove an item from the CSV
     lock_file = None
     try:
-        logger.debug("Entering /tab/3/remove_csv_item endpoint")
+        logger.debug("Entering /tab/3/remove_csv_item endpoint at %s", datetime.now())
         lock_file = open(LOCK_FILE_PATH, 'w')
         fcntl.flock(lock_file, fcntl.LOCK_EX)
         logger.debug("Acquired lock for remove_csv_item")
@@ -521,7 +529,7 @@ def sync_to_pc():
     session = None
     lock_file = None
     try:
-        logger.debug("Entering /tab/3/sync_to_pc endpoint")
+        logger.debug("Entering /tab/3/sync_to_pc endpoint at %s", datetime.now())
         session = db.session()
         logger.info("Entering /tab/3/sync_to_pc route")
 
@@ -586,7 +594,6 @@ def sync_to_pc():
         existing_tag_ids = csv_tag_ids.copy()
 
         # Query ItemMaster for 'Sold' items only
-        # Fix: Only select items with status='Sold' to avoid 'Ready to Rent' or other in-use items
         logger.debug("Querying ItemMaster for 'Sold' items")
         try:
             sold_items = session.query(ItemMaster)\
@@ -612,18 +619,16 @@ def sync_to_pc():
                     'short_common_name': item.common_name,
                     'status': item.status,
                     'bin_location': item.bin_location,
-                    'rental_class_num': item.rental_class_num,
+                    'rental_class_num': normalize_rental_class_id(item.rental_class_num),
                     'is_new': False
                 })
                 existing_tag_ids.add(item.tag_id)
-                logger.info(f"Added to synced_items: tag_id={item.tag_id}, common_name={item.common_name}, status={item.status}")
+                logger.info(f"Added to synced_items: tag_id={item.tag_id}, common_name={item.common_name}, status={item.status}, rental_class_num={item.rental_class_num}")
         except sqlalchemy.exc.DatabaseError as e:
             logger.error(f"Database error querying ItemMaster: {str(e)}", exc_info=True)
             return jsonify({'error': f"Database error querying ItemMaster: {str(e)}"}), 500
 
         # Generate new items if needed
-        # Fix: Removed query for non-'Sold' items to prevent selecting in-use items
-        # Fix: Added no_autoflush and retry logic to handle lock timeouts
         new_items = []
         if len(synced_items) < quantity:
             remaining_quantity = quantity - len(synced_items)
@@ -639,7 +644,7 @@ def sync_to_pc():
                 logger.warning(f"No SeedRentalClass entry found for common_name={common_name} and bin_location in ['pack', 'resale']")
                 return jsonify({'error': f"No SeedRentalClass entry found for common name '{common_name}'"}), 404
 
-            rental_class_num = seed_entry.rental_class_id
+            rental_class_num = normalize_rental_class_id(seed_entry.rental_class_id)
             bin_location = seed_entry.bin_location
 
             @retry(
@@ -699,7 +704,7 @@ def sync_to_pc():
                     )
                     insert_new_item(new_item)  # Retry on lock timeout
                     new_items.append(new_item)
-                    logger.info(f"Generated new item: tag_id={tag_id}, common_name={common_name}")
+                    logger.info(f"Generated new item: tag_id={tag_id}, common_name={common_name}, rental_class_num={rental_class_num}")
 
         if len(synced_items) > quantity:
             synced_items = synced_items[:quantity]
@@ -707,22 +712,26 @@ def sync_to_pc():
         # Map rental class details
         base_mappings = session.query(RentalClassMapping).all()
         user_mappings = session.query(UserRentalClassMapping).all()
-        mappings_dict = {str(m.rental_class_id).strip().upper(): {
+        mappings_dict = {normalize_rental_class_id(m.rental_class_id): {
             'category': m.category,
             'subcategory': m.subcategory,
-            'short_common_name': m.short_common_name if hasattr(m, 'short_common_name') else None
+            'short_common_name': m.short_common_name or 'N/A'
         } for m in base_mappings}
         for um in user_mappings:
-            mappings_dict[str(um.rental_class_id).strip().upper()] = {
+            normalized_id = normalize_rental_class_id(um.rental_class_id)
+            mappings_dict[normalized_id] = {
                 'category': um.category,
                 'subcategory': um.subcategory,
-                'short_common_name': um.short_common_name if hasattr(um, 'short_common_name') else None
+                'short_common_name': um.short_common_name or 'N/A'
             }
+            logger.debug(f"Added user mapping: rental_class_id={normalized_id}, short_common_name={um.short_common_name}")
 
         for item in synced_items:
-            mapping = mappings_dict.get(str(item['rental_class_num']).strip().upper() if item['rental_class_num'] else '', {})
+            normalized_rental_class = normalize_rental_class_id(item['rental_class_num'])
+            mapping = mappings_dict.get(normalized_rental_class, {})
             item['subcategory'] = mapping.get('subcategory', 'Unknown')
             item['short_common_name'] = mapping.get('short_common_name', item['common_name'])
+            logger.debug(f"Mapping for item: tag_id={item['tag_id']}, rental_class_num={normalized_rental_class}, short_common_name={item['short_common_name']}")
 
         # Write to CSV
         all_items = [item for item in existing_items if item['tag_id'] not in {i['tag_id'] for i in synced_items}]
@@ -765,7 +774,7 @@ def update_synced_status():
     session = None
     lock_file = None
     try:
-        logger.debug("Entering /tab/3/update_synced_status endpoint")
+        logger.debug("Entering /tab/3/update_synced_status endpoint at %s", datetime.now())
         session = db.session()
         logger.info("Received request for /tab/3/update_synced_status")
 
@@ -829,7 +838,7 @@ def update_synced_status():
             .filter(ItemMaster.tag_id.in_(tag_ids))\
             .all()
         item_dict = {item.tag_id: {
-            'rental_class_num': item.rental_class_num,
+            'rental_class_num': normalize_rental_class_id(item.rental_class_num),
             'common_name': item.common_name,
             'bin_location': item.bin_location
         } for item in items_in_db}
@@ -908,7 +917,7 @@ def update_status():
     # Update individual item status
     session = None
     try:
-        logger.debug("Entering /tab/3/update_status endpoint")
+        logger.debug("Entering /tab/3/update_status endpoint at %s", datetime.now())
         session = db.session()
         data = request.get_json()
         tag_id = data.get('tag_id')
@@ -957,7 +966,7 @@ def update_notes():
     # Update individual item notes
     session = None
     try:
-        logger.debug("Entering /tab/3/update_notes endpoint")
+        logger.debug("Entering /tab/3/update_notes endpoint at %s", datetime.now())
         session = db.session()
         data = request.get_json()
         tag_id = data.get('tag_id')
@@ -997,7 +1006,7 @@ def get_pack_resale_common_names():
     # Fetch common names for pack/resale
     session = None
     try:
-        logger.debug("Entering /tab/3/pack_resale_common_names endpoint")
+        logger.debug("Entering /tab/3/pack_resale_common_names endpoint at %s", datetime.now())
         session = db.session()
         common_names = session.query(SeedRentalClass.common_name)\
             .filter(SeedRentalClass.bin_location.in_(['pack', 'resale']))\
