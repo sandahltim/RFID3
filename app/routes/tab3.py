@@ -1,7 +1,7 @@
 # app/routes/tab3.py
-# tab3.py version: 2025-06-25-v69
+# tab3.py version: 2025-06-25-v72
 from flask import Blueprint, render_template, request, jsonify, current_app
-from .. import db
+from .. import db, cache
 from ..models.db_models import ItemMaster, Transaction, RentalClassMapping, UserRentalClassMapping, SeedRentalClass
 from ..services.api_client import APIClient
 from sqlalchemy import text, func
@@ -17,6 +17,7 @@ import fcntl
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 import requests.exceptions
 import re
+import requests
 
 # Configure logging for Tab 3
 logger = logging.getLogger('tab3')
@@ -57,13 +58,12 @@ if not os.path.exists(SHARED_DIR):
     os.chown(SHARED_DIR, pwd.getpwnam('tim').pw_uid, grp.getgrnam('tim').gr_gid)
 
 # Log deployment version
-logger.info("Deployed tab3.py version: 2025-06-25-v69")
+logger.info("Deployed tab3.py version: 2025-06-25-v72")
 
 # Helper function to normalize common_name by removing suffixes like (G1), (G2)
 def normalize_common_name(name):
     if not name:
         return name
-    # Remove suffixes like (G1), (G2), etc.
     return re.sub(r'\s*\(G[0-9]+\)$', '', name).strip()
 
 # Helper function to normalize rental_class_id for consistent lookup
@@ -74,7 +74,6 @@ def normalize_rental_class_id(rental_class_id):
 
 @tab3_bp.route('/tab/3')
 def tab3_view():
-    # Log entry into endpoint
     logger.debug("Entering /tab/3 endpoint at %s", datetime.now())
     session = None
     try:
@@ -113,15 +112,34 @@ def tab3_view():
         page = int(request.args.get('page', 1))
         per_page = 20
 
-        # Define in-service statuses (exact match to database)
+        # Define in-service statuses
         in_service_statuses = ['Repair', 'Needs to be Inspected', 'Wash', 'Wet']
         all_statuses = in_service_statuses + ['On Rent', 'Ready to Rent']
-
-        # Construct IN clause manually to avoid tuple conversion issue
         in_service_statuses_sql = ', '.join([f"'{status}'" for status in in_service_statuses])
         all_statuses_sql = ', '.join([f"'{status}'" for status in all_statuses])
 
-        # Fetch all rental_class_num values for in-service items to ensure they are included
+        # Cache key for mappings
+        cache_key = 'rental_class_mappings'
+        mappings_dict = cache.get(cache_key)
+        if mappings_dict is None:
+            base_mappings = session.query(RentalClassMapping).all()
+            user_mappings = session.query(UserRentalClassMapping).all()
+            mappings_dict = {normalize_rental_class_id(m.rental_class_id): {
+                'category': m.category,
+                'subcategory': m.subcategory,
+                'short_common_name': m.short_common_name or 'N/A'
+            } for m in base_mappings}
+            for um in user_mappings:
+                normalized_id = normalize_rental_class_id(um.rental_class_id)
+                mappings_dict[normalized_id] = {
+                    'category': um.category,
+                    'subcategory': um.subcategory,
+                    'short_common_name': um.short_common_name or 'N/A'
+                }
+            cache.set(cache_key, mappings_dict, ex=3600)
+            logger.info("Cached rental_class_mappings")
+
+        # Fetch all rental_class_num values for in-service items
         rental_class_query = f"""
             SELECT DISTINCT COALESCE(rental_class_num, '') AS rental_class_id
             FROM id_item_master
@@ -131,8 +149,7 @@ def tab3_view():
         in_service_rental_classes = [row[0] for row in rental_class_result.fetchall()]
         logger.info(f"In-service rental_class_num values: {in_service_rental_classes}")
 
-        # Query for summary data (parent layer)
-        # Normalize common_name by removing suffixes like (G1), (G2)
+        # Summary query
         summary_query = f"""
             SELECT 
                 COALESCE(rental_class_num, '') AS rental_class_id,
@@ -145,20 +162,11 @@ def tab3_view():
             WHERE TRIM(COALESCE(status, '')) IN ({all_statuses_sql})
         """
         params = {}
-        
         if common_name_filter:
             summary_query += " AND LOWER(REGEXP_REPLACE(common_name, '\s*\(G[0-9]+\)$', '')) LIKE :common_name_filter"
             params['common_name_filter'] = f'%{common_name_filter}%'
-        
         summary_query += " GROUP BY COALESCE(rental_class_num, ''), REGEXP_REPLACE(common_name, '\s*\(G[0-9]+\)$', '')"
-        
-        # Apply sorting for summary
-        if sort == 'date_last_scanned_asc':
-            summary_query += " ORDER BY MIN(date_last_scanned) ASC, REGEXP_REPLACE(common_name, '\s*\(G[0-9]+\)$', '') ASC"
-        else:
-            summary_query += " ORDER BY MIN(date_last_scanned) DESC, REGEXP_REPLACE(common_name, '\s*\(G[0-9]+\)$', '') ASC"
-
-        # Removed LIMIT to ensure all relevant groups are fetched
+        summary_query += " ORDER BY MIN(date_last_scanned) DESC, REGEXP_REPLACE(common_name, '\s*\(G[0-9]+\)$', '') ASC"
         logger.debug(f"Executing summary query: {summary_query} with params: {params}")
         summary_result = session.execute(text(summary_query), params)
         summary_rows = summary_result.fetchall()
@@ -178,10 +186,9 @@ def tab3_view():
                 'item_list': []
             }
             summary_groups.append(group)
-            # Map rental_class_id to group for quick lookup
             rental_class_to_group[group['rental_class_id']] = group
 
-        # Query detailed items for in-service statuses
+        # Detail query (paginated)
         detail_query = f"""
             SELECT 
                 tag_id, 
@@ -205,13 +212,11 @@ def tab3_view():
                 detail_query += " AND DATE(date_last_scanned) = :date_filter"
                 detail_params['date_filter'] = date
             except ValueError:
-                logger.warning(f"Invalid date format for date_last_scanned filter: {date_filter}")
-
-        if sort == 'date_last_scanned_asc':
-            detail_query += " ORDER BY date_last_scanned ASC, LOWER(REGEXP_REPLACE(common_name, '\s*\(G[0-9]+\)$', '')) ASC"
-        else:
-            detail_query += " ORDER BY date_last_scanned DESC, LOWER(REGEXP_REPLACE(common_name, '\s*\(G[0-9]+\)$', '')) ASC"
-
+                logger.warning(f"Invalid date format: {date_filter}")
+        detail_query += f" ORDER BY date_last_scanned {'ASC' if sort == 'date_last_scanned_asc' else 'DESC'}, LOWER(REGEXP_REPLACE(common_name, '\s*\(G[0-9]+\)$', '')) ASC"
+        detail_query += " LIMIT :limit OFFSET :offset"
+        detail_params['limit'] = per_page
+        detail_params['offset'] = (page - 1) * per_page
         logger.debug(f"Executing detail query: {detail_query} with params: {detail_params}")
         detail_result = session.execute(text(detail_query), detail_params)
         detail_rows = detail_result.fetchall()
@@ -313,7 +318,7 @@ def tab3_view():
                     'last_transaction_scan_date': t.scan_date.strftime('%Y-%m-%d %H:%M:%S') if t.scan_date else 'N/A'
                 }
 
-        # Assign detailed items to summary groups, updating existing groups instead of creating duplicates
+        # Assign detailed items to summary groups
         unmatched_items = []
         for item in items_in_service:
             t_data = transaction_data.get(item['tag_id'], {
@@ -368,10 +373,8 @@ def tab3_view():
                 'last_transaction_scan_date': t_data['last_transaction_scan_date']
             }
 
-            # Find or update the existing summary group
             group = rental_class_to_group.get(item['rental_class_num'])
             if group:
-                # Update the existing group's common_name to the unnormalized version
                 group['common_name'] = item['common_name']
                 group['item_list'].append(item_details)
                 group['number_in_service'] = len(group['item_list'])
@@ -379,7 +382,6 @@ def tab3_view():
                     group['statuses'].append(item['status'])
                 logger.debug(f"Updated existing group: rental_class_id={item['rental_class_num']}, common_name={item['common_name']}")
             else:
-                # Create a new group if none exists
                 new_group = {
                     'rental_class_id': item['rental_class_num'],
                     'common_name': item['common_name'],
@@ -393,7 +395,7 @@ def tab3_view():
                 rental_class_to_group[item['rental_class_num']] = new_group
                 logger.debug(f"Created new group for unmatched item: rental_class_id={item['rental_class_num']}, common_name={item['common_name']}")
 
-        # Debug: Log groups after assignment but before filtering
+        # Debug: Log groups after assignment
         logger.debug(f"After assignment - Summary groups: {len(summary_groups)}")
         for group in summary_groups:
             logger.debug(f"Group: rental_class_id={group['rental_class_id']}, common_name={group['common_name']}, number_in_service={group['number_in_service']}, items={len(group['item_list'])}")
@@ -446,7 +448,6 @@ def tab3_view():
 
 @tab3_bp.route('/tab/3/csv_contents', methods=['GET'])
 def get_csv_contents():
-    # Fetch and return CSV contents
     try:
         logger.debug("Entering /tab/3/csv_contents endpoint at %s", datetime.now())
         if not os.path.exists(CSV_FILE_PATH):
@@ -479,7 +480,6 @@ def get_csv_contents():
 
 @tab3_bp.route('/tab/3/remove_csv_item', methods=['POST'])
 def remove_csv_item():
-    # Remove an item from the CSV
     lock_file = None
     try:
         logger.debug("Entering /tab/3/remove_csv_item endpoint at %s", datetime.now())
@@ -525,7 +525,6 @@ def remove_csv_item():
 
 @tab3_bp.route('/tab/3/sync_to_pc', methods=['POST'])
 def sync_to_pc():
-    # Sync items to CSV for printing
     session = None
     lock_file = None
     try:
@@ -603,6 +602,7 @@ def sync_to_pc():
                     ItemMaster.status == 'Sold'
                 )\
                 .order_by(ItemMaster.date_updated.asc())\
+                .limit(quantity)\
                 .all()
             logger.debug(f"Found {len(sold_items)} 'Sold' items in ItemMaster for common_name={common_name}")
 
@@ -657,7 +657,7 @@ def sync_to_pc():
                 session.add(new_item)
                 session.flush()
 
-            with session.no_autoflush:  # Prevent premature flush during max query
+            with session.no_autoflush:
                 for i in range(remaining_quantity):
                     max_tag_id = session.query(func.max(ItemMaster.tag_id))\
                         .filter(ItemMaster.tag_id.startswith('425445'))\
@@ -686,7 +686,7 @@ def sync_to_pc():
                         'common_name': common_name,
                         'subcategory': 'Unknown',
                         'short_common_name': common_name,
-                        'status': 'Ready to Rent',  # New items start as Ready to Rent
+                        'status': 'Ready to Rent',
                         'bin_location': bin_location,
                         'rental_class_num': rental_class_num,
                         'is_new': True
@@ -702,7 +702,7 @@ def sync_to_pc():
                         date_created=datetime.now(),
                         date_updated=datetime.now()
                     )
-                    insert_new_item(new_item)  # Retry on lock timeout
+                    insert_new_item(new_item)
                     new_items.append(new_item)
                     logger.info(f"Generated new item: tag_id={tag_id}, common_name={common_name}, rental_class_num={rental_class_num}")
 
@@ -710,21 +710,25 @@ def sync_to_pc():
             synced_items = synced_items[:quantity]
 
         # Map rental class details
-        base_mappings = session.query(RentalClassMapping).all()
-        user_mappings = session.query(UserRentalClassMapping).all()
-        mappings_dict = {normalize_rental_class_id(m.rental_class_id): {
-            'category': m.category,
-            'subcategory': m.subcategory,
-            'short_common_name': m.short_common_name or 'N/A'
-        } for m in base_mappings}
-        for um in user_mappings:
-            normalized_id = normalize_rental_class_id(um.rental_class_id)
-            mappings_dict[normalized_id] = {
-                'category': um.category,
-                'subcategory': um.subcategory,
-                'short_common_name': um.short_common_name or 'N/A'
-            }
-            logger.debug(f"Added user mapping: rental_class_id={normalized_id}, short_common_name={um.short_common_name}")
+        cache_key = 'rental_class_mappings'
+        mappings_dict = cache.get(cache_key)
+        if mappings_dict is None:
+            base_mappings = session.query(RentalClassMapping).all()
+            user_mappings = session.query(UserRentalClassMapping).all()
+            mappings_dict = {normalize_rental_class_id(m.rental_class_id): {
+                'category': m.category,
+                'subcategory': m.subcategory,
+                'short_common_name': m.short_common_name or 'N/A'
+            } for m in base_mappings}
+            for um in user_mappings:
+                normalized_id = normalize_rental_class_id(um.rental_class_id)
+                mappings_dict[normalized_id] = {
+                    'category': um.category,
+                    'subcategory': um.subcategory,
+                    'short_common_name': um.short_common_name or 'N/A'
+                }
+                logger.debug(f"Added user mapping: rental_class_id={normalized_id}, short_common_name={um.short_common_name}")
+            cache.set(cache_key, mappings_dict, ex=3600)
 
         for item in synced_items:
             normalized_rental_class = normalize_rental_class_id(item['rental_class_num'])
@@ -770,7 +774,6 @@ def sync_to_pc():
 
 @tab3_bp.route('/tab/3/update_synced_status', methods=['POST'])
 def update_synced_status():
-    # Update synced items' status to Ready to Rent
     session = None
     lock_file = None
     try:
@@ -799,7 +802,7 @@ def update_synced_status():
             logger.error(f"CSV file {CSV_FILE_PATH} is not readable/writable")
             return jsonify({'error': f"CSV file {CSV_FILE_PATH} is not readable/writable"}), 500
 
-        # Read CSV items
+        # Read CSV items (minimal fields)
         items_to_update = []
         try:
             with open(CSV_FILE_PATH, 'r') as csvfile:
@@ -834,49 +837,61 @@ def update_synced_status():
 
         # Fetch ItemMaster data
         logger.debug("Fetching items from ItemMaster")
-        items_in_db = session.query(ItemMaster.tag_id, ItemMaster.rental_class_num, ItemMaster.common_name, ItemMaster.bin_location)\
-            .filter(ItemMaster.tag_id.in_(tag_ids))\
-            .all()
-        item_dict = {item.tag_id: {
-            'rental_class_num': normalize_rental_class_id(item.rental_class_num),
-            'common_name': item.common_name,
-            'bin_location': item.bin_location
-        } for item in items_in_db}
+        batch_size = 100
+        item_dict = {}
+        for i in range(0, len(tag_ids), batch_size):
+            batch_tags = tag_ids[i:i + batch_size]
+            items_in_db = session.query(ItemMaster.tag_id, ItemMaster.rental_class_num, ItemMaster.common_name, ItemMaster.bin_location)\
+                .filter(ItemMaster.tag_id.in_(batch_tags))\
+                .all()
+            item_dict.update({item.tag_id: {
+                'rental_class_num': normalize_rental_class_id(item.rental_class_num),
+                'common_name': item.common_name,
+                'bin_location': item.bin_location
+            } for item in items_in_db})
 
-        # Update ItemMaster status
+        # Batch update ItemMaster status
         logger.debug("Updating ItemMaster status to 'Ready to Rent'")
-        updated_items = ItemMaster.query\
-            .filter(ItemMaster.tag_id.in_(tag_ids))\
-            .update({ItemMaster.status: 'Ready to Rent'}, synchronize_session='fetch')
-        session.flush()
+        updated_items = 0
+        for i in range(0, len(tag_ids), batch_size):
+            batch_tags = tag_ids[i:i + batch_size]
+            updated = ItemMaster.query\
+                .filter(ItemMaster.tag_id.in_(batch_tags))\
+                .update({ItemMaster.status: 'Ready to Rent'}, synchronize_session='fetch')
+            updated_items += updated
+            session.flush()
         logger.info(f"Updated {updated_items} items in ItemMaster")
 
-        # Update API
+        # Batch API updates with timeout
         api_client = APIClient()
         failed_items = []
-        for item in items_to_update:
-            tag_id = item['tag_id']
-            db_item = item_dict.get(tag_id, {})
-            try:
-                params = {'filter[eq]': f"tag_id,eq,'{tag_id}'"}
-                existing_items = api_client._make_request("14223767938169344381", params)
-                if existing_items:
-                    api_client.update_status(tag_id, 'Ready to Rent')
-                    logger.debug(f"Updated status for tag_id {tag_id} in API")
-                else:
-                    new_item = {
-                        'tag_id': tag_id,
-                        'common_name': db_item.get('common_name', item['common_name']),
-                        'bin_location': db_item.get('bin_location', item['bin_location']),
-                        'status': 'Ready to Rent',
-                        'date_last_scanned': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                        'rental_class_num': db_item.get('rental_class_num', '')
-                    }
-                    api_client.insert_item(new_item)
-                    logger.debug(f"Inserted new item for tag_id {tag_id} in API")
-            except Exception as api_error:
-                logger.error(f"Error updating/inserting tag_id {tag_id} in API: {str(api_error)}", exc_info=True)
-                failed_items.append(tag_id)
+        for i in range(0, len(tag_ids), batch_size):
+            batch_tags = tag_ids[i:i + batch_size]
+            for tag_id in batch_tags:
+                try:
+                    params = {'filter[eq]': f"tag_id,eq,'{tag_id}'"}
+                    existing_items = api_client._make_request("14223767938169344381", params, timeout=10)
+                    if existing_items:
+                        api_client.update_status(tag_id, 'Ready to Rent', timeout=10)
+                        logger.debug(f"Updated status for tag_id {tag_id} in API")
+                    else:
+                        db_item = item_dict.get(tag_id, {})
+                        new_item = {
+                            'tag_id': tag_id,
+                            'common_name': db_item.get('common_name', item['common_name']),
+                            'bin_location': db_item.get('bin_location', item['bin_location']),
+                            'status': 'Ready to Rent',
+                            'date_last_scanned': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                            'rental_class_num': db_item.get('rental_class_num', '')
+                        }
+                        api_client.insert_item(new_item, timeout=10)
+                        logger.debug(f"Inserted new item for tag_id {tag_id} in API")
+                except requests.exceptions.Timeout:
+                    logger.error(f"Timeout updating/inserting tag_id {tag_id} in API")
+                    failed_items.append(tag_id)
+                except Exception as api_error:
+                    logger.error(f"Error updating/inserting tag_id {tag_id} in API: {str(api_error)}", exc_info=True)
+                    failed_items.append(tag_id)
 
         if failed_items:
             logger.warning(f"Failed to update {len(failed_items)} items in API: {failed_items}")
@@ -914,7 +929,6 @@ def update_synced_status():
 
 @tab3_bp.route('/tab/3/update_status', methods=['POST'])
 def update_status():
-    # Update individual item status
     session = None
     try:
         logger.debug("Entering /tab/3/update_status endpoint at %s", datetime.now())
@@ -947,7 +961,9 @@ def update_status():
 
         try:
             api_client = APIClient()
-            api_client.update_status(tag_id, new_status)
+            api_client.update_status(tag_id, new_status, timeout=10)
+        except requests.exceptions.Timeout:
+            logger.error(f"Timeout updating API status for tag_id {tag_id}")
         except Exception as e:
             logger.error(f"Failed to update API status for tag_id {tag_id}: {str(e)}", exc_info=True)
 
@@ -963,7 +979,6 @@ def update_status():
 
 @tab3_bp.route('/tab/3/update_notes', methods=['POST'])
 def update_notes():
-    # Update individual item notes
     session = None
     try:
         logger.debug("Entering /tab/3/update_notes endpoint at %s", datetime.now())
@@ -987,7 +1002,9 @@ def update_notes():
 
         try:
             api_client = APIClient()
-            api_client.update_notes(tag_id, new_notes if new_notes else '')
+            api_client.update_notes(tag_id, new_notes if new_notes else '', timeout=10)
+        except requests.exceptions.Timeout:
+            logger.error(f"Timeout updating API notes for tag_id {tag_id}")
         except Exception as e:
             logger.error(f"Failed to update API notes for tag_id {tag_id}: {str(e)}", exc_info=True)
 
@@ -1003,7 +1020,6 @@ def update_notes():
 
 @tab3_bp.route('/tab/3/pack_resale_common_names', methods=['GET'])
 def get_pack_resale_common_names():
-    # Fetch common names for pack/resale
     session = None
     try:
         logger.debug("Entering /tab/3/pack_resale_common_names endpoint at %s", datetime.now())
