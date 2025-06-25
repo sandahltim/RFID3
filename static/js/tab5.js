@@ -1,12 +1,12 @@
-console.log('tab5.js version: 2025-06-25-v10 loaded');
+console.log('tab5.js version: 2025-06-25-v11 loaded');
 
 /**
  * Tab5.js: Logic for Tab 5 (Resale/Rental Packs).
  * Dependencies: common.js (for formatDate, showLoading, hideLoading, collapseSection, printTable, printFullItemList).
- * Updated: 2025-06-25-v10
- * - Modified populateSubcategories to fetch all pages of subcategories, fixing dropdown truncation at 10 items.
- * - Added debug logs with timestamps to trace pagination and subcategory population.
- * - Preserved all original functionality (bulk updates, CSV export, pagination for common names and items).
+ * Updated: 2025-06-25-v11
+ * - Fixed collapse button to fully collapse space by hiding parent <tr> in handleClick.
+ * - Retained fetchAllSubcategories from v10 to prevent dropdown truncation.
+ * - Preserved all functionality (bulk updates, CSV export, pagination).
  */
 
 function applyFilterToAllLevelsTab5() {
@@ -203,7 +203,6 @@ function populateSubcategories() {
             return Promise.resolve();
         }
 
-        // Function to fetch all pages of subcategories
         async function fetchAllSubcategories(page = 1, accumulatedSubcats = []) {
             const url = `/tab/5/subcat_data?category=${encodeURIComponent(category)}&page=${page}`;
             try {
@@ -222,19 +221,16 @@ function populateSubcategories() {
                 const totalPages = Math.ceil(totalSubcats / perPage);
 
                 if (page < totalPages) {
-                    // Fetch next page
                     return fetchAllSubcategories(page + 1, subcategories);
                 } else {
-                    // All pages fetched
                     return subcategories;
                 }
             } catch (error) {
                 console.error(`Subcategory fetch error for ${category}, page ${page}: ${error.message} at ${new Date().toISOString()}`);
-                return accumulatedSubcats; // Return accumulated subcategories on error
+                return accumulatedSubcats;
             }
         }
 
-        // Start fetching all subcategories
         return fetchAllSubcategories().then(subcategories => {
             select.innerHTML = '<option value="">Select a subcategory</option>';
             if (subcategories.length > 0) {
@@ -1012,6 +1008,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 console.log(`Collapsing ${targetId} at ${new Date().toISOString()}`);
                 if (commonName) {
                     collapseSection(targetId);
+                    const parentRow = container.closest('tr.common-name-row');
+                    if (parentRow) {
+                        parentRow.style.display = 'none';
+                        console.log(`Collapsed parent row for ${targetId} at ${new Date().toISOString()}`);
+                    }
                 }
                 if (expandBtn && collapseBtn) {
                     expandBtn.style.display = 'inline-block';
@@ -1045,8 +1046,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
             const expandBtn = collapseBtn.parentElement.querySelector(`.expand-btn[data-target-id="${targetId}"]`);
+            const parentRow = container.closest('tr.common-name-row');
             if (container.classList.contains('item-level')) {
                 collapseSection(targetId);
+                if (parentRow) {
+                    parentRow.style.display = 'none';
+                    console.log(`Collapsed parent row for ${targetId} at ${new Date().toISOString()}`);
+                }
             }
             if (expandBtn && collapseBtn) {
                 expandBtn.style.display = 'inline-block';
