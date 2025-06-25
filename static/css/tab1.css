@@ -1,4 +1,8 @@
-/* Styles specific to Tab 1 */
+/* tab1.css version: 2025-06-25-v2
+ * - Strengthened .common-name-row.collapsed to collapse all related rows.
+ * - Ensured .common-table.collapsed and .item-table.collapsed remove all space.
+ * - Preserves all existing styles for Tab 1.
+ */
 
 /* Style for common name table rows */
 .common-name-row {
@@ -6,24 +10,43 @@
     border-left: 3px solid var(--bte-accent-green);
     margin-left: 2rem;
     padding: 1rem;
-    display: table-row !important;
-    visibility: visible !important;
+    display: table-row;
+    visibility: visible;
+}
+
+.common-name-row.collapsed {
+    display: none !important;
+    visibility: hidden !important;
+    min-height: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
 }
 
 .common-name-row td {
-    padding: 0 !important;
-    display: table-cell !important;
-    visibility: visible !important;
+    padding: 0;
+    display: table-cell;
+}
+
+.common-name-row.collapsed td {
+    display: none !important;
+    visibility: hidden !important;
 }
 
 .common-table {
     width: 100%;
     border-collapse: collapse;
-    display: table !important;
-    visibility: visible !important;
-    margin: 0 !important;
+    display: table;
+    visibility: visible;
+    margin: 0;
     table-layout: auto;
     will-change: opacity;
+}
+
+.common-table.collapsed {
+    display: none !important;
+    visibility: hidden !important;
+    min-height: 0 !important;
+    margin: 0 !important;
 }
 
 .common-table.loaded {
@@ -35,9 +58,9 @@ div.item-level-wrapper table.item-table th,
 div.item-level-wrapper table.item-table td,
 tr.common-name-row td table.common-table th,
 tr.common-name-row td table.common-table td {
-    color: var(--bte-dark-gray) !important;
-    font-family: 'Roboto', sans-serif !important;
-    font-weight: 500 !important;
+    color: var(--bte-dark-gray);
+    font-family: 'Roboto', sans-serif;
+    font-weight: 500;
 }
 
 .item-level-wrapper {
@@ -50,8 +73,8 @@ tr.common-name-row td table.common-table td {
     width: 100%;
     min-width: 1200px;
     box-sizing: border-box;
-    display: block !important;
-    visibility: visible !important;
+    display: block;
+    visibility: visible;
     z-index: 1;
     position: relative;
     scrollbar-width: auto;
@@ -59,24 +82,33 @@ tr.common-name-row td table.common-table td {
 }
 
 .item-level-wrapper.collapsed {
-    min-height: 0;
-    padding: 0;
-    margin: 0;
+    display: none !important;
+    visibility: hidden !important;
+    min-height: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
 }
 
 .item-level {
     width: 100%;
     min-width: 1200px;
-    display: table !important;
-    visibility: visible !important;
+    display: table;
+    visibility: visible;
 }
 
 .item-table {
     width: 100%;
     border-collapse: collapse;
-    display: table !important;
-    visibility: visible !important;
+    display: table;
+    visibility: visible;
     will-change: opacity;
+}
+
+.item-table.collapsed {
+    display: none !important;
+    visibility: hidden !important;
+    min-height: 0 !important;
+    margin: 0 !important;
 }
 
 .item-table.loaded {
@@ -89,10 +121,10 @@ tr.common-name-row td table.common-table td {
 .item-table {
     width: 100%;
     border-collapse: collapse;
-    display: table !important;
-    visibility: visible !important;
+    display: table;
+    visibility: visible;
     table-layout: auto;
-    margin-top: 0; /* Remove any inherited margin */
+    margin-top: 0;
 }
 
 /* Ensure headers and cells are centered */
@@ -106,8 +138,8 @@ tr.common-name-row td table.common-table td {
     vertical-align: middle;
     padding: 12px;
     border: 1px solid var(--bte-medium-gray);
-    display: table-cell !important;
-    visibility: visible !important;
+    display: table-cell;
+    visibility: visible;
     white-space: normal;
     word-wrap: break-word;
 }
@@ -117,7 +149,7 @@ tr.common-name-row td table.common-table td {
 .common-table thead th,
 .item-table thead th {
     position: sticky;
-    top: 80px; /* Increased to clear the h2 header with padding */
+    top: 80px;
     z-index: 5;
     background-color: var(--bte-white);
     border-bottom: 2px solid var(--bte-gold);
@@ -128,8 +160,8 @@ tr.common-name-row td table.common-table td {
 .category-table tbody,
 .common-table tbody,
 .item-table tbody {
-    display: table-row-group !important;
-    visibility: visible !important;
+    display: table-row-group;
+    visibility: visible;
     z-index: 1;
     position: relative;
 }
@@ -192,13 +224,13 @@ tr.common-name-row td table.common-table td {
 
 /* Ensure parent rows and cells are visible */
 .category-row {
-    display: table-row !important;
-    visibility: visible !important;
+    display: table-row;
+    visibility: visible;
 }
 
 .category-row td {
-    display: table-cell !important;
-    visibility: visible !important;
+    display: table-cell;
+    visibility: visible;
 }
 
 /* Editable cells for Tab 1 */
@@ -223,7 +255,7 @@ tr.common-name-row td table.common-table td {
 }
 
 .dropdown-menu.show {
-    display: block !important;
+    display: block;
 }
 
 .dropdown-item {
@@ -240,6 +272,39 @@ tr.common-name-row td table.common-table td {
 .dropdown-item[disabled], .dropdown-item[style*="pointer-events: none"] {
     color: var(--bte-medium-gray);
     cursor: not-allowed;
+}
+
+/* Expandable sections */
+.expandable {
+    transition: opacity 0.7s ease-in-out;
+}
+
+.expandable.collapsed {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+}
+
+/* Pagination controls */
+.pagination-controls {
+    text-align: center;
+    margin-top: 10px;
+}
+
+.pagination-controls button {
+    margin: 0 5px;
+    background: linear-gradient(90deg, var(--bte-royal-blue) 0%, #0047AB 100%);
+    color: var(--bte-white);
+    border: none;
+    padding: 8px 12px;
+    border-radius: 4px;
+    transition: background 0.3s ease, transform 0.2s ease;
+}
+
+.pagination-controls button:hover {
+    background: linear-gradient(90deg, var(--bte-gold) 0%, #FFD54F 100%);
+    color: var(--bte-dark-gray);
+    transform: translateY(-2px);
 }
 
 /* Responsive adjustments for Tab 1 */
