@@ -1,12 +1,12 @@
-console.log('tab5.js version: 2025-06-25-v9 loaded');
+console.log('tab5.js version: 2025-06-25-v10 loaded');
 
 /**
  * Tab5.js: Logic for Tab 5 (Resale/Rental Packs).
  * Dependencies: common.js (for formatDate, showLoading, hideLoading, collapseSection, printTable, printFullItemList).
- * Updated: 2025-06-25-v9
- * - Fixed DOMContentLoaded to check both window.location.pathname and window.cachedTabNum to prevent skipping initialization.
- * - Added detailed timestamps to console logs for debugging subcategory population issue.
- * - Preserved all original functionality (bulk updates, CSV export, pagination).
+ * Updated: 2025-06-25-v10
+ * - Modified populateSubcategories to fetch all pages of subcategories, fixing dropdown truncation at 10 items.
+ * - Added debug logs with timestamps to trace pagination and subcategory population.
+ * - Preserved all original functionality (bulk updates, CSV export, pagination for common names and items).
  */
 
 function applyFilterToAllLevelsTab5() {
@@ -202,33 +202,57 @@ function populateSubcategories() {
             console.error(`Missing data-category attribute for select element at ${new Date().toISOString()}`, select);
             return Promise.resolve();
         }
-        const url = `/tab/5/subcat_data?category=${encodeURIComponent(category)}`;
-        return fetch(url)
-            .then(response => {
-                console.log(`Subcategory fetch status for ${category}: ${response.status} at ${new Date().toISOString()}`);
+
+        // Function to fetch all pages of subcategories
+        async function fetchAllSubcategories(page = 1, accumulatedSubcats = []) {
+            const url = `/tab/5/subcat_data?category=${encodeURIComponent(category)}&page=${page}`;
+            try {
+                const response = await fetch(url);
+                console.log(`Subcategory fetch status for ${category}, page ${page}: ${response.status} at ${new Date().toISOString()}`);
                 if (!response.ok) {
-                    return response.text().then(text => {
-                        throw new Error(`Subcategory fetch failed: ${response.status} - ${text}`);
-                    });
+                    const text = await response.text();
+                    throw new Error(`Subcategory fetch failed: ${response.status} - ${text}`);
                 }
-                return response.json();
-            })
-            .then(data => {
-                console.log(`Subcategory data for ${category}:`, data, `at ${new Date().toISOString()}`);
-                select.innerHTML = '<option value="">Select a subcategory</option>';
-                if (data.subcategories && data.subcategories.length > 0) {
-                    data.subcategories.forEach(subcat => {
-                        const option = document.createElement('option');
-                        option.value = subcat.subcategory;
-                        option.textContent = subcat.subcategory;
-                        select.appendChild(option);
-                    });
+                const data = await response.json();
+                console.log(`Subcategory data for ${category}, page ${page}:`, data, `at ${new Date().toISOString()}`);
+
+                const subcategories = accumulatedSubcats.concat(data.subcategories || []);
+                const totalSubcats = data.total_subcats || 0;
+                const perPage = data.per_page || 10;
+                const totalPages = Math.ceil(totalSubcats / perPage);
+
+                if (page < totalPages) {
+                    // Fetch next page
+                    return fetchAllSubcategories(page + 1, subcategories);
                 } else {
-                    select.innerHTML += '<option value="">No subcategories</option>';
-                    console.warn(`No subcategories returned for ${category} at ${new Date().toISOString()}`);
+                    // All pages fetched
+                    return subcategories;
                 }
-            })
-            .catch(error => console.error(`Subcategory error for ${category}: ${error.message} at ${new Date().toISOString()}`));
+            } catch (error) {
+                console.error(`Subcategory fetch error for ${category}, page ${page}: ${error.message} at ${new Date().toISOString()}`);
+                return accumulatedSubcats; // Return accumulated subcategories on error
+            }
+        }
+
+        // Start fetching all subcategories
+        return fetchAllSubcategories().then(subcategories => {
+            select.innerHTML = '<option value="">Select a subcategory</option>';
+            if (subcategories.length > 0) {
+                subcategories.forEach(subcat => {
+                    const option = document.createElement('option');
+                    option.value = subcat.subcategory;
+                    option.textContent = subcat.subcategory;
+                    select.appendChild(option);
+                });
+                console.log(`Populated ${subcategories.length} subcategories for ${category} at ${new Date().toISOString()}`);
+            } else {
+                select.innerHTML += '<option value="">No subcategories</option>';
+                console.warn(`No subcategories returned for ${category} at ${new Date().toISOString()}`);
+            }
+        }).catch(error => {
+            console.error(`Error populating subcategories for ${category}: ${error.message} at ${new Date().toISOString()}`);
+            select.innerHTML = '<option value="">Error loading subcategories</option>';
+        });
     });
 
     return Promise.all(promises).catch(error => console.error('Error populating subcategories:', error, `at ${new Date().toISOString()}`));
