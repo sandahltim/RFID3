@@ -1,20 +1,22 @@
-console.log('tab.js version: 2025-05-29-v8 loaded');
+console.log('tab.js version: 2025-06-25-v9 loaded');
 
 /**
  * Tab.js: Initializes tab-specific logic and handles printing.
  * Dependencies: common.js (for formatDateTime, printTable, renderPaginationControls).
- * Updated: Refined logging, restricted expand handling to Tabs 1, 3, 5, avoiding interference with Tab 2 and 4.
+ * Updated: 2025-06-25-v9
+ * - Fixed printTable for Tabs 1 and 5 to count Ready to Rent items for aggregate report.
+ * - Preserved all existing functionality.
  */
 
 /**
  * Format ISO date strings for consistency (fallback if common.js is not loaded)
  */
 function formatDateTime(dateTimeStr) {
-    console.log(`formatDateTime: Processing ${dateTimeStr}`);
+    console.log(`formatDateTime: Processing ${dateTimeStr} at ${new Date().toISOString()}`);
     if (typeof formatDate === 'function') {
         return formatDate(dateTimeStr);
     }
-    console.warn('formatDate not available, using fallback');
+    console.warn('formatDate not available, using fallback at ${new Date().toISOString()}');
     if (!dateTimeStr || dateTimeStr === 'N/A') return 'N/A';
     try {
         const date = new Date(dateTimeStr);
@@ -29,7 +31,7 @@ function formatDateTime(dateTimeStr) {
             hour12: true
         });
     } catch (error) {
-        console.error('formatDateTime error:', error);
+        console.error('formatDateTime error:', error, `at ${new Date().toISOString()}`);
         return 'N/A';
     }
 }
@@ -38,7 +40,7 @@ function formatDateTime(dateTimeStr) {
  * Fetch paginated data for expandable sections (Tabs 1, 3, 5)
  */
 async function fetchExpandableData(tabNum, contractNumber, page, perPage) {
-    console.log(`fetchExpandableData: tabNum=${tabNum}, contractNumber=${contractNumber}, page=${page}, perPage=${perPage}`);
+    console.log(`fetchExpandableData: tabNum=${tabNum}, contractNumber=${contractNumber}, page=${page}, perPage=${perPage} at ${new Date().toISOString()}`);
     const url = `/tab/${tabNum}/common_names?contract_number=${encodeURIComponent(contractNumber)}&page=${page}&per_page=${perPage}`;
     try {
         const response = await fetch(url);
@@ -46,10 +48,10 @@ async function fetchExpandableData(tabNum, contractNumber, page, perPage) {
             throw new Error(`fetchExpandableData failed: ${response.status}`);
         }
         const data = await response.json();
-        console.log('fetchExpandableData: Data received', data);
+        console.log('fetchExpandableData: Data received', data, `at ${new Date().toISOString()}`);
         return data;
     } catch (error) {
-        console.error('fetchExpandableData error:', error);
+        console.error('fetchExpandableData error:', error, `at ${new Date().toISOString()}`);
         return { common_names: [], total_items: 0 };
     }
 }
@@ -58,10 +60,10 @@ async function fetchExpandableData(tabNum, contractNumber, page, perPage) {
  * Update expandable table with new data
  */
 function updateExpandableTable(tableId, data, page, perPage, tabNum, contractNumber) {
-    console.log(`updateExpandableTable: tableId=${tableId}, page=${page}, perPage=${perPage}, tabNum=${tabNum}, contractNumber=${contractNumber}`);
+    console.log(`updateExpandableTable: tableId=${tableId}, page=${page}, perPage=${perPage}, tabNum=${tabNum}, contractNumber=${contractNumber} at ${new Date().toISOString()}`);
     const table = document.getElementById(tableId);
     if (!table) {
-        console.warn(`updateExpandableTable: Table not found ${tableId}`);
+        console.warn(`updateExpandableTable: Table not found ${tableId} at ${new Date().toISOString()}`);
         return;
     }
 
@@ -84,7 +86,7 @@ function updateExpandableTable(tableId, data, page, perPage, tabNum, contractNum
             });
         }
     } else {
-        console.error('updateExpandableTable: renderPaginationControls not defined');
+        console.error('updateExpandableTable: renderPaginationControls not defined at ${new Date().toISOString()}');
     }
 }
 
@@ -92,27 +94,27 @@ function updateExpandableTable(tableId, data, page, perPage, tabNum, contractNum
  * Initialize the page
  */
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('tab.js: DOMContentLoaded');
+    console.log('tab.js: DOMContentLoaded at ${new Date().toISOString()}');
     try {
         let tabNum;
         const path = window.location.pathname;
-        console.log(`Current path: ${path}`);
+        console.log(`Current path: ${path} at ${new Date().toISOString()}`);
         const pathMatch = path.match(/\/tab\/(\d+)/);
         if (pathMatch) {
             tabNum = parseInt(pathMatch[1], 10);
-            console.log(`Tab number extracted from URL: ${tabNum}`);
+            console.log(`Tab number extracted from URL: ${tabNum} at ${new Date().toISOString()}`);
         } else if (path === '/' || path === '/home') {
             tabNum = 1;
-            console.log('Home page detected, setting tabNum=1');
+            console.log('Home page detected, setting tabNum=1 at ${new Date().toISOString()}');
         } else {
-            console.warn('No tab number found in URL, using default tab number 1');
+            console.warn('No tab number found in URL, using default tab number 1 at ${new Date().toISOString()}');
             tabNum = 1;
         }
         window.cachedTabNum = tabNum;
-        console.log(`Set window.cachedTabNum=${window.cachedTabNum}`);
+        console.log(`Set window.cachedTabNum=${window.cachedTabNum} at ${new Date().toISOString()}`);
 
         document.addEventListener('click', (event) => {
-            console.log('Click event triggered');
+            console.log('Click event triggered at ${new Date().toISOString()}');
             const printBtn = event.target.closest('.print-btn');
             const printFullBtn = event.target.closest('.print-full-btn');
             const expandBtn = event.target.closest('.expand-btn');
@@ -142,12 +144,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.log('Expand button clicked:', {
                     contractNumber: expandBtn.getAttribute('data-contract-number'),
                     targetId: expandBtn.getAttribute('data-target-id')
-                });
+                }, `at ${new Date().toISOString()}`);
                 const row = expandBtn.closest('tr');
                 const nextRow = row.nextElementSibling;
                 const expandable = nextRow.querySelector('.expandable');
                 if (!expandable) {
-                    console.warn('Expandable section not found');
+                    console.warn('Expandable section not found at ${new Date().toISOString()}');
                     return;
                 }
 
@@ -155,7 +157,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const targetId = expandBtn.getAttribute('data-target-id');
 
                 if (!contractNumber || !targetId) {
-                    console.warn('Contract number or target ID missing');
+                    console.warn('Contract number or target ID missing at ${new Date().toISOString()}');
                     return;
                 }
 
@@ -165,13 +167,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     const tableId = expandable.querySelector('.common-table')?.id;
                     if (!tableId) {
-                        console.warn('Table ID not found in expandable section');
+                        console.warn('Table ID not found in expandable section at ${new Date().toISOString()}');
                     }
                     fetchExpandableData(tabNum, contractNumber, 1, 20).then(data => {
                         if (tableId) {
                             updateExpandableTable(tableId, data, 1, 20, tabNum, contractNumber);
                         } else {
-                            console.log('No table ID; expandable content should be populated by tab-specific script');
+                            console.log('No table ID; expandable content should be populated by tab-specific script at ${new Date().toISOString()}');
                         }
                     });
                 } else {
@@ -181,6 +183,349 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     } catch (error) {
-        console.error('Initialization error:', error);
+        console.error('Initialization error:', error, `at ${new Date().toISOString()}`);
     }
 });
+
+/**
+ * Print a table (Contract, Common Name, or Item level)
+ */
+async function printTable(level, id, commonName = null, category = null, subcategory = null) {
+    console.log(`Printing table: ${level}, ID: ${id}, Common Name: ${commonName}, Category: ${category}, Subcategory: ${subcategory} at ${new Date().toISOString()}`);
+    const element = document.getElementById(id);
+    if (!element) {
+        console.error(`Element with ID ${id} not found for printing at ${new Date().toISOString()}`);
+        return;
+    }
+
+    const tabNum = window.cachedTabNum || 1;
+    const tabName = tabNum == 2 ? 'Open Contracts' : tabNum == 4 ? 'Laundry Contracts' : tabNum == 5 ? 'Resale/Rental Packs' : tabNum == 3 ? 'Service' : `Tab ${tabNum}`;
+
+    let contractNumber = '';
+    if (level === 'Contract') {
+        if (id.startsWith('common-')) {
+            contractNumber = id.replace('common-', '');
+        } else {
+            const contractCell = element.querySelector('td:first-child');
+            contractNumber = contractCell ? contractCell.textContent.trim() : '';
+        }
+    } else {
+        contractNumber = category || '';
+    }
+
+    let contractDate = 'N/A';
+    if (contractNumber && (tabNum == 2 || tabNum == 4)) {
+        try {
+            const response = await fetch(`/get_contract_date?contract_number=${encodeURIComponent(contractNumber)}`);
+            const data = await response.json();
+            contractDate = data.date ? formatDateTime(data.date) : 'N/A';
+        } catch (error) {
+            console.error('Error fetching contract date:', error, `at ${new Date().toISOString()}`);
+        }
+    }
+
+    let printElement;
+    let tableWrapper;
+
+    if (level === 'Common Name' && commonName && category) {
+        let url = `/tab/${tabNum}/data?common_name=${encodeURIComponent(commonName)}`;
+        if (tabNum == 2 || tabNum == 4) {
+            url += `&contract_number=${encodeURIComponent(category)}`;
+        } else {
+            url += `&category=${encodeURIComponent(category)}`;
+        }
+        if (subcategory) {
+            url += `&subcategory=${encodeURIComponent(subcategory)}`;
+        }
+        const response = await fetch(url);
+        if (!response.ok) {
+            console.error(`Failed to fetch data for printing: ${response.status} at ${new Date().toISOString()}`);
+            return;
+        }
+        const data = await response.json();
+        const items = data.items || [];
+
+        const statusCounts = {};
+        items.forEach(item => {
+            const status = item.status || 'Unknown';
+            statusCounts[status] = (statusCounts[status] || 0) + 1;
+        });
+
+        const readyToRentCount = statusCounts['Ready to Rent'] || 0;
+
+        tableWrapper = document.createElement('table');
+        tableWrapper.className = 'table table-bordered';
+        if (tabNum == 1 || tabNum == 5) {
+            tableWrapper.innerHTML = `
+                <thead>
+                    <tr>
+                        <th>Common Name</th>
+                        <th>Status</th>
+                        <th>Count</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${Object.entries(statusCounts).map(([status, count]) => `
+                        <tr>
+                            <td>${commonName}</td>
+                            <td>${status}</td>
+                            <td>${count}</td>
+                        </tr>
+                    `).join('')}
+                    <tr>
+                        <td>${commonName}</td>
+                        <td>Ready to Rent (Total Available)</td>
+                        <td>${readyToRentCount}</td>
+                    </tr>
+                </tbody>
+            `;
+        } else {
+            tableWrapper.innerHTML = `
+                <thead>
+                    <tr>
+                        <th>Common Name</th>
+                        <th>Status</th>
+                        <th>Count</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${Object.entries(statusCounts).map(([status, count]) => `
+                        <tr>
+                            <td>${commonName}</td>
+                            <td>${status}</td>
+                            <td>${count}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            `;
+        }
+    } else if (level === 'Contract' && tabNum === 4) {
+        const url = `/tab/4/common_names?contract_number=${encodeURIComponent(contractNumber)}&all=true`;
+        try {
+            const response = await fetch(url);
+            if (!response.ok) {
+                throw new Error(`Failed to fetch all common names: ${response.status}`);
+            }
+            const data = await response.json();
+            const commonNames = data.common_names || [];
+
+            tableWrapper = document.createElement('table');
+            tableWrapper.className = 'table table-bordered';
+            tableWrapper.innerHTML = `
+                <thead>
+                    <tr>
+                        <th>Common Name</th>
+                        <th>Items on Contract</th>
+                        <th>Total Items in Inventory</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${commonNames.map(common => `
+                        <tr>
+                            <td>${common.name}</td>
+                            <td>${common.on_contracts}</td>
+                            <td>${common.is_hand_counted ? 'N/A' : common.total_items_inventory}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            `;
+        } catch (error) {
+            console.error('Error fetching all common names for print:', error, `at ${new Date().toISOString()}`);
+            tableWrapper = document.createElement('table');
+            tableWrapper.className = 'table table-bordered';
+            tableWrapper.innerHTML = `<tr><td colspan="3">Error loading common names: ${error.message}</td></tr>`;
+        }
+    } else {
+        printElement = element.cloneNode(true);
+
+        if (level === 'Contract') {
+            let commonTable;
+            if (id.startsWith('common-')) {
+                if (printElement.classList.contains('expanded')) {
+                    commonTable = printElement.querySelector('.common-table');
+                }
+            } else {
+                const row = element.closest('tr');
+                if (row) {
+                    const nextRow = row.nextElementSibling;
+                    if (nextRow) {
+                        const expandedContent = nextRow.querySelector('.expandable.expanded');
+                        if (expandedContent) {
+                            commonTable = expandedContent.querySelector('.common-table');
+                        }
+                    }
+                }
+            }
+
+            if (commonTable) {
+                tableWrapper = commonTable.cloneNode(true);
+            } else {
+                const url = `/tab/${tabNum}/common_names?contract_number=${encodeURIComponent(contractNumber)}`;
+                const response = await fetch(url);
+                const data = await response.json();
+                const commonNames = data.common_names || [];
+
+                tableWrapper = document.createElement('table');
+                tableWrapper.className = 'table table-bordered';
+                tableWrapper.innerHTML = `
+                    <thead>
+                        <tr>
+                            <th>Common Name</th>
+                            <th>Items on Contract</th>
+                            <th>Total Items in Inventory</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${commonNames.map(common => `
+                            <tr>
+                                <td>${common.name}</td>
+                                <td>${common.on_contracts}</td>
+                                <td>${common.total_items_inventory}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                `;
+            }
+        } else {
+            tableWrapper = printElement;
+        }
+
+        removeTotalItemsInventoryColumn(tableWrapper, tabNum);
+
+        tableWrapper.querySelectorAll('.btn, .loading, .expandable.collapsed, .pagination-controls, .filter-sort-controls, .filter-row').forEach(el => el.remove());
+    }
+
+    tableWrapper.querySelectorAll('br').forEach(br => br.remove());
+
+    const printContent = `
+        <html>
+            <head>
+                <title>Broadway Tent and Event - ${tabName} - ${level}</title>
+                <style>
+                    body {
+                        font-family: 'Roboto', sans-serif;
+                        margin: 20px;
+                        color: #333;
+                    }
+                    .print-header {
+                        text-align: center;
+                        margin-bottom: 40px;
+                    }
+                    .print-header h1 {
+                        font-size: 28px;
+                        margin: 0;
+                    }
+                    .print-header h2 {
+                        font-size: 20px;
+                        margin: 5px 0;
+                    }
+                    .print-header p {
+                        font-size: 14px;
+                        color: #666;
+                        margin: 5px 0;
+                    }
+                    table {
+                        border-collapse: collapse;
+                        width: 100%;
+                        margin-top: 20px;
+                    }
+                    th, td {
+                        border: 1px solid #ccc;
+                        padding: 12px;
+                        text-align: center;
+                        font-size: 14px;
+                        white-space: normal;
+                        word-wrap: break-word;
+                    }
+                    th {
+                        background-color: #f2f2f2;
+                        font-weight: bold;
+                    }
+                    td {
+                        vertical-align: middle;
+                    }
+                    .hidden {
+                        display: none;
+                    }
+                    .common-level {
+                        margin-left: 1rem;
+                        background-color: #e9ecef;
+                        padding: 0.5rem;
+                        border-left: 3px solid #28a745;
+                        margin-top: 10px;
+                    }
+                    .item-level-wrapper {
+                        margin-left: 1rem;
+                        background-color: #dee2e6;
+                        padding: 0.5rem;
+                        border-left: 3px solid #dc3545;
+                        margin-top: 10px;
+                    }
+                    .signature-line {
+                        margin-top: 40px;
+                        border-top: 1px solid #000;
+                        width: 300px;
+                        text-align: center;
+                        padding-top: 10px;
+                        font-size: 14px;
+                    }
+                    @media print {
+                        body {
+                            margin: 0;
+                        }
+                        .print-header {
+                            position: static;
+                            width: 100%;
+                            margin-bottom: 20px;
+                        }
+                        table {
+                            page-break-inside: auto;
+                        }
+                        tr {
+                            page-break-inside: avoid;
+                            page-break-after: auto;
+                        }
+                        th, td {
+                            font-size: 8pt;
+                            padding: 4px 8px;
+                            word-break: break-word;
+                            text-align: center;
+                        }
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="print-header">
+                    <h1>Broadway Tent and Event</h1>
+                    <h2>${tabName}</h2>
+                    ${contractNumber ? `<p>Contract Number: ${contractNumber}</p>` : ''}
+                    ${contractDate !== 'N/A' ? `<p>Contract Created: ${contractDate}</p>` : ''}
+                    ${commonName ? `<p>Common Name: ${commonName}</p>` : ''}
+                    <p>Printed on: ${new Date().toLocaleString()}</p>
+                </div>
+                <div>
+                    ${tableWrapper.outerHTML}
+                </div>
+                <div class="signature-line">
+                    Signature: _______________________________
+                </div>
+                <script>
+                    window.onload = function() {
+                        window.print();
+                        window.onafterprint = function() {
+                            window.close();
+                        };
+                    };
+                </script>
+            </body>
+        </html>
+    `;
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+        console.error('Failed to open print window. Please allow popups at ${new Date().toISOString()}.');
+        return;
+    }
+    printWindow.document.write(printContent);
+    printWindow.document.close();
+}

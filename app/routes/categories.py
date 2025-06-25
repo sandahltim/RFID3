@@ -1,10 +1,10 @@
 # app/routes/categories.py
-# categories.py version: 2025-06-20-v25
+# categories.py version: 2025-06-25-v26
 from flask import Blueprint, render_template, request, jsonify, current_app
 from .. import db, cache
 from ..models.db_models import RentalClassMapping, UserRentalClassMapping, SeedRentalClass
 from ..services.api_client import APIClient
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 from time import time
 import logging
 import sys
@@ -45,7 +45,7 @@ if not any(isinstance(h, logging.StreamHandler) for h in root_logger.handlers):
 categories_bp = Blueprint('categories', __name__)
 
 # Version check to ensure correct deployment
-logger.info("Deployed categories.py version: 2025-06-20-v25")
+logger.info("Deployed categories.py version: 2025-06-25-v26")
 
 def build_common_name_dict(seed_data):
     """Build a dictionary mapping rental_class_id to common_name from seed_data."""
@@ -202,8 +202,8 @@ def get_mappings():
     session = None
     try:
         session = db.session()
-        logger.info("Fetching rental class mappings for API")
-        current_app.logger.info("Fetching rental class mappings for API")
+        logger.info("Fetching rental class mappings for API at %s", time())
+        current_app.logger.info("Fetching rental class mappings for API at %s", time())
 
         # Fetch all rental class mappings
         logger.debug("Querying rental_class_mappings")
@@ -328,8 +328,8 @@ def update_mappings():
     session = None
     try:
         session = db.session()
-        logger.info("Starting new session for update_mappings")
-        current_app.logger.info("Starting new session for update_mappings")
+        logger.info("Starting new session for update_mappings at %s", time())
+        current_app.logger.info("Starting new session for update_mappings at %s", time())
 
         new_mappings = request.get_json()
         logger.info(f"Received {len(new_mappings)} new mappings")
@@ -340,13 +340,7 @@ def update_mappings():
             current_app.logger.error("Invalid data format received, expected a list")
             return jsonify({'error': 'Invalid data format, expected a list'}), 400
 
-        # Clear existing user mappings
-        logger.debug("Deleting existing user mappings")
-        deleted_count = session.query(UserRentalClassMapping).delete()
-        logger.info(f"Deleted {deleted_count} existing user mappings")
-        current_app.logger.info(f"Deleted {deleted_count} existing user mappings")
-
-        # Add new user mappings
+        # Validate and update mappings
         for mapping in new_mappings:
             rental_class_id = mapping.get('rental_class_id')
             category = mapping.get('category')
@@ -358,19 +352,36 @@ def update_mappings():
                 current_app.logger.warning(f"Skipping invalid mapping due to missing rental_class_id or category: {mapping}")
                 continue
 
-            user_mapping = UserRentalClassMapping(
-                rental_class_id=rental_class_id,
-                category=category,
-                subcategory=subcategory or '',
-                short_common_name=short_common_name or ''
-            )
-            session.add(user_mapping)
+            # Check if mapping exists
+            existing = session.query(UserRentalClassMapping).filter_by(rental_class_id=rental_class_id).first()
+            if existing:
+                # Update existing mapping
+                existing.category = category
+                existing.subcategory = subcategory
+                existing.short_common_name = short_common_name
+                logger.debug(f"Updated existing mapping: rental_class_id={rental_class_id}, category={category}, subcategory={subcategory}")
+            else:
+                # Insert new mapping
+                user_mapping = UserRentalClassMapping(
+                    rental_class_id=rental_class_id,
+                    category=category,
+                    subcategory=subcategory or '',
+                    short_common_name=short_common_name or ''
+                )
+                session.add(user_mapping)
+                logger.debug(f"Added new mapping: rental_class_id={rental_class_id}, category={category}, subcategory={subcategory}")
 
         session.commit()
         logger.info("Successfully committed rental class mappings")
         current_app.logger.info("Successfully committed rental class mappings")
 
         return jsonify({'message': 'Mappings updated successfully'})
+    except IntegrityError as e:
+        logger.error(f"Database integrity error during update_mappings: {str(e)}", exc_info=True)
+        current_app.logger.error(f"Database integrity error during update_mappings: {str(e)}", exc_info=True)
+        if session:
+            session.rollback()
+        return jsonify({'error': f'Database integrity error: {str(e)}'}), 400
     except SQLAlchemyError as e:
         logger.error(f"Database error during update_mappings: {str(e)}", exc_info=True)
         current_app.logger.error(f"Database error during update_mappings: {str(e)}", exc_info=True)

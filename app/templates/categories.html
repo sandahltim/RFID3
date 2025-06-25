@@ -5,13 +5,15 @@
     <script src="{{ url_for('static', filename='js/categories.js') }}?v={{ cache_bust }}"></script>
 {% endblock %}
 {% block content %}
-<div class="container">
+<div class="container mt-4">
     <h1>Manage Categories</h1>
     <div class="mb-3">
-        <button class="btn btn-primary" onclick="window.categories.confirmSaveMappings()">Save Mappings</button>
+        <button class="btn btn-primary" onclick="window.categories.addMappingRow()">Add Mapping</button>
+        <button class="btn btn-success" onclick="window.categories.confirmSaveMappings()">Save Mappings</button>
+        <button class="btn btn-secondary" onclick="window.categories.clearEdits()">Clear Changes</button>
     </div>
     <table id="mappings-table" class="table table-bordered">
-        <thead>
+        <thead class="thead-dark">
             <tr>
                 <th>Category</th>
                 <th>Subcategory</th>
@@ -23,12 +25,12 @@
         </thead>
         <tbody>
             {% for mapping in categories %}
-            <tr>
-                <td><input type="text" class="form-control category-input" value="{{ mapping.category | default('') }}"></td>
-                <td><input type="text" class="form-control subcategory-input" value="{{ mapping.subcategory | default('') }}"></td>
-                <td><input type="text" class="form-control rental-class-id-input" value="{{ mapping.rental_class_id | default('') }}"></td>
+            <tr data-edited="false">
+                <td><input type="text" class="form-control category-input" value="{{ mapping.category }}"></td>
+                <td><input type="text" class="form-control subcategory-input" value="{{ mapping.subcategory }}"></td>
+                <td><input type="text" class="form-control rental-class-id-input" value="{{ mapping.rental_class_id }}"></td>
                 <td>{{ mapping.common_name | default('N/A') }}</td>
-                <td><input type="text" class="form-control short-common-name-input" value="{{ mapping.short_common_name | default('') }}"></td>
+                <td><input type="text" class="form-control short-common-name-input" value="{{ mapping.short_common_name }}"></td>
                 <td>
                     <button class="btn btn-danger btn-sm remove-btn" onclick="window.categories.removeMappingRow(this)">Remove</button>
                 </td>
@@ -36,9 +38,5 @@
             {% endfor %}
         </tbody>
     </table>
-    <div class="mb-3">
-        <button class="btn btn-secondary" onclick="window.categories.addMappingRow()">Add Mapping</button>
-        <button class="btn btn-primary" onclick="window.categories.confirmSaveMappings()">Save Mappings</button>
-    </div>
 </div>
 {% endblock %}
