@@ -3,10 +3,14 @@
 {% block title %}Resale/Rental Packs{% endblock %}
 
 {% block extra_head %}
+    <!-- Version: 2025-06-25-v2
+         - Reverted `urlencode` filter on data-category to use plain text for compatibility with tab5.js.
+         - Ensures category names match expected format in populateSubcategories. -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/tab5.css') }}">
 {% endblock %}
 
 {% block content %}
+    <!-- Section: Resale/Rental Packs Header -->
     <h2 class="tab-title">Resale/Rental Packs</h2>
 
     <div class="card">
