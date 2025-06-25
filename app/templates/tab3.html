@@ -1,6 +1,10 @@
 {% extends "base.html" %}
 
 {% block title %}Tab 3 - Items in Service{% endblock %}
+{% block scripts %}
+    {{ super() }}
+    <script src="{{ url_for('static', filename='js/tab3.js') }}?v={{ cache_bust }}"></script>
+{% endblock %}
 
 {% block content %}
 <h1>Tab 3 - Items in Service</h1>
