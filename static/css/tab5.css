@@ -1,4 +1,8 @@
-/* tab5.css: Styles for Tab 5 (Resale/Rental Packs) */
+/* tab5.css version: 2025-06-25-v3
+ * - Updated .common-name-row.collapsed to override display: table-row !important and ensure no space is occupied.
+ * - Removed min-height from .common-table and .item-table when collapsed.
+ * - Preserves all existing styles for Tab 5.
+ */
 
 /* Style for common name table rows */
 .common-name-row {
@@ -6,25 +10,41 @@
     border-left: 3px solid var(--bte-accent-green);
     margin-left: 2rem;
     padding: 1rem;
-    display: table-row !important;
-    visibility: visible !important;
+    display: table-row;
+    visibility: visible;
+}
+
+.common-name-row.collapsed {
+    display: none !important;
+    visibility: hidden !important;
+    min-height: 0 !important;
+    padding: 0 !important;
 }
 
 .common-name-row td {
-    padding: 0 !important;
-    display: table-cell !important;
-    visibility: visible !important;
+    padding: 0;
+    display: table-cell;
+}
+
+.common-name-row.collapsed td {
+    display: none !important;
+    visibility: hidden !important;
 }
 
 .common-table {
     width: 100%;
     border-collapse: collapse;
-    display: table !important;
-    visibility: visible !important;
-    margin: 0 !important;
+    display: table;
+    visibility: visible;
+    margin: 0;
     table-layout: auto;
-    min-height: 200px;
     will-change: opacity;
+}
+
+.common-table.collapsed {
+    display: none !important;
+    visibility: hidden !important;
+    min-height: 0 !important;
 }
 
 .common-table.loaded {
@@ -42,28 +62,40 @@
     width: 100%;
     min-width: 1200px;
     box-sizing: border-box;
-    display: block !important;
-    visibility: visible !important;
+    display: block;
+    visibility: visible;
     z-index: 1;
     position: relative;
     scrollbar-width: auto;
     -ms-overflow-style: auto;
 }
 
+.item-level-wrapper.collapsed {
+    display: none !important;
+    visibility: hidden !important;
+    min-height: 0 !important;
+    padding: 0 !important;
+}
+
 .item-level {
     width: 100%;
     min-width: 1200px;
-    display: table !important;
-    visibility: visible !important;
+    display: table;
+    visibility: visible;
 }
 
 .item-table {
     width: 100%;
     border-collapse: collapse;
-    display: table !important;
-    visibility: visible !important;
-    min-height: 200px;
+    display: table;
+    visibility: visible;
     will-change: opacity;
+}
+
+.item-table.collapsed {
+    display: none !important;
+    visibility: hidden !important;
+    min-height: 0 !important;
 }
 
 .item-table.loaded {
@@ -76,8 +108,8 @@
 .item-table {
     width: 100%;
     border-collapse: collapse;
-    display: table !important;
-    visibility: visible !important;
+    display: table;
+    visibility: visible;
     table-layout: auto;
 }
 
@@ -92,8 +124,8 @@
     vertical-align: middle;
     padding: 12px;
     border: 1px solid var(--bte-medium-gray);
-    display: table-cell !important;
-    visibility: visible !important;
+    display: table-cell;
+    visibility: visible;
     white-space: normal;
     word-wrap: break-word;
 }
@@ -114,8 +146,8 @@
 .category-table tbody,
 .common-table tbody,
 .item-table tbody {
-    display: table-row-group !important;
-    visibility: visible !important;
+    display: table-row-group;
+    visibility: visible;
     z-index: 5;
     position: relative;
 }
@@ -203,13 +235,13 @@
 
 /* Ensure parent rows and cells are visible */
 .category-row {
-    display: table-row !important;
-    visibility: visible !important;
+    display: table-row;
+    visibility: visible;
 }
 
 .category-row td {
-    display: table-cell !important;
-    visibility: visible !important;
+    display: table-cell;
+    visibility: visible;
 }
 
 /* Bulk update controls for Tab 5 */
@@ -235,13 +267,9 @@
     transition: opacity 0.7s ease-in-out;
 }
 
-.expanded {
-    display: block;
-    opacity: 1;
-}
-
-.collapsed {
-    display: none;
+.expandable.collapsed {
+    display: none !important;
+    visibility: hidden !important;
     opacity: 0;
 }
 
