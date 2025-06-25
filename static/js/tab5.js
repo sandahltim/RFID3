@@ -1,10 +1,10 @@
-console.log('tab5.js version: 2025-06-25-v11 loaded');
+console.log('tab5.js version: 2025-06-25-v12 loaded');
 
 /**
  * Tab5.js: Logic for Tab 5 (Resale/Rental Packs).
  * Dependencies: common.js (for formatDate, showLoading, hideLoading, collapseSection, printTable, printFullItemList).
- * Updated: 2025-06-25-v11
- * - Fixed collapse button to fully collapse space by hiding parent <tr> in handleClick.
+ * Updated: 2025-06-25-v12
+ * - Enhanced handleClick collapse logic to add .collapsed class to parent <tr> and clear styles.
  * - Retained fetchAllSubcategories from v10 to prevent dropdown truncation.
  * - Preserved all functionality (bulk updates, CSV export, pagination).
  */
@@ -1003,14 +1003,17 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             const collapseBtn = expandBtn.parentElement.querySelector(`.collapse-btn[data-collapse-target="${targetId}"]`);
+            const parentRow = container.closest('tr.common-name-row');
 
             if (isExpanded) {
                 console.log(`Collapsing ${targetId} at ${new Date().toISOString()}`);
                 if (commonName) {
                     collapseSection(targetId);
-                    const parentRow = container.closest('tr.common-name-row');
                     if (parentRow) {
+                        parentRow.classList.add('collapsed');
                         parentRow.style.display = 'none';
+                        parentRow.style.minHeight = '0';
+                        parentRow.style.padding = '0';
                         console.log(`Collapsed parent row for ${targetId} at ${new Date().toISOString()}`);
                     }
                 }
@@ -1024,6 +1027,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (commonName && subcategory) {
                     console.log(`Loading items for ${commonName} at ${new Date().toISOString()}`);
                     loadItems(category, subcategory, commonName, targetId);
+                    if (parentRow) {
+                        parentRow.classList.remove('collapsed');
+                        parentRow.style.display = '';
+                        console.log(`Expanded parent row for ${targetId} at ${new Date().toISOString()}`);
+                    }
                     if (expandBtn && collapseBtn) {
                         expandBtn.style.display = 'none';
                         collapseBtn.style.display = 'inline-block';
@@ -1050,7 +1058,10 @@ document.addEventListener('DOMContentLoaded', function() {
             if (container.classList.contains('item-level')) {
                 collapseSection(targetId);
                 if (parentRow) {
+                    parentRow.classList.add('collapsed');
                     parentRow.style.display = 'none';
+                    parentRow.style.minHeight = '0';
+                    parentRow.style.padding = '0';
                     console.log(`Collapsed parent row for ${targetId} at ${new Date().toISOString()}`);
                 }
             }
