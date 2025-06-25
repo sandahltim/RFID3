@@ -1,9 +1,12 @@
-console.log('tab3.js version: 2025-05-29-v17 loaded');
+console.log('tab3.js version: 2025-06-25-v18 loaded');
 
 /**
  * Tab3.js: Logic for Tab 3 (Items in Service).
  * Dependencies: common.js for formatDate.
- * Updated 2025-05-29: Removed duplicate formatDate, now using common.js.
+ * Updated: 2025-06-25-v18
+ * - Removed { once: true } from syncToPcBtn to allow multiple syncs without refresh.
+ * - Cleared commonNameSelect and tagQuantity after sync for seamless next entry.
+ * - Preserved all existing functionality.
  */
 
 /**
@@ -16,18 +19,18 @@ function debounce(func, wait) {
 
     return function executedFunction(...args) {
         if (isProcessing) {
-            console.log('DEBUG: Request blocked - sync already in progress');
+            console.log(`DEBUG: Request blocked - sync already in progress at ${new Date().toISOString()}`);
             return;
         }
 
         clearTimeout(timeout);
         isProcessing = true;
-        console.log('DEBUG: Setting isProcessing to true');
+        console.log(`DEBUG: Setting isProcessing to true at ${new Date().toISOString()}`);
 
         timeout = setTimeout(() => {
             func(...args).finally(() => {
                 isProcessing = false;
-                console.log('DEBUG: Setting isProcessing to false');
+                console.log(`DEBUG: Setting isProcessing to false at ${new Date().toISOString()}`);
             });
         }, wait);
     };
@@ -40,7 +43,7 @@ function debounce(func, wait) {
 function populateCommonNameDropdown() {
     const select = document.getElementById('commonNameSelect');
     if (!select) {
-        console.warn('Common name dropdown not found');
+        console.warn(`Common name dropdown not found at ${new Date().toISOString()}`);
         return;
     }
 
@@ -61,7 +64,7 @@ function populateCommonNameDropdown() {
             });
         })
         .catch(error => {
-            console.error('Error fetching common names for dropdown:', error);
+            console.error(`Error fetching common names for dropdown: ${error} at ${new Date().toISOString()}`);
             select.innerHTML = '<option value="">Error loading common names</option>';
         });
 }
@@ -74,7 +77,7 @@ function fetchCsvContents() {
     const tbody = document.getElementById('csvContentsBody');
     const updateStatusBtn = document.getElementById('updateStatusBtn');
     if (!tbody || !updateStatusBtn) {
-        console.warn('CSV contents table or update status button not found');
+        console.warn(`CSV contents table or update status button not found at ${new Date().toISOString()}`);
         return;
     }
 
@@ -114,7 +117,7 @@ function fetchCsvContents() {
             }
         })
         .catch(error => {
-            console.error('Error fetching CSV contents:', error);
+            console.error(`Error fetching CSV contents: ${error} at ${new Date().toISOString()}`);
             tbody.innerHTML = `<tr><td colspan="5">Error loading CSV: ${error.message}</td></tr>`;
             updateStatusBtn.disabled = true;
         });
@@ -128,15 +131,17 @@ function setupPrintTagsSection() {
     const updateStatusBtn = document.getElementById('updateStatusBtn');
     const syncMessage = document.getElementById('syncMessage');
     const csvContentsTable = document.getElementById('csvContentsTable');
+    const commonNameSelect = document.getElementById('commonNameSelect');
+    const tagQuantity = document.getElementById('tagQuantity');
 
-    if (!syncBtn || !updateStatusBtn || !syncMessage || !csvContentsTable) {
-        console.warn('Print tags section elements not found');
+    if (!syncBtn || !updateStatusBtn || !syncMessage || !csvContentsTable || !commonNameSelect || !tagQuantity) {
+        console.warn(`Print tags section elements not found at ${new Date().toISOString()}`);
         return;
     }
 
     const debouncedSync = debounce(async () => {
-        const commonName = document.getElementById('commonNameSelect')?.value;
-        const quantity = parseInt(document.getElementById('tagQuantity')?.value) || 0;
+        const commonName = commonNameSelect.value;
+        const quantity = parseInt(tagQuantity.value) || 0;
 
         if (!commonName) {
             syncMessage.innerHTML = '<div class="alert alert-danger">Please select a common name.</div>';
@@ -149,7 +154,7 @@ function setupPrintTagsSection() {
 
         syncBtn.disabled = true;
         syncMessage.innerHTML = '<div class="alert alert-info">Syncing to PC...</div>';
-        console.log(`DEBUG: Sending sync request: commonName=${commonName}, quantity=${quantity}`);
+        console.log(`DEBUG: Sending sync request: commonName=${commonName}, quantity=${quantity} at ${new Date().toISOString()}`);
 
         try {
             const response = await fetch('/tab/3/sync_to_pc', {
@@ -173,21 +178,25 @@ function setupPrintTagsSection() {
             }
 
             syncMessage.innerHTML = `<div class="alert alert-success">Successfully synced ${data.synced_items} items to PC.</div>`;
-            console.log(`DEBUG: Sync successful, ${data.synced_items} items added`);
+            console.log(`DEBUG: Sync successful, ${data.synced_items} items added at ${new Date().toISOString()}`);
             fetchCsvContents();
+            // Clear inputs for next sync
+            commonNameSelect.value = '';
+            tagQuantity.value = '';
         } catch (error) {
-            console.error('Sync error:', error);
+            console.error(`Sync error: ${error} at ${new Date().toISOString()}`);
             syncMessage.innerHTML = `<div class="alert alert-danger">Error syncing to PC: ${error.message}</div>`;
         } finally {
             syncBtn.disabled = false;
         }
     }, 500);
 
+    // Remove any existing listeners and add new one without { once: true }
     syncBtn.removeEventListener('click', debouncedSync);
     syncBtn.addEventListener('click', () => {
-        console.log('DEBUG: Sync to PC button clicked');
+        console.log(`DEBUG: Sync to PC button clicked at ${new Date().toISOString()}`);
         debouncedSync();
-    }, { once: true });
+    });
 
     updateStatusBtn.addEventListener('click', async () => {
         updateStatusBtn.disabled = true;
@@ -216,7 +225,7 @@ function setupPrintTagsSection() {
                 window.location.reload();
             }, 2000);
         } catch (error) {
-            console.error('Status update error:', error);
+            console.error(`Status update error: ${error} at ${new Date().toISOString()}`);
             syncMessage.innerHTML = `<div class="alert alert-danger">Error updating status: ${error.message}</div>`;
             updateStatusBtn.disabled = false;
         }
@@ -228,12 +237,12 @@ function setupPrintTagsSection() {
 
         const tagId = removeBtn.getAttribute('data-tag-id');
         if (!tagId) {
-            console.warn('No tag_id found for remove button');
+            console.warn(`No tag_id found for remove button at ${new Date().toISOString()}`);
             return;
         }
 
         if (removeBtn.classList.contains('processing')) {
-            console.log('DEBUG: Remove button already processing for tag_id:', tagId);
+            console.log(`DEBUG: Remove button already processing for tag_id: ${tagId} at ${new Date().toISOString()}`);
             return;
         }
         removeBtn.classList.add('processing');
@@ -264,7 +273,7 @@ function setupPrintTagsSection() {
             fetchCsvContents();
         })
         .catch(error => {
-            console.error('Error removing item:', error);
+            console.error(`Error removing item: ${error} at ${new Date().toISOString()}`);
             syncMessage.innerHTML = `<div class="alert alert-danger">Error removing item: ${error.message}</div>`;
         })
         .finally(() => {
@@ -303,7 +312,7 @@ function updateStatusVisibility(tagId) {
     const select = document.getElementById(`tab3-status-${tagId}`);
     const saveBtn = select.closest('tr').querySelector('.tab3-save-status-btn');
     if (!select || !saveBtn) {
-        console.warn(`Status select or save button not found for tag_id: ${tagId}`);
+        console.warn(`Status select or save button not found for tag_id: ${tagId} at ${new Date().toISOString()}`);
         return;
     }
     const originalStatus = select.options[0].value;
@@ -336,7 +345,7 @@ function updateStatus(tagId) {
         }
     })
     .catch(error => {
-        console.error('Error updating status:', error);
+        console.error(`Error updating status: ${error} at ${new Date().toISOString()}`);
         alert('Failed to update status');
     });
 }
@@ -348,7 +357,7 @@ function updateNotesVisibility(tagId) {
     const textarea = document.getElementById(`tab3-notes-${tagId}`);
     const saveBtn = textarea.closest('tr').querySelector('.tab3-save-notes-btn');
     if (!textarea || !saveBtn) {
-        console.warn(`Notes textarea or save button not found for tag_id: ${tagId}`);
+        console.warn(`Notes textarea or save button not found for tag_id: ${tagId} at ${new Date().toISOString()}`);
         return;
     }
     const originalNotes = textarea.dataset.originalNotes || '';
@@ -381,14 +390,13 @@ function updateNotes(tagId) {
         }
     })
     .catch(error => {
-        console.error('Error updating notes:', error);
+        console.error(`Error updating notes: ${error} at ${new Date().toISOString()}`);
         alert('Failed to update notes');
     });
 }
 
 /**
  * Handle expand/collapse functionality for summary table
- * Updated 2025-05-29: Handles expand-btn and collapse-btn for tab3-details sections
  */
 function setupExpandCollapse() {
     document.addEventListener('click', (event) => {
@@ -399,7 +407,7 @@ function setupExpandCollapse() {
             const targetId = expandBtn.getAttribute('data-target');
             const expandable = document.getElementById(targetId);
             if (!expandable) {
-                console.warn(`Expandable section not found for target: ${targetId}`);
+                console.warn(`Expandable section not found for target: ${targetId} at ${new Date().toISOString()}`);
                 return;
             }
 
@@ -414,7 +422,7 @@ function setupExpandCollapse() {
             const targetId = collapseBtn.getAttribute('data-target');
             const expandable = document.getElementById(targetId);
             if (!expandable) {
-                console.warn(`Expandable section not found for target: ${targetId}`);
+                console.warn(`Expandable section not found for target: ${targetId} at ${new Date().toISOString()}`);
                 return;
             }
 
@@ -433,6 +441,7 @@ function setupExpandCollapse() {
  * Initialize the page
  */
 document.addEventListener('DOMContentLoaded', function() {
+    console.log(`tab3.js: DOMContentLoaded at ${new Date().toISOString()}`);
     // Format timestamps in the details tables
     document.querySelectorAll('.tab3-details-table').forEach(table => {
         const rows = table.querySelectorAll('tbody tr');
