@@ -1,5 +1,5 @@
 # app/__init__.py
-# __init__.py version: 2025-06-19-v2
+# __init__.py version: 2025-06-26-v3
 import os
 import logging
 from logging.handlers import RotatingFileHandler
@@ -7,6 +7,7 @@ from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_redis import FlaskRedis
 from config import DB_CONFIG, REDIS_URL, LOG_FILE
+from datetime import datetime
 
 # Initialize extensions
 db = SQLAlchemy()
@@ -63,6 +64,11 @@ def create_app():
         app.logger.error(f"Failed to initialize extensions: {str(e)}", exc_info=True)
         raise
 
+    # Add custom Jinja2 filter for timestamp
+    def timestamp_filter(value):
+        return int(datetime.now().timestamp())
+    app.jinja_env.filters['timestamp'] = timestamp_filter
+
     # Create database tables
     try:
         with app.app_context():
@@ -83,8 +89,8 @@ def create_app():
         from app.routes.tab5 import tab5_bp
         from app.routes.categories import categories_bp
         from app.routes.health import health_bp
-        from app.services.refresh import refresh_bp
         from app.routes.tabs import tabs_bp
+        from app.services.refresh import refresh_bp
 
         app.register_blueprint(home_bp)
         app.register_blueprint(tab1_bp)
@@ -94,8 +100,8 @@ def create_app():
         app.register_blueprint(tab5_bp)
         app.register_blueprint(categories_bp)
         app.register_blueprint(health_bp)
-        app.register_blueprint(refresh_bp)
         app.register_blueprint(tabs_bp)
+        app.register_blueprint(refresh_bp)
         app.logger.info("Blueprints registered successfully")
     except Exception as e:
         app.logger.error(f"Failed to register blueprints: {str(e)}", exc_info=True)

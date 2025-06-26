@@ -1,4 +1,4 @@
-# config.py version: 2025-06-20-v5
+# config.py version: 2025-06-26-v6
 import os
 
 # Base directory
@@ -8,10 +8,10 @@ BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 DB_CONFIG = {
     'host': 'localhost',
     'user': 'rfid_user',
-    'password': 'rfid_user_password',  # Change this to a secure password
+    'password': 'rfid_user_password',
     'database': 'rfid_inventory',
     'charset': 'utf8mb4',
-    'collation': 'utf8mb4_unicode_ci'  # Explicitly set to match table collation
+    'collation': 'utf8mb4_unicode_ci'
 }
 
 # Redis configuration
@@ -27,8 +27,8 @@ SEED_URL = 'https://cs.iot.ptshome.com/api/v1/data/14223767938169215907'
 
 # Refresh intervals (seconds)
 FULL_REFRESH_INTERVAL = 1800  # 30 minutes
-INCREMENTAL_REFRESH_INTERVAL = 30  # 30 seconds
-INCREMENTAL_LOOKBACK_SECONDS = 2592000  # Look back 30 days for incremental refresh
+INCREMENTAL_REFRESH_INTERVAL = 60  # 60 seconds
+INCREMENTAL_LOOKBACK_SECONDS = 600  # Look back 10 minutes
 INCREMENTAL_FALLBACK_SECONDS = 172800  # Fall back to 2 days if API filter fails
 
 # Bulk update configuration
@@ -43,5 +43,5 @@ SQLALCHEMY_ENGINE_OPTIONS = {
     'max_overflow': 20,
     'pool_timeout': 30,
     'pool_recycle': 1800,  # Recycle connections every 30 minutes
-    'connect_args': {'charset': 'utf8mb4', 'collation': 'utf8mb4_unicode_ci'}  # Explicit connection settings
+    'connect_args': {'charset': 'utf8mb4', 'collation': 'utf8mb4_unicode_ci'}
 }

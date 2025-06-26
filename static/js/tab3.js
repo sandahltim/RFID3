@@ -1,9 +1,9 @@
-console.log('tab3.js version: 2025-06-26-v22 loaded');
+console.log('tab3.js version: 2025-06-26-v23 loaded');
 
 /**
  * Tab3.js: Logic for Tab 3 (Items in Service).
  * Dependencies: common.js for formatDate.
- * Updated: 2025-06-26-v22
+ * Updated: 2025-06-26-v23
  * - Increased debounce wait time to 10000ms to prevent 429 errors.
  * - Adjusted retry delays to 2000ms, 4000ms, 8000ms for 429 errors.
  * - Added retry status message to improve UX.
