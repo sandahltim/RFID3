@@ -1,5 +1,5 @@
 # app/routes/tab3.py
-# tab3.py version: 2025-06-26-v75
+# tab3.py version: 2025-06-26-v76
 from flask import Blueprint, render_template, request, jsonify, current_app
 from .. import db, cache
 from ..models.db_models import ItemMaster, Transaction, RentalClassMapping, UserRentalClassMapping, SeedRentalClass
@@ -58,7 +58,7 @@ if not os.path.exists(SHARED_DIR):
     os.chown(SHARED_DIR, pwd.getpwnam('tim').pw_uid, grp.getgrnam('tim').gr_gid)
 
 # Log deployment version
-logger.info("Deployed tab3.py version: 2025-06-26-v75")
+logger.info("Deployed tab3.py version: 2025-06-26-v76")
 
 # Helper function to normalize common_name by removing suffixes like (G1), (G2)
 def normalize_common_name(name):
@@ -868,35 +868,35 @@ def update_synced_status():
         # Batch API updates
         api_client = APIClient()
         failed_items = []
-        for i in range(0, len(tag_ids), batch_size):
-            batch_tags = tag_ids[i:i + batch_size]
-            for tag_id in batch_tags:
-                try:
-                    params = {'filter[eq]': f"tag_id,eq,'{tag_id}'"}
-                    existing_items = api_client._make_request("14223767938169344381", params, timeout=10)
-                    if existing_items:
-                        api_client.update_status(tag_id, 'Ready to Rent', timeout=10)
-                        logger.debug(f"Updated status for tag_id {tag_id} in API")
-                    else:
-                        db_item = item_dict.get(tag_id, {})
-                        new_item = {
-                            'tag_id': tag_id,
-                            'common_name': db_item.get('common_name', item['common_name']),
-                            'bin_location': db_item.get('bin_location', item['bin_location']),
-                            'status': 'Ready to Rent',
-                            'date_last_scanned': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                            'rental_class_num': db_item.get('rental_class_num', '')
-                        }
-                        api_client.insert_item(new_item, timeout=10)
-                        logger.debug(f"Inserted new item for tag_id {tag_id} in API")
-                except Exception as api_error:
-                    logger.error(f"Error updating/inserting tag_id {tag_id} in API: {str(api_error)}", exc_info=True)
-                    failed_items.append(tag_id)
+        for item in items_to_update:
+            tag_id = item['tag_id']
+            try:
+                params = {'filter[eq]': f"tag_id,eq,'{tag_id}'"}
+                existing_items = api_client._make_request("14223767938169344381", params, timeout=10)
+                if existing_items:
+                    api_client.update_status(tag_id, 'Ready to Rent', timeout=10)
+                    logger.debug(f"Updated status for tag_id {tag_id} in API")
+                else:
+                    db_item = item_dict.get(tag_id, {})
+                    new_item = {
+                        'tag_id': tag_id,
+                        'common_name': db_item.get('common_name', item['common_name']),
+                        'bin_location': db_item.get('bin_location', item['bin_location']),
+                        'status': 'Ready to Rent',
+                        'date_last_scanned': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                        'rental_class_num': db_item.get('rental_class_num', '')
+                    }
+                    api_client.insert_item(new_item, timeout=10)
+                    logger.debug(f"Inserted new item for tag_id {tag_id} in API")
+            except Exception as api_error:
+                logger.error(f"Error updating/inserting tag_id {tag_id} in API: {str(api_error)}", exc_info=True)
+                failed_items.append(tag_id)
+                continue  # Continue with next item instead of failing entire operation
 
         if failed_items:
             logger.warning(f"Failed to update {len(failed_items)} items in API: {failed_items}")
-            session.rollback()
-            return jsonify({'error': f"Failed to update {len(failed_items)} items in API", 'failed_items': failed_items}), 500
+            # Proceed to clear CSV despite API failures to avoid stuck state
+            logger.info("Proceeding to clear CSV despite API failures")
 
         # Clear CSV
         logger.debug("Clearing CSV file")
@@ -913,7 +913,11 @@ def update_synced_status():
 
         session.commit()
         logger.info(f"Completed update_synced_status: Updated {updated_items} items and cleared CSV file")
-        return jsonify({'updated_items': updated_items, 'message': 'Status updated successfully'}), 200
+        return jsonify({
+            'updated_items': updated_items,
+            'message': 'Status updated successfully',
+            'failed_items': failed_items if failed_items else []
+        }), 200
     except Exception as e:
         logger.error(f"Uncaught exception in update_synced_status: {str(e)}", exc_info=True)
         if session:
