@@ -1,27 +1,22 @@
 # app/services/api_client.py
-# api_client.py version: 2025-06-26-v3
+# api_client.py version: 2025-06-26-v4
 import requests
 import time
 from datetime import datetime, timedelta
 from config import API_USERNAME, API_PASSWORD, LOGIN_URL, INCREMENTAL_FALLBACK_SECONDS
 import logging
 from urllib.parse import quote
+from .. import cache
 
-# Configure logging for API client
+# Configure logging
 logger = logging.getLogger('api_client')
 logger.setLevel(logging.INFO)
-
-# Remove existing handlers to avoid duplicates
 logger.handlers = []
-
-# File handler for rfid_dashboard.log
 file_handler = logging.FileHandler('/home/tim/test_rfidpi/logs/rfid_dashboard.log')
 file_handler.setLevel(logging.INFO)
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 file_handler.setFormatter(formatter)
 logger.addHandler(file_handler)
-
-# Console handler
 console_handler = logging.StreamHandler()
 console_handler.setLevel(logging.INFO)
 console_handler.setFormatter(formatter)
@@ -29,7 +24,6 @@ logger.addHandler(console_handler)
 
 class APIClient:
     def __init__(self):
-        """Initialize API client with base URL and authentication."""
         self.base_url = "https://cs.iot.ptshome.com/api/v1/data/"
         self.auth_url = LOGIN_URL
         self.item_master_endpoint = "14223767938169344381"
@@ -38,32 +32,30 @@ class APIClient:
         self.authenticate()
 
     def authenticate(self):
-        """Authenticate with the API to obtain an access token."""
         payload = {"username": API_USERNAME, "password": API_PASSWORD}
         for attempt in range(5):
             try:
-                logger.debug(f"Requesting token from {self.auth_url} with username={API_USERNAME}")
+                logger.debug(f"Requesting token from {self.auth_url}")
                 response = requests.post(self.auth_url, json=payload, timeout=20)
                 data = response.json()
-                logger.debug(f"Token attempt {attempt + 1}: Status {response.status_code}, Response: {data}")
+                logger.debug(f"Token attempt {attempt + 1}: Status {response.status_code}")
                 if response.status_code == 200 and data.get('result'):
                     self.token = data.get('access_token')
                     self.token_expiry = datetime.now() + timedelta(minutes=30)
-                    logger.debug(f"Access token received: {self.token} (expires {self.token_expiry})")
+                    logger.debug(f"Access token received: expires {self.token_expiry}")
                     return
                 else:
-                    logger.error(f"Token attempt {attempt + 1} failed: {response.status_code} {response.reason}, response: {data}")
+                    logger.error(f"Token attempt {attempt + 1} failed: {response.status_code}")
                     if attempt < 4:
                         time.sleep(3)
             except requests.RequestException as e:
-                logger.error(f"Token attempt {attempt + 1} failed with exception: {str(e)}")
+                logger.error(f"Token attempt {attempt + 1} failed: {str(e)}")
                 if attempt < 4:
                     time.sleep(3)
         logger.error("Failed to fetch access token after 5 attempts")
         raise Exception("Failed to fetch access token after 5 attempts")
 
     def _make_request(self, endpoint_id, params=None, method='GET', data=None, timeout=20):
-        """Make an API request with the specified method, endpoint, data, and timeout."""
         if not params:
             params = {}
         if method == 'GET':
@@ -82,22 +74,20 @@ class APIClient:
             while True:
                 query_string = '&'.join([f"{k}={quote(str(v))}" for k, v in params.items()])
                 full_url = f"{url}?{query_string}"
-                logger.debug(f"Making GET request to full URL: {full_url}")
-                logger.debug(f"Request headers: {headers}, timeout: {timeout}")
+                logger.debug(f"Making GET request: {full_url}")
                 try:
                     response = requests.get(url, headers=headers, params=params, timeout=timeout)
                     data = response.json()
-                    logger.debug(f"API response: {response.status_code} {response.reason}, response: {data}")
                     if response.status_code == 500:
-                        logger.error(f"Server returned 500 Internal Server Error: {data}")
+                        logger.error(f"Server error: {data}")
                         raise Exception(f"500 Internal Server Error: {data.get('result', {}).get('message', 'Unknown error')}")
                     if response.status_code != 200:
-                        logger.error(f"Request failed: {response.status_code} {response.reason}, response: {data}")
+                        logger.error(f"Request failed: {response.status_code} {response.reason}")
                         raise Exception(f"{response.status_code} {response.reason}")
                     records = data.get('data', [])
                     total_count = data.get('totalcount', 0)
                     offset = params['offset']
-                    logger.debug(f"Fetched {len(records)} records, Total Count: {total_count}, Offset: {offset}")
+                    logger.debug(f"Fetched {len(records)} records, Total: {total_count}, Offset: {offset}")
                     all_data.extend(records)
                     if len(records) < params['limit'] or offset + len(records) >= total_count:
                         break
@@ -108,30 +98,28 @@ class APIClient:
             logger.debug(f"Total records fetched: {len(all_data)}")
             return all_data
         elif method in ['POST', 'PATCH']:
-            logger.debug(f"Making {method} request to URL: {url}")
-            logger.debug(f"Request headers: {headers}, data: {data}, timeout: {timeout}")
-            try:
-                if method == 'POST':
-                    response = requests.post(url, headers=headers, json=data, timeout=timeout)
-                else:
-                    response = requests.patch(url, headers=headers, json=data, timeout=timeout)
-                data = response.json()
-                logger.debug(f"API response: {response.status_code} {response.reason}, response: {data}")
-                if response.status_code == 500:
-                    logger.error(f"Server returned 500 Internal Server Error: {data}")
-                    raise Exception(f"500 Internal Server Error: {data.get('result', {}).get('message', 'Unknown error')}")
-                if response.status_code not in [200, 201]:
-                    logger.error(f"Request failed: {response.status_code} {response.reason}, response: {data}")
-                    raise Exception(f"{response.status_code} {response.reason}")
-                return data
-            except requests.RequestException as e:
-                logger.error(f"Request failed: {str(e)}")
-                raise
+            with cache.lock("user_operation_lock", timeout=30):
+                logger.debug(f"Making {method} request to URL: {url}")
+                try:
+                    if method == 'POST':
+                        response = requests.post(url, headers=headers, json=data, timeout=timeout)
+                    else:
+                        response = requests.patch(url, headers=headers, json=data, timeout=timeout)
+                    data = response.json()
+                    if response.status_code == 500:
+                        logger.error(f"Server error: {data}")
+                        raise Exception(f"500 Internal Server Error: {data.get('result', {}).get('message', 'Unknown error')}")
+                    if response.status_code not in [200, 201]:
+                        logger.error(f"Request failed: {response.status_code} {response.reason}")
+                        raise Exception(f"{response.status_code} {response.reason}")
+                    return data
+                except requests.RequestException as e:
+                    logger.error(f"Request failed: {str(e)}")
+                    raise
         else:
             raise ValueError(f"Unsupported method: {method}")
 
     def validate_date(self, date_str, field_name):
-        """Validate date string and return datetime object or None."""
         if date_str is None or date_str == '0000-00-00 00:00:00':
             logger.debug(f"Null or invalid {field_name}: {date_str}, returning None")
             return None
@@ -145,7 +133,6 @@ class APIClient:
                 return None
 
     def get_item_master(self, since_date=None):
-        """Fetch Item Master records, optionally filtered by since_date."""
         params = {}
         all_data = []
         if since_date:
@@ -158,7 +145,6 @@ class APIClient:
             data = self._make_request("14223767938169344381", params, timeout=20)
             all_data = data
             logger.info(f"Fetched {len(all_data)} items with since_date filter")
-            # If fewer than 10000 items, try fetching without filter
             if len(all_data) < 10000 and since_date:
                 logger.warning(f"Only {len(all_data)} items fetched with since_date filter, trying without filter")
                 params.pop('filter[gt]', None)
@@ -181,11 +167,9 @@ class APIClient:
                         )
                     ]
                     logger.info(f"Filtered to {len(all_data)} items locally after fetching all")
-        logger.debug(f"Item master data sample: {all_data[:5] if all_data else 'No data'}")
         return all_data
 
     def get_transactions(self, since_date=None):
-        """Fetch transaction records, optionally filtered by scan_date."""
         params = {}
         all_data = []
         if since_date:
@@ -197,7 +181,6 @@ class APIClient:
                 data = self._make_request("14223767938169346196", params, timeout=20)
                 all_data = data
                 logger.info(f"Fetched {len(all_data)} transactions with since_date filter")
-                # If fewer than 10000 transactions, try fetching without filter
                 if len(all_data) < 10000 and since_date:
                     logger.warning(f"Only {len(all_data)} transactions fetched with since_date filter, trying without filter")
                     params.pop('filter[gt]', None)
@@ -223,18 +206,15 @@ class APIClient:
         else:
             all_data = self._make_request("14223767938169346196", timeout=20)
             logger.info(f"Fetched {len(all_data)} transactions without filter")
-        logger.debug(f"Transactions data sample: {all_data[:5] if all_data else 'No data'}")
         return all_data
 
     def get_seed_data(self, since_date=None):
-        """Fetch seed data (no date filtering supported)."""
         params = {}
         data = self._make_request("14223767938169215907", params, timeout=20)
-        logger.debug(f"Seed data sample: {data[:5] if data else 'No data'}")
+        logger.info(f"Fetched {len(data)} seed rental classes")
         return data
 
     def update_bin_location(self, tag_id, bin_location, timeout=20):
-        """Update an item's bin_location and date_last_scanned via API PATCH."""
         if not tag_id or not bin_location:
             raise ValueError("tag_id and bin_location are required")
 
@@ -244,18 +224,17 @@ class APIClient:
             raise Exception(f"Item with tag_id {tag_id} not found in Item Master")
 
         current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        update_data = {
+        update_data = [{
             'tag_id': tag_id,
             'bin_location': bin_location,
             'date_last_scanned': current_time
-        }
+        }]
 
-        response = self._make_request(self.item_master_endpoint, params=params, method='PATCH', data=[update_data], timeout=timeout)
-        logger.info(f"Updated bin_location for tag_id {tag_id} to {bin_location} and date_last_scanned to {current_time} via API")
+        response = self._make_request(self.item_master_endpoint, params=params, method='PATCH', data=update_data, timeout=timeout)
+        logger.info(f"Updated bin_location for tag_id {tag_id} to {bin_location} via API")
         return response
 
     def update_status(self, tag_id, status, timeout=20):
-        """Update an item's status and date_last_scanned via API PATCH."""
         if not tag_id or not status:
             raise ValueError("tag_id and status are required")
 
@@ -265,18 +244,17 @@ class APIClient:
             raise Exception(f"Item with tag_id {tag_id} not found in Item Master")
 
         current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        update_data = {
+        update_data = [{
             'tag_id': tag_id,
             'status': status,
             'date_last_scanned': current_time
-        }
+        }]
 
-        response = self._make_request(self.item_master_endpoint, params=params, method='PATCH', data=[update_data], timeout=timeout)
-        logger.info(f"Updated status for tag_id {tag_id} to {status} and date_last_scanned to {current_time} via API")
+        response = self._make_request(self.item_master_endpoint, params=params, method='PATCH', data=update_data, timeout=timeout)
+        logger.info(f"Updated status for tag_id {tag_id} to {status} via API")
         return response
 
     def update_notes(self, tag_id, notes):
-        """Update an item's notes and date_updated via API PATCH."""
         if not tag_id:
             raise ValueError("tag_id is required")
 
@@ -286,21 +264,20 @@ class APIClient:
             raise Exception(f"Item with tag_id {tag_id} not found in Item Master")
 
         current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        update_data = {
+        update_data = [{
             'tag_id': tag_id,
             'notes': notes if notes else '',
             'date_updated': current_time
-        }
+        }]
 
-        response = self._make_request(self.item_master_endpoint, params=params, method='PATCH', data=[update_data])
-        logger.info(f"Updated notes for tag_id {tag_id} to '{notes}' and date_updated to {current_time} via API")
+        response = self._make_request(self.item_master_endpoint, params=params, method='PATCH', data=update_data)
+        logger.info(f"Updated notes for tag_id {tag_id} to '{notes}' via API")
         return response
 
     def insert_item(self, item_data, timeout=20):
-        """Insert a new item into Item Master via API POST."""
         if not item_data or 'tag_id' not in item_data:
             raise ValueError("item_data must contain a tag_id")
 
         response = self._make_request(self.item_master_endpoint, method='POST', data=[item_data], timeout=timeout)
-        logger.info(f"Inserted new item with tag_id {item_data['tag_id']} into API via POST")
+        logger.info(f"Inserted new item with tag_id {item_data['tag_id']} via API")
         return response

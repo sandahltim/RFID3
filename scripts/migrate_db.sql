@@ -1,5 +1,5 @@
 -- scripts/migrate_db.sql
--- migrate_db.sql version: 2025-06-19-v3
+-- migrate_db.sql version: 2025-06-26-v5
 
 -- Drop existing tables if they exist
 DROP TABLE IF EXISTS id_transactions;
@@ -46,7 +46,8 @@ CREATE TABLE id_transactions (
     latitude DECIMAL(9,6),
     wet BOOLEAN,
     service_required BOOLEAN,
-    notes TEXT
+    notes TEXT,
+    INDEX idx_tag_id_scan_date (tag_id, scan_date)
 );
 
 -- Create id_item_master table
@@ -68,7 +69,10 @@ CREATE TABLE id_item_master (
     latitude DECIMAL(9,6),
     date_last_scanned DATETIME,
     date_created DATETIME,
-    date_updated DATETIME
+    date_updated DATETIME,
+    INDEX idx_tag_id (tag_id),
+    INDEX idx_status (status),
+    INDEX idx_date_last_scanned (date_last_scanned)
 );
 
 -- Create id_rfidtag table
@@ -104,8 +108,8 @@ CREATE TABLE seed_rental_classes (
 -- Create refresh_state table
 CREATE TABLE refresh_state (
     id INT PRIMARY KEY AUTO_INCREMENT,
-    last_refresh DATETIME,  -- Changed to DATETIME
-    state_type VARCHAR(50)  -- Added state_type
+    last_refresh DATETIME,
+    state_type VARCHAR(50)
 );
 
 -- Create rental_class_mappings table

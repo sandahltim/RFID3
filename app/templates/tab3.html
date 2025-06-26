@@ -3,9 +3,9 @@
 {% block title %}Tab 3 - Items in Service{% endblock %}
 {% block scripts %}
     {{ super() }}
-    <script src="{{ url_for('static', filename='js/common.js') }}?v={{ (url_for('static', filename='js/common.js') | filemtime) }}"></script>
-    <script src="{{ url_for('static', filename='js/tab.js') }}?v={{ (url_for('static', filename='js/tab.js') | filemtime) }}"></script>
-    <script src="{{ url_for('static', filename='js/tab3.js') }}?v={{ (url_for('static', filename='js/tab3.js') | filemtime) }}"></script>
+    <script src="{{ url_for('static', filename='js/common.js') }}?v={{ 'now' | timestamp }}"></script>
+    <script src="{{ url_for('static', filename='js/tab.js') }}?v={{ 'now' | timestamp }}"></script>
+    <script src="{{ url_for('static', filename='js/tab3.js') }}?v={{ 'now' | timestamp }}"></script>
 {% endblock %}
 
 {% block content %}
@@ -212,7 +212,6 @@
 </div>
 {% endblock %}
 
-{% macro filemtime(path) %}
-{% set stat = get_file_stat(path) %}
-{{ stat.mtime if stat else '' }}
+{% macro timestamp(arg) %}
+{{ (now() | int) }}
 {% endmacro %}
