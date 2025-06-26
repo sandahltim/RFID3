@@ -3,7 +3,7 @@
 {% block title %}Tab 3 - Items in Service{% endblock %}
 {% block scripts %}
     {{ super() }}
-    <script src="{{ url_for('static', filename='js/tab3.js') }}?v={{ timestamp() }}"></script>
+    <script src="{{ url_for('static', filename='js/tab3.js') }}?v={{ '' | timestamp }}"></script>
 {% endblock %}
 
 {% block content %}
@@ -235,9 +235,4 @@
         JavaScript is disabled or failed to load. Please enable JavaScript to use the expand/collapse functionality and other interactive features.
     </div>
 </div>
-
 {% endblock %}
-
-{% macro timestamp() %}
-{{ (now() | int) }}
-{% endmacro %}
