@@ -1,16 +1,18 @@
 # app/services/refresh.py
-# refresh.py version: 2025-06-26-v5
+# refresh.py version: 2025-06-26-v6
 import logging
 import traceback
 from datetime import datetime, timedelta
 from sqlalchemy.exc import SQLAlchemyError, OperationalError
 from .. import db
-from ..models.db_models import ItemMaster, Transaction, SeedRentalClass, RefreshState
+from ..models.db_models import ItemMaster, Transaction, SeedRentalClass, RefreshState, UserRentalClassMapping
 from ..services.api_client import APIClient
 from flask import Blueprint, jsonify
 from config import INCREMENTAL_LOOKBACK_SECONDS
 import time
 import os
+import csv
+import json
 
 logger = logging.getLogger(f'refresh_{os.getpid()}')
 logger.setLevel(logging.INFO)
@@ -65,6 +67,69 @@ def update_refresh_state(state_type, timestamp):
     finally:
         session.close()
 
+def update_user_mappings(session, csv_file_path='/home/tim/test_rfidpi/seeddata_20250425155406.csv'):
+    """Populate user_rental_class_mappings from CSV."""
+    logger.info("Updating user_rental_class_mappings from CSV")
+    mappings_dict = {}
+    row_count = 0
+    try:
+        if not os.path.exists(csv_file_path):
+            logger.error(f"CSV file not found at: {csv_file_path}")
+            return
+        with open(csv_file_path, 'r', encoding='utf-8') as csvfile:
+            reader = csv.DictReader(csvfile)
+            logger.info("Reading CSV for user mappings")
+            expected_columns = {'rental_class_id', 'Cat', 'SubCat'}
+            if not expected_columns.issubset(reader.fieldnames):
+                logger.error(f"CSV missing required columns. Expected: {expected_columns}, Found: {reader.fieldnames}")
+                return
+            for row in reader:
+                row_count += 1
+                try:
+                    rental_class_id = row.get('rental_class_id', '').strip()
+                    category = row.get('Cat', '').strip()
+                    subcategory = row.get('SubCat', '').strip()
+                    if not rental_class_id or not category or not subcategory:
+                        logger.debug(f"Skipping row {row_count} with missing data: {row}")
+                        continue
+                    if rental_class_id in mappings_dict:
+                        logger.warning(f"Duplicate rental_class_id {rental_class_id} at row {row_count}, keeping first")
+                        continue
+                    mappings_dict[rental_class_id] = {
+                        'rental_class_id': rental_class_id,
+                        'category': category,
+                        'subcategory': subcategory,
+                        'short_common_name': ''
+                    }
+                except Exception as e:
+                    logger.error(f"Error processing CSV row {row_count}: {str(e)}", exc_info=True)
+                    continue
+        logger.info(f"Processed {row_count} CSV rows, {len(mappings_dict)} unique mappings")
+        deleted_count = session.query(UserRentalClassMapping).delete()
+        logger.info(f"Deleted {deleted_count} existing user mappings")
+        inserted_count = 0
+        for mapping in mappings_dict.values():
+            try:
+                user_mapping = UserRentalClassMapping(
+                    rental_class_id=mapping['rental_class_id'],
+                    category=mapping['category'],
+                    subcategory=mapping['subcategory'],
+                    short_common_name=mapping['short_common_name'],
+                    created_at=datetime.utcnow(),
+                    updated_at=datetime.utcnow()
+                )
+                session.add(user_mapping)
+                session.commit()
+                inserted_count += 1
+            except Exception as e:
+                logger.error(f"Error inserting mapping {mapping['rental_class_id']}: {str(e)}", exc_info=True)
+                session.rollback()
+                continue
+        logger.info(f"Inserted {inserted_count} user mappings")
+    except Exception as e:
+        logger.error(f"Error updating user mappings: {str(e)}", exc_info=True)
+        session.rollback()
+
 def update_item_master(session, items):
     logger.info(f"Updating {len(items)} items in id_item_master")
     skipped = 0
@@ -79,7 +144,6 @@ def update_item_master(session, items):
                     logger.warning(f"Skipping item with missing tag_id: {item}")
                     skipped += 1
                     continue
-
                 db_item = ItemMaster(tag_id=tag_id)
                 db_item.serial_number = item.get('serial_number')
                 db_item.rental_class_num = item.get('rental_class_num')
@@ -100,7 +164,6 @@ def update_item_master(session, items):
                 db_item.date_last_scanned = validate_date(item.get('date_last_scanned'), 'date_last_scanned', tag_id)
                 db_item.date_created = validate_date(item.get('date_created'), 'date_created', tag_id)
                 db_item.date_updated = validate_date(item.get('date_updated'), 'date_updated', tag_id)
-
                 session.merge(db_item)
             session.commit()
             logger.debug(f"Committed item batch {i//batch_size + 1}")
@@ -125,13 +188,11 @@ def update_transactions(session, transactions):
                     logger.warning(f"Skipping transaction with missing tag_id or scan_date: {transaction}")
                     skipped += 1
                     continue
-
                 scan_date_dt = validate_date(scan_date, 'scan_date', tag_id)
                 if not scan_date_dt:
                     logger.warning(f"Skipping transaction with invalid scan_date for tag_id {tag_id}: {scan_date}")
                     skipped += 1
                     continue
-
                 db_transaction = Transaction(tag_id=tag_id, scan_date=scan_date_dt)
                 db_transaction.scan_type = transaction.get('scan_type', 'Unknown')
                 db_transaction.contract_number = transaction.get('contract_number')
@@ -149,7 +210,6 @@ def update_transactions(session, transactions):
                     if isinstance(value, str):
                         return value.lower() == 'true'
                     return bool(value) if value is not None else None
-
                 db_transaction.dirty_or_mud = to_bool(transaction.get('dirty_or_mud'))
                 db_transaction.leaves = to_bool(transaction.get('leaves'))
                 db_transaction.oil = to_bool(transaction.get('oil'))
@@ -166,7 +226,6 @@ def update_transactions(session, transactions):
                 db_transaction.service_required = to_bool(transaction.get('service_required'))
                 db_transaction.date_created = validate_date(transaction.get('date_created'), 'date_created', tag_id)
                 db_transaction.date_updated = validate_date(transaction.get('date_updated'), 'date_updated', tag_id)
-
                 session.merge(db_transaction)
             session.commit()
             logger.debug(f"Committed transaction batch {i//batch_size + 1}")
@@ -190,11 +249,9 @@ def update_seed_data(session, seed_data):
                     logger.warning(f"Skipping seed item with missing rental_class_id: {item}")
                     skipped += 1
                     continue
-
                 db_seed = SeedRentalClass(rental_class_id=rental_class_id)
                 db_seed.common_name = item.get('common_name', 'Unknown')
                 db_seed.bin_location = item.get('bin_location')
-
                 session.merge(db_seed)
             session.commit()
             logger.debug(f"Committed seed data batch {i//batch_size + 1}")
@@ -214,10 +271,12 @@ def full_refresh():
             deleted_items = session.query(ItemMaster).delete()
             deleted_transactions = session.query(Transaction).delete()
             deleted_seed = session.query(SeedRentalClass).delete()
+            deleted_mappings = session.query(UserRentalClassMapping).delete()
             session.commit()
             logger.info(f"Deleted {deleted_items} items from id_item_master")
             logger.info(f"Deleted {deleted_transactions} transactions from id_transactions")
             logger.info(f"Deleted {deleted_seed} items from seed_rental_classes")
+            logger.info(f"Deleted {deleted_mappings} user mappings from user_rental_class_mappings")
 
             logger.debug("Fetching data from API")
             items = api_client.get_item_master(since_date=None)
@@ -238,6 +297,7 @@ def full_refresh():
             update_item_master(session, items)
             update_transactions(session, transactions)
             update_seed_data(session, seed_data)
+            update_user_mappings(session)
 
             update_refresh_state('full_refresh', datetime.utcnow())
             logger.info("Full refresh completed successfully")
