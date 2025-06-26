@@ -1,5 +1,5 @@
 # app/services/scheduler.py
-# scheduler.py version: 2025-06-26-v4
+# scheduler.py version: 2025-06-26-v5
 from apscheduler.schedulers.background import BackgroundScheduler
 from redis import Redis
 from config import REDIS_URL, INCREMENTAL_REFRESH_INTERVAL
@@ -8,6 +8,7 @@ from .refresh import full_refresh, incremental_refresh
 import logging
 import sys
 import os
+import time
 from sqlalchemy.sql import text
 from datetime import datetime
 
