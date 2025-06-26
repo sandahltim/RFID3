@@ -1,5 +1,5 @@
 # app/services/api_client.py
-# api_client.py version: 2025-06-26-v4
+# api_client.py version: 2025-06-26-v5
 import requests
 import time
 from datetime import datetime, timedelta
@@ -55,7 +55,7 @@ class APIClient:
         logger.error("Failed to fetch access token after 5 attempts")
         raise Exception("Failed to fetch access token after 5 attempts")
 
-    def _make_request(self, endpoint_id, params=None, method='GET', data=None, timeout=20):
+    def _make_request(self, endpoint_id, params=None, method='GET', data=None, timeout=20, user_operation=False):
         if not params:
             params = {}
         if method == 'GET':
@@ -98,24 +98,29 @@ class APIClient:
             logger.debug(f"Total records fetched: {len(all_data)}")
             return all_data
         elif method in ['POST', 'PATCH']:
-            with cache.lock("user_operation_lock", timeout=30):
-                logger.debug(f"Making {method} request to URL: {url}")
-                try:
-                    if method == 'POST':
-                        response = requests.post(url, headers=headers, json=data, timeout=timeout)
-                    else:
-                        response = requests.patch(url, headers=headers, json=data, timeout=timeout)
-                    data = response.json()
-                    if response.status_code == 500:
-                        logger.error(f"Server error: {data}")
-                        raise Exception(f"500 Internal Server Error: {data.get('result', {}).get('message', 'Unknown error')}")
-                    if response.status_code not in [200, 201]:
-                        logger.error(f"Request failed: {response.status_code} {response.reason}")
-                        raise Exception(f"{response.status_code} {response.reason}")
-                    return data
-                except requests.RequestException as e:
-                    logger.error(f"Request failed: {str(e)}")
-                    raise
+            lock_context = cache.lock("user_operation_lock", timeout=30) if user_operation else nullcontext()
+            try:
+                with lock_context:
+                    logger.debug(f"Making {method} request to URL: {url}")
+                    try:
+                        if method == 'POST':
+                            response = requests.post(url, headers=headers, json=data, timeout=timeout)
+                        else:
+                            response = requests.patch(url, headers=headers, json=data, timeout=timeout)
+                        data = response.json()
+                        if response.status_code == 500:
+                            logger.error(f"Server error: {data}")
+                            raise Exception(f"500 Internal Server Error: {data.get('result', {}).get('message', 'Unknown error')}")
+                        if response.status_code not in [200, 201]:
+                            logger.error(f"Request failed: {response.status_code} {response.reason}")
+                            raise Exception(f"{response.status_code} {response.reason}")
+                        return data
+                    except requests.RequestException as e:
+                        logger.error(f"Request failed: {str(e)}")
+                        raise
+            except redis.exceptions.LockError as e:
+                logger.error(f"Redis lock error: {str(e)}", exc_info=True)
+                raise
         else:
             raise ValueError(f"Unsupported method: {method}")
 
@@ -189,7 +194,7 @@ class APIClient:
             except Exception as e:
                 logger.warning(f"Filter failed: {str(e)}. Fetching all data and filtering locally for last {INCREMENTAL_FALLBACK_SECONDS} seconds.")
                 params.pop('filter[gt]', None)
-                all_data = self._make_request("14223767938169346196", timeout=20)
+                all_data = self._make_request("14223767938169346196", params, timeout=20)
                 if since_date:
                     since_dt = self.validate_date(since_date_str, 'since_date')
                     if since_dt:
@@ -230,7 +235,7 @@ class APIClient:
             'date_last_scanned': current_time
         }]
 
-        response = self._make_request(self.item_master_endpoint, params=params, method='PATCH', data=update_data, timeout=timeout)
+        response = self._make_request(self.item_master_endpoint, params=params, method='PATCH', data=update_data, timeout=timeout, user_operation=True)
         logger.info(f"Updated bin_location for tag_id {tag_id} to {bin_location} via API")
         return response
 
@@ -250,7 +255,7 @@ class APIClient:
             'date_last_scanned': current_time
         }]
 
-        response = self._make_request(self.item_master_endpoint, params=params, method='PATCH', data=update_data, timeout=timeout)
+        response = self._make_request(self.item_master_endpoint, params=params, method='PATCH', data=update_data, timeout=timeout, user_operation=True)
         logger.info(f"Updated status for tag_id {tag_id} to {status} via API")
         return response
 
@@ -270,7 +275,7 @@ class APIClient:
             'date_updated': current_time
         }]
 
-        response = self._make_request(self.item_master_endpoint, params=params, method='PATCH', data=update_data)
+        response = self._make_request(self.item_master_endpoint, params=params, method='PATCH', data=update_data, user_operation=True)
         logger.info(f"Updated notes for tag_id {tag_id} to '{notes}' via API")
         return response
 
@@ -278,6 +283,6 @@ class APIClient:
         if not item_data or 'tag_id' not in item_data:
             raise ValueError("item_data must contain a tag_id")
 
-        response = self._make_request(self.item_master_endpoint, method='POST', data=[item_data], timeout=timeout)
+        response = self._make_request(self.item_master_endpoint, method='POST', data=[item_data], timeout=timeout, user_operation=True)
         logger.info(f"Inserted new item with tag_id {item_data['tag_id']} via API")
         return response

@@ -1,4 +1,4 @@
-# config.py version: 2025-06-26-v6
+# config.py version: 2025-06-26-v7
 import os
 
 # Base directory
@@ -26,7 +26,7 @@ TRANSACTION_URL = 'https://cs.iot.ptshome.com/api/v1/data/14223767938169346196'
 SEED_URL = 'https://cs.iot.ptshome.com/api/v1/data/14223767938169215907'
 
 # Refresh intervals (seconds)
-FULL_REFRESH_INTERVAL = 1800  # 30 minutes
+FULL_REFRESH_INTERVAL = 3600  # 1 hour
 INCREMENTAL_REFRESH_INTERVAL = 60  # 60 seconds
 INCREMENTAL_LOOKBACK_SECONDS = 600  # Look back 10 minutes
 INCREMENTAL_FALLBACK_SECONDS = 172800  # Fall back to 2 days if API filter fails
