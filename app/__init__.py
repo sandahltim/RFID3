@@ -6,7 +6,7 @@ from logging.handlers import RotatingFileHandler
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_redis import FlaskRedis
-from config import DB_CONFIG, REDIS_URL, LOG_FILE
+from config import DB_CONFIG, REDIS_URL, LOG_FILE, APP_IP
 from datetime import datetime
 
 # Initialize extensions
@@ -15,7 +15,7 @@ cache = FlaskRedis()
 
 def create_app():
     """Create and configure the Flask application."""
-    app = Flask(__name__, static_folder='static')  # Updated to match /home/tim/test_rfidpi/static/
+    app = Flask(__name__, static_folder='static')
 
     # Configure logging
     log_dir = os.path.dirname(LOG_FILE)
@@ -48,6 +48,7 @@ def create_app():
             'pool_recycle': 1800,
         }
         app.config['REDIS_URL'] = REDIS_URL
+        app.config['APP_IP'] = APP_IP
         app.logger.info("Database and Redis configuration set successfully")
     except Exception as e:
         app.logger.error(f"Failed to set database/Redis configuration: {str(e)}", exc_info=True)
@@ -62,10 +63,21 @@ def create_app():
         app.logger.error(f"Failed to initialize extensions: {str(e)}", exc_info=True)
         raise
 
-    # Add custom Jinja2 filter for timestamp
+    # Add custom Jinja2 filters
     def timestamp_filter(value):
         return int(datetime.now().timestamp())
     app.jinja_env.filters['timestamp'] = timestamp_filter
+
+    def datetimeformat(value):
+        if value is None:
+            return 'N/A'
+        if isinstance(value, str):
+            try:
+                value = datetime.fromisoformat(value.replace('Z', '+00:00'))
+            except ValueError:
+                return value
+        return value.strftime('%Y-%m-%d %H:%M:%S')
+    app.jinja_env.filters['datetimeformat'] = datetimeformat
 
     # Create database tables
     try:

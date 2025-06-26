@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}{% endblock %}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='lib/bootstrap/bootstrap.min.css') }}?v={{ '' | timestamp }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}?v={{ '' | timestamp }}">
     {% block head %}{% endblock %}
     {% block extra_head %}{% endblock %}
 </head>

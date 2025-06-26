@@ -1,8 +1,11 @@
-# config.py version: 2025-06-26-v7
+# config.py version: 2025-06-26-v8
 import os
 
 # Base directory
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+
+# Application IP address
+APP_IP = os.environ.get('APP_IP', '192.168.3.112')
 
 # MariaDB configuration
 DB_CONFIG = {
