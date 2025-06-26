@@ -1,10 +1,10 @@
-console.log('tab3.js version: 2025-06-25-v18 loaded');
+console.log('tab3.js version: 2025-06-26-v19 loaded');
 
 /**
  * Tab3.js: Logic for Tab 3 (Items in Service).
  * Dependencies: common.js for formatDate.
- * Updated: 2025-06-25-v18
- * - Removed { once: true } from syncToPcBtn to allow multiple syncs without refresh.
+ * Updated: 2025-06-26-v19
+ * - Increased debounce wait time to 1000ms to prevent 429 errors.
  * - Cleared commonNameSelect and tagQuantity after sync for seamless next entry.
  * - Preserved all existing functionality.
  */
@@ -189,9 +189,9 @@ function setupPrintTagsSection() {
         } finally {
             syncBtn.disabled = false;
         }
-    }, 500);
+    }, 1000); // Increased to 1000ms to prevent 429 errors
 
-    // Remove any existing listeners and add new one without { once: true }
+    // Remove any existing listeners and add new one
     syncBtn.removeEventListener('click', debouncedSync);
     syncBtn.addEventListener('click', () => {
         console.log(`DEBUG: Sync to PC button clicked at ${new Date().toISOString()}`);

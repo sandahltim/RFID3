@@ -1,5 +1,5 @@
 # app/routes/tab3.py
-# tab3.py version: 2025-06-25-v72
+# tab3.py version: 2025-06-26-v73
 from flask import Blueprint, render_template, request, jsonify, current_app
 from .. import db, cache
 from ..models.db_models import ItemMaster, Transaction, RentalClassMapping, UserRentalClassMapping, SeedRentalClass
@@ -17,7 +17,7 @@ import fcntl
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 import requests.exceptions
 import re
-import requests
+import json
 
 # Configure logging for Tab 3
 logger = logging.getLogger('tab3')
@@ -58,7 +58,7 @@ if not os.path.exists(SHARED_DIR):
     os.chown(SHARED_DIR, pwd.getpwnam('tim').pw_uid, grp.getgrnam('tim').gr_gid)
 
 # Log deployment version
-logger.info("Deployed tab3.py version: 2025-06-25-v72")
+logger.info("Deployed tab3.py version: 2025-06-26-v73")
 
 # Helper function to normalize common_name by removing suffixes like (G1), (G2)
 def normalize_common_name(name):
@@ -86,24 +86,22 @@ def tab3_view():
 
         # Debug: Check all statuses in id_item_master
         status_query = """
-            SELECT DISTINCT status
+            SELECT DISTINCT COALESCE(status, 'NULL') AS status
             FROM id_item_master
-            WHERE status IS NOT NULL
         """
         status_result = session.execute(text(status_query))
         statuses = [row[0] for row in status_result.fetchall()]
-        logger.info(f"All items in status: {statuses}")
+        logger.info(f"All statuses in id_item_master: {statuses}")
 
         # Debug: Count items by status
         count_query = """
-            SELECT status, COUNT(*)
+            SELECT COALESCE(status, 'NULL') AS status, COUNT(*)
             FROM id_item_master
-            WHERE TRIM(COALESCE(status, '')) IN ('Repair', 'Needs to be Inspected', 'Wash', 'Wet', 'On Rent', 'Ready to Rent')
             GROUP BY status
         """
         count_result = session.execute(text(count_query))
         status_counts = {row[0]: row[1] for row in count_result.fetchall()}
-        logger.info(f"Status counts: {status_counts}")
+        logger.info(f"Status counts in id_item_master: {status_counts}")
 
         # Get query parameters
         common_name_filter = request.args.get('common_name', '').lower()
@@ -136,8 +134,8 @@ def tab3_view():
                     'subcategory': um.subcategory,
                     'short_common_name': um.short_common_name or 'N/A'
                 }
-            cache.set(cache_key, mappings_dict, ex=3600)
-            logger.info("Cached rental_class_mappings")
+            cache.set(cache_key, json.dumps(mappings_dict), ex=3600)
+            logger.info("Cached rental_class_mappings as JSON")
 
         # Fetch all rental_class_num values for in-service items
         rental_class_query = f"""
@@ -711,8 +709,8 @@ def sync_to_pc():
 
         # Map rental class details
         cache_key = 'rental_class_mappings'
-        mappings_dict = cache.get(cache_key)
-        if mappings_dict is None:
+        mappings_dict_json = cache.get(cache_key)
+        if mappings_dict_json is None:
             base_mappings = session.query(RentalClassMapping).all()
             user_mappings = session.query(UserRentalClassMapping).all()
             mappings_dict = {normalize_rental_class_id(m.rental_class_id): {
@@ -728,7 +726,10 @@ def sync_to_pc():
                     'short_common_name': um.short_common_name or 'N/A'
                 }
                 logger.debug(f"Added user mapping: rental_class_id={normalized_id}, short_common_name={um.short_common_name}")
-            cache.set(cache_key, mappings_dict, ex=3600)
+            cache.set(cache_key, json.dumps(mappings_dict), ex=3600)
+            logger.info(f"Cached rental_class_mappings as JSON for common_name={common_name}")
+        else:
+            mappings_dict = json.loads(mappings_dict_json)
 
         for item in synced_items:
             normalized_rental_class = normalize_rental_class_id(item['rental_class_num'])
