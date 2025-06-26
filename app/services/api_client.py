@@ -1,4 +1,5 @@
-# api_client.py version: 2025-06-20-v2
+# app/services/api_client.py
+# api_client.py version: 2025-06-26-v3
 import requests
 import time
 from datetime import datetime, timedelta
@@ -61,8 +62,8 @@ class APIClient:
         logger.error("Failed to fetch access token after 5 attempts")
         raise Exception("Failed to fetch access token after 5 attempts")
 
-    def _make_request(self, endpoint_id, params=None, method='GET', data=None):
-        """Make an API request with the specified method, endpoint, and data."""
+    def _make_request(self, endpoint_id, params=None, method='GET', data=None, timeout=20):
+        """Make an API request with the specified method, endpoint, data, and timeout."""
         if not params:
             params = {}
         if method == 'GET':
@@ -82,9 +83,9 @@ class APIClient:
                 query_string = '&'.join([f"{k}={quote(str(v))}" for k, v in params.items()])
                 full_url = f"{url}?{query_string}"
                 logger.debug(f"Making GET request to full URL: {full_url}")
-                logger.debug(f"Request headers: {headers}")
+                logger.debug(f"Request headers: {headers}, timeout: {timeout}")
                 try:
-                    response = requests.get(url, headers=headers, params=params, timeout=20)
+                    response = requests.get(url, headers=headers, params=params, timeout=timeout)
                     data = response.json()
                     logger.debug(f"API response: {response.status_code} {response.reason}, response: {data}")
                     if response.status_code == 500:
@@ -108,12 +109,12 @@ class APIClient:
             return all_data
         elif method in ['POST', 'PATCH']:
             logger.debug(f"Making {method} request to URL: {url}")
-            logger.debug(f"Request headers: {headers}, data: {data}")
+            logger.debug(f"Request headers: {headers}, data: {data}, timeout: {timeout}")
             try:
                 if method == 'POST':
-                    response = requests.post(url, headers=headers, json=data, timeout=20)
+                    response = requests.post(url, headers=headers, json=data, timeout=timeout)
                 else:
-                    response = requests.patch(url, headers=headers, json=data, timeout=20)
+                    response = requests.patch(url, headers=headers, json=data, timeout=timeout)
                 data = response.json()
                 logger.debug(f"API response: {response.status_code} {response.reason}, response: {data}")
                 if response.status_code == 500:
@@ -154,19 +155,19 @@ class APIClient:
             params['filter[gt]'] = filter_str
         
         try:
-            data = self._make_request("14223767938169344381", params)
+            data = self._make_request("14223767938169344381", params, timeout=20)
             all_data = data
             logger.info(f"Fetched {len(all_data)} items with since_date filter")
             # If fewer than 10000 items, try fetching without filter
             if len(all_data) < 10000 and since_date:
                 logger.warning(f"Only {len(all_data)} items fetched with since_date filter, trying without filter")
                 params.pop('filter[gt]', None)
-                all_data = self._make_request("14223767938169344381", params)
+                all_data = self._make_request("14223767938169344381", params, timeout=20)
                 logger.info(f"Fetched {len(all_data)} items without since_date filter")
         except Exception as e:
             logger.warning(f"Filter failed: {str(e)}. Fetching all data and filtering locally for last {INCREMENTAL_FALLBACK_SECONDS} seconds.")
             params.pop('filter[gt]', None)
-            all_data = self._make_request("14223767938169344381")
+            all_data = self._make_request("14223767938169344381", timeout=20)
             if since_date:
                 since_dt = self.validate_date(since_date_str, 'since_date')
                 if since_dt:
@@ -193,19 +194,19 @@ class APIClient:
             filter_str = f"scan_date,gt,'{since_date_str}'"
             params['filter[gt]'] = filter_str
             try:
-                data = self._make_request("14223767938169346196", params)
+                data = self._make_request("14223767938169346196", params, timeout=20)
                 all_data = data
                 logger.info(f"Fetched {len(all_data)} transactions with since_date filter")
                 # If fewer than 10000 transactions, try fetching without filter
                 if len(all_data) < 10000 and since_date:
                     logger.warning(f"Only {len(all_data)} transactions fetched with since_date filter, trying without filter")
                     params.pop('filter[gt]', None)
-                    all_data = self._make_request("14223767938169346196", params)
+                    all_data = self._make_request("14223767938169346196", params, timeout=20)
                     logger.info(f"Fetched {len(all_data)} transactions without since_date filter")
             except Exception as e:
                 logger.warning(f"Filter failed: {str(e)}. Fetching all data and filtering locally for last {INCREMENTAL_FALLBACK_SECONDS} seconds.")
                 params.pop('filter[gt]', None)
-                all_data = self._make_request("14223767938169346196")
+                all_data = self._make_request("14223767938169346196", timeout=20)
                 if since_date:
                     since_dt = self.validate_date(since_date_str, 'since_date')
                     if since_dt:
@@ -220,7 +221,7 @@ class APIClient:
                         ]
                         logger.info(f"Filtered to {len(all_data)} transactions locally after fetching all")
         else:
-            all_data = self._make_request("14223767938169346196")
+            all_data = self._make_request("14223767938169346196", timeout=20)
             logger.info(f"Fetched {len(all_data)} transactions without filter")
         logger.debug(f"Transactions data sample: {all_data[:5] if all_data else 'No data'}")
         return all_data
@@ -228,17 +229,17 @@ class APIClient:
     def get_seed_data(self, since_date=None):
         """Fetch seed data (no date filtering supported)."""
         params = {}
-        data = self._make_request("14223767938169215907", params)
+        data = self._make_request("14223767938169215907", params, timeout=20)
         logger.debug(f"Seed data sample: {data[:5] if data else 'No data'}")
         return data
 
-    def update_bin_location(self, tag_id, bin_location):
+    def update_bin_location(self, tag_id, bin_location, timeout=20):
         """Update an item's bin_location and date_last_scanned via API PATCH."""
         if not tag_id or not bin_location:
             raise ValueError("tag_id and bin_location are required")
 
         params = {'filter[eq]': f"tag_id,eq,'{tag_id}'"}
-        items = self._make_request(self.item_master_endpoint, params)
+        items = self._make_request(self.item_master_endpoint, params, timeout=timeout)
         if not items:
             raise Exception(f"Item with tag_id {tag_id} not found in Item Master")
 
@@ -249,17 +250,17 @@ class APIClient:
             'date_last_scanned': current_time
         }
 
-        response = self._make_request(self.item_master_endpoint, params=params, method='PATCH', data=[update_data])
+        response = self._make_request(self.item_master_endpoint, params=params, method='PATCH', data=[update_data], timeout=timeout)
         logger.info(f"Updated bin_location for tag_id {tag_id} to {bin_location} and date_last_scanned to {current_time} via API")
         return response
 
-    def update_status(self, tag_id, status):
+    def update_status(self, tag_id, status, timeout=20):
         """Update an item's status and date_last_scanned via API PATCH."""
         if not tag_id or not status:
             raise ValueError("tag_id and status are required")
 
         params = {'filter[eq]': f"tag_id,eq,'{tag_id}'"}
-        items = self._make_request(self.item_master_endpoint, params)
+        items = self._make_request(self.item_master_endpoint, params, timeout=timeout)
         if not items:
             raise Exception(f"Item with tag_id {tag_id} not found in Item Master")
 
@@ -270,7 +271,7 @@ class APIClient:
             'date_last_scanned': current_time
         }
 
-        response = self._make_request(self.item_master_endpoint, params=params, method='PATCH', data=[update_data])
+        response = self._make_request(self.item_master_endpoint, params=params, method='PATCH', data=[update_data], timeout=timeout)
         logger.info(f"Updated status for tag_id {tag_id} to {status} and date_last_scanned to {current_time} via API")
         return response
 
@@ -295,11 +296,11 @@ class APIClient:
         logger.info(f"Updated notes for tag_id {tag_id} to '{notes}' and date_updated to {current_time} via API")
         return response
 
-    def insert_item(self, item_data):
+    def insert_item(self, item_data, timeout=20):
         """Insert a new item into Item Master via API POST."""
         if not item_data or 'tag_id' not in item_data:
             raise ValueError("item_data must contain a tag_id")
 
-        response = self._make_request(self.item_master_endpoint, method='POST', data=[item_data])
+        response = self._make_request(self.item_master_endpoint, method='POST', data=[item_data], timeout=timeout)
         logger.info(f"Inserted new item with tag_id {item_data['tag_id']} into API via POST")
         return response

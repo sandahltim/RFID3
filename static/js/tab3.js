@@ -1,17 +1,18 @@
-console.log('tab3.js version: 2025-06-26-v19 loaded');
+console.log('tab3.js version: 2025-06-26-v21 loaded');
 
 /**
  * Tab3.js: Logic for Tab 3 (Items in Service).
  * Dependencies: common.js for formatDate.
- * Updated: 2025-06-26-v19
- * - Increased debounce wait time to 1000ms to prevent 429 errors.
+ * Updated: 2025-06-26-v21
+ * - Increased debounce wait time to 5000ms to prevent 429 errors.
+ * - Enhanced retry logic with exponential backoff for 429 errors.
  * - Cleared commonNameSelect and tagQuantity after sync for seamless next entry.
  * - Preserved all existing functionality.
  */
 
 /**
  * Debounce function with immediate lock to prevent multiple rapid executions
- * Used by: setupPrintTagsSection for syncToPc
+ * Used by: setupPrintTagsSection for syncToPc and updateStatusBtn
  */
 function debounce(func, wait) {
     let timeout;
@@ -19,7 +20,7 @@ function debounce(func, wait) {
 
     return function executedFunction(...args) {
         if (isProcessing) {
-            console.log(`DEBUG: Request blocked - sync already in progress at ${new Date().toISOString()}`);
+            console.log(`DEBUG: Request blocked - operation already in progress at ${new Date().toISOString()}`);
             return;
         }
 
@@ -34,6 +35,33 @@ function debounce(func, wait) {
             });
         }, wait);
     };
+}
+
+/**
+ * Retry function for handling 429 errors with exponential backoff
+ */
+async function retryRequest(url, options, maxRetries = 3, baseDelay = 1000) {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+            const response = await fetch(url, options);
+            if (response.status === 429) {
+                console.log(`DEBUG: 429 Too Many Requests on attempt ${attempt} at ${new Date().toISOString()}`);
+                if (attempt === maxRetries) {
+                    throw new Error(`Request failed with status 429 after ${maxRetries} retries`);
+                }
+                const delay = baseDelay * Math.pow(2, attempt - 1);
+                console.log(`DEBUG: Waiting ${delay}ms before retry ${attempt + 1} at ${new Date().toISOString()}`);
+                await new Promise(resolve => setTimeout(resolve, delay));
+                continue;
+            }
+            return response;
+        } catch (error) {
+            if (attempt === maxRetries) {
+                throw error;
+            }
+            console.error(`Attempt ${attempt} failed: ${error} at ${new Date().toISOString()}`);
+        }
+    }
 }
 
 /**
@@ -157,7 +185,7 @@ function setupPrintTagsSection() {
         console.log(`DEBUG: Sending sync request: commonName=${commonName}, quantity=${quantity} at ${new Date().toISOString()}`);
 
         try {
-            const response = await fetch('/tab/3/sync_to_pc', {
+            const response = await retryRequest('/tab/3/sync_to_pc', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -166,7 +194,7 @@ function setupPrintTagsSection() {
                     common_name: commonName,
                     quantity: quantity
                 })
-            });
+            }, 3, 1000);
 
             if (!response.ok) {
                 throw new Error(`Sync failed with status ${response.status}`);
@@ -189,26 +217,19 @@ function setupPrintTagsSection() {
         } finally {
             syncBtn.disabled = false;
         }
-    }, 1000); // Increased to 1000ms to prevent 429 errors
+    }, 5000); // Increased to 5000ms to prevent 429 errors
 
-    // Remove any existing listeners and add new one
-    syncBtn.removeEventListener('click', debouncedSync);
-    syncBtn.addEventListener('click', () => {
-        console.log(`DEBUG: Sync to PC button clicked at ${new Date().toISOString()}`);
-        debouncedSync();
-    });
-
-    updateStatusBtn.addEventListener('click', async () => {
+    const debouncedUpdateStatus = debounce(async () => {
         updateStatusBtn.disabled = true;
         syncMessage.innerHTML = '<div class="alert alert-info">Updating status...</div>';
 
         try {
-            const response = await fetch('/tab/3/update_synced_status', {
+            const response = await retryRequest('/tab/3/update_synced_status', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 }
-            });
+            }, 3, 1000);
 
             if (!response.ok) {
                 throw new Error(`Status update failed with status ${response.status}`);
@@ -220,6 +241,7 @@ function setupPrintTagsSection() {
             }
 
             syncMessage.innerHTML = `<div class="alert alert-success">Successfully updated status for ${data.updated_items} items.</div>`;
+            console.log(`DEBUG: Status update successful, ${data.updated_items} items updated at ${new Date().toISOString()}`);
             fetchCsvContents();
             setTimeout(() => {
                 window.location.reload();
@@ -229,6 +251,19 @@ function setupPrintTagsSection() {
             syncMessage.innerHTML = `<div class="alert alert-danger">Error updating status: ${error.message}</div>`;
             updateStatusBtn.disabled = false;
         }
+    }, 5000); // Increased to 5000ms to prevent 429 errors
+
+    // Remove any existing listeners and add new ones
+    syncBtn.removeEventListener('click', debouncedSync);
+    syncBtn.addEventListener('click', () => {
+        console.log(`DEBUG: Sync to PC button clicked at ${new Date().toISOString()}`);
+        debouncedSync();
+    });
+
+    updateStatusBtn.removeEventListener('click', debouncedUpdateStatus);
+    updateStatusBtn.addEventListener('click', () => {
+        console.log(`DEBUG: Update Status button clicked at ${new Date().toISOString()}`);
+        debouncedUpdateStatus();
     }, { once: true });
 
     csvContentsTable.addEventListener('click', (event) => {
@@ -270,6 +305,7 @@ function setupPrintTagsSection() {
                 throw new Error(data.error);
             }
             syncMessage.innerHTML = `<div class="alert alert-success">${data.message}</div>`;
+            console.log(`DEBUG: Removed item with tag_id ${tagId} at ${new Date().toISOString()}`);
             fetchCsvContents();
         })
         .catch(error => {
