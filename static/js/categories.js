@@ -1,9 +1,10 @@
-console.log('categories.js version: 2025-06-25-v4 loaded');
+console.log('categories.js version: 2025-06-26-v5 loaded');
 
 /**
  * categories.js: Logic for Manage Categories tab.
  * Dependencies: None (self-contained).
- * Updated: 2025-06-25-v4
+ * Updated: 2025-06-26-v5
+ * - Fixed endpoint URL from /categories/mapping to /categories/mappings.
  * - Added tracking for edited rows with data-edited attribute.
  * - Modified collectMappings to send only edited mappings.
  * - Added clearEdits function for resetting changes.
@@ -16,7 +17,7 @@ console.log('categories.js version: 2025-06-25-v4 loaded');
     function addMappingRow(mapping = {category: '', subcategory: '', rental_class_id: '', common_name: 'N/A', short_common_name: ''}) {
         const table = document.getElementById('mappings-table');
         if (!table) {
-            console.error('Mappings table not found at ${new Date().toISOString()}');
+            console.error(`Mappings table not found at ${new Date().toISOString()}`);
             return;
         }
         const tbody = table.querySelector('tbody') || table.appendChild(document.createElement('tbody'));
@@ -49,7 +50,7 @@ console.log('categories.js version: 2025-06-25-v4 loaded');
     function removeMappingRow(button) {
         const row = button.closest('tr');
         if (!row) {
-            console.error('Row not found for removal at ${new Date().toISOString()}');
+            console.error(`Row not found for removal at ${new Date().toISOString()}`);
             return;
         }
         const index = Array.from(row.parentNode.children).indexOf(row);
@@ -133,43 +134,66 @@ console.log('categories.js version: 2025-06-25-v4 loaded');
     }
 
     document.addEventListener('DOMContentLoaded', () => {
-        console.log('categories.js: DOMContentLoaded triggered at ${new Date().toISOString()}');
+        console.log(`categories.js: DOMContentLoaded triggered at ${new Date().toISOString()}`);
         const table = document.getElementById('mappings-table');
         if (!table) {
-            console.error('Mappings table not found on page load at ${new Date().toISOString()}');
+            console.error(`Mappings table not found on page load at ${new Date().toISOString()}`);
             return;
         }
         table.innerHTML = '<tbody></tbody>'; // Ensure tbody exists
-        fetch('/categories/mapping')
-            .then(response => {
-                console.log(`Fetch mappings status: ${response.status} at ${new Date().toISOString()}`);
-                if (!response.ok) {
-                    return response.text().then(text => {
-                        throw new Error(`Failed to fetch mappings: ${response.status} - ${text}`);
-                    });
-                }
-                return response.json();
-            })
-            .then(data => {
-                if (data.error) {
-                    alert('Failed to load mappings: ' + data.error);
-                    console.error('Error loading mappings:', data.error, `at ${new Date().toISOString()}`);
-                    return;
-                }
-                mappings = data || [];
-                if (mappings.length === 0) {
-                    console.warn('No mappings returned from /categories/mapping at ${new Date().toISOString()}');
-                    addMappingRow(); // Add an empty row for user input
-                } else {
-                    mappings.forEach(mapping => addMappingRow(mapping));
-                }
-                console.log(`Loaded ${mappings.length} mappings at ${new Date().toISOString()}`);
-            })
-            .catch(error => {
-                console.error('Error loading mappings:', error, `at ${new Date().toISOString()}`);
-                alert('Failed to load mappings: ' + error.message);
-                addMappingRow(); // Add an empty row on error
-            });
+        fetch('/categories/mappings', {
+            method: 'GET',
+            headers: {'Content-Type': 'application/json'}
+        })
+        .then(response => {
+            console.log(`Fetch mappings status: ${response.status} at ${new Date().toISOString()}`);
+            if (!response.ok) {
+                return response.text().then(text => {
+                    throw new Error(`Failed to fetch mappings: ${response.status} - ${text}`);
+                });
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.error) {
+                alert('Failed to load mappings: ' + data.error);
+                console.error('Error loading mappings:', data.error, `at ${new Date().toISOString()}`);
+                return;
+            }
+            mappings = data || [];
+            if (mappings.length === 0) {
+                console.warn(`No mappings returned from /categories/mappings at ${new Date().toISOString()}`);
+                addMappingRow(); // Add an empty row for user input
+            } else {
+                mappings.forEach(mapping => addMappingRow(mapping));
+            }
+            console.log(`Loaded ${mappings.length} mappings at ${new Date().toISOString()}`);
+        })
+        .then(() => {
+            const addButton = document.getElementById('add-mapping-btn');
+            const saveButton = document.getElementById('save-mappings-btn');
+            const clearButton = document.getElementById('clear-changes-btn');
+
+            if (addButton) {
+                addButton.addEventListener('click', () => {
+                    addMappingRow();
+                    console.log('Add mapping button clicked');
+                });
+            }
+            if (saveButton) {
+                saveButton.addEventListener('click', confirmSaveMappings);
+                console.log('Save mappings button initialized');
+            }
+            if (clearButton) {
+                clearButton.addEventListener('click', clearEdits);
+                console.log('Clear changes button initialized');
+            }
+        })
+        .catch(error => {
+            console.error('Error loading mappings:', error, `at ${new Date().toISOString()}`);
+            alert('Failed to load mappings: ' + error.message);
+            addMappingRow(); // Add an empty row on error
+        });
     });
 
     // Expose functions to global scope safely
