@@ -1,5 +1,5 @@
 # app/services/scheduler.py
-# scheduler.py version: 2025-06-26-v5
+# scheduler.py version: 2025-06-26-v6
 from apscheduler.schedulers.background import BackgroundScheduler
 from redis import Redis
 from config import REDIS_URL, INCREMENTAL_REFRESH_INTERVAL
@@ -91,8 +91,8 @@ def init_scheduler(app):
 
     def run_with_context():
         with app.app_context():
-            if redis_client.get("user_operation_lock"):
-                logger.debug("User operation in progress, skipping incremental refresh")
+            if redis_client.get("full_refresh_lock") or redis_client.get("user_operation_lock"):
+                logger.debug("Full refresh or user operation in progress, skipping incremental refresh")
                 return
             if retry_database_connection():
                 logger.debug("Starting scheduled incremental refresh")
