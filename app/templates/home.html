@@ -21,23 +21,42 @@
             <div class="card">
                 <div class="card-header">Inventory Summary</div>
                 <div class="card-body">
-                    <p>Total Items: {{ total_items }}</p>
-                    <p>Items on Rent: {{ items_on_rent }}</p>
-                    <p>Items in Service: {{ items_in_service }}</p>
-                    <p>Items Available: {{ items_available }}</p>
+                    <p><strong>Total Items:</strong> {{ total_items }}</p>
+                    <p><strong>Items on Rent:</strong> {{ items_on_rent }}</p>
+                    <p><strong>Items in Service:</strong> {{ items_in_service }}</p>
+                    <p><strong>Items Available:</strong> {{ items_available }}</p>
+                    <p><strong>Status Counts:</strong></p>
+                    <ul>
+                        {% for status, count in status_counts %}
+                            <li>{{ status }}: {{ count }}</li>
+                        {% endfor %}
+                    </ul>
                 </div>
             </div>
         </div>
         <div class="col-md-4">
             <div class="card">
-                <div class="card-header">Recent Scans</div>
+                <div class="card-header">Recent Scans (Last 10)</div>
                 <div class="card-body">
                     {% if recent_scans %}
-                        <ul>
-                            {% for scan in recent_scans %}
-                                <li>{{ scan[0] }} - {{ scan[1] }} ({{ scan[2] | timestamp }})</li>
-                            {% endfor %}
-                        </ul>
+                        <table class="table table-bordered">
+                            <thead>
+                                <tr>
+                                    <th>Tag ID</th>
+                                    <th>Common Name</th>
+                                    <th>Scan Date</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for scan in recent_scans %}
+                                    <tr>
+                                        <td>{{ scan[0] }}</td>
+                                        <td>{{ scan[1] }}</td>
+                                        <td>{{ scan[2] | datetimeformat }}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
                     {% else %}
                         <p>No recent scans available.</p>
                     {% endif %}
@@ -48,8 +67,8 @@
             <div class="card">
                 <div class="card-header">Refresh Status</div>
                 <div class="card-body" id="refreshStatus">
-                    <p>Last Refresh: {{ last_refresh or 'N/A' }}</p>
-                    <p>Type: {{ refresh_type or 'N/A' }}</p>
+                    <p><strong>Last Refresh:</strong> {{ last_refresh | datetimeformat or 'N/A' }}</p>
+                    <p><strong>Type:</strong> {{ refresh_type or 'N/A' }}</p>
                 </div>
             </div>
         </div>
