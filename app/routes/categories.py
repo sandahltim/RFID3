@@ -1,440 +1,439 @@
-# app/routes/categories.py
-# categories.py version: 2025-06-25-v26
-from flask import Blueprint, render_template, request, jsonify, current_app
-from .. import db, cache
-from ..models.db_models import RentalClassMapping, UserRentalClassMapping, SeedRentalClass
-from ..services.api_client import APIClient
-from sqlalchemy.exc import SQLAlchemyError, IntegrityError
-from time import time
+# app/services/refresh.py
+# refresh.py version: 2025-06-26-v6
 import logging
-import sys
-import copy
+import traceback
+from datetime import datetime, timedelta
+from sqlalchemy.exc import SQLAlchemyError, OperationalError
+from .. import db
+from ..models.db_models import ItemMaster, Transaction, SeedRentalClass, RefreshState, UserRentalClassMapping
+from ..services.api_client import APIClient
+from flask import Blueprint, jsonify
+from config import INCREMENTAL_LOOKBACK_SECONDS
+import time
+import os
+import csv
+import json
 
-# Configure logging
-logger = logging.getLogger('categories')
+logger = logging.getLogger(f'refresh_{os.getpid()}')
 logger.setLevel(logging.INFO)
+if not logger.handlers:
+    file_handler = logging.FileHandler('/home/tim/test_rfidpi/logs/rfid_dashboard.log')
+    file_handler.setLevel(logging.INFO)
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    file_handler.setFormatter(formatter)
+    logger.addHandler(file_handler)
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(logging.INFO)
+    console_handler.setFormatter(formatter)
+    logger.addHandler(console_handler)
 
-# Remove existing handlers to avoid duplicates
-logger.handlers = []
+refresh_bp = Blueprint('refresh', __name__)
 
-# File handler for rfid_dashboard.log
-file_handler = logging.FileHandler('/home/tim/test_rfidpi/logs/rfid_dashboard.log')
-file_handler.setLevel(logging.INFO)
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-file_handler.setFormatter(formatter)
-logger.addHandler(file_handler)
+api_client = APIClient()
 
-# Secondary file handler for debug.log
-debug_handler = logging.FileHandler('/home/tim/test_rfidpi/logs/debug.log')
-debug_handler.setLevel(logging.INFO)
-debug_handler.setFormatter(formatter)
-logger.addHandler(debug_handler)
-
-# Console handler
-console_handler = logging.StreamHandler(sys.stdout)
-console_handler.setLevel(logging.INFO)
-console_handler.setFormatter(formatter)
-logger.addHandler(console_handler)
-
-# Also add logs to the root logger (which Gunicorn might capture)
-root_logger = logging.getLogger()
-root_logger.setLevel(logging.INFO)
-if not any(isinstance(h, logging.StreamHandler) for h in root_logger.handlers):
-    root_logger.addHandler(console_handler)
-
-categories_bp = Blueprint('categories', __name__)
-
-# Version check to ensure correct deployment
-logger.info("Deployed categories.py version: 2025-06-25-v26")
-
-def build_common_name_dict(seed_data):
-    """Build a dictionary mapping rental_class_id to common_name from seed_data."""
-    common_name_dict = {}
-    if not seed_data:
-        logger.warning("Seed data is empty or None")
-        return common_name_dict
-    for item in seed_data:
+def validate_date(date_str, field_name, tag_id):
+    """Validate date string and return datetime object or None."""
+    if date_str is None or date_str == '0000-00-00 00:00:00':
+        logger.debug(f"Null or invalid {field_name} for tag_id {tag_id}: {date_str}, returning None")
+        return None
+    try:
+        return datetime.strptime(date_str, '%Y-%m-%d %H:%M:%S')
+    except ValueError:
         try:
-            rental_class_id = item.get('rental_class_id')
-            common_name = item.get('common_name', 'Unknown')
-            bin_location = item.get('bin_location')
-            if rental_class_id:
-                normalized_key = str(rental_class_id).strip()
-                common_name_dict[normalized_key] = common_name
-                logger.debug(f"Seed item - rental_class_id: {normalized_key}, common_name: {common_name}, bin_location: {bin_location}")
+            return datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+        except ValueError as e:
+            if all(c in '0123456789ABCDEFabcdef' for c in date_str):
+                logger.warning(f"Possible hexadecimal {field_name} for tag_id {tag_id}: {date_str}. Returning None.")
             else:
-                logger.debug(f"Skipping item due to missing rental_class_id: {item}")
-        except Exception as comp_error:
-            logger.error(f"Error processing item for common_name_dict: {str(comp_error)}", exc_info=True)
-            current_app.logger.error(f"Error processing item for common_name_dict: {str(comp_error)}", exc_info=True)
-    logger.info(f"Built common_name_dict with {len(common_name_dict)} entries")
-    return common_name_dict
+                logger.warning(f"Invalid {field_name} for tag_id {tag_id}: {date_str}. Error: {str(e)}. Returning None.")
+            return None
 
-@categories_bp.route('/categories')
-def manage_categories():
-    session = None
+def update_refresh_state(state_type, timestamp):
+    """Update the refresh_state table with the latest refresh timestamp."""
+    session = db.session()
     try:
-        session = db.session()
-        logger.info("Starting new session for manage_categories")
-        current_app.logger.info("Starting new session for manage_categories")
-
-        # Fetch all rental class mappings from both tables
-        logger.debug("Fetching rental class mappings")
-        try:
-            base_mappings = session.query(RentalClassMapping).all()
-            logger.info(f"Fetched {len(base_mappings)} base mappings from RentalClassMapping")
-        except Exception as db_error:
-            logger.error(f"Failed to fetch base_mappings from RentalClassMapping: {str(db_error)}", exc_info=True)
-            current_app.logger.error(f"Failed to fetch base_mappings from RentalClassMapping: {str(db_error)}", exc_info=True)
-            base_mappings = []
-
-        try:
-            user_mappings = session.query(UserRentalClassMapping).all()
-            logger.info(f"Fetched {len(user_mappings)} user mappings from UserRentalClassMapping")
-        except Exception as db_error:
-            logger.error(f"Failed to fetch user_mappings from UserRentalClassMapping: {str(db_error)}", exc_info=True)
-            current_app.logger.error(f"Failed to fetch user_mappings from UserRentalClassMapping: {str(db_error)}", exc_info=True)
-            user_mappings = []
-
-        # Merge mappings, prioritizing user mappings
-        mappings_dict = {}
-        for m in base_mappings:
-            normalized_id = str(m.rental_class_id).strip()
-            mappings_dict[normalized_id] = {
-                'category': m.category,
-                'subcategory': m.subcategory,
-                'short_common_name': m.short_common_name or 'N/A'
-            }
-            logger.debug(f"Added base mapping: rental_class_id={normalized_id}, category={m.category}, subcategory={m.subcategory}")
-        for um in user_mappings:
-            normalized_id = str(um.rental_class_id).strip()
-            mappings_dict[normalized_id] = {
-                'category': um.category,
-                'subcategory': um.subcategory,
-                'short_common_name': um.short_common_name or 'N/A'
-            }
-            logger.debug(f"Added user mapping: rental_class_id={normalized_id}, category={um.category}, subcategory={um.subcategory}")
-        logger.debug(f"Merged mappings into dictionary with {len(mappings_dict)} entries")
-
-        # Fetch seed data from cache or database
-        cache_key = 'seed_rental_classes'
-        logger.debug(f"Checking cache for key: {cache_key}")
-        try:
-            seed_data = cache.get(cache_key)
-        except Exception as cache_error:
-            logger.error(f"Cache error for key {cache_key}: {str(cache_error)}. Bypassing cache.", exc_info=True)
-            current_app.logger.error(f"Cache error for key {cache_key}: {str(cache_error)}. Bypassing cache.", exc_info=True)
-            seed_data = None
-
-        if seed_data is None:
-            logger.info("Seed data not found in cache or cache failed, fetching from database")
-            try:
-                seed_data = session.query(SeedRentalClass).all()
-                seed_data = [{'rental_class_id': s.rental_class_id, 'common_name': s.common_name or 'Unknown', 'bin_location': s.bin_location} for s in seed_data]
-                logger.info(f"Fetched {len(seed_data)} seed data records from database")
-            except Exception as db_error:
-                logger.error(f"Failed to fetch seed data from database: {str(db_error)}", exc_info=True)
-                current_app.logger.error(f"Failed to fetch seed data from database: {str(db_error)}", exc_info=True)
-                seed_data = []
-
-            # Fallback to API if database is empty
-            if not seed_data:
-                logger.info("No seed data in database, fetching from API")
-                try:
-                    api_client = APIClient()
-                    seed_data = api_client.get_seed_data()
-                    if isinstance(seed_data, dict) and 'data' in seed_data:
-                        seed_data = seed_data['data']
-                    logger.debug(f"Fetched seed data from API: {len(seed_data)} records")
-                except Exception as api_error:
-                    logger.error(f"Failed to fetch seed data from API: {str(api_error)}", exc_info=True)
-                    current_app.logger.error(f"Failed to fetch seed data from API: {str(api_error)}", exc_info=True)
-                    seed_data = []
-
-        # Create a mapping of rental_class_id to common_name
-        try:
-            common_name_dict = build_common_name_dict(seed_data)
-        except Exception as dict_error:
-            logger.error(f"Error creating common_name_dict from seed_data: {str(dict_error)}", exc_info=True)
-            current_app.logger.error(f"Error creating common_name_dict from seed_data: {str(dict_error)}", exc_info=True)
-            common_name_dict = {}
-
-        # Build categories list
-        categories = []
-        for rental_class_id, mapping in mappings_dict.items():
-            normalized_rental_class_id = str(rental_class_id).strip()
-            common_name = common_name_dict.get(normalized_rental_class_id, 'N/A')
-            categories.append({
-                'category': mapping['category'],
-                'subcategory': mapping['subcategory'],
-                'rental_class_id': rental_class_id,
-                'common_name': common_name,
-                'short_common_name': mapping['short_common_name']
-            })
-        logger.debug(f"Built categories list with {len(categories)} entries")
-
-        # Cache the seed_data after lookup
-        if seed_data:
-            try:
-                seed_data_copy = copy.deepcopy(seed_data)
-                cache.set(cache_key, seed_data_copy, ex=3600)  # Cache for 1 hour
-                logger.info("Fetched seed data and cached")
-                current_app.logger.info("Fetched seed data and cached")
-            except Exception as cache_error:
-                logger.error(f"Error caching seed_data: {str(cache_error)}. Data will be fetched on next request.", exc_info=True)
-                current_app.logger.error(f"Error caching seed_data: {str(cache_error)}. Data will be fetched on next request.", exc_info=True)
-
-        categories.sort(key=lambda x: (x['category'] or '', x['subcategory'] or '', x['rental_class_id'] or ''))
-        logger.info(f"Fetched {len(categories)} category mappings")
-        current_app.logger.info(f"Fetched {len(categories)} category mappings")
-
-        session.close()
-        return render_template('categories.html', categories=categories, cache_bust=int(time()))
+        refresh_state = session.query(RefreshState).first()
+        if not refresh_state:
+            refresh_state = RefreshState(last_refresh=timestamp.strftime('%Y-%m-%d %H:%M:%S'), state_type=state_type)
+            session.add(refresh_state)
+        else:
+            refresh_state.last_refresh = timestamp.strftime('%Y-%m-%d %H:%M:%S')
+            refresh_state.state_type = state_type
+        session.commit()
+        logger.info(f"Updated refresh state: {state_type} at {timestamp}")
     except Exception as e:
-        logger.error(f"Error rendering categories page: {str(e)}", exc_info=True)
-        current_app.logger.error(f"Error rendering categories page: {str(e)}", exc_info=True)
-        if 'session' in locals():
-            session.close()
-        return render_template('categories.html', categories=[])
-
-@categories_bp.route('/categories/mapping', methods=['GET'])
-def get_mappings():
-    session = None
-    try:
-        session = db.session()
-        logger.info("Fetching rental class mappings for API at %s", time())
-        current_app.logger.info("Fetching rental class mappings for API at %s", time())
-
-        # Fetch all rental class mappings
-        logger.debug("Querying rental_class_mappings")
-        try:
-            base_mappings = session.query(RentalClassMapping).all()
-            logger.info(f"Fetched {len(base_mappings)} base mappings from RentalClassMapping")
-        except Exception as db_error:
-            logger.error(f"Failed to fetch base_mappings from RentalClassMapping: {str(db_error)}", exc_info=True)
-            current_app.logger.error(f"Failed to fetch base_mappings from RentalClassMapping: {str(db_error)}", exc_info=True)
-            base_mappings = []
-
-        logger.debug("Querying user_rental_class_mappings")
-        try:
-            user_mappings = session.query(UserRentalClassMapping).all()
-            logger.info(f"Fetched {len(user_mappings)} user mappings from UserRentalClassMapping")
-        except Exception as db_error:
-            logger.error(f"Failed to fetch user_mappings from UserRentalClassMapping: {str(db_error)}", exc_info=True)
-            current_app.logger.error(f"Failed to fetch user_mappings from UserRentalClassMapping: {str(db_error)}", exc_info=True)
-            user_mappings = []
-
-        # Merge mappings, prioritizing user mappings
-        mappings_dict = {}
-        for m in base_mappings:
-            normalized_id = str(m.rental_class_id).strip()
-            mappings_dict[normalized_id] = {
-                'category': m.category,
-                'subcategory': m.subcategory,
-                'short_common_name': m.short_common_name or 'N/A'
-            }
-            logger.debug(f"Added base mapping: rental_class_id={normalized_id}, category={m.category}, subcategory={m.subcategory}")
-        for um in user_mappings:
-            normalized_id = str(um.rental_class_id).strip()
-            mappings_dict[normalized_id] = {
-                'category': um.category,
-                'subcategory': um.subcategory,
-                'short_common_name': um.short_common_name or 'N/A'
-            }
-            logger.debug(f"Added user mapping: rental_class_id={normalized_id}, category={um.category}, subcategory={um.subcategory}")
-        logger.debug(f"Merged mappings into dictionary with {len(mappings_dict)} entries")
-
-        # Fetch seed data from cache or database
-        cache_key = 'seed_rental_classes'
-        logger.debug(f"Checking cache for key: {cache_key}")
-        try:
-            seed_data = cache.get(cache_key)
-        except Exception as cache_error:
-            logger.error(f"Cache error for key {cache_key}: {str(cache_error)}. Bypassing cache.", exc_info=True)
-            current_app.logger.error(f"Cache error for key {cache_key}: {str(cache_error)}. Bypassing cache.", exc_info=True)
-            seed_data = None
-
-        if seed_data is None:
-            logger.info("Seed data not found in cache or cache failed, fetching from database")
-            try:
-                seed_data = session.query(SeedRentalClass).all()
-                seed_data = [{'rental_class_id': s.rental_class_id, 'common_name': s.common_name or 'Unknown', 'bin_location': s.bin_location} for s in seed_data]
-                logger.info(f"Fetched {len(seed_data)} seed data records from database")
-            except Exception as db_error:
-                logger.error(f"Failed to fetch seed data from database: {str(db_error)}", exc_info=True)
-                current_app.logger.error(f"Failed to fetch seed data from database: {str(db_error)}", exc_info=True)
-                seed_data = []
-
-            # Fallback to API if database is empty
-            if not seed_data:
-                logger.info("No seed data in database, fetching from API")
-                try:
-                    api_client = APIClient()
-                    seed_data = api_client.get_seed_data()
-                    if isinstance(seed_data, dict) and 'data' in seed_data:
-                        seed_data = seed_data['data']
-                    logger.debug(f"Fetched seed data from API: {len(seed_data)} records")
-                except Exception as api_error:
-                    logger.error(f"Failed to fetch seed data from API: {str(api_error)}", exc_info=True)
-                    current_app.logger.error(f"Failed to fetch seed data from API: {str(api_error)}", exc_info=True)
-                    seed_data = []
-
-        # Create a mapping of rental_class_id to common_name
-        try:
-            common_name_dict = build_common_name_dict(seed_data)
-        except Exception as dict_error:
-            logger.error(f"Error creating common_name_dict from seed_data: {str(dict_error)}", exc_info=True)
-            current_app.logger.error(f"Error creating common_name_dict from seed_data: {str(dict_error)}", exc_info=True)
-            common_name_dict = {}
-
-        # Build categories list
-        categories = []
-        for rental_class_id, mapping in mappings_dict.items():
-            normalized_rental_class_id = str(rental_class_id).strip()
-            common_name = common_name_dict.get(normalized_rental_class_id, 'N/A')
-            categories.append({
-                'category': mapping['category'],
-                'subcategory': mapping['subcategory'],
-                'rental_class_id': rental_class_id,
-                'common_name': common_name,
-                'short_common_name': mapping['short_common_name']
-            })
-        logger.debug(f"Built categories list with {len(categories)} entries")
-
-        # Cache the seed_data after lookup
-        if seed_data:
-            try:
-                seed_data_copy = copy.deepcopy(seed_data)
-                cache.set(cache_key, seed_data_copy, ex=3600)  # Cache for 1 hour
-                logger.info("Fetched seed data and cached")
-                current_app.logger.info("Fetched seed data and cached")
-            except Exception as cache_error:
-                logger.error(f"Error caching seed_data: {str(cache_error)}. Data will be fetched on next request.", exc_info=True)
-                current_app.logger.error(f"Error caching seed_data: {str(cache_error)}. Data will be fetched on next request.", exc_info=True)
-
-        categories.sort(key=lambda x: (x['category'] or '', x['subcategory'] or '', x['rental_class_id'] or ''))
-        logger.info(f"Returning {len(categories)} category mappings")
+        logger.error(f"Error updating refresh state: {str(e)}", exc_info=True)
+        session.rollback()
+    finally:
         session.close()
-        return jsonify(categories)
-    except Exception as e:
-        logger.error(f"Error fetching mappings: {str(e)}", exc_info=True)
-        current_app.logger.error(f"Error fetching mappings: {str(e)}", exc_info=True)
-        if 'session' in locals():
-            session.close()
-        return jsonify({'error': f'Failed to fetch mappings: {str(e)}'}), 500
 
-@categories_bp.route('/categories/update', methods=['POST'])
-def update_mappings():
-    session = None
+def update_user_mappings(session, csv_file_path='/home/tim/test_rfidpi/seeddata_20250425155406.csv'):
+    """Populate user_rental_class_mappings from CSV."""
+    logger.info("Updating user_rental_class_mappings from CSV")
+    mappings_dict = {}
+    row_count = 0
     try:
-        session = db.session()
-        logger.info("Starting new session for update_mappings at %s", time())
-        current_app.logger.info("Starting new session for update_mappings at %s", time())
-
-        new_mappings = request.get_json()
-        logger.info(f"Received {len(new_mappings)} new mappings")
-        current_app.logger.info(f"Received {len(new_mappings)} new mappings")
-
-        if not isinstance(new_mappings, list):
-            logger.error("Invalid data format received, expected a list")
-            current_app.logger.error("Invalid data format received, expected a list")
-            return jsonify({'error': 'Invalid data format, expected a list'}), 400
-
-        # Validate and update mappings
-        for mapping in new_mappings:
-            rental_class_id = mapping.get('rental_class_id')
-            category = mapping.get('category')
-            subcategory = mapping.get('subcategory', '')
-            short_common_name = mapping.get('short_common_name', '')
-
-            if not rental_class_id or not category:
-                logger.warning(f"Skipping invalid mapping due to missing rental_class_id or category: {mapping}")
-                current_app.logger.warning(f"Skipping invalid mapping due to missing rental_class_id or category: {mapping}")
-                continue
-
-            # Check if mapping exists
-            existing = session.query(UserRentalClassMapping).filter_by(rental_class_id=rental_class_id).first()
-            if existing:
-                # Update existing mapping
-                existing.category = category
-                existing.subcategory = subcategory
-                existing.short_common_name = short_common_name
-                logger.debug(f"Updated existing mapping: rental_class_id={rental_class_id}, category={category}, subcategory={subcategory}")
-            else:
-                # Insert new mapping
+        if not os.path.exists(csv_file_path):
+            logger.error(f"CSV file not found at: {csv_file_path}")
+            return
+        with open(csv_file_path, 'r', encoding='utf-8') as csvfile:
+            reader = csv.DictReader(csvfile)
+            logger.info("Reading CSV for user mappings")
+            expected_columns = {'rental_class_id', 'Cat', 'SubCat'}
+            if not expected_columns.issubset(reader.fieldnames):
+                logger.error(f"CSV missing required columns. Expected: {expected_columns}, Found: {reader.fieldnames}")
+                return
+            for row in reader:
+                row_count += 1
+                try:
+                    rental_class_id = row.get('rental_class_id', '').strip()
+                    category = row.get('Cat', '').strip()
+                    subcategory = row.get('SubCat', '').strip()
+                    if not rental_class_id or not category or not subcategory:
+                        logger.debug(f"Skipping row {row_count} with missing data: {row}")
+                        continue
+                    if rental_class_id in mappings_dict:
+                        logger.warning(f"Duplicate rental_class_id {rental_class_id} at row {row_count}, keeping first")
+                        continue
+                    mappings_dict[rental_class_id] = {
+                        'rental_class_id': rental_class_id,
+                        'category': category,
+                        'subcategory': subcategory,
+                        'short_common_name': ''
+                    }
+                except Exception as e:
+                    logger.error(f"Error processing CSV row {row_count}: {str(e)}", exc_info=True)
+                    continue
+        logger.info(f"Processed {row_count} CSV rows, {len(mappings_dict)} unique mappings")
+        deleted_count = session.query(UserRentalClassMapping).delete()
+        logger.info(f"Deleted {deleted_count} existing user mappings")
+        inserted_count = 0
+        for mapping in mappings_dict.values():
+            try:
                 user_mapping = UserRentalClassMapping(
-                    rental_class_id=rental_class_id,
-                    category=category,
-                    subcategory=subcategory or '',
-                    short_common_name=short_common_name or ''
+                    rental_class_id=mapping['rental_class_id'],
+                    category=mapping['category'],
+                    subcategory=mapping['subcategory'],
+                    short_common_name=mapping['short_common_name'],
+                    created_at=datetime.utcnow(),
+                    updated_at=datetime.utcnow()
                 )
                 session.add(user_mapping)
-                logger.debug(f"Added new mapping: rental_class_id={rental_class_id}, category={category}, subcategory={subcategory}")
-
-        session.commit()
-        logger.info("Successfully committed rental class mappings")
-        current_app.logger.info("Successfully committed rental class mappings")
-
-        return jsonify({'message': 'Mappings updated successfully'})
-    except IntegrityError as e:
-        logger.error(f"Database integrity error during update_mappings: {str(e)}", exc_info=True)
-        current_app.logger.error(f"Database integrity error during update_mappings: {str(e)}", exc_info=True)
-        if session:
-            session.rollback()
-        return jsonify({'error': f'Database integrity error: {str(e)}'}), 400
-    except SQLAlchemyError as e:
-        logger.error(f"Database error during update_mappings: {str(e)}", exc_info=True)
-        current_app.logger.error(f"Database error during update_mappings: {str(e)}", exc_info=True)
-        if session:
-            session.rollback()
-        return jsonify({'error': f'Database error: {str(e)}'}), 500
+                session.commit()
+                inserted_count += 1
+            except Exception as e:
+                logger.error(f"Error inserting mapping {mapping['rental_class_id']}: {str(e)}", exc_info=True)
+                session.rollback()
+                continue
+        logger.info(f"Inserted {inserted_count} user mappings")
     except Exception as e:
-        logger.error(f"Unexpected error during update_mappings: {str(e)}", exc_info=True)
-        current_app.logger.error(f"Unexpected error during update_mappings: {str(e)}", exc_info=True)
-        if session:
-            session.rollback()
-        return jsonify({'error': f'Unexpected error: {str(e)}'}), 500
-    finally:
-        if session:
-            session.close()
-            logger.info("Database session closed for update_mappings")
-            current_app.logger.info("Database session closed for update_mappings")
+        logger.error(f"Error updating user mappings: {str(e)}", exc_info=True)
+        session.rollback()
 
-@categories_bp.route('/categories/delete', methods=['POST'])
-def delete_mapping():
-    session = None
+def update_item_master(session, items):
+    logger.info(f"Updating {len(items)} items in id_item_master")
+    skipped = 0
+    failed = 0
+    batch_size = 500
+    for i in range(0, len(items), batch_size):
+        batch = items[i:i + batch_size]
+        try:
+            for item in batch:
+                tag_id = item.get('tag_id')
+                if not tag_id:
+                    logger.warning(f"Skipping item with missing tag_id: {item}")
+                    skipped += 1
+                    continue
+                db_item = ItemMaster(tag_id=tag_id)
+                db_item.serial_number = item.get('serial_number')
+                db_item.rental_class_num = item.get('rental_class_num')
+                db_item.client_name = item.get('client_name')
+                db_item.common_name = item.get('common_name', 'Unknown')
+                db_item.quality = item.get('quality')
+                db_item.bin_location = item.get('bin_location')
+                raw_status = item.get('status')
+                db_item.status = raw_status if raw_status else 'Unknown'
+                db_item.last_contract_num = item.get('last_contract_num')
+                db_item.last_scanned_by = item.get('last_scanned_by')
+                db_item.notes = item.get('notes')
+                db_item.status_notes = item.get('status_notes')
+                longitude = item.get('long')
+                latitude = item.get('lat')
+                db_item.longitude = float(longitude) if longitude and longitude.strip() else None
+                db_item.latitude = float(latitude) if latitude and longitude.strip() else None
+                db_item.date_last_scanned = validate_date(item.get('date_last_scanned'), 'date_last_scanned', tag_id)
+                db_item.date_created = validate_date(item.get('date_created'), 'date_created', tag_id)
+                db_item.date_updated = validate_date(item.get('date_updated'), 'date_updated', tag_id)
+                session.merge(db_item)
+            session.commit()
+            logger.debug(f"Committed item batch {i//batch_size + 1}")
+        except Exception as e:
+            logger.error(f"Error updating item batch {i//batch_size + 1}: {str(e)}", exc_info=True)
+            session.rollback()
+            failed += len(batch)
+    logger.info(f"Updated {len(items) - skipped - failed} items, skipped {skipped}, failed {failed}")
+
+def update_transactions(session, transactions):
+    logger.info(f"Updating {len(transactions)} transactions in id_transactions")
+    skipped = 0
+    failed = 0
+    batch_size = 500
+    for i in range(0, len(transactions), batch_size):
+        batch = transactions[i:i + batch_size]
+        try:
+            for transaction in batch:
+                tag_id = transaction.get('tag_id')
+                scan_date = transaction.get('scan_date')
+                if not tag_id or not scan_date:
+                    logger.warning(f"Skipping transaction with missing tag_id or scan_date: {transaction}")
+                    skipped += 1
+                    continue
+                scan_date_dt = validate_date(scan_date, 'scan_date', tag_id)
+                if not scan_date_dt:
+                    logger.warning(f"Skipping transaction with invalid scan_date for tag_id {tag_id}: {scan_date}")
+                    skipped += 1
+                    continue
+                db_transaction = Transaction(tag_id=tag_id, scan_date=scan_date_dt)
+                db_transaction.scan_type = transaction.get('scan_type', 'Unknown')
+                db_transaction.contract_number = transaction.get('contract_number')
+                db_transaction.client_name = transaction.get('client_name')
+                db_transaction.notes = transaction.get('notes')
+                db_transaction.rental_class_num = transaction.get('rental_class_id')
+                db_transaction.common_name = transaction.get('common_name', 'Unknown')
+                db_transaction.serial_number = transaction.get('serial_number')
+                db_transaction.location_of_repair = transaction.get('location_of_repair')
+                db_transaction.quality = transaction.get('quality')
+                db_transaction.bin_location = transaction.get('bin_location')
+                db_transaction.status = transaction.get('status')
+                db_transaction.scan_by = transaction.get('scan_by')
+                def to_bool(value):
+                    if isinstance(value, str):
+                        return value.lower() == 'true'
+                    return bool(value) if value is not None else None
+                db_transaction.dirty_or_mud = to_bool(transaction.get('dirty_or_mud'))
+                db_transaction.leaves = to_bool(transaction.get('leaves'))
+                db_transaction.oil = to_bool(transaction.get('oil'))
+                db_transaction.mold = to_bool(transaction.get('mold'))
+                db_transaction.stain = to_bool(transaction.get('stain'))
+                db_transaction.oxidation = to_bool(transaction.get('oxidation'))
+                db_transaction.other = transaction.get('other')
+                db_transaction.rip_or_tear = to_bool(transaction.get('rip_or_tear'))
+                db_transaction.sewing_repair_needed = to_bool(transaction.get('sewing_repair_needed'))
+                db_transaction.grommet = to_bool(transaction.get('grommet'))
+                db_transaction.rope = to_bool(transaction.get('rope'))
+                db_transaction.buckle = to_bool(transaction.get('buckle'))
+                db_transaction.wet = to_bool(transaction.get('wet'))
+                db_transaction.service_required = to_bool(transaction.get('service_required'))
+                db_transaction.date_created = validate_date(transaction.get('date_created'), 'date_created', tag_id)
+                db_transaction.date_updated = validate_date(transaction.get('date_updated'), 'date_updated', tag_id)
+                session.merge(db_transaction)
+            session.commit()
+            logger.debug(f"Committed transaction batch {i//batch_size + 1}")
+        except Exception as e:
+            logger.error(f"Error updating transaction batch {i//batch_size + 1}: {str(e)}", exc_info=True)
+            session.rollback()
+            failed += len(batch)
+    logger.info(f"Updated {len(transactions) - skipped - failed} transactions, skipped {skipped}, failed {failed}")
+
+def update_seed_data(session, seed_data):
+    logger.info(f"Updating {len(seed_data)} items in seed_rental_classes")
+    skipped = 0
+    failed = 0
+    batch_size = 500
+    for i in range(0, len(seed_data), batch_size):
+        batch = seed_data[i:i + batch_size]
+        try:
+            for item in batch:
+                rental_class_id = item.get('rental_class_id')
+                if not rental_class_id:
+                    logger.warning(f"Skipping seed item with missing rental_class_id: {item}")
+                    skipped += 1
+                    continue
+                db_seed = SeedRentalClass(rental_class_id=rental_class_id)
+                db_seed.common_name = item.get('common_name', 'Unknown')
+                db_seed.bin_location = item.get('bin_location')
+                session.merge(db_seed)
+            session.commit()
+            logger.debug(f"Committed seed data batch {i//batch_size + 1}")
+        except Exception as e:
+            logger.error(f"Error updating seed item batch {i//batch_size + 1}: {str(e)}", exc_info=True)
+            session.rollback()
+            failed += len(batch)
+    logger.info(f"Updated {len(seed_data) - skipped - failed} seed items, skipped {skipped}, failed {failed}")
+
+def full_refresh():
+    logger.info("Starting full refresh")
+    session = db.session()
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            logger.debug("Clearing existing data")
+            deleted_items = session.query(ItemMaster).delete()
+            deleted_transactions = session.query(Transaction).delete()
+            deleted_seed = session.query(SeedRentalClass).delete()
+            deleted_mappings = session.query(UserRentalClassMapping).delete()
+            session.commit()
+            logger.info(f"Deleted {deleted_items} items from id_item_master")
+            logger.info(f"Deleted {deleted_transactions} transactions from id_transactions")
+            logger.info(f"Deleted {deleted_seed} items from seed_rental_classes")
+            logger.info(f"Deleted {deleted_mappings} user mappings from user_rental_class_mappings")
+
+            logger.debug("Fetching data from API")
+            items = api_client.get_item_master(since_date=None)
+            transactions = api_client.get_transactions(since_date=None)
+            seed_data = api_client.get_seed_data()
+
+            logger.info(f"Fetched {len(items)} items from item master")
+            logger.info(f"Fetched {len(transactions)} transactions")
+            logger.info(f"Fetched {len(seed_data)} items from seed data")
+
+            if not items:
+                logger.warning("No items fetched from item master API")
+            if not transactions:
+                logger.warning("No transactions fetched from transactions API")
+            if not seed_data:
+                logger.warning("No seed data fetched from seed API")
+
+            update_item_master(session, items)
+            update_transactions(session, transactions)
+            update_seed_data(session, seed_data)
+            update_user_mappings(session)
+
+            update_refresh_state('full_refresh', datetime.utcnow())
+            logger.info("Full refresh completed successfully")
+            break
+        except OperationalError as e:
+            if "Deadlock" in str(e):
+                if attempt < max_retries - 1:
+                    logger.warning(f"Deadlock detected, retrying ({attempt + 1}/{max_retries})")
+                    session.rollback()
+                    time.sleep(2 ** attempt)
+                    continue
+                else:
+                    logger.error(f"Max retries reached for deadlock: {str(e)}", exc_info=True)
+                    raise
+            else:
+                logger.error(f"Database error: {str(e)}", exc_info=True)
+                raise
+        except Exception as e:
+            logger.error(f"Full refresh failed: {str(e)}", exc_info=True)
+            session.rollback()
+            raise
+        finally:
+            if session.is_active:
+                session.rollback()
+            session.close()
+
+def incremental_refresh():
+    logger.info("Starting incremental refresh")
+    session = db.session()
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            with session.no_autoflush:
+                since_date = datetime.utcnow() - timedelta(seconds=INCREMENTAL_LOOKBACK_SECONDS)
+                logger.info(f"Checking for updates since: {since_date.strftime('%Y-%m-%d %H:%M:%S')}")
+
+                items = api_client.get_item_master(since_date=since_date)
+                logger.info(f"Fetched {len(items)} items from item master")
+                if not items:
+                    logger.info("No new items fetched from item master API")
+
+                transactions = api_client.get_transactions(since_date=since_date)
+                logger.info(f"Fetched {len(transactions)} transactions")
+                if not transactions:
+                    logger.info("No new transactions fetched from transactions API")
+
+                update_item_master(session, items)
+                update_transactions(session, transactions)
+
+                session.commit()
+                update_refresh_state('incremental_refresh', datetime.utcnow())
+                logger.info("Incremental refresh completed successfully")
+                break
+        except OperationalError as e:
+            if "Lock wait timeout" in str(e) or "Deadlock" in str(e):
+                if attempt < max_retries - 1:
+                    logger.warning(f"Database lock/timeout detected, retrying ({attempt + 1}/{max_retries})")
+                    session.rollback()
+                    time.sleep(2 ** attempt)
+                    continue
+                else:
+                    logger.error(f"Max retries reached for lock/timeout: {str(e)}", exc_info=True)
+                    raise
+            else:
+                logger.error(f"Database error: {str(e)}", exc_info=True)
+                raise
+        except Exception as e:
+            logger.error(f"Incremental refresh failed: {str(e)}", exc_info=True)
+            session.rollback()
+            raise
+        finally:
+            session.close()
+
+@refresh_bp.route('/refresh/full', methods=['POST'])
+def full_refresh_endpoint():
+    logger.info("Received request for full refresh via endpoint")
     try:
-        session = db.session()
-        data = request.get_json()
-        rental_class_id = data.get('rental_class_id')
-
-        if not rental_class_id:
-            logger.error("Missing rental_class_id in delete request")
-            current_app.logger.error("Missing rental_class_id in delete request")
-            return jsonify({'error': 'Rental class ID is required'}), 400
-
-        logger.info(f"Deleting mapping for rental_class_id: {rental_class_id}")
-        current_app.logger.info(f"Deleting mapping for rental_class_id: {rental_class_id}")
-        deleted_count = session.query(UserRentalClassMapping).filter_by(rental_class_id=rental_class_id).delete()
-        session.commit()
-        logger.info(f"Deleted {deleted_count} user mappings for rental_class_id: {rental_class_id}")
-        current_app.logger.info(f"Deleted {deleted_count} user mappings for rental_class_id: {rental_class_id}")
-
-        return jsonify({'message': 'Mapping deleted successfully'})
-    except SQLAlchemyError as e:
-        logger.error(f"Database error during delete_mapping: {str(e)}", exc_info=True)
-        current_app.logger.error(f"Database error during delete_mapping: {str(e)}", exc_info=True)
-        if session:
-            session.rollback()
-        return jsonify({'error': f'Database error: {str(e)}'}), 500
+        full_refresh()
+        logger.info("Full refresh completed successfully")
+        return jsonify({'status': 'success', 'message': 'Full refresh completed successfully'})
+    except OperationalError as e:
+        logger.error(f"Database error during full refresh: {str(e)}", exc_info=True)
+        return jsonify({'status': 'error', 'message': f"Database error: {str(e)}"}), 500
     except Exception as e:
-        logger.error(f"Unexpected error during delete_mapping: {str(e)}", exc_info=True)
-        current_app.logger.error(f"Unexpected error during delete_mapping: {str(e)}", exc_info=True)
-        if session:
-            session.rollback()
-        return jsonify({'error': f'Unexpected error: {str(e)}'}), 500
+        logger.error(f"Full refresh failed: {str(e)}", exc_info=True)
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@refresh_bp.route('/refresh/incremental', methods=['POST'])
+def incremental_refresh_endpoint():
+    logger.info("Received request for incremental refresh via endpoint")
+    try:
+        incremental_refresh()
+        logger.info("Incremental refresh completed successfully")
+        return jsonify({'status': 'success', 'message': 'Incremental refresh completed successfully'})
+    except OperationalError as e:
+        logger.error(f"Database error during incremental refresh: {str(e)}", exc_info=True)
+        return jsonify({'status': 'error', 'message': f"Database error: {str(e)}"}), 500
+    except Exception as e:
+        logger.error(f"Incremental refresh failed: {str(e)}", exc_info=True)
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@refresh_bp.route('/clear_api_data', methods=['POST'])
+def clear_api_data():
+    logger.info("Received request for clear API data and refresh")
+    try:
+        full_refresh()
+        logger.info("Clear API data and refresh completed successfully")
+        return jsonify({'status': 'success', 'message': 'API data cleared and refreshed successfully'})
+    except OperationalError as e:
+        logger.error(f"Database error during clear API data: {str(e)}", exc_info=True)
+        return jsonify({'status': 'error', 'message': f"Database error: {str(e)}"}), 500
+    except Exception as e:
+        logger.error(f"Clear API data and refresh failed: {str(e)}", exc_info=True)
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@refresh_bp.route('/refresh/status', methods=['GET'])
+def get_refresh_status():
+    logger.info("Fetching refresh status")
+    session = db.session()
+    try:
+        refresh_state = session.query(RefreshState).first()
+        if refresh_state:
+            return jsonify({
+                'status': 'success',
+                'last_refresh': refresh_state.last_refresh,
+                'refresh_type': refresh_state.state_type
+            })
+        else:
+            logger.info("No refresh state found")
+            return jsonify({
+                'status': 'success',
+                'last_refresh': 'N/A',
+                'refresh_type': 'N/A'
+            })
+    except Exception as e:
+        logger.error(f"Error fetching refresh status: {str(e)}", exc_info=True)
+        return jsonify({'status': 'error', 'message': str(e)}), 500
     finally:
-        if session:
-            session.close()
-            logger.info("Database session closed for delete_mapping")
-            current_app.logger.info("Database session closed for delete_mapping")
+        session.close()
