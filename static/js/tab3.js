@@ -1,19 +1,20 @@
-console.log('tab3.js version: 2025-06-26-v23 loaded');
+console.log('tab3.js version: 2025-06-26-v24 loaded');
 
 /**
  * Tab3.js: Logic for Tab 3 (Items in Service).
  * Dependencies: common.js for formatDate.
- * Updated: 2025-06-26-v23
- * - Increased debounce wait time to 10000ms to prevent 429 errors.
- * - Adjusted retry delays to 2000ms, 4000ms, 8000ms for 429 errors.
- * - Added retry status message to improve UX.
- * - Cleared commonNameSelect and tagQuantity after sync for seamless next entry.
+ * Updated: 2025-06-26-v24
+ * - Ensured sections start collapsed on load.
+ * - Fixed collapse button functionality with proper CSS toggling.
+ * - Added crew filter dropdown (Tent Crew, Linen Crew, Service Dept).
+ * - Enhanced debouncing for remove-btn (15000ms).
+ * - Increased debounce wait time to 15000ms for syncToPc and updateStatusBtn.
+ * - Removed duplicate event listeners by checking existing ones.
  * - Preserved all existing functionality.
  */
 
 /**
- * Debounce function with immediate lock to prevent multiple rapid executions
- * Used by: setupPrintTagsSection for syncToPc and updateStatusBtn
+ * Debounce function with immediate lock
  */
 function debounce(func, wait) {
     let timeout;
@@ -39,7 +40,7 @@ function debounce(func, wait) {
 }
 
 /**
- * Retry function for handling 429 errors with exponential backoff
+ * Retry function for handling 429 errors
  */
 async function retryRequest(url, options, maxRetries = 3, baseDelay = 2000) {
     const syncMessage = document.getElementById('syncMessage');
@@ -70,8 +71,7 @@ async function retryRequest(url, options, maxRetries = 3, baseDelay = 2000) {
 }
 
 /**
- * Populate the common name dropdown for printing tags
- * Called on: DOMContentLoaded
+ * Populate the common name dropdown
  */
 function populateCommonNameDropdown() {
     const select = document.getElementById('commonNameSelect');
@@ -103,8 +103,23 @@ function populateCommonNameDropdown() {
 }
 
 /**
+ * Populate crew filter dropdown
+ */
+function populateCrewFilter() {
+    const select = document.getElementById('crewFilterTab3');
+    if (!select) {
+        console.warn(`Crew filter dropdown not found at ${new Date().toISOString()}`);
+        return;
+    }
+
+    const crews = ['All', 'Tent Crew', 'Linen Crew', 'Service Dept'];
+    select.innerHTML = crews.map(crew => `<option value="${crew === 'All' ? '' : crew}">${crew}</option>`).join('');
+    const urlParams = new URLSearchParams(window.location.search);
+    select.value = urlParams.get('crew') || '';
+}
+
+/**
  * Fetch and display CSV contents
- * Called on: DOMContentLoaded, syncToPc, removeCsvItem, updateStatusBtn
  */
 function fetchCsvContents() {
     const tbody = document.getElementById('csvContentsBody');
@@ -157,7 +172,7 @@ function fetchCsvContents() {
 }
 
 /**
- * Handle sync to PC and status update for printing tags
+ * Handle sync to PC and status update
  */
 function setupPrintTagsSection() {
     const syncBtn = document.getElementById('syncToPcBtn');
@@ -213,7 +228,6 @@ function setupPrintTagsSection() {
             syncMessage.innerHTML = `<div class="alert alert-success">Successfully synced ${data.synced_items} items to PC.</div>`;
             console.log(`DEBUG: Sync successful, ${data.synced_items} items added at ${new Date().toISOString()}`);
             fetchCsvContents();
-            // Clear inputs for next sync
             commonNameSelect.value = '';
             tagQuantity.value = '';
         } catch (error) {
@@ -222,7 +236,7 @@ function setupPrintTagsSection() {
         } finally {
             syncBtn.disabled = false;
         }
-    }, 10000); // Increased to 10000ms to prevent 429 errors
+    }, 15000);
 
     const debouncedUpdateStatus = debounce(async () => {
         updateStatusBtn.disabled = true;
@@ -260,22 +274,57 @@ function setupPrintTagsSection() {
             syncMessage.innerHTML = `<div class="alert alert-danger">Error updating status: ${error.message}</div>`;
             updateStatusBtn.disabled = false;
         }
-    }, 10000); // Increased to 10000ms to prevent 429 errors
+    }, 15000);
 
-    // Remove any existing listeners and add new ones
-    syncBtn.removeEventListener('click', debouncedSync);
-    syncBtn.addEventListener('click', () => {
+    const debouncedRemove = debounce(async (tagId, removeBtn) => {
+        if (!confirm(`Are you sure you want to remove item with Tag ID ${tagId}?`)) {
+            return;
+        }
+
+        try {
+            const response = await retryRequest('/tab/3/remove_csv_item', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ tag_id: tagId })
+            }, 3, 2000);
+
+            if (!response.ok) {
+                throw new Error(`Failed to remove item: ${response.status}`);
+            }
+
+            const data = await response.json();
+            if (data.error) {
+                throw new Error(data.error);
+            }
+
+            syncMessage.innerHTML = `<div class="alert alert-success">${data.message}</div>`;
+            console.log(`DEBUG: Removed item with tag_id ${tagId} at ${new Date().toISOString()}`);
+            fetchCsvContents();
+        } catch (error) {
+            console.error(`Error removing item: ${error} at ${new Date().toISOString()}`);
+            syncMessage.innerHTML = `<div class="alert alert-danger">Error removing item: ${error.message}</div>`;
+        }
+    }, 15000);
+
+    // Remove existing listeners
+    syncBtn.removeEventListener('click', syncBtn._clickHandler);
+    syncBtn._clickHandler = () => {
         console.log(`DEBUG: Sync to PC button clicked at ${new Date().toISOString()}`);
         debouncedSync();
-    });
+    };
+    syncBtn.addEventListener('click', syncBtn._clickHandler, { once: true });
 
-    updateStatusBtn.removeEventListener('click', debouncedUpdateStatus);
-    updateStatusBtn.addEventListener('click', () => {
+    updateStatusBtn.removeEventListener('click', updateStatusBtn._clickHandler);
+    updateStatusBtn._clickHandler = () => {
         console.log(`DEBUG: Update Status button clicked at ${new Date().toISOString()}`);
         debouncedUpdateStatus();
-    }, { once: true });
+    };
+    updateStatusBtn.addEventListener('click', updateStatusBtn._clickHandler, { once: true });
 
-    csvContentsTable.addEventListener('click', (event) => {
+    csvContentsTable.removeEventListener('click', csvContentsTable._clickHandler);
+    csvContentsTable._clickHandler = (event) => {
         const removeBtn = event.target.closest('.remove-btn');
         if (!removeBtn) return;
 
@@ -285,60 +334,28 @@ function setupPrintTagsSection() {
             return;
         }
 
-        if (removeBtn.classList.contains('processing')) {
-            console.log(`DEBUG: Remove button already processing for tag_id: ${tagId} at ${new Date().toISOString()}`);
-            return;
-        }
         removeBtn.classList.add('processing');
-
-        if (!confirm(`Are you sure you want to remove item with Tag ID ${tagId}?`)) {
-            removeBtn.classList.remove('processing');
-            return;
-        }
-
-        fetch('/tab/3/remove_csv_item', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ tag_id: tagId })
-        })
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`Failed to remove item: ${response.status}`);
-            }
-            return response.json();
-        })
-        .then(data => {
-            if (data.error) {
-                throw new Error(data.error);
-            }
-            syncMessage.innerHTML = `<div class="alert alert-success">${data.message}</div>`;
-            console.log(`DEBUG: Removed item with tag_id ${tagId} at ${new Date().toISOString()}`);
-            fetchCsvContents();
-        })
-        .catch(error => {
-            console.error(`Error removing item: ${error} at ${new Date().toISOString()}`);
-            syncMessage.innerHTML = `<div class="alert alert-danger">Error removing item: ${error.message}</div>`;
-        })
-        .finally(() => {
+        debouncedRemove(tagId, removeBtn).finally(() => {
             removeBtn.classList.remove('processing');
         });
-    }, { once: false });
+    };
+    csvContentsTable.addEventListener('click', csvContentsTable._clickHandler);
 }
 
 /**
  * Apply filters for Tab 3
  */
 function applyTab3Filters() {
-    const commonName = document.getElementById('commonNameFilterTab3').value;
-    const date = document.getElementById('dateFilterTab3').value;
-    const sort = document.getElementById('sortFilterTab3').value;
+    const commonName = document.getElementById('commonNameFilterTab3')?.value || '';
+    const date = document.getElementById('dateFilterTab3')?.value || '';
+    const sort = document.getElementById('sortFilterTab3')?.value || 'date_last_scanned_desc';
+    const crew = document.getElementById('crewFilterTab3')?.value || '';
 
     const params = new URLSearchParams();
     if (commonName) params.append('common_name', commonName);
     if (date) params.append('date_last_scanned', date);
     if (sort) params.append('sort', sort);
+    if (crew) params.append('crew', crew);
 
     window.location.href = `/tab/3?${params.toString()}`;
 }
@@ -355,7 +372,7 @@ function clearTab3Filters() {
  */
 function updateStatusVisibility(tagId) {
     const select = document.getElementById(`tab3-status-${tagId}`);
-    const saveBtn = select.closest('tr').querySelector('.tab3-save-status-btn');
+    const saveBtn = select?.closest('tr')?.querySelector('.tab3-save-status-btn');
     if (!select || !saveBtn) {
         console.warn(`Status select or save button not found for tag_id: ${tagId} at ${new Date().toISOString()}`);
         return;
@@ -400,7 +417,7 @@ function updateStatus(tagId) {
  */
 function updateNotesVisibility(tagId) {
     const textarea = document.getElementById(`tab3-notes-${tagId}`);
-    const saveBtn = textarea.closest('tr').querySelector('.tab3-save-notes-btn');
+    const saveBtn = textarea?.closest('tr')?.querySelector('.tab3-save-notes-btn');
     if (!textarea || !saveBtn) {
         console.warn(`Notes textarea or save button not found for tag_id: ${tagId} at ${new Date().toISOString()}`);
         return;
@@ -444,7 +461,23 @@ function updateNotes(tagId) {
  * Handle expand/collapse functionality for summary table
  */
 function setupExpandCollapse() {
+    // Initialize all expandable sections as collapsed
+    document.querySelectorAll('.expandable').forEach(section => {
+        section.classList.remove('expanded');
+        section.classList.add('collapsed');
+        section.style.display = 'none';
+        section.style.opacity = '0';
+        const collapseBtn = section.closest('tr').querySelector('.collapse-btn');
+        const expandBtn = section.closest('tr').querySelector('.expand-btn');
+        if (collapseBtn && expandBtn) {
+            collapseBtn.style.display = 'none';
+            expandBtn.style.display = 'inline-block';
+        }
+    });
+
     document.addEventListener('click', (event) => {
+        if (window.cachedTabNum !== 3) return; // Skip for non-Tab 3 pages
+
         const expandBtn = event.target.closest('.expand-btn');
         const collapseBtn = event.target.closest('.collapse-btn');
 
@@ -458,6 +491,8 @@ function setupExpandCollapse() {
 
             expandable.classList.remove('collapsed');
             expandable.classList.add('expanded');
+            expandable.style.display = 'block';
+            expandable.style.opacity = '1';
             expandBtn.style.display = 'none';
             const siblingCollapseBtn = expandBtn.parentElement.querySelector('.collapse-btn');
             if (siblingCollapseBtn) {
@@ -473,6 +508,8 @@ function setupExpandCollapse() {
 
             expandable.classList.remove('expanded');
             expandable.classList.add('collapsed');
+            expandable.style.display = 'none';
+            expandable.style.opacity = '0';
             collapseBtn.style.display = 'none';
             const siblingExpandBtn = collapseBtn.parentElement.querySelector('.expand-btn');
             if (siblingExpandBtn) {
@@ -487,7 +524,12 @@ function setupExpandCollapse() {
  */
 document.addEventListener('DOMContentLoaded', function() {
     console.log(`tab3.js: DOMContentLoaded at ${new Date().toISOString()}`);
-    // Format timestamps in the details tables
+    if (window.cachedTabNum !== 3) {
+        console.log(`Skipping Tab 3 initialization for non-Tab 3 page at ${new Date().toISOString()}`);
+        return;
+    }
+
+    // Format timestamps
     document.querySelectorAll('.tab3-details-table').forEach(table => {
         const rows = table.querySelectorAll('tbody tr');
         rows.forEach(row => {
@@ -500,7 +542,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // Initialize save button visibility for status and notes
+    // Initialize save button visibility
     document.querySelectorAll('.tab3-details-table select').forEach(select => {
         const tagId = select.id.replace('tab3-status-', '');
         updateStatusVisibility(tagId);
@@ -511,11 +553,12 @@ document.addEventListener('DOMContentLoaded', function() {
         updateNotesVisibility(tagId);
     });
 
-    // Set up expand/collapse functionality
+    // Set up expand/collapse
     setupExpandCollapse();
 
-    // Initialize the print tags section
+    // Initialize print tags section
     populateCommonNameDropdown();
+    populateCrewFilter();
     setupPrintTagsSection();
     fetchCsvContents();
 });

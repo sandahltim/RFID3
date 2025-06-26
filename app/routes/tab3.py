@@ -1,6 +1,8 @@
 # app/routes/tab3.py
-# tab3.py version: 2025-06-26-v76
+# tab3.py version: 2025-06-26-v77
 from flask import Blueprint, render_template, request, jsonify, current_app
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from .. import db, cache
 from ..models.db_models import ItemMaster, Transaction, RentalClassMapping, UserRentalClassMapping, SeedRentalClass
 from ..services.api_client import APIClient
@@ -47,6 +49,13 @@ logger.addHandler(console_handler)
 
 tab3_bp = Blueprint('tab3', __name__)
 
+# Initialize rate limiter
+limiter = Limiter(
+    key_func=get_remote_address,
+    default_limits=["200 per day", "50 per hour"],
+    storage_uri="memory://"
+)
+
 SHARED_DIR = '/home/tim/test_rfidpi/shared'
 CSV_FILE_PATH = os.path.join(SHARED_DIR, 'rfid_tags.csv')
 LOCK_FILE_PATH = os.path.join(SHARED_DIR, 'rfid_tags.lock')
@@ -58,19 +67,33 @@ if not os.path.exists(SHARED_DIR):
     os.chown(SHARED_DIR, pwd.getpwnam('tim').pw_uid, grp.getgrnam('tim').gr_gid)
 
 # Log deployment version
-logger.info("Deployed tab3.py version: 2025-06-26-v76")
+logger.info("Deployed tab3.py version: 2025-06-26-v77")
 
-# Helper function to normalize common_name by removing suffixes like (G1), (G2)
+# Define crew categories
+TENT_CATEGORIES = ['Frame Tent Tops', 'Pole Tent Tops', 'Tent Crates', 'Sidewall']
+LINEN_CATEGORIES = ['Napkins', 'Rectangle Linen', 'Round Linen', 'Skirt', 'Spandex']
+SERVICE_DEPT_CATEGORIES = ['Other']  # Default for non-tent, non-linen
+
+# Helper function to normalize common_name
 def normalize_common_name(name):
     if not name:
         return name
     return re.sub(r'\s*\(G[0-9]+\)$', '', name).strip()
 
-# Helper function to normalize rental_class_id for consistent lookup
+# Helper function to normalize rental_class_id
 def normalize_rental_class_id(rental_class_id):
     if not rental_class_id:
         return 'N/A'
     return str(rental_class_id).strip().upper()
+
+# Helper function to determine crew based on category
+def get_crew_for_category(category):
+    if category in TENT_CATEGORIES:
+        return 'Tent Crew'
+    elif category in LINEN_CATEGORIES:
+        return 'Linen Crew'
+    else:
+        return 'Service Dept'
 
 @tab3_bp.route('/tab/3')
 def tab3_view():
@@ -109,6 +132,7 @@ def tab3_view():
         sort = request.args.get('sort', 'date_last_scanned_desc')
         page = int(request.args.get('page', 1))
         per_page = 20
+        crew_filter = request.args.get('crew', '')  # New crew filter
 
         # Define in-service statuses
         in_service_statuses = ['Repair', 'Needs to be Inspected', 'Wash', 'Wet']
@@ -149,33 +173,51 @@ def tab3_view():
         in_service_rental_classes = [row[0] for row in rental_class_result.fetchall()]
         logger.info(f"In-service rental_class_num values: {in_service_rental_classes}")
 
-        # Summary query (case-insensitive)
+        # Summary query with crew grouping
         summary_query = f"""
             SELECT 
-                COALESCE(rental_class_num, '') AS rental_class_id,
-                REGEXP_REPLACE(common_name, '\s*\(G[0-9]+\)$', '') AS common_name,
-                COUNT(CASE WHEN LOWER(TRIM(COALESCE(status, ''))) IN ({', '.join([f"'{status.lower()}'" for status in in_service_statuses])}) THEN 1 END) AS number_in_service,
-                COUNT(CASE WHEN LOWER(TRIM(COALESCE(status, ''))) = 'on rent' THEN 1 END) AS number_on_rent,
-                COUNT(CASE WHEN LOWER(TRIM(COALESCE(status, ''))) = 'ready to rent' THEN 1 END) AS number_ready_to_rent,
-                GROUP_CONCAT(DISTINCT CASE WHEN LOWER(TRIM(COALESCE(status, ''))) IN ({', '.join([f"'{status.lower()}'" for status in in_service_statuses])}) THEN status END) AS statuses
-            FROM id_item_master
-            WHERE LOWER(TRIM(COALESCE(status, ''))) IN ({', '.join([f"'{status.lower()}'" for status in all_statuses])})
+                COALESCE(i.rental_class_num, '') AS rental_class_id,
+                REGEXP_REPLACE(i.common_name, '\s*\(G[0-9]+\)$', '') AS common_name,
+                COUNT(CASE WHEN LOWER(TRIM(COALESCE(i.status, ''))) IN ({', '.join([f"'{status.lower()}'" for status in in_service_statuses])}) THEN 1 END) AS number_in_service,
+                COUNT(CASE WHEN LOWER(TRIM(COALESCE(i.status, ''))) = 'on rent' THEN 1 END) AS number_on_rent,
+                COUNT(CASE WHEN LOWER(TRIM(COALESCE(i.status, ''))) = 'ready to rent' THEN 1 END) AS number_ready_to_rent,
+                GROUP_CONCAT(DISTINCT CASE WHEN LOWER(TRIM(COALESCE(i.status, ''))) IN ({', '.join([f"'{status.lower()}'" for status in in_service_statuses])}) THEN i.status END) AS statuses,
+                COALESCE(u.category, r.category, 'Other') AS category
+            FROM id_item_master i
+            LEFT JOIN user_rental_class_mappings u ON i.rental_class_num = u.rental_class_id
+            LEFT JOIN rental_class_mappings r ON i.rental_class_num = r.rental_class_id
+            WHERE LOWER(TRIM(COALESCE(i.status, ''))) IN ({', '.join([f"'{status.lower()}'" for status in all_statuses])})
         """
         params = {}
         if common_name_filter:
-            summary_query += " AND LOWER(REGEXP_REPLACE(common_name, '\s*\(G[0-9]+\)$', '')) LIKE :common_name_filter"
+            summary_query += " AND LOWER(REGEXP_REPLACE(i.common_name, '\s*\(G[0-9]+\)$', '')) LIKE :common_name_filter"
             params['common_name_filter'] = f'%{common_name_filter}%'
-        summary_query += " GROUP BY COALESCE(rental_class_num, ''), REGEXP_REPLACE(common_name, '\s*\(G[0-9]+\)$', '')"
-        summary_query += " ORDER BY MIN(date_last_scanned) DESC, REGEXP_REPLACE(common_name, '\s*\(G[0-9]+\)$', '') ASC"
+        if crew_filter:
+            crew_categories = TENT_CATEGORIES if crew_filter == 'Tent Crew' else LINEN_CATEGORIES if crew_filter == 'Linen Crew' else SERVICE_DEPT_CATEGORIES
+            if crew_filter == 'Service Dept':
+                summary_query += " AND (COALESCE(u.category, r.category, 'Other') NOT IN :tent_categories AND COALESCE(u.category, r.category, 'Other') NOT IN :linen_categories)"
+                params['tent_categories'] = tuple(TENT_CATEGORIES)
+                params['linen_categories'] = tuple(LINEN_CATEGORIES)
+            else:
+                summary_query += " AND COALESCE(u.category, r.category, 'Other') IN :crew_categories"
+                params['crew_categories'] = tuple(crew_categories)
+        summary_query += " GROUP BY COALESCE(i.rental_class_num, ''), REGEXP_REPLACE(i.common_name, '\s*\(G[0-9]+\)$', ''), COALESCE(u.category, r.category, 'Other')"
+        summary_query += " ORDER BY MIN(i.date_last_scanned) DESC, REGEXP_REPLACE(i.common_name, '\s*\(G[0-9]+\)$', '') ASC"
         logger.debug(f"Executing summary query: {summary_query} with params: {params}")
         summary_result = session.execute(text(summary_query), params)
         summary_rows = summary_result.fetchall()
-        logger.info(f"Summary query returned {len(summary_rows)} groups: {[(row[0], row[1], row[2]) for row in summary_rows]}")
+        logger.info(f"Summary query returned {len(summary_rows)} groups")
 
-        # Structure summary groups
-        summary_groups = []
+        # Structure summary groups by crew
+        crew_groups = {
+            'Tent Crew': [],
+            'Linen Crew': [],
+            'Service Dept': []
+        }
         rental_class_to_group = {}
         for row in summary_rows:
+            category = row[6] or 'Other'
+            crew = get_crew_for_category(category)
             group = {
                 'rental_class_id': row[0] or 'N/A',
                 'common_name': row[1] or 'Unknown',
@@ -183,44 +225,57 @@ def tab3_view():
                 'number_on_rent': row[3] or 0,
                 'number_ready_to_rent': row[4] or 0,
                 'statuses': row[5].split(',') if row[5] else [],
-                'item_list': []
+                'item_list': [],
+                'category': category,
+                'crew': crew
             }
-            summary_groups.append(group)
+            crew_groups[crew].append(group)
             rental_class_to_group[group['rental_class_id']] = group
 
-        # Detail query (case-insensitive)
+        # Detail query
         detail_query = f"""
             SELECT 
-                tag_id, 
-                common_name, 
-                status, 
-                bin_location, 
-                last_contract_num, 
-                date_last_scanned, 
-                rental_class_num, 
-                notes
-            FROM id_item_master
-            WHERE LOWER(TRIM(COALESCE(status, ''))) IN ({', '.join([f"'{status.lower()}'" for status in in_service_statuses])})
+                i.tag_id, 
+                i.common_name, 
+                i.status, 
+                i.bin_location, 
+                i.last_contract_num, 
+                i.date_last_scanned, 
+                i.rental_class_num, 
+                i.notes,
+                COALESCE(u.category, r.category, 'Other') AS category
+            FROM id_item_master i
+            LEFT JOIN user_rental_class_mappings u ON i.rental_class_num = u.rental_class_id
+            LEFT JOIN rental_class_mappings r ON i.rental_class_num = r.rental_class_id
+            WHERE LOWER(TRIM(COALESCE(i.status, ''))) IN ({', '.join([f"'{status.lower()}'" for status in in_service_statuses])})
         """
         detail_params = {}
         if common_name_filter:
-            detail_query += " AND LOWER(REGEXP_REPLACE(common_name, '\s*\(G[0-9]+\)$', '')) LIKE :common_name_filter"
+            detail_query += " AND LOWER(REGEXP_REPLACE(i.common_name, '\s*\(G[0-9]+\)$', '')) LIKE :common_name_filter"
             detail_params['common_name_filter'] = f'%{common_name_filter}%'
+        if crew_filter:
+            if crew_filter == 'Service Dept':
+                detail_query += " AND (COALESCE(u.category, r.category, 'Other') NOT IN :tent_categories AND COALESCE(u.category, r.category, 'Other') NOT IN :linen_categories)"
+                detail_params['tent_categories'] = tuple(TENT_CATEGORIES)
+                detail_params['linen_categories'] = tuple(LINEN_CATEGORIES)
+            else:
+                detail_query += " AND COALESCE(u.category, r.category, 'Other') IN :crew_categories"
+                detail_params['crew_categories'] = tuple(crew_categories)
         if date_filter:
             try:
                 date = datetime.strptime(date_filter, '%Y-%m-%d')
-                detail_query += " AND DATE(date_last_scanned) = :date_filter"
+                detail_query += " AND DATE(i.date_last_scanned) = :date_filter"
                 detail_params['date_filter'] = date
             except ValueError:
                 logger.warning(f"Invalid date format: {date_filter}")
-        detail_query += f" ORDER BY date_last_scanned {'ASC' if sort == 'date_last_scanned_asc' else 'DESC'}, LOWER(REGEXP_REPLACE(common_name, '\s*\(G[0-9]+\)$', '')) ASC"
+        detail_query += f" ORDER BY i.date_last_scanned {'ASC' if sort == 'date_last_scanned_asc' else 'DESC'}, LOWER(REGEXP_REPLACE(i.common_name, '\s*\(G[0-9]+\)$', '')) ASC"
         detail_query += " LIMIT :limit OFFSET :offset"
         detail_params['limit'] = per_page
         detail_params['offset'] = (page - 1) * per_page
         logger.debug(f"Executing detail query: {detail_query} with params: {detail_params}")
         detail_result = session.execute(text(detail_query), detail_params)
         detail_rows = detail_result.fetchall()
-        logger.info(f"Detailed query returned {len(detail_rows)} items: {[(row[0], row[1], row[2]) for row in detail_rows]}")
+        logger.info(f"Detailed query returned {len(detail_rows)} items")
 
         # Structure detailed items
         items_in_service = [
@@ -233,7 +288,8 @@ def tab3_view():
                 'last_contract_num': row[4] or 'N/A',
                 'date_last_scanned': row[5].isoformat() if row[5] else 'N/A',
                 'rental_class_num': normalize_rental_class_id(row[6]),
-                'notes': row[7] or ''
+                'notes': row[7] or '',
+                'category': row[8] or 'Other'
             }
             for row in detail_rows
         ]
@@ -375,53 +431,61 @@ def tab3_view():
 
             group = rental_class_to_group.get(item['rental_class_num'])
             if group:
-                group['common_name'] = item['common_name']
                 group['item_list'].append(item_details)
-                group['number_in_service'] = len(group['item_list'])
                 if item['status'] not in group['statuses']:
                     group['statuses'].append(item['status'])
                 logger.debug(f"Updated existing group: rental_class_id={item['rental_class_num']}, common_name={item['common_name']}")
             else:
-                new_group = {
-                    'rental_class_id': item['rental_class_num'],
-                    'common_name': item['common_name'],
-                    'number_in_service': 1,
-                    'number_on_rent': 0,
-                    'number_ready_to_rent': 0,
-                    'statuses': [item['status']],
-                    'item_list': [item_details]
-                }
-                summary_groups.append(new_group)
-                rental_class_to_group[item['rental_class_num']] = new_group
-                logger.debug(f"Created new group for unmatched item: rental_class_id={item['rental_class_num']}, common_name={item['common_name']}")
+                unmatched_items.append(item_details)
+                logger.debug(f"Unmatched item: tag_id={item['tag_id']}, common_name={item['common_name']}")
 
-        # Debug: Log groups after assignment
-        logger.debug(f"After assignment - Summary groups: {len(summary_groups)}")
-        for group in summary_groups:
-            logger.debug(f"Group: rental_class_id={group['rental_class_id']}, common_name={group['common_name']}, number_in_service={group['number_in_service']}, items={len(group['item_list'])}")
+        # Add unmatched items to Service Dept
+        for item in unmatched_items:
+            crew = get_crew_for_category(item['category'])
+            new_group = {
+                'rental_class_id': item['rental_class_num'],
+                'common_name': item['common_name'],
+                'number_in_service': 1,
+                'number_on_rent': 0,
+                'number_ready_to_rent': 0,
+                'statuses': [item['status']],
+                'item_list': [item],
+                'category': item['category'],
+                'crew': crew
+            }
+            crew_groups[crew].append(new_group)
+            rental_class_to_group[item['rental_class_num']] = new_group
+            logger.debug(f"Created new group for unmatched item: rental_class_id={item['rental_class_num']}, common_name={item['common_name']}, crew={crew}")
 
         # Filter out groups with no in-service items
-        summary_groups = [g for g in summary_groups if g['number_in_service'] > 0]
+        for crew in crew_groups:
+            crew_groups[crew] = [g for g in crew_groups[crew] if g['number_in_service'] > 0]
 
         # Apply pagination after filtering
-        total_groups = len(summary_groups)
+        all_groups = []
+        for crew in ['Tent Crew', 'Linen Crew', 'Service Dept']:
+            all_groups.extend(crew_groups[crew])
+        total_groups = len(all_groups)
         start_idx = (page - 1) * per_page
         end_idx = start_idx + per_page
-        summary_groups = summary_groups[start_idx:end_idx]
+        summary_groups = all_groups[start_idx:end_idx]
 
         # Debug log data structure
-        logger.debug(f"After filtering and pagination - Summary groups: {len(summary_groups)}")
-        for group in summary_groups:
-            logger.debug(f"Final group: rental_class_id={group['rental_class_id']}, common_name={group['common_name']}, items={len(group['item_list'])}, statuses={group['statuses']}")
+        logger.debug(f"After filtering and pagination - Total groups: {total_groups}")
+        for crew, groups in crew_groups.items():
+            logger.debug(f"{crew}: {len(groups)} groups")
+            for group in groups:
+                logger.debug(f"Group: rental_class_id={group['rental_class_id']}, common_name={group['common_name']}, items={len(group['item_list'])}, statuses={group['statuses']}, crew={group['crew']}")
 
         session.commit()
         logger.info("Rendering Tab 3 template")
         return render_template(
             'tab3.html',
-            summary_groups=summary_groups,
+            crew_groups=crew_groups,
             common_name_filter=common_name_filter,
             date_filter=date_filter,
             sort=sort,
+            crew_filter=crew_filter,
             total_groups=total_groups,
             current_page=page,
             per_page=per_page,
@@ -433,10 +497,11 @@ def tab3_view():
             session.rollback()
         return render_template(
             'tab3.html',
-            summary_groups=[],
+            crew_groups={'Tent Crew': [], 'Linen Crew': [], 'Service Dept': []},
             common_name_filter='',
             date_filter='',
             sort='date_last_scanned_desc',
+            crew_filter='',
             total_groups=0,
             current_page=1,
             per_page=20,
@@ -479,6 +544,7 @@ def get_csv_contents():
         return jsonify({'error': f"Error reading CSV file: {str(e)}"}), 500
 
 @tab3_bp.route('/tab/3/remove_csv_item', methods=['POST'])
+@limiter.limit("10 per minute")
 def remove_csv_item():
     lock_file = None
     try:
@@ -524,6 +590,7 @@ def remove_csv_item():
             logger.debug("Released lock for remove_csv_item")
 
 @tab3_bp.route('/tab/3/sync_to_pc', methods=['POST'])
+@limiter.limit("5 per minute")
 def sync_to_pc():
     session = None
     lock_file = None
@@ -776,6 +843,7 @@ def sync_to_pc():
             session.close()
 
 @tab3_bp.route('/tab/3/update_synced_status', methods=['POST'])
+@limiter.limit("5 per minute")
 def update_synced_status():
     session = None
     lock_file = None
@@ -891,12 +959,10 @@ def update_synced_status():
             except Exception as api_error:
                 logger.error(f"Error updating/inserting tag_id {tag_id} in API: {str(api_error)}", exc_info=True)
                 failed_items.append(tag_id)
-                continue  # Continue with next item instead of failing entire operation
+                continue
 
         if failed_items:
             logger.warning(f"Failed to update {len(failed_items)} items in API: {failed_items}")
-            # Proceed to clear CSV despite API failures to avoid stuck state
-            logger.info("Proceeding to clear CSV despite API failures")
 
         # Clear CSV
         logger.debug("Clearing CSV file")
@@ -932,6 +998,7 @@ def update_synced_status():
             session.close()
 
 @tab3_bp.route('/tab/3/update_status', methods=['POST'])
+@limiter.limit("10 per minute")
 def update_status():
     session = None
     try:
@@ -980,6 +1047,7 @@ def update_status():
             session.close()
 
 @tab3_bp.route('/tab/3/update_notes', methods=['POST'])
+@limiter.limit("10 per minute")
 def update_notes():
     session = None
     try:
