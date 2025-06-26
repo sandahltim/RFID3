@@ -1,5 +1,5 @@
 # app/routes/categories.py
-# categories.py version: 2025-06-26-v27
+# categories.py version: 2025-06-26-v28
 import logging
 import sys
 import json
@@ -27,7 +27,7 @@ logger.addHandler(console_handler)
 
 categories_bp = Blueprint('categories', __name__)
 
-logger.info(f"Deployed categories.py version: 2025-06-26-v27")
+logger.info(f"Deployed categories.py version: 2025-06-26-v28")
 
 def normalize_rental_class_id(rental_class_id):
     """Normalize rental_class_id for consistent lookup."""
@@ -208,8 +208,8 @@ def get_mappings():
     session = None
     try:
         session = db.session()
-        logger.info(f"Fetching rental class mappings for API at {time.time()}")
-        current_app.logger.info(f"Fetching rental class mappings for API at {time.time()}")
+        logger.info(f"Fetching rental class mappings for API at {time()}")
+        current_app.logger.info(f"Fetching rental class mappings for API at {time()}")
 
         cache_key = 'rental_class_mappings'
         mappings_dict_json = cache.get(cache_key)
