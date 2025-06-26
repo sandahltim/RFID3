@@ -47,7 +47,7 @@
         {% block content %}{% endblock %}
     </div>
 
-    <script src="{{ url_for('static', filename='lib/jquery/jquery.min.js') }}?v={{ '' | timestamp }}"></script>
+    <script src="{{ url_for('static', filename='lib/jquery.min.js') }}?v={{ '' | timestamp }}"></script>
     <script src="{{ url_for('static', filename='lib/bootstrap/bootstrap.bundle.min.js') }}?v={{ '' | timestamp }}"></script>
     <script src="{{ url_for('static', filename='lib/htmx/htmx.min.js') }}?v={{ '' | timestamp }}"></script>
     <script src="{{ url_for('static', filename='js/common.js') }}?v={{ '' | timestamp }}"></script>
