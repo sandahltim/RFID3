@@ -82,7 +82,7 @@ cat /home/tim/test_rfidpi/logs/sync.log
 
 source venv/bin/activate
 # rfid_samba_pass  samba shared server on pi
-## CODE AS OF4/26/25
+## CODE AS OF 6/26/25
 ###run.py
 from app import create_app
 
@@ -94,25 +94,6 @@ if __name__ == '__main__':
 #!/bin/bash
 source /home/tim/test_rfidpi/venv/bin/activate
 exec gunicorn --workers 3 --timeout 300 --bind 127.0.0.1:3608 --chdir /home/tim/test_rfidpi run:app
-
-### rfid_dash_dev.service
-[Unit]
-Description=RFID Dashboard Flask App
-After=network.target
-
-[Service]
-User=tim
-Group=www-data
-WorkingDirectory=/home/tim/test_rfidpi
-Environment="PATH=/home/tim/test_rfidpi/venv/bin"
-ExecStart=/home/tim/test_rfidpi/venv/bin/gunicorn --workers 4 --threads 2 --timeout 180 --bind 127.0.0.1:3608 --error-logfile /home/tim/test_rfidpi/logs/gunicorn_error.log --access-logfile /home/tim/test_rfidpi/logs/gunicorn_access.log run:app
-ExecStop=/bin/kill -s KILL $MAINPID
-Restart=always
-KillMode=mixed
-TimeoutStopSec=20
-
-[Install]
-WantedBy=multi-user.target
 
 
 ### setupmariadb.sh
@@ -170,9 +151,10 @@ sudo mkdir -p /home/tim/test_rfidpi/logs
 sudo chown tim:tim /home/tim/test_rfidpi/logs
 sudo chmod 750 /home/tim/test_rfidpi/logs
 
+
 ### migrate_db.sql
 -- scripts/migrate_db.sql
--- migrate_db.sql version: 2025-06-19-v3
+-- migrate_db.sql version: 2025-06-26-v5
 
 -- Drop existing tables if they exist
 DROP TABLE IF EXISTS id_transactions;
@@ -219,7 +201,8 @@ CREATE TABLE id_transactions (
     latitude DECIMAL(9,6),
     wet BOOLEAN,
     service_required BOOLEAN,
-    notes TEXT
+    notes TEXT,
+    INDEX idx_tag_id_scan_date (tag_id, scan_date)
 );
 
 -- Create id_item_master table
@@ -241,7 +224,10 @@ CREATE TABLE id_item_master (
     latitude DECIMAL(9,6),
     date_last_scanned DATETIME,
     date_created DATETIME,
-    date_updated DATETIME
+    date_updated DATETIME,
+    INDEX idx_tag_id (tag_id),
+    INDEX idx_status (status),
+    INDEX idx_date_last_scanned (date_last_scanned)
 );
 
 -- Create id_rfidtag table
@@ -277,8 +263,8 @@ CREATE TABLE seed_rental_classes (
 -- Create refresh_state table
 CREATE TABLE refresh_state (
     id INT PRIMARY KEY AUTO_INCREMENT,
-    last_refresh DATETIME,  -- Changed to DATETIME
-    state_type VARCHAR(50)  -- Added state_type
+    last_refresh DATETIME,
+    state_type VARCHAR(50)
 );
 
 -- Create rental_class_mappings table
@@ -310,11 +296,30 @@ CREATE TABLE user_rental_class_mappings (
     updated_at DATETIME NOT NULL
 );
 
+### rfid_dash_dev.service
+[Unit]
+Description=RFID Dashboard Flask App
+After=network.target mariadb.service
+
+[Service]
+User=tim
+Group=www-data
+WorkingDirectory=/home/tim/test_rfidpi
+Environment="PATH=/home/tim/test_rfidpi/venv/bin:/usr/bin"
+ExecStart=/home/tim/test_rfidpi/venv/bin/gunicorn --workers 1 --threads 4 --timeout 600 --bind 0.0.0.0:3608 --error-logfile /home/tim/test_rfidpi/logs/gunicorn_error.log --access-logfile /home/tim/test_rfidpi/logs/gunicorn_access.log run:app
+ExecStop=/bin/kill -s KILL $MAINPID
+Restart=always
+KillMode=mixed
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target
+
 
 
 
 ### config.py
-# config.py version: 2025-06-19-v4
+# config.py version: 2025-06-26-v7
 import os
 
 # Base directory
@@ -324,10 +329,10 @@ BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 DB_CONFIG = {
     'host': 'localhost',
     'user': 'rfid_user',
-    'password': 'rfid_user_password',  # Change this to a secure password
+    'password': 'rfid_user_password',
     'database': 'rfid_inventory',
     'charset': 'utf8mb4',
-    'collation': 'utf8mb4_unicode_ci'  # Changed to compatible collation for MariaDB 10.11
+    'collation': 'utf8mb4_unicode_ci'
 }
 
 # Redis configuration
@@ -342,9 +347,9 @@ TRANSACTION_URL = 'https://cs.iot.ptshome.com/api/v1/data/14223767938169346196'
 SEED_URL = 'https://cs.iot.ptshome.com/api/v1/data/14223767938169215907'
 
 # Refresh intervals (seconds)
-FULL_REFRESH_INTERVAL = 1800  # 30 minutes
-INCREMENTAL_REFRESH_INTERVAL = 30  # 30 seconds
-INCREMENTAL_LOOKBACK_SECONDS = 2592000  # Look back 30 days for incremental refresh
+FULL_REFRESH_INTERVAL = 3600  # 1 hour
+INCREMENTAL_REFRESH_INTERVAL = 60  # 60 seconds
+INCREMENTAL_LOOKBACK_SECONDS = 600  # Look back 10 minutes
 INCREMENTAL_FALLBACK_SECONDS = 172800  # Fall back to 2 days if API filter fails
 
 # Bulk update configuration
@@ -353,14 +358,20 @@ BULK_UPDATE_BATCH_SIZE = 50  # Batch size for bulk updates in tab5.py
 # Logging
 LOG_FILE = os.path.join(BASE_DIR, 'logs', 'rfid_dashboard.log')
 
-# Logging
-LOG_FILE = os.path.join(BASE_DIR, 'logs', 'rfid_dashboard.log')
+# SQLAlchemy configuration
+SQLALCHEMY_ENGINE_OPTIONS = {
+    'pool_size': 10,
+    'max_overflow': 20,
+    'pool_timeout': 30,
+    'pool_recycle': 1800,  # Recycle connections every 30 minutes
+    'connect_args': {'charset': 'utf8mb4', 'collation': 'utf8mb4_unicode_ci'}
+}
 #mariadbhash   *8226E019AE8D0D41243D07D91ABCD8E2F20358BC  root password    MySecureRootPass123
 
 
 ### db_models.py
 # app/models/db_models.py
-# db_models.py version: 2025-06-19-v2
+# db_models.py version: 2025-06-20-v3
 from app import db
 from datetime import datetime
 
@@ -446,6 +457,52 @@ class Transaction(db.Model):
     service_required = db.Column(db.Boolean)
     notes = db.Column(db.Text)
 
+class RFIDTag(db.Model):
+    __tablename__ = 'id_rfidtag'
+
+    tag_id = db.Column(db.String(255), primary_key=True)
+    uuid_accounts_fk = db.Column(db.String(255))
+    category = db.Column(db.String(255))
+    serial_number = db.Column(db.String(255))
+    client_name = db.Column(db.String(255))
+    rental_class_num = db.Column(db.String(255))
+    common_name = db.Column(db.String(255))
+    quality = db.Column(db.String(50))
+    bin_location = db.Column(db.String(255))
+    status = db.Column(db.String(50))
+    last_contract_num = db.Column(db.String(255))
+    last_scanned_by = db.Column(db.String(255))
+    notes = db.Column(db.Text)
+    status_notes = db.Column(db.Text)
+    longitude = db.Column(db.DECIMAL(9, 6))
+    latitude = db.Column(db.DECIMAL(9, 6))
+    date_last_scanned = db.Column(db.DateTime)
+    date_created = db.Column(db.DateTime)
+    date_updated = db.Column(db.DateTime)
+
+    def to_dict(self):
+        return {
+            'tag_id': self.tag_id,
+            'uuid_accounts_fk': self.uuid_accounts_fk,
+            'category': self.category,
+            'serial_number': self.serial_number,
+            'client_name': self.client_name,
+            'rental_class_num': self.rental_class_num,
+            'common_name': self.common_name,
+            'quality': self.quality,
+            'bin_location': self.bin_location,
+            'status': self.status,
+            'last_contract_num': self.last_contract_num,
+            'last_scanned_by': self.last_scanned_by,
+            'notes': self.notes,
+            'status_notes': self.status_notes,
+            'longitude': float(self.longitude) if self.longitude else None,
+            'latitude': float(self.latitude) if self.latitude else None,
+            'date_last_scanned': self.date_last_scanned.isoformat() if self.date_last_scanned else None,
+            'date_created': self.date_created.isoformat() if self.date_created else None,
+            'date_updated': self.date_updated.isoformat() if self.date_updated else None
+        }
+
 class SeedRentalClass(db.Model):
     __tablename__ = 'seed_rental_classes'
 
@@ -489,9 +546,9 @@ class UserRentalClassMapping(db.Model):
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-###__init__.py
+### __init__.py
 # app/__init__.py
-# __init__.py version: 2025-06-19-v2
+# __init__.py version: 2025-06-26-v3
 import os
 import logging
 from logging.handlers import RotatingFileHandler
@@ -499,6 +556,7 @@ from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_redis import FlaskRedis
 from config import DB_CONFIG, REDIS_URL, LOG_FILE
+from datetime import datetime
 
 # Initialize extensions
 db = SQLAlchemy()
@@ -555,6 +613,11 @@ def create_app():
         app.logger.error(f"Failed to initialize extensions: {str(e)}", exc_info=True)
         raise
 
+    # Add custom Jinja2 filter for timestamp
+    def timestamp_filter(value):
+        return int(datetime.now().timestamp())
+    app.jinja_env.filters['timestamp'] = timestamp_filter
+
     # Create database tables
     try:
         with app.app_context():
@@ -575,8 +638,8 @@ def create_app():
         from app.routes.tab5 import tab5_bp
         from app.routes.categories import categories_bp
         from app.routes.health import health_bp
-        from app.services.refresh import refresh_bp
         from app.routes.tabs import tabs_bp
+        from app.services.refresh import refresh_bp
 
         app.register_blueprint(home_bp)
         app.register_blueprint(tab1_bp)
@@ -586,8 +649,8 @@ def create_app():
         app.register_blueprint(tab5_bp)
         app.register_blueprint(categories_bp)
         app.register_blueprint(health_bp)
-        app.register_blueprint(refresh_bp)
         app.register_blueprint(tabs_bp)
+        app.register_blueprint(refresh_bp)
         app.logger.info("Blueprints registered successfully")
     except Exception as e:
         app.logger.error(f"Failed to register blueprints: {str(e)}", exc_info=True)
@@ -606,6 +669,8 @@ def create_app():
     return app
 
 ### bulk_update_mappings.py
+# scripts/bulk_update_mappings.py
+# bulk_update_mappings.py version: 2025-06-20-v2
 import sys
 import os
 import csv
@@ -619,7 +684,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.exc import IntegrityError
 from app.models.db_models import UserRentalClassMapping
-from config import DB_CONFIG
+from config import DB_CONFIG, SQLALCHEMY_ENGINE_OPTIONS
 import logging
 
 # Set up logging
@@ -644,8 +709,8 @@ logger.addHandler(console_handler)
 
 # Database connection
 try:
-    db_url = f"mysql+mysqlconnector://{DB_CONFIG['user']}:{DB_CONFIG['password']}@{DB_CONFIG['host']}/{DB_CONFIG['database']}?charset={DB_CONFIG['charset']}"
-    engine = create_engine(db_url)
+    db_url = f"mysql+mysqlconnector://{DB_CONFIG['user']}:{DB_CONFIG['password']}@{DB_CONFIG['host']}/{DB_CONFIG['database']}?charset={DB_CONFIG['charset']}&collation={DB_CONFIG['collation']}"
+    engine = create_engine(db_url, **SQLALCHEMY_ENGINE_OPTIONS)
     Session = sessionmaker(bind=engine)
     session = Session()
     logger.info("Successfully connected to the database")
@@ -753,20 +818,9 @@ if __name__ == "__main__":
         logger.error(f"Script failed: {str(main_error)}", exc_info=True)
         sys.exit(1)
 
-
-### fix_collation.sql
--- scripts/fix_collation.sql
-ALTER DATABASE rfid_inventory
-    CHARACTER SET utf8mb4
-    COLLATE utf8mb4_unicode_ci;
-
-ALTER TABLE rfid_inventory.rental_class_mappings
-    CONVERT TO CHARACTER SET utf8mb4
-    COLLATE utf8mb4_unicode_ci;
-
 ### migrate_db.sql
 -- scripts/migrate_db.sql
--- migrate_db.sql version: 2025-06-19-v3
+-- migrate_db.sql version: 2025-06-26-v5
 
 -- Drop existing tables if they exist
 DROP TABLE IF EXISTS id_transactions;
@@ -813,7 +867,8 @@ CREATE TABLE id_transactions (
     latitude DECIMAL(9,6),
     wet BOOLEAN,
     service_required BOOLEAN,
-    notes TEXT
+    notes TEXT,
+    INDEX idx_tag_id_scan_date (tag_id, scan_date)
 );
 
 -- Create id_item_master table
@@ -835,7 +890,10 @@ CREATE TABLE id_item_master (
     latitude DECIMAL(9,6),
     date_last_scanned DATETIME,
     date_created DATETIME,
-    date_updated DATETIME
+    date_updated DATETIME,
+    INDEX idx_tag_id (tag_id),
+    INDEX idx_status (status),
+    INDEX idx_date_last_scanned (date_last_scanned)
 );
 
 -- Create id_rfidtag table
@@ -871,8 +929,8 @@ CREATE TABLE seed_rental_classes (
 -- Create refresh_state table
 CREATE TABLE refresh_state (
     id INT PRIMARY KEY AUTO_INCREMENT,
-    last_refresh DATETIME,  -- Changed to DATETIME
-    state_type VARCHAR(50)  -- Added state_type
+    last_refresh DATETIME,
+    state_type VARCHAR(50)
 );
 
 -- Create rental_class_mappings table
@@ -905,22 +963,7 @@ CREATE TABLE user_rental_class_mappings (
 );
 
 ### migrate_hand_counted_items.sql
--- Migration script to add the HandCountedItems table
--- Added on 2025-04-21 for tracking hand-counted items on contracts
 
-CREATE TABLE IF NOT EXISTS id_hand_counted_items (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    contract_number VARCHAR(50) NOT NULL,
-    item_name VARCHAR(255) NOT NULL,
-    quantity INT NOT NULL,
-    action VARCHAR(50) NOT NULL,
-    timestamp DATETIME NOT NULL,
-    user VARCHAR(50) NOT NULL
-);
-
--- Add indexes for faster lookups
-CREATE INDEX idx_hand_counted_items_contract_number ON id_hand_counted_items (contract_number);
-CREATE INDEX idx_hand_counted_items_timestamp ON id_hand_counted_items (timestamp);
 
 
 ### migrate_short_common_name.sql
@@ -1649,4 +1692,4 @@ Notes
 Not all items will have a category or subcategory assigned until mapped by the user in the "Manage Categories" section.
 Hand-counted items are specific to laundry contracts (Tab 4) and are stored locally in the database.
 
-Last Updated: May 29, 2025
+Last Updated: 6-6-2025

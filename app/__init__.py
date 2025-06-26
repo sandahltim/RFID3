@@ -1,5 +1,5 @@
 # app/__init__.py
-# __init__.py version: 2025-06-26-v3
+# Version: 2025-06-26-v4
 import os
 import logging
 from logging.handlers import RotatingFileHandler
@@ -15,7 +15,7 @@ cache = FlaskRedis()
 
 def create_app():
     """Create and configure the Flask application."""
-    app = Flask(__name__, static_folder='static')
+    app = Flask(__name__, static_folder='static')  # Updated to match /home/tim/test_rfidpi/static/
 
     # Configure logging
     log_dir = os.path.dirname(LOG_FILE)
@@ -25,18 +25,16 @@ def create_app():
     handler.setLevel(logging.DEBUG)
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     handler.setFormatter(formatter)
-    # Clear existing handlers to prevent duplicates
     logging.getLogger('').handlers = []
     app.logger.handlers = []
-    # Add handler to root logger and app logger
     logging.getLogger('').addHandler(handler)
     app.logger.addHandler(handler)
     app.logger.setLevel(logging.DEBUG)
-    app.logger.propagate = False  # Prevent double logging
+    app.logger.propagate = False
     app.logger.info("Application starting up - logging initialized")
     app.logger.debug(f"Static folder path: {app.static_folder}")
 
-    # Database configuration with connection pooling
+    # Database configuration
     try:
         app.config['SQLALCHEMY_DATABASE_URI'] = (
             f"mysql+mysqlconnector://{DB_CONFIG['user']}:{DB_CONFIG['password']}@"
@@ -47,7 +45,7 @@ def create_app():
             'pool_size': 10,
             'max_overflow': 20,
             'pool_timeout': 30,
-            'pool_recycle': 1800,  # Recycle connections every 30 minutes
+            'pool_recycle': 1800,
         }
         app.config['REDIS_URL'] = REDIS_URL
         app.logger.info("Database and Redis configuration set successfully")
