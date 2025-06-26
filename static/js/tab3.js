@@ -1,11 +1,12 @@
-console.log('tab3.js version: 2025-06-26-v21 loaded');
+console.log('tab3.js version: 2025-06-26-v22 loaded');
 
 /**
  * Tab3.js: Logic for Tab 3 (Items in Service).
  * Dependencies: common.js for formatDate.
- * Updated: 2025-06-26-v21
- * - Increased debounce wait time to 5000ms to prevent 429 errors.
- * - Enhanced retry logic with exponential backoff for 429 errors.
+ * Updated: 2025-06-26-v22
+ * - Increased debounce wait time to 10000ms to prevent 429 errors.
+ * - Adjusted retry delays to 2000ms, 4000ms, 8000ms for 429 errors.
+ * - Added retry status message to improve UX.
  * - Cleared commonNameSelect and tagQuantity after sync for seamless next entry.
  * - Preserved all existing functionality.
  */
@@ -40,7 +41,8 @@ function debounce(func, wait) {
 /**
  * Retry function for handling 429 errors with exponential backoff
  */
-async function retryRequest(url, options, maxRetries = 3, baseDelay = 1000) {
+async function retryRequest(url, options, maxRetries = 3, baseDelay = 2000) {
+    const syncMessage = document.getElementById('syncMessage');
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
             const response = await fetch(url, options);
@@ -51,6 +53,9 @@ async function retryRequest(url, options, maxRetries = 3, baseDelay = 1000) {
                 }
                 const delay = baseDelay * Math.pow(2, attempt - 1);
                 console.log(`DEBUG: Waiting ${delay}ms before retry ${attempt + 1} at ${new Date().toISOString()}`);
+                if (syncMessage) {
+                    syncMessage.innerHTML = `<div class="alert alert-warning">Operation in progress, retrying (${attempt}/${maxRetries})...</div>`;
+                }
                 await new Promise(resolve => setTimeout(resolve, delay));
                 continue;
             }
@@ -194,7 +199,7 @@ function setupPrintTagsSection() {
                     common_name: commonName,
                     quantity: quantity
                 })
-            }, 3, 1000);
+            }, 3, 2000);
 
             if (!response.ok) {
                 throw new Error(`Sync failed with status ${response.status}`);
@@ -217,7 +222,7 @@ function setupPrintTagsSection() {
         } finally {
             syncBtn.disabled = false;
         }
-    }, 5000); // Increased to 5000ms to prevent 429 errors
+    }, 10000); // Increased to 10000ms to prevent 429 errors
 
     const debouncedUpdateStatus = debounce(async () => {
         updateStatusBtn.disabled = true;
@@ -229,7 +234,7 @@ function setupPrintTagsSection() {
                 headers: {
                     'Content-Type': 'application/json'
                 }
-            }, 3, 1000);
+            }, 3, 2000);
 
             if (!response.ok) {
                 throw new Error(`Status update failed with status ${response.status}`);
@@ -240,7 +245,11 @@ function setupPrintTagsSection() {
                 throw new Error(data.error);
             }
 
-            syncMessage.innerHTML = `<div class="alert alert-success">Successfully updated status for ${data.updated_items} items.</div>`;
+            let message = `Successfully updated status for ${data.updated_items} items.`;
+            if (data.failed_items && data.failed_items.length > 0) {
+                message += ` Failed to update ${data.failed_items.length} items.`;
+            }
+            syncMessage.innerHTML = `<div class="alert alert-success">${message}</div>`;
             console.log(`DEBUG: Status update successful, ${data.updated_items} items updated at ${new Date().toISOString()}`);
             fetchCsvContents();
             setTimeout(() => {
@@ -251,7 +260,7 @@ function setupPrintTagsSection() {
             syncMessage.innerHTML = `<div class="alert alert-danger">Error updating status: ${error.message}</div>`;
             updateStatusBtn.disabled = false;
         }
-    }, 5000); // Increased to 5000ms to prevent 429 errors
+    }, 10000); // Increased to 10000ms to prevent 429 errors
 
     // Remove any existing listeners and add new ones
     syncBtn.removeEventListener('click', debouncedSync);
