@@ -50,9 +50,9 @@
                             <tbody>
                                 {% for scan in recent_scans %}
                                     <tr>
-                                        <td>{{ scan[0] }}</td>
-                                        <td>{{ scan[1] }}</td>
-                                        <td>{{ scan[2] | datetimeformat }}</td>
+                                        <td>{{ scan.tag_id }}</td>
+                                        <td>{{ scan.common_name }}</td>
+                                        <td>{{ scan.date_last_scanned | datetimeformat }}</td>
                                     </tr>
                                 {% endfor %}
                             </tbody>
@@ -67,8 +67,8 @@
             <div class="card">
                 <div class="card-header">Refresh Status</div>
                 <div class="card-body" id="refreshStatus">
-                    <p><strong>Last Refresh:</strong> {{ last_refresh | datetimeformat or 'N/A' }}</p>
-                    <p><strong>Type:</strong> {{ refresh_type or 'N/A' }}</p>
+                    <p><strong>Last Refresh:</strong> {{ last_refresh }}</p>
+                    <p><strong>Type:</strong> {{ refresh_type }}</p>
                 </div>
             </div>
         </div>
