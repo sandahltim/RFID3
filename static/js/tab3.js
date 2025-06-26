@@ -1,16 +1,17 @@
-console.log('tab3.js version: 2025-06-26-v24 loaded');
+console.log('tab3.js version: 2025-06-26-v25 loaded');
 
 /**
  * Tab3.js: Logic for Tab 3 (Items in Service).
  * Dependencies: common.js for formatDate.
- * Updated: 2025-06-26-v24
+ * Updated: 2025-06-26-v25
  * - Ensured sections start collapsed on load.
  * - Fixed collapse button functionality with proper CSS toggling.
  * - Added crew filter dropdown (Tent Crew, Linen Crew, Service Dept).
  * - Enhanced debouncing for remove-btn (15000ms).
  * - Increased debounce wait time to 15000ms for syncToPc and updateStatusBtn.
  * - Removed duplicate event listeners by checking existing ones.
- * - Preserved all existing functionality.
+ * - Aligned DOM IDs with tab3.html v3 (crewFilter, syncToPCBtn, syncedItems).
+ * - Preserved all existing functionality per user instructions.
  */
 
 /**
@@ -106,7 +107,7 @@ function populateCommonNameDropdown() {
  * Populate crew filter dropdown
  */
 function populateCrewFilter() {
-    const select = document.getElementById('crewFilterTab3');
+    const select = document.getElementById('crewFilter');
     if (!select) {
         console.warn(`Crew filter dropdown not found at ${new Date().toISOString()}`);
         return;
@@ -122,8 +123,8 @@ function populateCrewFilter() {
  * Fetch and display CSV contents
  */
 function fetchCsvContents() {
-    const tbody = document.getElementById('csvContentsBody');
-    const updateStatusBtn = document.getElementById('updateStatusBtn');
+    const tbody = document.getElementById('syncedItems');
+    const updateStatusBtn = document.getElementById('updateStatusToReady');
     if (!tbody || !updateStatusBtn) {
         console.warn(`CSV contents table or update status button not found at ${new Date().toISOString()}`);
         return;
@@ -175,12 +176,12 @@ function fetchCsvContents() {
  * Handle sync to PC and status update
  */
 function setupPrintTagsSection() {
-    const syncBtn = document.getElementById('syncToPcBtn');
-    const updateStatusBtn = document.getElementById('updateStatusBtn');
+    const syncBtn = document.getElementById('syncToPCBtn');
+    const updateStatusBtn = document.getElementById('updateStatusToReady');
     const syncMessage = document.getElementById('syncMessage');
-    const csvContentsTable = document.getElementById('csvContentsTable');
+    const csvContentsTable = document.getElementById('syncedItems'); // Adjusted to match v3
     const commonNameSelect = document.getElementById('commonNameSelect');
-    const tagQuantity = document.getElementById('tagQuantity');
+    const tagQuantity = document.getElementById('tagCount');
 
     if (!syncBtn || !updateStatusBtn || !syncMessage || !csvContentsTable || !commonNameSelect || !tagQuantity) {
         console.warn(`Print tags section elements not found at ${new Date().toISOString()}`);
@@ -346,10 +347,10 @@ function setupPrintTagsSection() {
  * Apply filters for Tab 3
  */
 function applyTab3Filters() {
-    const commonName = document.getElementById('commonNameFilterTab3')?.value || '';
-    const date = document.getElementById('dateFilterTab3')?.value || '';
-    const sort = document.getElementById('sortFilterTab3')?.value || 'date_last_scanned_desc';
-    const crew = document.getElementById('crewFilterTab3')?.value || '';
+    const commonName = document.getElementById('commonNameFilter')?.value || '';
+    const date = document.getElementById('lastScannedFilter')?.value || '';
+    const sort = document.getElementById('sortFilter')?.value || 'date_last_scanned_desc';
+    const crew = document.getElementById('crewFilter')?.value || '';
 
     const params = new URLSearchParams();
     if (commonName) params.append('common_name', commonName);
@@ -482,7 +483,7 @@ function setupExpandCollapse() {
         const collapseBtn = event.target.closest('.collapse-btn');
 
         if (expandBtn) {
-            const targetId = expandBtn.getAttribute('data-target');
+            const targetId = expandBtn.getAttribute('data-target-id');
             const expandable = document.getElementById(targetId);
             if (!expandable) {
                 console.warn(`Expandable section not found for target: ${targetId} at ${new Date().toISOString()}`);
@@ -499,7 +500,7 @@ function setupExpandCollapse() {
                 siblingCollapseBtn.style.display = 'inline-block';
             }
         } else if (collapseBtn) {
-            const targetId = collapseBtn.getAttribute('data-target');
+            const targetId = collapseBtn.getAttribute('data-target-id');
             const expandable = document.getElementById(targetId);
             if (!expandable) {
                 console.warn(`Expandable section not found for target: ${targetId} at ${new Date().toISOString()}`);
