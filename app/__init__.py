@@ -15,7 +15,7 @@ cache = FlaskRedis()
 
 def create_app():
     """Create and configure the Flask application."""
-    app = Flask(__name__, static_folder='static')
+    app = Flask(__name__, static_folder='/home/tim/test_rfidpi/static')
 
     # Configure logging
     log_dir = os.path.dirname(LOG_FILE)
@@ -128,3 +128,4 @@ def create_app():
 
     app.logger.info("Application startup completed successfully")
     return app
+    
