@@ -1,5 +1,5 @@
 # app/routes/tab3.py
-# tab3.py version: 2025-06-26-v73
+# tab3.py version: 2025-06-26-v75
 from flask import Blueprint, render_template, request, jsonify, current_app
 from .. import db, cache
 from ..models.db_models import ItemMaster, Transaction, RentalClassMapping, UserRentalClassMapping, SeedRentalClass
@@ -58,7 +58,7 @@ if not os.path.exists(SHARED_DIR):
     os.chown(SHARED_DIR, pwd.getpwnam('tim').pw_uid, grp.getgrnam('tim').gr_gid)
 
 # Log deployment version
-logger.info("Deployed tab3.py version: 2025-06-26-v73")
+logger.info("Deployed tab3.py version: 2025-06-26-v75")
 
 # Helper function to normalize common_name by removing suffixes like (G1), (G2)
 def normalize_common_name(name):
@@ -118,8 +118,8 @@ def tab3_view():
 
         # Cache key for mappings
         cache_key = 'rental_class_mappings'
-        mappings_dict = cache.get(cache_key)
-        if mappings_dict is None:
+        mappings_dict_json = cache.get(cache_key)
+        if mappings_dict_json is None:
             base_mappings = session.query(RentalClassMapping).all()
             user_mappings = session.query(UserRentalClassMapping).all()
             mappings_dict = {normalize_rental_class_id(m.rental_class_id): {
@@ -136,28 +136,30 @@ def tab3_view():
                 }
             cache.set(cache_key, json.dumps(mappings_dict), ex=3600)
             logger.info("Cached rental_class_mappings as JSON")
+        else:
+            mappings_dict = json.loads(mappings_dict_json)
 
         # Fetch all rental_class_num values for in-service items
         rental_class_query = f"""
             SELECT DISTINCT COALESCE(rental_class_num, '') AS rental_class_id
             FROM id_item_master
-            WHERE TRIM(COALESCE(status, '')) IN ({in_service_statuses_sql})
+            WHERE LOWER(TRIM(COALESCE(status, ''))) IN ({', '.join([f"'{status.lower()}'" for status in in_service_statuses])})
         """
         rental_class_result = session.execute(text(rental_class_query))
         in_service_rental_classes = [row[0] for row in rental_class_result.fetchall()]
         logger.info(f"In-service rental_class_num values: {in_service_rental_classes}")
 
-        # Summary query
+        # Summary query (case-insensitive)
         summary_query = f"""
             SELECT 
                 COALESCE(rental_class_num, '') AS rental_class_id,
                 REGEXP_REPLACE(common_name, '\s*\(G[0-9]+\)$', '') AS common_name,
-                COUNT(CASE WHEN TRIM(COALESCE(status, '')) IN ({in_service_statuses_sql}) THEN 1 END) AS number_in_service,
-                COUNT(CASE WHEN TRIM(COALESCE(status, '')) = 'On Rent' THEN 1 END) AS number_on_rent,
-                COUNT(CASE WHEN TRIM(COALESCE(status, '')) = 'Ready to Rent' THEN 1 END) AS number_ready_to_rent,
-                GROUP_CONCAT(DISTINCT CASE WHEN TRIM(COALESCE(status, '')) IN ({in_service_statuses_sql}) THEN status END) AS statuses
+                COUNT(CASE WHEN LOWER(TRIM(COALESCE(status, ''))) IN ({', '.join([f"'{status.lower()}'" for status in in_service_statuses])}) THEN 1 END) AS number_in_service,
+                COUNT(CASE WHEN LOWER(TRIM(COALESCE(status, ''))) = 'on rent' THEN 1 END) AS number_on_rent,
+                COUNT(CASE WHEN LOWER(TRIM(COALESCE(status, ''))) = 'ready to rent' THEN 1 END) AS number_ready_to_rent,
+                GROUP_CONCAT(DISTINCT CASE WHEN LOWER(TRIM(COALESCE(status, ''))) IN ({', '.join([f"'{status.lower()}'" for status in in_service_statuses])}) THEN status END) AS statuses
             FROM id_item_master
-            WHERE TRIM(COALESCE(status, '')) IN ({all_statuses_sql})
+            WHERE LOWER(TRIM(COALESCE(status, ''))) IN ({', '.join([f"'{status.lower()}'" for status in all_statuses])})
         """
         params = {}
         if common_name_filter:
@@ -186,7 +188,7 @@ def tab3_view():
             summary_groups.append(group)
             rental_class_to_group[group['rental_class_id']] = group
 
-        # Detail query (paginated)
+        # Detail query (case-insensitive)
         detail_query = f"""
             SELECT 
                 tag_id, 
@@ -198,7 +200,7 @@ def tab3_view():
                 rental_class_num, 
                 notes
             FROM id_item_master
-            WHERE TRIM(COALESCE(status, '')) IN ({in_service_statuses_sql})
+            WHERE LOWER(TRIM(COALESCE(status, ''))) IN ({', '.join([f"'{status.lower()}'" for status in in_service_statuses])})
         """
         detail_params = {}
         if common_name_filter:
@@ -863,7 +865,7 @@ def update_synced_status():
             session.flush()
         logger.info(f"Updated {updated_items} items in ItemMaster")
 
-        # Batch API updates with timeout
+        # Batch API updates
         api_client = APIClient()
         failed_items = []
         for i in range(0, len(tag_ids), batch_size):
@@ -887,9 +889,6 @@ def update_synced_status():
                         }
                         api_client.insert_item(new_item, timeout=10)
                         logger.debug(f"Inserted new item for tag_id {tag_id} in API")
-                except requests.exceptions.Timeout:
-                    logger.error(f"Timeout updating/inserting tag_id {tag_id} in API")
-                    failed_items.append(tag_id)
                 except Exception as api_error:
                     logger.error(f"Error updating/inserting tag_id {tag_id} in API: {str(api_error)}", exc_info=True)
                     failed_items.append(tag_id)
@@ -963,8 +962,6 @@ def update_status():
         try:
             api_client = APIClient()
             api_client.update_status(tag_id, new_status, timeout=10)
-        except requests.exceptions.Timeout:
-            logger.error(f"Timeout updating API status for tag_id {tag_id}")
         except Exception as e:
             logger.error(f"Failed to update API status for tag_id {tag_id}: {str(e)}", exc_info=True)
 
@@ -1003,9 +1000,7 @@ def update_notes():
 
         try:
             api_client = APIClient()
-            api_client.update_notes(tag_id, new_notes if new_notes else '', timeout=10)
-        except requests.exceptions.Timeout:
-            logger.error(f"Timeout updating API notes for tag_id {tag_id}")
+            api_client.update_notes(tag_id, new_notes if new_notes else '')
         except Exception as e:
             logger.error(f"Failed to update API notes for tag_id {tag_id}: {str(e)}", exc_info=True)
 
