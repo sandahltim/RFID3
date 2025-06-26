@@ -7,7 +7,7 @@ User=tim
 Group=www-data
 WorkingDirectory=/home/tim/test_rfidpi
 Environment="PATH=/home/tim/test_rfidpi/venv/bin:/usr/bin"
-ExecStart=/home/tim/test_rfidpi/venv/bin/gunicorn --workers  --threads 4 --timeout 600 --bind 0.0.0.0:3607 --error-logfile /home/tim/test_rfidpi/logs/gunicorn_error.log --access-logfile /home/tim/test_rfidpi/logs/gunicorn_access.log run:app
+ExecStart=/home/tim/test_rfidpi/venv/bin/gunicorn --workers 1 --threads 4 --timeout 600 --bind 0.0.0.0:3607 --error-logfile /home/tim/test_rfidpi/logs/gunicorn_error.log --access-logfile /home/tim/test_rfidpi/logs/gunicorn_access.log run:app
 ExecStop=/bin/kill -s KILL $MAINPID
 Restart=always
 KillMode=mixed
