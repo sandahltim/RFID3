@@ -1,5 +1,7 @@
-from flask import Blueprint, redirect, url_for, jsonify, current_app
-from datetime import datetime  # Added import for datetime
+# app/routes/tabs.py
+# Version: 2025-06-26-v4
+from flask import Blueprint, redirect, url_for, jsonify, current_app, render_template
+from datetime import datetime
 import logging
 import sys
 
@@ -28,12 +30,12 @@ logger.addHandler(console_handler)
 tabs_bp = Blueprint('tabs', __name__)
 
 # Version marker
-logger.info("Deployed tabs.py version: 2025-06-23-v3 at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+logger.info("Deployed tabs.py version: 2025-06-26-v4 at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
 
 @tabs_bp.route('/tab/<int:tab_num>')
 def tab_view(tab_num):
     # Route to redirect to the appropriate tab view based on tab number
-    # Updated on 2025-06-23 to ensure proper routing
+    # Updated on 2025-06-26 to ensure proper routing with context
     logger.info(f"Routing request for /tab/{tab_num} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
     current_app.logger.info(f"Routing request for /tab/{tab_num} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
     if tab_num == 1:
@@ -59,12 +61,12 @@ def tab_view(tab_num):
     else:
         logger.warning(f"Tab {tab_num} not implemented at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
         current_app.logger.warning(f"Tab {tab_num} not implemented at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-        return jsonify({'error': 'Tab not implemented'}), 404
+        return render_template('common.html', tab_num=tab_num)
 
 @tabs_bp.route('/tab/<int:tab_num>/categories')
 def tab_categories(tab_num):
     # Route to redirect to the appropriate tab categories endpoint
-    # Updated on 2025-06-23 to ensure proper routing
+    # Updated on 2025-06-26 to ensure proper routing
     logger.info(f"Routing categories request for /tab/{tab_num} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
     if tab_num == 1:
         return redirect(url_for('tab1.tab1_categories'))
@@ -82,7 +84,7 @@ def tab_categories(tab_num):
 @tabs_bp.route('/tab/<int:tab_num>/subcat_data')
 def subcat_data(tab_num):
     # Route to redirect to the appropriate tab subcategory data endpoint
-    # Updated on 2025-06-23 to ensure proper routing
+    # Updated on 2025-06-26 to ensure proper routing
     logger.info(f"Routing subcat_data request for /tab/{tab_num} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
     if tab_num == 1:
         return redirect(url_for('tab1.tab1_subcat_data'))
@@ -100,7 +102,7 @@ def subcat_data(tab_num):
 @tabs_bp.route('/tab/<int:tab_num>/common_names')
 def common_names(tab_num):
     # Route to redirect to the appropriate tab common names endpoint
-    # Updated on 2025-06-23 to ensure proper routing
+    # Updated on 2025-06-26 to ensure proper routing
     logger.info(f"Routing common_names request for /tab/{tab_num} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
     if tab_num == 1:
         return redirect(url_for('tab1.tab1_common_names'))
@@ -118,7 +120,7 @@ def common_names(tab_num):
 @tabs_bp.route('/tab/<int:tab_num>/data')
 def tab_data(tab_num):
     # Route to redirect to the appropriate tab data endpoint
-    # Updated on 2025-06-23 to ensure proper routing
+    # Updated on 2025-06-26 to ensure proper routing
     logger.info(f"Routing data request for /tab/{tab_num} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
     if tab_num == 1:
         return redirect(url_for('tab1.tab1_data'))

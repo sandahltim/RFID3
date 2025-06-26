@@ -1,38 +1,34 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="container">
-    <h2>
-        {% if tab_num == 1 %}
-            Rental Inventory
-        {% elif tab_num == 2 %}
-            Open Contracts
-        {% elif tab_num == 3 %}
-            Service
-        {% elif tab_num == 4 %}
-            Laundry Contracts
-        {% elif tab_num == 5 %}
-            Resale/Rental Packs
-        {% else %}
-            Tab {{ tab_num | default('Unknown') }}
-        {% endif %}
-    </h2>
+    <div class="container mt-4">
+        <h2>
+            {% if tab_num == 1 %}Rental Inventory
+            {% elif tab_num == 2 %}Open Contracts
+            {% elif tab_num == 3 %}Service
+            {% elif tab_num == 4 %}Laundry Contracts
+            {% elif tab_num == 5 %}Resale/Rental Packs
+            {% else %}Tab {{ tab_num | default('Unknown') }}{% endif %}
+        </h2>
 
-    <table class="table table-bordered table-hover category-table" id="category-table">
-        <thead class="thead-dark">
-            <tr>
-                <th>Category</th>
-                <th>Subcategory</th>
-                <th>Total Items</th>
-                <th>Items on Contracts</th>
-                <th>Items in Service</th>
-                <th>Items Available</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% include '_category_rows.html' %}
-        </tbody>
-    </table>
-</div>
+        <table class="table table-bordered">
+            <thead>
+                <tr>
+                    <th>Category</th>
+                    <th>Subcategory</th>
+                    <th>Total Items</th>
+                    <th>Items on Contracts</th>
+                    <th>Items in Service</th>
+                    <th>Items Available</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% include '_category_rows.html' ignore missing %}
+                {% if not self._category_rows() %}
+                    <tr><td colspan="7">No data available</td></tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
 {% endblock %}
