@@ -3,193 +3,195 @@
 {% block title %}Tab 3 - Items in Service{% endblock %}
 {% block scripts %}
     {{ super() }}
-    <script src="{{ url_for('static', filename='js/tab3.js') }}?v={{ cache_bust }}"></script>
+    <script src="{{ url_for('static', filename='js/common.js') }}?v={{ (url_for('static', filename='js/common.js') | filemtime) }}"></script>
+    <script src="{{ url_for('static', filename='js/tab.js') }}?v={{ (url_for('static', filename='js/tab.js') | filemtime) }}"></script>
+    <script src="{{ url_for('static', filename='js/tab3.js') }}?v={{ (url_for('static', filename='js/tab3.js') | filemtime) }}"></script>
 {% endblock %}
 
 {% block content %}
-<h1>Tab 3 - Items in Service</h1>
+<div class="container-fluid">
+    <h2>Tab 3 - Items in Service</h2>
 
-<div class="filter-sort-controls mb-4">
-    <div class="row">
+    <div class="row mb-3">
         <div class="col-md-4">
             <label for="commonNameFilterTab3">Filter by Common Name:</label>
-            <input type="text" id="commonNameFilterTab3" class="form-control" value="{{ common_name_filter }}" placeholder="Enter common name">
+            <input type="text" id="commonNameFilterTab3" class="form-control" value="{{ common_name_filter }}" placeholder="Enter Common Name">
         </div>
-        <div class="col-md-4">
+        <div class="col-md-3">
             <label for="dateFilterTab3">Filter by Last Scanned Date:</label>
             <input type="date" id="dateFilterTab3" class="form-control" value="{{ date_filter }}">
         </div>
-        <div class="col-md-4">
+        <div class="col-md-3">
             <label for="sortFilterTab3">Sort By:</label>
             <select id="sortFilterTab3" class="form-control">
                 <option value="date_last_scanned_desc" {% if sort == 'date_last_scanned_desc' %}selected{% endif %}>Last Scanned (Newest First)</option>
                 <option value="date_last_scanned_asc" {% if sort == 'date_last_scanned_asc' %}selected{% endif %}>Last Scanned (Oldest First)</option>
             </select>
         </div>
-    </div>
-    <div class="row mt-2">
-        <div class="col-md-12">
+        <div class="col-md-2">
             <button class="btn btn-primary" onclick="applyTab3Filters()">Apply Filters</button>
             <button class="btn btn-secondary" onclick="clearTab3Filters()">Clear Filters</button>
         </div>
     </div>
-</div>
 
-<div class="tab3-items-section">
     <h3>Items in Service</h3>
     {% if summary_groups %}
-        <table class="table table-bordered tab3-summary-table" id="tab3-summary-table">
-            <thead>
-                <tr>
-                    <th>Rental Class ID</th>
-                    <th>Common Name</th>
-                    <th>In Service</th>
-                    <th>On Rent</th>
-                    <th>Ready to Rent</th>
-                    <th>Statuses</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for group in summary_groups %}
-                    <tr>
-                        <td>{{ group.rental_class_id }}</td>
-                        <td>{{ group.common_name }}</td>
-                        <td>{{ group.number_in_service }}</td>
-                        <td>{{ group.number_on_rent }}</td>
-                        <td>{{ group.number_ready_to_rent }}</td>
-                        <td>{{ group.statuses | join(', ') }}</td>
-                        <td>
-                            <button class="btn btn-sm btn-secondary expand-btn" data-target="tab3-details-{{ loop.index0 }}">Expand</button>
-                            <button class="btn btn-sm btn-secondary collapse-btn" data-target="tab3-details-{{ loop.index0 }}" style="display: none;">Collapse</button>
-                        </td>
-                    </tr>
-                    <tr class="expandable collapsed" id="tab3-details-{{ loop.index0 }}">
-                        <td colspan="7">
-                            <div class="tab3-details-section">
-                                <table class="table table-bordered tab3-details-table">
-                                    <thead>
-                                        <tr>
-                                            <th>Tag ID</th>
-                                            <th>Rental Class ID</th>
-                                            <th>Common Name</th>
-                                            <th>Status</th>
-                                            <th>Bin Location</th>
-                                            <th>Last Contract</th>
-                                            <th>Last Scanned Date</th>
-                                            <th>Location of Repair</th>
-                                            <th>Repair Types</th>
-                                            <th>Transaction Details</th>
-                                            <th>Notes</th>
-                                            <th>Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {% for item in group.item_list %}
-                                            <tr>
-                                                <td>{{ item.tag_id }}</td>
-                                                <td>{{ item.rental_class_id }}</td>
-                                                <td>{{ item.common_name }}</td>
-                                                <td>
-                                                    <select id="tab3-status-{{ item.tag_id }}" onchange="updateStatusVisibility('{{ item.tag_id }}')">
-                                                        <option value="{{ item.status }}" selected>{{ item.status }}</option>
-                                                        <option value="Ready to Rent">Ready to Rent</option>
-                                                        <option value="Sold">Sold</option>
-                                                        <option value="Repair">Repair</option>
-                                                        <option value="Needs to be Inspected">Needs to be Inspected</option>
-                                                        <option value="Staged">Staged</option>
-                                                        <option value="Wash">Wash</option>
-                                                        <option value="Wet">Wet</option>
-                                                    </select>
-                                                </td>
-                                                <td>{{ item.bin_location }}</td>
-                                                <td>{{ item.last_contract_num }}</td>
-                                                <td class="tab3-date-last-scanned">{{ item.date_last_scanned }}</td>
-                                                <td>{{ item.location_of_repair }}</td>
-                                                <td>{{ item.repair_types | join(', ') }}</td>
-                                                <td>
-                                                    <ul>
-                                                        <li><strong>Last Transaction Scan Date:</strong> {{ item.last_transaction_scan_date }}</li>
-                                                        <li><strong>Dirty/Mud:</strong> {{ 'Yes' if item.dirty_or_mud else 'No' }}</li>
-                                                        <li><strong>Leaves:</strong> {{ 'Yes' if item.leaves else 'No' }}</li>
-                                                        <li><strong>Oil:</strong> {{ 'Yes' if item.oil else 'No' }}</li>
-                                                        <li><strong>Mold:</strong> {{ 'Yes' if item.mold else 'No' }}</li>
-                                                        <li><strong>Stain:</strong> {{ 'Yes' if item.stain else 'No' }}</li>
-                                                        <li><strong>Oxidation:</strong> {{ 'Yes' if item.oxidation else 'No' }}</li>
-                                                        <li><strong>Rip/Tear:</strong> {{ 'Yes' if item.rip_or_tear else 'No' }}</li>
-                                                        <li><strong>Sewing Repair Needed:</strong> {{ 'Yes' if item.sewing_repair_needed else 'No' }}</li>
-                                                        <li><strong>Grommet:</strong> {{ 'Yes' if item.grommet else 'No' }}</li>
-                                                        <li><strong>Rope:</strong> {{ 'Yes' if item.rope else 'No' }}</li>
-                                                        <li><strong>Buckle:</strong> {{ 'Yes' if item.buckle else 'No' }}</li>
-                                                        <li><strong>Wet:</strong> {{ 'Yes' if item.wet else 'No' }}</li>
-                                                        <li><strong>Other:</strong> {{ item.other }}</li>
-                                                        <li><strong>Service Required:</strong> {{ 'Yes' if item.service_required else 'No' }}</li>
-                                                        <li><strong>Longitude:</strong> {{ item.longitude if item.longitude is not none else 'N/A' }}</li>
-                                                        <li><strong>Latitude:</strong> {{ item.latitude if item.latitude is not none else 'N/A' }}</li>
-                                                    </ul>
-                                                </td>
-                                                <td>
-                                                    <textarea id="tab3-notes-{{ item.tag_id }}" rows="4" class="form-control notes-textarea" data-original-notes="{{ item.notes | escape }}" oninput="updateNotesVisibility('{{ item.tag_id }}')">{{ item.notes | escape }}</textarea>
-                                                </td>
-                                                <td>
-                                                    <button class="btn btn-sm btn-primary tab3-save-status-btn" onclick="updateStatus('{{ item.tag_id }}')" style="display: none;">Save Status</button>
-                                                    <button class="btn btn-sm btn-primary tab3-save-notes-btn" onclick="updateNotes('{{ item.tag_id }}')" style="display: none;">Save Notes</button>
-                                                </td>
-                                            </tr>
-                                        {% endfor %}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+    <table class="table table-bordered table-striped">
+        <thead>
+            <tr>
+                <th>Rental Class ID</th>
+                <th>Common Name</th>
+                <th>In Service</th>
+                <th>On Rent</th>
+                <th>Ready to Rent</th>
+                <th>Statuses</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for group in summary_groups %}
+            <tr>
+                <td>{{ group.rental_class_id }}</td>
+                <td>{{ group.common_name }}</td>
+                <td>{{ group.number_in_service }}</td>
+                <td>{{ group.number_on_rent }}</td>
+                <td>{{ group.number_ready_to_rent }}</td>
+                <td>{{ group.statuses | join(', ') }}</td>
+                <td>
+                    <button class="btn btn-sm btn-primary expand-btn" data-target="details-{{ group.rental_class_id }}">Expand</button>
+                    <button class="btn btn-sm btn-primary collapse-btn" data-target="details-{{ group.rental_class_id }}" style="display: none;">Collapse</button>
+                </td>
+            </tr>
+            <tr id="details-{{ group.rental_class_id }}" class="collapsed">
+                <td colspan="7">
+                    <table class="table table-bordered tab3-details-table">
+                        <thead>
+                            <tr>
+                                <th>Tag ID</th>
+                                <th>Rental Class ID</th>
+                                <th>Common Name</th>
+                                <th>Status</th>
+                                <th>Bin Location</th>
+                                <th>Last Contract</th>
+                                <th>Last Scanned Date</th>
+                                <th>Location of Repair</th>
+                                <th>Repair Types</th>
+                                <th>Transaction Details</th>
+                                <th>Notes</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in group.item_list %}
+                            <tr>
+                                <td>{{ item.tag_id }}</td>
+                                <td>{{ item.rental_class_id }}</td>
+                                <td>{{ item.common_name }}</td>
+                                <td>
+                                    <select id="tab3-status-{{ item.tag_id }}" onchange="updateStatusVisibility('{{ item.tag_id }}')">
+                                        <option value="{{ item.status }}">{{ item.status }}</option>
+                                        <option value="Ready to Rent">Ready to Rent</option>
+                                        <option value="Sold">Sold</option>
+                                        <option value="Repair">Repair</option>
+                                        <option value="Needs to be Inspected">Needs to be Inspected</option>
+                                        <option value="Staged">Staged</option>
+                                        <option value="Wash">Wash</option>
+                                        <option value="Wet">Wet</option>
+                                    </select>
+                                    <button class="btn btn-sm btn-primary tab3-save-status-btn" style="display: none;" onclick="updateStatus('{{ item.tag_id }}')">Save Status</button>
+                                </td>
+                                <td>{{ item.bin_location }}</td>
+                                <td>{{ item.last_contract_num }}</td>
+                                <td class="tab3-date-last-scanned">{{ item.date_last_scanned }}</td>
+                                <td>{{ item.location_of_repair }}</td>
+                                <td>{{ item.repair_types | join(', ') }}</td>
+                                <td>
+                                    <div>Last Transaction Scan Date: {{ item.last_transaction_scan_date }}</div>
+                                    <div>Dirty/Mud: {{ 'Yes' if item.dirty_or_mud else 'No' }}</div>
+                                    <div>Leaves: {{ 'Yes' if item.leaves else 'No' }}</div>
+                                    <div>Oil: {{ 'Yes' if item.oil else 'No' }}</div>
+                                    <div>Mold: {{ 'Yes' if item.mold else 'No' }}</div>
+                                    <div>Stain: {{ 'Yes' if item.stain else 'No' }}</div>
+                                    <div>Oxidation: {{ 'Yes' if item.oxidation else 'No' }}</div>
+                                    <div>Rip/Tear: {{ 'Yes' if item.rip_or_tear else 'No' }}</div>
+                                    <div>Sewing Repair Needed: {{ 'Yes' if item.sewing_repair_needed else 'No' }}</div>
+                                    <div>Grommet: {{ 'Yes' if item.grommet else 'No' }}</div>
+                                    <div>Rope: {{ 'Yes' if item.rope else 'No' }}</div>
+                                    <div>Buckle: {{ 'Yes' if item.buckle else 'No' }}</div>
+                                    <div>Wet: {{ 'Yes' if item.wet else 'No' }}</div>
+                                    <div>Other: {{ item.other }}</div>
+                                    <div>Service Required: {{ 'Yes' if item.service_required else 'No' }}</div>
+                                    <div>Longitude: {{ item.longitude if item.longitude is not none else 'N/A' }}</div>
+                                    <div>Latitude: {{ item.latitude if item.latitude is not none else 'N/A' }}</div>
+                                </td>
+                                <td>
+                                    <textarea id="tab3-notes-{{ item.tag_id }}" data-original-notes="{{ item.notes | escape }}" oninput="updateNotesVisibility('{{ item.tag_id }}')">{{ item.notes | escape }}</textarea>
+                                    <button class="btn btn-sm btn-primary tab3-save-notes-btn" style="display: none;" onclick="updateNotes('{{ item.tag_id }}')">Save Notes</button>
+                                </td>
+                                <td>
+                                    <!-- Optional additional actions can be added here -->
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
 
-        <!-- Pagination Controls -->
-        <div class="pagination-controls" id="pagination-tab3-summary-table">
-            {% if total_groups > per_page %}
-                <nav aria-label="Pagination">
-                    <ul class="pagination justify-content-center">
-                        <li class="page-item {% if current_page == 1 %}disabled{% endif %}">
-                            <a class="page-link" href="{% if current_page > 1 %}/tab/3?page={{ current_page - 1 }}{% if common_name_filter %}&common_name={{ common_name_filter }}{% endif %}{% if date_filter %}&date_last_scanned={{ date_filter }}{% endif %}{% if sort %}&sort={{ sort }}{% endif %}{% else %}#{% endif %}">Previous</a>
-                        </li>
-                        {% set total_pages = (total_groups / per_page) | int %}
-                        {% if total_groups % per_page != 0 %}
-                            {% set total_pages = total_pages + 1 %}
-                        {% endif %}
-                        {% for i in range(1, total_pages + 1) %}
-                            <li class="page-item {% if i == current_page %}active{% endif %}">
-                                <a class="page-link" href="/tab/3?page={{ i }}{% if common_name_filter %}&common_name={{ common_name_filter }}{% endif %}{% if date_filter %}&date_last_scanned={{ date_filter }}{% endif %}{% if sort %}&sort={{ sort }}{% endif %}">{{ i }}</a>
-                            </li>
-                        {% endfor %}
-                        <li class="page-item {% if current_page == total_pages %}disabled{% endif %}">
-                            <a class="page-link" href="{% if current_page < total_pages %}/tab/3?page={{ current_page + 1 }}{% if common_name_filter %}&common_name={{ common_name_filter }}{% endif %}{% if date_filter %}&date_last_scanned={{ date_filter }}{% endif %}{% if sort %}&sort={{ sort }}{% endif %}{% else %}#{% endif %}">Next</a>
-                        </li>
-                    </ul>
-                </nav>
+    {% if total_groups > per_page %}
+    <nav aria-label="Page navigation">
+        <ul class="pagination">
+            {% if current_page > 1 %}
+            <li class="page-item">
+                <a class="page-link" href="/tab/3?page={{ current_page - 1 }}{% if common_name_filter %}&common_name={{ common_name_filter }}{% endif %}{% if date_filter %}&date_last_scanned={{ date_filter }}{% endif %}{% if sort %}&sort={{ sort }}{% endif %}">Previous</a>
+            </li>
             {% endif %}
-        </div>
-    {% else %}
-        <p>No items currently in service. If this is unexpected, please check the database or contact support.</p>
+            {% set total_pages = (total_groups / per_page) | int %}
+            {% if total_groups % per_page != 0 %}
+                {% set total_pages = total_pages + 1 %}
+            {% endif %}
+            {% for i in range(1, total_pages + 1) %}
+            <li class="page-item {% if i == current_page %}active{% endif %}">
+                <a class="page-link" href="/tab/3?page={{ i }}{% if common_name_filter %}&common_name={{ common_name_filter }}{% endif %}{% if date_filter %}&date_last_scanned={{ date_filter }}{% endif %}{% if sort %}&sort={{ sort }}{% endif %}">{{ i }}</a>
+            </li>
+            {% endfor %}
+            {% if current_page < total_pages %}
+            <li class="page-item">
+                <a class="page-link" href="/tab/3?page={{ current_page + 1 }}{% if common_name_filter %}&common_name={{ common_name_filter }}{% endif %}{% if date_filter %}&date_last_scanned={{ date_filter }}{% endif %}{% if sort %}&sort={{ sort }}{% endif %}">Next</a>
+            </li>
+            {% endif %}
+        </ul>
+    </nav>
     {% endif %}
-</div>
+    {% else %}
+    <p>No items currently in service. If this is unexpected, please check the database or contact support.</p>
+    {% endif %}
 
-<div class="print-tags-section mt-4">
-    <h4>Print RFID Tags</h4>
-    <div class="form-group">
-        <label for="commonNameSelect">Select Common Name (Pack/Resale):</label>
-        <select id="commonNameSelect" class="form-control">
-            <option value="">Select Common Name</option>
-        </select>
+    <h3>Print RFID Tags</h3>
+    <div class="row mb-3">
+        <div class="col-md-4">
+            <label for="commonNameSelect">Select Common Name (Pack/Resale):</label>
+            <select id="commonNameSelect" class="form-control">
+                <option value="">Select Common Name</option>
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label for="tagQuantity">Number of Tags to Print:</label>
+            <input type="number" id="tagQuantity" class="form-control" placeholder="Enter Number of Tags" min="1">
+        </div>
+        <div class="col-md-3">
+            <button id="syncToPcBtn" class="btn btn-primary">Sync to PC</button>
+        </div>
+        <div class="col-md-2">
+            <button id="updateStatusBtn" class="btn btn-success" disabled>Update Status to Ready to Rent</button>
+        </div>
     </div>
-    <div class="form-group">
-        <label for="tagQuantity">Number of Tags to Print:</label>
-        <input type="number" id="tagQuantity" class="form-control" min="1" value="1">
-    </div>
-    <button id="syncToPcBtn" class="btn btn-primary mt-2">Sync to PC</button>
-    <h5 class="mt-4">Synced Items</h5>
-    <table class="table table-bordered" id="csvContentsTable">
+    <div id="syncMessage"></div>
+    <h4>Synced Items</h4>
+    <table id="csvContentsTable" class="table table-bordered table-striped">
         <thead>
             <tr>
                 <th>Tag ID</th>
@@ -199,29 +201,18 @@
                 <th>Action</th>
             </tr>
         </thead>
-        <tbody id="csvContentsBody"></tbody>
+        <tbody id="csvContentsBody">
+            <tr><td colspan="5">Loading...</td></tr>
+        </tbody>
     </table>
-    <button id="updateStatusBtn" class="btn btn-success mt-2" disabled>Update Status to Ready to Rent</button>
-    <div id="syncMessage" class="mt-2"></div>
-</div>
 
-<style>
-.tab3-details-section {
-    margin-left: 1rem;
-    padding: 0.5rem;
-    border-left: 3px solid #28a745;
-}
-.expandable.collapsed {
-    display: none;
-}
-.expandable.expanded {
-    display: table-row;
-}
-</style>
-
-<noscript>
-    <div style="color: red; text-align: center; margin: 20px;">
+    <noscript>
         <p>JavaScript is disabled or failed to load. Please enable JavaScript to use the expand/collapse functionality and other interactive features.</p>
-    </div>
-</noscript>
+    </noscript>
+</div>
 {% endblock %}
+
+{% macro filemtime(path) %}
+{% set stat = get_file_stat(path) %}
+{{ stat.mtime if stat else '' }}
+{% endmacro %}
