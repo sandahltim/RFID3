@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}{% endblock %}</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap.min.css') }}?v={{ '' | timestamp }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='lib/bootstrap/bootstrap.min.css') }}?v={{ '' | timestamp }}">
     {% block head %}{% endblock %}
     {% block extra_head %}{% endblock %}
 </head>
@@ -47,9 +47,9 @@
         {% block content %}{% endblock %}
     </div>
 
-    <script src="{{ url_for('static', filename='js/jquery.min.js') }}?v={{ '' | timestamp }}"></script>
-    <script src="{{ url_for('static', filename='js/bootstrap.min.js') }}?v={{ '' | timestamp }}"></script>
-    <script src="{{ url_for('static', filename='js/htmx.min.js') }}?v={{ '' | timestamp }}"></script>
+    <script src="{{ url_for('static', filename='lib/jquery/jquery.min.js') }}?v={{ '' | timestamp }}"></script>
+    <script src="{{ url_for('static', filename='lib/bootstrap/bootstrap.bundle.min.js') }}?v={{ '' | timestamp }}"></script>
+    <script src="{{ url_for('static', filename='lib/htmx/htmx.min.js') }}?v={{ '' | timestamp }}"></script>
     <script src="{{ url_for('static', filename='js/common.js') }}?v={{ '' | timestamp }}"></script>
     <script src="{{ url_for('static', filename='js/tab.js') }}?v={{ '' | timestamp }}"></script>
     {% block scripts %}
