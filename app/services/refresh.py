@@ -1,5 +1,5 @@
 # app/services/refresh.py
-# refresh.py version: 2025-06-26-v6
+# refresh.py version: 2025-06-27-v7
 import logging
 import traceback
 from datetime import datetime, timedelta
@@ -16,16 +16,16 @@ import json
 
 logger = logging.getLogger(f'refresh_{os.getpid()}')
 logger.setLevel(logging.INFO)
-if not logger.handlers:
-    file_handler = logging.FileHandler('/home/tim/test_rfidpi/logs/rfid_dashboard.log')
-    file_handler.setLevel(logging.INFO)
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    file_handler.setFormatter(formatter)
-    logger.addHandler(file_handler)
-    console_handler = logging.StreamHandler()
-    console_handler.setLevel(logging.INFO)
-    console_handler.setFormatter(formatter)
-    logger.addHandler(console_handler)
+logger.handlers = []  # Clear existing handlers
+file_handler = logging.FileHandler('/home/tim/test_rfidpi/logs/rfid_dashboard.log')
+file_handler.setLevel(logging.INFO)
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+file_handler.setFormatter(formatter)
+logger.addHandler(file_handler)
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.INFO)
+console_handler.setFormatter(formatter)
+logger.addHandler(console_handler)
 
 refresh_bp = Blueprint('refresh', __name__)
 
@@ -131,6 +131,9 @@ def update_user_mappings(session, csv_file_path='/home/tim/test_rfidpi/seeddata_
         session.rollback()
 
 def update_item_master(session, items):
+    if not items:
+        logger.info("No items to update in id_item_master")
+        return
     logger.info(f"Updating {len(items)} items in id_item_master")
     skipped = 0
     failed = 0
@@ -174,6 +177,9 @@ def update_item_master(session, items):
     logger.info(f"Updated {len(items) - skipped - failed} items, skipped {skipped}, failed {failed}")
 
 def update_transactions(session, transactions):
+    if not transactions:
+        logger.info("No transactions to update in id_transactions")
+        return
     logger.info(f"Updating {len(transactions)} transactions in id_transactions")
     skipped = 0
     failed = 0
@@ -236,6 +242,9 @@ def update_transactions(session, transactions):
     logger.info(f"Updated {len(transactions) - skipped - failed} transactions, skipped {skipped}, failed {failed}")
 
 def update_seed_data(session, seed_data):
+    if not seed_data:
+        logger.info("No seed data to update in seed_rental_classes")
+        return
     logger.info(f"Updating {len(seed_data)} items in seed_rental_classes")
     skipped = 0
     failed = 0
@@ -279,8 +288,8 @@ def full_refresh():
             logger.info(f"Deleted {deleted_mappings} user mappings from user_rental_class_mappings")
 
             logger.debug("Fetching data from API")
-            items = api_client.get_item_master(since_date=None)
-            transactions = api_client.get_transactions(since_date=None)
+            items = api_client.get_item_master(since_date=None, full_refresh=True)
+            transactions = api_client.get_transactions(since_date=None, full_refresh=True)
             seed_data = api_client.get_seed_data()
 
             logger.info(f"Fetched {len(items)} items from item master")
@@ -334,15 +343,21 @@ def incremental_refresh():
                 since_date = datetime.utcnow() - timedelta(seconds=INCREMENTAL_LOOKBACK_SECONDS)
                 logger.info(f"Checking for updates since: {since_date.strftime('%Y-%m-%d %H:%M:%S')}")
 
-                items = api_client.get_item_master(since_date=since_date)
+                items = api_client.get_item_master(since_date=since_date, full_refresh=False)
                 logger.info(f"Fetched {len(items)} items from item master")
                 if not items:
                     logger.info("No new items fetched from item master API")
 
-                transactions = api_client.get_transactions(since_date=since_date)
+                transactions = api_client.get_transactions(since_date=since_date, full_refresh=False)
                 logger.info(f"Fetched {len(transactions)} transactions")
                 if not transactions:
                     logger.info("No new transactions fetched from transactions API")
+
+                if not items and not transactions:
+                    logger.info("No new data to process, skipping database updates")
+                    session.commit()
+                    update_refresh_state('incremental_refresh', datetime.utcnow())
+                    break
 
                 update_item_master(session, items)
                 update_transactions(session, transactions)

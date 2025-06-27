@@ -1,5 +1,5 @@
 # app/services/scheduler.py
-# scheduler.py version: 2025-06-26-v6
+# scheduler.py version: 2025-06-27-v7
 from apscheduler.schedulers.background import BackgroundScheduler
 from redis import Redis
 from config import REDIS_URL, INCREMENTAL_REFRESH_INTERVAL
@@ -15,7 +15,8 @@ from datetime import datetime
 # Configure logging with process ID
 logger = logging.getLogger(f'scheduler_{os.getpid()}')
 logger.setLevel(logging.DEBUG)
-if not logger.handlers and os.getpid() == os.getppid():
+logger.handlers = []  # Clear existing handlers
+if os.getpid() == os.getppid():
     file_handler = logging.FileHandler('/home/tim/test_rfidpi/logs/rfid_dashboard.log')
     file_handler.setLevel(logging.DEBUG)
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -32,6 +33,7 @@ def init_scheduler(app):
     logger.info("Initializing background scheduler")
     redis_client = Redis.from_url(REDIS_URL)
     lock_key = "full_refresh_lock"
+    incremental_lock_key = "incremental_refresh_lock"
     lock_timeout = 300
 
     def retry_database_connection():
@@ -91,22 +93,32 @@ def init_scheduler(app):
 
     def run_with_context():
         with app.app_context():
-            if redis_client.get("full_refresh_lock") or redis_client.get("user_operation_lock"):
-                logger.debug("Full refresh or user operation in progress, skipping incremental refresh")
+            if redis_client.get("full_refresh_lock") or redis_client.get(incremental_lock_key):
+                logger.debug("Full refresh or incremental refresh in progress, skipping incremental refresh")
                 return
             if retry_database_connection():
-                logger.debug("Starting scheduled incremental refresh")
-                incremental_refresh()
-                logger.info("Scheduled incremental refresh completed successfully")
+                if redis_client.setnx(incremental_lock_key, 1):
+                    try:
+                        redis_client.expire(incremental_lock_key, lock_timeout)
+                        logger.debug("Starting scheduled incremental refresh")
+                        incremental_refresh()
+                        logger.info("Scheduled incremental refresh completed successfully")
+                    except Exception as e:
+                        logger.error(f"Incremental refresh failed: {str(e)}", exc_info=True)
+                    finally:
+                        redis_client.delete(incremental_lock_key)
+                        logger.debug("Released incremental refresh lock")
+                else:
+                    logger.debug("Incremental refresh lock exists, skipping refresh")
             else:
                 logger.error("Skipping incremental refresh due to database connection failure")
 
-    # Schedule incremental refresh every 60 seconds
+    # Schedule incremental refresh every 300 seconds
     logger.debug("Adding incremental refresh job to scheduler")
     scheduler.add_job(
         func=run_with_context,
         trigger='interval',
-        seconds=INCREMENTAL_REFRESH_INTERVAL,
+        seconds=300,  # Increased from 60 to 300 seconds
         id='incremental_refresh',
         replace_existing=True,
         coalesce=True,
@@ -115,7 +127,7 @@ def init_scheduler(app):
     try:
         logger.debug("Starting scheduler")
         scheduler.start()
-        logger.info(f"Background scheduler started for incremental refresh every {INCREMENTAL_REFRESH_INTERVAL} seconds")
+        logger.info("Background scheduler started for incremental refresh every 300 seconds")
     except Exception as e:
         logger.error(f"Failed to start scheduler: {str(e)}", exc_info=True)
         raise
