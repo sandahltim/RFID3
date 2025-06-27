@@ -1,5 +1,5 @@
 # app/routes/home.py
-# home.py version: 2025-06-27-v4
+# home.py version: 2025-06-27-v5
 from flask import Blueprint, render_template, current_app
 from .. import db, cache
 from ..models.db_models import ItemMaster, Transaction, RefreshState
@@ -9,6 +9,7 @@ import logging
 import sys
 from datetime import datetime
 import os
+import json
 
 # Configure logging with process ID
 logger = logging.getLogger(f'home_{os.getpid()}')
@@ -27,8 +28,13 @@ logger.addHandler(console_handler)
 home_bp = Blueprint('home', __name__)
 
 @home_bp.route('/', endpoint='home')
-@cache.cached(timeout=60, key_prefix='home_page')  # Cache for 60 seconds
 def home():
+    cache_key = 'home_page_cache'
+    cached_data = cache.get(cache_key)
+    if cached_data:
+        logger.debug("Serving home page from cache")
+        return render_template('home.html', **json.loads(cached_data), cache_bust=int(time()))
+
     try:
         session = db.session()
         logger.info("Starting new session for home")
@@ -102,6 +108,19 @@ def home():
         last_refresh = refresh_state.last_refresh.strftime('%Y-%m-%d %H:%M:%S') if refresh_state and refresh_state.last_refresh else 'N/A'
         refresh_type = refresh_state.state_type if refresh_state else 'N/A'
         logger.debug(f"Last refresh: {last_refresh}, Type: {refresh_type}")
+
+        # Cache the response
+        render_data = {
+            'total_items': total_items or 0,
+            'items_on_rent': items_on_rent or 0,
+            'items_in_service': items_in_service or 0,
+            'items_available': items_available or 0,
+            'status_counts': status_counts,
+            'recent_scans': [(item.tag_id, item.common_name, item.date_last_scanned.isoformat() if item.date_last_scanned else None) for item in recent_scans],
+            'last_refresh': last_refresh,
+            'refresh_type': refresh_type
+        }
+        cache.set(cache_key, json.dumps(render_data), ex=60)  # Cache for 60 seconds
 
         session.close()
         return render_template('home.html', 
