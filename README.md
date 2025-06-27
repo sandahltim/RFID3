@@ -319,11 +319,14 @@ WantedBy=multi-user.target
 
 
 ### config.py
-# config.py version: 2025-06-26-v7
+# config.py version: 2025-06-26-v8
 import os
 
 # Base directory
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+
+# Application IP address
+APP_IP = os.environ.get('APP_IP', '192.168.3.112')
 
 # MariaDB configuration
 DB_CONFIG = {
@@ -366,6 +369,7 @@ SQLALCHEMY_ENGINE_OPTIONS = {
     'pool_recycle': 1800,  # Recycle connections every 30 minutes
     'connect_args': {'charset': 'utf8mb4', 'collation': 'utf8mb4_unicode_ci'}
 }
+
 #mariadbhash   *8226E019AE8D0D41243D07D91ABCD8E2F20358BC  root password    MySecureRootPass123
 
 
@@ -548,14 +552,14 @@ class UserRentalClassMapping(db.Model):
 
 ### __init__.py
 # app/__init__.py
-# __init__.py version: 2025-06-26-v3
+# Version: 2025-06-26-v4
 import os
 import logging
 from logging.handlers import RotatingFileHandler
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_redis import FlaskRedis
-from config import DB_CONFIG, REDIS_URL, LOG_FILE
+from config import DB_CONFIG, REDIS_URL, LOG_FILE, APP_IP
 from datetime import datetime
 
 # Initialize extensions
@@ -564,7 +568,7 @@ cache = FlaskRedis()
 
 def create_app():
     """Create and configure the Flask application."""
-    app = Flask(__name__, static_folder='static')
+    app = Flask(__name__, static_folder='/home/tim/test_rfidpi/static')
 
     # Configure logging
     log_dir = os.path.dirname(LOG_FILE)
@@ -574,18 +578,16 @@ def create_app():
     handler.setLevel(logging.DEBUG)
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     handler.setFormatter(formatter)
-    # Clear existing handlers to prevent duplicates
     logging.getLogger('').handlers = []
     app.logger.handlers = []
-    # Add handler to root logger and app logger
     logging.getLogger('').addHandler(handler)
     app.logger.addHandler(handler)
     app.logger.setLevel(logging.DEBUG)
-    app.logger.propagate = False  # Prevent double logging
+    app.logger.propagate = False
     app.logger.info("Application starting up - logging initialized")
     app.logger.debug(f"Static folder path: {app.static_folder}")
 
-    # Database configuration with connection pooling
+    # Database configuration
     try:
         app.config['SQLALCHEMY_DATABASE_URI'] = (
             f"mysql+mysqlconnector://{DB_CONFIG['user']}:{DB_CONFIG['password']}@"
@@ -596,9 +598,10 @@ def create_app():
             'pool_size': 10,
             'max_overflow': 20,
             'pool_timeout': 30,
-            'pool_recycle': 1800,  # Recycle connections every 30 minutes
+            'pool_recycle': 1800,
         }
         app.config['REDIS_URL'] = REDIS_URL
+        app.config['APP_IP'] = APP_IP
         app.logger.info("Database and Redis configuration set successfully")
     except Exception as e:
         app.logger.error(f"Failed to set database/Redis configuration: {str(e)}", exc_info=True)
@@ -613,10 +616,21 @@ def create_app():
         app.logger.error(f"Failed to initialize extensions: {str(e)}", exc_info=True)
         raise
 
-    # Add custom Jinja2 filter for timestamp
+    # Add custom Jinja2 filters
     def timestamp_filter(value):
         return int(datetime.now().timestamp())
     app.jinja_env.filters['timestamp'] = timestamp_filter
+
+    def datetimeformat(value):
+        if value is None:
+            return 'N/A'
+        if isinstance(value, str):
+            try:
+                value = datetime.fromisoformat(value.replace('Z', '+00:00'))
+            except ValueError:
+                return value
+        return value.strftime('%Y-%m-%d %H:%M:%S')
+    app.jinja_env.filters['datetimeformat'] = datetimeformat
 
     # Create database tables
     try:
@@ -667,6 +681,7 @@ def create_app():
 
     app.logger.info("Application startup completed successfully")
     return app
+    
 
 ### bulk_update_mappings.py
 # scripts/bulk_update_mappings.py

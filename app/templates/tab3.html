@@ -3,298 +3,170 @@
 {% block title %}Tab 3 - Items in Service{% endblock %}
 {% block scripts %}
     {{ super() }}
-    <script src="{{ url_for('static', filename='js/tab3.js') }}?v={{ '' | timestamp }}"></script>
+    <script src="{{ url_for('static', filename='js/common.js') }}?v={{ cache_bust }}"></script>
+    <script src="{{ url_for('static', filename='js/tab.js') }}?v={{ cache_bust }}"></script>
+    <script src="{{ url_for('static', filename='js/tab3.js') }}?v={{ cache_bust }}"></script>
 {% endblock %}
 
 {% block content %}
-    <div class="container mt-4">
-        <h2>Tab 3 - Items in Service</h2>
+<div class="container">
+    <h2>Tab 3 - Items in Service</h2>
 
-        <div class="row mb-3">
-            <div class="col-md-12">
-                <div class="filter-section">
-                    <label for="commonNameFilter">Filter by Common Name:</label>
-                    <input type="text" id="commonNameFilter" class="form-control" onkeyup="applyGlobalFilter()">
-                    <label for="lastScannedFilter">Filter by Last Scanned Date:</label>
-                    <input type="date" id="lastScannedFilter" class="form-control" onchange="applyGlobalFilter()">
-                    <label for="crewFilter">Filter by Crew:</label>
-                    <select id="crewFilter" class="form-control" onchange="applyGlobalFilter()">
-                        <option value="">All</option>
-                        <option value="Tent Crew">Tent Crew</option>
-                        <option value="Linen Crew">Linen Crew</option>
-                        <option value="Service Dept">Service Dept</option>
-                    </select>
-                    <label for="sortFilter">Sort By:</label>
-                    <select id="sortFilter" class="form-control" onchange="applyGlobalFilter()">
-                        <option value="date_last_scanned_desc">Last Scanned (Newest First)</option>
-                        <option value="date_last_scanned_asc">Last Scanned (Oldest First)</option>
-                    </select>
-                </div>
-                <div class="btn-group mt-2">
-                    <button class="btn btn-primary" onclick="applyGlobalFilter()">Apply Filters</button>
-                    <button class="btn btn-secondary" onclick="clearGlobalFilter()">Clear Filters</button>
-                </div>
+    <div class="filter-sort-controls mb-3">
+        <div class="row">
+            <div class="col-md-3">
+                <label for="commonNameFilter">Filter by Common Name:</label>
+                <input type="text" id="commonNameFilter" class="form-control" value="{{ common_name_filter | escape }}" placeholder="Enter common name">
+            </div>
+            <div class="col-md-3">
+                <label for="lastScannedFilter">Filter by Last Scanned Date:</label>
+                <input type="date" id="lastScannedFilter" class="form-control" value="{{ date_filter | escape }}">
+            </div>
+            <div class="col-md-3">
+                <label for="crewFilter">Filter by Crew:</label>
+                <select id="crewFilter" class="form-control">
+                    <option value="">All</option>
+                    <option value="Tent Crew" {% if crew_filter == 'Tent Crew' %}selected{% endif %}>Tent Crew</option>
+                    <option value="Linen Crew" {% if crew_filter == 'Linen Crew' %}selected{% endif %}>Linen Crew</option>
+                    <option value="Service Dept" {% if crew_filter == 'Service Dept' %}selected{% endif %}>Service Dept</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label for="sortFilter">Sort By:</label>
+                <select id="sortFilter" class="form-control">
+                    <option value="date_last_scanned_desc" {% if sort == 'date_last_scanned_desc' %}selected{% endif %}>Last Scanned (Newest First)</option>
+                    <option value="date_last_scanned_asc" {% if sort == 'date_last_scanned_asc' %}selected{% endif %}>Last Scanned (Oldest First)</option>
+                </select>
             </div>
         </div>
-
-        <h3>Items in Service</h3>
-
-        {% if crew_groups.get('Tent Crew') or crew_groups.get('Linen Crew') or crew_groups.get('Service Dept') %}
-            {% for crew in ['Tent Crew', 'Linen Crew', 'Service Dept'] %}
-                {% if crew_groups.get(crew) %}
-                    <h4>{{ crew }}</h4>
-                    <table class="table table-bordered">
-                        <thead>
-                            <tr>
-                                <th>Rental Class ID</th>
-                                <th>Common Name</th>
-                                <th>In Service</th>
-                                <th>On Rent</th>
-                                <th>Ready to Rent</th>
-                                <th>Statuses</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for group in crew_groups[crew] %}
-                                <tr>
-                                    <td>{{ group.rental_class_id }}</td>
-                                    <td>{{ group.common_name }}</td>
-                                    <td>{{ group.number_in_service }}</td>
-                                    <td>{{ group.number_on_rent }}</td>
-                                    <td>{{ group.number_ready_to_rent }}</td>
-                                    <td>{{ group.statuses | join(', ') }}</td>
-                                    <td>
-                                        <button class="btn btn-sm btn-secondary expand-btn" data-target-id="expand-{{ loop.index }}">Expand</button>
-                                        <button class="btn btn-sm btn-secondary collapse-btn" data-target-id="expand-{{ loop.index }}" style="display:none;">Collapse</button>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td colspan="7">
-                                        <div id="expand-{{ loop.index }}" class="expandable collapsed">
-                                            <table class="table table-bordered">
-                                                <thead>
-                                                    <tr>
-                                                        <th>Tag ID</th>
-                                                        <th>Rental Class ID</th>
-                                                        <th>Common Name</th>
-                                                        <th>Status</th>
-                                                        <th>Bin Location</th>
-                                                        <th>Last Contract</th>
-                                                        <th>Last Scanned Date</th>
-                                                        <th>Location of Repair</th>
-                                                        <th>Repair Types</th>
-                                                        <th>Transaction Details</th>
-                                                        <th>Notes</th>
-                                                        <th>Actions</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {% for item in group.item_list %}
-                                                        <tr>
-                                                            <td>{{ item.tag_id }}</td>
-                                                            <td>{{ item.rental_class_id }}</td>
-                                                            <td>{{ item.common_name }}</td>
-                                                            <td>
-                                                                {{ item.status }}
-                                                                <select class="status-select" data-tag-id="{{ item.tag_id }}">
-                                                                    <option value="Ready to Rent" {% if item.status == 'Ready to Rent' %}selected{% endif %}>Ready to Rent</option>
-                                                                    <option value="Sold" {% if item.status == 'Sold' %}selected{% endif %}>Sold</option>
-                                                                    <option value="Repair" {% if item.status == 'Repair' %}selected{% endif %}>Repair</option>
-                                                                    <option value="Needs to be Inspected" {% if item.status == 'Needs to be Inspected' %}selected{% endif %}>Needs to be Inspected</option>
-                                                                    <option value="Staged" {% if item.status == 'Staged' %}selected{% endif %}>Staged</option>
-                                                                    <option value="Wash" {% if item.status == 'Wash' %}selected{% endif %}>Wash</option>
-                                                                    <option value="Wet" {% if item.status == 'Wet' %}selected{% endif %}>Wet</option>
-                                                                </select>
-                                                                <button class="btn btn-sm btn-success save-status" data-tag-id="{{ item.tag_id }}">Save Status</button>
-                                                            </td>
-                                                            <td>{{ item.bin_location }}</td>
-                                                            <td>{{ item.last_contract_num }}</td>
-                                                            <td>{{ item.date_last_scanned | datetimeformat if item.date_last_scanned else 'N/A' }}</td>
-                                                            <td>{{ item.location_of_repair }}</td>
-                                                            <td>{{ item.repair_types | join(', ') }}</td>
-                                                            <td>Last Transaction Scan Date: {{ item.last_transaction_scan_date | datetimeformat if item.last_transaction_scan_date else 'N/A' }}</td>
-                                                            <td>
-                                                                <textarea class="notes-textarea" data-tag-id="{{ item.tag_id }}">{{ item.notes | escape }}</textarea>
-                                                                <button class="btn btn-sm btn-success save-notes" data-tag-id="{{ item.tag_id }}">Save Notes</button>
-                                                            </td>
-                                                            <td><button class="btn btn-sm btn-info print-btn" data-tag-id="{{ item.tag_id }}">Print</button></td>
-                                                        </tr>
-                                                    {% endfor %}
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    </td>
-                                </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                {% endif %}
-            {% endfor %}
-            {% if total_groups > per_page %}
-                <div class="pagination-controls">
-                    {% if current_page > 1 %}
-                        <a href="{{ url_for('tabs.tab_view', tab_num=3, page=current_page - 1) }}" class="btn btn-sm btn-secondary">Previous</a>
-                    {% endif %}
-                    {% set total_pages = (total_groups / per_page) | int %}
-                    {% if total_groups % per_page != 0 %}
-                        {% set total_pages = total_pages + 1 %}
-                    {% endif %}
-                    {% for i in range(1, total_pages + 1) %}
-                        <a href="{{ url_for('tabs.tab_view', tab_num=3, page=i) }}" class="btn btn-sm btn-secondary {% if i == current_page %}active{% endif %}">{{ i }}</a>
-                    {% endfor %}
-                    {% if current_page < total_pages %}
-                        <a href="{{ url_for('tabs.tab_view', tab_num=3, page=current_page + 1) }}" class="btn btn-sm btn-secondary">Next</a>
-                    {% endif %}
-                </div>
-            {% endif %}
-        {% else %}
-            <p>No items currently in service. If this is unexpected, please check the database or contact support.</p>
-        {% endif %}
-
-        <h3>Print RFID Tags</h3>
-        <div class="row mb-3">
+        <div class="row mt-2">
             <div class="col-md-12">
-                <div class="card">
-                    <div class="card-body">
-                        <label for="commonNameSelect">Select Common Name (Pack/Resale):</label>
-                        <select id="commonNameSelect" class="form-control">
-                            <option value="">Select Common Name</option>
-                            {% for common_name in common_names %}
-                                <option value="{{ common_name }}">{{ common_name }}</option>
-                            {% endfor %}
-                        </select>
-                        <label for="tagCount">Number of Tags to Print:</label>
-                        <input type="number" id="tagCount" class="form-control" min="1" value="1">
-                        <button class="btn btn-primary mt-2" onclick="syncToPC()">Sync to PC</button>
-                        <button class="btn btn-success mt-2" onclick="updateStatusToReady()">Update Status to Ready to Rent</button>
-                    </div>
-                </div>
+                <button class="btn btn-primary btn-sm" onclick="applyTab3Filters()">Apply Filters</button>
+                <button class="btn btn-secondary btn-sm" onclick="clearTab3Filters()">Clear Filters</button>
             </div>
-        </div>
-
-        <h3>Synced Items</h3>
-        <table class="table table-bordered">
-            <thead>
-                <tr>
-                    <th>Tag ID</th>
-                    <th>Common Name</th>
-                    <th>Status</th>
-                    <th>Bin Location</th>
-                    <th>Action</th>
-                </tr>
-            </thead>
-            <tbody id="syncedItems">
-                <tr><td colspan="5">Loading...</td></tr>
-            </tbody>
-        </table>
-
-        <div class="alert alert-warning" role="alert" style="display: none;" id="jsDisabledWarning">
-            JavaScript is disabled or failed to load. Please enable JavaScript to use the expand/collapse functionality and other interactive features.
         </div>
     </div>
 
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            document.querySelectorAll('.expand-btn').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    const targetId = btn.getAttribute('data-target-id');
-                    const expandable = document.getElementById(targetId);
-                    expandable.classList.remove('collapsed');
-                    expandable.classList.add('expanded');
-                    btn.style.display = 'none';
-                    btn.nextElementSibling.style.display = 'inline-block';
-                });
-            });
+    <h4>Items in Service</h4>
 
-            document.querySelectorAll('.collapse-btn').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    const targetId = btn.getAttribute('data-target-id');
-                    const expandable = document.getElementById(targetId);
-                    expandable.classList.remove('expanded');
-                    expandable.classList.add('collapsed');
-                    btn.style.display = 'none';
-                    btn.previousElementSibling.style.display = 'inline-block';
-                });
-            });
-
-            document.querySelectorAll('.save-status').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    const tagId = btn.getAttribute('data-tag-id');
-                    const status = btn.parentElement.querySelector('.status-select').value;
-                    fetch('/tab/3/update_status', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ tag_id: tagId, status: status })
-                    }).then(response => response.json()).then(data => {
-                        alert(data.message);
-                    }).catch(error => console.error('Error updating status:', error));
-                });
-            });
-
-            document.querySelectorAll('.save-notes').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    const tagId = btn.getAttribute('data-tag-id');
-                    const notes = btn.previousElementSibling.value;
-                    fetch('/tab/3/update_notes', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ tag_id: tagId, notes: notes })
-                    }).then(response => response.json()).then(data => {
-                        alert(data.message);
-                    }).catch(error => console.error('Error updating notes:', error));
-                });
-            });
-
-            document.querySelectorAll('.print-btn').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    const tagId = btn.getAttribute('data-tag-id');
-                    printTable('Item', `item-${tagId}`, null, null, null);
-                });
-            });
-
-            function syncToPC() {
-                const commonName = document.getElementById('commonNameSelect').value;
-                const tagCount = document.getElementById('tagCount').value;
-                if (commonName && tagCount) {
-                    fetch('/tab/3/sync_to_pc', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ common_name: commonName, count: tagCount })
-                    }).then(response => response.json()).then(data => {
-                        const tbody = document.getElementById('syncedItems');
-                        tbody.innerHTML = data.items.map(item => `
+    {% if crew_groups.get('Tent Crew') or crew_groups.get('Linen Crew') or crew_groups.get('Service Dept') %}
+        {% for crew in ['Tent Crew', 'Linen Crew', 'Service Dept'] %}
+            {% if crew_groups.get(crew) %}
+                <h4>{{ crew }}</h4>
+                <table class="table table-bordered table-hover">
+                    <thead class="thead-dark">
+                        <tr>
+                            <th>Rental Class ID</th>
+                            <th>Common Name</th>
+                            <th>In Service</th>
+                            <th>On Rent</th>
+                            <th>Ready to Rent</th>
+                            <th>Statuses</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for group in crew_groups[crew] %}
                             <tr>
-                                <td>${item.tag_id}</td>
-                                <td>${item.common_name}</td>
-                                <td>${item.status}</td>
-                                <td>${item.bin_location}</td>
-                                <td><button class="btn btn-sm btn-info">Print</button></td>
+                                <td>{{ group.rental_class_id }}</td>
+                                <td>{{ group.common_name }}</td>
+                                <td>{{ group.number_in_service }}</td>
+                                <td>{{ group.number_on_rent }}</td>
+                                <td>{{ group.number_ready_to_rent }}</td>
+                                <td>{{ group.statuses | join(', ') }}</td>
+                                <td>
+                                    <button class="btn btn-sm btn-secondary expand-btn" 
+                                            data-target-id="expand-{{ group.rental_class_id | replace(' ', '_') }}-{{ loop.index }}" 
+                                            data-identifier="{{ group.rental_class_id }}">Expand</button>
+                                    <button class="btn btn-sm btn-secondary collapse-btn" 
+                                            data-target-id="expand-{{ group.rental_class_id | replace(' ', '_') }}-{{ loop.index }}" 
+                                            style="display:none;">Collapse</button>
+                                    <button class="btn btn-sm btn-info print-btn" 
+                                            data-print-level="Common Name" 
+                                            data-print-id="expand-{{ group.rental_class_id | replace(' ', '_') }}-{{ loop.index }}" 
+                                            data-common-name="{{ group.common_name | escape }}"
+                                            data-category="{{ group.rental_class_id | escape }}">Print</button>
+                                </td>
                             </tr>
-                        `).join('');
-                    }).catch(error => console.error('Error syncing to PC:', error));
-                } else {
-                    alert('Please select a common name and number of tags.');
-                }
-            }
+                            <tr>
+                                <td colspan="7">
+                                    <div id="expand-{{ group.rental_class_id | replace(' ', '_') }}-{{ loop.index }}" class="expandable collapsed">
+                                        <table id="common-table-{{ group.rental_class_id | replace(' ', '_') }}-{{ loop.index }}" class="table table-bordered table-hover common-table">
+                                            <thead class="thead-dark">
+                                                <tr>
+                                                    <th>Common Name</th>
+                                                    <th>Items in Service</th>
+                                                    <th>Total Items in Inventory</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <tr><td colspan="3">Loading...</td></tr>
+                                            </tbody>
+                                        </table>
+                                        <div id="pagination-common-table-{{ group.rental_class_id | replace(' ', '_') }}-{{ loop.index }}" class="pagination-controls mt-2"></div>
+                                        <div class="row-count mt-2">Loading...</div>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% endif %}
+        {% endfor %}
+        {% if total_groups > per_page %}
+            <div class="pagination-controls mt-3">
+                {% if current_page > 1 %}
+                    <a href="/tab/3?page={{ current_page - 1 }}{% if common_name_filter %}&common_name={{ common_name_filter | urlencode }}{% endif %}{% if date_filter %}&date_last_scanned={{ date_filter | urlencode }}{% endif %}{% if sort %}&sort={{ sort | urlencode }}{% endif %}{% if crew_filter %}&crew={{ crew_filter | urlencode }}{% endif %}" class="btn btn-sm btn-secondary">Previous</a>
+                {% endif %}
+                <div id="pagination-controls" class="pagination-controls mt-2"></div>
+                {% if current_page < (total_groups / per_page) | round(0, 'ceil') | int %}
+                    <a href="/tab/3?page={{ current_page + 1 }}{% if common_name_filter %}&common_name={{ common_name_filter | urlencode }}{% endif %}{% if date_filter %}&date_last_scanned={{ date_filter | urlencode }}{% endif %}{% if sort %}&sort={{ sort | urlencode }}{% endif %}{% if crew_filter %}&crew={{ crew_filter | urlencode }}{% endif %}" class="btn btn-sm btn-secondary">Next</a>
+                {% endif %}
+                <div class="row-count mt-2">Showing {{ crew_groups['Tent Crew']|length + crew_groups['Linen Crew']|length + crew_groups['Service Dept']|length }} of {{ total_groups }} groups</div>
+            </div>
+        {% endif %}
+    {% else %}
+        <p>No items currently in service. If this is unexpected, please check the database or contact support.</p>
+    {% endif %}
 
-            function updateStatusToReady() {
-                const commonName = document.getElementById('commonNameSelect').value;
-                if (commonName) {
-                    if (confirm('Are you sure you want to update all items with this common name to "Ready to Rent"?')) {
-                        fetch('/tab/3/update_status_to_ready', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ common_name: commonName })
-                        }).then(response => response.json()).then(data => {
-                            alert(data.message);
-                            location.reload();
-                        }).catch(error => console.error('Error updating status:', error));
-                    }
-                } else {
-                    alert('Please select a common name.');
-                }
-            }
-        });
-    </script>
+    <h4>Print RFID Tags</h4>
+    <div id="syncMessage" class="mb-3"></div>
+    <div class="row mb-3">
+        <div class="col-md-4">
+            <label for="commonNameSelect">Select Common Name (Pack/Resale):</label>
+            <select id="commonNameSelect" class="form-control">
+                <option value="">Select Common Name</option>
+                {% for common_name in common_names %}
+                    <option value="{{ common_name | escape }}">{{ common_name | escape }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-4">
+            <label for="tagCount">Number of Tags to Print:</label>
+            <input type="number" id="tagCount" class="form-control" min="1">
+        </div>
+        <div class="col-md-4 align-self-end">
+            <button id="syncToPCBtn" class="btn btn-primary btn-sm">Sync to PC</button>
+            <button id="updateStatusToReady" class="btn btn-success btn-sm">Update Status to Ready to Rent</button>
+        </div>
+    </div>
+
+    <h4>Synced Items</h4>
+    <table id="syncedItems" class="table table-bordered table-hover">
+        <thead class="thead-dark">
+            <tr>
+                <th>Tag ID</th>
+                <th>Common Name</th>
+                <th>Status</th>
+                <th>Bin Location</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr><td colspan="5">Loading...</td></tr>
+        </tbody>
+    </table>
+
+    <p class="text-muted">JavaScript is disabled or failed to load. Please enable JavaScript to use the expand/collapse functionality and other interactive features.</p>
+</div>
 {% endblock %}

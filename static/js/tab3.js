@@ -1,16 +1,14 @@
-console.log('tab3.js version: 2025-06-26-v25 loaded');
+// app/static/js/tab3.js
+// tab3.js version: 2025-06-27-v26
+console.log('tab3.js version: 2025-06-27-v26 loaded');
 
 /**
  * Tab3.js: Logic for Tab 3 (Items in Service).
- * Dependencies: common.js for formatDate.
- * Updated: 2025-06-26-v25
- * - Ensured sections start collapsed on load.
- * - Fixed collapse button functionality with proper CSS toggling.
- * - Added crew filter dropdown (Tent Crew, Linen Crew, Service Dept).
- * - Enhanced debouncing for remove-btn (15000ms).
- * - Increased debounce wait time to 15000ms for syncToPc and updateStatusBtn.
- * - Removed duplicate event listeners by checking existing ones.
- * - Aligned DOM IDs with tab3.html v3 (crewFilter, syncToPCBtn, syncedItems).
+ * Dependencies: common.js for formatDate, tab.js for renderPaginationControls.
+ * Updated: 2025-06-27-v26
+ * - Fixed DOM element lookups for syncToPCBtn, updateStatusToReady, and syncedItems.
+ * - Integrated pagination with tab.js for expandable sections.
+ * - Ensured single DOMContentLoaded event listener.
  * - Preserved all existing functionality per user instructions.
  */
 
@@ -179,7 +177,7 @@ function setupPrintTagsSection() {
     const syncBtn = document.getElementById('syncToPCBtn');
     const updateStatusBtn = document.getElementById('updateStatusToReady');
     const syncMessage = document.getElementById('syncMessage');
-    const csvContentsTable = document.getElementById('syncedItems'); // Adjusted to match v3
+    const csvContentsTable = document.getElementById('syncedItems');
     const commonNameSelect = document.getElementById('commonNameSelect');
     const tagQuantity = document.getElementById('tagCount');
 
@@ -309,22 +307,28 @@ function setupPrintTagsSection() {
         }
     }, 15000);
 
-    // Remove existing listeners
-    syncBtn.removeEventListener('click', syncBtn._clickHandler);
+    // Remove existing listeners to prevent duplicates
+    if (syncBtn._clickHandler) {
+        syncBtn.removeEventListener('click', syncBtn._clickHandler);
+    }
     syncBtn._clickHandler = () => {
         console.log(`DEBUG: Sync to PC button clicked at ${new Date().toISOString()}`);
         debouncedSync();
     };
-    syncBtn.addEventListener('click', syncBtn._clickHandler, { once: true });
+    syncBtn.addEventListener('click', syncBtn._clickHandler);
 
-    updateStatusBtn.removeEventListener('click', updateStatusBtn._clickHandler);
+    if (updateStatusBtn._clickHandler) {
+        updateStatusBtn.removeEventListener('click', updateStatusBtn._clickHandler);
+    }
     updateStatusBtn._clickHandler = () => {
         console.log(`DEBUG: Update Status button clicked at ${new Date().toISOString()}`);
         debouncedUpdateStatus();
     };
-    updateStatusBtn.addEventListener('click', updateStatusBtn._clickHandler, { once: true });
+    updateStatusBtn.addEventListener('click', updateStatusBtn._clickHandler);
 
-    csvContentsTable.removeEventListener('click', csvContentsTable._clickHandler);
+    if (csvContentsTable._clickHandler) {
+        csvContentsTable.removeEventListener('click', csvContentsTable._clickHandler);
+    }
     csvContentsTable._clickHandler = (event) => {
         const removeBtn = event.target.closest('.remove-btn');
         if (!removeBtn) return;
@@ -475,55 +479,12 @@ function setupExpandCollapse() {
             expandBtn.style.display = 'inline-block';
         }
     });
-
-    document.addEventListener('click', (event) => {
-        if (window.cachedTabNum !== 3) return; // Skip for non-Tab 3 pages
-
-        const expandBtn = event.target.closest('.expand-btn');
-        const collapseBtn = event.target.closest('.collapse-btn');
-
-        if (expandBtn) {
-            const targetId = expandBtn.getAttribute('data-target-id');
-            const expandable = document.getElementById(targetId);
-            if (!expandable) {
-                console.warn(`Expandable section not found for target: ${targetId} at ${new Date().toISOString()}`);
-                return;
-            }
-
-            expandable.classList.remove('collapsed');
-            expandable.classList.add('expanded');
-            expandable.style.display = 'block';
-            expandable.style.opacity = '1';
-            expandBtn.style.display = 'none';
-            const siblingCollapseBtn = expandBtn.parentElement.querySelector('.collapse-btn');
-            if (siblingCollapseBtn) {
-                siblingCollapseBtn.style.display = 'inline-block';
-            }
-        } else if (collapseBtn) {
-            const targetId = collapseBtn.getAttribute('data-target-id');
-            const expandable = document.getElementById(targetId);
-            if (!expandable) {
-                console.warn(`Expandable section not found for target: ${targetId} at ${new Date().toISOString()}`);
-                return;
-            }
-
-            expandable.classList.remove('expanded');
-            expandable.classList.add('collapsed');
-            expandable.style.display = 'none';
-            expandable.style.opacity = '0';
-            collapseBtn.style.display = 'none';
-            const siblingExpandBtn = collapseBtn.parentElement.querySelector('.expand-btn');
-            if (siblingExpandBtn) {
-                siblingExpandBtn.style.display = 'inline-block';
-            }
-        }
-    });
 }
 
 /**
  * Initialize the page
  */
-document.addEventListener('DOMContentLoaded', function() {
+function initializeTab3() {
     console.log(`tab3.js: DOMContentLoaded at ${new Date().toISOString()}`);
     if (window.cachedTabNum !== 3) {
         console.log(`Skipping Tab 3 initialization for non-Tab 3 page at ${new Date().toISOString()}`);
@@ -562,4 +523,22 @@ document.addEventListener('DOMContentLoaded', function() {
     populateCrewFilter();
     setupPrintTagsSection();
     fetchCsvContents();
-});
+
+    // Initialize pagination for summary table
+    const paginationContainer = document.getElementById('pagination-controls');
+    if (paginationContainer) {
+        const totalItems = parseInt('{{ total_groups }}') || 0;
+        const currentPage = parseInt('{{ current_page }}') || 1;
+        const perPage = parseInt('{{ per_page }}') || 20;
+        renderPaginationControls(paginationContainer, totalItems, currentPage, perPage, (newPage) => {
+            const params = new URLSearchParams(window.location.search);
+            params.set('page', newPage);
+            window.location.href = `/tab/3?${params.toString()}`;
+        });
+    }
+}
+
+// Remove existing DOMContentLoaded listeners to prevent duplicates
+document.removeEventListener('DOMContentLoaded', window.tab3InitHandler);
+window.tab3InitHandler = initializeTab3;
+document.addEventListener('DOMContentLoaded', window.tab3InitHandler);

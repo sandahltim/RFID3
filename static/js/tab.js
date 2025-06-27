@@ -1,10 +1,13 @@
-console.log('tab.js version: 2025-06-25-v9 loaded');
+// app/static/js/tab.js
+// tab.js version: 2025-06-27-v10
+console.log('tab.js version: 2025-06-27-v10 loaded');
 
 /**
  * Tab.js: Initializes tab-specific logic and handles printing.
  * Dependencies: common.js (for formatDateTime, printTable, renderPaginationControls).
- * Updated: 2025-06-25-v9
- * - Fixed printTable for Tabs 1 and 5 to count Ready to Rent items for aggregate report.
+ * Updated: 2025-06-27-v10
+ * - Modified fetchExpandableData to use rental_class_id for Tab 3 instead of contractNumber.
+ * - Ensured pagination integration for Tab 3 expandable sections.
  * - Preserved all existing functionality.
  */
 
@@ -16,7 +19,7 @@ function formatDateTime(dateTimeStr) {
     if (typeof formatDate === 'function') {
         return formatDate(dateTimeStr);
     }
-    console.warn('formatDate not available, using fallback at ${new Date().toISOString()}');
+    console.warn(`formatDate not available, using fallback at ${new Date().toISOString()}`);
     if (!dateTimeStr || dateTimeStr === 'N/A') return 'N/A';
     try {
         const date = new Date(dateTimeStr);
@@ -39,9 +42,14 @@ function formatDateTime(dateTimeStr) {
 /**
  * Fetch paginated data for expandable sections (Tabs 1, 3, 5)
  */
-async function fetchExpandableData(tabNum, contractNumber, page, perPage) {
-    console.log(`fetchExpandableData: tabNum=${tabNum}, contractNumber=${contractNumber}, page=${page}, perPage=${perPage} at ${new Date().toISOString()}`);
-    const url = `/tab/${tabNum}/common_names?contract_number=${encodeURIComponent(contractNumber)}&page=${page}&per_page=${perPage}`;
+async function fetchExpandableData(tabNum, identifier, page, perPage) {
+    console.log(`fetchExpandableData: tabNum=${tabNum}, identifier=${identifier}, page=${page}, perPage=${perPage} at ${new Date().toISOString()}`);
+    let url;
+    if (tabNum === 3) {
+        url = `/tab/${tabNum}/common_names?rental_class_id=${encodeURIComponent(identifier)}&page=${page}&per_page=${perPage}`;
+    } else {
+        url = `/tab/${tabNum}/common_names?contract_number=${encodeURIComponent(identifier)}&page=${page}&per_page=${perPage}`;
+    }
     try {
         const response = await fetch(url);
         if (!response.ok) {
@@ -59,8 +67,8 @@ async function fetchExpandableData(tabNum, contractNumber, page, perPage) {
 /**
  * Update expandable table with new data
  */
-function updateExpandableTable(tableId, data, page, perPage, tabNum, contractNumber) {
-    console.log(`updateExpandableTable: tableId=${tableId}, page=${page}, perPage=${perPage}, tabNum=${tabNum}, contractNumber=${contractNumber} at ${new Date().toISOString()}`);
+function updateExpandableTable(tableId, data, page, perPage, tabNum, identifier) {
+    console.log(`updateExpandableTable: tableId=${tableId}, page=${page}, perPage=${perPage}, tabNum=${tabNum}, identifier=${identifier} at ${new Date().toISOString()}`);
     const table = document.getElementById(tableId);
     if (!table) {
         console.warn(`updateExpandableTable: Table not found ${tableId} at ${new Date().toISOString()}`);
@@ -80,8 +88,8 @@ function updateExpandableTable(tableId, data, page, perPage, tabNum, contractNum
         const paginationContainer = document.querySelector(`#pagination-${tableId}`);
         if (paginationContainer) {
             renderPaginationControls(paginationContainer, data.total_items, page, perPage, (newPage) => {
-                fetchExpandableData(tabNum, contractNumber, newPage, perPage).then(newData => {
-                    updateExpandableTable(tableId, newData, newPage, perPage, tabNum, contractNumber);
+                fetchExpandableData(tabNum, identifier, newPage, perPage).then(newData => {
+                    updateExpandableTable(tableId, newData, newPage, perPage, tabNum, identifier);
                 });
             });
         }
@@ -94,7 +102,7 @@ function updateExpandableTable(tableId, data, page, perPage, tabNum, contractNum
  * Initialize the page
  */
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('tab.js: DOMContentLoaded at ${new Date().toISOString()}');
+    console.log(`tab.js: DOMContentLoaded at ${new Date().toISOString()}`);
     try {
         let tabNum;
         const path = window.location.pathname;
@@ -113,7 +121,9 @@ document.addEventListener('DOMContentLoaded', () => {
         window.cachedTabNum = tabNum;
         console.log(`Set window.cachedTabNum=${window.cachedTabNum} at ${new Date().toISOString()}`);
 
-        document.addEventListener('click', (event) => {
+        // Remove any existing click listeners to prevent duplicates
+        document.removeEventListener('click', window.tabClickHandler);
+        window.tabClickHandler = (event) => {
             console.log('Click event triggered at ${new Date().toISOString()}');
             const printBtn = event.target.closest('.print-btn');
             const printFullBtn = event.target.closest('.print-full-btn');
@@ -142,7 +152,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Handle expandable sections for Tabs 1, 3, 5 only
             if (expandBtn && [1, 3, 5].includes(tabNum)) {
                 console.log('Expand button clicked:', {
-                    contractNumber: expandBtn.getAttribute('data-contract-number'),
+                    identifier: expandBtn.getAttribute('data-identifier'),
                     targetId: expandBtn.getAttribute('data-target-id')
                 }, `at ${new Date().toISOString()}`);
                 const row = expandBtn.closest('tr');
@@ -153,11 +163,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
 
-                const contractNumber = expandBtn.getAttribute('data-contract-number');
+                const identifier = expandBtn.getAttribute('data-identifier');
                 const targetId = expandBtn.getAttribute('data-target-id');
 
-                if (!contractNumber || !targetId) {
-                    console.warn('Contract number or target ID missing at ${new Date().toISOString()}');
+                if (!identifier || !targetId) {
+                    console.warn('Identifier or target ID missing at ${new Date().toISOString()}');
                     return;
                 }
 
@@ -169,9 +179,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (!tableId) {
                         console.warn('Table ID not found in expandable section at ${new Date().toISOString()}');
                     }
-                    fetchExpandableData(tabNum, contractNumber, 1, 20).then(data => {
+                    fetchExpandableData(tabNum, identifier, 1, 20).then(data => {
                         if (tableId) {
-                            updateExpandableTable(tableId, data, 1, 20, tabNum, contractNumber);
+                            updateExpandableTable(tableId, data, 1, 20, tabNum, identifier);
                         } else {
                             console.log('No table ID; expandable content should be populated by tab-specific script at ${new Date().toISOString()}');
                         }
@@ -181,7 +191,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     expandable.classList.add('collapsed');
                 }
             }
-        });
+        };
+        document.addEventListener('click', window.tabClickHandler);
     } catch (error) {
         console.error('Initialization error:', error, `at ${new Date().toISOString()}`);
     }
@@ -360,7 +371,7 @@ async function printTable(level, id, commonName = null, category = null, subcate
             if (commonTable) {
                 tableWrapper = commonTable.cloneNode(true);
             } else {
-                const url = `/tab/${tabNum}/common_names?contract_number=${encodeURIComponent(contractNumber)}`;
+                const url = `/tab/${tabNum}/common_names?${tabNum === 3 ? 'rental_class_id' : 'contract_number'}=${encodeURIComponent(contractNumber)}`;
                 const response = await fetch(url);
                 const data = await response.json();
                 const commonNames = data.common_names || [];
@@ -380,7 +391,7 @@ async function printTable(level, id, commonName = null, category = null, subcate
                             <tr>
                                 <td>${common.name}</td>
                                 <td>${common.on_contracts}</td>
-                                <td>${common.total_items_inventory}</td>
+                                <td>${common.is_hand_counted ? 'N/A' : common.total_items_inventory}</td>
                             </tr>
                         `).join('')}
                     </tbody>
@@ -391,7 +402,6 @@ async function printTable(level, id, commonName = null, category = null, subcate
         }
 
         removeTotalItemsInventoryColumn(tableWrapper, tabNum);
-
         tableWrapper.querySelectorAll('.btn, .loading, .expandable.collapsed, .pagination-controls, .filter-sort-controls, .filter-row').forEach(el => el.remove());
     }
 
