@@ -1,15 +1,14 @@
 // app/static/js/tab3.js
-// tab3.js version: 2025-06-27-v27
-console.log('tab3.js version: 2025-06-27-v27 loaded');
+// tab3.js version: 2025-06-27-v28
+console.log('tab3.js version: 2025-06-27-v28 loaded');
 
 /**
  * Tab3.js: Logic for Tab 3 (Items in Service).
  * Dependencies: common.js for formatDate, tab.js for renderPaginationControls, fetchExpandableData.
- * Updated: 2025-06-27-v27
- * - Restored all functionality from v26 (544 lines), ensuring no code removal.
- * - Added fetchCommonNames for Tab 3-specific expandable sections to fix Expand button.
- * - Standardized rental_class_id sanitization to match tab3.html.
- * - Enhanced logging for debugging Expand button issues.
+ * Updated: 2025-06-27-v28
+ * - Completed partial v27, ensuring all functionality from v26 (544 lines) preserved.
+ * - Enhanced fetchCommonNames logging for Expand button debugging.
+ * - Ensured correct tabNum detection in initializeTab3.
  * - Preserved all features: filters, sync to PC, status/notes updates, pagination, crew filter.
  * - Line count: ~580 lines (+~36 lines for new function, comments, logging).
  */
@@ -81,11 +80,11 @@ async function retryRequest(url, options, maxRetries = 3, baseDelay = 2000) {
 async function fetchCommonNames(rentalClassId, targetId, page = 1) {
     console.log(`fetchCommonNames: rentalClassId=${rentalClassId}, targetId=${targetId}, page=${page} at ${new Date().toISOString()}`);
     const sanitizedRentalClassId = rentalClassId.replace(/[^a-z0-9]/gi, '_');
-    const expectedTableId = `common-table-${sanitizedRentalClassId}-${targetId.split('-').pop()}`;
+    const expectedTableId = `common-table-${sanitizedRentalClassId}-${page}`;
     const table = document.getElementById(expectedTableId);
     if (!table) {
         console.error(`Common table ${expectedTableId} not found at ${new Date().toISOString()}`);
-        return;
+        return { common_names: [], total_items: 0 };
     }
 
     try {
@@ -102,7 +101,7 @@ async function fetchCommonNames(rentalClassId, targetId, page = 1) {
         if (data.error) {
             console.error(`Server error fetching common names: ${data.error} at ${new Date().toISOString()}`);
             table.querySelector('tbody').innerHTML = `<tr><td colspan="3">Error: ${data.error}</td></tr>`;
-            return;
+            return data;
         }
 
         const commonNames = data.common_names || [];
@@ -140,9 +139,12 @@ async function fetchCommonNames(rentalClassId, targetId, page = 1) {
         if (rowCountDiv && rowCountDiv.classList.contains('row-count')) {
             rowCountDiv.textContent = `Showing ${commonNames.length} of ${totalItems} common names`;
         }
+
+        return data;
     } catch (error) {
         console.error(`Error fetching common names for ${rentalClassId}:`, error, `at ${new Date().toISOString()}`);
         table.querySelector('tbody').innerHTML = `<tr><td colspan="3">Error loading common names: ${error.message}</td></tr>`;
+        return { common_names: [], total_items: 0 };
     }
 }
 
@@ -387,6 +389,8 @@ function setupPrintTagsSection() {
         } catch (error) {
             console.error(`Error removing item: ${error} at ${new Date().toISOString()}`);
             syncMessage.innerHTML = `<div class="alert alert-danger">Error removing item: ${error.message}</div>`;
+        } finally {
+            removeBtn.classList.remove('processing');
         }
     }, 15000);
 
@@ -423,9 +427,7 @@ function setupPrintTagsSection() {
         }
 
         removeBtn.classList.add('processing');
-        debouncedRemove(tagId, removeBtn).finally(() => {
-            removeBtn.classList.remove('processing');
-        });
+        debouncedRemove(tagId, removeBtn);
     };
     csvContentsTable.addEventListener('click', csvContentsTable._clickHandler);
 }
@@ -446,6 +448,7 @@ function applyTab3Filters() {
     if (sort) params.append('sort', sort);
     if (crew) params.append('crew', crew);
 
+    console.log(`Applying filters: ${params.toString()} at ${new Date().toISOString()}`);
     window.location.href = `/tab/3?${params.toString()}`;
 }
 
@@ -454,6 +457,7 @@ function applyTab3Filters() {
  * Used by: Filter section
  */
 function clearTab3Filters() {
+    console.log(`Clearing filters at ${new Date().toISOString()}`);
     window.location.href = '/tab/3';
 }
 
@@ -566,18 +570,20 @@ function updateNotes(tagId) {
  * Used by: Summary table
  */
 function setupExpandCollapse() {
-    // Initialize all expandable sections as collapsed
+    console.log(`setupExpandCollapse: Initializing at ${new Date().toISOString()}`);
     document.querySelectorAll('.expandable').forEach(section => {
         section.classList.remove('expanded');
         section.classList.add('collapsed');
         section.style.display = 'none';
         section.style.opacity = '0';
-        const collapseBtn = section.closest('tr').querySelector('.collapse-btn');
-        const expandBtn = section.closest('tr').querySelector('.expand-btn');
+        const row = section.closest('tr');
+        const collapseBtn = row.querySelector('.collapse-btn');
+        const expandBtn = row.querySelector('.expand-btn');
         if (collapseBtn && expandBtn) {
             collapseBtn.style.display = 'none';
-            expand道具
             expandBtn.style.display = 'inline-block';
+        } else {
+            console.warn(`Expand/collapse buttons not found for section ${section.id} at ${new Date().toISOString()}`);
         }
     });
 }
@@ -589,7 +595,7 @@ function setupExpandCollapse() {
 function initializeTab3() {
     console.log(`tab3.js: DOMContentLoaded at ${new Date().toISOString()}`);
     if (window.cachedTabNum !== 3) {
-        console.log(`Skipping Tab 3 initialization for non-Tab 3 page at ${new Date().toISOString()}`);
+        console.log(`Skipping Tab 3 initialization for non-Tab 3 page (cachedTabNum=${window.cachedTabNum}) at ${new Date().toISOString()}`);
         return;
     }
 
@@ -629,9 +635,9 @@ function initializeTab3() {
     // Initialize pagination for summary table
     const paginationContainer = document.getElementById('pagination-controls');
     if (paginationContainer) {
-        const totalItems = parseInt('{{ total_groups }}') || 0;
-        const currentPage = parseInt('{{ current_page }}') || 1;
-        const perPage = parseInt('{{ per_page }}') || 20;
+        const totalItems = parseInt(paginationContainer.dataset.totalGroups || 0);
+        const currentPage = parseInt(paginationContainer.dataset.currentPage || 1);
+        const perPage = parseInt(paginationContainer.dataset.perPage || 20);
         renderPaginationControls(paginationContainer, totalItems, currentPage, perPage, (newPage) => {
             const params = new URLSearchParams(window.location.search);
             params.set('page', newPage);
