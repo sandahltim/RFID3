@@ -1,14 +1,15 @@
 // app/static/js/tab.js
-// tab.js version: 2025-06-27-v10
-console.log('tab.js version: 2025-06-27-v10 loaded');
+// tab.js version: 2025-06-27-v11
+console.log('tab.js version: 2025-06-27-v11 loaded');
 
 /**
  * Tab.js: Initializes tab-specific logic and handles printing.
  * Dependencies: common.js (for formatDateTime, printTable, renderPaginationControls).
- * Updated: 2025-06-27-v10
- * - Modified fetchExpandableData to use rental_class_id for Tab 3 instead of contractNumber.
+ * Updated: 2025-06-27-v11
+ * - Modified fetchExpandableData to call fetchCommonNames for Tab 3.
  * - Ensured pagination integration for Tab 3 expandable sections.
  * - Preserved all existing functionality.
+ * - Line count: ~480 lines (+~10 lines for new logic, comments).
  */
 
 /**
@@ -44,6 +45,10 @@ function formatDateTime(dateTimeStr) {
  */
 async function fetchExpandableData(tabNum, identifier, page, perPage) {
     console.log(`fetchExpandableData: tabNum=${tabNum}, identifier=${identifier}, page=${page}, perPage=${perPage} at ${new Date().toISOString()}`);
+    if (tabNum === 3 && typeof fetchCommonNames === 'function') {
+        console.log(`Calling fetchCommonNames for Tab 3, identifier=${identifier}, page=${page} at ${new Date().toISOString()}`);
+        return fetchCommonNames(identifier, `common-table-${identifier.replace(/[^a-z0-9]/gi, '_')}-${page}`, page);
+    }
     let url;
     if (tabNum === 3) {
         url = `/tab/${tabNum}/common_names?rental_class_id=${encodeURIComponent(identifier)}&page=${page}&per_page=${perPage}`;
@@ -52,11 +57,12 @@ async function fetchExpandableData(tabNum, identifier, page, perPage) {
     }
     try {
         const response = await fetch(url);
+        console.log(`fetchExpandableData: Fetch ${url}, status: ${response.status} at ${new Date().toISOString()}`);
         if (!response.ok) {
             throw new Error(`fetchExpandableData failed: ${response.status}`);
         }
         const data = await response.json();
-        console.log('fetchExpandableData: Data received', data, `at ${new Date().toISOString()}`);
+        console.log('fetchExpandableData: Data received', JSON.stringify(data, null, 2), `at ${new Date().toISOString()}`);
         return data;
     } catch (error) {
         console.error('fetchExpandableData error:', error, `at ${new Date().toISOString()}`);
@@ -174,6 +180,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (expandable.classList.contains('collapsed')) {
                     expandable.classList.remove('collapsed');
                     expandable.classList.add('expanded');
+                    expandable.style.display = 'block';
+                    expandable.style.opacity = '1';
+                    const collapseBtn = row.querySelector('.collapse-btn');
+                    const expandBtn = row.querySelector('.expand-btn');
+                    if (collapseBtn && expandBtn) {
+                        collapseBtn.style.display = 'inline-block';
+                        expandBtn.style.display = 'none';
+                    }
 
                     const tableId = expandable.querySelector('.common-table')?.id;
                     if (!tableId) {
@@ -182,13 +196,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     fetchExpandableData(tabNum, identifier, 1, 20).then(data => {
                         if (tableId) {
                             updateExpandableTable(tableId, data, 1, 20, tabNum, identifier);
-                        } else {
-                            console.log('No table ID; expandable content should be populated by tab-specific script at ${new Date().toISOString()}');
                         }
                     });
-                } else {
-                    expandable.classList.remove('expanded');
-                    expandable.classList.add('collapsed');
                 }
             }
         };
@@ -196,7 +205,7 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (error) {
         console.error('Initialization error:', error, `at ${new Date().toISOString()}`);
     }
-});
+}
 
 /**
  * Print a table (Contract, Common Name, or Item level)
@@ -511,6 +520,185 @@ async function printTable(level, id, commonName = null, category = null, subcate
                     ${contractNumber ? `<p>Contract Number: ${contractNumber}</p>` : ''}
                     ${contractDate !== 'N/A' ? `<p>Contract Created: ${contractDate}</p>` : ''}
                     ${commonName ? `<p>Common Name: ${commonName}</p>` : ''}
+                    <p>Printed on: ${new Date().toLocaleString()}</p>
+                </div>
+                <div>
+                    ${tableWrapper.outerHTML}
+                </div>
+                <div class="signature-line">
+                    Signature: _______________________________
+                </div>
+                <script>
+                    window.onload = function() {
+                        window.print();
+                        window.onafterprint = function() {
+                            window.close();
+                        };
+                    };
+                </script>
+            </body>
+        </html>
+    `;
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+        console.error('Failed to open print window. Please allow popups at ${new Date().toISOString()}.');
+        return;
+    }
+    printWindow.document.write(printContent);
+    printWindow.document.close();
+}
+
+/**
+ * Remove "Total Items in Inventory" column for Tabs 2 and 4
+ */
+function removeTotalItemsInventoryColumn(table, tabNum) {
+    if (tabNum == 2 || tabNum == 4) {
+        const headers = table.querySelectorAll('th');
+        const rows = table.querySelectorAll('tbody tr');
+        headers.forEach((th, index) => {
+            if (th.textContent.trim() === 'Total Items in Inventory') {
+                th.remove();
+                rows.forEach(row => {
+                    const cell = row.cells[index];
+                    if (cell) cell.remove();
+                });
+            }
+        });
+    }
+}
+
+/**
+ * Print full item list
+ */
+async function printFullItemList(category, subcategory, commonName) {
+    console.log(`Printing full item list for Category: ${category}, Subcategory: ${subcategory}, Common Name: ${commonName} at ${new Date().toISOString()}`);
+    const tabNum = window.cachedTabNum || 1;
+    const tabName = tabNum == 2 ? 'Open Contracts' : tabNum == 4 ? 'Laundry Contracts' : tabNum == 5 ? 'Resale/Rental Packs' : tabNum == 3 ? 'Service' : `Tab ${tabNum}`;
+
+    const normalizedCommonName = normalizeCommonName(commonName);
+    console.log(`Normalized Common Name: ${normalizedCommonName} at ${new Date().toISOString()}`);
+
+    const url = `/tab/${tabNum}/full_items_by_rental_class?category=${encodeURIComponent(category)}&subcategory=${subcategory ? encodeURIComponent(subcategory) : 'null'}&common_name=${encodeURIComponent(normalizedCommonName)}`;
+    const response = await fetch(url);
+    if (!response.ok) {
+        console.error(`Failed to fetch full item list: ${response.status} at ${new Date().toISOString()}`);
+        return;
+    }
+    const data = await response.json();
+    const items = data.items || [];
+
+    const tableWrapper = document.createElement('table');
+    tableWrapper.className = 'table table-bordered';
+    const headers = ['Tag ID', 'Common Name', 'Rental Class Num', 'Bin Location', 'Status', 'Last Contract', 'Last Scanned Date', 'Quality', 'Notes'];
+    tableWrapper.innerHTML = `
+        <thead>
+            <tr>
+                ${headers.map(header => `<th>${header}</th>`).join('')}
+            </tr>
+        </thead>
+        <tbody>
+            ${items.map(item => `
+                <tr>
+                    <td>${item.tag_id}</td>
+                    <td>${item.common_name}</td>
+                    <td>${item.rental_class_num || 'N/A'}</td>
+                    <td>${item.bin_location || 'N/A'}</td>
+                    <td>${item.status}</td>
+                    <td>${item.last_contract_num || 'N/A'}</td>
+                    <td>${formatDateTime(item.last_scanned_date)}</td>
+                    <td>${item.quality || 'N/A'}</td>
+                    <td>${item.notes || 'N/A'}</td>
+                </tr>
+            `).join('')}
+        </tbody>
+    `;
+
+    const printContent = `
+        <html>
+            <head>
+                <title>Broadway Tent and Event - ${tabName} - Full Item List</title>
+                <style>
+                    body {
+                        font-family: 'Roboto', sans-serif;
+                        margin: 20px;
+                        color: #333;
+                    }
+                    .print-header {
+                        text-align: center;
+                        margin-bottom: 40px;
+                    }
+                    .print-header h1 {
+                        font-size: 28px;
+                        margin: 0;
+                    }
+                    .print-header h2 {
+                        font-size: 20px;
+                        margin: 5px 0;
+                    }
+                    .print-header p {
+                        font-size: 14px;
+                        color: #666;
+                        margin: 5px 0;
+                    }
+                    table {
+                        border-collapse: collapse;
+                        width: 100%;
+                        margin-top: 20px;
+                    }
+                    th, td {
+                        border: 1px solid #ccc;
+                        padding: 8px;
+                        text-align: center;
+                        font-size: 12px;
+                        white-space: normal;
+                        word-wrap: break-word;
+                    }
+                    th {
+                        background-color: #f2f2f2;
+                        font-weight: bold;
+                    }
+                    td {
+                        vertical-align: middle;
+                    }
+                    .signature-line {
+                        margin-top: 40px;
+                        border-top: 1px solid #000;
+                        width: 300px;
+                        text-align: center;
+                        padding-top: 10px;
+                        font-size: 14px;
+                    }
+                    @media print {
+                        body {
+                            margin: 0;
+                        }
+                        .print-header {
+                            position: static;
+                            width: 100%;
+                            margin-bottom: 20px;
+                        }
+                        table {
+                            page-break-inside: auto;
+                        }
+                        tr {
+                            page-break-inside: avoid;
+                            page-break-after: auto;
+                        }
+                        th, td {
+                            font-size: 8pt;
+                            padding: 4px 8px;
+                            word-break: break-word;
+                            text-align: center;
+                        }
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="print-header">
+                    <h1>Broadway Tent and Event</h1>
+                    <h2>${tabName}</h2>
+                    <p>Common Name: ${commonName}</p>
                     <p>Printed on: ${new Date().toLocaleString()}</p>
                 </div>
                 <div>

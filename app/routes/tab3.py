@@ -1,5 +1,5 @@
 # app/routes/tab3.py
-# tab3.py version: 2025-06-27-v78
+# tab3.py version: 2025-06-27-v79
 from flask import Blueprint, render_template, request, jsonify, current_app
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -23,7 +23,7 @@ import json
 
 # Configure logging for Tab 3
 logger = logging.getLogger('tab3')
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)  # Reduced to INFO to minimize disk I/O
 logger.handlers = []
 
 tab3_log_file = '/home/tim/test_rfidpi/logs/rfid_dashboard.log'
@@ -37,13 +37,13 @@ except Exception as e:
     sys.stderr.write(f"ERROR: Failed to set up Tab 3 log file {tab3_log_file}: {str(e)}\n")
 
 file_handler = logging.FileHandler(tab3_log_file)
-file_handler.setLevel(logging.DEBUG)
+file_handler.setLevel(logging.INFO)
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 file_handler.setFormatter(formatter)
 logger.addHandler(file_handler)
 
 console_handler = logging.StreamHandler(sys.stdout)
-console_handler.setLevel(logging.DEBUG)
+console_handler.setLevel(logging.INFO)
 console_handler.setFormatter(formatter)
 logger.addHandler(console_handler)
 
@@ -67,12 +67,12 @@ if not os.path.exists(SHARED_DIR):
     os.chown(SHARED_DIR, pwd.getpwnam('tim').pw_uid, grp.getgrnam('tim').gr_gid)
 
 # Log deployment version
-logger.info("Deployed tab3.py version: 2025-06-27-v78")
+logger.info("Deployed tab3.py version: 2025-06-27-v79")
 
 # Define crew categories
 TENT_CATEGORIES = ['Frame Tent Tops', 'Pole Tent Tops', 'Tent Crates', 'Sidewall']
 LINEN_CATEGORIES = ['Napkins', 'Rectangle Linen', 'Round Linen', 'Skirt', 'Spandex']
-SERVICE_DEPT_CATEGORIES = ['Other']  # Default for non-tent, non-linen
+SERVICE_DEPT_CATEGORIES = ['Other']
 
 # Helper function to normalize common_name
 def normalize_common_name(name):
@@ -105,7 +105,7 @@ def tab3_view():
 
         # Test database connection
         session.execute(text("SELECT 1"))
-        logger.info("Database connection test successful")
+        logger.debug("Database connection test successful")
 
         # Debug: Check all statuses in id_item_master
         status_query = """
@@ -114,7 +114,7 @@ def tab3_view():
         """
         status_result = session.execute(text(status_query))
         statuses = [row[0] for row in status_result.fetchall()]
-        logger.info(f"All statuses in id_item_master: {statuses}")
+        logger.debug(f"All statuses in id_item_master: {statuses}")
 
         # Debug: Count items by status
         count_query = """
@@ -124,7 +124,7 @@ def tab3_view():
         """
         count_result = session.execute(text(count_query))
         status_counts = {row[0]: row[1] for row in count_result.fetchall()}
-        logger.info(f"Status counts in id_item_master: {status_counts}")
+        logger.debug(f"Status counts in id_item_master: {status_counts}")
 
         # Get query parameters
         common_name_filter = request.args.get('common_name', '').lower()
@@ -159,7 +159,7 @@ def tab3_view():
                     'short_common_name': um.short_common_name or 'N/A'
                 }
             cache.set(cache_key, json.dumps(mappings_dict), ex=3600)
-            logger.info("Cached rental_class_mappings as JSON")
+            logger.debug("Cached rental_class_mappings as JSON")
         else:
             mappings_dict = json.loads(mappings_dict_json)
 
@@ -171,7 +171,7 @@ def tab3_view():
         """
         rental_class_result = session.execute(text(rental_class_query))
         in_service_rental_classes = [row[0] for row in rental_class_result.fetchall()]
-        logger.info(f"In-service rental_class_num values: {in_service_rental_classes}")
+        logger.debug(f"In-service rental_class_num values: {in_service_rental_classes}")
 
         # Summary query with crew grouping
         summary_query = f"""
@@ -333,7 +333,7 @@ def tab3_view():
                 (Transaction.tag_id == max_scan_date_subquery.c.tag_id) &
                 (Transaction.scan_date == max_scan_date_subquery.c.max_scan_date)
             ).all()
-            logger.info(f"Fetched {len(transactions)} transactions")
+            logger.debug(f"Fetched {len(transactions)} transactions")
 
             for t in transactions:
                 repair_types = []
@@ -501,7 +501,7 @@ def tab3_view():
             cache_bust=int(datetime.now().timestamp())
         )
     except Exception as e:
-        logger.error(f"Error rendering Tab 3: {str(e)}", exc_info=True)
+        logger.error(f"Error rendering Tab 3: {str(e)}")
         if session:
             session.rollback()
         return render_template(
@@ -522,6 +522,7 @@ def tab3_view():
             session.close()
 
 @tab3_bp.route('/tab/3/common_names')
+@cache.cached(timeout=60, query_string=True)
 def tab3_common_names():
     logger.debug("Entering /tab/3/common_names endpoint at %s", datetime.now())
     session = None
@@ -534,6 +535,10 @@ def tab3_common_names():
         if not rental_class_id:
             logger.warning("Missing rental_class_id parameter")
             return jsonify({'error': 'rental_class_id is required'}), 400
+
+        # Validate rental_class_id
+        normalized_rental_class_id = normalize_rental_class_id(rental_class_id)
+        logger.debug(f"Normalized rental_class_id: {normalized_rental_class_id}")
 
         # Query for common names under the rental class
         query = """
@@ -549,7 +554,7 @@ def tab3_common_names():
             LIMIT :limit OFFSET :offset
         """
         params = {
-            'rental_class_id': rental_class_id,
+            'rental_class_id': normalized_rental_class_id,
             'limit': per_page,
             'offset': (page - 1) * per_page
         }
@@ -571,17 +576,18 @@ def tab3_common_names():
             WHERE COALESCE(i.rental_class_num, '') = :rental_class_id
             AND LOWER(TRIM(COALESCE(i.status, ''))) IN ('repair', 'needs to be inspected', 'wash', 'wet')
         """
-        total_items = session.execute(text(count_query), {'rental_class_id': rental_class_id}).scalar() or 0
+        total_items = session.execute(text(count_query), {'rental_class_id': normalized_rental_class_id}).scalar() or 0
 
-        logger.info(f"Fetched {len(common_names)} common names for rental_class_id {rental_class_id}")
-        return jsonify({
+        response = {
             'common_names': common_names,
             'total_items': total_items,
             'page': page,
             'per_page': per_page
-        }), 200
+        }
+        logger.info(f"Fetched {len(common_names)} common names for rental_class_id {normalized_rental_class_id}, total: {total_items}")
+        return jsonify(response), 200
     except Exception as e:
-        logger.error(f"Error fetching common names: {str(e)}", exc_info=True)
+        logger.error(f"Error fetching common names: {str(e)}")
         return jsonify({'error': str(e)}), 500
     finally:
         if session:
@@ -616,7 +622,7 @@ def get_csv_contents():
         logger.info(f"Fetched {len(items)} items from CSV")
         return jsonify({'items': items, 'count': len(items)}), 200
     except Exception as e:
-        logger.error(f"Error reading CSV file: {str(e)}", exc_info=True)
+        logger.error(f"Error reading CSV file: {str(e)}")
         return jsonify({'error': f"Error reading CSV file: {str(e)}"}), 500
 
 @tab3_bp.route('/tab/3/remove_csv_item', methods=['POST'])
@@ -657,7 +663,7 @@ def remove_csv_item():
         logger.info(f"Removed item with tag_id {tag_id} from CSV")
         return jsonify({'message': f"Removed item with tag_id {tag_id}"}), 200
     except Exception as e:
-        logger.error(f"Error removing item from CSV: {str(e)}", exc_info=True)
+        logger.error(f"Error removing item from CSV: {str(e)}")
         return jsonify({'error': f"Error removing item from CSV: {str(e)}"}), 500
     finally:
         if lock_file:
@@ -727,10 +733,10 @@ def sync_to_pc():
                                     csv_tag_ids.add(row['tag_id'])
                                     existing_items.append(row)
             except Exception as e:
-                logger.error(f"Error reading existing CSV file: {str(e)}", exc_info=True)
+                logger.error(f"Error reading existing CSV file: {str(e)}")
                 return jsonify({'error': f"Failed to read existing CSV file: {str(e)}"}), 500
 
-        logger.info(f"Found {len(csv_tag_ids)} unique tag_ids in CSV before sync")
+        logger.debug(f"Found {len(csv_tag_ids)} unique tag_ids in CSV before sync")
 
         synced_items = []
         existing_tag_ids = csv_tag_ids.copy()
@@ -766,9 +772,9 @@ def sync_to_pc():
                     'is_new': False
                 })
                 existing_tag_ids.add(item.tag_id)
-                logger.info(f"Added to synced_items: tag_id={item.tag_id}, common_name={item.common_name}, status={item.status}, rental_class_num={item.rental_class_num}")
+                logger.debug(f"Added to synced_items: tag_id={item.tag_id}, common_name={item.common_name}, status={item.status}, rental_class_num={item.rental_class_num}")
         except sqlalchemy.exc.DatabaseError as e:
-            logger.error(f"Database error querying ItemMaster: {str(e)}", exc_info=True)
+            logger.error(f"Database error querying ItemMaster: {str(e)}")
             return jsonify({'error': f"Database error querying ItemMaster: {str(e)}"}), 500
 
         # Generate new items if needed
@@ -847,7 +853,7 @@ def sync_to_pc():
                     )
                     insert_new_item(new_item)
                     new_items.append(new_item)
-                    logger.info(f"Generated new item: tag_id={tag_id}, common_name={common_name}, rental_class_num={rental_class_num}")
+                    logger.debug(f"Generated new item: tag_id={tag_id}, common_name={common_name}, rental_class_num={rental_class_num}")
 
         if len(synced_items) > quantity:
             synced_items = synced_items[:quantity]
@@ -872,7 +878,7 @@ def sync_to_pc():
                 }
                 logger.debug(f"Added user mapping: rental_class_id={normalized_id}, short_common_name={um.short_common_name}")
             cache.set(cache_key, json.dumps(mappings_dict), ex=3600)
-            logger.info(f"Cached rental_class_mappings as JSON for common_name={common_name}")
+            logger.debug(f"Cached rental_class_mappings as JSON for common_name={common_name}")
         else:
             mappings_dict = json.loads(mappings_dict_json)
 
@@ -907,7 +913,7 @@ def sync_to_pc():
         logger.info(f"Successfully synced {len(synced_items)} items to CSV")
         return jsonify({'synced_items': len(synced_items)}), 200
     except Exception as e:
-        logger.error(f"Uncaught exception in sync_to_pc: {str(e)}", exc_info=True)
+        logger.error(f"Uncaught exception in sync_to_pc: {str(e)}")
         if session:
             session.rollback()
         return jsonify({'error': str(e)}), 500
@@ -949,7 +955,7 @@ def update_synced_status():
             logger.error(f"CSV file {CSV_FILE_PATH} is not readable/writable")
             return jsonify({'error': f"CSV file {CSV_FILE_PATH} is not readable/writable"}), 500
 
-        # Read CSV items (minimal fields)
+        # Read CSV items
         items_to_update = []
         try:
             with open(CSV_FILE_PATH, 'r') as csvfile:
@@ -972,7 +978,7 @@ def update_synced_status():
                         logger.error(f"Missing required field in CSV row: {ke}, row: {row}")
                         return jsonify({'error': f"Missing required field in CSV row: {ke}"}), 400
         except Exception as e:
-            logger.error(f"Error reading CSV file: {str(e)}", exc_info=True)
+            logger.error(f"Error reading CSV file: {str(e)}")
             return jsonify({'error': f"Error reading CSV file: {str(e)}"}), 500
 
         if not items_to_update:
@@ -1004,7 +1010,7 @@ def update_synced_status():
             batch_tags = tag_ids[i:i + batch_size]
             updated = ItemMaster.query\
                 .filter(ItemMaster.tag_id.in_(batch_tags))\
-                .update({ItemMaster.status: 'Ready to Rent'}, synchronize_session='fetch')
+                .update({ItemMaster.status: 'Ready to Rent', ItemMaster.date_updated: datetime.now()}, synchronize_session='fetch')
             updated_items += updated
             session.flush()
         logger.info(f"Updated {updated_items} items in ItemMaster")
@@ -1033,7 +1039,7 @@ def update_synced_status():
                     api_client.insert_item(new_item, timeout=10)
                     logger.debug(f"Inserted new item for tag_id {tag_id} in API")
             except Exception as api_error:
-                logger.error(f"Error updating/inserting tag_id {tag_id} in API: {str(api_error)}", exc_info=True)
+                logger.error(f"Error updating/inserting tag_id {tag_id} in API: {str(api_error)}")
                 failed_items.append(tag_id)
                 continue
 
@@ -1049,8 +1055,7 @@ def update_synced_status():
                 writer.writeheader()
             logger.info("CSV file cleared successfully")
         except Exception as e:
-            logger.error(f"Error clearing CSV file: {str(e)}", exc_info=True)
-            Ascending
+            logger.error(f"Error clearing CSV file: {str(e)}")
             session.rollback()
             return jsonify({'error': f"Error clearing CSV file: {str(e)}"}), 500
 
@@ -1062,7 +1067,7 @@ def update_synced_status():
             'failed_items': failed_items if failed_items else []
         }), 200
     except Exception as e:
-        logger.error(f"Uncaught exception in update_synced_status: {str(e)}", exc_info=True)
+        logger.error(f"Uncaught exception in update_synced_status: {str(e)}")
         if session:
             session.rollback()
         return jsonify({'error': str(e)}), 500
@@ -1104,18 +1109,20 @@ def update_status():
             return jsonify({'error': 'Status cannot be updated to "On Rent" or "Delivered" manually'}), 400
 
         item.status = new_status
-        item.date_last_scanned = datetime.now()
+        item.date_updated = datetime.now()
         session.commit()
 
         try:
             api_client = APIClient()
             api_client.update_status(tag_id, new_status, timeout=10)
+            logger.debug(f"Updated API status for tag_id {tag_id} to {new_status}")
         except Exception as e:
-            logger.error(f"Failed to update API status for tag_id {tag_id}: {str(e)}", exc_info=True)
+            logger.error(f"Failed to update API status for tag_id {tag_id}: {str(e)}")
 
+        logger.info(f"Updated status for tag_id {tag_id} to {new_status}")
         return jsonify({'message': 'Status updated successfully'})
     except Exception as e:
-        logger.error(f"Uncaught exception in update_status: {str(e)}", exc_info=True)
+        logger.error(f"Uncaught exception in update_status: {str(e)}")
         if session:
             session.rollback()
         return jsonify({'error': str(e)}), 500
@@ -1150,12 +1157,14 @@ def update_notes():
         try:
             api_client = APIClient()
             api_client.update_notes(tag_id, new_notes if new_notes else '')
+            logger.debug(f"Updated API notes for tag_id {tag_id}")
         except Exception as e:
-            logger.error(f"Failed to update API notes for tag_id {tag_id}: {str(e)}", exc_info=True)
+            logger.error(f"Failed to update API notes for tag_id {tag_id}: {str(e)}")
 
+        logger.info(f"Updated notes for tag_id {tag_id}")
         return jsonify({'message': 'Notes updated successfully'})
     except Exception as e:
-        logger.error(f"Uncaught exception in update_notes: {str(e)}", exc_info=True)
+        logger.error(f"Uncaught exception in update_notes: {str(e)}")
         if session:
             session.rollback()
         return jsonify({'error': str(e)}), 500
@@ -1164,6 +1173,7 @@ def update_notes():
             session.close()
 
 @tab3_bp.route('/tab/3/pack_resale_common_names', methods=['GET'])
+@cache.cached(timeout=60)
 def get_pack_resale_common_names():
     session = None
     try:
@@ -1178,7 +1188,62 @@ def get_pack_resale_common_names():
         logger.info(f"Fetched {len(common_names)} common names from SeedRentalClass for pack/resale")
         return jsonify({'common_names': common_names}), 200
     except Exception as e:
-        logger.error(f"Error fetching common names: {str(e)}", exc_info=True)
+        logger.error(f"Error fetching common names: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+    finally:
+        if session:
+            session.close()
+
+@tab3_bp.route('/tab/3/update_mappings', methods=['POST'])
+@limiter.limit("5 per minute")
+def update_mappings():
+    session = None
+    try:
+        logger.debug("Entering /tab/3/update_mappings endpoint at %s", datetime.now())
+        session = db.session()
+        data = request.get_json()
+        rental_class_id = data.get('rental_class_id')
+        category = data.get('category')
+        subcategory = data.get('subcategory')
+        short_common_name = data.get('short_common_name')
+
+        if not rental_class_id or not category or not subcategory:
+            logger.warning(f"Invalid input in update_mappings: rental_class_id={rental_class_id}, category={category}, subcategory={subcategory}")
+            return jsonify({'error': 'Rental class ID, category, and subcategory are required'}), 400
+
+        normalized_rental_class_id = normalize_rental_class_id(rental_class_id)
+        existing_mapping = session.query(UserRentalClassMapping).filter_by(rental_class_id=normalized_rental_class_id).first()
+
+        if existing_mapping:
+            existing_mapping.category = category
+            existing_mapping.subcategory = subcategory
+            existing_mapping.short_common_name = short_common_name if short_common_name else existing_mapping.short_common_name
+            existing_mapping.updated_at = datetime.utcnow()
+            logger.debug(f"Updated existing mapping: rental_class_id={normalized_rental_class_id}")
+        else:
+            new_mapping = UserRentalClassMapping(
+                rental_class_id=normalized_rental_class_id,
+                category=category,
+                subcategory=subcategory,
+                short_common_name=short_common_name if short_common_name else 'N/A',
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow()
+            )
+            session.add(new_mapping)
+            logger.debug(f"Created new mapping: rental_class_id={normalized_rental_class_id}")
+
+        session.commit()
+
+        # Invalidate cache
+        cache.delete('rental_class_mappings')
+        logger.debug("Invalidated rental_class_mappings cache")
+
+        logger.info(f"Updated mapping for rental_class_id {normalized_rental_class_id}")
+        return jsonify({'message': 'Mapping updated successfully'}), 200
+    except Exception as e:
+        logger.error(f"Uncaught exception in update_mappings: {str(e)}")
+        if session:
+            session.rollback()
         return jsonify({'error': str(e)}), 500
     finally:
         if session:
