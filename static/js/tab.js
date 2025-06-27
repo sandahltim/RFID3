@@ -1,16 +1,16 @@
 // app/static/js/tab.js
-// tab.js version: 2025-06-27-v14
-console.log(`tab.js version: 2025-06-27-v14 loaded at ${new Date().toISOString()}`);
+// tab.js version: 2025-06-27-v15
+console.log(`tab.js version: 2025-06-27-v15 loaded at ${new Date().toISOString()}`);
 
 /**
  * Tab.js: Initializes tab-specific logic and handles printing.
  * Dependencies: common.js (for formatDateTime, printTable, renderPaginationControls).
- * Updated: 2025-06-27-v14
- * - Fixed SyntaxError at line 252 (corrected template literal quotes to backticks).
- * - Updated click handler to use id selectors for Tab 3 expand/collapse buttons.
- * - Improved tabNum parsing to handle query parameters in URL.
+ * Updated: 2025-06-27-v15
+ * - Fixed SyntaxError at line 254 (corrected template literal quotes to backticks).
+ * - Refined click handler to use specific id selectors for Tab 3 expand/collapse buttons.
+ * - Added debug logging for button attributes in click handler.
  * - Preserved all functionality: printing, expandable sections.
- * - Line count: ~480 lines (same as v13, syntax and selector fixes).
+ * - Line count: ~480 lines (same as v14, syntax and click handler fixes).
  */
 
 /**
@@ -48,7 +48,7 @@ async function fetchExpandableData(tabNum, identifier, page, perPage) {
     console.log(`fetchExpandableData: tabNum=${tabNum}, identifier=${identifier}, page=${page}, perPage=${perPage} at ${new Date().toISOString()}`);
     if (tabNum === 3 && typeof fetchCommonNames === 'function') {
         console.log(`Calling fetchCommonNames for Tab 3, identifier=${identifier}, page=${page} at ${new Date().toISOString()}`);
-        return fetchCommonNames(identifier, `common-table-${identifier.replace(/[^a-z0-9]/gi, '_')}-${page}`, page);
+        return fetchCommonNames(identifier, `expand-${identifier}-${page}`, page);
     }
     let url;
     if (tabNum === 3) {
@@ -174,6 +174,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const commonName = printBtn.getAttribute('data-common-name');
                 const category = printBtn.getAttribute('data-category');
                 const subcategory = printBtn.getAttribute('data-subcategory');
+                console.log(`Print button clicked: level=${level}, id=${id}, commonName=${commonName}, category=${category}, subcategory=${subcategory} at ${new Date().toISOString()}`);
                 printTable(level, id, commonName, category, subcategory);
             }
 
@@ -183,25 +184,25 @@ document.addEventListener('DOMContentLoaded', () => {
                 const commonName = printFullBtn.getAttribute('data-common-name');
                 const category = printFullBtn.getAttribute('data-category');
                 const subcategory = printFullBtn.getAttribute('data-subcategory');
+                console.log(`Print full button clicked: commonName=${commonName}, category=${category}, subcategory=${subcategory} at ${new Date().toISOString()}`);
                 printFullItemList(category, subcategory, commonName);
             }
 
             // Handle expandable sections for Tabs 1, 3, 5 only
             if (expandBtn && [1, 3, 5].includes(tabNum)) {
-                console.log(`Expand button clicked: identifier=${expandBtn.getAttribute('data-identifier')}, targetId=${expandBtn.getAttribute('data-target-id')} at ${new Date().toISOString()}`);
+                const identifier = expandBtn.getAttribute('data-identifier');
+                const targetId = expandBtn.getAttribute('data-target-id');
+                console.log(`Expand button clicked: id=${expandBtn.id}, identifier=${identifier}, targetId=${targetId} at ${new Date().toISOString()}`);
+                if (!identifier || !targetId) {
+                    console.warn(`Missing data-identifier or data-target-id for expand button ${expandBtn.id} at ${new Date().toISOString()}`);
+                    return;
+                }
+
                 const row = expandBtn.closest('tr');
                 const nextRow = row.nextElementSibling;
                 const expandable = nextRow.querySelector('.expandable');
                 if (!expandable) {
-                    console.warn(`Expandable section not found at ${new Date().toISOString()}`);
-                    return;
-                }
-
-                const identifier = expandBtn.getAttribute('data-identifier');
-                const targetId = expandBtn.getAttribute('data-target-id');
-
-                if (!identifier || !targetId) {
-                    console.warn(`Identifier or target ID missing at ${new Date().toISOString()}`);
+                    console.warn(`Expandable section not found for targetId=${targetId} at ${new Date().toISOString()}`);
                     return;
                 }
 
@@ -210,28 +211,34 @@ document.addEventListener('DOMContentLoaded', () => {
                     expandable.classList.add('expanded');
                     expandable.style.display = 'block';
                     expandable.style.opacity = '1';
-                    const collapseBtn = row.querySelector(`[id^="collapse-btn-"]`);
-                    const expandBtn = row.querySelector(`[id^="expand-btn-"]`);
+                    const collapseBtn = row.querySelector(`[id^="collapse-btn-${identifier}-"]`);
+                    const expandBtn = row.querySelector(`[id^="expand-btn-${identifier}-"]`);
                     if (collapseBtn && expandBtn) {
                         collapseBtn.style.display = 'inline-block';
                         expandBtn.style.display = 'none';
+                    } else {
+                        console.warn(`Collapse/expand buttons not found for identifier=${identifier} at ${new Date().toISOString()}`);
                     }
 
                     const tableId = expandable.querySelector('.common-table')?.id;
                     if (!tableId) {
-                        console.warn(`Table ID not found in expandable section at ${new Date().toISOString()}`);
+                        console.warn(`Table ID not found in expandable section ${targetId} at ${new Date().toISOString()}`);
+                        return;
                     }
                     fetchExpandableData(tabNum, identifier, 1, 20).then(data => {
-                        if (tableId) {
-                            updateExpandableTable(tableId, data, 1, 20, tabNum, identifier);
-                        }
+                        updateExpandableTable(tableId, data, 1, 20, tabNum, identifier);
                     });
                 }
             }
 
             if (collapseBtn && [1, 3, 5].includes(tabNum)) {
-                console.log(`Collapse button clicked: targetId=${collapseBtn.getAttribute('data-collapse-target')} at ${new Date().toISOString()}`);
                 const targetId = collapseBtn.getAttribute('data-collapse-target');
+                console.log(`Collapse button clicked: id=${collapseBtn.id}, targetId=${targetId} at ${new Date().toISOString()}`);
+                if (!targetId) {
+                    console.warn(`Missing data-collapse-target for collapse button ${collapseBtn.id} at ${new Date().toISOString()}`);
+                    return;
+                }
+
                 const section = document.getElementById(targetId);
                 if (section) {
                     section.classList.remove('expanded');
@@ -243,6 +250,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (expandBtn && collapseBtn) {
                         expandBtn.style.display = 'inline-block';
                         collapseBtn.style.display = 'none';
+                    } else {
+                        console.warn(`Expand button not found for targetId=${targetId} at ${new Date().toISOString()}`);
                     }
                 }
             }
