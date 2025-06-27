@@ -1,15 +1,16 @@
 // app/static/js/tab3.js
-// tab3.js version: 2025-06-27-v28
-console.log(`tab3.js version: 2025-06-27-v28 loaded at ${new Date().toISOString()}`);
+// tab3.js version: 2025-06-27-v29
+console.log(`tab3.js version: 2025-06-27-v29 loaded at ${new Date().toISOString()}`);
 
 /**
  * Tab3.js: Logic for Tab 3 (Items in Service).
  * Dependencies: common.js for formatDate, tab.js for renderPaginationControls, fetchExpandableData.
- * Updated: 2025-06-27-v28
+ * Updated: 2025-06-27-v29
+ * - Updated setupExpandCollapse to use id selectors (#expand-btn-<id>-<index>, #collapse-btn-<id>-<index>).
  * - Ensured initializeTab3 runs on /tab/3 with fallback tabNum detection.
  * - Enhanced fetchCommonNames logging for Expand button debugging.
- * - Preserved all functionality from v27: filters, sync, status/notes, pagination.
- * - Line count: ~580 lines (+~36 lines from v26 for new function, comments, logging).
+ * - Preserved all functionality from v28: filters, sync, status/notes, pagination.
+ * - Line count: ~580 lines (same as v28, selector fix).
  */
 
 /**
@@ -79,7 +80,8 @@ async function retryRequest(url, options, maxRetries = 3, baseDelay = 2000) {
 async function fetchCommonNames(rentalClassId, targetId, page = 1) {
     console.log(`fetchCommonNames: rentalClassId=${rentalClassId}, targetId=${targetId}, page=${page} at ${new Date().toISOString()}`);
     const sanitizedRentalClassId = rentalClassId.replace(/[^a-z0-9]/gi, '_');
-    const expectedTableId = `common-table-${sanitizedRentalClassId}-${page}`;
+    const index = targetId.match(/-(\d+)$/)[1];
+    const expectedTableId = `common-table-${sanitizedRentalClassId}-${index}`;
     const table = document.getElementById(expectedTableId);
     if (!table) {
         console.error(`Common table ${expectedTableId} not found at ${new Date().toISOString()}`);
@@ -576,8 +578,10 @@ function setupExpandCollapse() {
         section.style.display = 'none';
         section.style.opacity = '0';
         const row = section.closest('tr');
-        const collapseBtn = row.querySelector('.collapse-btn');
-        const expandBtn = row.querySelector('.expand-btn');
+        const rentalClassId = section.id.match(/expand-([^-]+)-/)[1];
+        const index = section.id.match(/-(\d+)$/)[1];
+        const collapseBtn = row.querySelector(`#collapse-btn-${rentalClassId}-${index}`);
+        const expandBtn = row.querySelector(`#expand-btn-${rentalClassId}-${index}`);
         if (collapseBtn && expandBtn) {
             collapseBtn.style.display = 'none';
             expandBtn.style.display = 'inline-block';
