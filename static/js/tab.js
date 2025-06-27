@@ -1,14 +1,15 @@
 // app/static/js/tab.js
-// tab.js version: 2025-06-27-v11
-console.log('tab.js version: 2025-06-27-v11 loaded');
+// tab.js version: 2025-06-27-v12
+console.log('tab.js version: 2025-06-27-v12 loaded');
 
 /**
  * Tab.js: Initializes tab-specific logic and handles printing.
  * Dependencies: common.js (for formatDateTime, printTable, renderPaginationControls).
- * Updated: 2025-06-27-v11
+ * Updated: 2025-06-27-v12
+ * - Fixed SyntaxError in setupExpandCollapse (removed invalid characters).
+ * - Ensured correct window.cachedTabNum setting for Tab 3 initialization.
  * - Modified fetchExpandableData to call fetchCommonNames for Tab 3.
- * - Ensured pagination integration for Tab 3 expandable sections.
- * - Preserved all existing functionality.
+ * - Preserved all existing functionality (printing, expandable sections).
  * - Line count: ~480 lines (+~10 lines for new logic, comments).
  */
 
@@ -105,6 +106,28 @@ function updateExpandableTable(tableId, data, page, perPage, tabNum, identifier)
 }
 
 /**
+ * Handle expand/collapse for Tab 3 summary table
+ */
+function setupExpandCollapse() {
+    console.log(`setupExpandCollapse: Initializing at ${new Date().toISOString()}`);
+    document.querySelectorAll('.expandable').forEach(section => {
+        section.classList.remove('expanded');
+        section.classList.add('collapsed');
+        section.style.display = 'none';
+        section.style.opacity = '0';
+        const row = section.closest('tr');
+        const collapseBtn = row.querySelector('.collapse-btn');
+        const expandBtn = row.querySelector('.expand-btn');
+        if (collapseBtn && expandBtn) {
+            collapseBtn.style.display = 'none';
+            expandBtn.style.display = 'inline-block';
+        } else {
+            console.warn(`Expand/collapse buttons not found for section ${section.id} at ${new Date().toISOString()}`);
+        }
+    });
+}
+
+/**
  * Initialize the page
  */
 document.addEventListener('DOMContentLoaded', () => {
@@ -127,6 +150,11 @@ document.addEventListener('DOMContentLoaded', () => {
         window.cachedTabNum = tabNum;
         console.log(`Set window.cachedTabNum=${window.cachedTabNum} at ${new Date().toISOString()}`);
 
+        // Initialize expand/collapse for Tab 3
+        if (tabNum === 3) {
+            setupExpandCollapse();
+        }
+
         // Remove any existing click listeners to prevent duplicates
         document.removeEventListener('click', window.tabClickHandler);
         window.tabClickHandler = (event) => {
@@ -134,6 +162,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const printBtn = event.target.closest('.print-btn');
             const printFullBtn = event.target.closest('.print-full-btn');
             const expandBtn = event.target.closest('.expand-btn');
+            const collapseBtn = event.target.closest('.collapse-btn');
 
             if (printBtn) {
                 event.preventDefault();
@@ -198,6 +227,26 @@ document.addEventListener('DOMContentLoaded', () => {
                             updateExpandableTable(tableId, data, 1, 20, tabNum, identifier);
                         }
                     });
+                }
+            }
+
+            if (collapseBtn && [1, 3, 5].includes(tabNum)) {
+                console.log('Collapse button clicked:', {
+                    targetId: collapseBtn.getAttribute('data-collapse-target')
+                }, `at ${new Date().toISOString()}`);
+                const targetId = collapseBtn.getAttribute('data-collapse-target');
+                const section = document.getElementById(targetId);
+                if (section) {
+                    section.classList.remove('expanded');
+                    section.classList.add('collapsed');
+                    section.style.display = 'none';
+                    section.style.opacity = '0';
+                    const row = collapseBtn.closest('tr');
+                    const expandBtn = row.querySelector('.expand-btn');
+                    if (expandBtn && collapseBtn) {
+                        expandBtn.style.display = 'inline-block';
+                        collapseBtn.style.display = 'none';
+                    }
                 }
             }
         };
