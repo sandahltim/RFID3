@@ -1,5 +1,5 @@
 # app/services/api_client.py
-# api_client.py version: 2025-06-26-v5
+# api_client.py version: 2025-06-27-v6
 import requests
 import time
 from datetime import datetime, timedelta
@@ -11,7 +11,7 @@ from .. import cache
 # Configure logging
 logger = logging.getLogger('api_client')
 logger.setLevel(logging.INFO)
-logger.handlers = []
+logger.handlers = []  # Clear existing handlers
 file_handler = logging.FileHandler('/home/tim/test_rfidpi/logs/rfid_dashboard.log')
 file_handler.setLevel(logging.INFO)
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -137,47 +137,45 @@ class APIClient:
                 logger.warning(f"Invalid {field_name}: {date_str}. Error: {str(e)}. Returning None.")
                 return None
 
-    def get_item_master(self, since_date=None):
+    def get_item_master(self, since_date=None, full_refresh=False):
         params = {}
         all_data = []
-        if since_date:
+        if since_date and not full_refresh:
             since_date_str = since_date.strftime('%Y-%m-%d %H:%M:%S') if isinstance(since_date, datetime) else since_date
             logger.debug(f"Item master filter since_date: {since_date_str}")
             filter_str = f"date_last_scanned,gt,'{since_date_str}'"
             params['filter[gt]'] = filter_str
-        
-        try:
-            data = self._make_request("14223767938169344381", params, timeout=20)
-            all_data = data
-            logger.info(f"Fetched {len(all_data)} items with since_date filter")
-            if len(all_data) < 10000 and since_date:
-                logger.warning(f"Only {len(all_data)} items fetched with since_date filter, trying without filter")
-                params.pop('filter[gt]', None)
-                all_data = self._make_request("14223767938169344381", params, timeout=20)
-                logger.info(f"Fetched {len(all_data)} items without since_date filter")
-        except Exception as e:
-            logger.warning(f"Filter failed: {str(e)}. Fetching all data and filtering locally for last {INCREMENTAL_FALLBACK_SECONDS} seconds.")
-            params.pop('filter[gt]', None)
-            all_data = self._make_request("14223767938169344381", timeout=20)
-            if since_date:
-                since_dt = self.validate_date(since_date_str, 'since_date')
-                if since_dt:
-                    fallback_dt = datetime.utcnow() - timedelta(seconds=INCREMENTAL_FALLBACK_SECONDS)
-                    all_data = [
-                        item for item in all_data
-                        if item.get('date_last_scanned') is None or 
-                        (
-                            self.validate_date(item.get('date_last_scanned'), 'date_last_scanned') and
-                            self.validate_date(item.get('date_last_scanned'), 'date_last_scanned') > max(since_dt, fallback_dt)
-                        )
-                    ]
-                    logger.info(f"Filtered to {len(all_data)} items locally after fetching all")
+            try:
+                data = self._make_request(self.item_master_endpoint, params, timeout=20)
+                all_data = data
+                logger.info(f"Fetched {len(all_data)} items with since_date filter")
+                return all_data  # Return early if since_date filter is used
+            except Exception as e:
+                logger.warning(f"Filter failed: {str(e)}. Skipping fetch for incremental refresh.")
+                return []  # Skip fetching all data for incremental refresh
+        # Full refresh or no since_date
+        params.pop('filter[gt]', None)
+        all_data = self._make_request(self.item_master_endpoint, params, timeout=20)
+        logger.info(f"Fetched {len(all_data)} items without since_date filter")
+        if since_date and full_refresh:
+            since_dt = self.validate_date(since_date_str, 'since_date')
+            if since_dt:
+                fallback_dt = datetime.utcnow() - timedelta(seconds=INCREMENTAL_FALLBACK_SECONDS)
+                all_data = [
+                    item for item in all_data
+                    if item.get('date_last_scanned') is None or 
+                    (
+                        self.validate_date(item.get('date_last_scanned'), 'date_last_scanned') and
+                        self.validate_date(item.get('date_last_scanned'), 'date_last_scanned') > max(since_dt, fallback_dt)
+                    )
+                ]
+                logger.info(f"Filtered to {len(all_data)} items locally after fetching all")
         return all_data
 
-    def get_transactions(self, since_date=None):
+    def get_transactions(self, since_date=None, full_refresh=False):
         params = {}
         all_data = []
-        if since_date:
+        if since_date and not full_refresh:
             since_date_str = since_date.strftime('%Y-%m-%d %H:%M:%S') if isinstance(since_date, datetime) else since_date
             logger.debug(f"Transactions filter since_date: {since_date_str}")
             filter_str = f"scan_date,gt,'{since_date_str}'"
@@ -186,31 +184,27 @@ class APIClient:
                 data = self._make_request("14223767938169346196", params, timeout=20)
                 all_data = data
                 logger.info(f"Fetched {len(all_data)} transactions with since_date filter")
-                if len(all_data) < 10000 and since_date:
-                    logger.warning(f"Only {len(all_data)} transactions fetched with since_date filter, trying without filter")
-                    params.pop('filter[gt]', None)
-                    all_data = self._make_request("14223767938169346196", params, timeout=20)
-                    logger.info(f"Fetched {len(all_data)} transactions without since_date filter")
+                return all_data  # Return early if since_date filter is used
             except Exception as e:
-                logger.warning(f"Filter failed: {str(e)}. Fetching all data and filtering locally for last {INCREMENTAL_FALLBACK_SECONDS} seconds.")
-                params.pop('filter[gt]', None)
-                all_data = self._make_request("14223767938169346196", params, timeout=20)
-                if since_date:
-                    since_dt = self.validate_date(since_date_str, 'since_date')
-                    if since_dt:
-                        fallback_dt = datetime.utcnow() - timedelta(seconds=INCREMENTAL_FALLBACK_SECONDS)
-                        all_data = [
-                            item for item in all_data
-                            if item.get('scan_date') is None or 
-                            (
-                                self.validate_date(item.get('scan_date'), 'scan_date') and
-                                self.validate_date(item.get('scan_date'), 'scan_date') > max(since_dt, fallback_dt)
-                            )
-                        ]
-                        logger.info(f"Filtered to {len(all_data)} transactions locally after fetching all")
-        else:
-            all_data = self._make_request("14223767938169346196", timeout=20)
-            logger.info(f"Fetched {len(all_data)} transactions without filter")
+                logger.warning(f"Filter failed: {str(e)}. Skipping fetch for incremental refresh.")
+                return []  # Skip fetching all data for incremental refresh
+        # Full refresh or no since_date
+        params.pop('filter[gt]', None)
+        all_data = self._make_request("14223767938169346196", params, timeout=20)
+        logger.info(f"Fetched {len(all_data)} transactions without since_date filter")
+        if since_date and full_refresh:
+            since_dt = self.validate_date(since_date_str, 'since_date')
+            if since_dt:
+                fallback_dt = datetime.utcnow() - timedelta(seconds=INCREMENTAL_FALLBACK_SECONDS)
+                all_data = [
+                    item for item in all_data
+                    if item.get('scan_date') is None or 
+                    (
+                        self.validate_date(item.get('scan_date'), 'scan_date') and
+                        self.validate_date(item.get('scan_date'), 'scan_date') > max(since_dt, fallback_dt)
+                    )
+                ]
+                logger.info(f"Filtered to {len(all_data)} transactions locally after fetching all")
         return all_data
 
     def get_seed_data(self, since_date=None):
