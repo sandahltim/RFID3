@@ -1,16 +1,16 @@
 // app/static/js/tab.js
-// tab.js version: 2025-06-27-v13
-console.log(`tab.js version: 2025-06-27-v13 loaded at ${new Date().toISOString()}`);
+// tab.js version: 2025-06-27-v14
+console.log(`tab.js version: 2025-06-27-v14 loaded at ${new Date().toISOString()}`);
 
 /**
  * Tab.js: Initializes tab-specific logic and handles printing.
  * Dependencies: common.js (for formatDateTime, printTable, renderPaginationControls).
- * Updated: 2025-06-27-v13
- * - Fixed SyntaxError at line 257 (corrected template literal quotes).
+ * Updated: 2025-06-27-v14
+ * - Fixed SyntaxError at line 252 (corrected template literal quotes to backticks).
+ * - Updated click handler to use id selectors for Tab 3 expand/collapse buttons.
  * - Improved tabNum parsing to handle query parameters in URL.
- * - Ensured correct window.cachedTabNum for Tab 3 initialization.
  * - Preserved all functionality: printing, expandable sections.
- * - Line count: ~480 lines (same as v12, syntax fix only).
+ * - Line count: ~480 lines (same as v13, syntax and selector fixes).
  */
 
 /**
@@ -116,8 +116,10 @@ function setupExpandCollapse() {
         section.style.display = 'none';
         section.style.opacity = '0';
         const row = section.closest('tr');
-        const collapseBtn = row.querySelector('.collapse-btn');
-        const expandBtn = row.querySelector('.expand-btn');
+        const rentalClassId = section.id.match(/expand-([^-]+)-/)[1];
+        const index = section.id.match(/-(\d+)$/)[1];
+        const collapseBtn = row.querySelector(`#collapse-btn-${rentalClassId}-${index}`);
+        const expandBtn = row.querySelector(`#expand-btn-${rentalClassId}-${index}`);
         if (collapseBtn && expandBtn) {
             collapseBtn.style.display = 'none';
             expandBtn.style.display = 'inline-block';
@@ -161,8 +163,8 @@ document.addEventListener('DOMContentLoaded', () => {
             console.log(`Click event triggered at ${new Date().toISOString()}`);
             const printBtn = event.target.closest('.print-btn');
             const printFullBtn = event.target.closest('.print-full-btn');
-            const expandBtn = event.target.closest('.expand-btn');
-            const collapseBtn = event.target.closest('.collapse-btn');
+            const expandBtn = event.target.closest('[id^="expand-btn-"]');
+            const collapseBtn = event.target.closest('[id^="collapse-btn-"]');
 
             if (printBtn) {
                 event.preventDefault();
@@ -208,8 +210,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     expandable.classList.add('expanded');
                     expandable.style.display = 'block';
                     expandable.style.opacity = '1';
-                    const collapseBtn = row.querySelector('.collapse-btn');
-                    const expandBtn = row.querySelector('.expand-btn');
+                    const collapseBtn = row.querySelector(`[id^="collapse-btn-"]`);
+                    const expandBtn = row.querySelector(`[id^="expand-btn-"]`);
                     if (collapseBtn && expandBtn) {
                         collapseBtn.style.display = 'inline-block';
                         expandBtn.style.display = 'none';
@@ -237,7 +239,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     section.style.display = 'none';
                     section.style.opacity = '0';
                     const row = collapseBtn.closest('tr');
-                    const expandBtn = row.querySelector('.expand-btn');
+                    const expandBtn = row.querySelector(`[id^="expand-btn-"]`);
                     if (expandBtn && collapseBtn) {
                         expandBtn.style.display = 'inline-block';
                         collapseBtn.style.display = 'none';
