@@ -1,5 +1,5 @@
 # app/services/refresh.py
-# refresh.py version: 2025-06-27-v8
+# refresh.py version: 2025-06-27-v9
 import logging
 import traceback
 from datetime import datetime, timedelta
@@ -156,13 +156,19 @@ def update_user_mappings(session, csv_file_path='/home/tim/test_rfidpi/seeddata_
 
         # Fetch existing user mappings from temporary table
         existing_mappings = session.execute(text("SELECT * FROM temp_user_rental_class_mappings")).fetchall()
-        existing_mapping_dict = {row.rental_class_id: {
-            'category': row.category,
-            'subcategory': row.subcategory,
-            'short_common_name': row.short_common_name,
-            'created_at': row.created_at,
-            'updated_at': row.updated_at
-        } for row in existing_mappings}
+        existing_mapping_dict = {}
+        for row in existing_mappings:
+            if hasattr(row, 'rental_class_id') and row.rental_class_id:
+                existing_mapping_dict[row.rental_class_id] = {
+                    'rental_class_id': row.rental_class_id,
+                    'category': row.category,
+                    'subcategory': row.subcategory,
+                    'short_common_name': row.short_common_name or 'N/A',
+                    'created_at': row.created_at,
+                    'updated_at': row.updated_at
+                }
+            else:
+                logger.warning(f"Skipping invalid row in temp_user_rental_class_mappings: {row}")
 
         # Merge mappings, prioritizing user mappings
         merged_mappings = {}
@@ -184,6 +190,9 @@ def update_user_mappings(session, csv_file_path='/home/tim/test_rfidpi/seeddata_
         inserted_count = 0
         for mapping in merged_mappings.values():
             try:
+                if 'rental_class_id' not in mapping or not mapping['rental_class_id']:
+                    logger.warning(f"Skipping mapping with missing rental_class_id: {mapping}")
+                    continue
                 user_mapping = UserRentalClassMapping(
                     rental_class_id=mapping['rental_class_id'],
                     category=mapping['category'],
@@ -197,7 +206,7 @@ def update_user_mappings(session, csv_file_path='/home/tim/test_rfidpi/seeddata_
                 inserted_count += 1
                 logger.debug(f"Inserted mapping: {mapping['rental_class_id']}")
             except Exception as e:
-                logger.error(f"Error inserting mapping {mapping['rental_class_id']}: {str(e)}", exc_info=True)
+                logger.error(f"Error inserting mapping: {str(e)}", exc_info=True)
                 continue
 
         session.commit()
@@ -384,7 +393,6 @@ def full_refresh():
             deleted_items = session.query(ItemMaster).delete()
             deleted_transactions = session.query(Transaction).delete()
             deleted_seed = session.query(SeedRentalClass).delete()
-            # Preserve user mappings by calling update_user_mappings separately
             session.commit()
             logger.info(f"Deleted {deleted_items} items from id_item_master")
             logger.info(f"Deleted {deleted_transactions} transactions from id_transactions")
