@@ -1,16 +1,16 @@
 // app/static/js/tab.js
-// tab.js version: 2025-06-27-v12
-console.log('tab.js version: 2025-06-27-v12 loaded');
+// tab.js version: 2025-06-27-v13
+console.log(`tab.js version: 2025-06-27-v13 loaded at ${new Date().toISOString()}`);
 
 /**
  * Tab.js: Initializes tab-specific logic and handles printing.
  * Dependencies: common.js (for formatDateTime, printTable, renderPaginationControls).
- * Updated: 2025-06-27-v12
- * - Fixed SyntaxError in setupExpandCollapse (removed invalid characters).
- * - Ensured correct window.cachedTabNum setting for Tab 3 initialization.
- * - Modified fetchExpandableData to call fetchCommonNames for Tab 3.
- * - Preserved all existing functionality (printing, expandable sections).
- * - Line count: ~480 lines (+~10 lines for new logic, comments).
+ * Updated: 2025-06-27-v13
+ * - Fixed SyntaxError at line 257 (corrected template literal quotes).
+ * - Improved tabNum parsing to handle query parameters in URL.
+ * - Ensured correct window.cachedTabNum for Tab 3 initialization.
+ * - Preserved all functionality: printing, expandable sections.
+ * - Line count: ~480 lines (same as v12, syntax fix only).
  */
 
 /**
@@ -36,7 +36,7 @@ function formatDateTime(dateTimeStr) {
             hour12: true
         });
     } catch (error) {
-        console.error('formatDateTime error:', error, `at ${new Date().toISOString()}`);
+        console.error(`formatDateTime error: ${error} at ${new Date().toISOString()}`);
         return 'N/A';
     }
 }
@@ -63,10 +63,10 @@ async function fetchExpandableData(tabNum, identifier, page, perPage) {
             throw new Error(`fetchExpandableData failed: ${response.status}`);
         }
         const data = await response.json();
-        console.log('fetchExpandableData: Data received', JSON.stringify(data, null, 2), `at ${new Date().toISOString()}`);
+        console.log(`fetchExpandableData: Data received ${JSON.stringify(data, null, 2)} at ${new Date().toISOString()}`);
         return data;
     } catch (error) {
-        console.error('fetchExpandableData error:', error, `at ${new Date().toISOString()}`);
+        console.error(`fetchExpandableData error: ${error} at ${new Date().toISOString()}`);
         return { common_names: [], total_items: 0 };
     }
 }
@@ -101,7 +101,7 @@ function updateExpandableTable(tableId, data, page, perPage, tabNum, identifier)
             });
         }
     } else {
-        console.error('updateExpandableTable: renderPaginationControls not defined at ${new Date().toISOString()}');
+        console.error(`updateExpandableTable: renderPaginationControls not defined at ${new Date().toISOString()}`);
     }
 }
 
@@ -134,17 +134,17 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log(`tab.js: DOMContentLoaded at ${new Date().toISOString()}`);
     try {
         let tabNum;
-        const path = window.location.pathname;
-        console.log(`Current path: ${path} at ${new Date().toISOString()}`);
+        const path = window.location.pathname.split('?')[0]; // Strip query parameters
+        console.log(`Current path (cleaned): ${path} at ${new Date().toISOString()}`);
         const pathMatch = path.match(/\/tab\/(\d+)/);
         if (pathMatch) {
             tabNum = parseInt(pathMatch[1], 10);
             console.log(`Tab number extracted from URL: ${tabNum} at ${new Date().toISOString()}`);
         } else if (path === '/' || path === '/home') {
             tabNum = 1;
-            console.log('Home page detected, setting tabNum=1 at ${new Date().toISOString()}');
+            console.log(`Home page detected, setting tabNum=1 at ${new Date().toISOString()}`);
         } else {
-            console.warn('No tab number found in URL, using default tab number 1 at ${new Date().toISOString()}');
+            console.warn(`No tab number found in URL, using default tab number 1 at ${new Date().toISOString()}`);
             tabNum = 1;
         }
         window.cachedTabNum = tabNum;
@@ -158,7 +158,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Remove any existing click listeners to prevent duplicates
         document.removeEventListener('click', window.tabClickHandler);
         window.tabClickHandler = (event) => {
-            console.log('Click event triggered at ${new Date().toISOString()}');
+            console.log(`Click event triggered at ${new Date().toISOString()}`);
             const printBtn = event.target.closest('.print-btn');
             const printFullBtn = event.target.closest('.print-full-btn');
             const expandBtn = event.target.closest('.expand-btn');
@@ -186,15 +186,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Handle expandable sections for Tabs 1, 3, 5 only
             if (expandBtn && [1, 3, 5].includes(tabNum)) {
-                console.log('Expand button clicked:', {
-                    identifier: expandBtn.getAttribute('data-identifier'),
-                    targetId: expandBtn.getAttribute('data-target-id')
-                }, `at ${new Date().toISOString()}`);
+                console.log(`Expand button clicked: identifier=${expandBtn.getAttribute('data-identifier')}, targetId=${expandBtn.getAttribute('data-target-id')} at ${new Date().toISOString()}`);
                 const row = expandBtn.closest('tr');
                 const nextRow = row.nextElementSibling;
                 const expandable = nextRow.querySelector('.expandable');
                 if (!expandable) {
-                    console.warn('Expandable section not found at ${new Date().toISOString()}');
+                    console.warn(`Expandable section not found at ${new Date().toISOString()}`);
                     return;
                 }
 
@@ -202,7 +199,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const targetId = expandBtn.getAttribute('data-target-id');
 
                 if (!identifier || !targetId) {
-                    console.warn('Identifier or target ID missing at ${new Date().toISOString()}');
+                    console.warn(`Identifier or target ID missing at ${new Date().toISOString()}`);
                     return;
                 }
 
@@ -220,7 +217,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     const tableId = expandable.querySelector('.common-table')?.id;
                     if (!tableId) {
-                        console.warn('Table ID not found in expandable section at ${new Date().toISOString()}');
+                        console.warn(`Table ID not found in expandable section at ${new Date().toISOString()}`);
                     }
                     fetchExpandableData(tabNum, identifier, 1, 20).then(data => {
                         if (tableId) {
@@ -231,9 +228,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             if (collapseBtn && [1, 3, 5].includes(tabNum)) {
-                console.log('Collapse button clicked:', {
-                    targetId: collapseBtn.getAttribute('data-collapse-target')
-                }, `at ${new Date().toISOString()}`);
+                console.log(`Collapse button clicked: targetId=${collapseBtn.getAttribute('data-collapse-target')} at ${new Date().toISOString()}`);
                 const targetId = collapseBtn.getAttribute('data-collapse-target');
                 const section = document.getElementById(targetId);
                 if (section) {
@@ -252,7 +247,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
         document.addEventListener('click', window.tabClickHandler);
     } catch (error) {
-        console.error('Initialization error:', error, `at ${new Date().toISOString()}`);
+        console.error(`Initialization error: ${error} at ${new Date().toISOString()}`);
     }
 }
 
@@ -289,7 +284,7 @@ async function printTable(level, id, commonName = null, category = null, subcate
             const data = await response.json();
             contractDate = data.date ? formatDateTime(data.date) : 'N/A';
         } catch (error) {
-            console.error('Error fetching contract date:', error, `at ${new Date().toISOString()}`);
+            console.error(`Error fetching contract date: ${error} at ${new Date().toISOString()}`);
         }
     }
 
@@ -399,7 +394,7 @@ async function printTable(level, id, commonName = null, category = null, subcate
                 </tbody>
             `;
         } catch (error) {
-            console.error('Error fetching all common names for print:', error, `at ${new Date().toISOString()}`);
+            console.error(`Error fetching all common names for print: ${error} at ${new Date().toISOString()}`);
             tableWrapper = document.createElement('table');
             tableWrapper.className = 'table table-bordered';
             tableWrapper.innerHTML = `<tr><td colspan="3">Error loading common names: ${error.message}</td></tr>`;
@@ -591,7 +586,7 @@ async function printTable(level, id, commonName = null, category = null, subcate
 
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
-        console.error('Failed to open print window. Please allow popups at ${new Date().toISOString()}.');
+        console.error(`Failed to open print window. Please allow popups at ${new Date().toISOString()}.`);
         return;
     }
     printWindow.document.write(printContent);
@@ -770,7 +765,7 @@ async function printFullItemList(category, subcategory, commonName) {
 
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
-        console.error('Failed to open print window. Please allow popups at ${new Date().toISOString()}.');
+        console.error(`Failed to open print window. Please allow popups at ${new Date().toISOString()}.`);
         return;
     }
     printWindow.document.write(printContent);

@@ -1,16 +1,15 @@
 // app/static/js/tab3.js
 // tab3.js version: 2025-06-27-v28
-console.log('tab3.js version: 2025-06-27-v28 loaded');
+console.log(`tab3.js version: 2025-06-27-v28 loaded at ${new Date().toISOString()}`);
 
 /**
  * Tab3.js: Logic for Tab 3 (Items in Service).
  * Dependencies: common.js for formatDate, tab.js for renderPaginationControls, fetchExpandableData.
  * Updated: 2025-06-27-v28
- * - Completed partial v27, ensuring all functionality from v26 (544 lines) preserved.
+ * - Ensured initializeTab3 runs on /tab/3 with fallback tabNum detection.
  * - Enhanced fetchCommonNames logging for Expand button debugging.
- * - Ensured correct tabNum detection in initializeTab3.
- * - Preserved all features: filters, sync to PC, status/notes updates, pagination, crew filter.
- * - Line count: ~580 lines (+~36 lines for new function, comments, logging).
+ * - Preserved all functionality from v27: filters, sync, status/notes, pagination.
+ * - Line count: ~580 lines (+~36 lines from v26 for new function, comments, logging).
  */
 
 /**
@@ -96,7 +95,7 @@ async function fetchCommonNames(rentalClassId, targetId, page = 1) {
             throw new Error(`Failed to fetch common names: ${response.status}`);
         }
         const data = await response.json();
-        console.log(`Common names data for ${rentalClassId}, page ${page}:`, JSON.stringify(data, null, 2), `at ${new Date().toISOString()}`);
+        console.log(`Common names data for ${rentalClassId}, page ${page}: ${JSON.stringify(data, null, 2)} at ${new Date().toISOString()}`);
 
         if (data.error) {
             console.error(`Server error fetching common names: ${data.error} at ${new Date().toISOString()}`);
@@ -142,7 +141,7 @@ async function fetchCommonNames(rentalClassId, targetId, page = 1) {
 
         return data;
     } catch (error) {
-        console.error(`Error fetching common names for ${rentalClassId}:`, error, `at ${new Date().toISOString()}`);
+        console.error(`Error fetching common names for ${rentalClassId}: ${error} at ${new Date().toISOString()}`);
         table.querySelector('tbody').innerHTML = `<tr><td colspan="3">Error loading common names: ${error.message}</td></tr>`;
         return { common_names: [], total_items: 0 };
     }
@@ -594,8 +593,9 @@ function setupExpandCollapse() {
  */
 function initializeTab3() {
     console.log(`tab3.js: DOMContentLoaded at ${new Date().toISOString()}`);
-    if (window.cachedTabNum !== 3) {
-        console.log(`Skipping Tab 3 initialization for non-Tab 3 page (cachedTabNum=${window.cachedTabNum}) at ${new Date().toISOString()}`);
+    const path = window.location.pathname.split('?')[0];
+    if (path !== '/tab/3' && window.cachedTabNum !== 3) {
+        console.log(`Skipping Tab 3 initialization for non-Tab 3 page (path=${path}, cachedTabNum=${window.cachedTabNum}) at ${new Date().toISOString()}`);
         return;
     }
 
