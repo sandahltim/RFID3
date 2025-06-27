@@ -1,16 +1,15 @@
 // app/static/js/tab3.js
-// tab3.js version: 2025-06-27-v29
-console.log(`tab3.js version: 2025-06-27-v29 loaded at ${new Date().toISOString()}`);
+// tab3.js version: 2025-06-27-v30
+console.log(`tab3.js version: 2025-06-27-v30 loaded at ${new Date().toISOString()}`);
 
 /**
  * Tab3.js: Logic for Tab 3 (Items in Service).
  * Dependencies: common.js for formatDate, tab.js for renderPaginationControls, fetchExpandableData.
- * Updated: 2025-06-27-v29
- * - Updated setupExpandCollapse to use id selectors (#expand-btn-<id>-<index>, #collapse-btn-<id>-<index>).
- * - Ensured initializeTab3 runs on /tab/3 with fallback tabNum detection.
- * - Enhanced fetchCommonNames logging for Expand button debugging.
- * - Preserved all functionality from v28: filters, sync, status/notes, pagination.
- * - Line count: ~580 lines (same as v28, selector fix).
+ * Updated: 2025-06-27-v30
+ * - Added debug logging in setupExpandCollapse and fetchCommonNames for button attributes.
+ * - Ensured table ID alignment with tab3.html (common-table-<sanitizedRentalClassId>-<index>).
+ * - Preserved all functionality from v29: filters, sync, status/notes, pagination.
+ * - Line count: ~580 lines (same as v29, debug logging added).
  */
 
 /**
@@ -84,7 +83,7 @@ async function fetchCommonNames(rentalClassId, targetId, page = 1) {
     const expectedTableId = `common-table-${sanitizedRentalClassId}-${index}`;
     const table = document.getElementById(expectedTableId);
     if (!table) {
-        console.error(`Common table ${expectedTableId} not found at ${new Date().toISOString()}`);
+        console.error(`Common table ${expectedTableId} not found for targetId=${targetId} at ${new Date().toISOString()}`);
         return { common_names: [], total_items: 0 };
     }
 
@@ -583,10 +582,12 @@ function setupExpandCollapse() {
         const collapseBtn = row.querySelector(`#collapse-btn-${rentalClassId}-${index}`);
         const expandBtn = row.querySelector(`#expand-btn-${rentalClassId}-${index}`);
         if (collapseBtn && expandBtn) {
+            console.log(`Found buttons for section ${section.id}: expandBtn.id=${expandBtn.id}, collapseBtn.id=${collapseBtn.id} at ${new Date().toISOString()}`);
             collapseBtn.style.display = 'none';
             expandBtn.style.display = 'inline-block';
         } else {
             console.warn(`Expand/collapse buttons not found for section ${section.id} at ${new Date().toISOString()}`);
+            console.log(`DEBUG: row HTML=${row.outerHTML} at ${new Date().toISOString()}`);
         }
     });
 }
