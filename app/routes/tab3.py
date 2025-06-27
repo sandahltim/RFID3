@@ -1,5 +1,5 @@
 # app/routes/tab3.py
-# tab3.py version: 2025-06-26-v77
+# tab3.py version: 2025-06-27-v78
 from flask import Blueprint, render_template, request, jsonify, current_app
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -67,7 +67,7 @@ if not os.path.exists(SHARED_DIR):
     os.chown(SHARED_DIR, pwd.getpwnam('tim').pw_uid, grp.getgrnam('tim').gr_gid)
 
 # Log deployment version
-logger.info("Deployed tab3.py version: 2025-06-26-v77")
+logger.info("Deployed tab3.py version: 2025-06-27-v78")
 
 # Define crew categories
 TENT_CATEGORIES = ['Frame Tent Tops', 'Pole Tent Tops', 'Tent Crates', 'Sidewall']
@@ -132,7 +132,7 @@ def tab3_view():
         sort = request.args.get('sort', 'date_last_scanned_desc')
         page = int(request.args.get('page', 1))
         per_page = 20
-        crew_filter = request.args.get('crew', '')  # New crew filter
+        crew_filter = request.args.get('crew', '')
 
         # Define in-service statuses
         in_service_statuses = ['Repair', 'Needs to be Inspected', 'Wash', 'Wet']
@@ -477,6 +477,14 @@ def tab3_view():
             for group in groups:
                 logger.debug(f"Group: rental_class_id={group['rental_class_id']}, common_name={group['common_name']}, items={len(group['item_list'])}, statuses={group['statuses']}, crew={group['crew']}")
 
+        # Fetch common names for dropdown
+        common_names = session.query(SeedRentalClass.common_name)\
+            .filter(SeedRentalClass.bin_location.in_(['pack', 'resale']))\
+            .distinct()\
+            .order_by(SeedRentalClass.common_name.asc())\
+            .all()
+        common_names = [name[0] for name in common_names if name[0]]
+
         session.commit()
         logger.info("Rendering Tab 3 template")
         return render_template(
@@ -489,6 +497,7 @@ def tab3_view():
             total_groups=total_groups,
             current_page=page,
             per_page=per_page,
+            common_names=common_names,
             cache_bust=int(datetime.now().timestamp())
         )
     except Exception as e:
@@ -505,8 +514,75 @@ def tab3_view():
             total_groups=0,
             current_page=1,
             per_page=20,
+            common_names=[],
             cache_bust=int(datetime.now().timestamp())
         )
+    finally:
+        if session:
+            session.close()
+
+@tab3_bp.route('/tab/3/common_names')
+def tab3_common_names():
+    logger.debug("Entering /tab/3/common_names endpoint at %s", datetime.now())
+    session = None
+    try:
+        session = db.session()
+        rental_class_id = request.args.get('rental_class_id', '')
+        page = int(request.args.get('page', 1))
+        per_page = int(request.args.get('per_page', 20))
+
+        if not rental_class_id:
+            logger.warning("Missing rental_class_id parameter")
+            return jsonify({'error': 'rental_class_id is required'}), 400
+
+        # Query for common names under the rental class
+        query = """
+            SELECT 
+                REGEXP_REPLACE(i.common_name, '\s*\(G[0-9]+\)$', '') AS name,
+                COUNT(*) AS on_contracts,
+                COUNT(*) AS total_items_inventory
+            FROM id_item_master i
+            WHERE COALESCE(i.rental_class_num, '') = :rental_class_id
+            AND LOWER(TRIM(COALESCE(i.status, ''))) IN ('repair', 'needs to be inspected', 'wash', 'wet')
+            GROUP BY REGEXP_REPLACE(i.common_name, '\s*\(G[0-9]+\)$', '')
+            ORDER BY name ASC
+            LIMIT :limit OFFSET :offset
+        """
+        params = {
+            'rental_class_id': rental_class_id,
+            'limit': per_page,
+            'offset': (page - 1) * per_page
+        }
+
+        result = session.execute(text(query), params)
+        common_names = [
+            {
+                'name': row[0],
+                'on_contracts': row[1],
+                'total_items_inventory': row[2],
+                'is_hand_counted': False
+            } for row in result.fetchall()
+        ]
+
+        # Get total count for pagination
+        count_query = """
+            SELECT COUNT(DISTINCT REGEXP_REPLACE(i.common_name, '\s*\(G[0-9]+\)$', ''))
+            FROM id_item_master i
+            WHERE COALESCE(i.rental_class_num, '') = :rental_class_id
+            AND LOWER(TRIM(COALESCE(i.status, ''))) IN ('repair', 'needs to be inspected', 'wash', 'wet')
+        """
+        total_items = session.execute(text(count_query), {'rental_class_id': rental_class_id}).scalar() or 0
+
+        logger.info(f"Fetched {len(common_names)} common names for rental_class_id {rental_class_id}")
+        return jsonify({
+            'common_names': common_names,
+            'total_items': total_items,
+            'page': page,
+            'per_page': per_page
+        }), 200
+    except Exception as e:
+        logger.error(f"Error fetching common names: {str(e)}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
     finally:
         if session:
             session.close()
@@ -974,6 +1050,7 @@ def update_synced_status():
             logger.info("CSV file cleared successfully")
         except Exception as e:
             logger.error(f"Error clearing CSV file: {str(e)}", exc_info=True)
+            Ascending
             session.rollback()
             return jsonify({'error': f"Error clearing CSV file: {str(e)}"}), 500
 
