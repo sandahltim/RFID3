@@ -1,9 +1,24 @@
 // app/static/js/home.js
-// home.js version: 2025-06-19-v3
-console.log('home.js version: 2025-06-19-v3 loaded');
+// home.js version: 2025-06-27-v4
+console.log('home.js version: 2025-06-27-v4 loaded');
 
+/**
+ * Home.js: Logic for the home page.
+ * Dependencies: common.js for formatDate.
+ * Updated: 2025-06-27-v4
+ * - Removed fetchRefreshStatus since home.html renders last_refresh statically.
+ * - Preserved all existing functionality (full/incremental refresh buttons, date formatting).
+ */
+
+/**
+ * Trigger a full refresh
+ */
 function triggerFullRefresh() {
     const button = document.getElementById('full-refresh-btn');
+    if (!button) {
+        console.warn('Full refresh button not found at ${new Date().toISOString()}');
+        return;
+    }
     button.disabled = true;
     button.innerText = 'Refreshing...';
     
@@ -15,13 +30,13 @@ function triggerFullRefresh() {
     .then(data => {
         if (data.status === 'success') {
             alert('Full refresh completed successfully');
-            fetchRefreshStatus();
+            window.location.reload(); // Refresh page to update static data
         } else {
             alert('Error: ' + data.message);
         }
     })
     .catch(error => {
-        console.error('Error during full refresh:', error);
+        console.error('Error during full refresh:', error, `at ${new Date().toISOString()}`);
         alert('Failed to perform full refresh: ' + error.message);
     })
     .finally(() => {
@@ -30,8 +45,15 @@ function triggerFullRefresh() {
     });
 }
 
+/**
+ * Trigger an incremental refresh
+ */
 function triggerIncrementalRefresh() {
     const button = document.getElementById('incremental-refresh-btn');
+    if (!button) {
+        console.warn('Incremental refresh button not found at ${new Date().toISOString()}');
+        return;
+    }
     button.disabled = true;
     button.innerText = 'Refreshing...';
     
@@ -43,13 +65,13 @@ function triggerIncrementalRefresh() {
     .then(data => {
         if (data.status === 'success') {
             alert('Incremental refresh completed successfully');
-            fetchRefreshStatus();
+            window.location.reload(); // Refresh page to update static data
         } else {
             alert('Error: ' + data.message);
         }
     })
     .catch(error => {
-        console.error('Error during incremental refresh:', error);
+        console.error('Error during incremental refresh:', error, `at ${new Date().toISOString()}`);
         alert('Failed to perform incremental refresh: ' + error.message);
     })
     .finally(() => {
@@ -58,39 +80,18 @@ function triggerIncrementalRefresh() {
     });
 }
 
-async function fetchRefreshStatus() {
-    try {
-        const response = await fetch('/refresh/status');
-        const data = await response.json();
-        if (data.status === 'success') {
-            const lastRefresh = data.last_refresh || 'N/A';
-            const refreshType = data.refresh_type || 'N/A';
-            const formattedDate = lastRefresh !== 'N/A' ? formatDate(lastRefresh) : 'N/A';
-            document.getElementById('refresh-status').innerText = 
-                `Last Refresh: ${formattedDate} (${refreshType})`;
-        } else {
-            console.error('Error fetching refresh status:', data.message);
-            document.getElementById('refresh-status').innerText = 'Last Refresh: Error fetching status';
-        }
-    } catch (error) {
-        console.error('Error fetching refresh status:', error);
-        document.getElementById('refresh-status').innerText = 'Last Refresh: Error fetching status';
-    }
-}
-
-function startStatusPolling() {
-    fetchRefreshStatus();
-    setInterval(fetchRefreshStatus, 30000); // Poll every 30 seconds
-}
-
+/**
+ * Initialize the page
+ */
 document.addEventListener('DOMContentLoaded', () => {
-    if (typeof formatDate === 'function') {
-        document.querySelectorAll('#recent-scans-table td:nth-child(3)').forEach(cell => {
-            const rawDate = cell.textContent.trim();
-            cell.textContent = formatDate(rawDate);
-        });
-    } else {
-        console.warn('formatDate function not found, skipping date formatting');
+    console.log(`home.js: DOMContentLoaded at ${new Date().toISOString()}`);
+    if (typeof formatDate !== 'function') {
+        console.warn('formatDate function not found, skipping date formatting at ${new Date().toISOString()}');
+        return;
     }
-    startStatusPolling();
+
+    document.querySelectorAll('#recent-scans-table td:nth-child(3)').forEach(cell => {
+        const rawDate = cell.textContent.trim();
+        cell.textContent = formatDate(rawDate);
+    });
 });
