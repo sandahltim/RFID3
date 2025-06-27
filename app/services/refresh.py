@@ -1,9 +1,10 @@
 # app/services/refresh.py
-# refresh.py version: 2025-06-27-v7
+# refresh.py version: 2025-06-27-v8
 import logging
 import traceback
 from datetime import datetime, timedelta
 from sqlalchemy.exc import SQLAlchemyError, OperationalError
+from sqlalchemy.sql import text
 from .. import db
 from ..models.db_models import ItemMaster, Transaction, SeedRentalClass, RefreshState, UserRentalClassMapping
 from ..services.api_client import APIClient
@@ -14,8 +15,9 @@ import os
 import csv
 import json
 
+# Configure logging
 logger = logging.getLogger(f'refresh_{os.getpid()}')
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.INFO)  # Maintain INFO level to minimize disk I/O
 logger.handlers = []  # Clear existing handlers
 file_handler = logging.FileHandler('/home/tim/test_rfidpi/logs/rfid_dashboard.log')
 file_handler.setLevel(logging.INFO)
@@ -32,7 +34,16 @@ refresh_bp = Blueprint('refresh', __name__)
 api_client = APIClient()
 
 def validate_date(date_str, field_name, tag_id):
-    """Validate date string and return datetime object or None."""
+    """Validate date string and return datetime object or None.
+    
+    Args:
+        date_str (str): Date string to validate
+        field_name (str): Name of the date field
+        tag_id (str): Tag ID for logging context
+    
+    Returns:
+        datetime: Parsed datetime object or None if invalid
+    """
     if date_str is None or date_str == '0000-00-00 00:00:00':
         logger.debug(f"Null or invalid {field_name} for tag_id {tag_id}: {date_str}, returning None")
         return None
@@ -49,7 +60,12 @@ def validate_date(date_str, field_name, tag_id):
             return None
 
 def update_refresh_state(state_type, timestamp):
-    """Update the refresh_state table with the latest refresh timestamp."""
+    """Update the refresh_state table with the latest refresh timestamp.
+    
+    Args:
+        state_type (str): Type of refresh (full or incremental)
+        timestamp (datetime): Timestamp of the refresh
+    """
     session = db.session()
     try:
         refresh_state = session.query(RefreshState).first()
@@ -68,11 +84,42 @@ def update_refresh_state(state_type, timestamp):
         session.close()
 
 def update_user_mappings(session, csv_file_path='/home/tim/test_rfidpi/seeddata_20250425155406.csv'):
-    """Populate user_rental_class_mappings from CSV."""
-    logger.info("Updating user_rental_class_mappings from CSV")
-    mappings_dict = {}
-    row_count = 0
+    """Populate user_rental_class_mappings from CSV, preserving existing user mappings.
+    
+    Creates a temporary table to back up user mappings, merges with CSV data
+    (prioritizing user mappings), and repopulates user_rental_class_mappings.
+    
+    Args:
+        session: SQLAlchemy session
+        csv_file_path (str): Path to seed data CSV
+    """
+    logger.info("Updating user_rental_class_mappings from CSV while preserving user mappings")
     try:
+        # Create temporary table for user mappings backup
+        session.execute(text("""
+            CREATE TABLE IF NOT EXISTS temp_user_rental_class_mappings (
+                rental_class_id VARCHAR(50) PRIMARY KEY,
+                category VARCHAR(100) NOT NULL,
+                subcategory VARCHAR(100) NOT NULL,
+                short_common_name VARCHAR(50),
+                created_at DATETIME NOT NULL,
+                updated_at DATETIME NOT NULL
+            )
+        """))
+        session.commit()
+        logger.debug("Created temporary table temp_user_rental_class_mappings")
+
+        # Back up existing user mappings
+        session.execute(text("""
+            INSERT INTO temp_user_rental_class_mappings
+            SELECT * FROM user_rental_class_mappings
+        """))
+        session.commit()
+        logger.debug("Backed up user_rental_class_mappings to temporary table")
+
+        # Read CSV and deduplicate mappings
+        mappings_dict = {}
+        row_count = 0
         if not os.path.exists(csv_file_path):
             logger.error(f"CSV file not found at: {csv_file_path}")
             return
@@ -86,7 +133,7 @@ def update_user_mappings(session, csv_file_path='/home/tim/test_rfidpi/seeddata_
             for row in reader:
                 row_count += 1
                 try:
-                    rental_class_id = row.get('rental_class_id', '').strip()
+                    rental_class_id = row.get('rental_class_id', '').strip().upper()
                     category = row.get('Cat', '').strip()
                     subcategory = row.get('SubCat', '').strip()
                     if not rental_class_id or not category or not subcategory:
@@ -99,38 +146,82 @@ def update_user_mappings(session, csv_file_path='/home/tim/test_rfidpi/seeddata_
                         'rental_class_id': rental_class_id,
                         'category': category,
                         'subcategory': subcategory,
-                        'short_common_name': ''
+                        'short_common_name': row.get('short_common_name', '').strip() or 'N/A',
+                        'created_at': datetime.utcnow(),
+                        'updated_at': datetime.utcnow()
                     }
                 except Exception as e:
                     logger.error(f"Error processing CSV row {row_count}: {str(e)}", exc_info=True)
                     continue
-        logger.info(f"Processed {row_count} CSV rows, {len(mappings_dict)} unique mappings")
+
+        # Fetch existing user mappings from temporary table
+        existing_mappings = session.execute(text("SELECT * FROM temp_user_rental_class_mappings")).fetchall()
+        existing_mapping_dict = {row.rental_class_id: {
+            'category': row.category,
+            'subcategory': row.subcategory,
+            'short_common_name': row.short_common_name,
+            'created_at': row.created_at,
+            'updated_at': row.updated_at
+        } for row in existing_mappings}
+
+        # Merge mappings, prioritizing user mappings
+        merged_mappings = {}
+        for rental_class_id, mapping in existing_mapping_dict.items():
+            merged_mappings[rental_class_id] = mapping
+        for rental_class_id, mapping in mappings_dict.items():
+            if rental_class_id not in merged_mappings:
+                merged_mappings[rental_class_id] = mapping
+            else:
+                logger.debug(f"Preserving user mapping for rental_class_id {rental_class_id}")
+
+        logger.info(f"Processed {row_count} CSV rows, {len(merged_mappings)} merged mappings (user mappings prioritized)")
+
+        # Clear existing user mappings
         deleted_count = session.query(UserRentalClassMapping).delete()
         logger.info(f"Deleted {deleted_count} existing user mappings")
+
+        # Insert merged mappings
         inserted_count = 0
-        for mapping in mappings_dict.values():
+        for mapping in merged_mappings.values():
             try:
                 user_mapping = UserRentalClassMapping(
                     rental_class_id=mapping['rental_class_id'],
                     category=mapping['category'],
                     subcategory=mapping['subcategory'],
                     short_common_name=mapping['short_common_name'],
-                    created_at=datetime.utcnow(),
-                    updated_at=datetime.utcnow()
+                    created_at=mapping['created_at'],
+                    updated_at=mapping['updated_at']
                 )
                 session.add(user_mapping)
-                session.commit()
+                session.flush()
                 inserted_count += 1
+                logger.debug(f"Inserted mapping: {mapping['rental_class_id']}")
             except Exception as e:
                 logger.error(f"Error inserting mapping {mapping['rental_class_id']}: {str(e)}", exc_info=True)
-                session.rollback()
                 continue
-        logger.info(f"Inserted {inserted_count} user mappings")
+
+        session.commit()
+        logger.info(f"Inserted {inserted_count} merged mappings into user_rental_class_mappings")
+
+        # Drop temporary table
+        session.execute(text("DROP TABLE IF EXISTS temp_user_rental_class_mappings"))
+        session.commit()
+        logger.debug("Dropped temporary user mappings table")
     except Exception as e:
         logger.error(f"Error updating user mappings: {str(e)}", exc_info=True)
         session.rollback()
+    finally:
+        session.execute(text("DROP TABLE IF EXISTS temp_user_rental_class_mappings"))
+        session.commit()
+        session.close()
 
 def update_item_master(session, items):
+    """Update id_item_master with provided items.
+    
+    Args:
+        session: SQLAlchemy session
+        items: List of item dictionaries
+    """
     if not items:
         logger.info("No items to update in id_item_master")
         return
@@ -177,6 +268,12 @@ def update_item_master(session, items):
     logger.info(f"Updated {len(items) - skipped - failed} items, skipped {skipped}, failed {failed}")
 
 def update_transactions(session, transactions):
+    """Update id_transactions with provided transactions.
+    
+    Args:
+        session: SQLAlchemy session
+        transactions: List of transaction dictionaries
+    """
     if not transactions:
         logger.info("No transactions to update in id_transactions")
         return
@@ -242,6 +339,12 @@ def update_transactions(session, transactions):
     logger.info(f"Updated {len(transactions) - skipped - failed} transactions, skipped {skipped}, failed {failed}")
 
 def update_seed_data(session, seed_data):
+    """Update seed_rental_classes with provided seed data.
+    
+    Args:
+        session: SQLAlchemy session
+        seed_data: List of seed data dictionaries
+    """
     if not seed_data:
         logger.info("No seed data to update in seed_rental_classes")
         return
@@ -271,6 +374,7 @@ def update_seed_data(session, seed_data):
     logger.info(f"Updated {len(seed_data) - skipped - failed} seed items, skipped {skipped}, failed {failed}")
 
 def full_refresh():
+    """Perform a full refresh of the database."""
     logger.info("Starting full refresh")
     session = db.session()
     max_retries = 3
@@ -280,12 +384,11 @@ def full_refresh():
             deleted_items = session.query(ItemMaster).delete()
             deleted_transactions = session.query(Transaction).delete()
             deleted_seed = session.query(SeedRentalClass).delete()
-            deleted_mappings = session.query(UserRentalClassMapping).delete()
+            # Preserve user mappings by calling update_user_mappings separately
             session.commit()
             logger.info(f"Deleted {deleted_items} items from id_item_master")
             logger.info(f"Deleted {deleted_transactions} transactions from id_transactions")
             logger.info(f"Deleted {deleted_seed} items from seed_rental_classes")
-            logger.info(f"Deleted {deleted_mappings} user mappings from user_rental_class_mappings")
 
             logger.debug("Fetching data from API")
             items = api_client.get_item_master(since_date=None, full_refresh=True)
@@ -334,6 +437,7 @@ def full_refresh():
             session.close()
 
 def incremental_refresh():
+    """Perform an incremental refresh of the database."""
     logger.info("Starting incremental refresh")
     session = db.session()
     max_retries = 3
@@ -388,6 +492,7 @@ def incremental_refresh():
 
 @refresh_bp.route('/refresh/full', methods=['POST'])
 def full_refresh_endpoint():
+    """Endpoint for full refresh."""
     logger.info("Received request for full refresh via endpoint")
     try:
         full_refresh()
@@ -402,6 +507,7 @@ def full_refresh_endpoint():
 
 @refresh_bp.route('/refresh/incremental', methods=['POST'])
 def incremental_refresh_endpoint():
+    """Endpoint for incremental refresh."""
     logger.info("Received request for incremental refresh via endpoint")
     try:
         incremental_refresh()
@@ -416,6 +522,7 @@ def incremental_refresh_endpoint():
 
 @refresh_bp.route('/clear_api_data', methods=['POST'])
 def clear_api_data():
+    """Endpoint to clear API data and perform full refresh."""
     logger.info("Received request for clear API data and refresh")
     try:
         full_refresh()
@@ -430,6 +537,7 @@ def clear_api_data():
 
 @refresh_bp.route('/refresh/status', methods=['GET'])
 def get_refresh_status():
+    """Endpoint to fetch refresh status."""
     logger.info("Fetching refresh status")
     session = db.session()
     try:

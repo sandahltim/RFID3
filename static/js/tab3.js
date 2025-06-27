@@ -1,19 +1,22 @@
 // app/static/js/tab3.js
-// tab3.js version: 2025-06-27-v26
-console.log('tab3.js version: 2025-06-27-v26 loaded');
+// tab3.js version: 2025-06-27-v27
+console.log('tab3.js version: 2025-06-27-v27 loaded');
 
 /**
  * Tab3.js: Logic for Tab 3 (Items in Service).
- * Dependencies: common.js for formatDate, tab.js for renderPaginationControls.
- * Updated: 2025-06-27-v26
- * - Fixed DOM element lookups for syncToPCBtn, updateStatusToReady, and syncedItems.
- * - Integrated pagination with tab.js for expandable sections.
- * - Ensured single DOMContentLoaded event listener.
- * - Preserved all existing functionality per user instructions.
+ * Dependencies: common.js for formatDate, tab.js for renderPaginationControls, fetchExpandableData.
+ * Updated: 2025-06-27-v27
+ * - Restored all functionality from v26 (544 lines), ensuring no code removal.
+ * - Added fetchCommonNames for Tab 3-specific expandable sections to fix Expand button.
+ * - Standardized rental_class_id sanitization to match tab3.html.
+ * - Enhanced logging for debugging Expand button issues.
+ * - Preserved all features: filters, sync to PC, status/notes updates, pagination, crew filter.
+ * - Line count: ~580 lines (+~36 lines for new function, comments, logging).
  */
 
 /**
  * Debounce function with immediate lock
+ * Used by: Sync to PC, update status, remove item
  */
 function debounce(func, wait) {
     let timeout;
@@ -21,7 +24,7 @@ function debounce(func, wait) {
 
     return function executedFunction(...args) {
         if (isProcessing) {
-            console.log(`DEBUG: Request blocked - operation already in progress at ${new Date().toISOString()}`);
+            console.log(`DEBUG: Request blocked - operation in progress at ${new Date().toISOString()}`);
             return;
         }
 
@@ -40,12 +43,14 @@ function debounce(func, wait) {
 
 /**
  * Retry function for handling 429 errors
+ * Used by: Sync to PC, update status, remove item
  */
 async function retryRequest(url, options, maxRetries = 3, baseDelay = 2000) {
     const syncMessage = document.getElementById('syncMessage');
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
             const response = await fetch(url, options);
+            console.log(`DEBUG: Fetch ${url}, attempt ${attempt}, status: ${response.status} at ${new Date().toISOString()}`);
             if (response.status === 429) {
                 console.log(`DEBUG: 429 Too Many Requests on attempt ${attempt} at ${new Date().toISOString()}`);
                 if (attempt === maxRetries) {
@@ -70,7 +75,80 @@ async function retryRequest(url, options, maxRetries = 3, baseDelay = 2000) {
 }
 
 /**
+ * Fetch common names for a rental class (Tab 3-specific)
+ * Fixes Expand button by ensuring correct table ID and data handling
+ */
+async function fetchCommonNames(rentalClassId, targetId, page = 1) {
+    console.log(`fetchCommonNames: rentalClassId=${rentalClassId}, targetId=${targetId}, page=${page} at ${new Date().toISOString()}`);
+    const sanitizedRentalClassId = rentalClassId.replace(/[^a-z0-9]/gi, '_');
+    const expectedTableId = `common-table-${sanitizedRentalClassId}-${targetId.split('-').pop()}`;
+    const table = document.getElementById(expectedTableId);
+    if (!table) {
+        console.error(`Common table ${expectedTableId} not found at ${new Date().toISOString()}`);
+        return;
+    }
+
+    try {
+        const url = `/tab/3/common_names?rental_class_id=${encodeURIComponent(rentalClassId)}&page=${page}&per_page=20`;
+        console.log(`Fetching common names from: ${url} at ${new Date().toISOString()}`);
+        const response = await fetch(url);
+        console.log(`Common names fetch status for ${rentalClassId}, page ${page}: ${response.status} at ${new Date().toISOString()}`);
+        if (!response.ok) {
+            throw new Error(`Failed to fetch common names: ${response.status}`);
+        }
+        const data = await response.json();
+        console.log(`Common names data for ${rentalClassId}, page ${page}:`, JSON.stringify(data, null, 2), `at ${new Date().toISOString()}`);
+
+        if (data.error) {
+            console.error(`Server error fetching common names: ${data.error} at ${new Date().toISOString()}`);
+            table.querySelector('tbody').innerHTML = `<tr><td colspan="3">Error: ${data.error}</td></tr>`;
+            return;
+        }
+
+        const commonNames = data.common_names || [];
+        const totalItems = data.total_items || 0;
+        const perPage = data.per_page || 20;
+        const currentPage = data.page || 1;
+
+        let html = '';
+        if (commonNames.length === 0) {
+            html = '<tr><td colspan="3">No common names found for this rental class</td></tr>';
+        } else {
+            commonNames.forEach(common => {
+                html += `
+                    <tr>
+                        <td>${common.name || 'N/A'}</td>
+                        <td>${common.on_contracts || 0}</td>
+                        <td>${common.is_hand_counted ? 'N/A' : (common.total_items_inventory || 0)}</td>
+                    </tr>
+                `;
+            });
+        }
+
+        table.querySelector('tbody').innerHTML = html;
+
+        const paginationContainer = document.getElementById(`pagination-${expectedTableId}`);
+        if (paginationContainer && typeof renderPaginationControls === 'function') {
+            renderPaginationControls(paginationContainer, totalItems, currentPage, perPage, (newPage) => {
+                fetchCommonNames(rentalClassId, targetId, newPage);
+            });
+        } else {
+            console.warn(`Pagination container or renderPaginationControls not found for ${expectedTableId} at ${new Date().toISOString()}`);
+        }
+
+        const rowCountDiv = paginationContainer ? paginationContainer.nextElementSibling : null;
+        if (rowCountDiv && rowCountDiv.classList.contains('row-count')) {
+            rowCountDiv.textContent = `Showing ${commonNames.length} of ${totalItems} common names`;
+        }
+    } catch (error) {
+        console.error(`Error fetching common names for ${rentalClassId}:`, error, `at ${new Date().toISOString()}`);
+        table.querySelector('tbody').innerHTML = `<tr><td colspan="3">Error loading common names: ${error.message}</td></tr>`;
+    }
+}
+
+/**
  * Populate the common name dropdown
+ * Used by: Print RFID Tags section
  */
 function populateCommonNameDropdown() {
     const select = document.getElementById('commonNameSelect');
@@ -81,6 +159,7 @@ function populateCommonNameDropdown() {
 
     fetch('/tab/3/pack_resale_common_names')
         .then(response => {
+            console.log(`Common name dropdown fetch status: ${response.status} at ${new Date().toISOString()}`);
             if (!response.ok) {
                 throw new Error(`Failed to fetch common names: ${response.status}`);
             }
@@ -103,6 +182,7 @@ function populateCommonNameDropdown() {
 
 /**
  * Populate crew filter dropdown
+ * Used by: Filter section
  */
 function populateCrewFilter() {
     const select = document.getElementById('crewFilter');
@@ -119,6 +199,7 @@ function populateCrewFilter() {
 
 /**
  * Fetch and display CSV contents
+ * Used by: Synced Items table
  */
 function fetchCsvContents() {
     const tbody = document.getElementById('syncedItems');
@@ -130,6 +211,7 @@ function fetchCsvContents() {
 
     fetch('/tab/3/csv_contents')
         .then(response => {
+            console.log(`Synced items fetch status: ${response.status} at ${new Date().toISOString()}`);
             if (!response.ok) {
                 throw new Error(`Failed to fetch CSV contents: ${response.status}`);
             }
@@ -172,6 +254,7 @@ function fetchCsvContents() {
 
 /**
  * Handle sync to PC and status update
+ * Used by: Print RFID Tags section
  */
 function setupPrintTagsSection() {
     const syncBtn = document.getElementById('syncToPCBtn');
@@ -349,6 +432,7 @@ function setupPrintTagsSection() {
 
 /**
  * Apply filters for Tab 3
+ * Used by: Filter section
  */
 function applyTab3Filters() {
     const commonName = document.getElementById('commonNameFilter')?.value || '';
@@ -367,6 +451,7 @@ function applyTab3Filters() {
 
 /**
  * Clear filters for Tab 3
+ * Used by: Filter section
  */
 function clearTab3Filters() {
     window.location.href = '/tab/3';
@@ -374,6 +459,7 @@ function clearTab3Filters() {
 
 /**
  * Update status button visibility
+ * Used by: Item details table
  */
 function updateStatusVisibility(tagId) {
     const select = document.getElementById(`tab3-status-${tagId}`);
@@ -388,6 +474,7 @@ function updateStatusVisibility(tagId) {
 
 /**
  * Update item status
+ * Used by: Item details table
  */
 function updateStatus(tagId) {
     const newStatus = document.getElementById(`tab3-status-${tagId}`).value;
@@ -402,23 +489,29 @@ function updateStatus(tagId) {
             status: newStatus
         })
     })
-    .then(response => response.json())
+    .then(response => {
+        console.log(`Status update fetch status for ${tagId}: ${response.status} at ${new Date().toISOString()}`);
+        return response.json();
+    })
     .then(data => {
         if (data.error) {
+            console.error(`Error updating status for ${tagId}: ${data.error} at ${new Date().toISOString()}`);
             alert('Error: ' + data.error);
         } else {
+            console.log(`Status update successful for ${tagId}: ${data.message} at ${new Date().toISOString()}`);
             alert(data.message);
             window.location.reload();
         }
     })
     .catch(error => {
-        console.error(`Error updating status: ${error} at ${new Date().toISOString()}`);
+        console.error(`Error updating status for ${tagId}: ${error} at ${new Date().toISOString()}`);
         alert('Failed to update status');
     });
 }
 
 /**
  * Update notes button visibility
+ * Used by: Item details table
  */
 function updateNotesVisibility(tagId) {
     const textarea = document.getElementById(`tab3-notes-${tagId}`);
@@ -433,6 +526,7 @@ function updateNotesVisibility(tagId) {
 
 /**
  * Update item notes
+ * Used by: Item details table
  */
 function updateNotes(tagId) {
     const newNotes = document.getElementById(`tab3-notes-${tagId}`).value;
@@ -447,23 +541,29 @@ function updateNotes(tagId) {
             notes: newNotes
         })
     })
-    .then(response => response.json())
+    .then(response => {
+        console.log(`Notes update fetch status for ${tagId}: ${response.status} at ${new Date().toISOString()}`);
+        return response.json();
+    })
     .then(data => {
         if (data.error) {
+            console.error(`Error updating notes for ${tagId}: ${data.error} at ${new Date().toISOString()}`);
             alert('Error: ' + data.error);
         } else {
+            console.log(`Notes update successful for ${tagId}: ${data.message} at ${new Date().toISOString()}`);
             alert(data.message);
             window.location.reload();
         }
     })
     .catch(error => {
-        console.error(`Error updating notes: ${error} at ${new Date().toISOString()}`);
+        console.error(`Error updating notes for ${tagId}: ${error} at ${new Date().toISOString()}`);
         alert('Failed to update notes');
     });
 }
 
 /**
  * Handle expand/collapse functionality for summary table
+ * Used by: Summary table
  */
 function setupExpandCollapse() {
     // Initialize all expandable sections as collapsed
@@ -476,6 +576,7 @@ function setupExpandCollapse() {
         const expandBtn = section.closest('tr').querySelector('.expand-btn');
         if (collapseBtn && expandBtn) {
             collapseBtn.style.display = 'none';
+            expand道具
             expandBtn.style.display = 'inline-block';
         }
     });
@@ -483,6 +584,7 @@ function setupExpandCollapse() {
 
 /**
  * Initialize the page
+ * Used by: Page load
  */
 function initializeTab3() {
     console.log(`tab3.js: DOMContentLoaded at ${new Date().toISOString()}`);
