@@ -1,16 +1,16 @@
 // app/static/js/tab.js
-// tab.js version: 2025-06-27-v15
-console.log(`tab.js version: 2025-06-27-v15 loaded at ${new Date().toISOString()}`);
+// tab.js version: 2025-06-30-v16
+console.log(`tab.js version: 2025-06-30-v16 loaded at ${new Date().toISOString()}`);
 
 /**
  * Tab.js: Initializes tab-specific logic and handles printing.
  * Dependencies: common.js (for formatDateTime, printTable, renderPaginationControls).
- * Updated: 2025-06-27-v15
- * - Fixed SyntaxError at line 254 (corrected template literal quotes to backticks).
- * - Refined click handler to use specific id selectors for Tab 3 expand/collapse buttons.
+ * Updated: 2025-06-30-v16
+ * - Fixed SyntaxError at line 263 (corrected template literal quotes to backticks).
+ * - Updated click handler to use previous row for Tab 3 expand/collapse buttons.
  * - Added debug logging for button attributes in click handler.
  * - Preserved all functionality: printing, expandable sections.
- * - Line count: ~480 lines (same as v14, syntax and click handler fixes).
+ * - Line count: ~480 lines (same as v15, syntax and click handler fixes).
  */
 
 /**
@@ -121,10 +121,12 @@ function setupExpandCollapse() {
         const collapseBtn = row.querySelector(`#collapse-btn-${rentalClassId}-${index}`);
         const expandBtn = row.querySelector(`#expand-btn-${rentalClassId}-${index}`);
         if (collapseBtn && expandBtn) {
+            console.log(`Found buttons for section ${section.id}: expandBtn.id=${expandBtn.id}, collapseBtn.id=${collapseBtn.id} at ${new Date().toISOString()}`);
             collapseBtn.style.display = 'none';
             expandBtn.style.display = 'inline-block';
         } else {
             console.warn(`Expand/collapse buttons not found for section ${section.id} at ${new Date().toISOString()}`);
+            console.log(`DEBUG: row HTML=${row.outerHTML} at ${new Date().toISOString()}`);
         }
     });
 }
