@@ -1,15 +1,16 @@
 // app/static/js/tab3.js
-// tab3.js version: 2025-06-27-v30
-console.log(`tab3.js version: 2025-06-27-v30 loaded at ${new Date().toISOString()}`);
+// tab3.js version: 2025-06-30-v31
+console.log(`tab3.js version: 2025-06-30-v31 loaded at ${new Date().toISOString()}`);
 
 /**
  * Tab3.js: Logic for Tab 3 (Items in Service).
  * Dependencies: common.js for formatDate, tab.js for renderPaginationControls, fetchExpandableData.
- * Updated: 2025-06-27-v30
- * - Added debug logging in setupExpandCollapse and fetchCommonNames for button attributes.
+ * Updated: 2025-06-30-v31
+ * - Fixed setupExpandCollapse to look for buttons in previous row per tab3.html structure.
+ * - Retained debug logging for button attributes and row HTML.
  * - Ensured table ID alignment with tab3.html (common-table-<sanitizedRentalClassId>-<index>).
- * - Preserved all functionality from v29: filters, sync, status/notes, pagination.
- * - Line count: ~580 lines (same as v29, debug logging added).
+ * - Preserved all functionality from v30: filters, sync, status/notes, pagination.
+ * - Line count: ~580 lines (same as v30, button selector fix).
  */
 
 /**
@@ -576,18 +577,24 @@ function setupExpandCollapse() {
         section.classList.add('collapsed');
         section.style.display = 'none';
         section.style.opacity = '0';
-        const row = section.closest('tr');
+        const expandableRow = section.closest('tr');
+        const dataRow = expandableRow.previousElementSibling;
+        if (!dataRow) {
+            console.warn(`Previous data row not found for section ${section.id} at ${new Date().toISOString()}`);
+            console.log(`DEBUG: expandableRow HTML=${expandableRow.outerHTML} at ${new Date().toISOString()}`);
+            return;
+        }
         const rentalClassId = section.id.match(/expand-([^-]+)-/)[1];
         const index = section.id.match(/-(\d+)$/)[1];
-        const collapseBtn = row.querySelector(`#collapse-btn-${rentalClassId}-${index}`);
-        const expandBtn = row.querySelector(`#expand-btn-${rentalClassId}-${index}`);
+        const collapseBtn = dataRow.querySelector(`#collapse-btn-${rentalClassId}-${index}`);
+        const expandBtn = dataRow.querySelector(`#expand-btn-${rentalClassId}-${index}`);
         if (collapseBtn && expandBtn) {
             console.log(`Found buttons for section ${section.id}: expandBtn.id=${expandBtn.id}, collapseBtn.id=${collapseBtn.id} at ${new Date().toISOString()}`);
             collapseBtn.style.display = 'none';
             expandBtn.style.display = 'inline-block';
         } else {
             console.warn(`Expand/collapse buttons not found for section ${section.id} at ${new Date().toISOString()}`);
-            console.log(`DEBUG: row HTML=${row.outerHTML} at ${new Date().toISOString()}`);
+            console.log(`DEBUG: dataRow HTML=${dataRow.outerHTML} at ${new Date().toISOString()}`);
         }
     });
 }
