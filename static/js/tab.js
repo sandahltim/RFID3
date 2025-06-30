@@ -1,16 +1,16 @@
 // app/static/js/tab.js
-// tab.js version: 2025-06-30-v16
-console.log(`tab.js version: 2025-06-30-v16 loaded at ${new Date().toISOString()}`);
+// tab.js version: 2025-06-30-v17
+console.log(`tab.js version: 2025-06-30-v17 loaded at ${new Date().toISOString()}`);
 
 /**
  * Tab.js: Initializes tab-specific logic and handles printing.
  * Dependencies: common.js (for formatDateTime, printTable, renderPaginationControls).
- * Updated: 2025-06-30-v16
- * - Fixed SyntaxError at line 263 (corrected template literal quotes to backticks).
+ * Updated: 2025-06-30-v17
+ * - Fixed SyntaxError at line 263 by adding missing ); to close addEventListener.
+ * - Ensured all console.log statements use backticks for template literals.
  * - Updated click handler to use previous row for Tab 3 expand/collapse buttons.
- * - Added debug logging for button attributes in click handler.
  * - Preserved all functionality: printing, expandable sections.
- * - Line count: ~480 lines (same as v15, syntax and click handler fixes).
+ * - Line count: ~480 lines (same as v16, syntax fix).
  */
 
 /**
@@ -262,7 +262,7 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (error) {
         console.error(`Initialization error: ${error} at ${new Date().toISOString()}`);
     }
-}
+});
 
 /**
  * Print a table (Contract, Common Name, or Item level)
