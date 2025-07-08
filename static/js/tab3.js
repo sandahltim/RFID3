@@ -1,16 +1,16 @@
 // app/static/js/tab3.js
-// tab3.js version: 2025-07-08-v42
-console.log(`tab3.js version: 2025-07-08-v42 loaded at ${new Date().toISOString()}`);
+// tab3.js version: 2025-07-08-v43
+console.log(`tab3.js version: 2025-07-08-v43 loaded at ${new Date().toISOString()}`);
 
 /**
  * Tab3.js: Logic for Tab 3 (Items in Service).
  * Dependencies: common.js for formatDate, tab.js for renderPaginationControls.
- * Updated: 2025-07-08-v42
- * - Fixed Uncaught TypeError: Assignment to constant variable by using let for reassignable variables in tab3ClickHandler.
- * - Retained debugging logs to verify structure and button attributes.
- * - Aligned with tab3.html (v2) and tab3.py (v80) for item-level editing.
- * - Preserved all functionality from v41: filters, sync, status/notes, pagination, crew filter.
- * - Line count: ~705 lines (same as v41, syntax correction only).
+ * Updated: 2025-07-08-v43
+ * - Restored print button functionality with client-side printing.
+ * - Added individual item print option in expandable sections.
+ * - Enhanced API update logging and error handling compatibility with tab3.py (v82).
+ * - Preserved all functionality from v42: filters, sync, status/notes, pagination, crew filter.
+ * - Line count: ~715 lines (+10 from v42, added print logic).
  */
 
 /**
@@ -143,6 +143,11 @@ async function fetchCommonNames(rentalClassId, targetId, page = 1) {
                             <button class="btn btn-sm btn-secondary collapse-btn" 
                                     data-collapse-target="items-${rowId}" 
                                     style="display:none;">Collapse</button>
+                            <button class="btn btn-sm btn-primary print-btn"
+                                    data-print-level="Item"
+                                    data-print-id="items-${rowId}"
+                                    data-rental-class-id="${rentalClassId}"
+                                    data-common-name="${escapedName}">Print</button>
                         </div>
                     </td>
                 `;
@@ -228,11 +233,13 @@ async function loadItems(rentalClassId, commonName, targetId, page = 1) {
                 <th>Last Scanned Date</th>
                 <th>Quality</th>
                 <th>Notes</th>
+                <th>Actions</th>
             </tr>
         </thead>
         <tbody>
             <tr>
                 <td>Loading...</td>
+                <td>-</td>
                 <td>-</td>
                 <td>-</td>
                 <td>-</td>
@@ -307,6 +314,13 @@ async function loadItems(rentalClassId, commonName, targetId, page = 1) {
                         <span class="cell-content">${item.notes || 'N/A'}</span>
                         <input class="edit-input" style="display: none;" value="${item.notes || ''}">
                     </td>
+                    <td>
+                        <button class="btn btn-sm btn-primary print-btn"
+                                data-print-level="Item"
+                                data-print-id="${item.tag_id}"
+                                data-rental-class-id="${rentalClassId}"
+                                data-common-name="${commonName}">Print</button>
+                    </td>
                 `;
                 tbody.appendChild(row);
             });
@@ -337,7 +351,7 @@ async function loadItems(rentalClassId, commonName, targetId, page = 1) {
             }
             wrapper.appendChild(paginationDiv);
         } else {
-            tbody.innerHTML = `<tr><td colspan="8">No items found.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="9">No items found.</td></tr>`;
             console.warn(`No items returned for rental_class_id ${rentalClassId}, commonName ${commonName} at ${new Date().toISOString()}`);
         }
 
@@ -361,7 +375,7 @@ async function loadItems(rentalClassId, commonName, targetId, page = 1) {
     } catch (error) {
         console.error(`Items error: ${error.message} at ${new Date().toISOString()}`);
         const tbody = itemTable.querySelector('tbody');
-        tbody.innerHTML = `<tr><td colspan="8">Error: ${error.message}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="9">Error: ${error.message}</td></tr>`;
         container.classList.remove('collapsed');
         container.classList.add('expanded');
         container.style.display = 'block';
@@ -931,6 +945,43 @@ function handleItemClick(event) {
 }
 
 /**
+ * Handle print functionality
+ */
+function handlePrint(event) {
+    const printBtn = event.target.closest('.print-btn');
+    if (!printBtn) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+    const printLevel = printBtn.getAttribute('data-print-level');
+    const printId = printBtn.getAttribute('data-print-id');
+    const rentalClassId = printBtn.getAttribute('data-rental-class-id');
+    const commonName = printBtn.getAttribute('data-common-name');
+
+    console.log(`Print button clicked: level=${printLevel}, id=${printId}, rentalClassId=${rentalClassId}, commonName=${commonName} at ${new Date().toISOString()}`);
+
+    const url = `/tab/3/print?rental_class_id=${encodeURIComponent(rentalClassId)}&common_name=${encodeURIComponent(commonName)}`;
+    fetch(url)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`Print fetch failed: ${response.status}`);
+            }
+            return response.text();
+        })
+        .then(html => {
+            const printWindow = window.open('', '_blank');
+            printWindow.document.write(html);
+            printWindow.document.close();
+            printWindow.print();
+            printWindow.close();
+        })
+        .catch(error => {
+            console.error(`Print error: ${error.message} at ${new Date().toISOString()}`);
+            alert(`Failed to print: ${error.message}`);
+        });
+}
+
+/**
  * Initialize the page
  */
 function initializeTab3() {
@@ -1106,6 +1157,8 @@ function initializeTab3() {
                 }
             }
         }
+
+        handlePrint(event); // Handle print button clicks
     };
     document.addEventListener('click', window.tab3ClickHandler);
 

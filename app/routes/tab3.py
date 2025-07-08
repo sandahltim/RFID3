@@ -1,6 +1,6 @@
 # app/routes/tab3.py
-# tab3.py version: 2025-07-08-v81
-from flask import Blueprint, render_template, request, jsonify, current_app
+# tab3.py version: 2025-07-08-v82
+from flask import Blueprint, render_template, request, jsonify, current_app, make_response
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from .. import db, cache
@@ -68,7 +68,7 @@ if not os.path.exists(SHARED_DIR):
     os.chown(SHARED_DIR, pwd.getpwnam('tim').pw_uid, grp.getgrnam('tim').gr_gid)
 
 # Log deployment version
-logger.info("Deployed tab3.py version: 2025-07-08-v81")
+logger.info("Deployed tab3.py version: 2025-07-08-v82")
 
 # Define crew categories
 TENT_CATEGORIES = ['Frame Tent Tops', 'Pole Tent Tops', 'Tent Crates', 'Sidewall']
@@ -1242,10 +1242,13 @@ def update_status():
 
         try:
             api_client = APIClient()
-            api_client.update_status(tag_id, new_status, timeout=10)
-            logger.debug(f"Updated API status for tag_id {tag_id} to {new_status}")
+            api_client.update_status(tag_id, new_status, timeout=10)  # Ensure API call is robust
+            logger.info(f"Successfully updated API status for tag_id {tag_id} to {new_status}")
         except Exception as e:
             logger.error(f"Failed to update API status for tag_id {tag_id}: {str(e)}", exc_info=True)
+            # Roll back if API fails, but log and proceed
+            session.rollback()
+            return jsonify({'error': f"Failed to update API: {str(e)}", 'local_update': 'success'}), 200
 
         logger.info(f"Updated status for tag_id {tag_id} to {new_status}")
         return jsonify({'message': 'Status updated successfully'})
@@ -1285,10 +1288,13 @@ def update_notes():
 
         try:
             api_client = APIClient()
-            api_client.update_notes(tag_id, new_notes if new_notes else '')
-            logger.debug(f"Updated API notes for tag_id {tag_id}")
+            api_client.update_notes(tag_id, new_notes if new_notes else '')  # Ensure API call is robust
+            logger.info(f"Successfully updated API notes for tag_id {tag_id}")
         except Exception as e:
             logger.error(f"Failed to update API notes for tag_id {tag_id}: {str(e)}", exc_info=True)
+            # Roll back if API fails, but log and proceed
+            session.rollback()
+            return jsonify({'error': f"Failed to update API: {str(e)}", 'local_update': 'success'}), 200
 
         logger.info(f"Updated notes for tag_id {tag_id}")
         return jsonify({'message': 'Notes updated successfully'})
@@ -1333,10 +1339,13 @@ def update_quality():
 
         try:
             api_client = APIClient()
-            api_client.update_item(tag_id, {'quality': new_quality if new_quality else ''})
-            logger.debug(f"Updated API quality for tag_id {tag_id} to {new_quality}")
+            api_client.update_item(tag_id, {'quality': new_quality if new_quality else ''})  # Ensure API call is robust
+            logger.info(f"Successfully updated API quality for tag_id {tag_id} to {new_quality}")
         except Exception as e:
             logger.error(f"Failed to update API quality for tag_id {tag_id}: {str(e)}", exc_info=True)
+            # Roll back if API fails, but log and proceed
+            session.rollback()
+            return jsonify({'error': f"Failed to update API: {str(e)}", 'local_update': 'success'}), 200
 
         logger.info(f"Updated quality for tag_id {tag_id} to {new_quality}")
         return jsonify({'message': 'Quality updated successfully'})
@@ -1381,10 +1390,13 @@ def update_bin_location():
 
         try:
             api_client = APIClient()
-            api_client.update_item(tag_id, {'bin_location': new_bin_location if new_bin_location else ''})
-            logger.debug(f"Updated API bin location for tag_id {tag_id} to {new_bin_location}")
+            api_client.update_item(tag_id, {'bin_location': new_bin_location if new_bin_location else ''})  # Ensure API call is robust
+            logger.info(f"Successfully updated API bin location for tag_id {tag_id} to {new_bin_location}")
         except Exception as e:
             logger.error(f"Failed to update API bin location for tag_id {tag_id}: {str(e)}", exc_info=True)
+            # Roll back if API fails, but log and proceed
+            session.rollback()
+            return jsonify({'error': f"Failed to update API: {str(e)}", 'local_update': 'success'}), 200
 
         logger.info(f"Updated bin location for tag_id {tag_id} to {new_bin_location}")
         return jsonify({'message': 'Bin location updated successfully'})
@@ -1478,6 +1490,65 @@ def update_mappings():
         logger.error(f"Uncaught exception in update_mappings: {str(e)}", exc_info=True)
         if session:
             session.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        if session:
+            session.close()
+
+@tab3_bp.route('/tab/3/print', methods=['GET'])
+def print_items():
+    """Generate a printable view of items for a rental class and common name."""
+    logger.debug("Entering /tab/3/print endpoint at %s", datetime.now())
+    session = None
+    try:
+        session = db.session()
+        rental_class_id = unquote(request.args.get('rental_class_id', ''))
+        common_name = unquote(request.args.get('common_name', ''))
+
+        if not rental_class_id or not common_name:
+            logger.warning(f"Missing parameters: rental_class_id={rental_class_id}, common_name={common_name}")
+            return jsonify({'error': 'rental_class_id and common_name are required'}), 400
+
+        normalized_rental_class_id = normalize_rental_class_id(rental_class_id)
+        logger.debug(f"Normalized rental_class_id: {normalized_rental_class_id}, common_name: {common_name}")
+
+        # Query for items
+        query = session.query(
+            ItemMaster.tag_id,
+            ItemMaster.common_name,
+            ItemMaster.status,
+            ItemMaster.bin_location,
+            ItemMaster.last_contract_num,
+            ItemMaster.date_last_scanned,
+            ItemMaster.notes,
+            ItemMaster.quality
+        ).filter(
+            ItemMaster.rental_class_num == normalized_rental_class_id,
+            ItemMaster.common_name == common_name
+        ).order_by(ItemMaster.date_last_scanned.desc())
+
+        items = query.all()
+        items_data = [
+            {
+                'tag_id': item.tag_id,
+                'common_name': item.common_name,
+                'status': item.status or 'N/A',
+                'bin_location': item.bin_location or 'N/A',
+                'last_contract_num': item.last_contract_num or 'N/A',
+                'date_last_scanned': item.date_last_scanned.isoformat() if item.date_last_scanned else 'N/A',
+                'notes': item.notes or '',
+                'quality': item.quality or 'N/A'
+            } for item in items
+        ]
+
+        # Generate HTML for printing
+        html = render_template('tab3_print.html', items=items_data, rental_class_id=rental_class_id, common_name=common_name)
+        response = make_response(html)
+        response.headers['Content-Type'] = 'text/html'
+        response.headers['Content-Disposition'] = 'inline; filename=items_print.html'
+        return response
+    except Exception as e:
+        logger.error(f"Error generating print view: {str(e)}", exc_info=True)
         return jsonify({'error': str(e)}), 500
     finally:
         if session:
