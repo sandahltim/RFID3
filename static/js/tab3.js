@@ -1,16 +1,16 @@
 // app/static/js/tab3.js
-// tab3.js version: 2025-07-08-v39
-console.log(`tab3.js version: 2025-07-08-v39 loaded at ${new Date().toISOString()}`);
+// tab3.js version: 2025-07-08-v40
+console.log(`tab3.js version: 2025-07-08-v40 loaded at ${new Date().toISOString()}`);
 
 /**
  * Tab3.js: Logic for Tab 3 (Items in Service).
  * Dependencies: common.js for formatDate, tab.js for renderPaginationControls.
- * Updated: 2025-07-08-v39
- * - Fixed item-level expansion by appending rows dynamically in fetchCommonNames, avoiding full table overwrite.
- * - Ensured Actions column with Expand/Collapse buttons is rendered for each common name.
+ * Updated: 2025-07-08-v40
+ * - Fixed item-level expansion by overriding tab.js tabClickHandler with custom logic in initializeTab3.
+ * - Ensured fetchCommonNames output is not overwritten by updateExpandableTable.
  * - Aligned with tab3.html (v2) and tab3.py (v80) for item-level editing.
- * - Preserved all functionality from v38: filters, sync, status/notes, pagination, crew filter.
- * - Line count: ~685 lines (+5 from v38, refined append logic).
+ * - Preserved all functionality from v39: filters, sync, status/notes, pagination, crew filter.
+ * - Line count: ~695 lines (+10 from v39, added custom event handling).
  */
 
 /**
@@ -976,10 +976,92 @@ function initializeTab3() {
         });
     }
 
-    // Remove existing click listeners to prevent duplicates
-    document.removeEventListener('click', window.tab3ItemClickHandler);
-    window.tab3ItemClickHandler = handleItemClick;
-    document.addEventListener('click', window.tab3ItemClickHandler);
+    // Custom click handler for Tab 3 to override tab.js behavior
+    document.removeEventListener('click', window.tab3ClickHandler);
+    window.tab3ClickHandler = (event) => {
+        console.log(`tab3ClickHandler: Click event triggered at ${new Date().toISOString()}`);
+        const expandBtn = event.target.closest('.expand-btn');
+        if (expandBtn) {
+            event.preventDefault();
+            event.stopPropagation();
+            const rentalClassId = expandBtn.getAttribute('data-identifier') || expandBtn.getAttribute('data-rental-class-id');
+            const targetId = expandBtn.getAttribute('data-target-id');
+            console.log(`Expand button clicked: rentalClassId=${rentalClassId}, targetId=${targetId} at ${new Date().toISOString()}`);
+
+            if (!rentalClassId || !targetId) {
+                console.warn(`Missing data-identifier or data-target-id for expand button at ${new Date().toISOString()}`);
+                return;
+            }
+
+            const row = expandBtn.closest('tr');
+            const nextRow = row.nextElementSibling;
+            const expandable = nextRow ? nextRow.querySelector('.expandable') : null;
+            if (!expandable) {
+                console.warn(`Expandable section not found for targetId=${targetId} at ${new Date().toISOString()}`);
+                return;
+            }
+
+            if (expandable.classList.contains('collapsed')) {
+                expandable.classList.remove('collapsed');
+                expandable.classList.add('expanded');
+                expandable.style.display = 'block';
+                expandable.style.opacity = '1';
+                const collapseBtn = row.querySelector(`.collapse-btn[data-target-id="${targetId}"]`);
+                if (expandBtn && collapseBtn) {
+                    console.log(`Found buttons for expand: collapseBtn=${collapseBtn.className}, expandBtn=${expandBtn.className} at ${new Date().toISOString()}`);
+                    collapseBtn.style.display = 'inline-block';
+                    expandBtn.style.display = 'none';
+                } else {
+                    console.warn(`Collapse/expand buttons not found for targetId=${targetId} at ${new Date().toISOString()}`);
+                }
+
+                const tableId = expandable.querySelector('.common-table')?.id;
+                if (tableId) {
+                    fetchCommonNames(rentalClassId, targetId, 1).then(() => {
+                        console.log(`fetchCommonNames completed for ${rentalClassId}, targetId=${targetId} at ${new Date().toISOString()}`);
+                    });
+                } else {
+                    console.warn(`Table ID not found in expandable section ${targetId} at ${new Date().toISOString()}`);
+                }
+            }
+        }
+
+        const collapseBtn = event.target.closest('.collapse-btn');
+        if (collapseBtn) {
+            event.preventDefault();
+            event.stopPropagation();
+            const targetId = collapseBtn.getAttribute('data-target-id') || collapseBtn.getAttribute('data-collapse-target');
+            console.log(`Collapse button clicked: targetId=${targetId} at ${new Date().toISOString()}`);
+
+            if (!targetId) {
+                console.warn(`Missing data-target-id or data-collapse-target for collapse button at ${new Date().toISOString()}`);
+                return;
+            }
+
+            const section = document.getElementById(targetId);
+            if (section) {
+                section.classList.remove('expanded');
+                section.classList.add('collapsed');
+                section.style.display = 'none';
+                section.style.opacity = '0';
+                const row = collapseBtn.closest('tr');
+                const expandBtn = row.querySelector(`.expand-btn[data-target-id="${targetId}"]`);
+                if (expandBtn && collapseBtn) {
+                    console.log(`Found buttons for collapse: expandBtn=${expandBtn.className}, collapseBtn=${collapseBtn.className} at ${new Date().toISOString()}`);
+                    expandBtn.style.display = 'inline-block';
+                    collapseBtn.style.display = 'none';
+                } else {
+                    console.warn(`Expand button not found for targetId=${targetId} at ${new Date().toISOString()}`);
+                }
+            }
+        }
+    };
+    document.addEventListener('click', window.tab3ClickHandler);
+
+    // Remove existing click listeners from tab.js to prevent conflicts
+    if (window.tabClickHandler) {
+        document.removeEventListener('click', window.tabClickHandler);
+    }
 }
 
 // Remove existing DOMContentLoaded listeners to prevent duplicates
