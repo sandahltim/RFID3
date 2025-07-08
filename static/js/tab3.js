@@ -1,16 +1,16 @@
 // app/static/js/tab3.js
-// tab3.js version: 2025-07-08-v37
-console.log(`tab3.js version: 2025-07-08-v37 loaded at ${new Date().toISOString()}`);
+// tab3.js version: 2025-07-08-v38
+console.log(`tab3.js version: 2025-07-08-v38 loaded at ${new Date().toISOString()}`);
 
 /**
  * Tab3.js: Logic for Tab 3 (Items in Service).
- * Dependencies: common.js for formatDate, tab.js for renderPaginationControls, fetchExpandableData.
- * Updated: 2025-07-08-v37
- * - Fixed item-level expansion by adding Expand/Collapse buttons in fetchCommonNames.
- * - Ensured handleItemClick correctly identifies rental_class_id and common_name from buttons.
- * - Aligned with tab3.html (v2) structure, matching Tab 1’s item-level design.
- * - Preserved all functionality from v36: filters, sync, status/notes, pagination, crew filter.
- * - Line count: ~670 lines (+20 from v36, added item-level button logic).
+ * Dependencies: common.js for formatDate, tab.js for renderPaginationControls.
+ * Updated: 2025-07-08-v38
+ * - Fixed item-level expansion by moving full table rendering to fetchCommonNames, bypassing tab.js updateExpandableTable.
+ * - Ensured handleItemClick works with the new structure, extracting rental_class_id and common_name correctly.
+ * - Aligned with tab3.html (v2) and tab3.py (v80) for item-level editing.
+ * - Preserved all functionality from v37: filters, sync, status/notes, pagination, crew filter.
+ * - Line count: ~680 lines (+10 from v37, refined rendering logic).
  */
 
 /**
@@ -149,7 +149,17 @@ async function fetchCommonNames(rentalClassId, targetId, page = 1) {
             });
         }
 
-        table.querySelector('tbody').innerHTML = html;
+        table.innerHTML = `
+            <thead class="thead-dark">
+                <tr>
+                    <th>Common Name</th>
+                    <th>Items in Service</th>
+                    <th>Total Items in Inventory</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>${html}</tbody>
+        `;
 
         const paginationContainer = document.getElementById(`pagination-${expectedTableId}`);
         if (paginationContainer && typeof renderPaginationControls === 'function') {
