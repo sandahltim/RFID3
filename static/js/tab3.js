@@ -1,16 +1,16 @@
 // app/static/js/tab3.js
-// tab3.js version: 2025-07-08-v33
-console.log(`tab3.js version: 2025-07-08-v33 loaded at ${new Date().toISOString()}`);
+// tab3.js version: 2025-07-08-v34
+console.log(`tab3.js version: 2025-07-08-v34 loaded at ${new Date().toISOString()}`);
 
 /**
  * Tab3.js: Logic for Tab 3 (Items in Service).
  * Dependencies: common.js for formatDate, tab.js for renderPaginationControls, fetchExpandableData.
- * Updated: 2025-07-08-v33
- * - Fixed setupExpandCollapse to use robust class-based selectors (.expand-btn, .collapse-btn) with data attributes.
- * - Added debug logging for button attributes and DOM structure.
- * - Ensured exclusive initialization for Tab 3 (removed from tab.js v19).
- * - Preserved all functionality from v32: filters, sync, status/notes, pagination.
- * - Line count: ~580 lines (same as v32, selector and debug enhancements).
+ * Updated: 2025-07-08-v34
+ * - Enhanced setupExpandCollapse with robust class-based selectors and detailed debug logging.
+ * - Ensured exclusive initialization for Tab 3 (removed from tab.js v20).
+ * - Fixed potential DOM timing issues by adding retry logic for button lookup.
+ * - Preserved all functionality from v33: filters, sync, status/notes, pagination.
+ * - Line count: ~580 lines (same as v33, debug enhancements).
  */
 
 /**
@@ -569,34 +569,52 @@ function updateNotes(tagId) {
  * Handle expand/collapse functionality for summary table
  * Used by: Summary table
  */
-function setupExpandCollapse() {
+function setupExpandCollapse(maxRetries = 3, delay = 100) {
     console.log(`setupExpandCollapse: Initializing at ${new Date().toISOString()}`);
-    document.querySelectorAll('.expandable').forEach(section => {
-        section.classList.remove('expanded');
-        section.classList.add('collapsed');
-        section.style.display = 'none';
-        section.style.opacity = '0';
-        const expandableRow = section.closest('tr');
-        const dataRow = expandableRow.previousElementSibling;
-        if (!dataRow) {
-            console.warn(`Previous data row not found for section ${section.id} at ${new Date().toISOString()}`);
-            console.log(`DEBUG: expandableRow HTML=${expandableRow.outerHTML} at ${new Date().toISOString()}`);
-            return;
+
+    function trySetupExpandCollapse(attempt = 1) {
+        console.log(`setupExpandCollapse: Attempt ${attempt} at ${new Date().toISOString()}`);
+        let buttonsFound = 0;
+        let buttonsNotFound = 0;
+
+        document.querySelectorAll('.expandable').forEach(section => {
+            section.classList.remove('expanded');
+            section.classList.add('collapsed');
+            section.style.display = 'none';
+            section.style.opacity = '0';
+            const expandableRow = section.closest('tr');
+            const dataRow = expandableRow.previousElementSibling;
+            if (!dataRow) {
+                console.warn(`Previous data row not found for section ${section.id} at ${new Date().toISOString()}`);
+                console.log(`DEBUG: expandableRow HTML=${expandableRow.outerHTML} at ${new Date().toISOString()}`);
+                buttonsNotFound++;
+                return;
+            }
+            const rentalClassId = section.id.match(/expand-([^-]+)-/)[1];
+            const index = section.id.match(/-(\d+)$/)[1];
+            const collapseBtn = dataRow.querySelector(`.collapse-btn[data-target-id="expand-${rentalClassId}-${index}"]`);
+            const expandBtn = dataRow.querySelector(`.expand-btn[data-target-id="expand-${rentalClassId}-${index}"]`);
+            if (collapseBtn && expandBtn) {
+                console.log(`Found buttons for section ${section.id}: expandBtn.className=${expandBtn.className}, expandBtn.data-identifier=${expandBtn.getAttribute('data-identifier')}, collapseBtn.className=${collapseBtn.className}, collapseBtn.data-target-id=${collapseBtn.getAttribute('data-target-id')} at ${new Date().toISOString()}`);
+                collapseBtn.style.display = 'none';
+                expandBtn.style.display = 'inline-block';
+                buttonsFound++;
+            } else {
+                console.warn(`Expand/collapse buttons not found for section ${section.id} at ${new Date().toISOString()}`);
+                console.log(`DEBUG: dataRow HTML=${dataRow.outerHTML} at ${new Date().toISOString()}`);
+                console.log(`DEBUG: Attempted selectors - expand: .expand-btn[data-target-id="expand-${rentalClassId}-${index}"], collapse: .collapse-btn[data-target-id="expand-${rentalClassId}-${index}"] at ${new Date().toISOString()}`);
+                buttonsNotFound++;
+            }
+        });
+
+        console.log(`setupExpandCollapse: Attempt ${attempt} completed - ${buttonsFound} sections with buttons, ${buttonsNotFound} sections without buttons at ${new Date().toISOString()}`);
+        if (buttonsNotFound > 0 && attempt < maxRetries) {
+            console.log(`Retrying setupExpandCollapse in ${delay}ms (attempt ${attempt + 1}) at ${new Date().toISOString()}`);
+            setTimeout(() => trySetupExpandCollapse(attempt + 1), delay);
         }
-        const rentalClassId = section.id.match(/expand-([^-]+)-/)[1];
-        const index = section.id.match(/-(\d+)$/)[1];
-        const collapseBtn = dataRow.querySelector(`.collapse-btn[data-target-id="expand-${rentalClassId}-${index}"]`);
-        const expandBtn = dataRow.querySelector(`.expand-btn[data-target-id="expand-${rentalClassId}-${index}"]`);
-        if (collapseBtn && expandBtn) {
-            console.log(`Found buttons for section ${section.id}: expandBtn.className=${expandBtn.className}, expandBtn.data-identifier=${expandBtn.getAttribute('data-identifier')}, collapseBtn.className=${collapseBtn.className}, collapseBtn.data-target-id=${collapseBtn.getAttribute('data-target-id')} at ${new Date().toISOString()}`);
-            collapseBtn.style.display = 'none';
-            expandBtn.style.display = 'inline-block';
-        } else {
-            console.warn(`Expand/collapse buttons not found for section ${section.id} at ${new Date().toISOString()}`);
-            console.log(`DEBUG: dataRow HTML=${dataRow.outerHTML} at ${new Date().toISOString()}`);
-            console.log(`DEBUG: Attempted selectors - expand: .expand-btn[data-target-id="expand-${rentalClassId}-${index}"], collapse: .collapse-btn[data-target-id="expand-${rentalClassId}-${index}"] at ${new Date().toISOString()}`);
-        }
-    });
+    }
+
+    trySetupExpandCollapse();
 }
 
 /**
