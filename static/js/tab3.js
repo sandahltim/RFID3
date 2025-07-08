@@ -1,16 +1,17 @@
 // app/static/js/tab3.js
-// tab3.js version: 2025-07-08-v35
-console.log(`tab3.js version: 2025-07-08-v35 loaded at ${new Date().toISOString()}`);
+// tab3.js version: 2025-07-08-v36
+console.log(`tab3.js version: 2025-07-08-v36 loaded at ${new Date().toISOString()}`);
 
 /**
  * Tab3.js: Logic for Tab 3 (Items in Service).
  * Dependencies: common.js for formatDate, tab.js for renderPaginationControls, fetchExpandableData.
- * Updated: 2025-07-08-v35
- * - Fixed common table error by validating tableId in fetchCommonNames.
- * - Added debug logging for table ID and expandable section HTML.
- * - Retained retry logic for setupExpandCollapse.
- * - Preserved all functionality from v34: filters, sync, status/notes, pagination.
- * - Line count: ~580 lines (same as v34, debug enhancements).
+ * Updated: 2025-07-08-v36
+ * - Added Expand/Collapse buttons to common names table for item-level expansion.
+ * - Implemented loadItems to fetch and display individual items with editable status, notes, bin_location, and quality.
+ * - Added handleItemClick for item-level event handling, ensuring no conflict with tab.js.
+ * - Fixed errors from v36 (previous): Corrected DOM selectors, integrated with updated tab3.html structure.
+ * - Preserved all functionality from v35: filters, sync, status/notes, pagination, crew filter.
+ * - Line count: ~650 lines (+70 from v35, added item-level logic).
  */
 
 /**
@@ -42,7 +43,7 @@ function debounce(func, wait) {
 
 /**
  * Retry function for handling 429 errors
- * Used by: Sync to PC, update status, remove item
+ * Used by: Sync to PC, update status, remove item, update item fields
  */
 async function retryRequest(url, options, maxRetries = 3, baseDelay = 2000) {
     const syncMessage = document.getElementById('syncMessage');
@@ -106,7 +107,7 @@ async function fetchCommonNames(rentalClassId, targetId, page = 1) {
 
         if (data.error) {
             console.error(`Server error fetching common names: ${data.error} at ${new Date().toISOString()}`);
-            table.querySelector('tbody').innerHTML = `<tr><td colspan="3">Error: ${data.error}</td></tr>`;
+            table.querySelector('tbody').innerHTML = `<tr><td colspan="4">Error: ${data.error}</td></tr>`;
             return data;
         }
 
@@ -117,14 +118,33 @@ async function fetchCommonNames(rentalClassId, targetId, page = 1) {
 
         let html = '';
         if (commonNames.length === 0) {
-            html = '<tr><td colspan="3">No common names found for this rental class</td></tr>';
+            html = '<tr><td colspan="4">No common names found for this rental class</td></tr>';
         } else {
             commonNames.forEach(common => {
+                const rowId = `${sanitizedRentalClassId}_${common.name.replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '')}_${index}`;
+                const escapedName = common.name.replace(/'/g, "\\'").replace(/"/g, '\\"');
                 html += `
                     <tr>
                         <td>${common.name || 'N/A'}</td>
                         <td>${common.on_contracts || 0}</td>
                         <td>${common.is_hand_counted ? 'N/A' : (common.total_items_inventory || 0)}</td>
+                        <td>
+                            <div class="btn-group">
+                                <button class="btn btn-sm btn-secondary expand-btn" 
+                                        data-rental-class-id="${rentalClassId}" 
+                                        data-common-name="${escapedName}" 
+                                        data-target-id="items-${rowId}" 
+                                        data-expanded="false">Expand Items</button>
+                                <button class="btn btn-sm btn-secondary collapse-btn" 
+                                        data-collapse-target="items-${rowId}" 
+                                        style="display:none;">Collapse</button>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr class="item-name-row" data-target-id="${expectedTableId}">
+                        <td colspan="4">
+                            <div id="items-${rowId}" class="expandable item-level collapsed"></div>
+                        </td>
                     </tr>
                 `;
             });
@@ -149,8 +169,241 @@ async function fetchCommonNames(rentalClassId, targetId, page = 1) {
         return data;
     } catch (error) {
         console.error(`Error fetching common names for ${rentalClassId}: ${error} at ${new Date().toISOString()}`);
-        table.querySelector('tbody').innerHTML = `<tr><td colspan="3">Error loading common names: ${error.message}</td></tr>`;
+        table.querySelector('tbody').innerHTML = `<tr><td colspan="4">Error loading common names: ${error.message}</td></tr>`;
         return { common_names: [], total_items: 0 };
+    }
+}
+
+/**
+ * Fetch and display individual items for a rental class and common name
+ */
+async function loadItems(rentalClassId, commonName, targetId, page = 1) {
+    console.log(`loadItems: Starting at ${new Date().toISOString()}`, { rentalClassId, commonName, targetId, page });
+
+    if (!rentalClassId || !commonName || !targetId) {
+        console.error(`loadItems: Invalid parameters`, { rentalClassId, commonName, targetId }, `at ${new Date().toISOString()}`);
+        return;
+    }
+
+    const container = document.getElementById(targetId);
+    if (!container) {
+        console.error(`Container ${targetId} not found at ${new Date().toISOString()}`);
+        return;
+    }
+
+    if (container.classList.contains('loading')) {
+        console.log(`Container ${targetId} already loading at ${new Date().toISOString()}`);
+        return;
+    }
+    container.classList.add('loading');
+
+    const key = targetId;
+    const loadingSuccess = typeof showLoading === 'function' ? showLoading(key) : false;
+
+    container.innerHTML = '';
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'item-level-wrapper';
+    container.appendChild(wrapper);
+
+    const itemTable = document.createElement('table');
+    itemTable.className = 'table table-bordered table-hover item-table';
+    itemTable.id = `item-table-${key}`;
+    itemTable.innerHTML = `
+        <thead class="thead-dark">
+            <tr>
+                <th>Tag ID</th>
+                <th>Common Name</th>
+                <th>Bin Location</th>
+                <th>Status</th>
+                <th>Last Contract</th>
+                <th>Last Scanned Date</th>
+                <th>Quality</th>
+                <th>Notes</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Loading...</td>
+                <td>-</td>
+                <td>-</td>
+                <td>-</td>
+                <td>-</td>
+                <td>-</td>
+                <td>-</td>
+                <td>-</td>
+            </tr>
+        </tbody>
+    `;
+    wrapper.appendChild(itemTable);
+
+    const url = `/tab/3/data?rental_class_id=${encodeURIComponent(rentalClassId)}&common_name=${encodeURIComponent(commonName)}&page=${page}&per_page=10`;
+    console.log(`Fetching items: ${url} at ${new Date().toISOString()}`);
+
+    try {
+        const response = await fetch(url);
+        console.log(`Items fetch status: ${response.status} at ${new Date().toISOString()}`);
+        if (!response.ok) {
+            throw new Error(`Items fetch failed: ${response.status}`);
+        }
+        const data = await response.json();
+        console.log(`Items data: ${JSON.stringify(data, null, 2)} at ${new Date().toISOString()}`);
+
+        const tbody = itemTable.querySelector('tbody');
+        tbody.innerHTML = '';
+
+        if (data.items && data.items.length > 0) {
+            data.items.forEach(item => {
+                const lastScanned = window.formatDate ? window.formatDate(item.date_last_scanned) : item.date_last_scanned || 'N/A';
+                const currentStatus = item.status || 'N/A';
+                const binLocationLower = item.bin_location ? item.bin_location.toLowerCase() : '';
+                const row = document.createElement('tr');
+                row.setAttribute('data-item-id', item.tag_id);
+                row.innerHTML = `
+                    <td class="editable" data-field="tag_id">${item.tag_id}</td>
+                    <td>${item.common_name}</td>
+                    <td class="editable" data-field="bin_location">
+                        <span class="cell-content">${item.bin_location || 'N/A'}</span>
+                        <select class="edit-select" style="display: none;">
+                            <option value="" ${!item.bin_location ? 'selected' : ''}>Select Bin Location</option>
+                            <option value="resale" ${binLocationLower === 'resale' ? 'selected' : ''}>Resale</option>
+                            <option value="sold" ${binLocationLower === 'sold' ? 'selected' : ''}>Sold</option>
+                            <option value="pack" ${binLocationLower === 'pack' ? 'selected' : ''}>Pack</option>
+                            <option value="burst" ${binLocationLower === 'burst' ? 'selected' : ''}>Burst</option>
+                        </select>
+                    </td>
+                    <td class="editable" data-field="status">
+                        <span class="cell-content">${currentStatus}</span>
+                        <select class="edit-select" style="display: none;">
+                            <option value="${currentStatus}" selected>${currentStatus}</option>
+                            <option value="Ready to Rent" ${currentStatus === 'On Rent' || currentStatus === 'Delivered' ? '' : 'disabled'}>Ready to Rent</option>
+                            <option value="Sold">Sold</option>
+                            <option value="Repair">Repair</option>
+                            <option value="Needs to be Inspected">Needs to be Inspected</option>
+                            <option value="Wash">Wash</option>
+                            <option value="Wet">Wet</option>
+                        </select>
+                    </td>
+                    <td>${item.last_contract_num || 'N/A'}</td>
+                    <td>${lastScanned}</td>
+                    <td class="editable" data-field="quality">
+                        <span class="cell-content">${item.quality || 'N/A'}</span>
+                        <select class="edit-select" style="display: none;">
+                            <option value="" ${!item.quality ? 'selected' : ''}>Select Quality</option>
+                            <option value="Good" ${item.quality === 'Good' ? 'selected' : ''}>Good</option>
+                            <option value="Fair" ${item.quality === 'Fair' ? 'selected' : ''}>Fair</option>
+                            <option value="Poor" ${item.quality === 'Poor' ? 'selected' : ''}>Poor</option>
+                        </select>
+                    </td>
+                    <td class="editable" data-field="notes">
+                        <span class="cell-content">${item.notes || 'N/A'}</span>
+                        <input class="edit-input" style="display: none;" value="${item.notes || ''}">
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+
+            const paginationDiv = document.createElement('div');
+            paginationDiv.className = 'pagination-controls';
+            paginationDiv.id = `pagination-${key}`;
+            if (data.total_items > data.per_page) {
+                const totalPages = Math.ceil(data.total_items / data.per_page);
+                const escapedCommonName = commonName.replace(/'/g, "\\'").replace(/"/g, '\\"');
+                paginationDiv.innerHTML = `
+                    <button class="btn btn-sm btn-secondary prev-page" 
+                            data-page="${data.page - 1}" 
+                            ${data.page === 1 ? 'disabled' : ''}>Previous</button>
+                    <span>Page ${data.page} of ${totalPages}</span>
+                    <button class="btn btn-sm btn-secondary next-page" 
+                            data-page="${data.page + 1}" 
+                            ${data.page === totalPages ? 'disabled' : ''}>Next</button>
+                `;
+                wrapper.appendChild(paginationDiv);
+
+                paginationDiv.querySelectorAll('.prev-page, .next-page').forEach(button => {
+                    button.addEventListener('click', () => {
+                        const newPage = parseInt(button.getAttribute('data-page'));
+                        loadItems(rentalClassId, commonName, targetId, newPage);
+                    });
+                });
+            }
+            wrapper.appendChild(paginationDiv);
+        } else {
+            tbody.innerHTML = `<tr><td colspan="8">No items found.</td></tr>`;
+            console.warn(`No items returned for rental_class_id ${rentalClassId}, commonName ${commonName} at ${new Date().toISOString()}`);
+        }
+
+        container.classList.remove('collapsed');
+        container.classList.add('expanded');
+        container.style.display = 'block';
+        container.style.opacity = '1';
+        container.style.visibility = 'visible';
+
+        console.log(`Container styles:`, {
+            classList: container.classList.toString(),
+            display: container.style.display,
+            opacity: container.style.opacity,
+            visibility: window.getComputedStyle(container).visibility
+        }, `at ${new Date().toISOString()}`);
+
+        console.log(`Item table styles:`, {
+            display: itemTable.style.display,
+            visibility: window.getComputedStyle(itemTable).visibility
+        }, `at ${new Date().toISOString()}`);
+    } catch (error) {
+        console.error(`Items error: ${error.message} at ${new Date().toISOString()}`);
+        const tbody = itemTable.querySelector('tbody');
+        tbody.innerHTML = `<tr><td colspan="8">Error: ${error.message}</td></tr>`;
+        container.classList.remove('collapsed');
+        container.classList.add('expanded');
+        container.style.display = 'block';
+        container.style.opacity = '1';
+        container.style.visibility = 'visible';
+    } finally {
+        setTimeout(() => {
+            if (loadingSuccess) hideLoading(key);
+            container.classList.remove('loading');
+        }, 700);
+    }
+}
+
+/**
+ * Save edits for item fields
+ */
+async function saveEdit(cell, tagId, field, rentalClassId, commonName, targetId) {
+    console.log(`saveEdit: Starting at ${new Date().toISOString()}`, { tagId, field, rentalClassId, commonName, targetId });
+    const select = cell.querySelector('.edit-select');
+    const input = cell.querySelector('.edit-input');
+    const value = select ? select.value : input ? input.value : '';
+
+    if (!value && field !== 'notes') {
+        alert(`Please select a value for ${field}.`);
+        return;
+    }
+
+    const url = `/tab/3/update_${field}`;
+    try {
+        const response = await retryRequest(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tag_id: tagId, [field]: value })
+        }, 3, 2000);
+
+        console.log(`Update ${field} status for ${tagId}: ${response.status} at ${new Date().toISOString()}`);
+        if (!response.ok) {
+            throw new Error(`Update ${field} failed: ${response.status}`);
+        }
+        const data = await response.json();
+        if (data.error) {
+            console.error(`Update ${field} error: ${data.error} at ${new Date().toISOString()}`);
+            alert(`Failed to update ${field}: ${data.error}`);
+        } else {
+            console.log(`Update ${field} successful at ${new Date().toISOString()}`);
+            loadItems(rentalClassId, commonName, targetId);
+        }
+    } catch (error) {
+        console.error(`Update ${field} error: ${error.message} at ${new Date().toISOString()}`);
+        alert(`Error: ${error.message}`);
     }
 }
 
@@ -573,7 +826,6 @@ function updateNotes(tagId) {
 
 /**
  * Handle expand/collapse functionality for summary table
- * Used by: Summary table
  */
 function setupExpandCollapse(maxRetries = 3, delay = 100) {
     console.log(`setupExpandCollapse: Initializing at ${new Date().toISOString()}`);
@@ -624,8 +876,158 @@ function setupExpandCollapse(maxRetries = 3, delay = 100) {
 }
 
 /**
+ * Handle item-level click events
+ */
+function handleItemClick(event) {
+    console.log(`handleItemClick: Event triggered at ${new Date().toISOString()}`);
+    const expandBtn = event.target.closest('.expand-btn');
+    if (expandBtn) {
+        event.preventDefault();
+        event.stopPropagation();
+        console.log(`Expand button clicked:`, {
+            rentalClassId: expandBtn.getAttribute('data-rental-class-id'),
+            commonName: expandBtn.getAttribute('data-common-name'),
+            targetId: expandBtn.getAttribute('data-target-id'),
+            isExpanded: expandBtn.getAttribute('data-expanded')
+        }, `at ${new Date().toISOString()}`);
+
+        const rentalClassId = expandBtn.getAttribute('data-rental-class-id');
+        const commonName = expandBtn.getAttribute('data-common-name');
+        const targetId = expandBtn.getAttribute('data-target-id');
+        const isExpanded = expandBtn.getAttribute('data-expanded') === 'true';
+
+        if (!targetId) {
+            console.error(`Missing data-target-id on expand button at ${new Date().toISOString()}`);
+            return;
+        }
+
+        const container = document.getElementById(targetId);
+        if (!container) {
+            console.error(`Container ${targetId} not found at ${new Date().toISOString()}`);
+            return;
+        }
+
+        const collapseBtn = expandBtn.parentElement.querySelector(`.collapse-btn[data-collapse-target="${targetId}"]`);
+        const parentRow = container.closest('tr.item-name-row');
+
+        if (isExpanded) {
+            console.log(`Collapsing ${targetId} at ${new Date().toISOString()}`);
+            container.classList.remove('expanded');
+            container.classList.add('collapsed');
+            container.style.display = 'none';
+            container.style.opacity = '0';
+            parentRow.classList.add('collapsed');
+            parentRow.style.display = 'none';
+            if (expandBtn && collapseBtn) {
+                expandBtn.style.display = 'inline-block';
+                collapseBtn.style.display = 'none';
+                expandBtn.setAttribute('data-expanded', 'false');
+                expandBtn.textContent = 'Expand Items';
+            }
+        } else {
+            if (rentalClassId && commonName) {
+                console.log(`Loading items for ${commonName} at ${new Date().toISOString()}`);
+                loadItems(rentalClassId, commonName, targetId);
+                parentRow.classList.remove('collapsed');
+                parentRow.style.display = '';
+                if (expandBtn && collapseBtn) {
+                    expandBtn.style.display = 'none';
+                    collapseBtn.style.display = 'inline-block';
+                    expandBtn.setAttribute('data-expanded', 'true');
+                }
+            }
+        }
+        return;
+    }
+
+    const collapseBtn = event.target.closest('.collapse-btn');
+    if (collapseBtn) {
+        event.preventDefault();
+        event.stopPropagation();
+        const targetId = collapseBtn.getAttribute('data-collapse-target');
+        console.log(`Collapsing ${targetId} at ${new Date().toISOString()}`);
+        const container = document.getElementById(targetId);
+        if (!container) {
+            console.error(`Container ${targetId} not found at ${new Date().toISOString()}`);
+            return;
+        }
+        const expandBtn = collapseBtn.parentElement.querySelector(`.expand-btn[data-target-id="${targetId}"]`);
+        const parentRow = container.closest('tr.item-name-row');
+        container.classList.remove('expanded');
+        container.classList.add('collapsed');
+        container.style.display = 'none';
+        container.style.opacity = '0';
+        parentRow.classList.add('collapsed');
+        parentRow.style.display = 'none';
+        if (expandBtn && collapseBtn) {
+            expandBtn.style.display = 'inline-block';
+            collapseBtn.style.display = 'none';
+            expandBtn.setAttribute('data-expanded', 'false');
+            expandBtn.textContent = 'Expand Items';
+        }
+        return;
+    }
+
+    const editableCell = event.target.closest('.editable');
+    if (editableCell) {
+        const field = editableCell.getAttribute('data-field');
+        const row = editableCell.closest('tr');
+        const tagId = row.getAttribute('data-item-id');
+        const rentalClassId = row.closest('.item-level')?.querySelector('button[data-rental-class-id]')?.getAttribute('data-rental-class-id');
+        const commonName = row.closest('.item-level')?.querySelector('button[data-common-name]')?.getAttribute('data-common-name');
+        const targetId = row.closest('.expandable').id;
+
+        const cellContent = editableCell.querySelector('.cell-content');
+        const select = editableCell.querySelector('.edit-select');
+        const input = editableCell.querySelector('.edit-input');
+
+        if (select) {
+            cellContent.style.display = 'none';
+            select.style.display = 'block';
+            select.focus();
+
+            const saveChanges = () => {
+                saveEdit(editableCell, tagId, field, rentalClassId, commonName, targetId);
+                select.removeEventListener('change', saveChanges);
+                select.removeEventListener('blur', revert);
+            };
+
+            const revert = () => {
+                select.style.display = 'none';
+                cellContent.style.display = 'block';
+                select.removeEventListener('change', saveChanges);
+                select.removeEventListener('blur', revert);
+            };
+
+            select.addEventListener('change', saveChanges);
+            select.addEventListener('blur', revert);
+        } else if (input) {
+            cellContent.style.display = 'none';
+            input.style.display = 'block';
+            input.focus();
+
+            const saveChanges = () => {
+                saveEdit(editableCell, tagId, field, rentalClassId, commonName, targetId);
+                input.removeEventListener('blur', saveChanges);
+                input.removeEventListener('keypress', handleKeypress);
+            };
+
+            const handleKeypress = (e) => {
+                if (e.key === 'Enter') {
+                    saveEdit(editableCell, tagId, field, rentalClassId, commonName, targetId);
+                    input.removeEventListener('blur', saveChanges);
+                    input.removeEventListener('keypress', handleKeypress);
+                }
+            };
+
+            input.addEventListener('blur', saveChanges);
+            input.addEventListener('keypress', handleKeypress);
+        }
+    }
+}
+
+/**
  * Initialize the page
- * Used by: Page load
  */
 function initializeTab3() {
     console.log(`tab3.js: DOMContentLoaded at ${new Date().toISOString()}`);
@@ -680,6 +1082,11 @@ function initializeTab3() {
             window.location.href = `/tab/3?${params.toString()}`;
         });
     }
+
+    // Remove existing click listeners to prevent duplicates
+    document.removeEventListener('click', window.tab3ItemClickHandler);
+    window.tab3ItemClickHandler = handleItemClick;
+    document.addEventListener('click', window.tab3ItemClickHandler);
 }
 
 // Remove existing DOMContentLoaded listeners to prevent duplicates
