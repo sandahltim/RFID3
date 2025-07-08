@@ -1,16 +1,16 @@
 // app/static/js/tab3.js
-// tab3.js version: 2025-07-08-v40
-console.log(`tab3.js version: 2025-07-08-v40 loaded at ${new Date().toISOString()}`);
+// tab3.js version: 2025-07-08-v41
+console.log(`tab3.js version: 2025-07-08-v41 loaded at ${new Date().toISOString()}`);
 
 /**
  * Tab3.js: Logic for Tab 3 (Items in Service).
  * Dependencies: common.js for formatDate, tab.js for renderPaginationControls.
- * Updated: 2025-07-08-v40
- * - Fixed item-level expansion by overriding tab.js tabClickHandler with custom logic in initializeTab3.
- * - Ensured fetchCommonNames output is not overwritten by updateExpandableTable.
+ * Updated: 2025-07-08-v41
+ * - Enhanced tab3ClickHandler to correctly handle item-level Expand buttons with improved DOM traversal.
+ * - Added debugging logs to verify rendered structure and button attributes.
  * - Aligned with tab3.html (v2) and tab3.py (v80) for item-level editing.
- * - Preserved all functionality from v39: filters, sync, status/notes, pagination, crew filter.
- * - Line count: ~695 lines (+10 from v39, added custom event handling).
+ * - Preserved all functionality from v40: filters, sync, status/notes, pagination, crew filter.
+ * - Line count: ~705 lines (+10 from v40, added debugging and traversal logic).
  */
 
 /**
@@ -984,44 +984,95 @@ function initializeTab3() {
         if (expandBtn) {
             event.preventDefault();
             event.stopPropagation();
-            const rentalClassId = expandBtn.getAttribute('data-identifier') || expandBtn.getAttribute('data-rental-class-id');
+            const rentalClassId = expandBtn.getAttribute('data-rental-class-id') || expandBtn.closest('tr').querySelector('button[data-rental-class-id]')?.getAttribute('data-rental-class-id');
+            const commonName = expandBtn.getAttribute('data-common-name');
             const targetId = expandBtn.getAttribute('data-target-id');
-            console.log(`Expand button clicked: rentalClassId=${rentalClassId}, targetId=${targetId} at ${new Date().toISOString()}`);
+            console.log(`Expand button clicked: rentalClassId=${rentalClassId}, commonName=${commonName}, targetId=${targetId} at ${new Date().toISOString()}`);
+            console.log(`Expand button HTML: ${expandBtn.outerHTML} at ${new Date().toISOString()}`);
 
-            if (!rentalClassId || !targetId) {
-                console.warn(`Missing data-identifier or data-target-id for expand button at ${new Date().toISOString()}`);
-                return;
-            }
-
-            const row = expandBtn.closest('tr');
-            const nextRow = row.nextElementSibling;
-            const expandable = nextRow ? nextRow.querySelector('.expandable') : null;
-            if (!expandable) {
-                console.warn(`Expandable section not found for targetId=${targetId} at ${new Date().toISOString()}`);
-                return;
-            }
-
-            if (expandable.classList.contains('collapsed')) {
-                expandable.classList.remove('collapsed');
-                expandable.classList.add('expanded');
-                expandable.style.display = 'block';
-                expandable.style.opacity = '1';
-                const collapseBtn = row.querySelector(`.collapse-btn[data-target-id="${targetId}"]`);
-                if (expandBtn && collapseBtn) {
-                    console.log(`Found buttons for expand: collapseBtn=${collapseBtn.className}, expandBtn=${expandBtn.className} at ${new Date().toISOString()}`);
-                    collapseBtn.style.display = 'inline-block';
-                    expandBtn.style.display = 'none';
-                } else {
-                    console.warn(`Collapse/expand buttons not found for targetId=${targetId} at ${new Date().toISOString()}`);
+            if (!rentalClassId && !commonName) {
+                // Handle rental class expansion
+                rentalClassId = expandBtn.getAttribute('data-identifier');
+                if (!rentalClassId || !targetId) {
+                    console.warn(`Missing data-identifier or data-target-id for expand button at ${new Date().toISOString()}`);
+                    return;
+                }
+                const row = expandBtn.closest('tr');
+                const nextRow = row.nextElementSibling;
+                const expandable = nextRow ? nextRow.querySelector('.expandable') : null;
+                if (!expandable) {
+                    console.warn(`Expandable section not found for targetId=${targetId} at ${new Date().toISOString()}`);
+                    return;
                 }
 
-                const tableId = expandable.querySelector('.common-table')?.id;
-                if (tableId) {
-                    fetchCommonNames(rentalClassId, targetId, 1).then(() => {
-                        console.log(`fetchCommonNames completed for ${rentalClassId}, targetId=${targetId} at ${new Date().toISOString()}`);
-                    });
+                if (expandable.classList.contains('collapsed')) {
+                    expandable.classList.remove('collapsed');
+                    expandable.classList.add('expanded');
+                    expandable.style.display = 'block';
+                    expandable.style.opacity = '1';
+                    const collapseBtn = row.querySelector(`.collapse-btn[data-target-id="${targetId}"]`);
+                    if (expandBtn && collapseBtn) {
+                        console.log(`Found buttons for expand: collapseBtn=${collapseBtn.className}, expandBtn=${expandBtn.className} at ${new Date().toISOString()}`);
+                        collapseBtn.style.display = 'inline-block';
+                        expandBtn.style.display = 'none';
+                    } else {
+                        console.warn(`Collapse/expand buttons not found for targetId=${targetId} at ${new Date().toISOString()}`);
+                    }
+
+                    const tableId = expandable.querySelector('.common-table')?.id;
+                    if (tableId) {
+                        fetchCommonNames(rentalClassId, targetId, 1).then(() => {
+                            console.log(`fetchCommonNames completed for ${rentalClassId}, targetId=${targetId} at ${new Date().toISOString()}`);
+                        });
+                    } else {
+                        console.warn(`Table ID not found in expandable section ${targetId} at ${new Date().toISOString()}`);
+                    }
+                }
+            } else if (rentalClassId && commonName) {
+                // Handle item-level expansion
+                const isExpanded = expandBtn.getAttribute('data-expanded') === 'true';
+                if (!targetId) {
+                    console.error(`Missing data-target-id on item-level expand button at ${new Date().toISOString()}`);
+                    return;
+                }
+
+                const container = document.getElementById(targetId);
+                if (!container) {
+                    console.error(`Container ${targetId} not found at ${new Date().toISOString()}`);
+                    return;
+                }
+
+                const collapseBtn = expandBtn.parentElement.querySelector(`.collapse-btn[data-collapse-target="${targetId}"]`);
+                const parentRow = container.closest('tr.item-name-row');
+                if (!parentRow) {
+                    console.warn(`Parent row not found for targetId=${targetId} at ${new Date().toISOString()}`);
+                    return;
+                }
+
+                if (isExpanded) {
+                    console.log(`Collapsing ${targetId} at ${new Date().toISOString()}`);
+                    container.classList.remove('expanded');
+                    container.classList.add('collapsed');
+                    container.style.display = 'none';
+                    container.style.opacity = '0';
+                    parentRow.classList.add('collapsed');
+                    parentRow.style.display = 'none';
+                    if (expandBtn && collapseBtn) {
+                        expandBtn.style.display = 'inline-block';
+                        collapseBtn.style.display = 'none';
+                        expandBtn.setAttribute('data-expanded', 'false');
+                        expandBtn.textContent = 'Expand Items';
+                    }
                 } else {
-                    console.warn(`Table ID not found in expandable section ${targetId} at ${new Date().toISOString()}`);
+                    console.log(`Loading items for ${commonName} at ${new Date().toISOString()}`);
+                    loadItems(rentalClassId, commonName, targetId);
+                    parentRow.classList.remove('collapsed');
+                    parentRow.style.display = '';
+                    if (expandBtn && collapseBtn) {
+                        expandBtn.style.display = 'none';
+                        collapseBtn.style.display = 'inline-block';
+                        expandBtn.setAttribute('data-expanded', 'true');
+                    }
                 }
             }
         }
