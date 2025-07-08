@@ -1,16 +1,16 @@
 // app/static/js/tab3.js
-// tab3.js version: 2025-06-30-v31
-console.log(`tab3.js version: 2025-06-30-v31 loaded at ${new Date().toISOString()}`);
+// tab3.js version: 2025-07-08-v33
+console.log(`tab3.js version: 2025-07-08-v33 loaded at ${new Date().toISOString()}`);
 
 /**
  * Tab3.js: Logic for Tab 3 (Items in Service).
  * Dependencies: common.js for formatDate, tab.js for renderPaginationControls, fetchExpandableData.
- * Updated: 2025-06-30-v31
- * - Fixed setupExpandCollapse to look for buttons in previous row per tab3.html structure.
- * - Retained debug logging for button attributes and row HTML.
- * - Ensured table ID alignment with tab3.html (common-table-<sanitizedRentalClassId>-<index>).
- * - Preserved all functionality from v30: filters, sync, status/notes, pagination.
- * - Line count: ~580 lines (same as v30, button selector fix).
+ * Updated: 2025-07-08-v33
+ * - Fixed setupExpandCollapse to use robust class-based selectors (.expand-btn, .collapse-btn) with data attributes.
+ * - Added debug logging for button attributes and DOM structure.
+ * - Ensured exclusive initialization for Tab 3 (removed from tab.js v19).
+ * - Preserved all functionality from v32: filters, sync, status/notes, pagination.
+ * - Line count: ~580 lines (same as v32, selector and debug enhancements).
  */
 
 /**
@@ -75,7 +75,6 @@ async function retryRequest(url, options, maxRetries = 3, baseDelay = 2000) {
 
 /**
  * Fetch common names for a rental class (Tab 3-specific)
- * Fixes Expand button by ensuring correct table ID and data handling
  */
 async function fetchCommonNames(rentalClassId, targetId, page = 1) {
     console.log(`fetchCommonNames: rentalClassId=${rentalClassId}, targetId=${targetId}, page=${page} at ${new Date().toISOString()}`);
@@ -586,15 +585,16 @@ function setupExpandCollapse() {
         }
         const rentalClassId = section.id.match(/expand-([^-]+)-/)[1];
         const index = section.id.match(/-(\d+)$/)[1];
-        const collapseBtn = dataRow.querySelector(`#collapse-btn-${rentalClassId}-${index}`);
-        const expandBtn = dataRow.querySelector(`#expand-btn-${rentalClassId}-${index}`);
+        const collapseBtn = dataRow.querySelector(`.collapse-btn[data-target-id="expand-${rentalClassId}-${index}"]`);
+        const expandBtn = dataRow.querySelector(`.expand-btn[data-target-id="expand-${rentalClassId}-${index}"]`);
         if (collapseBtn && expandBtn) {
-            console.log(`Found buttons for section ${section.id}: expandBtn.id=${expandBtn.id}, collapseBtn.id=${collapseBtn.id} at ${new Date().toISOString()}`);
+            console.log(`Found buttons for section ${section.id}: expandBtn.className=${expandBtn.className}, expandBtn.data-identifier=${expandBtn.getAttribute('data-identifier')}, collapseBtn.className=${collapseBtn.className}, collapseBtn.data-target-id=${collapseBtn.getAttribute('data-target-id')} at ${new Date().toISOString()}`);
             collapseBtn.style.display = 'none';
             expandBtn.style.display = 'inline-block';
         } else {
             console.warn(`Expand/collapse buttons not found for section ${section.id} at ${new Date().toISOString()}`);
             console.log(`DEBUG: dataRow HTML=${dataRow.outerHTML} at ${new Date().toISOString()}`);
+            console.log(`DEBUG: Attempted selectors - expand: .expand-btn[data-target-id="expand-${rentalClassId}-${index}"], collapse: .collapse-btn[data-target-id="expand-${rentalClassId}-${index}"] at ${new Date().toISOString()}`);
         }
     });
 }
