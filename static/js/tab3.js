@@ -1,16 +1,16 @@
 // app/static/js/tab3.js
-// tab3.js version: 2025-07-08-v38
-console.log(`tab3.js version: 2025-07-08-v38 loaded at ${new Date().toISOString()}`);
+// tab3.js version: 2025-07-08-v39
+console.log(`tab3.js version: 2025-07-08-v39 loaded at ${new Date().toISOString()}`);
 
 /**
  * Tab3.js: Logic for Tab 3 (Items in Service).
  * Dependencies: common.js for formatDate, tab.js for renderPaginationControls.
- * Updated: 2025-07-08-v38
- * - Fixed item-level expansion by moving full table rendering to fetchCommonNames, bypassing tab.js updateExpandableTable.
- * - Ensured handleItemClick works with the new structure, extracting rental_class_id and common_name correctly.
+ * Updated: 2025-07-08-v39
+ * - Fixed item-level expansion by appending rows dynamically in fetchCommonNames, avoiding full table overwrite.
+ * - Ensured Actions column with Expand/Collapse buttons is rendered for each common name.
  * - Aligned with tab3.html (v2) and tab3.py (v80) for item-level editing.
- * - Preserved all functionality from v37: filters, sync, status/notes, pagination, crew filter.
- * - Line count: ~680 lines (+10 from v37, refined rendering logic).
+ * - Preserved all functionality from v38: filters, sync, status/notes, pagination, crew filter.
+ * - Line count: ~685 lines (+5 from v38, refined append logic).
  */
 
 /**
@@ -115,51 +115,50 @@ async function fetchCommonNames(rentalClassId, targetId, page = 1) {
         const perPage = data.per_page || 20;
         const currentPage = data.page || 1;
 
-        let html = '';
+        const tbody = table.querySelector('tbody');
+        if (!tbody) {
+            console.error(`tbody not found in table ${expectedTableId} at ${new Date().toISOString()}`);
+            return data;
+        }
+
+        tbody.innerHTML = '';
         if (commonNames.length === 0) {
-            html = '<tr><td colspan="4">No common names found for this rental class</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="4">No common names found for this rental class</td></tr>';
         } else {
             commonNames.forEach(common => {
                 const rowId = `${sanitizedRentalClassId}_${common.name.replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '')}_${index}`;
                 const escapedName = common.name.replace(/'/g, "\\'").replace(/"/g, '\\"');
-                html += `
-                    <tr>
-                        <td>${common.name || 'N/A'}</td>
-                        <td>${common.on_contracts || 0}</td>
-                        <td>${common.is_hand_counted ? 'N/A' : (common.total_items_inventory || 0)}</td>
-                        <td>
-                            <div class="btn-group">
-                                <button class="btn btn-sm btn-secondary expand-btn" 
-                                        data-rental-class-id="${rentalClassId}" 
-                                        data-common-name="${escapedName}" 
-                                        data-target-id="items-${rowId}" 
-                                        data-expanded="false">Expand Items</button>
-                                <button class="btn btn-sm btn-secondary collapse-btn" 
-                                        data-collapse-target="items-${rowId}" 
-                                        style="display:none;">Collapse</button>
-                            </div>
-                        </td>
-                    </tr>
-                    <tr class="item-name-row" data-target-id="${expectedTableId}">
-                        <td colspan="4">
-                            <div id="items-${rowId}" class="expandable item-level collapsed"></div>
-                        </td>
-                    </tr>
+                const commonRow = document.createElement('tr');
+                commonRow.innerHTML = `
+                    <td>${common.name || 'N/A'}</td>
+                    <td>${common.on_contracts || 0}</td>
+                    <td>${common.is_hand_counted ? 'N/A' : (common.total_items_inventory || 0)}</td>
+                    <td>
+                        <div class="btn-group">
+                            <button class="btn btn-sm btn-secondary expand-btn" 
+                                    data-rental-class-id="${rentalClassId}" 
+                                    data-common-name="${escapedName}" 
+                                    data-target-id="items-${rowId}" 
+                                    data-expanded="false">Expand Items</button>
+                            <button class="btn btn-sm btn-secondary collapse-btn" 
+                                    data-collapse-target="items-${rowId}" 
+                                    style="display:none;">Collapse</button>
+                        </div>
+                    </td>
                 `;
+                tbody.appendChild(commonRow);
+
+                const itemsRow = document.createElement('tr');
+                itemsRow.className = 'item-name-row';
+                itemsRow.setAttribute('data-target-id', expectedTableId);
+                itemsRow.innerHTML = `
+                    <td colspan="4">
+                        <div id="items-${rowId}" class="expandable item-level collapsed"></div>
+                    </td>
+                `;
+                tbody.appendChild(itemsRow);
             });
         }
-
-        table.innerHTML = `
-            <thead class="thead-dark">
-                <tr>
-                    <th>Common Name</th>
-                    <th>Items in Service</th>
-                    <th>Total Items in Inventory</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>${html}</tbody>
-        `;
 
         const paginationContainer = document.getElementById(`pagination-${expectedTableId}`);
         if (paginationContainer && typeof renderPaginationControls === 'function') {
