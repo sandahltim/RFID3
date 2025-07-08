@@ -1,5 +1,5 @@
 # app/routes/tab3.py
-# tab3.py version: 2025-07-08-v80
+# tab3.py version: 2025-07-08-v81
 from flask import Blueprint, render_template, request, jsonify, current_app
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -68,7 +68,7 @@ if not os.path.exists(SHARED_DIR):
     os.chown(SHARED_DIR, pwd.getpwnam('tim').pw_uid, grp.getgrnam('tim').gr_gid)
 
 # Log deployment version
-logger.info("Deployed tab3.py version: 2025-07-08-v80")
+logger.info("Deployed tab3.py version: 2025-07-08-v81")
 
 # Define crew categories
 TENT_CATEGORIES = ['Frame Tent Tops', 'Pole Tent Tops', 'Tent Crates', 'Sidewall']
@@ -267,7 +267,7 @@ def tab3_view():
                 i.last_contract_num, 
                 i.date_last_scanned, 
                 i.rental_class_num, 
-                i.notes,
+                i.notes,  -- Added notes to the query
                 COALESCE(u.category, r.category, 'Other') AS category,
                 i.quality
             FROM id_item_master i
@@ -314,7 +314,7 @@ def tab3_view():
                 'last_contract_num': row[4] or 'N/A',
                 'date_last_scanned': row[5].isoformat() if row[5] else 'N/A',
                 'rental_class_num': normalize_rental_class_id(row[6]),
-                'notes': row[7] or '',
+                'notes': row[7] or '',  # Now safely accessible
                 'category': row[8] or 'Other',
                 'quality': row[9] or 'N/A'
             }
@@ -658,7 +658,7 @@ def tab3_data():
             logger.info(f"Returning cached data for {cache_key}")
             return jsonify(cached_data), 200
 
-        # Query for items
+        # Query for items, including notes
         query = session.query(
             ItemMaster.tag_id,
             ItemMaster.common_name,
@@ -666,6 +666,8 @@ def tab3_data():
             ItemMaster.bin_location,
             ItemMaster.last_contract_num,
             ItemMaster.date_last_scanned,
+            ItemMaster.rental_class_num,
+            ItemMaster.notes,  # Added notes to the query
             ItemMaster.quality
         ).filter(
             ItemMaster.rental_class_num == normalized_rental_class_id,
@@ -694,7 +696,7 @@ def tab3_data():
                 'last_contract_num': item.last_contract_num or 'N/A',
                 'date_last_scanned': item.date_last_scanned.isoformat() if item.date_last_scanned else 'N/A',
                 'quality': item.quality or 'N/A',
-                'notes': item.notes or ''
+                'notes': item.notes or ''  # Now safely accessible
             } for item in items
         ]
 
