@@ -1,12 +1,12 @@
 # app/routes/tab3.py
-# tab3.py version: 2025-06-27-v79
+# tab3.py version: 2025-07-08-v80
 from flask import Blueprint, render_template, request, jsonify, current_app
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from .. import db, cache
 from ..models.db_models import ItemMaster, Transaction, RentalClassMapping, UserRentalClassMapping, SeedRentalClass
 from ..services.api_client import APIClient
-from sqlalchemy import text, func
+from sqlalchemy import text, func, or_
 from datetime import datetime
 import logging
 import sys
@@ -20,6 +20,7 @@ from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_excep
 import requests.exceptions
 import re
 import json
+from urllib.parse import unquote
 
 # Configure logging for Tab 3
 logger = logging.getLogger('tab3')
@@ -67,7 +68,7 @@ if not os.path.exists(SHARED_DIR):
     os.chown(SHARED_DIR, pwd.getpwnam('tim').pw_uid, grp.getgrnam('tim').gr_gid)
 
 # Log deployment version
-logger.info("Deployed tab3.py version: 2025-06-27-v79")
+logger.info("Deployed tab3.py version: 2025-07-08-v80")
 
 # Define crew categories
 TENT_CATEGORIES = ['Frame Tent Tops', 'Pole Tent Tops', 'Tent Crates', 'Sidewall']
@@ -267,7 +268,8 @@ def tab3_view():
                 i.date_last_scanned, 
                 i.rental_class_num, 
                 i.notes,
-                COALESCE(u.category, r.category, 'Other') AS category
+                COALESCE(u.category, r.category, 'Other') AS category,
+                i.quality
             FROM id_item_master i
             LEFT JOIN user_rental_class_mappings u ON i.rental_class_num = u.rental_class_id
             LEFT JOIN rental_class_mappings r ON i.rental_class_num = r.rental_class_id
@@ -313,7 +315,8 @@ def tab3_view():
                 'date_last_scanned': row[5].isoformat() if row[5] else 'N/A',
                 'rental_class_num': normalize_rental_class_id(row[6]),
                 'notes': row[7] or '',
-                'category': row[8] or 'Other'
+                'category': row[8] or 'Other',
+                'quality': row[9] or 'N/A'
             }
             for row in detail_rows
         ]
@@ -434,6 +437,7 @@ def tab3_view():
                 'location_of_repair': t_data['location_of_repair'],
                 'repair_types': t_data['repair_types'],
                 'notes': item['notes'],
+                'quality': item['quality'],
                 'dirty_or_mud': t_data['dirty_or_mud'],
                 'leaves': t_data['leaves'],
                 'oil': t_data['oil'],
@@ -622,6 +626,91 @@ def tab3_common_names():
         return jsonify(response), 200
     except Exception as e:
         logger.error(f"Error fetching common names: {str(e)}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+    finally:
+        if session:
+            session.close()
+
+@tab3_bp.route('/tab/3/data')
+def tab3_data():
+    """Fetch individual items for a rental class and common name."""
+    logger.debug("Entering /tab/3/data endpoint at %s", datetime.now())
+    session = None
+    try:
+        session = db.session()
+        rental_class_id = unquote(request.args.get('rental_class_id', ''))
+        common_name = unquote(request.args.get('common_name', ''))
+        page = int(request.args.get('page', 1))
+        per_page = int(request.args.get('per_page', 10))
+
+        if not rental_class_id or not common_name:
+            logger.warning(f"Missing parameters: rental_class_id={rental_class_id}, common_name={common_name}")
+            return jsonify({'error': 'rental_class_id and common_name are required'}), 400
+
+        # Validate rental_class_id
+        normalized_rental_class_id = normalize_rental_class_id(rental_class_id)
+        logger.debug(f"Normalized rental_class_id: {normalized_rental_class_id}, common_name: {common_name}")
+
+        # Check cache
+        cache_key = f"tab3_items_{normalized_rental_class_id}_{common_name}_{page}_{per_page}"
+        cached_data = cache_get(cache_key)
+        if cached_data:
+            logger.info(f"Returning cached data for {cache_key}")
+            return jsonify(cached_data), 200
+
+        # Query for items
+        query = session.query(
+            ItemMaster.tag_id,
+            ItemMaster.common_name,
+            ItemMaster.status,
+            ItemMaster.bin_location,
+            ItemMaster.last_contract_num,
+            ItemMaster.date_last_scanned,
+            ItemMaster.quality
+        ).filter(
+            ItemMaster.rental_class_num == normalized_rental_class_id,
+            ItemMaster.common_name == common_name,
+            or_(
+                ItemMaster.status.in_(['Repair', 'Needs to be Inspected', 'Wash', 'Wet']),
+                ItemMaster.tag_id.in_(
+                    session.query(Transaction.tag_id).filter(
+                        Transaction.tag_id == ItemMaster.tag_id,
+                        Transaction.scan_date == session.query(func.max(Transaction.scan_date)).filter(Transaction.tag_id == ItemMaster.tag_id).correlate(Transaction).scalar_subquery(),
+                        Transaction.service_required == True
+                    )
+                )
+            )
+        ).order_by(ItemMaster.date_last_scanned.desc())
+
+        total_items = query.count()
+        items = query.offset((page - 1) * per_page).limit(per_page).all()
+
+        items_data = [
+            {
+                'tag_id': item.tag_id,
+                'common_name': item.common_name,
+                'status': item.status or 'N/A',
+                'bin_location': item.bin_location or 'N/A',
+                'last_contract_num': item.last_contract_num or 'N/A',
+                'date_last_scanned': item.date_last_scanned.isoformat() if item.date_last_scanned else 'N/A',
+                'quality': item.quality or 'N/A',
+                'notes': item.notes or ''
+            } for item in items
+        ]
+
+        response = {
+            'items': items_data,
+            'total_items': total_items,
+            'page': page,
+            'per_page': per_page
+        }
+
+        # Cache response
+        cache_set(cache_key, response, timeout=60)
+        logger.info(f"Fetched and cached {len(items_data)} items for rental_class_id {normalized_rental_class_id}, common_name {common_name}, total: {total_items}")
+        return jsonify(response), 200
+    except Exception as e:
+        logger.error(f"Error fetching items: {str(e)}", exc_info=True)
         return jsonify({'error': str(e)}), 500
     finally:
         if session:
@@ -1131,7 +1220,7 @@ def update_status():
             logger.warning(f"Invalid input in update_status: tag_id={tag_id}, new_status={new_status}")
             return jsonify({'error': 'Tag ID and status are required'}), 400
 
-        valid_statuses = ['Ready to Rent', 'Sold', 'Repair', 'Needs to be Inspected', 'Staged', 'Wash', 'Wet']
+        valid_statuses = ['Ready to Rent', 'Sold', 'Repair', 'Needs to be Inspected', 'Wash', 'Wet']
         if new_status not in valid_statuses:
             logger.warning(f"Invalid status value: {new_status}")
             return jsonify({'error': f'Status must be one of {", ".join(valid_statuses)}'}), 400
@@ -1203,6 +1292,102 @@ def update_notes():
         return jsonify({'message': 'Notes updated successfully'})
     except Exception as e:
         logger.error(f"Uncaught exception in update_notes: {str(e)}", exc_info=True)
+        if session:
+            session.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        if session:
+            session.close()
+
+@tab3_bp.route('/tab/3/update_quality', methods=['POST'])
+@limiter.limit("10 per minute")
+def update_quality():
+    """Update the quality of an item."""
+    session = None
+    try:
+        logger.debug("Entering /tab/3/update_quality endpoint at %s", datetime.now())
+        session = db.session()
+        data = request.get_json()
+        tag_id = data.get('tag_id')
+        new_quality = data.get('quality')
+
+        if not tag_id or not new_quality:
+            logger.warning(f"Invalid input in update_quality: tag_id={tag_id}, new_quality={new_quality}")
+            return jsonify({'error': 'Tag ID and quality are required'}), 400
+
+        valid_qualities = ['Good', 'Fair', 'Poor']
+        if new_quality not in valid_qualities and new_quality != '':
+            logger.warning(f"Invalid quality value: {new_quality}")
+            return jsonify({'error': f'Quality must be one of {", ".join(valid_qualities)} or empty'}), 400
+
+        item = session.query(ItemMaster).filter_by(tag_id=tag_id).first()
+        if not item:
+            logger.info(f"Item not found for tag_id {tag_id}")
+            return jsonify({'error': 'Item not found'}), 404
+
+        item.quality = new_quality if new_quality else None
+        item.date_updated = datetime.now()
+        session.commit()
+
+        try:
+            api_client = APIClient()
+            api_client.update_item(tag_id, {'quality': new_quality if new_quality else ''})
+            logger.debug(f"Updated API quality for tag_id {tag_id} to {new_quality}")
+        except Exception as e:
+            logger.error(f"Failed to update API quality for tag_id {tag_id}: {str(e)}", exc_info=True)
+
+        logger.info(f"Updated quality for tag_id {tag_id} to {new_quality}")
+        return jsonify({'message': 'Quality updated successfully'})
+    except Exception as e:
+        logger.error(f"Uncaught exception in update_quality: {str(e)}", exc_info=True)
+        if session:
+            session.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        if session:
+            session.close()
+
+@tab3_bp.route('/tab/3/update_bin_location', methods=['POST'])
+@limiter.limit("10 per minute")
+def update_bin_location():
+    """Update the bin location of an item."""
+    session = None
+    try:
+        logger.debug("Entering /tab/3/update_bin_location endpoint at %s", datetime.now())
+        session = db.session()
+        data = request.get_json()
+        tag_id = data.get('tag_id')
+        new_bin_location = data.get('bin_location')
+
+        if not tag_id:
+            logger.warning(f"Invalid input in update_bin_location: tag_id={tag_id}")
+            return jsonify({'error': 'Tag ID is required'}), 400
+
+        valid_bin_locations = ['resale', 'sold', 'pack', 'burst']
+        if new_bin_location not in valid_bin_locations and new_bin_location != '':
+            logger.warning(f"Invalid bin location value: {new_bin_location}")
+            return jsonify({'error': f'Bin location must be one of {", ".join(valid_bin_locations)} or empty'}), 400
+
+        item = session.query(ItemMaster).filter_by(tag_id=tag_id).first()
+        if not item:
+            logger.info(f"Item not found for tag_id {tag_id}")
+            return jsonify({'error': 'Item not found'}), 404
+
+        item.bin_location = new_bin_location if new_bin_location else None
+        item.date_updated = datetime.now()
+        session.commit()
+
+        try:
+            api_client = APIClient()
+            api_client.update_item(tag_id, {'bin_location': new_bin_location if new_bin_location else ''})
+            logger.debug(f"Updated API bin location for tag_id {tag_id} to {new_bin_location}")
+        except Exception as e:
+            logger.error(f"Failed to update API bin location for tag_id {tag_id}: {str(e)}", exc_info=True)
+
+        logger.info(f"Updated bin location for tag_id {tag_id} to {new_bin_location}")
+        return jsonify({'message': 'Bin location updated successfully'})
+    except Exception as e:
+        logger.error(f"Uncaught exception in update_bin_location: {str(e)}", exc_info=True)
         if session:
             session.rollback()
         return jsonify({'error': str(e)}), 500
