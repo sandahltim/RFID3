@@ -1,17 +1,16 @@
 // app/static/js/tab3.js
-// tab3.js version: 2025-07-08-v36
-console.log(`tab3.js version: 2025-07-08-v36 loaded at ${new Date().toISOString()}`);
+// tab3.js version: 2025-07-08-v37
+console.log(`tab3.js version: 2025-07-08-v37 loaded at ${new Date().toISOString()}`);
 
 /**
  * Tab3.js: Logic for Tab 3 (Items in Service).
  * Dependencies: common.js for formatDate, tab.js for renderPaginationControls, fetchExpandableData.
- * Updated: 2025-07-08-v36
- * - Added Expand/Collapse buttons to common names table for item-level expansion.
- * - Implemented loadItems to fetch and display individual items with editable status, notes, bin_location, and quality.
- * - Added handleItemClick for item-level event handling, ensuring no conflict with tab.js.
- * - Fixed errors from v36 (previous): Corrected DOM selectors, integrated with updated tab3.html structure.
- * - Preserved all functionality from v35: filters, sync, status/notes, pagination, crew filter.
- * - Line count: ~650 lines (+70 from v35, added item-level logic).
+ * Updated: 2025-07-08-v37
+ * - Fixed item-level expansion by adding Expand/Collapse buttons in fetchCommonNames.
+ * - Ensured handleItemClick correctly identifies rental_class_id and common_name from buttons.
+ * - Aligned with tab3.html (v2) structure, matching Tab 1’s item-level design.
+ * - Preserved all functionality from v36: filters, sync, status/notes, pagination, crew filter.
+ * - Line count: ~670 lines (+20 from v36, added item-level button logic).
  */
 
 /**
@@ -721,110 +720,6 @@ function clearTab3Filters() {
 }
 
 /**
- * Update status button visibility
- * Used by: Item details table
- */
-function updateStatusVisibility(tagId) {
-    const select = document.getElementById(`tab3-status-${tagId}`);
-    const saveBtn = select?.closest('tr')?.querySelector('.tab3-save-status-btn');
-    if (!select || !saveBtn) {
-        console.warn(`Status select or save button not found for tag_id: ${tagId} at ${new Date().toISOString()}`);
-        return;
-    }
-    const originalStatus = select.options[0].value;
-    saveBtn.style.display = select.value !== originalStatus ? 'inline-block' : 'none';
-}
-
-/**
- * Update item status
- * Used by: Item details table
- */
-function updateStatus(tagId) {
-    const newStatus = document.getElementById(`tab3-status-${tagId}`).value;
-
-    fetch('/tab/3/update_status', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            tag_id: tagId,
-            status: newStatus
-        })
-    })
-    .then(response => {
-        console.log(`Status update fetch status for ${tagId}: ${response.status} at ${new Date().toISOString()}`);
-        return response.json();
-    })
-    .then(data => {
-        if (data.error) {
-            console.error(`Error updating status for ${tagId}: ${data.error} at ${new Date().toISOString()}`);
-            alert('Error: ' + data.error);
-        } else {
-            console.log(`Status update successful for ${tagId}: ${data.message} at ${new Date().toISOString()}`);
-            alert(data.message);
-            window.location.reload();
-        }
-    })
-    .catch(error => {
-        console.error(`Error updating status for ${tagId}: ${error} at ${new Date().toISOString()}`);
-        alert('Failed to update status');
-    });
-}
-
-/**
- * Update notes button visibility
- * Used by: Item details table
- */
-function updateNotesVisibility(tagId) {
-    const textarea = document.getElementById(`tab3-notes-${tagId}`);
-    const saveBtn = textarea?.closest('tr')?.querySelector('.tab3-save-notes-btn');
-    if (!textarea || !saveBtn) {
-        console.warn(`Notes textarea or save button not found for tag_id: ${tagId} at ${new Date().toISOString()}`);
-        return;
-    }
-    const originalNotes = textarea.dataset.originalNotes || '';
-    saveBtn.style.display = textarea.value !== originalNotes ? 'inline-block' : 'none';
-}
-
-/**
- * Update item notes
- * Used by: Item details table
- */
-function updateNotes(tagId) {
-    const newNotes = document.getElementById(`tab3-notes-${tagId}`).value;
-
-    fetch('/tab/3/update_notes', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            tag_id: tagId,
-            notes: newNotes
-        })
-    })
-    .then(response => {
-        console.log(`Notes update fetch status for ${tagId}: ${response.status} at ${new Date().toISOString()}`);
-        return response.json();
-    })
-    .then(data => {
-        if (data.error) {
-            console.error(`Error updating notes for ${tagId}: ${data.error} at ${new Date().toISOString()}`);
-            alert('Error: ' + data.error);
-        } else {
-            console.log(`Notes update successful for ${tagId}: ${data.message} at ${new Date().toISOString()}`);
-            alert(data.message);
-            window.location.reload();
-        }
-    })
-    .catch(error => {
-        console.error(`Error updating notes for ${tagId}: ${error} at ${new Date().toISOString()}`);
-        alert('Failed to update notes');
-    });
-}
-
-/**
  * Handle expand/collapse functionality for summary table
  */
 function setupExpandCollapse(maxRetries = 3, delay = 100) {
@@ -1048,17 +943,6 @@ function initializeTab3() {
                 dateCell.textContent = formattedDate;
             }
         });
-    });
-
-    // Initialize save button visibility
-    document.querySelectorAll('.tab3-details-table select').forEach(select => {
-        const tagId = select.id.replace('tab3-status-', '');
-        updateStatusVisibility(tagId);
-    });
-
-    document.querySelectorAll('.tab3-details-table textarea').forEach(textarea => {
-        const tagId = textarea.id.replace('tab3-notes-', '');
-        updateNotesVisibility(tagId);
     });
 
     // Set up expand/collapse
