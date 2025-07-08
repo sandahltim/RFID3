@@ -1,5 +1,5 @@
 # app/__init__.py
-# Version: 2025-06-26-v4
+# Version: 2025-07-08-v5
 import os
 import logging
 from logging.handlers import RotatingFileHandler
@@ -8,6 +8,7 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_redis import FlaskRedis
 from config import DB_CONFIG, REDIS_URL, LOG_FILE, APP_IP
 from datetime import datetime
+import re
 
 # Initialize extensions
 db = SQLAlchemy()
@@ -79,6 +80,13 @@ def create_app():
         return value.strftime('%Y-%m-%d %H:%M:%S')
     app.jinja_env.filters['datetimeformat'] = datetimeformat
 
+    def regex_replace(value, pattern, replace):
+        """Replace characters matching pattern with replace string."""
+        if not value:
+            return value
+        return re.sub(pattern, replace, str(value))
+    app.jinja_env.filters['regex_replace'] = regex_replace
+
     # Create database tables
     try:
         with app.app_context():
@@ -128,4 +136,3 @@ def create_app():
 
     app.logger.info("Application startup completed successfully")
     return app
-    
