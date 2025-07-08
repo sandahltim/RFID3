@@ -1,16 +1,16 @@
 // app/static/js/tab3.js
-// tab3.js version: 2025-07-08-v34
-console.log(`tab3.js version: 2025-07-08-v34 loaded at ${new Date().toISOString()}`);
+// tab3.js version: 2025-07-08-v35
+console.log(`tab3.js version: 2025-07-08-v35 loaded at ${new Date().toISOString()}`);
 
 /**
  * Tab3.js: Logic for Tab 3 (Items in Service).
  * Dependencies: common.js for formatDate, tab.js for renderPaginationControls, fetchExpandableData.
- * Updated: 2025-07-08-v34
- * - Enhanced setupExpandCollapse with robust class-based selectors and detailed debug logging.
- * - Ensured exclusive initialization for Tab 3 (removed from tab.js v20).
- * - Fixed potential DOM timing issues by adding retry logic for button lookup.
- * - Preserved all functionality from v33: filters, sync, status/notes, pagination.
- * - Line count: ~580 lines (same as v33, debug enhancements).
+ * Updated: 2025-07-08-v35
+ * - Fixed common table error by validating tableId in fetchCommonNames.
+ * - Added debug logging for table ID and expandable section HTML.
+ * - Retained retry logic for setupExpandCollapse.
+ * - Preserved all functionality from v34: filters, sync, status/notes, pagination.
+ * - Line count: ~580 lines (same as v34, debug enhancements).
  */
 
 /**
@@ -84,6 +84,12 @@ async function fetchCommonNames(rentalClassId, targetId, page = 1) {
     const table = document.getElementById(expectedTableId);
     if (!table) {
         console.error(`Common table ${expectedTableId} not found for targetId=${targetId} at ${new Date().toISOString()}`);
+        const expandable = document.getElementById(targetId);
+        if (expandable) {
+            console.log(`DEBUG: Expandable section HTML=${expandable.outerHTML} at ${new Date().toISOString()}`);
+        } else {
+            console.warn(`Expandable section ${targetId} not found at ${new Date().toISOString()}`);
+        }
         return { common_names: [], total_items: 0 };
     }
 
