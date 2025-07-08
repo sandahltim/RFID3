@@ -1,16 +1,16 @@
 // app/static/js/tab3.js
-// tab3.js version: 2025-07-08-v41
-console.log(`tab3.js version: 2025-07-08-v41 loaded at ${new Date().toISOString()}`);
+// tab3.js version: 2025-07-08-v42
+console.log(`tab3.js version: 2025-07-08-v42 loaded at ${new Date().toISOString()}`);
 
 /**
  * Tab3.js: Logic for Tab 3 (Items in Service).
  * Dependencies: common.js for formatDate, tab.js for renderPaginationControls.
- * Updated: 2025-07-08-v41
- * - Enhanced tab3ClickHandler to correctly handle item-level Expand buttons with improved DOM traversal.
- * - Added debugging logs to verify rendered structure and button attributes.
+ * Updated: 2025-07-08-v42
+ * - Fixed Uncaught TypeError: Assignment to constant variable by using let for reassignable variables in tab3ClickHandler.
+ * - Retained debugging logs to verify structure and button attributes.
  * - Aligned with tab3.html (v2) and tab3.py (v80) for item-level editing.
- * - Preserved all functionality from v40: filters, sync, status/notes, pagination, crew filter.
- * - Line count: ~705 lines (+10 from v40, added debugging and traversal logic).
+ * - Preserved all functionality from v41: filters, sync, status/notes, pagination, crew filter.
+ * - Line count: ~705 lines (same as v41, syntax correction only).
  */
 
 /**
@@ -984,7 +984,7 @@ function initializeTab3() {
         if (expandBtn) {
             event.preventDefault();
             event.stopPropagation();
-            const rentalClassId = expandBtn.getAttribute('data-rental-class-id') || expandBtn.closest('tr').querySelector('button[data-rental-class-id]')?.getAttribute('data-rental-class-id');
+            let rentalClassId = expandBtn.getAttribute('data-rental-class-id');
             const commonName = expandBtn.getAttribute('data-common-name');
             const targetId = expandBtn.getAttribute('data-target-id');
             console.log(`Expand button clicked: rentalClassId=${rentalClassId}, commonName=${commonName}, targetId=${targetId} at ${new Date().toISOString()}`);
