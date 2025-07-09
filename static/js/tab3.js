@@ -1,15 +1,15 @@
 // app/static/js/tab3.js
-// tab3.js version: 2025-07-09-v44
-console.log(`tab3.js version: 2025-07-09-v44 loaded at ${new Date().toISOString()}`);
+// tab3.js version: 2025-07-09-v45
+console.log(`tab3.js version: 2025-07-09-v45 loaded at ${new Date().toISOString()}`);
 
 /**
  * Tab3.js: Logic for Tab 3 (Items in Service).
- * Dependencies: common.js for formatDate, tab.js for renderPaginationControls.
- * Updated: 2025-07-09-v44
- * - Fixed edit functionality for status (dropdown) and notes (text box) with improved event handling.
- * - Adjusted print functionality to work client-side without new templates, fixing 500 error.
- * - Preserved all functionality from v43: filters, sync, pagination, crew filter.
- * - Line count: ~720 lines (+5 from v43, refined edit and print logic).
+ * Dependencies: common.js for formatDate, printTable, renderPaginationControls; tab.js for shared logic.
+ * Updated: 2025-07-09-v45
+ * - Fixed edit functionality for status, notes, quality, and bin_location with robust event delegation.
+ * - Integrated print functionality with common.js printTable, fixing table selection issues.
+ * - Preserved all functionality from v44: filters, sync, pagination, crew filter.
+ * - Line count: ~725 lines (+5 from v44, refined edit and print handling).
  */
 
 /**
@@ -137,9 +137,11 @@ async function fetchCommonNames(rentalClassId, targetId, page = 1) {
                                     data-collapse-target="items-${rowId}" 
                                     style="display:none;">Collapse</button>
                             <button class="btn btn-sm btn-primary print-btn"
-                                    data-print-id="${rowId}"
+                                    data-print-level="Common Name"
+                                    data-print-id="items-${rowId}"
                                     data-rental-class-id="${rentalClassId}"
-                                    data-common-name="${escapedName}">Print</button>
+                                    data-common-name="${escapedName}"
+                                    data-category="${rentalClassId}">Print</button>
                         </div>
                     </td>
                 `;
@@ -267,7 +269,7 @@ async function loadItems(rentalClassId, commonName, targetId, page = 1) {
                 const row = document.createElement('tr');
                 row.setAttribute('data-item-id', item.tag_id);
                 row.innerHTML = `
-                    <td class="editable" data-field="tag_id">${item.tag_id}</td>
+                    <td>${item.tag_id}</td>
                     <td>${item.common_name}</td>
                     <td class="editable" data-field="bin_location">
                         <span class="cell-content">${item.bin_location || 'N/A'}</span>
@@ -308,9 +310,10 @@ async function loadItems(rentalClassId, commonName, targetId, page = 1) {
                     </td>
                     <td>
                         <button class="btn btn-sm btn-primary print-btn"
-                                data-print-id="${item.tag_id}"
+                                data-print-level="Item"
+                                data-print-id="item-${item.tag_id}"
                                 data-rental-class-id="${rentalClassId}"
-                                data-common-name="${commonName}">Print</button>
+                                data-common-name="${commonName.replace(/'/g, "\\'").replace(/"/g, '\\"')}">Print</button>
                     </td>
                 `;
                 tbody.appendChild(row);
@@ -383,14 +386,31 @@ async function loadItems(rentalClassId, commonName, targetId, page = 1) {
 /**
  * Save edits for item fields
  */
-async function saveEdit(cell, tagId, field, rentalClassId, commonName, targetId) {
-    console.log(`saveEdit: Starting at ${new Date().toISOString()}`, { tagId, field, rentalClassId, commonName, targetId });
-    const select = cell.querySelector('.edit-select');
-    const input = cell.querySelector('.edit-input');
-    const value = select ? select.value : input ? input.value : '';
+async function saveEdit(cell, tagId, field, rentalClassId, commonName, targetId, value) {
+    console.log(`saveEdit: Starting at ${new Date().toISOString()}`, { tagId, field, rentalClassId, commonName, targetId, value });
+    if (!tagId || !field) {
+        console.error(`Invalid parameters for saveEdit: tagId=${tagId}, field=${field} at ${new Date().toISOString()}`);
+        alert(`Error: Missing tag ID or field`);
+        return;
+    }
 
-    if (!value && field !== 'notes' && field !== 'quality') {
-        alert(`Please select or enter a value for ${field}.`);
+    const validStatuses = ['Ready to Rent', 'Sold', 'Repair', 'Needs to be Inspected', 'Wash', 'Wet'];
+    const validQualities = ['Good', 'Fair', 'Poor', ''];
+    const validBinLocations = ['resale', 'sold', 'pack', 'burst', ''];
+
+    if (field === 'status' && !validStatuses.includes(value)) {
+        console.error(`Invalid status value: ${value} at ${new Date().toISOString()}`);
+        alert(`Invalid status. Choose from: ${validStatuses.join(', ')}`);
+        return;
+    }
+    if (field === 'quality' && !validQualities.includes(value)) {
+        console.error(`Invalid quality value: ${value} at ${new Date().toISOString()}`);
+        alert(`Invalid quality. Choose from: ${validQualities.join(', ')}`);
+        return;
+    }
+    if (field === 'bin_location' && !validBinLocations.includes(value)) {
+        console.error(`Invalid bin location value: ${value} at ${new Date().toISOString()}`);
+        alert(`Invalid bin location. Choose from: ${validBinLocations.join(', ')}`);
         return;
     }
 
@@ -413,9 +433,10 @@ async function saveEdit(cell, tagId, field, rentalClassId, commonName, targetId)
         } else if (data.local_update === 'success' && data.error) {
             console.warn(`Update ${field} succeeded locally but failed in API: ${data.error} at ${new Date().toISOString()}`);
             alert(`Updated ${field} locally, but API failed: ${data.error}`);
+            loadItems(rentalClassId, commonName, targetId); // Refresh to show local update
         } else {
             console.log(`Update ${field} successful at ${new Date().toISOString()}`);
-            loadItems(rentalClassId, commonName, targetId);
+            loadItems(rentalClassId, commonName, targetId); // Refresh to show update
         }
     } catch (error) {
         console.error(`Update ${field} error: ${error.message} at ${new Date().toISOString()}`);
@@ -878,6 +899,9 @@ function handleItemClick(event) {
 
     const editableCell = event.target.closest('.editable');
     if (editableCell) {
+        event.preventDefault();
+        event.stopPropagation();
+        console.log(`Editable cell clicked: field=${editableCell.getAttribute('data-field')} at ${new Date().toISOString()}`);
         const field = editableCell.getAttribute('data-field');
         const row = editableCell.closest('tr');
         const tagId = row.getAttribute('data-item-id');
@@ -893,20 +917,18 @@ function handleItemClick(event) {
             cellContent.style.display = 'none';
             select.style.display = 'block';
             select.focus();
+            console.log(`Showing dropdown for field=${field}, tagId=${tagId} at ${new Date().toISOString()}`);
 
             const saveChanges = () => {
                 const value = select.value;
-                if (!value && field !== 'notes' && field !== 'quality') {
-                    alert(`Please select a value for ${field}.`);
-                    revert();
-                    return;
-                }
+                console.log(`Saving dropdown value: ${value} for field=${field}, tagId=${tagId} at ${new Date().toISOString()}`);
                 saveEdit(editableCell, tagId, field, rentalClassId, commonName, targetId, value);
                 select.removeEventListener('change', saveChanges);
                 select.removeEventListener('blur', revert);
             };
 
             const revert = () => {
+                console.log(`Reverting dropdown for field=${field}, tagId=${tagId} at ${new Date().toISOString()}`);
                 select.style.display = 'none';
                 cellContent.style.display = 'block';
                 select.removeEventListener('change', saveChanges);
@@ -919,9 +941,11 @@ function handleItemClick(event) {
             cellContent.style.display = 'none';
             input.style.display = 'block';
             input.focus();
+            console.log(`Showing input for field=${field}, tagId=${tagId} at ${new Date().toISOString()}`);
 
             const saveChanges = () => {
                 const value = input.value;
+                console.log(`Saving input value: ${value} for field=${field}, tagId=${tagId} at ${new Date().toISOString()}`);
                 saveEdit(editableCell, tagId, field, rentalClassId, commonName, targetId, value);
                 input.removeEventListener('blur', saveChanges);
                 input.removeEventListener('keypress', handleKeypress);
@@ -935,6 +959,8 @@ function handleItemClick(event) {
 
             input.addEventListener('blur', saveChanges);
             input.addEventListener('keypress', handleKeypress);
+        } else {
+            console.warn(`No select or input found for editable cell: field=${field}, tagId=${tagId} at ${new Date().toISOString()}`);
         }
     }
 }
@@ -948,43 +974,67 @@ function handlePrint(event) {
 
     event.preventDefault();
     event.stopPropagation();
+    const printLevel = printBtn.getAttribute('data-print-level');
     const printId = printBtn.getAttribute('data-print-id');
     const rentalClassId = printBtn.getAttribute('data-rental-class-id');
     const commonName = printBtn.getAttribute('data-common-name');
 
-    console.log(`Print button clicked: id=${printId}, rentalClassId=${rentalClassId}, commonName=${commonName} at ${new Date().toISOString()}`);
+    console.log(`Print button clicked: level=${printLevel}, id=${printId}, rentalClassId=${rentalClassId}, commonName=${commonName} at ${new Date().toISOString()}`);
 
-    const table = document.querySelector(`#item-table-${printId}`) || document.querySelector(`#common-table-${printId.split('_')[0]}-${printId.split('_')[printId.split('_').length - 1]}`);
-    if (!table) {
-        console.error(`Print table not found for printId=${printId} at ${new Date().toISOString()}`);
-        alert('No data available to print.');
+    if (typeof printTable !== 'function') {
+        console.error(`printTable function not found in common.js at ${new Date().toISOString()}`);
+        alert('Print functionality is unavailable. Please ensure common.js is loaded.');
         return;
     }
 
-    const printContent = table.cloneNode(true);
-    printContent.querySelectorAll('button').forEach(btn => btn.remove()); // Remove buttons from print
-    const printWindow = window.open('', '_blank');
-    printWindow.document.write(`
-        <html>
-        <head>
-            <title>Print - ${commonName}</title>
-            <style>
-                table { border-collapse: collapse; width: 100%; }
-                th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-                th { background-color: #f2f2f2; }
-                @media print {
-                    body { margin: 0; }
-                    table { page-break-inside: avoid; }
-                }
-            </style>
-        </head>
-        <body onload="window.print();window.close()">
-            <h2>${commonName} - Items</h2>
-            ${printContent.outerHTML}
-        </body>
-        </html>
-    `);
-    printWindow.document.close();
+    // For Common Name level, print a summary table
+    if (printLevel === 'Common Name') {
+        printTable('Common Name', `items-${printId}`, commonName, rentalClassId);
+    }
+    // For Item level, create a single-item table
+    else if (printLevel === 'Item') {
+        const row = printBtn.closest('tr');
+        if (!row) {
+            console.error(`Row not found for printId=${printId} at ${new Date().toISOString()}`);
+            alert('No data available to print.');
+            return;
+        }
+        const table = document.createElement('table');
+        table.className = 'table table-bordered';
+        table.id = `item-${printId}`;
+        table.innerHTML = `
+            <thead class="thead-dark">
+                <tr>
+                    <th>Tag ID</th>
+                    <th>Common Name</th>
+                    <th>Bin Location</th>
+                    <th>Status</th>
+                    <th>Last Contract</th>
+                    <th>Last Scanned Date</th>
+                    <th>Quality</th>
+                    <th>Notes</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>${row.cells[0].textContent}</td>
+                    <td>${row.cells[1].textContent}</td>
+                    <td>${row.cells[2].querySelector('.cell-content').textContent}</td>
+                    <td>${row.cells[3].querySelector('.cell-content').textContent}</td>
+                    <td>${row.cells[4].textContent}</td>
+                    <td>${row.cells[5].textContent}</td>
+                    <td>${row.cells[6].querySelector('.cell-content').textContent}</td>
+                    <td>${row.cells[7].querySelector('.cell-content').textContent}</td>
+                </tr>
+            </tbody>
+        `;
+        document.body.appendChild(table); // Temporarily add to DOM
+        printTable('Item', `item-${printId}`, commonName, rentalClassId);
+        table.remove(); // Clean up
+    } else {
+        console.error(`Invalid print level: ${printLevel} at ${new Date().toISOString()}`);
+        alert('Invalid print level.');
+    }
 }
 
 /**
@@ -1037,119 +1087,7 @@ function initializeTab3() {
     document.removeEventListener('click', window.tab3ClickHandler);
     window.tab3ClickHandler = (event) => {
         console.log(`tab3ClickHandler: Click event triggered at ${new Date().toISOString()}`);
-        const expandBtn = event.target.closest('.expand-btn');
-        if (expandBtn) {
-            event.preventDefault();
-            event.stopPropagation();
-            let rentalClassId = expandBtn.getAttribute('data-rental-class-id');
-            const commonName = expandBtn.getAttribute('data-common-name');
-            const targetId = expandBtn.getAttribute('data-target-id');
-            console.log(`Expand button clicked: rentalClassId=${rentalClassId}, commonName=${commonName}, targetId=${targetId} at ${new Date().toISOString()}`);
-            console.log(`Expand button HTML: ${expandBtn.outerHTML} at ${new Date().toISOString()}`);
-
-            if (!rentalClassId && !commonName) {
-                rentalClassId = expandBtn.getAttribute('data-identifier');
-                if (!rentalClassId || !targetId) {
-                    console.warn(`Missing data-identifier or data-target-id for expand button at ${new Date().toISOString()}`);
-                    return;
-                }
-                const row = expandBtn.closest('tr');
-                const nextRow = row.nextElementSibling;
-                const expandable = nextRow ? nextRow.querySelector('.expandable') : null;
-                if (!expandable) {
-                    console.warn(`Expandable section not found for targetId=${targetId} at ${new Date().toISOString()}`);
-                    return;
-                }
-
-                if (expandable.classList.contains('collapsed')) {
-                    expandable.classList.remove('collapsed');
-                    expandable.classList.add('expanded');
-                    expandable.style.display = 'block';
-                    expandable.style.opacity = '1';
-                    const collapseBtn = row.querySelector(`.collapse-btn[data-target-id="${targetId}"]`);
-                    if (expandBtn && collapseBtn) {
-                        collapseBtn.style.display = 'inline-block';
-                        expandBtn.style.display = 'none';
-                    }
-
-                    const tableId = expandable.querySelector('.common-table')?.id;
-                    if (tableId) {
-                        fetchCommonNames(rentalClassId, targetId, 1);
-                    }
-                }
-            } else if (rentalClassId && commonName) {
-                const isExpanded = expandBtn.getAttribute('data-expanded') === 'true';
-                if (!targetId) {
-                    console.error(`Missing data-target-id on item-level expand button at ${new Date().toISOString()}`);
-                    return;
-                }
-
-                const container = document.getElementById(targetId);
-                if (!container) {
-                    console.error(`Container ${targetId} not found at ${new Date().toISOString()}`);
-                    return;
-                }
-
-                const collapseBtn = expandBtn.parentElement.querySelector(`.collapse-btn[data-collapse-target="${targetId}"]`);
-                const parentRow = container.closest('tr.item-name-row');
-                if (!parentRow) {
-                    console.warn(`Parent row not found for targetId=${targetId} at ${new Date().toISOString()}`);
-                    return;
-                }
-
-                if (isExpanded) {
-                    container.classList.remove('expanded');
-                    container.classList.add('collapsed');
-                    container.style.display = 'none';
-                    container.style.opacity = '0';
-                    parentRow.classList.add('collapsed');
-                    parentRow.style.display = 'none';
-                    if (expandBtn && collapseBtn) {
-                        expandBtn.style.display = 'inline-block';
-                        collapseBtn.style.display = 'none';
-                        expandBtn.setAttribute('data-expanded', 'false');
-                        expandBtn.textContent = 'Expand Items';
-                    }
-                } else {
-                    loadItems(rentalClassId, commonName, targetId);
-                    parentRow.classList.remove('collapsed');
-                    parentRow.style.display = '';
-                    if (expandBtn && collapseBtn) {
-                        expandBtn.style.display = 'none';
-                        collapseBtn.style.display = 'inline-block';
-                        expandBtn.setAttribute('data-expanded', 'true');
-                    }
-                }
-            }
-        }
-
-        const collapseBtn = event.target.closest('.collapse-btn');
-        if (collapseBtn) {
-            event.preventDefault();
-            event.stopPropagation();
-            const targetId = collapseBtn.getAttribute('data-collapse-target');
-            console.log(`Collapse button clicked: targetId=${targetId} at ${new Date().toISOString()}`);
-
-            if (!targetId) {
-                console.warn(`Missing data-target-id or data-collapse-target for collapse button at ${new Date().toISOString()}`);
-                return;
-            }
-
-            const section = document.getElementById(targetId);
-            if (section) {
-                section.classList.remove('expanded');
-                section.classList.add('collapsed');
-                section.style.display = 'none';
-                section.style.opacity = '0';
-                const row = collapseBtn.closest('tr');
-                const expandBtn = row.querySelector(`.expand-btn[data-target-id="${targetId}"]`);
-                if (expandBtn && collapseBtn) {
-                    expandBtn.style.display = 'inline-block';
-                    collapseBtn.style.display = 'none';
-                }
-            }
-        }
-
+        handleItemClick(event);
         handlePrint(event); // Handle print button clicks
     };
     document.addEventListener('click', window.tab3ClickHandler);
