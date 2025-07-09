@@ -1,17 +1,19 @@
 from flask import Blueprint, render_template, request, jsonify, current_app
 from .. import db
 from ..models.db_models import ItemMaster, Transaction, RentalClassMapping, UserRentalClassMapping
+from ..services.api_client import APIClient
 from sqlalchemy import func, desc, or_, asc
+from datetime import datetime
 from time import time
 import logging
 import sys
 from urllib.parse import unquote
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 
 # Configure logging
 logger = logging.getLogger('tab1')
 logger.setLevel(logging.DEBUG)  # DEBUG for detailed tracing
-
-# Remove existing handlers to avoid duplicates
 logger.handlers = []
 
 # File handler for rfid_dashboard.log
@@ -29,8 +31,18 @@ logger.addHandler(console_handler)
 
 tab1_bp = Blueprint('tab1', __name__)
 
+# Initialize rate limiter
+limiter = Limiter(
+    key_func=get_remote_address,
+    default_limits=["200 per day", "50 per hour"],
+    storage_uri="memory://"
+)
+
+# Valid values for quality
+VALID_QUALITIES = ['A+', 'A', 'A-', 'B+', 'B', 'B-', 'C+', 'C', 'C-', '']
+
 # Version marker
-logger.info("Deployed tab1.py version: 2025-05-23-v20")
+logger.info("Deployed tab1.py version: 2025-07-09-v21")
 
 def get_category_data(session, filter_query='', sort='', status_filter='', bin_filter=''):
     logger.debug(f"get_category_data: filter_query={filter_query}, sort={sort}, status_filter={status_filter}, bin_filter={bin_filter}")
@@ -620,30 +632,44 @@ def tab1_data():
         return jsonify({'error': 'Failed to fetch items'}), 500
 
 @tab1_bp.route('/tab/1/update_bin_location', methods=['POST'])
+@limiter.limit("10 per minute")
 def update_bin_location():
     logger.debug("update_bin_location route accessed")
     try:
         session = db.session()
         data = request.get_json()
         tag_id = data.get('tag_id')
-        bin_location = data.get('bin_location')
-        logger.debug(f"update_bin_location: tag_id={tag_id}, bin_location={bin_location}")
+        new_bin_location = data.get('bin_location')
+        logger.debug(f"update_bin_location: tag_id={tag_id}, bin_location={new_bin_location}")
 
-        if not tag_id or not bin_location:
-            logger.error("tag_id and bin_location are required")
-            return jsonify({'error': 'tag_id and bin_location are required'}), 400
+        if not tag_id:
+            logger.error("tag_id is required")
+            return jsonify({'error': 'Tag ID is required'}), 400
+
+        valid_bin_locations = ['resale', 'sold', 'pack', 'burst', '']
+        if new_bin_location not in valid_bin_locations:
+            logger.warning(f"Invalid bin location value: {new_bin_location}")
+            return jsonify({'error': f'Bin location must be one of {", ".join(valid_bin_locations)}'}), 400
 
         item = session.query(ItemMaster).filter(ItemMaster.tag_id == tag_id).first()
         if not item:
             logger.warning(f"Item not found for tag_id {tag_id}")
             return jsonify({'error': 'Item not found'}), 404
 
-        item.bin_location = bin_location
-        item.date_updated = func.now()
+        item.bin_location = new_bin_location if new_bin_location else None
+        item.date_updated = datetime.now()
         session.commit()
-        logger.info(f"Updated bin_location for tag_id {tag_id} to {bin_location}")
 
-        session.close()
+        try:
+            api_client = APIClient()
+            api_client.update_item(tag_id, {'bin_location': new_bin_location if new_bin_location else ''}, timeout=10)
+            logger.info(f"Successfully updated API bin location for tag_id {tag_id} to {new_bin_location}")
+        except Exception as e:
+            logger.error(f"Failed to update API bin location for tag_id {tag_id}: {str(e)}", exc_info=True)
+            session.rollback()
+            return jsonify({'error': f"Failed to update API: {str(e)}", 'local_update': 'success'}), 200
+
+        logger.info(f"Updated bin location for tag_id {tag_id} to {new_bin_location}")
         return jsonify({'message': 'Bin location updated successfully'})
     except Exception as e:
         logger.error(f"Error updating bin location: {str(e)}", exc_info=True)
@@ -653,39 +679,141 @@ def update_bin_location():
         session.close()
 
 @tab1_bp.route('/tab/1/update_status', methods=['POST'])
+@limiter.limit("10 per minute")
 def update_status():
     logger.debug("update_status route accessed")
     try:
         session = db.session()
         data = request.get_json()
         tag_id = data.get('tag_id')
-        status = data.get('status')
-        logger.debug(f"update_status: tag_id={tag_id}, status={status}")
+        new_status = data.get('status')
+        logger.debug(f"update_status: tag_id={tag_id}, status={new_status}")
 
-        if not tag_id or not status:
+        if not tag_id or not new_status:
             logger.error("tag_id and status are required")
-            return jsonify({'error': 'tag_id and status are required'}), 400
+            return jsonify({'error': 'Tag ID and status are required'}), 400
+
+        valid_statuses = ['Ready to Rent', 'Sold', 'Repair', 'Needs to be Inspected', 'Wash', 'Wet']
+        if new_status not in valid_statuses:
+            logger.warning(f"Invalid status value: {new_status}")
+            return jsonify({'error': f'Status must be one of {", ".join(valid_statuses)}'}), 400
 
         item = session.query(ItemMaster).filter(ItemMaster.tag_id == tag_id).first()
         if not item:
             logger.warning(f"Item not found for tag_id {tag_id}")
             return jsonify({'error': 'Item not found'}), 404
 
-        if status == 'Ready to Rent' and item.status not in ['On Rent', 'Delivered']:
-            logger.warning(f"Cannot set status to Ready to Rent for tag_id {tag_id}, current status: {item.status}")
-            return jsonify({'error': 'Cannot set status to Ready to Rent unless current status is On Rent or Delivered'}), 400
+        if new_status in ['On Rent', 'Delivered']:
+            logger.warning(f"Attempted manual update to restricted status {new_status} for tag_id {tag_id}")
+            return jsonify({'error': 'Status cannot be updated to "On Rent" or "Delivered" manually'}), 400
 
-        item.status = status
-        item.date_updated = func.now()
+        item.status = new_status
+        item.date_updated = datetime.now()
         session.commit()
-        logger.info(f"Updated status for tag_id {tag_id} to {status}")
 
-        session.close()
+        try:
+            api_client = APIClient()
+            api_client.update_status(tag_id, new_status, timeout=10)
+            logger.info(f"Successfully updated API status for tag_id {tag_id} to {new_status}")
+        except Exception as e:
+            logger.error(f"Failed to update API status for tag_id {tag_id}: {str(e)}", exc_info=True)
+            session.rollback()
+            return jsonify({'error': f"Failed to update API: {str(e)}", 'local_update': 'success'}), 200
+
+        logger.info(f"Updated status for tag_id {tag_id} to {new_status}")
         return jsonify({'message': 'Status updated successfully'})
     except Exception as e:
         logger.error(f"Error updating status: {str(e)}", exc_info=True)
         session.rollback()
         return jsonify({'error': 'Failed to update status'}), 500
+    finally:
+        session.close()
+
+@tab1_bp.route('/tab/1/update_quality', methods=['POST'])
+@limiter.limit("10 per minute")
+def update_quality():
+    logger.debug("update_quality route accessed")
+    try:
+        session = db.session()
+        data = request.get_json()
+        tag_id = data.get('tag_id')
+        new_quality = data.get('quality', '')
+        logger.debug(f"update_quality: tag_id={tag_id}, quality={new_quality}")
+
+        if not tag_id:
+            logger.error("tag_id is required")
+            return jsonify({'error': 'Tag ID is required'}), 400
+
+        if new_quality not in VALID_QUALITIES:
+            logger.warning(f"Invalid quality value: {new_quality}")
+            return jsonify({'error': f'Quality must be one of {", ".join(VALID_QUALITIES)}'}), 400
+
+        item = session.query(ItemMaster).filter(ItemMaster.tag_id == tag_id).first()
+        if not item:
+            logger.warning(f"Item not found for tag_id {tag_id}")
+            return jsonify({'error': 'Item not found'}), 404
+
+        item.quality = new_quality if new_quality else None
+        item.date_updated = datetime.now()
+        session.commit()
+
+        try:
+            api_client = APIClient()
+            api_client.update_item(tag_id, {'quality': new_quality if new_quality else ''}, timeout=10)
+            logger.info(f"Successfully updated API quality for tag_id {tag_id} to {new_quality}")
+        except Exception as e:
+            logger.error(f"Failed to update API quality for tag_id {tag_id}: {str(e)}", exc_info=True)
+            session.rollback()
+            return jsonify({'error': f"Failed to update API: {str(e)}", 'local_update': 'success'}), 200
+
+        logger.info(f"Updated quality for tag_id {tag_id} to {new_quality}")
+        return jsonify({'message': 'Quality updated successfully'})
+    except Exception as e:
+        logger.error(f"Error updating quality: {str(e)}", exc_info=True)
+        session.rollback()
+        return jsonify({'error': 'Failed to update quality'}), 500
+    finally:
+        session.close()
+
+@tab1_bp.route('/tab/1/update_notes', methods=['POST'])
+@limiter.limit("10 per minute")
+def update_notes():
+    logger.debug("update_notes route accessed")
+    try:
+        session = db.session()
+        data = request.get_json()
+        tag_id = data.get('tag_id')
+        new_notes = data.get('notes')
+        logger.debug(f"update_notes: tag_id={tag_id}, notes={new_notes}")
+
+        if not tag_id:
+            logger.error("tag_id is required")
+            return jsonify({'error': 'Tag ID is required'}), 400
+
+        item = session.query(ItemMaster).filter(ItemMaster.tag_id == tag_id).first()
+        if not item:
+            logger.warning(f"Item not found for tag_id {tag_id}")
+            return jsonify({'error': 'Item not found'}), 404
+
+        item.notes = new_notes if new_notes else ''
+        item.date_updated = datetime.now()
+        session.commit()
+
+        try:
+            api_client = APIClient()
+            api_client.update_notes(tag_id, new_notes if new_notes else '', timeout=10)
+            logger.info(f"Successfully updated API notes for tag_id {tag_id}")
+        except Exception as e:
+            logger.error(f"Failed to update API notes for tag_id {tag_id}: {str(e)}", exc_info=True)
+            session.rollback()
+            return jsonify({'error': f"Failed to update API: {str(e)}", 'local_update': 'success'}), 200
+
+        logger.info(f"Updated notes for tag_id {tag_id}")
+        return jsonify({'message': 'Notes updated successfully'})
+    except Exception as e:
+        logger.error(f"Error updating notes: {str(e)}", exc_info=True)
+        session.rollback()
+        return jsonify({'error': 'Failed to update notes'}), 500
     finally:
         session.close()
 

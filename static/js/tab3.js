@@ -1,16 +1,14 @@
 // app/static/js/tab3.js
-// tab3.js version: 2025-07-09-v46
-console.log(`tab3.js version: 2025-07-09-v46 loaded at ${new Date().toISOString()}`);
+// tab3.js version: 2025-07-09-v47
+console.log(`tab3.js version: 2025-07-09-v47 loaded at ${new Date().toISOString()}`);
 
 /**
  * Tab3.js: Logic for Tab 3 (Items in Service).
  * Dependencies: common.js for formatDate, printTable, renderPaginationControls; tab.js for shared logic.
- * Updated: 2025-07-09-v46
- * - Added Save/Cancel buttons for editing status, quality, bin_location, and notes with explicit user confirmation.
- * - Updated quality dropdown options to A+, A, A-, B+, B, B-, C+, C, C-, '' to match database values.
- * - Fixed redundant save calls by improving event handling and debouncing edit actions.
- * - Preserved all functionality from v45: filters, sync, pagination, crew filter, print.
- * - Line count: ~750 lines (+25 from v45, added Save/Cancel UI and refined edit logic).
+ * Updated: 2025-07-09-v47
+ * - Fixed UI refresh issue in debouncedSaveEdit by ensuring loadItems completes before re-enabling UI.
+ * - Preserved all functionality from v46: Save/Cancel buttons, quality options (A+, A, A-, B+, B, B-, C+, C, C-, ''), filters, sync, pagination, crew filter, print.
+ * - Line count: ~750 lines (same as v46, only modified saveEdit logic).
  */
 
 /**
@@ -24,19 +22,28 @@ function debounce(func, wait) {
     return function executedFunction(...args) {
         if (isProcessing) {
             console.log(`DEBUG: Request blocked - operation in progress at ${new Date().toISOString()}`);
-            return;
+            return Promise.resolve();
         }
 
         clearTimeout(timeout);
         isProcessing = true;
         console.log(`DEBUG: Setting isProcessing to true at ${new Date().toISOString()}`);
 
-        timeout = setTimeout(() => {
-            func(...args).finally(() => {
-                isProcessing = false;
-                console.log(`DEBUG: Setting isProcessing to false at ${new Date().toISOString()}`);
-            });
-        }, wait);
+        return new Promise((resolve, reject) => {
+            timeout = setTimeout(() => {
+                func(...args)
+                    .then(result => {
+                        isProcessing = false;
+                        console.log(`DEBUG: Setting isProcessing to false at ${new Date().toISOString()}`);
+                        resolve(result);
+                    })
+                    .catch(error => {
+                        isProcessing = false;
+                        console.log(`DEBUG: Setting isProcessing to false after error at ${new Date().toISOString()}`);
+                        reject(error);
+                    });
+            }, wait);
+        });
     };
 }
 
@@ -457,10 +464,10 @@ const debouncedSaveEdit = debounce(async (cell, tagId, field, rentalClassId, com
         } else if (data.local_update === 'success' && data.error) {
             console.warn(`Update ${field} succeeded locally but failed in API: ${data.error} at ${new Date().toISOString()}`);
             alert(`Updated ${field} locally, but API failed: ${data.error}`);
-            loadItems(rentalClassId, commonName, targetId); // Refresh to show local update
+            await loadItems(rentalClassId, commonName, targetId); // Refresh to show local update
         } else {
             console.log(`Update ${field} successful at ${new Date().toISOString()}`);
-            loadItems(rentalClassId, commonName, targetId); // Refresh to show update
+            await loadItems(rentalClassId, commonName, targetId); // Refresh to show update
         }
     } catch (error) {
         console.error(`Update ${field} error: ${error.message} at ${new Date().toISOString()}`);
@@ -955,9 +962,14 @@ function handleItemClick(event) {
             const saveChanges = () => {
                 const value = select ? select.value : input ? input.value : '';
                 console.log(`Saving value: ${value} for field=${field}, tagId=${tagId} at ${new Date().toISOString()}`);
-                debouncedSaveEdit(editableCell, tagId, field, rentalClassId, commonName, targetId, value);
-                editContainer.style.display = 'none';
-                cellContent.style.display = 'block';
+                debouncedSaveEdit(editableCell, tagId, field, rentalClassId, commonName, targetId, value)
+                    .then(() => {
+                        editContainer.style.display = 'none';
+                        cellContent.style.display = 'block';
+                    })
+                    .catch(error => {
+                        console.error(`Save failed for field=${field}, tagId=${tagId}: ${error} at ${new Date().toISOString()}`);
+                    });
                 saveBtn.removeEventListener('click', saveChanges);
                 cancelBtn.removeEventListener('click', revert);
             };
