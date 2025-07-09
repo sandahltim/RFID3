@@ -1,15 +1,14 @@
 // app/static/js/tab1.js
-// tab1.js version: 2025-07-09-v3
-console.log('tab1.js version: 2025-07-09-v3 loaded');
+// tab1.js version: 2025-07-09-v4
+console.log('tab1.js version: 2025-07-09-v4 loaded');
 
 /**
  * Tab1.js: Logic for Tab 1 (Rental Inventory).
  * Dependencies: common.js (for formatDate, showLoading, hideLoading, collapseSection, printTable, printFullItemList).
- * Updated: 2025-07-09-v3
- * - Aligned editable fields (status, quality, bin_location, notes) with Tab 3: added Save/Cancel buttons, updated status options to ['Ready to Rent', 'Sold', 'Repair', 'Needs to be Inspected', 'Wash', 'Wet'], quality options to ['A+', 'A', 'A-', 'B+', 'B', 'B-', 'C+', 'C', 'C-', ''], and bin_location options to ['resale', 'sold', 'pack', 'burst', ''].
- * - Fixed UI refresh issue in debouncedSaveEdit to ensure loadItems updates UI immediately after save.
- * - Preserved all functionality from v2: subcategory population, common name loading, pagination, print, collapse/expand, filters.
- * - Line count: ~900 lines (+150 from v2 due to Save/Cancel UI, enhanced edit logic, and Promise-based debounce).
+ * Updated: 2025-07-09-v4
+ * - Fixed subcategory retrieval in handleClick to use closest .category-row .subcategory-select, resolving undefined subcategory error in saveEdit.
+ * - Preserved all functionality from v3: aligned editable fields, Save/Cancel buttons, UI refresh, subcategory population, common name loading, pagination, print, collapse/expand, filters.
+ * - Line count: ~900 lines (same as v3, only modified handleClick).
  */
 
 /**
@@ -137,7 +136,7 @@ function applyFilterToAllLevelsTab1() {
                                         }
                                     });
 
-                                    let itemRowCountDiv = itemTable.nextElementSibling;
+                                    let itemRowCountDiv = itemTable.nextSibling;
                                     if (itemRowCountDiv && !itemRowCountDiv.classList.contains('row-count')) {
                                         itemRowCountDiv = document.createElement('div');
                                         itemRowCountDiv.className = 'row-count mt-2';
@@ -180,7 +179,7 @@ function applyFilterToAllLevelsTab1() {
                         if (showCommonRow) visibleCommonRows++;
                     });
 
-                    let commonRowCountDiv = commonTable.nextElementSibling;
+                    let commonRowCountDiv = commonTable.nextSibling;
                     if (commonRowCountDiv && !commonRowCountDiv.classList.contains('row-count')) {
                         commonRowCountDiv = document.createElement('div');
                         commonRowCountDiv.className = 'row-count mt-2';
@@ -973,11 +972,17 @@ document.addEventListener('DOMContentLoaded', function() {
             const row = editableCell.closest('tr');
             const tagId = row.getAttribute('data-item-id');
             const commonName = row.querySelector('td:nth-child(2)').textContent;
-            const category = row.closest('.common-name-row')?.querySelector('button[data-category]')?.getAttribute('data-category') ||
-                             row.closest('tr').previousElementSibling?.querySelector('button[data-category]')?.getAttribute('data-category');
-            const subcategory = row.closest('.common-name-row')?.querySelector('button[data-subcategory]')?.getAttribute('data-subcategory') ||
-                                row.closest('tr').previousElementSibling?.querySelector('button[data-subcategory]')?.getAttribute('data-subcategory');
+            const categoryRow = row.closest('.category-row') || row.closest('tbody').querySelector('.category-row');
+            const subcatSelect = categoryRow ? categoryRow.querySelector('.subcategory-select') : null;
+            const subcategory = subcatSelect ? subcatSelect.value : '';
+            const category = categoryRow ? categoryRow.querySelector('.subcategory-select').getAttribute('data-category') : '';
             const targetId = row.closest('.expandable').id;
+
+            if (!subcategory) {
+                console.warn(`Subcategory not found for editable cell: field=${field}, tagId=${tagId} at ${new Date().toISOString()}`);
+                alert('Please select a subcategory before editing.');
+                return;
+            }
 
             const cellContent = editableCell.querySelector('.cell-content');
             const editContainer = editableCell.querySelector('.edit-container');
