@@ -1,15 +1,14 @@
 // app/static/js/tab3.js
-// tab3.js version: 2025-07-09-v48
-console.log(`tab3.js version: 2025-07-09-v48 loaded at ${new Date().toISOString()}`);
+// tab3.js version: 2025-07-09-v49
+console.log(`tab3.js version: 2025-07-09-v49 loaded at ${new Date().toISOString()}`);
 
 /**
  * Tab3.js: Logic for Tab 3 (Items in Service).
  * Dependencies: common.js for formatDate, printTable, renderPaginationControls; tab.js for shared logic.
- * Updated: 2025-07-09-v48
- * - Wrapped code in IIFE to prevent duplicate declaration of debouncedSaveEdit, fixing SyntaxError.
- * - Ensured loadItems clears table before rendering and added cache-busting to fetch URL to fix UI refresh issue.
- * - Preserved all functionality from v47: Save/Cancel buttons, quality options (A+, A, A-, B+, B, B-, C+, C, C-, ''), filters, sync, pagination, crew filter, print.
- * - Line count: ~760 lines (+10 from v47 due to IIFE wrapper).
+ * Updated: 2025-07-09-v49
+ * - Fixed TypeError in fetchCommonNames by adding null checks for DOM elements and removing invalid classList.contains check.
+ * - Preserved all functionality from v48: IIFE wrapper, cache-busting, Save/Cancel buttons, quality options, filters, sync, pagination, crew filter, print.
+ * - Line count: ~760 lines (same as v48, only modified fetchCommonNames).
  */
 
 (function() {
@@ -86,11 +85,22 @@ console.log(`tab3.js version: 2025-07-09-v48 loaded at ${new Date().toISOString(
     async function fetchCommonNames(rentalClassId, targetId, page = 1) {
         console.log(`fetchCommonNames: rentalClassId=${rentalClassId}, targetId=${targetId}, page=${page} at ${new Date().toISOString()}`);
         const sanitizedRentalClassId = rentalClassId.replace(/[^a-z0-9]/gi, '_');
-        const index = targetId.match(/-(\d+)$/)[1];
+        const indexMatch = targetId.match(/-(\d+)$/);
+        if (!indexMatch) {
+            console.error(`Invalid targetId format: ${targetId} at ${new Date().toISOString()}`);
+            return { common_names: [], total_items: 0 };
+        }
+        const index = indexMatch[1];
         const expectedTableId = `common-table-${sanitizedRentalClassId}-${index}`;
         const table = document.getElementById(expectedTableId);
         if (!table) {
             console.error(`Common table ${expectedTableId} not found for targetId=${targetId} at ${new Date().toISOString()}`);
+            return { common_names: [], total_items: 0 };
+        }
+
+        const tbody = table.querySelector('tbody');
+        if (!tbody) {
+            console.error(`tbody not found in table ${expectedTableId} at ${new Date().toISOString()}`);
             return { common_names: [], total_items: 0 };
         }
 
@@ -108,7 +118,7 @@ console.log(`tab3.js version: 2025-07-09-v48 loaded at ${new Date().toISOString(
 
             if (data.error) {
                 console.error(`Server error fetching common names: ${data.error} at ${new Date().toISOString()}`);
-                table.querySelector('tbody').innerHTML = `<tr><td colspan="4">Error: ${data.error}</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="4">Error: ${data.error}</td></tr>`;
                 return data;
             }
 
@@ -116,12 +126,6 @@ console.log(`tab3.js version: 2025-07-09-v48 loaded at ${new Date().toISOString(
             const totalItems = data.total_items || 0;
             const perPage = data.per_page || 20;
             const currentPage = data.page || 1;
-
-            const tbody = table.querySelector('tbody');
-            if (!tbody) {
-                console.error(`tbody not found in table ${expectedTableId} at ${new Date().toISOString()}`);
-                return data;
-            }
 
             tbody.innerHTML = '';
             if (commonNames.length === 0) {
@@ -184,8 +188,8 @@ console.log(`tab3.js version: 2025-07-09-v48 loaded at ${new Date().toISOString(
 
             return data;
         } catch (error) {
-            console.error(`Error fetching common names for ${rentalClassId}: ${error} at ${new Date().toISOString()}`);
-            table.querySelector('tbody').innerHTML = `<tr><td colspan="4">Error loading common names: ${error.message}</td></tr>`;
+            console.error(`Error fetching common names for ${rentalClassId}: ${error.message} at ${new Date().toISOString()}`);
+            tbody.innerHTML = `<tr><td colspan="4">Error loading common names: ${error.message}</td></tr>`;
             return { common_names: [], total_items: 0 };
         }
     }
