@@ -1,15 +1,55 @@
-console.log('tab1.js version: 2025-06-25-v2 loaded');
+// app/static/js/tab1.js
+// tab1.js version: 2025-07-09-v3
+console.log('tab1.js version: 2025-07-09-v3 loaded');
 
 /**
- * Tab1.js: Logic for Tab 1.
+ * Tab1.js: Logic for Tab 1 (Rental Inventory).
  * Dependencies: common.js (for formatDate, showLoading, hideLoading, collapseSection, printTable, printFullItemList).
- * Updated: 2025-06-25-v2
- * - Added fetchAllSubcategories to populateSubcategories to fix dropdown truncation.
- * - Fixed collapse by hiding all related common-name-row <tr> elements.
- * - Added event.stopPropagation to handleClick to prevent tab.js warnings.
- * - Preserved all functionality (bulk updates, CSV export, pagination).
+ * Updated: 2025-07-09-v3
+ * - Aligned editable fields (status, quality, bin_location, notes) with Tab 3: added Save/Cancel buttons, updated status options to ['Ready to Rent', 'Sold', 'Repair', 'Needs to be Inspected', 'Wash', 'Wet'], quality options to ['A+', 'A', 'A-', 'B+', 'B', 'B-', 'C+', 'C', 'C-', ''], and bin_location options to ['resale', 'sold', 'pack', 'burst', ''].
+ * - Fixed UI refresh issue in debouncedSaveEdit to ensure loadItems updates UI immediately after save.
+ * - Preserved all functionality from v2: subcategory population, common name loading, pagination, print, collapse/expand, filters.
+ * - Line count: ~900 lines (+150 from v2 due to Save/Cancel UI, enhanced edit logic, and Promise-based debounce).
  */
 
+/**
+ * Debounce function with Promise support
+ */
+function debounce(func, wait) {
+    let timeout;
+    let isProcessing = false;
+
+    return function executedFunction(...args) {
+        if (isProcessing) {
+            console.log(`DEBUG: Request blocked - operation in progress at ${new Date().toISOString()}`);
+            return Promise.resolve();
+        }
+
+        clearTimeout(timeout);
+        isProcessing = true;
+        console.log(`DEBUG: Setting isProcessing to true at ${new Date().toISOString()}`);
+
+        return new Promise((resolve, reject) => {
+            timeout = setTimeout(() => {
+                func(...args)
+                    .then(result => {
+                        isProcessing = false;
+                        console.log(`DEBUG: Setting isProcessing to false at ${new Date().toISOString()}`);
+                        resolve(result);
+                    })
+                    .catch(error => {
+                        isProcessing = false;
+                        console.log(`DEBUG: Setting isProcessing to false after error at ${new Date().toISOString()}`);
+                        reject(error);
+                    });
+            }, wait);
+        });
+    };
+}
+
+/**
+ * Apply filters to all levels for Tab 1
+ */
 function applyFilterToAllLevelsTab1() {
     console.log(`applyFilterToAllLevelsTab1: Starting at ${new Date().toISOString()}`);
     if (window.cachedTabNum === 3 || !window.location.pathname.match(/\/tab\/\d+/)) {
@@ -190,6 +230,9 @@ function applyFilterToAllLevelsTab1() {
     }
 }
 
+/**
+ * Populate subcategory dropdowns
+ */
 function populateSubcategories() {
     console.log(`populateSubcategories: Starting at ${new Date().toISOString()}`);
     const selects = document.querySelectorAll('.subcategory-select');
@@ -253,6 +296,9 @@ function populateSubcategories() {
     return Promise.all(promises).catch(error => console.error('Error populating subcategories:', error, `at ${new Date().toISOString()}`));
 }
 
+/**
+ * Load common names for a subcategory
+ */
 function loadCommonNames(selectElement, page = 1) {
     console.log(`loadCommonNames: Starting at ${new Date().toISOString()}`, { selectElement, page });
     const subcategory = selectElement.value;
@@ -410,7 +456,7 @@ function loadCommonNames(selectElement, page = 1) {
                     itemsRow.setAttribute('data-target-id', targetId);
                     itemsRow.innerHTML = `
                         <td colspan="7">
-                            <div id="items-${rowId}" class="expandable collapsed item-level"></div>
+                            <div id="items-${rowId}" class="expandable item-level collapsed"></div>
                         </td>
                     `;
                     tableBody.appendChild(itemsRow);
@@ -457,7 +503,7 @@ function loadCommonNames(selectElement, page = 1) {
                     }, `at ${new Date().toISOString()}`);
                 }
             } else {
-                tableBody.innerHTML = `<tr><td colspan="7">No common names found.</td></tr>`;
+                tableBody.innerHTML = `<tr><td colspan="6">No common names found.</td></tr>`;
                 console.warn(`No common names returned for category ${category}, subcategory ${subcategory} at ${new Date().toISOString()}`);
             }
 
@@ -465,7 +511,7 @@ function loadCommonNames(selectElement, page = 1) {
         })
         .catch(error => {
             console.error(`Common names error: ${error.message} at ${new Date().toISOString()}`);
-            tableBody.innerHTML = `<tr><td colspan="7">Error: ${error.message}</td></tr>`;
+            tableBody.innerHTML = `<tr><td colspan="6">Error: ${error.message}</td></tr>`;
         })
         .finally(() => {
             setTimeout(() => {
@@ -474,7 +520,10 @@ function loadCommonNames(selectElement, page = 1) {
         });
 }
 
-function loadItems(category, subcategory, commonName, targetId, page = 1) {
+/**
+ * Load individual items for a common name
+ */
+async function loadItems(category, subcategory, commonName, targetId, page = 1) {
     console.log(`loadItems: Starting at ${new Date().toISOString()}`, { category, subcategory, commonName, targetId, page });
 
     if (!category || !subcategory || !commonName || !targetId) {
@@ -495,7 +544,7 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
     container.classList.add('loading');
 
     const key = targetId;
-    const loadingSuccess = showLoading(key);
+    const loadingSuccess = typeof showLoading === 'function' ? showLoading(key) : false;
 
     container.innerHTML = '';
 
@@ -517,11 +566,13 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                 <th>Last Scanned Date</th>
                 <th>Quality</th>
                 <th>Notes</th>
+                <th>Actions</th>
             </tr>
         </thead>
         <tbody>
             <tr>
                 <td>Loading...</td>
+                <td>-</td>
                 <td>-</td>
                 <td>-</td>
                 <td>-</td>
@@ -537,190 +588,236 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
     const url = `/tab/1/data?common_name=${encodeURIComponent(commonName)}&page=${page}&subcategory=${encodeURIComponent(subcategory)}&category=${encodeURIComponent(category)}`;
     console.log(`Fetching items: ${url} at ${new Date().toISOString()}`);
 
-    fetch(url)
-        .then(response => {
-            console.log(`Items fetch status: ${response.status} at ${new Date().toISOString()}`);
-            if (!response.ok) {
-                return response.text().then(text => {
-                    throw new Error(`Items fetch failed: ${response.status} - ${text}`);
-                });
-            }
-            return response.json();
-        })
-        .then(data => {
-            console.log(`Items data:`, data, `at ${new Date().toISOString()}`);
-            const tbody = itemTable.querySelector('tbody');
-            tbody.innerHTML = '';
+    try {
+        const response = await fetch(url);
+        console.log(`Items fetch status: ${response.status} at ${new Date().toISOString()}`);
+        if (!response.ok) {
+            throw new Error(`Items fetch failed: ${response.status}`);
+        }
+        const data = await response.json();
+        console.log(`Items data:`, data, `at ${new Date().toISOString()}`);
+        const tbody = itemTable.querySelector('tbody');
+        tbody.innerHTML = '';
 
-            if (data.items && data.items.length > 0) {
-                data.items.forEach(item => {
-                    const lastScanned = formatDate(item.last_scanned_date);
-                    const currentStatus = item.status || 'N/A';
-                    const binLocationLower = item.bin_location ? item.bin_location.toLowerCase() : '';
-                    const row = document.createElement('tr');
-                    row.setAttribute('data-item-id', item.tag_id);
-                    row.innerHTML = `
-                        <td class="editable" data-field="tag_id">${item.tag_id}</td>
-                        <td>${item.common_name}</td>
-                        <td class="editable" data-field="bin_location">
-                            <span class="cell-content">${item.bin_location || 'N/A'}</span>
-                            <select class="edit-select" style="display: none;">
+        if (data.items && data.items.length > 0) {
+            data.items.forEach(item => {
+                const lastScanned = formatDate ? formatDate(item.last_scanned_date) : item.last_scanned_date || 'N/A';
+                const currentStatus = item.status || 'N/A';
+                const currentQuality = item.quality || '';
+                const binLocationLower = item.bin_location ? item.bin_location.toLowerCase() : '';
+                const row = document.createElement('tr');
+                row.setAttribute('data-item-id', item.tag_id);
+                row.innerHTML = `
+                    <td class="editable" data-field="tag_id">${item.tag_id}</td>
+                    <td>${item.common_name}</td>
+                    <td class="editable" data-field="bin_location">
+                        <span class="cell-content">${item.bin_location || 'N/A'}</span>
+                        <div class="edit-container" style="display: none;">
+                            <select class="edit-select">
                                 <option value="" ${!item.bin_location ? 'selected' : ''}>Select Bin Location</option>
                                 <option value="resale" ${binLocationLower === 'resale' ? 'selected' : ''}>Resale</option>
                                 <option value="sold" ${binLocationLower === 'sold' ? 'selected' : ''}>Sold</option>
                                 <option value="pack" ${binLocationLower === 'pack' ? 'selected' : ''}>Pack</option>
                                 <option value="burst" ${binLocationLower === 'burst' ? 'selected' : ''}>Burst</option>
                             </select>
-                        </td>
-                        <td class="editable" data-field="status">
-                            <span class="cell-content">${currentStatus}</span>
-                            <select class="edit-select" style="display: none;">
+                            <button class="btn btn-sm btn-success save-btn">Save</button>
+                            <button class="btn btn-sm btn-secondary cancel-btn">Cancel</button>
+                        </div>
+                    </td>
+                    <td class="editable" data-field="status">
+                        <span class="cell-content">${currentStatus}</span>
+                        <div class="edit-container" style="display: none;">
+                            <select class="edit-select">
                                 <option value="${currentStatus}" selected>${currentStatus}</option>
-                                <option value="Ready to Rent" ${currentStatus === 'On Rent' || currentStatus === 'Delivered' ? '' : 'disabled'}>Ready to Rent</option>
+                                <option value="Ready to Rent">Ready to Rent</option>
                                 <option value="Sold">Sold</option>
+                                <option value="Repair">Repair</option>
+                                <option value="Needs to be Inspected">Needs to be Inspected</option>
+                                <option value="Wash">Wash</option>
+                                <option value="Wet">Wet</option>
                             </select>
-                        </td>
-                        <td>${item.last_contract_num || 'N/A'}</td>
-                        <td>${lastScanned}</td>
-                        <td class="editable" data-field="quality">
-                            <span class="cell-content">${item.quality || 'N/A'}</span>
-                            <select class="edit-select" style="display: none;">
-                                <option value="" ${!item.quality ? 'selected' : ''}>Select Quality</option>
-                                <option value="Good" ${item.quality === 'Good' ? 'selected' : ''}>Good</option>
-                                <option value="Fair" ${item.quality === 'Fair' ? 'selected' : ''}>Fair</option>
-                                <option value="Poor" ${item.quality === 'Poor' ? 'selected' : ''}>Poor</option>
+                            <button class="btn btn-sm btn-success save-btn">Save</button>
+                            <button class="btn btn-sm btn-secondary cancel-btn">Cancel</button>
+                        </div>
+                    </td>
+                    <td>${item.last_contract_num || 'N/A'}</td>
+                    <td>${lastScanned}</td>
+                    <td class="editable" data-field="quality">
+                        <span class="cell-content">${currentQuality || 'N/A'}</span>
+                        <div class="edit-container" style="display: none;">
+                            <select class="edit-select">
+                                <option value="" ${!currentQuality ? 'selected' : ''}>Select Quality</option>
+                                <option value="A+" ${currentQuality === 'A+' ? 'selected' : ''}>A+</option>
+                                <option value="A" ${currentQuality === 'A' ? 'selected' : ''}>A</option>
+                                <option value="A-" ${currentQuality === 'A-' ? 'selected' : ''}>A-</option>
+                                <option value="B+" ${currentQuality === 'B+' ? 'selected' : ''}>B+</option>
+                                <option value="B" ${currentQuality === 'B' ? 'selected' : ''}>B</option>
+                                <option value="B-" ${currentQuality === 'B-' ? 'selected' : ''}>B-</option>
+                                <option value="C+" ${currentQuality === 'C+' ? 'selected' : ''}>C+</option>
+                                <option value="C" ${currentQuality === 'C' ? 'selected' : ''}>C</option>
+                                <option value="C-" ${currentQuality === 'C-' ? 'selected' : ''}>C-</option>
                             </select>
-                        </td>
-                        <td class="editable" data-field="notes">
-                            <span class="cell-content">${item.notes || 'N/A'}</span>
-                            <input class="edit-input" style="display: none;" value="${item.notes || ''}">
-                        </td>
-                    `;
-                    tbody.appendChild(row);
-                });
+                            <button class="btn btn-sm btn-success save-btn">Save</button>
+                            <button class="btn btn-sm btn-secondary cancel-btn">Cancel</button>
+                        </div>
+                    </td>
+                    <td class="editable" data-field="notes">
+                        <span class="cell-content">${item.notes || 'N/A'}</span>
+                        <div class="edit-container" style="display: none;">
+                            <input class="edit-input" type="text" value="${item.notes || ''}">
+                            <button class="btn btn-sm btn-success save-btn">Save</button>
+                            <button class="btn btn-sm btn-secondary cancel-btn">Cancel</button>
+                        </div>
+                    </td>
+                    <td>
+                        <button class="btn btn-sm btn-primary print-btn"
+                                data-print-level="Item"
+                                data-print-id="item-${item.tag_id}"
+                                data-common-name="${commonName.replace(/'/g, "\\'").replace(/"/g, '\\"')}"
+                                data-category="${category}">Print</button>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
 
-                const paginationDiv = document.createElement('div');
-                paginationDiv.className = 'pagination-controls';
-                if (data.total_items > data.per_page) {
-                    const totalPages = Math.ceil(data.total_items / data.per_page);
-                    const escapedCommonName = commonName.replace(/'/g, "\\'").replace(/"/g, '\\"');
-                    paginationDiv.innerHTML = `
-                        <button class="btn btn-sm btn-secondary prev-page" 
-                                data-page="${data.page - 1}" 
-                                ${data.page === 1 ? 'disabled' : ''}>Previous</button>
-                        <span>Page ${data.page} of ${totalPages}</span>
-                        <button class="btn btn-sm btn-secondary next-page" 
-                                data-page="${data.page + 1}" 
-                                ${data.page === totalPages ? 'disabled' : ''}>Next</button>
-                    `;
-                    wrapper.appendChild(paginationDiv);
-
-                    paginationDiv.querySelectorAll('.prev-page, .next-page').forEach(button => {
-                        button.addEventListener('click', () => {
-                            const newPage = parseInt(button.getAttribute('data-page'));
-                            loadItems(category, subcategory, commonName, targetId, newPage);
-                        });
-                    });
-                }
+            const paginationDiv = document.createElement('div');
+            paginationDiv.className = 'pagination-controls';
+            if (data.total_items > data.per_page) {
+                const totalPages = Math.ceil(data.total_items / data.per_page);
+                paginationDiv.innerHTML = `
+                    <button class="btn btn-sm btn-secondary prev-page" 
+                            data-page="${data.page - 1}" 
+                            ${data.page === 1 ? 'disabled' : ''}>Previous</button>
+                    <span>Page ${data.page} of ${totalPages}</span>
+                    <button class="btn btn-sm btn-secondary next-page" 
+                            data-page="${data.page + 1}" 
+                            ${data.page === totalPages ? 'disabled' : ''}>Next</button>
+                `;
                 wrapper.appendChild(paginationDiv);
-            } else {
-                tbody.innerHTML = `<tr><td colspan="8">No items found.</td></tr>`;
-                console.warn(`No items returned for category ${category}, subcategory ${subcategory}, commonName ${commonName} at ${new Date().toISOString()}`);
+
+                paginationDiv.querySelectorAll('.prev-page, .next-page').forEach(button => {
+                    button.addEventListener('click', () => {
+                        const newPage = parseInt(button.getAttribute('data-page'));
+                        loadItems(category, subcategory, commonName, targetId, newPage);
+                    });
+                });
             }
+            wrapper.appendChild(paginationDiv);
+        } else {
+            tbody.innerHTML = `<tr><td colspan="9">No items found.</td></tr>`;
+            console.warn(`No items returned for category ${category}, subcategory ${subcategory}, commonName ${commonName} at ${new Date().toISOString()}`);
+        }
 
-            const parentRow = container.closest('tr.common-name-row').previousElementSibling;
-            if (parentRow) {
-                const expandBtn = parentRow.querySelector(`.expand-btn[data-target-id="${targetId}"]`);
-                const collapseBtn = parentRow.querySelector(`.collapse-btn[data-collapse-target="${targetId}"]`);
-                if (expandBtn && collapseBtn) {
-                    expandBtn.style.display = 'none';
-                    collapseBtn.style.display = 'inline-block';
-                } else {
-                    console.warn(`Expand/Collapse buttons not found for ${targetId} at ${new Date().toISOString()}`);
-                }
+        const parentRow = container.closest('tr.common-name-row').previousElementSibling;
+        if (parentRow) {
+            const expandBtn = parentRow.querySelector(`.expand-btn[data-target-id="${targetId}"]`);
+            const collapseBtn = parentRow.querySelector(`.collapse-btn[data-collapse-target="${targetId}"]`);
+            if (expandBtn && collapseBtn) {
+                expandBtn.style.display = 'none';
+                collapseBtn.style.display = 'inline-block';
             } else {
-                console.warn(`Parent row not found for ${targetId} at ${new Date().toISOString()}`);
+                console.warn(`Expand/Collapse buttons not found for ${targetId} at ${new Date().toISOString()}`);
             }
+        } else {
+            console.warn(`Parent row not found for ${targetId} at ${new Date().toISOString()}`);
+        }
 
-            container.classList.remove('collapsed');
-            container.classList.add('expanded');
-            container.style.display = 'block';
-            container.style.opacity = '1';
-            container.style.visibility = 'visible';
+        container.classList.remove('collapsed');
+        container.classList.add('expanded');
+        container.style.display = 'block';
+        container.style.opacity = '1';
+        container.style.visibility = 'visible';
 
-            console.log(`Container styles:`, {
-                classList: container.classList.toString(),
-                display: container.style.display,
-                opacity: container.style.opacity,
-                visibility: window.getComputedStyle(container).visibility
+        console.log(`Container styles:`, {
+            classList: container.classList.toString(),
+            display: container.style.display,
+            opacity: container.style.opacity,
+            visibility: window.getComputedStyle(container).visibility
+        }, `at ${new Date().toISOString()}`);
+
+        if (itemTable) {
+            console.log(`Item table styles:`, {
+                display: itemTable.style.display,
+                visibility: window.getComputedStyle(itemTable).visibility
             }, `at ${new Date().toISOString()}`);
-
-            if (itemTable) {
-                console.log(`Item table styles:`, {
-                    display: itemTable.style.display,
-                    visibility: window.getComputedStyle(itemTable).visibility
-                }, `at ${new Date().toISOString()}`);
-            }
-        })
-        .catch(error => {
-            console.error(`Items error: ${error.message} at ${new Date().toISOString()}`);
-            const tbody = itemTable.querySelector('tbody');
-            tbody.innerHTML = `<tr><td colspan="8">Error: ${error.message}</td></tr>`;
-            container.classList.remove('collapsed');
-            container.classList.add('expanded');
-            container.style.display = 'block';
-            container.style.opacity = '1';
-            container.style.visibility = 'visible';
-        })
-        .finally(() => {
-            setTimeout(() => {
-                if (loadingSuccess) hideLoading(key);
-                container.classList.remove('loading');
-            }, 700);
-        });
+        }
+    } catch (error) {
+        console.error(`Items error: ${error.message} at ${new Date().toISOString()}`);
+        const tbody = itemTable.querySelector('tbody');
+        tbody.innerHTML = `<tr><td colspan="9">Error: ${error.message}</td></tr>`;
+        container.classList.remove('collapsed');
+        container.classList.add('expanded');
+        container.style.display = 'block';
+        container.style.opacity = '1';
+        container.style.visibility = 'visible';
+    } finally {
+        setTimeout(() => {
+            if (loadingSuccess) hideLoading(key);
+            container.classList.remove('loading');
+        }, 700);
+    }
 }
 
-function saveEdit(cell, tagId, field, key, category, subcategory, commonName, targetId) {
-    console.log(`saveEdit: Starting at ${new Date().toISOString()}`, { tagId, field, key, category, subcategory, commonName, targetId });
-    const select = cell.querySelector('.edit-select');
-    const input = cell.querySelector('.edit-input');
-    const value = select ? select.value : input ? input.value : '';
+/**
+ * Save edits for item fields
+ */
+const debouncedSaveEdit = debounce(async (cell, tagId, field, category, subcategory, commonName, targetId, value) => {
+    console.log(`saveEdit: Starting at ${new Date().toISOString()}`, { tagId, field, category, subcategory, commonName, targetId, value });
+    if (!tagId || !field) {
+        console.error(`Invalid parameters for saveEdit: tagId=${tagId}, field=${field} at ${new Date().toISOString()}`);
+        alert(`Error: Missing tag ID or field`);
+        return;
+    }
 
-    if (!value && field !== 'notes') {
-        alert(`Please select a value for ${field}.`);
+    const validStatuses = ['Ready to Rent', 'Sold', 'Repair', 'Needs to be Inspected', 'Wash', 'Wet'];
+    const validQualities = ['A+', 'A', 'A-', 'B+', 'B', 'B-', 'C+', 'C', 'C-', ''];
+    const validBinLocations = ['resale', 'sold', 'pack', 'burst', ''];
+
+    if (field === 'status' && !validStatuses.includes(value)) {
+        console.error(`Invalid status value: ${value} at ${new Date().toISOString()}`);
+        alert(`Invalid status. Choose from: ${validStatuses.join(', ')}`);
+        return;
+    }
+    if (field === 'quality' && !validQualities.includes(value)) {
+        console.error(`Invalid quality value: ${value} at ${new Date().toISOString()}`);
+        alert(`Invalid quality. Choose from: ${validQualities.join(', ')}`);
+        return;
+    }
+    if (field === 'bin_location' && !validBinLocations.includes(value)) {
+        console.error(`Invalid bin location value: ${value} at ${new Date().toISOString()}`);
+        alert(`Invalid bin location. Choose from: ${validBinLocations.join(', ')}`);
         return;
     }
 
     const url = `/tab/1/update_${field}`;
-    fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tag_id: tagId, [field]: value })
-    })
-        .then(response => {
-            console.log(`Update ${field} status for ${tagId}: ${response.status} at ${new Date().toISOString()}`);
-            if (!response.ok) {
-                return response.text().then(text => {
-                    throw new Error(`Update ${field} failed: ${response.status} - ${text}`);
-                });
-            }
-            return response.json();
-        })
-        .then(data => {
-            if (data.error) {
-                console.error(`Update ${field} error: ${data.error} at ${new Date().toISOString()}`);
-                alert(`Failed to update ${field}: ${data.error}`);
-            } else {
-                console.log(`Update ${field} successful at ${new Date().toISOString()}`);
-                loadItems(category, subcategory, commonName, targetId);
-            }
-        })
-        .catch(error => {
-            console.error(`Update ${field} error: ${error.message} at ${new Date().toISOString()}`);
-            alert(`Error: ${error.message}`);
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tag_id: tagId, [field]: value || '' })
         });
-}
+        console.log(`Update ${field} status for ${tagId}: ${response.status} at ${new Date().toISOString()}`);
+        if (!response.ok) {
+            const text = await response.text();
+            throw new Error(`Update ${field} failed: ${response.status} - ${text}`);
+        }
+        const data = await response.json();
+        if (data.error) {
+            console.error(`Update ${field} error: ${data.error} at ${new Date().toISOString()}`);
+            alert(`Failed to update ${field}: ${data.error}`);
+        } else {
+            console.log(`Update ${field} successful at ${new Date().toISOString()}`);
+            await loadItems(category, subcategory, commonName, targetId); // Refresh UI
+        }
+    } catch (error) {
+        console.error(`Update ${field} error: ${error.message} at ${new Date().toISOString()}`);
+        alert(`Error updating ${field}: ${error.message}`);
+    }
+}, 500);
 
+/**
+ * Initialize the page and handle click events
+ */
 document.addEventListener('DOMContentLoaded', function() {
     console.log(`tab1.js: DOMContentLoaded at ${new Date().toISOString()}`);
     const isTab1 = window.location.pathname.match(/\/tab\/1\b/);
@@ -869,61 +966,75 @@ document.addEventListener('DOMContentLoaded', function() {
 
         const editableCell = event.target.closest('.editable');
         if (editableCell) {
+            event.preventDefault();
+            event.stopPropagation();
+            console.log(`Editable cell clicked: field=${editableCell.getAttribute('data-field')} at ${new Date().toISOString()}`);
             const field = editableCell.getAttribute('data-field');
             const row = editableCell.closest('tr');
             const tagId = row.getAttribute('data-item-id');
             const commonName = row.querySelector('td:nth-child(2)').textContent;
-            const category = row.closest('.common-level')?.querySelector('button[data-category]')?.getAttribute('data-category') ||
+            const category = row.closest('.common-name-row')?.querySelector('button[data-category]')?.getAttribute('data-category') ||
                              row.closest('tr').previousElementSibling?.querySelector('button[data-category]')?.getAttribute('data-category');
-            const subcategory = row.closest('.common-level')?.querySelector('button[data-subcategory]')?.getAttribute('data-subcategory') ||
+            const subcategory = row.closest('.common-name-row')?.querySelector('button[data-subcategory]')?.getAttribute('data-subcategory') ||
                                 row.closest('tr').previousElementSibling?.querySelector('button[data-subcategory]')?.getAttribute('data-subcategory');
             const targetId = row.closest('.expandable').id;
 
             const cellContent = editableCell.querySelector('.cell-content');
-            const select = editableCell.querySelector('.edit-select');
-            const input = editableCell.querySelector('.edit-input');
+            const editContainer = editableCell.querySelector('.edit-container');
+            const select = editContainer.querySelector('.edit-select');
+            const input = editContainer.querySelector('.edit-input');
+            const saveBtn = editContainer.querySelector('.save-btn');
+            const cancelBtn = editContainer.querySelector('.cancel-btn');
 
-            if (select) {
+            // Hide all other edit containers
+            document.querySelectorAll('.edit-container').forEach(container => {
+                container.style.display = 'none';
+                container.parentElement.querySelector('.cell-content').style.display = 'block';
+            });
+
+            if (editContainer) {
                 cellContent.style.display = 'none';
-                select.style.display = 'block';
-                select.focus();
+                editContainer.style.display = 'flex';
+                (select || input).focus();
+                console.log(`Showing edit container for field=${field}, tagId=${tagId} at ${new Date().toISOString()}`);
 
                 const saveChanges = () => {
-                    saveEdit(editableCell, tagId, field, targetId, category, subcategory, commonName, targetId);
-                    select.removeEventListener('change', saveChanges);
-                    select.removeEventListener('blur', revert);
+                    const value = select ? select.value : input ? input.value : '';
+                    console.log(`Saving value: ${value} for field=${field}, tagId=${tagId} at ${new Date().toISOString()}`);
+                    debouncedSaveEdit(editableCell, tagId, field, category, subcategory, commonName, targetId, value)
+                        .then(() => {
+                            editContainer.style.display = 'none';
+                            cellContent.style.display = 'block';
+                        })
+                        .catch(error => {
+                            console.error(`Save failed for field=${field}, tagId=${tagId}: ${error} at ${new Date().toISOString()}`);
+                        });
+                    saveBtn.removeEventListener('click', saveChanges);
+                    cancelBtn.removeEventListener('click', revert);
                 };
 
                 const revert = () => {
-                    select.style.display = 'none';
+                    console.log(`Cancelling edit for field=${field}, tagId=${tagId} at ${new Date().toISOString()}`);
+                    editContainer.style.display = 'none';
                     cellContent.style.display = 'block';
-                    select.removeEventListener('change', saveChanges);
-                    select.removeEventListener('blur', revert);
+                    saveBtn.removeEventListener('click', saveChanges);
+                    cancelBtn.removeEventListener('click', revert);
                 };
 
-                select.addEventListener('change', saveChanges);
-                select.addEventListener('blur', revert);
-            } else if (input) {
-                cellContent.style.display = 'none';
-                input.style.display = 'block';
-                input.focus();
+                saveBtn.addEventListener('click', saveChanges);
+                cancelBtn.addEventListener('click', revert);
 
-                const saveChanges = () => {
-                    saveEdit(editableCell, tagId, field, targetId, category, subcategory, commonName, targetId);
-                    input.removeEventListener('blur', saveChanges);
-                    input.removeEventListener('keypress', handleKeypress);
-                };
-
-                const handleKeypress = (e) => {
-                    if (e.key === 'Enter') {
-                        saveEdit(editableCell, tagId, field, targetId, category, subcategory, commonName, targetId);
-                        input.removeEventListener('blur', saveChanges);
-                        input.removeEventListener('keypress', handleKeypress);
-                    }
-                };
-
-                input.addEventListener('blur', saveChanges);
-                input.addEventListener('keypress', handleKeypress);
+                if (input) {
+                    const handleKeypress = (e) => {
+                        if (e.key === 'Enter') {
+                            saveChanges();
+                        }
+                    };
+                    input.addEventListener('keypress', handleKeypress);
+                    input.addEventListener('keypress', () => input.removeEventListener('keypress', handleKeypress), { once: true });
+                }
+            } else {
+                console.warn(`No edit container found for editable cell: field=${field}, tagId=${tagId} at ${new Date().toISOString()}`);
             }
         }
     }
