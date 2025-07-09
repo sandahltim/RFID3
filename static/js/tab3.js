@@ -1,20 +1,21 @@
 // app/static/js/tab3.js
-// tab3.js version: 2025-07-09-v45
-console.log(`tab3.js version: 2025-07-09-v45 loaded at ${new Date().toISOString()}`);
+// tab3.js version: 2025-07-09-v46
+console.log(`tab3.js version: 2025-07-09-v46 loaded at ${new Date().toISOString()}`);
 
 /**
  * Tab3.js: Logic for Tab 3 (Items in Service).
  * Dependencies: common.js for formatDate, printTable, renderPaginationControls; tab.js for shared logic.
- * Updated: 2025-07-09-v45
- * - Fixed edit functionality for status, notes, quality, and bin_location with robust event delegation.
- * - Integrated print functionality with common.js printTable, fixing table selection issues.
- * - Preserved all functionality from v44: filters, sync, pagination, crew filter.
- * - Line count: ~725 lines (+5 from v44, refined edit and print handling).
+ * Updated: 2025-07-09-v46
+ * - Added Save/Cancel buttons for editing status, quality, bin_location, and notes with explicit user confirmation.
+ * - Updated quality dropdown options to A+, A, A-, B+, B, B-, C+, C, C-, '' to match database values.
+ * - Fixed redundant save calls by improving event handling and debouncing edit actions.
+ * - Preserved all functionality from v45: filters, sync, pagination, crew filter, print.
+ * - Line count: ~750 lines (+25 from v45, added Save/Cancel UI and refined edit logic).
  */
 
 /**
  * Debounce function with immediate lock
- * Used by: Sync to PC, update status, remove item
+ * Used by: Sync to PC, update status, remove item, save edit
  */
 function debounce(func, wait) {
     let timeout;
@@ -265,6 +266,7 @@ async function loadItems(rentalClassId, commonName, targetId, page = 1) {
             data.items.forEach(item => {
                 const lastScanned = window.formatDate ? window.formatDate(item.date_last_scanned) : item.date_last_scanned || 'N/A';
                 const currentStatus = item.status || 'N/A';
+                const currentQuality = item.quality || '';
                 const binLocationLower = item.bin_location ? item.bin_location.toLowerCase() : '';
                 const row = document.createElement('tr');
                 row.setAttribute('data-item-id', item.tag_id);
@@ -273,40 +275,62 @@ async function loadItems(rentalClassId, commonName, targetId, page = 1) {
                     <td>${item.common_name}</td>
                     <td class="editable" data-field="bin_location">
                         <span class="cell-content">${item.bin_location || 'N/A'}</span>
-                        <select class="edit-select" style="display: none;">
-                            <option value="" ${!item.bin_location ? 'selected' : ''}>Select Bin Location</option>
-                            <option value="resale" ${binLocationLower === 'resale' ? 'selected' : ''}>Resale</option>
-                            <option value="sold" ${binLocationLower === 'sold' ? 'selected' : ''}>Sold</option>
-                            <option value="pack" ${binLocationLower === 'pack' ? 'selected' : ''}>Pack</option>
-                            <option value="burst" ${binLocationLower === 'burst' ? 'selected' : ''}>Burst</option>
-                        </select>
+                        <div class="edit-container" style="display: none;">
+                            <select class="edit-select">
+                                <option value="" ${!item.bin_location ? 'selected' : ''}>Select Bin Location</option>
+                                <option value="resale" ${binLocationLower === 'resale' ? 'selected' : ''}>Resale</option>
+                                <option value="sold" ${binLocationLower === 'sold' ? 'selected' : ''}>Sold</option>
+                                <option value="pack" ${binLocationLower === 'pack' ? 'selected' : ''}>Pack</option>
+                                <option value="burst" ${binLocationLower === 'burst' ? 'selected' : ''}>Burst</option>
+                            </select>
+                            <button class="btn btn-sm btn-success save-btn">Save</button>
+                            <button class="btn btn-sm btn-secondary cancel-btn">Cancel</button>
+                        </div>
                     </td>
                     <td class="editable" data-field="status">
                         <span class="cell-content">${currentStatus}</span>
-                        <select class="edit-select" style="display: none;">
-                            <option value="${currentStatus}" selected>${currentStatus}</option>
-                            <option value="Ready to Rent">Ready to Rent</option>
-                            <option value="Sold">Sold</option>
-                            <option value="Repair">Repair</option>
-                            <option value="Needs to be Inspected">Needs to be Inspected</option>
-                            <option value="Wash">Wash</option>
-                            <option value="Wet">Wet</option>
-                        </select>
+                        <div class="edit-container" style="display: none;">
+                            <select class="edit-select">
+                                <option value="${currentStatus}" selected>${currentStatus}</option>
+                                <option value="Ready to Rent">Ready to Rent</option>
+                                <option value="Sold">Sold</option>
+                                <option value="Repair">Repair</option>
+                                <option value="Needs to be Inspected">Needs to be Inspected</option>
+                                <option value="Wash">Wash</option>
+                                <option value="Wet">Wet</option>
+                            </select>
+                            <button class="btn btn-sm btn-success save-btn">Save</button>
+                            <button class="btn btn-sm btn-secondary cancel-btn">Cancel</button>
+                        </div>
                     </td>
                     <td>${item.last_contract_num || 'N/A'}</td>
                     <td>${lastScanned}</td>
                     <td class="editable" data-field="quality">
-                        <span class="cell-content">${item.quality || 'N/A'}</span>
-                        <select class="edit-select" style="display: none;">
-                            <option value="" ${!item.quality ? 'selected' : ''}>Select Quality</option>
-                            <option value="Good" ${item.quality === 'Good' ? 'selected' : ''}>Good</option>
-                            <option value="Fair" ${item.quality === 'Fair' ? 'selected' : ''}>Fair</option>
-                            <option value="Poor" ${item.quality === 'Poor' ? 'selected' : ''}>Poor</option>
-                        </select>
+                        <span class="cell-content">${currentQuality || 'N/A'}</span>
+                        <div class="edit-container" style="display: none;">
+                            <select class="edit-select">
+                                <option value="" ${!currentQuality ? 'selected' : ''}>Select Quality</option>
+                                <option value="A+" ${currentQuality === 'A+' ? 'selected' : ''}>A+</option>
+                                <option value="A" ${currentQuality === 'A' ? 'selected' : ''}>A</option>
+                                <option value="A-" ${currentQuality === 'A-' ? 'selected' : ''}>A-</option>
+                                <option value="B+" ${currentQuality === 'B+' ? 'selected' : ''}>B+</option>
+                                <option value="B" ${currentQuality === 'B' ? 'selected' : ''}>B</option>
+                                <option value="B-" ${currentQuality === 'B-' ? 'selected' : ''}>B-</option>
+                                <option value="C+" ${currentQuality === 'C+' ? 'selected' : ''}>C+</option>
+                                <option value="C" ${currentQuality === 'C' ? 'selected' : ''}>C</option>
+                                <option value="C-" ${currentQuality === 'C-' ? 'selected' : ''}>C-</option>
+                            </select>
+                            <button class="btn btn-sm btn-success save-btn">Save</button>
+                            <button class="btn btn-sm btn-secondary cancel-btn">Cancel</button>
+                        </div>
                     </td>
                     <td class="editable" data-field="notes">
                         <span class="cell-content">${item.notes || 'N/A'}</span>
-                        <input class="edit-input" type="text" style="display: none;" value="${item.notes || ''}">
+                        <div class="edit-container" style="display: none;">
+                            <input class="edit-input" type="text" value="${item.notes || ''}">
+                            <button class="btn btn-sm btn-success save-btn">Save</button>
+                            <button class="btn btn-sm btn-secondary cancel-btn">Cancel</button>
+                        </div>
                     </td>
                     <td>
                         <button class="btn btn-sm btn-primary print-btn"
@@ -386,7 +410,7 @@ async function loadItems(rentalClassId, commonName, targetId, page = 1) {
 /**
  * Save edits for item fields
  */
-async function saveEdit(cell, tagId, field, rentalClassId, commonName, targetId, value) {
+const debouncedSaveEdit = debounce(async (cell, tagId, field, rentalClassId, commonName, targetId, value) => {
     console.log(`saveEdit: Starting at ${new Date().toISOString()}`, { tagId, field, rentalClassId, commonName, targetId, value });
     if (!tagId || !field) {
         console.error(`Invalid parameters for saveEdit: tagId=${tagId}, field=${field} at ${new Date().toISOString()}`);
@@ -395,7 +419,7 @@ async function saveEdit(cell, tagId, field, rentalClassId, commonName, targetId,
     }
 
     const validStatuses = ['Ready to Rent', 'Sold', 'Repair', 'Needs to be Inspected', 'Wash', 'Wet'];
-    const validQualities = ['Good', 'Fair', 'Poor', ''];
+    const validQualities = ['A+', 'A', 'A-', 'B+', 'B', 'B-', 'C+', 'C', 'C-', ''];
     const validBinLocations = ['resale', 'sold', 'pack', 'burst', ''];
 
     if (field === 'status' && !validStatuses.includes(value)) {
@@ -442,7 +466,7 @@ async function saveEdit(cell, tagId, field, rentalClassId, commonName, targetId,
         console.error(`Update ${field} error: ${error.message} at ${new Date().toISOString()}`);
         alert(`Error updating ${field}: ${error.message}`);
     }
-}
+}, 500);
 
 /**
  * Populate the common name dropdown
@@ -910,57 +934,56 @@ function handleItemClick(event) {
         const targetId = row.closest('.expandable').id;
 
         const cellContent = editableCell.querySelector('.cell-content');
-        const select = editableCell.querySelector('.edit-select');
-        const input = editableCell.querySelector('.edit-input');
+        const editContainer = editableCell.querySelector('.edit-container');
+        const select = editContainer.querySelector('.edit-select');
+        const input = editContainer.querySelector('.edit-input');
+        const saveBtn = editContainer.querySelector('.save-btn');
+        const cancelBtn = editContainer.querySelector('.cancel-btn');
 
-        if (select) {
+        // Hide all other edit containers to prevent multiple edits
+        document.querySelectorAll('.edit-container').forEach(container => {
+            container.style.display = 'none';
+            container.parentElement.querySelector('.cell-content').style.display = 'block';
+        });
+
+        if (editContainer) {
             cellContent.style.display = 'none';
-            select.style.display = 'block';
-            select.focus();
-            console.log(`Showing dropdown for field=${field}, tagId=${tagId} at ${new Date().toISOString()}`);
+            editContainer.style.display = 'flex';
+            (select || input).focus();
+            console.log(`Showing edit container for field=${field}, tagId=${tagId} at ${new Date().toISOString()}`);
 
             const saveChanges = () => {
-                const value = select.value;
-                console.log(`Saving dropdown value: ${value} for field=${field}, tagId=${tagId} at ${new Date().toISOString()}`);
-                saveEdit(editableCell, tagId, field, rentalClassId, commonName, targetId, value);
-                select.removeEventListener('change', saveChanges);
-                select.removeEventListener('blur', revert);
+                const value = select ? select.value : input ? input.value : '';
+                console.log(`Saving value: ${value} for field=${field}, tagId=${tagId} at ${new Date().toISOString()}`);
+                debouncedSaveEdit(editableCell, tagId, field, rentalClassId, commonName, targetId, value);
+                editContainer.style.display = 'none';
+                cellContent.style.display = 'block';
+                saveBtn.removeEventListener('click', saveChanges);
+                cancelBtn.removeEventListener('click', revert);
             };
 
             const revert = () => {
-                console.log(`Reverting dropdown for field=${field}, tagId=${tagId} at ${new Date().toISOString()}`);
-                select.style.display = 'none';
+                console.log(`Cancelling edit for field=${field}, tagId=${tagId} at ${new Date().toISOString()}`);
+                editContainer.style.display = 'none';
                 cellContent.style.display = 'block';
-                select.removeEventListener('change', saveChanges);
-                select.removeEventListener('blur', revert);
+                saveBtn.removeEventListener('click', saveChanges);
+                cancelBtn.removeEventListener('click', revert);
             };
 
-            select.addEventListener('change', saveChanges);
-            select.addEventListener('blur', revert);
-        } else if (input) {
-            cellContent.style.display = 'none';
-            input.style.display = 'block';
-            input.focus();
-            console.log(`Showing input for field=${field}, tagId=${tagId} at ${new Date().toISOString()}`);
+            saveBtn.addEventListener('click', saveChanges);
+            cancelBtn.addEventListener('click', revert);
 
-            const saveChanges = () => {
-                const value = input.value;
-                console.log(`Saving input value: ${value} for field=${field}, tagId=${tagId} at ${new Date().toISOString()}`);
-                saveEdit(editableCell, tagId, field, rentalClassId, commonName, targetId, value);
-                input.removeEventListener('blur', saveChanges);
-                input.removeEventListener('keypress', handleKeypress);
-            };
-
-            const handleKeypress = (e) => {
-                if (e.key === 'Enter') {
-                    saveChanges();
-                }
-            };
-
-            input.addEventListener('blur', saveChanges);
-            input.addEventListener('keypress', handleKeypress);
+            if (input) {
+                const handleKeypress = (e) => {
+                    if (e.key === 'Enter') {
+                        saveChanges();
+                    }
+                };
+                input.addEventListener('keypress', handleKeypress);
+                input.addEventListener('keypress', () => input.removeEventListener('keypress', handleKeypress), { once: true });
+            }
         } else {
-            console.warn(`No select or input found for editable cell: field=${field}, tagId=${tagId} at ${new Date().toISOString()}`);
+            console.warn(`No edit container found for editable cell: field=${field}, tagId=${tagId} at ${new Date().toISOString()}`);
         }
     }
 }
