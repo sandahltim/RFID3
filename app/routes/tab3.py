@@ -1,5 +1,5 @@
 # app/routes/tab3.py
-# tab3.py version: 2025-07-08-v82
+# tab3.py version: 2025-07-09-v84
 from flask import Blueprint, render_template, request, jsonify, current_app, make_response
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -68,12 +68,15 @@ if not os.path.exists(SHARED_DIR):
     os.chown(SHARED_DIR, pwd.getpwnam('tim').pw_uid, grp.getgrnam('tim').gr_gid)
 
 # Log deployment version
-logger.info("Deployed tab3.py version: 2025-07-08-v82")
+logger.info("Deployed tab3.py version: 2025-07-09-v84")
 
 # Define crew categories
 TENT_CATEGORIES = ['Frame Tent Tops', 'Pole Tent Tops', 'Tent Crates', 'Sidewall']
 LINEN_CATEGORIES = ['Napkins', 'Rectangle Linen', 'Round Linen', 'Skirt', 'Spandex']
 SERVICE_DEPT_CATEGORIES = ['Other']
+
+# Valid values for quality
+VALID_QUALITIES = ['A+', 'A', 'A-', 'B+', 'B', 'B-', 'C+', 'C', 'C-', '']
 
 # Helper function to normalize common_name
 def normalize_common_name(name):
@@ -143,15 +146,14 @@ def tab3_view():
         statuses = [row[0] for row in status_result.fetchall()]
         logger.debug(f"All statuses in id_item_master: {statuses}")
 
-        # Debug: Count items by status
-        count_query = """
-            SELECT COALESCE(status, 'NULL') AS status, COUNT(*)
+        # Debug: Check all qualities in id_item_master
+        quality_query = """
+            SELECT DISTINCT COALESCE(quality, 'NULL') AS quality
             FROM id_item_master
-            GROUP BY status
         """
-        count_result = session.execute(text(count_query))
-        status_counts = {row[0]: row[1] for row in count_result.fetchall()}
-        logger.debug(f"Status counts in id_item_master: {status_counts}")
+        quality_result = session.execute(text(quality_query))
+        qualities = [row[0] for row in quality_result.fetchall()]
+        logger.debug(f"All qualities in id_item_master: {qualities}")
 
         # Get query parameters
         common_name_filter = request.args.get('common_name', '').lower()
@@ -267,7 +269,7 @@ def tab3_view():
                 i.last_contract_num, 
                 i.date_last_scanned, 
                 i.rental_class_num, 
-                i.notes,  -- Added notes to the query
+                i.notes, 
                 COALESCE(u.category, r.category, 'Other') AS category,
                 i.quality
             FROM id_item_master i
@@ -314,7 +316,7 @@ def tab3_view():
                 'last_contract_num': row[4] or 'N/A',
                 'date_last_scanned': row[5].isoformat() if row[5] else 'N/A',
                 'rental_class_num': normalize_rental_class_id(row[6]),
-                'notes': row[7] or '',  # Now safely accessible
+                'notes': row[7] or '',
                 'category': row[8] or 'Other',
                 'quality': row[9] or 'N/A'
             }
@@ -398,7 +400,7 @@ def tab3_view():
                     'service_required': t.service_required,
                     'longitude': float(t.longitude) if t.longitude is not None else None,
                     'latitude': float(t.latitude) if t.latitude is not None else None,
-                    'last_transaction_scan_date': t.scan_date.strftime('%Y-%m-%d %H:%M:%S') if t.scan_date else 'N/A'
+                    'last_transaction_scan_date': t.scan_date.isoformat() if t.scan_date else 'N/A'
                 }
 
         # Assign detailed items to summary groups
@@ -471,7 +473,7 @@ def tab3_view():
         for item in unmatched_items:
             crew = get_crew_for_category(item['category'])
             new_group = {
-                'rental_class_id': item['rental_class_num'],
+                'rental_class_id': item['rental_class_id'],
                 'common_name': item['common_name'],
                 'number_in_service': 1,
                 'number_on_rent': 0,
@@ -482,8 +484,8 @@ def tab3_view():
                 'crew': crew
             }
             crew_groups[crew].append(new_group)
-            rental_class_to_group[item['rental_class_num']] = new_group
-            logger.debug(f"Created new group for unmatched item: rental_class_id={item['rental_class_num']}, common_name={item['common_name']}, crew={crew}")
+            rental_class_to_group[item['rental_class_id']] = new_group
+            logger.debug(f"Created new group for unmatched item: rental_class_id={item['rental_class_id']}, common_name={item['common_name']}, crew={crew}")
 
         # Filter out groups with no in-service items
         for crew in crew_groups:
@@ -667,7 +669,7 @@ def tab3_data():
             ItemMaster.last_contract_num,
             ItemMaster.date_last_scanned,
             ItemMaster.rental_class_num,
-            ItemMaster.notes,  # Added notes to the query
+            ItemMaster.notes,
             ItemMaster.quality
         ).filter(
             ItemMaster.rental_class_num == normalized_rental_class_id,
@@ -696,7 +698,7 @@ def tab3_data():
                 'last_contract_num': item.last_contract_num or 'N/A',
                 'date_last_scanned': item.date_last_scanned.isoformat() if item.date_last_scanned else 'N/A',
                 'quality': item.quality or 'N/A',
-                'notes': item.notes or ''  # Now safely accessible
+                'notes': item.notes or ''
             } for item in items
         ]
 
@@ -1089,9 +1091,8 @@ def update_synced_status():
                 reader = csv.DictReader(csvfile)
                 required_fields = ['tag_id', 'common_name', 'bin_location', 'status']
                 if not all(field in reader.fieldnames for field in required_fields):
-                    missing = [field for field in required_fields if field not in reader.fieldnames]
-                    logger.error(f"CSV file missing required fields: {missing}")
-                    return jsonify({'error': f"CSV file missing required fields: {missing}"}), 400
+                    logger.error(f"CSV file missing required fields: {required_fields}")
+                    return jsonify({'error': f"CSV file missing required fields: {required_fields}"}), 400
 
                 for row in reader:
                     try:
@@ -1242,11 +1243,10 @@ def update_status():
 
         try:
             api_client = APIClient()
-            api_client.update_status(tag_id, new_status, timeout=10)  # Ensure API call is robust
+            api_client.update_status(tag_id, new_status, timeout=10)
             logger.info(f"Successfully updated API status for tag_id {tag_id} to {new_status}")
         except Exception as e:
             logger.error(f"Failed to update API status for tag_id {tag_id}: {str(e)}", exc_info=True)
-            # Roll back if API fails, but log and proceed
             session.rollback()
             return jsonify({'error': f"Failed to update API: {str(e)}", 'local_update': 'success'}), 200
 
@@ -1264,7 +1264,7 @@ def update_status():
 @tab3_bp.route('/tab/3/update_notes', methods=['POST'])
 @limiter.limit("10 per minute")
 def update_notes():
-    """Update the notes for an item."""
+    """Update the notes of an item."""
     session = None
     try:
         logger.debug("Entering /tab/3/update_notes endpoint at %s", datetime.now())
@@ -1288,11 +1288,10 @@ def update_notes():
 
         try:
             api_client = APIClient()
-            api_client.update_notes(tag_id, new_notes if new_notes else '')  # Ensure API call is robust
+            api_client.update_notes(tag_id, new_notes if new_notes else '')
             logger.info(f"Successfully updated API notes for tag_id {tag_id}")
         except Exception as e:
             logger.error(f"Failed to update API notes for tag_id {tag_id}: {str(e)}", exc_info=True)
-            # Roll back if API fails, but log and proceed
             session.rollback()
             return jsonify({'error': f"Failed to update API: {str(e)}", 'local_update': 'success'}), 200
 
@@ -1317,16 +1316,15 @@ def update_quality():
         session = db.session()
         data = request.get_json()
         tag_id = data.get('tag_id')
-        new_quality = data.get('quality')
+        new_quality = data.get('quality', '')
 
-        if not tag_id or not new_quality:
-            logger.warning(f"Invalid input in update_quality: tag_id={tag_id}, new_quality={new_quality}")
-            return jsonify({'error': 'Tag ID and quality are required'}), 400
+        if not tag_id:
+            logger.warning(f"Invalid input in update_quality: tag_id={tag_id}")
+            return jsonify({'error': 'Tag ID is required'}), 400
 
-        valid_qualities = ['Good', 'Fair', 'Poor']
-        if new_quality not in valid_qualities and new_quality != '':
+        if new_quality not in VALID_QUALITIES:
             logger.warning(f"Invalid quality value: {new_quality}")
-            return jsonify({'error': f'Quality must be one of {", ".join(valid_qualities)} or empty'}), 400
+            return jsonify({'error': f'Quality must be one of {", ".join(VALID_QUALITIES)}'}), 400
 
         item = session.query(ItemMaster).filter_by(tag_id=tag_id).first()
         if not item:
@@ -1339,11 +1337,10 @@ def update_quality():
 
         try:
             api_client = APIClient()
-            api_client.update_item(tag_id, {'quality': new_quality if new_quality else ''})  # Ensure API call is robust
+            api_client.update_item(tag_id, {'quality': new_quality if new_quality else ''})
             logger.info(f"Successfully updated API quality for tag_id {tag_id} to {new_quality}")
         except Exception as e:
             logger.error(f"Failed to update API quality for tag_id {tag_id}: {str(e)}", exc_info=True)
-            # Roll back if API fails, but log and proceed
             session.rollback()
             return jsonify({'error': f"Failed to update API: {str(e)}", 'local_update': 'success'}), 200
 
@@ -1390,11 +1387,10 @@ def update_bin_location():
 
         try:
             api_client = APIClient()
-            api_client.update_item(tag_id, {'bin_location': new_bin_location if new_bin_location else ''})  # Ensure API call is robust
+            api_client.update_item(tag_id, {'bin_location': new_bin_location if new_bin_location else ''})
             logger.info(f"Successfully updated API bin location for tag_id {tag_id} to {new_bin_location}")
         except Exception as e:
             logger.error(f"Failed to update API bin location for tag_id {tag_id}: {str(e)}", exc_info=True)
-            # Roll back if API fails, but log and proceed
             session.rollback()
             return jsonify({'error': f"Failed to update API: {str(e)}", 'local_update': 'success'}), 200
 
