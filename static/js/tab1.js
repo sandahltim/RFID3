@@ -1,14 +1,14 @@
 // app/static/js/tab1.js
-// tab1.js version: 2025-07-09-v4
-console.log('tab1.js version: 2025-07-09-v4 loaded');
+// tab1.js version: 2025-07-09-v5
+console.log('tab1.js version: 2025-07-09-v5 loaded');
 
 /**
  * Tab1.js: Logic for Tab 1 (Rental Inventory).
  * Dependencies: common.js (for formatDate, showLoading, hideLoading, collapseSection, printTable, printFullItemList).
- * Updated: 2025-07-09-v4
- * - Fixed subcategory retrieval in handleClick to use closest .category-row .subcategory-select, resolving undefined subcategory error in saveEdit.
- * - Preserved all functionality from v3: aligned editable fields, Save/Cancel buttons, UI refresh, subcategory population, common name loading, pagination, print, collapse/expand, filters.
- * - Line count: ~900 lines (same as v3, only modified handleClick).
+ * Updated: 2025-07-09-v5
+ * - Fixed subcategory retrieval in handleClick to traverse to .common-name-row and then .category-row, with fallback to expand button's data-subcategory.
+ * - Preserved all functionality from v4: aligned editable fields, Save/Cancel buttons, UI refresh, subcategory population, common name loading, pagination, print, collapse/expand, filters.
+ * - Line count: ~900 lines (same as v4, only modified handleClick).
  */
 
 /**
@@ -972,10 +972,41 @@ document.addEventListener('DOMContentLoaded', function() {
             const row = editableCell.closest('tr');
             const tagId = row.getAttribute('data-item-id');
             const commonName = row.querySelector('td:nth-child(2)').textContent;
-            const categoryRow = row.closest('.category-row') || row.closest('tbody').querySelector('.category-row');
-            const subcatSelect = categoryRow ? categoryRow.querySelector('.subcategory-select') : null;
-            const subcategory = subcatSelect ? subcatSelect.value : '';
-            const category = categoryRow ? categoryRow.querySelector('.subcategory-select').getAttribute('data-category') : '';
+
+            // Traverse to find subcategory and category
+            const commonNameRow = row.closest('.common-name-row');
+            let categoryRow = null;
+            let subcatSelect = null;
+            let subcategory = '';
+            let category = '';
+
+            // Find the preceding category row
+            let prevSibling = commonNameRow.previousElementSibling;
+            while (prevSibling) {
+                if (prevSibling.classList.contains('category-row')) {
+                    categoryRow = prevSibling;
+                    break;
+                }
+                prevSibling = prevSibling.previousElementSibling;
+            }
+
+            if (categoryRow) {
+                subcatSelect = categoryRow.querySelector('.subcategory-select');
+                if (subcatSelect) {
+                    subcategory = subcatSelect.value;
+                    category = subcatSelect.getAttribute('data-category');
+                }
+            }
+
+            // Fallback to expand button's data-subcategory if select not found
+            if (!subcategory) {
+                const expandBtn = commonNameRow.previousElementSibling?.querySelector('.expand-btn');
+                if (expandBtn) {
+                    subcategory = expandBtn.getAttribute('data-subcategory') || '';
+                    category = expandBtn.getAttribute('data-category') || '';
+                }
+            }
+
             const targetId = row.closest('.expandable').id;
 
             if (!subcategory) {
