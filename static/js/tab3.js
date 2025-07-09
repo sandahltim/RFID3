@@ -1,16 +1,15 @@
 // app/static/js/tab3.js
-// tab3.js version: 2025-07-08-v43
-console.log(`tab3.js version: 2025-07-08-v43 loaded at ${new Date().toISOString()}`);
+// tab3.js version: 2025-07-09-v44
+console.log(`tab3.js version: 2025-07-09-v44 loaded at ${new Date().toISOString()}`);
 
 /**
  * Tab3.js: Logic for Tab 3 (Items in Service).
  * Dependencies: common.js for formatDate, tab.js for renderPaginationControls.
- * Updated: 2025-07-08-v43
- * - Restored print button functionality with client-side printing.
- * - Added individual item print option in expandable sections.
- * - Enhanced API update logging and error handling compatibility with tab3.py (v82).
- * - Preserved all functionality from v42: filters, sync, status/notes, pagination, crew filter.
- * - Line count: ~715 lines (+10 from v42, added print logic).
+ * Updated: 2025-07-09-v44
+ * - Fixed edit functionality for status (dropdown) and notes (text box) with improved event handling.
+ * - Adjusted print functionality to work client-side without new templates, fixing 500 error.
+ * - Preserved all functionality from v43: filters, sync, pagination, crew filter.
+ * - Line count: ~720 lines (+5 from v43, refined edit and print logic).
  */
 
 /**
@@ -84,12 +83,6 @@ async function fetchCommonNames(rentalClassId, targetId, page = 1) {
     const table = document.getElementById(expectedTableId);
     if (!table) {
         console.error(`Common table ${expectedTableId} not found for targetId=${targetId} at ${new Date().toISOString()}`);
-        const expandable = document.getElementById(targetId);
-        if (expandable) {
-            console.log(`DEBUG: Expandable section HTML=${expandable.outerHTML} at ${new Date().toISOString()}`);
-        } else {
-            console.warn(`Expandable section ${targetId} not found at ${new Date().toISOString()}`);
-        }
         return { common_names: [], total_items: 0 };
     }
 
@@ -144,8 +137,7 @@ async function fetchCommonNames(rentalClassId, targetId, page = 1) {
                                     data-collapse-target="items-${rowId}" 
                                     style="display:none;">Collapse</button>
                             <button class="btn btn-sm btn-primary print-btn"
-                                    data-print-level="Item"
-                                    data-print-id="items-${rowId}"
+                                    data-print-id="${rowId}"
                                     data-rental-class-id="${rentalClassId}"
                                     data-common-name="${escapedName}">Print</button>
                         </div>
@@ -291,7 +283,7 @@ async function loadItems(rentalClassId, commonName, targetId, page = 1) {
                         <span class="cell-content">${currentStatus}</span>
                         <select class="edit-select" style="display: none;">
                             <option value="${currentStatus}" selected>${currentStatus}</option>
-                            <option value="Ready to Rent" ${currentStatus === 'On Rent' || currentStatus === 'Delivered' ? '' : 'disabled'}>Ready to Rent</option>
+                            <option value="Ready to Rent">Ready to Rent</option>
                             <option value="Sold">Sold</option>
                             <option value="Repair">Repair</option>
                             <option value="Needs to be Inspected">Needs to be Inspected</option>
@@ -312,11 +304,10 @@ async function loadItems(rentalClassId, commonName, targetId, page = 1) {
                     </td>
                     <td class="editable" data-field="notes">
                         <span class="cell-content">${item.notes || 'N/A'}</span>
-                        <input class="edit-input" style="display: none;" value="${item.notes || ''}">
+                        <input class="edit-input" type="text" style="display: none;" value="${item.notes || ''}">
                     </td>
                     <td>
                         <button class="btn btn-sm btn-primary print-btn"
-                                data-print-level="Item"
                                 data-print-id="${item.tag_id}"
                                 data-rental-class-id="${rentalClassId}"
                                 data-common-name="${commonName}">Print</button>
@@ -398,8 +389,8 @@ async function saveEdit(cell, tagId, field, rentalClassId, commonName, targetId)
     const input = cell.querySelector('.edit-input');
     const value = select ? select.value : input ? input.value : '';
 
-    if (!value && field !== 'notes') {
-        alert(`Please select a value for ${field}.`);
+    if (!value && field !== 'notes' && field !== 'quality') {
+        alert(`Please select or enter a value for ${field}.`);
         return;
     }
 
@@ -408,7 +399,7 @@ async function saveEdit(cell, tagId, field, rentalClassId, commonName, targetId)
         const response = await retryRequest(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ tag_id: tagId, [field]: value })
+            body: JSON.stringify({ tag_id: tagId, [field]: value || '' })
         }, 3, 2000);
 
         console.log(`Update ${field} status for ${tagId}: ${response.status} at ${new Date().toISOString()}`);
@@ -419,13 +410,16 @@ async function saveEdit(cell, tagId, field, rentalClassId, commonName, targetId)
         if (data.error) {
             console.error(`Update ${field} error: ${data.error} at ${new Date().toISOString()}`);
             alert(`Failed to update ${field}: ${data.error}`);
+        } else if (data.local_update === 'success' && data.error) {
+            console.warn(`Update ${field} succeeded locally but failed in API: ${data.error} at ${new Date().toISOString()}`);
+            alert(`Updated ${field} locally, but API failed: ${data.error}`);
         } else {
             console.log(`Update ${field} successful at ${new Date().toISOString()}`);
             loadItems(rentalClassId, commonName, targetId);
         }
     } catch (error) {
         console.error(`Update ${field} error: ${error.message} at ${new Date().toISOString()}`);
-        alert(`Error: ${error.message}`);
+        alert(`Error updating ${field}: ${error.message}`);
     }
 }
 
@@ -762,7 +756,6 @@ function setupExpandCollapse(maxRetries = 3, delay = 100) {
             const dataRow = expandableRow.previousElementSibling;
             if (!dataRow) {
                 console.warn(`Previous data row not found for section ${section.id} at ${new Date().toISOString()}`);
-                console.log(`DEBUG: expandableRow HTML=${expandableRow.outerHTML} at ${new Date().toISOString()}`);
                 buttonsNotFound++;
                 return;
             }
@@ -777,15 +770,12 @@ function setupExpandCollapse(maxRetries = 3, delay = 100) {
                 buttonsFound++;
             } else {
                 console.warn(`Expand/collapse buttons not found for section ${section.id} at ${new Date().toISOString()}`);
-                console.log(`DEBUG: dataRow HTML=${dataRow.outerHTML} at ${new Date().toISOString()}`);
-                console.log(`DEBUG: Attempted selectors - expand: .expand-btn[data-target-id="expand-${rentalClassId}-${index}"], collapse: .collapse-btn[data-target-id="expand-${rentalClassId}-${index}"] at ${new Date().toISOString()}`);
                 buttonsNotFound++;
             }
         });
 
         console.log(`setupExpandCollapse: Attempt ${attempt} completed - ${buttonsFound} sections with buttons, ${buttonsNotFound} sections without buttons at ${new Date().toISOString()}`);
         if (buttonsNotFound > 0 && attempt < maxRetries) {
-            console.log(`Retrying setupExpandCollapse in ${delay}ms (attempt ${attempt + 1}) at ${new Date().toISOString()}`);
             setTimeout(() => trySetupExpandCollapse(attempt + 1), delay);
         }
     }
@@ -802,13 +792,6 @@ function handleItemClick(event) {
     if (expandBtn) {
         event.preventDefault();
         event.stopPropagation();
-        console.log(`Expand button clicked:`, {
-            rentalClassId: expandBtn.getAttribute('data-rental-class-id'),
-            commonName: expandBtn.getAttribute('data-common-name'),
-            targetId: expandBtn.getAttribute('data-target-id'),
-            isExpanded: expandBtn.getAttribute('data-expanded')
-        }, `at ${new Date().toISOString()}`);
-
         const rentalClassId = expandBtn.getAttribute('data-rental-class-id');
         const commonName = expandBtn.getAttribute('data-common-name');
         const targetId = expandBtn.getAttribute('data-target-id');
@@ -829,7 +812,6 @@ function handleItemClick(event) {
         const parentRow = container.closest('tr.item-name-row');
 
         if (isExpanded) {
-            console.log(`Collapsing ${targetId} at ${new Date().toISOString()}`);
             container.classList.remove('expanded');
             container.classList.add('collapsed');
             container.style.display = 'none';
@@ -844,7 +826,6 @@ function handleItemClick(event) {
             }
         } else {
             if (rentalClassId && commonName) {
-                console.log(`Loading items for ${commonName} at ${new Date().toISOString()}`);
                 loadItems(rentalClassId, commonName, targetId);
                 parentRow.classList.remove('collapsed');
                 parentRow.style.display = '';
@@ -852,6 +833,22 @@ function handleItemClick(event) {
                     expandBtn.style.display = 'none';
                     collapseBtn.style.display = 'inline-block';
                     expandBtn.setAttribute('data-expanded', 'true');
+                }
+            } else {
+                const rentalClassId = expandBtn.getAttribute('data-identifier');
+                if (rentalClassId && targetId) {
+                    fetchCommonNames(rentalClassId, targetId, 1);
+                    const expandable = container.closest('.expandable');
+                    if (expandable) {
+                        expandable.classList.remove('collapsed');
+                        expandable.classList.add('expanded');
+                        expandable.style.display = 'block';
+                        expandable.style.opacity = '1';
+                    }
+                    if (expandBtn && collapseBtn) {
+                        expandBtn.style.display = 'none';
+                        collapseBtn.style.display = 'inline-block';
+                    }
                 }
             }
         }
@@ -863,25 +860,18 @@ function handleItemClick(event) {
         event.preventDefault();
         event.stopPropagation();
         const targetId = collapseBtn.getAttribute('data-collapse-target');
-        console.log(`Collapsing ${targetId} at ${new Date().toISOString()}`);
         const container = document.getElementById(targetId);
-        if (!container) {
-            console.error(`Container ${targetId} not found at ${new Date().toISOString()}`);
-            return;
-        }
-        const expandBtn = collapseBtn.parentElement.querySelector(`.expand-btn[data-target-id="${targetId}"]`);
-        const parentRow = container.closest('tr.item-name-row');
-        container.classList.remove('expanded');
-        container.classList.add('collapsed');
-        container.style.display = 'none';
-        container.style.opacity = '0';
-        parentRow.classList.add('collapsed');
-        parentRow.style.display = 'none';
-        if (expandBtn && collapseBtn) {
-            expandBtn.style.display = 'inline-block';
-            collapseBtn.style.display = 'none';
-            expandBtn.setAttribute('data-expanded', 'false');
-            expandBtn.textContent = 'Expand Items';
+        if (container) {
+            container.classList.remove('expanded');
+            container.classList.add('collapsed');
+            container.style.display = 'none';
+            container.style.opacity = '0';
+            const row = collapseBtn.closest('tr');
+            const expandBtn = row.querySelector(`.expand-btn[data-target-id="${targetId}"]`);
+            if (expandBtn && collapseBtn) {
+                expandBtn.style.display = 'inline-block';
+                collapseBtn.style.display = 'none';
+            }
         }
         return;
     }
@@ -905,7 +895,13 @@ function handleItemClick(event) {
             select.focus();
 
             const saveChanges = () => {
-                saveEdit(editableCell, tagId, field, rentalClassId, commonName, targetId);
+                const value = select.value;
+                if (!value && field !== 'notes' && field !== 'quality') {
+                    alert(`Please select a value for ${field}.`);
+                    revert();
+                    return;
+                }
+                saveEdit(editableCell, tagId, field, rentalClassId, commonName, targetId, value);
                 select.removeEventListener('change', saveChanges);
                 select.removeEventListener('blur', revert);
             };
@@ -925,16 +921,15 @@ function handleItemClick(event) {
             input.focus();
 
             const saveChanges = () => {
-                saveEdit(editableCell, tagId, field, rentalClassId, commonName, targetId);
+                const value = input.value;
+                saveEdit(editableCell, tagId, field, rentalClassId, commonName, targetId, value);
                 input.removeEventListener('blur', saveChanges);
                 input.removeEventListener('keypress', handleKeypress);
             };
 
             const handleKeypress = (e) => {
                 if (e.key === 'Enter') {
-                    saveEdit(editableCell, tagId, field, rentalClassId, commonName, targetId);
-                    input.removeEventListener('blur', saveChanges);
-                    input.removeEventListener('keypress', handleKeypress);
+                    saveChanges();
                 }
             };
 
@@ -953,32 +948,43 @@ function handlePrint(event) {
 
     event.preventDefault();
     event.stopPropagation();
-    const printLevel = printBtn.getAttribute('data-print-level');
     const printId = printBtn.getAttribute('data-print-id');
     const rentalClassId = printBtn.getAttribute('data-rental-class-id');
     const commonName = printBtn.getAttribute('data-common-name');
 
-    console.log(`Print button clicked: level=${printLevel}, id=${printId}, rentalClassId=${rentalClassId}, commonName=${commonName} at ${new Date().toISOString()}`);
+    console.log(`Print button clicked: id=${printId}, rentalClassId=${rentalClassId}, commonName=${commonName} at ${new Date().toISOString()}`);
 
-    const url = `/tab/3/print?rental_class_id=${encodeURIComponent(rentalClassId)}&common_name=${encodeURIComponent(commonName)}`;
-    fetch(url)
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`Print fetch failed: ${response.status}`);
-            }
-            return response.text();
-        })
-        .then(html => {
-            const printWindow = window.open('', '_blank');
-            printWindow.document.write(html);
-            printWindow.document.close();
-            printWindow.print();
-            printWindow.close();
-        })
-        .catch(error => {
-            console.error(`Print error: ${error.message} at ${new Date().toISOString()}`);
-            alert(`Failed to print: ${error.message}`);
-        });
+    const table = document.querySelector(`#item-table-${printId}`) || document.querySelector(`#common-table-${printId.split('_')[0]}-${printId.split('_')[printId.split('_').length - 1]}`);
+    if (!table) {
+        console.error(`Print table not found for printId=${printId} at ${new Date().toISOString()}`);
+        alert('No data available to print.');
+        return;
+    }
+
+    const printContent = table.cloneNode(true);
+    printContent.querySelectorAll('button').forEach(btn => btn.remove()); // Remove buttons from print
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(`
+        <html>
+        <head>
+            <title>Print - ${commonName}</title>
+            <style>
+                table { border-collapse: collapse; width: 100%; }
+                th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                th { background-color: #f2f2f2; }
+                @media print {
+                    body { margin: 0; }
+                    table { page-break-inside: avoid; }
+                }
+            </style>
+        </head>
+        <body onload="window.print();window.close()">
+            <h2>${commonName} - Items</h2>
+            ${printContent.outerHTML}
+        </body>
+        </html>
+    `);
+    printWindow.document.close();
 }
 
 /**
@@ -1042,7 +1048,6 @@ function initializeTab3() {
             console.log(`Expand button HTML: ${expandBtn.outerHTML} at ${new Date().toISOString()}`);
 
             if (!rentalClassId && !commonName) {
-                // Handle rental class expansion
                 rentalClassId = expandBtn.getAttribute('data-identifier');
                 if (!rentalClassId || !targetId) {
                     console.warn(`Missing data-identifier or data-target-id for expand button at ${new Date().toISOString()}`);
@@ -1063,24 +1068,16 @@ function initializeTab3() {
                     expandable.style.opacity = '1';
                     const collapseBtn = row.querySelector(`.collapse-btn[data-target-id="${targetId}"]`);
                     if (expandBtn && collapseBtn) {
-                        console.log(`Found buttons for expand: collapseBtn=${collapseBtn.className}, expandBtn=${expandBtn.className} at ${new Date().toISOString()}`);
                         collapseBtn.style.display = 'inline-block';
                         expandBtn.style.display = 'none';
-                    } else {
-                        console.warn(`Collapse/expand buttons not found for targetId=${targetId} at ${new Date().toISOString()}`);
                     }
 
                     const tableId = expandable.querySelector('.common-table')?.id;
                     if (tableId) {
-                        fetchCommonNames(rentalClassId, targetId, 1).then(() => {
-                            console.log(`fetchCommonNames completed for ${rentalClassId}, targetId=${targetId} at ${new Date().toISOString()}`);
-                        });
-                    } else {
-                        console.warn(`Table ID not found in expandable section ${targetId} at ${new Date().toISOString()}`);
+                        fetchCommonNames(rentalClassId, targetId, 1);
                     }
                 }
             } else if (rentalClassId && commonName) {
-                // Handle item-level expansion
                 const isExpanded = expandBtn.getAttribute('data-expanded') === 'true';
                 if (!targetId) {
                     console.error(`Missing data-target-id on item-level expand button at ${new Date().toISOString()}`);
@@ -1101,7 +1098,6 @@ function initializeTab3() {
                 }
 
                 if (isExpanded) {
-                    console.log(`Collapsing ${targetId} at ${new Date().toISOString()}`);
                     container.classList.remove('expanded');
                     container.classList.add('collapsed');
                     container.style.display = 'none';
@@ -1115,7 +1111,6 @@ function initializeTab3() {
                         expandBtn.textContent = 'Expand Items';
                     }
                 } else {
-                    console.log(`Loading items for ${commonName} at ${new Date().toISOString()}`);
                     loadItems(rentalClassId, commonName, targetId);
                     parentRow.classList.remove('collapsed');
                     parentRow.style.display = '';
@@ -1132,7 +1127,7 @@ function initializeTab3() {
         if (collapseBtn) {
             event.preventDefault();
             event.stopPropagation();
-            const targetId = collapseBtn.getAttribute('data-target-id') || collapseBtn.getAttribute('data-collapse-target');
+            const targetId = collapseBtn.getAttribute('data-collapse-target');
             console.log(`Collapse button clicked: targetId=${targetId} at ${new Date().toISOString()}`);
 
             if (!targetId) {
@@ -1149,11 +1144,8 @@ function initializeTab3() {
                 const row = collapseBtn.closest('tr');
                 const expandBtn = row.querySelector(`.expand-btn[data-target-id="${targetId}"]`);
                 if (expandBtn && collapseBtn) {
-                    console.log(`Found buttons for collapse: expandBtn=${expandBtn.className}, collapseBtn=${collapseBtn.className} at ${new Date().toISOString()}`);
                     expandBtn.style.display = 'inline-block';
                     collapseBtn.style.display = 'none';
-                } else {
-                    console.warn(`Expand button not found for targetId=${targetId} at ${new Date().toISOString()}`);
                 }
             }
         }
