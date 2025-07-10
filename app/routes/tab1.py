@@ -1,19 +1,20 @@
-from flask import Blueprint, render_template, request, jsonify, current_app
+# app/routes/tab1.py
+# tab1.py version: 2025-07-10-v23
+import logging
+from datetime import datetime
+from flask import Blueprint, request, jsonify, current_app
 from .. import db
 from ..models.db_models import ItemMaster, Transaction, RentalClassMapping, UserRentalClassMapping
 from ..services.api_client import APIClient
 from sqlalchemy import func, desc, or_, asc
-from datetime import datetime
 from time import time
-import logging
-import sys
 from urllib.parse import unquote
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 
 # Configure logging
 logger = logging.getLogger('tab1')
-logger.setLevel(logging.DEBUG)  # DEBUG for detailed tracing
+logger.setLevel(logging.DEBUG)
 logger.handlers = []
 
 # File handler for rfid_dashboard.log
@@ -24,7 +25,7 @@ file_handler.setFormatter(formatter)
 logger.addHandler(file_handler)
 
 # Console handler
-console_handler = logging.StreamHandler(sys.stdout)
+console_handler = logging.StreamHandler()
 console_handler.setLevel(logging.DEBUG)
 console_handler.setFormatter(formatter)
 logger.addHandler(console_handler)
@@ -42,7 +43,7 @@ limiter = Limiter(
 VALID_QUALITIES = ['A+', 'A', 'A-', 'B+', 'B', 'B-', 'C+', 'C', 'C-', '']
 
 # Version marker
-logger.info("Deployed tab1.py version: 2025-07-09-v21")
+logger.info("Deployed tab1.py version: 2025-07-10-v23")
 
 def get_category_data(session, filter_query='', sort='', status_filter='', bin_filter=''):
     logger.debug(f"get_category_data: filter_query={filter_query}, sort={sort}, status_filter={status_filter}, bin_filter={bin_filter}")
@@ -640,7 +641,8 @@ def update_bin_location():
         data = request.get_json()
         tag_id = data.get('tag_id')
         new_bin_location = data.get('bin_location')
-        logger.debug(f"update_bin_location: tag_id={tag_id}, bin_location={new_bin_location}")
+        date_updated = data.get('date_updated')
+        logger.debug(f"update_bin_location: tag_id={tag_id}, bin_location={new_bin_location}, date_updated={date_updated}")
 
         if not tag_id:
             logger.error("tag_id is required")
@@ -657,12 +659,12 @@ def update_bin_location():
             return jsonify({'error': 'Item not found'}), 404
 
         item.bin_location = new_bin_location if new_bin_location else None
-        item.date_updated = datetime.now()
+        item.date_updated = datetime.now() if not date_updated else datetime.fromisoformat(date_updated.replace('+00:00', 'Z'))
         session.commit()
 
         try:
             api_client = APIClient()
-            api_client.update_item(tag_id, {'bin_location': new_bin_location if new_bin_location else ''}, timeout=10)
+            api_client.update_bin_location(tag_id, new_bin_location if new_bin_location else '')
             logger.info(f"Successfully updated API bin location for tag_id {tag_id} to {new_bin_location}")
         except Exception as e:
             logger.error(f"Failed to update API bin location for tag_id {tag_id}: {str(e)}", exc_info=True)
@@ -687,7 +689,8 @@ def update_status():
         data = request.get_json()
         tag_id = data.get('tag_id')
         new_status = data.get('status')
-        logger.debug(f"update_status: tag_id={tag_id}, status={new_status}")
+        date_updated = data.get('date_updated')
+        logger.debug(f"update_status: tag_id={tag_id}, status={new_status}, date_updated={date_updated}")
 
         if not tag_id or not new_status:
             logger.error("tag_id and status are required")
@@ -708,12 +711,12 @@ def update_status():
             return jsonify({'error': 'Status cannot be updated to "On Rent" or "Delivered" manually'}), 400
 
         item.status = new_status
-        item.date_updated = datetime.now()
+        item.date_updated = datetime.now() if not date_updated else datetime.fromisoformat(date_updated.replace('+00:00', 'Z'))
         session.commit()
 
         try:
             api_client = APIClient()
-            api_client.update_status(tag_id, new_status, timeout=10)
+            api_client.update_status(tag_id, new_status)
             logger.info(f"Successfully updated API status for tag_id {tag_id} to {new_status}")
         except Exception as e:
             logger.error(f"Failed to update API status for tag_id {tag_id}: {str(e)}", exc_info=True)
@@ -738,7 +741,8 @@ def update_quality():
         data = request.get_json()
         tag_id = data.get('tag_id')
         new_quality = data.get('quality', '')
-        logger.debug(f"update_quality: tag_id={tag_id}, quality={new_quality}")
+        date_updated = data.get('date_updated')
+        logger.debug(f"update_quality: tag_id={tag_id}, quality={new_quality}, date_updated={date_updated}")
 
         if not tag_id:
             logger.error("tag_id is required")
@@ -754,12 +758,12 @@ def update_quality():
             return jsonify({'error': 'Item not found'}), 404
 
         item.quality = new_quality if new_quality else None
-        item.date_updated = datetime.now()
+        item.date_updated = datetime.now() if not date_updated else datetime.fromisoformat(date_updated.replace('+00:00', 'Z'))
         session.commit()
 
         try:
             api_client = APIClient()
-            api_client.update_item(tag_id, {'quality': new_quality if new_quality else ''}, timeout=10)
+            api_client.update_item(tag_id, {'quality': new_quality if new_quality else ''})
             logger.info(f"Successfully updated API quality for tag_id {tag_id} to {new_quality}")
         except Exception as e:
             logger.error(f"Failed to update API quality for tag_id {tag_id}: {str(e)}", exc_info=True)
@@ -784,7 +788,8 @@ def update_notes():
         data = request.get_json()
         tag_id = data.get('tag_id')
         new_notes = data.get('notes')
-        logger.debug(f"update_notes: tag_id={tag_id}, notes={new_notes}")
+        date_updated = data.get('date_updated')
+        logger.debug(f"update_notes: tag_id={tag_id}, notes={new_notes}, date_updated={date_updated}")
 
         if not tag_id:
             logger.error("tag_id is required")
@@ -796,12 +801,12 @@ def update_notes():
             return jsonify({'error': 'Item not found'}), 404
 
         item.notes = new_notes if new_notes else ''
-        item.date_updated = datetime.now()
+        item.date_updated = datetime.now() if not date_updated else datetime.fromisoformat(date_updated.replace('+00:00', 'Z'))
         session.commit()
 
         try:
             api_client = APIClient()
-            api_client.update_notes(tag_id, new_notes if new_notes else '', timeout=10)
+            api_client.update_notes(tag_id, new_notes if new_notes else '')
             logger.info(f"Successfully updated API notes for tag_id {tag_id}")
         except Exception as e:
             logger.error(f"Failed to update API notes for tag_id {tag_id}: {str(e)}", exc_info=True)

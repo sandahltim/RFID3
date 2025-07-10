@@ -1,14 +1,15 @@
 // app/static/js/tab1.js
-// tab1.js version: 2025-07-09-v5
-console.log('tab1.js version: 2025-07-09-v5 loaded');
+// tab1.js version: 2025-07-10-v7
+console.log('tab1.js version: 2025-07-10-v7 loaded');
 
 /**
  * Tab1.js: Logic for Tab 1 (Rental Inventory).
  * Dependencies: common.js (for formatDate, showLoading, hideLoading, collapseSection, printTable, printFullItemList).
- * Updated: 2025-07-09-v5
- * - Fixed subcategory retrieval in handleClick to traverse to .common-name-row and then .category-row, with fallback to expand button's data-subcategory.
- * - Preserved all functionality from v4: aligned editable fields, Save/Cancel buttons, UI refresh, subcategory population, common name loading, pagination, print, collapse/expand, filters.
- * - Line count: ~900 lines (same as v4, only modified handleClick).
+ * Updated: 2025-07-10-v7
+ * - Updated debouncedSaveEdit to include date_updated in API requests per EasyRFID API spec.
+ * - Preserved subcategory retrieval fix from v6: traverse to .common-name-row and .category-row, with fallback to expand button's data-subcategory.
+ * - Preserved all functionality from v6: aligned editable fields, Save/Cancel buttons, UI refresh, subcategory population, common name loading, pagination, print, collapse/expand, filters.
+ * - Line count: ~900 lines (same as v6, only modified debouncedSaveEdit).
  */
 
 /**
@@ -790,10 +791,15 @@ const debouncedSaveEdit = debounce(async (cell, tagId, field, category, subcateg
 
     const url = `/tab/1/update_${field}`;
     try {
+        const currentTime = new Date().toISOString().replace('Z', '+00:00');
         const response = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ tag_id: tagId, [field]: value || '' })
+            body: JSON.stringify({
+                tag_id: tagId,
+                [field]: value || '',
+                date_updated: currentTime
+            })
         });
         console.log(`Update ${field} status for ${tagId}: ${response.status} at ${new Date().toISOString()}`);
         if (!response.ok) {
