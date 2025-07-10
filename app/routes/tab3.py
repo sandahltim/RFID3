@@ -1,5 +1,5 @@
 # app/routes/tab3.py
-# tab3.py version: 2025-07-10-v86
+# tab3.py version: 2025-07-10-v87
 from flask import Blueprint, render_template, request, jsonify, current_app, make_response
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -24,7 +24,7 @@ from urllib.parse import unquote
 
 # Configure logging for Tab 3
 logger = logging.getLogger('tab3')
-logger.setLevel(logging.INFO)  # Reduced to INFO to minimize disk I/O
+logger.setLevel(logging.INFO)
 logger.handlers = []
 
 tab3_log_file = '/home/tim/test_rfidpi/logs/rfid_dashboard.log'
@@ -68,7 +68,7 @@ if not os.path.exists(SHARED_DIR):
     os.chown(SHARED_DIR, pwd.getpwnam('tim').pw_uid, grp.getgrnam('tim').gr_gid)
 
 # Log deployment version
-logger.info("Deployed tab3.py version: 2025-07-10-v86")
+logger.info("Deployed tab3.py version: 2025-07-10-v87")
 
 # Define crew categories
 TENT_CATEGORIES = ['Frame Tent Tops', 'Pole Tent Tops', 'Tent Crates', 'Sidewall']
@@ -1166,6 +1166,8 @@ def update_synced_status():
                     }
                     api_client.insert_item(new_item)
                     logger.debug(f"Inserted new item for tag_id {tag_id} in API")
+                # Invalidate cache for this tag_id
+                cache.delete(f"tab3_items_{db_item.get('rental_class_num', '')}_{item['common_name']}")
             except Exception as api_error:
                 logger.error(f"Error updating/inserting tag_id {tag_id} in API: {str(api_error)}", exc_info=True)
                 failed_items.append(tag_id)
@@ -1246,6 +1248,8 @@ def update_status():
             api_client = APIClient()
             api_client.update_status(tag_id, new_status)
             logger.info(f"Successfully updated API status for tag_id {tag_id} to {new_status}")
+            # Invalidate cache for this item
+            cache.delete(f"tab3_items_{item.rental_class_num}_{item.common_name}")
         except Exception as e:
             logger.error(f"Failed to update API status for tag_id {tag_id}: {str(e)}", exc_info=True)
             session.rollback()
@@ -1292,6 +1296,8 @@ def update_notes():
             api_client = APIClient()
             api_client.update_notes(tag_id, new_notes if new_notes else '')
             logger.info(f"Successfully updated API notes for tag_id {tag_id}")
+            # Invalidate cache for this item
+            cache.delete(f"tab3_items_{item.rental_class_num}_{item.common_name}")
         except Exception as e:
             logger.error(f"Failed to update API notes for tag_id {tag_id}: {str(e)}", exc_info=True)
             session.rollback()
@@ -1342,6 +1348,8 @@ def update_quality():
             api_client = APIClient()
             api_client.update_quality(tag_id, new_quality if new_quality else '')
             logger.info(f"Successfully updated API quality for tag_id {tag_id} to {new_quality}")
+            # Invalidate cache for this item
+            cache.delete(f"tab3_items_{item.rental_class_num}_{item.common_name}")
         except Exception as e:
             logger.error(f"Failed to update API quality for tag_id {tag_id}: {str(e)}", exc_info=True)
             session.rollback()
@@ -1393,6 +1401,8 @@ def update_bin_location():
             api_client = APIClient()
             api_client.update_bin_location(tag_id, new_bin_location if new_bin_location else '')
             logger.info(f"Successfully updated API bin location for tag_id {tag_id} to {new_bin_location}")
+            # Invalidate cache for this item
+            cache.delete(f"tab3_items_{item.rental_class_num}_{item.common_name}")
         except Exception as e:
             logger.error(f"Failed to update API bin location for tag_id {tag_id}: {str(e)}", exc_info=True)
             session.rollback()
