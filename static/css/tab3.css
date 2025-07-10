@@ -1,5 +1,5 @@
 /* app/static/css/tab3.css */
-/* tab3.css version: 2025-07-10-v4 */
+/* tab3.css version: 2025-07-10-v5 */
 body {
     font-family: 'Roboto', sans-serif;
     background-color: #f8f9fa;
@@ -71,7 +71,7 @@ body {
 
 .tab3-container .item-table thead th {
     position: sticky;
-    top: 100px;
+    top: 96px;
     z-index: 12;
     background: linear-gradient(to bottom, #343a40, #495057);
     color: white;
@@ -110,7 +110,7 @@ body {
 }
 
 .tab3-container .expandable-row {
-    padding-top: 120px; /* Increased to clear navbar and sticky headers */
+    padding-top: 0; /* Removed padding to prevent unnecessary space */
 }
 
 .tab3-container .btn {

@@ -71,6 +71,7 @@ border-left: 4px solid #007bff;
 padding-left: 15px;
 background-color: #f8f9fa;
 font-family: 'Roboto', sans-serif;
+position: relative;
 }
 
 /* Common table styling (aligned with category-table) */
@@ -89,7 +90,7 @@ font-size: 1rem;
 font-weight: 600;
 padding: 12px 16px;
 position: sticky;
-top: 100px;
+top: 96px;
 z-index: 12;
 }
 
@@ -107,6 +108,7 @@ border-left: 4px solid #28a745;
 padding-left: 15px;
 background-color: #f1f3f5;
 font-family: 'Roboto', sans-serif;
+position: relative;
 }
 
 .item-table {
@@ -123,7 +125,7 @@ font-size: 0.95rem;
 font-weight: 600;
 padding: 10px 12px;
 position: sticky;
-top: 144px;
+top: 136px;
 z-index: 11;
 }
 

@@ -1,5 +1,5 @@
 /* app/static/css/common.css */
-/* common.css version: 2025-07-10-v4 */
+/* common.css version: 2025-07-10-v5 */
 
 /* Define Broadway Tent and Event colors */
 :root {
@@ -21,6 +21,7 @@
     min-height: 100vh;
     max-width: 1400px;
     margin: 0 auto;
+    overflow-y: auto; /* Enable vertical scrolling on container */
 }
 
 /* Navigation bar styling with Bootstrap enhancement */
@@ -247,15 +248,7 @@ h4 {
     font-size: 0.9rem;
     text-transform: none;
     letter-spacing: normal;
-    z-index: 5;
-}
-
-.table tbody tr:nth-child(odd) {
-    background-color: var(--bte-light-gray);
-}
-
-.table tbody tr:hover {
-    background-color: rgba(255, 193, 7, 0.2);
+    height: 40px; /* Explicit height for consistent calculation */
 }
 
 /* Notes textarea styling */
