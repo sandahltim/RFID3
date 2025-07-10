@@ -1,157 +1,175 @@
-/* tab3.css version: 2025-07-10-v2
- * - Fixed header overlap by adjusting z-index and top values for sticky headers.
- * - Added padding-top to expandable-row to prevent content overlap with headers.
- * - Preserved styles from v1 for expandable-row, common-table, item-table, and responsive adjustments.
- * - Matches Bootstrap 5.3.2 classes used in tab3.html.
- */
-
-/* Ensure expandable rows are visible when expanded */
-.expandable-row {
-    display: table-row;
-    visibility: visible;
-    padding-top: 100px; /* Prevent content overlap with sticky headers */
-}
-
-.expandable-row.collapsed {
-    display: none !important;
-    visibility: hidden !important;
-}
-
-/* Common table styling for Tab 3 */
-.common-table {
-    width: 100%;
-    border-collapse: collapse;
-    display: table;
-    visibility: visible;
+/* app/static/css/tab3.css */
+/* tab3.css version: 2025-07-10-v3 */
+body {
+    font-family: 'Roboto', sans-serif;
+    background-color: #f8f9fa;
     margin: 0;
-    table-layout: auto;
+    padding: 0;
 }
 
-.common-table.collapsed {
-    display: none !important;
-    visibility: hidden !important;
+.tab3-container {
+    max-width: 100%;
+    margin: 0 auto;
+    padding: 20px;
+    background-color: #fff;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    border-radius: 8px;
 }
 
-.common-table th,
-.common-table td {
-    text-align: center;
-    vertical-align: middle;
-    padding: 12px;
-    border: 1px solid var(--bte-medium-gray);
-    display: table-cell;
-    visibility: visible;
-    white-space: normal;
-    word-wrap: break-word;
+.tab3-container h1 {
+    font-size: 24px;
+    margin-bottom: 20px;
+    color: #333;
 }
 
-.common-table thead th {
-    position: sticky;
-    top: 0; /* Adjusted to prevent overlap */
-    z-index: 10; /* Higher z-index to stay above content */
-    background-color: var(--bte-white);
-    border-bottom: 2px solid var(--bte-gold);
-    color: var(--bte-royal-blue);
-}
-
-/* Column widths for common-table */
-.common-table th:nth-child(1),
-.common-table td:nth-child(1) { width: 30%; }
-.common-table th:nth-child(2),
-.common-table td:nth-child(2) { width: 20%; }
-.common-table th:nth-child(3),
-.common-table td:nth-child(3) { width: 20%; }
-.common-table th:nth-child(4),
-.common-table td:nth-child(4) { width: 30%; }
-
-/* Item table styling */
-.item-table {
-    width: 100%;
-    border-collapse: collapse;
-    display: table;
-    visibility: visible;
-    margin: 0;
-    table-layout: auto;
-}
-
-.item-table.collapsed {
-    display: none !important;
-    visibility: hidden !important;
-}
-
-.item-table th,
-.item-table td {
-    text-align: center;
-    vertical-align: middle;
-    padding: 12px;
-    border: 1px solid var(--bte-medium-gray);
-    display: table-cell;
-    visibility: visible;
-    white-space: normal;
-    word-wrap: break-word;
-}
-
-.item-table thead th {
-    position: sticky;
-    top: 0; /* Adjusted to prevent overlap */
-    z-index: 10; /* Higher z-index to stay above content */
-    background-color: var(--bte-white);
-    border-bottom: 2px solid var(--bte-gold);
-    color: var(--bte-royal-blue);
-}
-
-/* Column widths for item-table */
-.item-table th:nth-child(1),
-.item-table td:nth-child(1) { width: 10%; }
-.item-table th:nth-child(2),
-.item-table td:nth-child(2) { width: 15%; }
-.item-table th:nth-child(3),
-.item-table td:nth-child(3) { width: 15%; }
-.item-table th:nth-child(4),
-.item-table td:nth-child(4) { width: 15%; }
-.item-table th:nth-child(5),
-.item-table td:nth-child(5) { width: 15%; }
-.item-table th:nth-child(6),
-.item-table td:nth-child(6) { width: 15%; }
-.item-table th:nth-child(7),
-.item-table td:nth-child(7) { width: 10%; }
-.item-table th:nth-child(8),
-.item-table td:nth-child(8) { width: 15%; }
-.item-table th:nth-child(9),
-.item-table td:nth-child(9) { width: 10%; }
-
-/* Ensure expandable sections are visible */
-.expandable {
-    transition: opacity 0.7s ease-in-out;
-    display: block;
-    visibility: visible;
-}
-
-.expandable.collapsed {
-    display: none !important;
-    visibility: hidden !important;
-    opacity: 0 !important;
-}
-
-.expandable.expanded {
-    display: block !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-}
-
-/* Button group */
-.btn-group {
+.tab3-container .filter-row {
     display: flex;
-    gap: 4px;
-    justify-content: center;
+    flex-wrap: wrap;
+    gap: 15px;
+    margin-bottom: 20px;
+    align-items: center;
 }
 
-/* Responsive adjustments */
-@media (max-width: 768px) {
-    .common-table th,
-    .common-table td,
-    .item-table th,
-    .item-table td {
-        padding: 8px;
-        font-size: 0.9rem;
-    }
+.tab3-container .filter-row select,
+.tab3-container .filter-row input {
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 14px;
+    flex: 1;
+    min-width: 150px;
+}
+
+.tab3-container .filter-row button {
+    padding: 8px 16px;
+    font-size: 14px;
+}
+
+.tab3-container .table-container {
+    overflow-x: auto;
+    margin-bottom: 20px;
+}
+
+.tab3-container .common-table,
+.tab3-container .item-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+    margin-bottom: 20px;
+}
+
+.tab3-container .common-table thead th,
+.tab3-container .item-table thead th {
+    position: sticky;
+    top: 56px; /* Matches navbar height from common.css */
+    z-index: 15; /* Increased to stay above content */
+    background: linear-gradient(to bottom, #343a40, #495057);
+    color: white;
+    padding: 12px;
+    text-align: left;
+    border-bottom: 2px solid #dee2e6;
+}
+
+.tab3-container .common-table tbody tr,
+.tab3-container .item-table tbody tr {
+    transition: background-color 0.2s;
+}
+
+.tab3-container .common-table tbody tr:hover,
+.tab3-container .item-table tbody tr:hover {
+    background-color: #f1f1f1;
+}
+
+.tab3-container .common-table td,
+.tab3-container .item-table td {
+    padding: 12px;
+    border: 1px solid #dee2e6;
+    vertical-align: middle;
+}
+
+.tab3-container .expandable {
+    display: none;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    margin-left: 20px;
+}
+
+.tab3-container .expandable.expanded {
+    display: block;
+    opacity: 1;
+}
+
+.tab3-container .expandable-row {
+    padding-top: 120px; /* Increased to clear navbar and sticky headers */
+}
+
+.tab3-container .btn {
+    padding: 6px 12px;
+    font-size: 14px;
+    border-radius: 4px;
+}
+
+.tab3-container .btn-primary {
+    background-color: #007bff;
+    border-color: #007bff;
+}
+
+.tab3-container .btn-primary:hover {
+    background-color: #0056b3;
+    border-color: #004085;
+}
+
+.tab3-container .btn-secondary {
+    background-color: #6c757d;
+    border-color: #6c757d;
+}
+
+.tab3-container .btn-secondary:hover {
+    background-color: #5a6268;
+    border-color: #545b62;
+}
+
+.tab3-container .btn-info {
+    background-color: #17a2b8;
+    border-color: #17a2b8;
+}
+
+.tab3-container .btn-info:hover {
+    background-color: #117a8b;
+    border-color: #0d5e6f;
+}
+
+.tab3-container .loading-indicator {
+    font-size: 14px;
+    color: #007bff;
+    padding: 10px;
+    text-align: center;
+}
+
+.tab3-container .pagination-controls {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+.tab3-container .pagination-controls button {
+    padding: 6px 12px;
+    font-size: 14px;
+}
+
+.tab3-container .row-count {
+    text-align: center;
+    font-size: 14px;
+    color: #6c757d;
+    margin-top: 10px;
+}
+
+.tab3-container .expandable-cell {
+    cursor: pointer;
+}
+
+.tab3-container .expandable-cell:hover {
+    text-decoration: underline;
 }
