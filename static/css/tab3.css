@@ -1,0 +1,155 @@
+/* tab3.css version: 2025-07-10-v1
+ * - Defined specific styles for Tab 3 to ensure expandable-row and common-table visibility.
+ * - Overrides conflicting styles from tab1.css and common.css.
+ * - Matches Bootstrap classes used in tab3.html.
+ */
+
+/* Ensure expandable rows are visible when expanded */
+.expandable-row {
+    display: table-row;
+    visibility: visible;
+}
+
+.expandable-row.collapsed {
+    display: none !important;
+    visibility: hidden !important;
+}
+
+/* Common table styling for Tab 3 */
+.common-table {
+    width: 100%;
+    border-collapse: collapse;
+    display: table;
+    visibility: visible;
+    margin: 0;
+    table-layout: auto;
+}
+
+.common-table.collapsed {
+    display: none !important;
+    visibility: hidden !important;
+}
+
+.common-table th,
+.common-table td {
+    text-align: center;
+    vertical-align: middle;
+    padding: 12px;
+    border: 1px solid var(--bte-medium-gray);
+    display: table-cell;
+    visibility: visible;
+    white-space: normal;
+    word-wrap: break-word;
+}
+
+.common-table thead th {
+    position: sticky;
+    top: 80px;
+    z-index: 5;
+    background-color: var(--bte-white);
+    border-bottom: 2px solid var(--bte-gold);
+    color: var(--bte-royal-blue);
+}
+
+/* Column widths for common-table */
+.common-table th:nth-child(1),
+.common-table td:nth-child(1) { width: 30%; }
+.common-table th:nth-child(2),
+.common-table td:nth-child(2) { width: 20%; }
+.common-table th:nth-child(3),
+.common-table td:nth-child(3) { width: 20%; }
+.common-table th:nth-child(4),
+.common-table td:nth-child(4) { width: 30%; }
+
+/* Item table styling */
+.item-table {
+    width: 100%;
+    border-collapse: collapse;
+    display: table;
+    visibility: visible;
+    margin: 0;
+    table-layout: auto;
+}
+
+.item-table.collapsed {
+    display: none !important;
+    visibility: hidden !important;
+}
+
+.item-table th,
+.item-table td {
+    text-align: center;
+    vertical-align: middle;
+    padding: 12px;
+    border: 1px solid var(--bte-medium-gray);
+    display: table-cell;
+    visibility: visible;
+    white-space: normal;
+    word-wrap: break-word;
+}
+
+.item-table thead th {
+    position: sticky;
+    top: 80px;
+    z-index: 5;
+    background-color: var(--bte-white);
+    border-bottom: 2px solid var(--bte-gold);
+    color: var(--bte-royal-blue);
+}
+
+/* Column widths for item-table */
+.item-table th:nth-child(1),
+.item-table td:nth-child(1) { width: 10%; }
+.item-table th:nth-child(2),
+.item-table td:nth-child(2) { width: 15%; }
+.item-table th:nth-child(3),
+.item-table td:nth-child(3) { width: 15%; }
+.item-table th:nth-child(4),
+.item-table td:nth-child(4) { width: 15%; }
+.item-table th:nth-child(5),
+.item-table td:nth-child(5) { width: 15%; }
+.item-table th:nth-child(6),
+.item-table td:nth-child(6) { width: 15%; }
+.item-table th:nth-child(7),
+.item-table td:nth-child(7) { width: 10%; }
+.item-table th:nth-child(8),
+.item-table td:nth-child(8) { width: 15%; }
+.item-table th:nth-child(9),
+.item-table td:nth-child(9) { width: 10%; }
+
+/* Ensure expandable sections are visible */
+.expandable {
+    transition: opacity 0.7s ease-in-out;
+    display: block;
+    visibility: visible;
+}
+
+.expandable.collapsed {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+}
+
+.expandable.expanded {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+/* Button group */
+.btn-group {
+    display: flex;
+    gap: 4px;
+    justify-content: center;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .common-table th,
+    .common-table td,
+    .item-table th,
+    .item-table td {
+        padding: 8px;
+        font-size: 0.9rem;
+    }
+}

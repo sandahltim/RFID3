@@ -1,5 +1,5 @@
 # app/routes/home.py
-# home.py version: 2025-06-27-v5
+# home.py version: 2025-07-10-v6
 from flask import Blueprint, render_template, current_app
 from .. import db, cache
 from ..models.db_models import ItemMaster, Transaction, RefreshState
@@ -28,6 +28,7 @@ logger.addHandler(console_handler)
 home_bp = Blueprint('home', __name__)
 
 @home_bp.route('/', endpoint='home')
+@home_bp.route('/home', endpoint='home_page')
 def home():
     cache_key = 'home_page_cache'
     cached_data = cache.get(cache_key)
