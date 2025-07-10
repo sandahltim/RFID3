@@ -1,16 +1,16 @@
 // app/static/js/tab3.js
-// tab3.js version: 2025-07-10-v51
-console.log(`tab3.js version: 2025-07-10-v51 loaded at ${new Date().toISOString()}`);
+// tab3.js version: 2025-07-10-v52
+console.log(`tab3.js version: 2025-07-10-v52 loaded at ${new Date().toISOString()}`);
 
 /**
  * Tab3.js: Logic for Tab 3 (Items in Service).
  * Dependencies: common.js for formatDate, printTable, renderPaginationControls; tab.js for shared logic.
- * Updated: 2025-07-10-v51
- * - Fixed parent layer expand issue by enhancing handleItemClick to correctly handle data-identifier and data-target-id for rental class expand buttons.
- * - Ensured tab3.js overrides tab.js click handlers for Tab 3 expand/collapse events.
- * - Added debug logs for parent layer expand actions.
- * - Preserved all functionality from v50: IIFE wrapper, cache-busting, Save/Cancel buttons, quality options, filters, sync, pagination, crew filter, print.
- * - Line count: ~1160 lines (added debug logs and parent layer logic).
+ * Updated: 2025-07-10-v52
+ * - Fixed parent layer expand by ensuring expandable-row and container visibility in fetchCommonNames.
+ * - Overrode tab.js updateExpandableTable for Tab 3 to prevent interference.
+ * - Added debug logs for DOM updates and visibility checks.
+ * - Preserved all functionality from v51: IIFE wrapper, cache-busting, Save/Cancel buttons, quality options, filters, sync, pagination, crew filter, print.
+ * - Line count: ~1170 lines (added DOM update logic and debug logs).
  */
 
 (function() {
@@ -97,6 +97,11 @@ console.log(`tab3.js version: 2025-07-10-v51 loaded at ${new Date().toISOString(
         const container = document.getElementById(targetId);
         if (!container) {
             console.error(`Container ${targetId} not found at ${new Date().toISOString()}`);
+            return { common_names: [], total_items: 0 };
+        }
+        const parentRow = container.closest('tr.expandable-row');
+        if (!parentRow) {
+            console.error(`Parent expandable-row not found for ${targetId} at ${new Date().toISOString()}`);
             return { common_names: [], total_items: 0 };
         }
 
@@ -217,14 +222,49 @@ console.log(`tab3.js version: 2025-07-10-v51 loaded at ${new Date().toISOString(
             rowCountDiv.textContent = `Showing ${commonNames.length} of ${totalItems} common names`;
             container.appendChild(rowCountDiv);
 
+            // Ensure visibility
+            container.classList.remove('collapsed');
+            container.classList.add('expanded');
             container.style.display = 'block';
             container.style.opacity = '1';
             container.style.visibility = 'visible';
+            parentRow.classList.remove('collapsed');
+            parentRow.style.display = 'table-row';
+            parentRow.style.visibility = 'visible';
+            table.classList.remove('collapsed');
+            table.style.display = 'table';
+            table.style.visibility = 'visible';
+
+            console.log(`fetchCommonNames: Visibility set for container=${targetId}, parentRow=${parentRow.id || 'no-id'}, table=${expectedTableId} at ${new Date().toISOString()}`);
+            console.log(`Container styles:`, {
+                classList: container.classList.toString(),
+                display: container.style.display,
+                opacity: container.style.opacity,
+                visibility: window.getComputedStyle(container).visibility
+            }, `at ${new Date().toISOString()}`);
+            console.log(`Parent row styles:`, {
+                classList: parentRow.classList.toString(),
+                display: parentRow.style.display,
+                visibility: window.getComputedStyle(parentRow).visibility
+            }, `at ${new Date().toISOString()}`);
+            console.log(`Table styles:`, {
+                classList: table.classList.toString(),
+                display: table.style.display,
+                visibility: window.getComputedStyle(table).visibility
+            }, `at ${new Date().toISOString()}`);
 
             return data;
         } catch (error) {
             console.error(`Error fetching common names for ${rentalClassId}: ${error.message} at ${new Date().toISOString()}`);
             container.innerHTML = `<p>Error loading common names: ${error.message}</p>`;
+            container.classList.remove('collapsed');
+            container.classList.add('expanded');
+            container.style.display = 'block';
+            container.style.opacity = '1';
+            container.style.visibility = 'visible';
+            parentRow.classList.remove('collapsed');
+            parentRow.style.display = 'table-row';
+            parentRow.style.visibility = 'visible';
             return { common_names: [], total_items: 0 };
         } finally {
             if (loadingDiv) {
@@ -232,6 +272,106 @@ console.log(`tab3.js version: 2025-07-10-v51 loaded at ${new Date().toISOString(
             }
         }
     }
+
+    /**
+     * Override tab.js updateExpandableTable for Tab 3
+     */
+    window.updateExpandableTable = function(tableId, data, page, perPage, tabNum, identifier) {
+        if (tabNum !== 3) {
+            // Call original tab.js updateExpandableTable for other tabs
+            if (typeof window.originalUpdateExpandableTable === 'function') {
+                return window.originalUpdateExpandableTable(tableId, data, page, perPage, tabNum, identifier);
+            }
+            return;
+        }
+
+        console.log(`updateExpandableTable (Tab 3): tableId=${tableId}, page=${page}, perPage=${perPage}, identifier=${identifier} at ${new Date().toISOString()}`);
+        const table = document.getElementById(tableId);
+        if (!table) {
+            console.warn(`updateExpandableTable: Table not found ${tableId} at ${new Date().toISOString()}`);
+            return;
+        }
+
+        const tbody = table.querySelector('tbody');
+        const container = table.closest('.expandable');
+        const parentRow = table.closest('tr.expandable-row');
+        if (!tbody || !container || !parentRow) {
+            console.warn(`updateExpandableTable: Missing tbody, container, or parentRow for ${tableId} at ${new Date().toISOString()}`);
+            return;
+        }
+
+        tbody.innerHTML = data.common_names.map(common => {
+            const rowId = `${identifier.replace(/[^a-z0-9]/gi, '_')}_${common.name.replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '')}_${tableId.match(/-(\d+)$/)[1]}`;
+            const escapedName = common.name.replace(/'/g, "\\'").replace(/"/g, '\\"');
+            return `
+                <tr>
+                    <td>${common.name}</td>
+                    <td>${common.on_contracts}</td>
+                    <td>${common.is_hand_counted ? 'N/A' : common.total_items_inventory}</td>
+                    <td>
+                        <div class="btn-group">
+                            <button class="btn btn-sm btn-secondary expand-btn" 
+                                    data-rental-class-id="${identifier}" 
+                                    data-common-name="${escapedName}" 
+                                    data-target-id="items-${rowId}" 
+                                    data-expanded="false">Expand Items</button>
+                            <button class="btn btn-sm btn-secondary collapse-btn" 
+                                    data-collapse-target="items-${rowId}" 
+                                    style="display:none;">Collapse</button>
+                            <button class="btn btn-sm btn-primary print-btn"
+                                    data-print-level="Common Name"
+                                    data-print-id="items-${rowId}"
+                                    data-rental-class-id="${identifier}"
+                                    data-common-name="${escapedName}">Print</button>
+                            <button class="btn btn-sm btn-info print-full-btn"
+                                    data-common-name="${escapedName}"
+                                    data-category="${identifier}">Print Full List</button>
+                        </div>
+                    </td>
+                </tr>
+                <tr class="item-name-row">
+                    <td colspan="4">
+                        <div id="items-${rowId}" class="expandable item-level collapsed"></div>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+
+        if (typeof renderPaginationControls === 'function') {
+            const paginationContainer = document.querySelector(`#pagination-${tableId}`);
+            if (paginationContainer) {
+                renderPaginationControls(paginationContainer, data.total_items, page, perPage, (newPage) => {
+                    fetchCommonNames(identifier, container.id, newPage);
+                });
+            }
+        } else {
+            console.warn(`renderPaginationControls not found at ${new Date().toISOString()}`);
+        }
+
+        const rowCountDiv = document.querySelector(`#pagination-${tableId} ~ .row-count`) || document.createElement('div');
+        if (!rowCountDiv.classList.contains('row-count')) {
+            rowCountDiv.className = 'row-count mt-2';
+            table.insertAdjacentElement('afterend', rowCountDiv);
+        }
+        rowCountDiv.textContent = `Showing ${data.common_names.length} of ${data.total_items} common names`;
+
+        container.classList.remove('collapsed');
+        container.classList.add('expanded');
+        container.style.display = 'block';
+        container.style.opacity = '1';
+        container.style.visibility = 'visible';
+        parentRow.classList.remove('collapsed');
+        parentRow.style.display = 'table-row';
+        parentRow.style.visibility = 'visible';
+        table.classList.remove('collapsed');
+        table.style.display = 'table';
+        table.style.visibility = 'visible';
+
+        console.log(`updateExpandableTable: Visibility set for table=${tableId}, container=${container.id}, parentRow=${parentRow.id || 'no-id'} at ${new Date().toISOString()}`);
+    };
+
+    // Preserve original updateExpandableTable
+    window.originalUpdateExpandableTable = window.updateExpandableTable;
 
     /**
      * Fetch and display individual items
@@ -247,6 +387,11 @@ console.log(`tab3.js version: 2025-07-10-v51 loaded at ${new Date().toISOString(
         const container = document.getElementById(targetId);
         if (!container) {
             console.error(`Container ${targetId} not found at ${new Date().toISOString()}`);
+            return;
+        }
+        const parentRow = container.closest('tr.item-name-row');
+        if (!parentRow) {
+            console.error(`Parent item-name-row not found for ${targetId} at ${new Date().toISOString()}`);
             return;
         }
 
@@ -429,18 +574,14 @@ console.log(`tab3.js version: 2025-07-10-v51 loaded at ${new Date().toISOString(
             container.style.display = 'block';
             container.style.opacity = '1';
             container.style.visibility = 'visible';
+            parentRow.classList.remove('collapsed');
+            parentRow.style.display = 'table-row';
+            parentRow.style.visibility = 'visible';
+            itemTable.classList.remove('collapsed');
+            itemTable.style.display = 'table';
+            itemTable.style.visibility = 'visible';
 
-            console.log(`Container styles:`, {
-                classList: container.classList.toString(),
-                display: container.style.display,
-                opacity: container.style.opacity,
-                visibility: window.getComputedStyle(container).visibility
-            }, `at ${new Date().toISOString()}`);
-
-            console.log(`Item table styles:`, {
-                display: itemTable.style.display,
-                visibility: window.getComputedStyle(itemTable).visibility
-            }, `at ${new Date().toISOString()}`);
+            console.log(`loadItems: Visibility set for container=${targetId}, parentRow=${parentRow.id || 'no-id'}, itemTable=${itemTable.id} at ${new Date().toISOString()}`);
         } catch (error) {
             console.error(`Items error: ${error.message} at ${new Date().toISOString()}`);
             const tbody = itemTable.querySelector('tbody');
@@ -450,6 +591,9 @@ console.log(`tab3.js version: 2025-07-10-v51 loaded at ${new Date().toISOString(
             container.style.display = 'block';
             container.style.opacity = '1';
             container.style.visibility = 'visible';
+            parentRow.classList.remove('collapsed');
+            parentRow.style.display = 'table-row';
+            parentRow.style.visibility = 'visible';
         } finally {
             setTimeout(() => {
                 if (loadingSuccess) hideLoading(key);
@@ -846,17 +990,16 @@ console.log(`tab3.js version: 2025-07-10-v51 loaded at ${new Date().toISOString(
                 section.classList.add('collapsed');
                 section.style.display = 'none';
                 section.style.opacity = '0';
-                const expandableRow = section.closest('tr');
-                const dataRow = expandableRow.previousElementSibling;
-                if (!dataRow) {
-                    console.warn(`Previous data row not found for section ${section.id} at ${new Date().toISOString()}`);
+                const expandableRow = section.closest('tr.expandable-row');
+                if (!expandableRow) {
+                    console.warn(`Parent expandable-row not found for section ${section.id} at ${new Date().toISOString()}`);
                     buttonsNotFound++;
                     return;
                 }
                 const rentalClassId = section.id.match(/expand-([^-]+)-/)[1];
                 const index = section.id.match(/-(\d+)$/)[1];
-                const collapseBtn = dataRow.querySelector(`.collapse-btn[data-target-id="expand-${rentalClassId}-${index}"]`);
-                const expandBtn = dataRow.querySelector(`.expand-btn[data-target-id="expand-${rentalClassId}-${index}"]`);
+                const collapseBtn = expandableRow.previousElementSibling.querySelector(`.collapse-btn[data-target-id="expand-${rentalClassId}-${index}"]`);
+                const expandBtn = expandableRow.previousElementSibling.querySelector(`.expand-btn[data-target-id="expand-${rentalClassId}-${index}"]`);
                 if (collapseBtn && expandBtn) {
                     console.log(`Found buttons for section ${section.id}: expandBtn.className=${expandBtn.className}, expandBtn.data-identifier=${expandBtn.getAttribute('data-identifier')}, collapseBtn.className=${collapseBtn.className}, collapseBtn.data-target-id=${collapseBtn.getAttribute('data-target-id')} at ${new Date().toISOString()}`);
                     collapseBtn.style.display = 'none';
@@ -903,7 +1046,6 @@ console.log(`tab3.js version: 2025-07-10-v51 loaded at ${new Date().toISOString(
                 console.error(`Container ${targetId} not found at ${new Date().toISOString()}`);
                 return;
             }
-
             const row = expandBtn.closest('tr');
             const collapseBtn = row.querySelector(`.collapse-btn[data-collapse-target="${targetId}"]`);
             const parentRow = container.closest('tr');
@@ -930,7 +1072,8 @@ console.log(`tab3.js version: 2025-07-10-v51 loaded at ${new Date().toISOString(
                         loadItems(rentalClassId, commonName, targetId);
                         if (parentRow) {
                             parentRow.classList.remove('collapsed');
-                            parentRow.style.display = '';
+                            parentRow.style.display = 'table-row';
+                            parentRow.style.visibility = 'visible';
                         }
                         if (expandBtn && collapseBtn) {
                             expandBtn.style.display = 'none';
@@ -960,7 +1103,8 @@ console.log(`tab3.js version: 2025-07-10-v51 loaded at ${new Date().toISOString(
                     fetchCommonNames(rentalClassId, targetId);
                     if (parentRow) {
                         parentRow.classList.remove('collapsed');
-                        parentRow.style.display = '';
+                        parentRow.style.display = 'table-row';
+                        parentRow.style.visibility = 'visible';
                     }
                     if (expandBtn && collapseBtn) {
                         expandBtn.style.display = 'none';
