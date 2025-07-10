@@ -52,7 +52,7 @@
                                         <tr>
                                             <td>{{ scan.tag_id or 'N/A' }}</td>
                                             <td>{{ scan.common_name or 'N/A' }}</td>
-                                            <td>{{ scan.date_last_scanned | datetimeformat if scan.date_last_scanned else 'N/A' }}</td>
+                                            <td>{{ scan.date_last_scanned | datetimeformat if scan.date_last_scanned else 'No Scan Date' }}</td>
                                         </tr>
                                     {% endfor %}
                                 </tbody>

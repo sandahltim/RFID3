@@ -1,12 +1,12 @@
 # app/routes/home.py
-# home.py version: 2025-07-10-v6
+# home.py version: 2025-07-10-v7
 from flask import Blueprint, render_template, current_app
 from .. import db, cache
 from ..models.db_models import ItemMaster, Transaction, RefreshState
 from sqlalchemy import func
 from time import time
 import logging
-import sys
+import sys       
 from datetime import datetime
 import os
 import json
@@ -42,6 +42,7 @@ def home():
 
         # Total items
         total_items = session.query(func.count(ItemMaster.tag_id)).scalar()
+        logger.info(f'Items in service details: {items_in_service}')
         logger.debug(f"Total items: {total_items}")
 
         # Status counts
@@ -49,12 +50,14 @@ def home():
             ItemMaster.status,
             func.count(ItemMaster.tag_id).label('count')
         ).group_by(ItemMaster.status).all()
+        logger.info(f'Status counts details: {status_counts}')
         logger.debug(f"Status counts in id_item_master: {[(status, count) for status, count in status_counts]}")
 
         # Items on rent
         items_on_rent = session.query(func.count(ItemMaster.tag_id)).filter(
             ItemMaster.status.in_(['On Rent', 'Delivered'])
         ).scalar()
+        logger.info(f'Items on rent details: {items_on_rent}')
         logger.debug(f"Items on rent: {items_on_rent}")
 
         # Items in service
@@ -89,6 +92,7 @@ def home():
         items_available = session.query(func.count(ItemMaster.tag_id)).filter(
             ItemMaster.status == 'Ready to Rent'
         ).scalar()
+        logger.info(f'Items available details: {items_available}')
         logger.debug(f"Items available: {items_available}")
 
         # Status breakdown
@@ -99,9 +103,10 @@ def home():
         status_counts = [(status or 'Unknown', count) for status, count in status_breakdown]
 
         # Recent scans
-        recent_scans = session.query(ItemMaster).order_by(
+        recent_scans = session.query(ItemMaster).filter(ItemMaster.date_last_scanned.isnot(None)).order_by(
             ItemMaster.date_last_scanned.desc()
         ).limit(10).all()
+        logger.info(f'Recent scans details: {[(scan.tag_id, scan.common_name, scan.date_last_scanned) for scan in recent_scans]}')
         logger.debug(f"Recent scans sample: {[(item.tag_id, item.common_name, item.date_last_scanned) for item in recent_scans[:5]]}")
 
         # Last refresh state
