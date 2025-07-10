@@ -1,8 +1,8 @@
 # app/routes/tab1.py
-# tab1.py version: 2025-07-10-v23
+# tab1.py version: 2025-07-10-v24
 import logging
 from datetime import datetime
-from flask import Blueprint, request, jsonify, current_app
+from flask import Blueprint, request, jsonify, current_app, render_template
 from .. import db
 from ..models.db_models import ItemMaster, Transaction, RentalClassMapping, UserRentalClassMapping
 from ..services.api_client import APIClient
@@ -43,7 +43,7 @@ limiter = Limiter(
 VALID_QUALITIES = ['A+', 'A', 'A-', 'B+', 'B', 'B-', 'C+', 'C', 'C-', '']
 
 # Version marker
-logger.info("Deployed tab1.py version: 2025-07-10-v23")
+logger.info("Deployed tab1.py version: 2025-07-10-v24")
 
 def get_category_data(session, filter_query='', sort='', status_filter='', bin_filter=''):
     logger.debug(f"get_category_data: filter_query={filter_query}, sort={sort}, status_filter={status_filter}, bin_filter={bin_filter}")
