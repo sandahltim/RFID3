@@ -1,5 +1,5 @@
 /* app/static/css/tab1.css */
-/* tab1.css version: 2025-07-10-v4 */
+/* tab1.css version: 2025-07-10-v5 */
 
 /* Style for common name table rows */
 .common-name-row {
@@ -153,7 +153,7 @@ tr.common-name-row td table.common-table td {
 
 .common-table thead th {
     position: sticky;
-    top: 106px;
+    top: 100px;
     z-index: 12;
     background: linear-gradient(90deg, var(--bte-royal-blue) 0%, #0047AB 100%);
     color: var(--bte-white);
@@ -162,7 +162,7 @@ tr.common-name-row td table.common-table td {
 
 .item-table thead th {
     position: sticky;
-    top: 156px;
+    top: 144px;
     z-index: 11;
     background: linear-gradient(90deg, var(--bte-royal-blue) 0%, #0047AB 100%);
     color: var(--bte-white);
@@ -175,7 +175,6 @@ tr.common-name-row td table.common-table td {
 .item-table tbody {
     display: table-row-group;
     visibility: visible;
-    position: relative;
 }
 
 /* Column widths for category table */
@@ -299,7 +298,7 @@ tr.common-name-row td table.common-table td {
 
 /* Expandable row padding */
 .expandable-row {
-    padding-top: 80px; /* Clears navbar and headers */
+    padding-top: 120px; /* Increased to clear navbar and headers */
 }
 
 /* Pagination controls */
