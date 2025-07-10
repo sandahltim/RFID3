@@ -38,21 +38,24 @@ font-size: 1rem;
 font-weight: 600;
 background-color: #e9ecef;
 padding: 12px 16px;
+position: sticky;
+top: 56px;
+z-index: 13;
 }
 
-/* Column widths for the Open Contracts table /
+/* Column widths for the Open Contracts table */
 .category-table th:nth-child(1),
-.category-table td:nth-child(1) { width: 15%; } / Contract Number /
+.category-table td:nth-child(1) { width: 15%; } /* Contract Number */
 .category-table th:nth-child(2),
-.category-table td:nth-child(2) { width: 25%; } / Customer Name /
+.category-table td:nth-child(2) { width: 25%; } /* Customer Name */
 .category-table th:nth-child(3),
-.category-table td:nth-child(3) { width: 15%; } / Items on Contract /
+.category-table td:nth-child(3) { width: 15%; } /* Items on Contract */
 .category-table th:nth-child(4),
-.category-table td:nth-child(4) { width: 15%; } / Total Items in Inventory /
+.category-table td:nth-child(4) { width: 15%; } /* Total Items in Inventory */
 .category-table th:nth-child(5),
-.category-table td:nth-child(5) { width: 20%; } / Last Scanned Date /
+.category-table td:nth-child(5) { width: 20%; } /* Last Scanned Date */
 .category-table th:nth-child(6),
-.category-table td:nth-child(6) { width: 10%; } / Actions */
+.category-table td:nth-child(6) { width: 10%; } /* Actions */
 
 /* Ensure the table body is scrollable if needed */
 .category-table tbody {
@@ -85,6 +88,9 @@ background-color: #e9ecef;
 font-size: 1rem;
 font-weight: 600;
 padding: 12px 16px;
+position: sticky;
+top: 106px;
+z-index: 12;
 }
 
 .common-table td {
@@ -116,6 +122,9 @@ background-color: #d4edda;
 font-size: 0.95rem;
 font-weight: 600;
 padding: 10px 12px;
+position: sticky;
+top: 156px;
+z-index: 11;
 }
 
 .item-table td {
