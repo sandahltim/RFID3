@@ -1,57 +1,57 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    {% block head %}
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}RFID Dashboard{% endblock %}</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='lib/bootstrap/bootstrap.min.css') }}?v={{ '' | timestamp }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}?v={{ '' | timestamp }}">
-    {% block head %}{% endblock %}
+    <title>RFID DASHBOARD</title>
+    <link rel="stylesheet" href="/static/css/bootstrap.min.css">
+    <link rel="stylesheet" href="/static/css/common.css">
+    <link rel="stylesheet" href="/static/css/tab1.css">
+    <link rel="icon" href="/static/favicon.ico">
+    {% endblock %}
     {% block extra_head %}{% endblock %}
 </head>
 <body>
     <nav class="navbar navbar-expand-lg">
-        <div class="navbar-brand">RFID DASHBOARD</div>
-        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
-            <span class="navbar-toggler-icon"></span>
-        </button>
-        <div class="collapse navbar-collapse" id="navbarNav">
-            <ul class="navbar-nav">
-                <li class="nav-item"><a class="nav-link" href="{{ url_for('home.home') }}">Home</a></li>
-                <li class="nav-item"><a class="nav-link" href="{{ url_for('tabs.tab_view', tab_num=1) }}">Rental Inventory</a></li>
-                <li class="nav-item"><a class="nav-link" href="{{ url_for('tabs.tab_view', tab_num=2) }}">Open Contracts</a></li>
-                <li class="nav-item"><a class="nav-link" href="{{ url_for('tabs.tab_view', tab_num=3) }}">Service</a></li>
-                <li class="nav-item"><a class="nav-link" href="{{ url_for('tabs.tab_view', tab_num=4) }}">Laundry Contracts</a></li>
-                <li class="nav-item"><a class="nav-link" href="{{ url_for('tabs.tab_view', tab_num=5) }}">Resale</a></li>
-                <li class="nav-item"><a class="nav-link" href="{{ url_for('categories.manage_categories') }}">Manage Categories</a></li>
-            </ul>
+        <div class="container-fluid">
+            <a class="navbar-brand" href="/">RFID DASHBOARD</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item"><a class="nav-link" href="/home">Home</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/tab/1">Rental Inventory</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/tab/2">Open Contracts</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/tab/3">Service</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/tab/4">Laundry Contracts</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/tab/5">Resale</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/categories">Manage Categories</a></li>
+                </ul>
+            </div>
         </div>
     </nav>
-
     <div class="container">
         {% block content %}{% endblock %}
     </div>
-
-    <script src="{{ url_for('static', filename='lib/jquery.min.js') }}?v={{ '' | timestamp }}"></script>
-    <script src="{{ url_for('static', filename='lib/bootstrap/bootstrap.bundle.min.js') }}?v={{ '' | timestamp }}"></script>
-    <script src="{{ url_for('static', filename='lib/htmx/htmx.min.js') }}?v={{ '' | timestamp }}"></script>
-    <script src="{{ url_for('static', filename='js/common.js') }}?v={{ '' | timestamp }}"></script>
-    <script src="{{ url_for('static', filename='js/tab.js') }}?v={{ '' | timestamp }}"></script>
     {% block scripts %}
+        <script src="/static/js/common.js?cb={{ cache_bust }}"></script>
+        <script src="/static/js/tab.js?cb={{ cache_bust }}"></script>
         {% if request.path == '/tab/1' %}
-            <script src="{{ url_for('static', filename='js/tab1.js') }}?v={{ '' | timestamp }}"></script>
+            <script src="/static/js/tab1.js?cb={{ cache_bust }}"></script>
         {% elif request.path == '/tab/2' %}
-            <script src="{{ url_for('static', filename='js/tab2.js') }}?v={{ '' | timestamp }}"></script>
+            <script src="/static/js/tab2.js?cb={{ cache_bust }}"></script>
         {% elif request.path == '/tab/3' %}
-            <script src="{{ url_for('static', filename='js/tab3.js') }}?v={{ '' | timestamp }}"></script>
+            <script src="/static/js/tab3.js?cb={{ cache_bust }}"></script>
         {% elif request.path == '/tab/4' %}
-            <script src="{{ url_for('static', filename='js/tab4.js') }}?v={{ '' | timestamp }}"></script>
+            <script src="/static/js/tab4.js?cb={{ cache_bust }}"></script>
         {% elif request.path == '/tab/5' %}
-            <script src="{{ url_for('static', filename='js/tab5.js') }}?v={{ '' | timestamp }}"></script>
+            <script src="/static/js/tab5.js?cb={{ cache_bust }}"></script>
         {% elif request.path == '/categories' %}
-            <script src="{{ url_for('static', filename='js/categories.js') }}?v={{ '' | timestamp }}"></script>
-        {% elif request.path == '/' %}
-            <script src="{{ url_for('static', filename='js/home.js') }}?v={{ '' | timestamp }}"></script>
+            <script src="/static/js/categories.js?cb={{ cache_bust }}"></script>
+        {% elif request.path == '/' or request.path == '/home' %}
+            <script src="/static/js/tab1.js?cb={{ cache_bust }}"></script>
         {% endif %}
     {% endblock %}
 </body>
