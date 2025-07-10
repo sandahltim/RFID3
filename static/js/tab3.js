@@ -1,15 +1,16 @@
 // app/static/js/tab3.js
-// tab3.js version: 2025-07-10-v50
-console.log(`tab3.js version: 2025-07-10-v50 loaded at ${new Date().toISOString()}`);
+// tab3.js version: 2025-07-10-v51
+console.log(`tab3.js version: 2025-07-10-v51 loaded at ${new Date().toISOString()}`);
 
 /**
  * Tab3.js: Logic for Tab 3 (Items in Service).
  * Dependencies: common.js for formatDate, printTable, renderPaginationControls; tab.js for shared logic.
- * Updated: 2025-07-10-v50
- * - Fixed TypeError in fetchCommonNames by removing all classList.contains checks and adding robust null checks for DOM elements.
- * - Ensured correct targetId construction and table rendering per tab3.html and tab3.py (v84).
- * - Preserved all functionality from v49: IIFE wrapper, cache-busting, Save/Cancel buttons, quality options, filters, sync, pagination, crew filter, print.
- * - Line count: ~1150 lines (same as v49, modified fetchCommonNames and handleItemClick).
+ * Updated: 2025-07-10-v51
+ * - Fixed parent layer expand issue by enhancing handleItemClick to correctly handle data-identifier and data-target-id for rental class expand buttons.
+ * - Ensured tab3.js overrides tab.js click handlers for Tab 3 expand/collapse events.
+ * - Added debug logs for parent layer expand actions.
+ * - Preserved all functionality from v50: IIFE wrapper, cache-busting, Save/Cancel buttons, quality options, filters, sync, pagination, crew filter, print.
+ * - Line count: ~1160 lines (added debug logs and parent layer logic).
  */
 
 (function() {
@@ -885,10 +886,12 @@ console.log(`tab3.js version: 2025-07-10-v50 loaded at ${new Date().toISOString(
         if (expandBtn) {
             event.preventDefault();
             event.stopPropagation();
-            const rentalClassId = expandBtn.getAttribute('data-rental-class-id');
+            const rentalClassId = expandBtn.getAttribute('data-rental-class-id') || expandBtn.getAttribute('data-identifier');
             const commonName = expandBtn.getAttribute('data-common-name');
             const targetId = expandBtn.getAttribute('data-target-id');
             const isExpanded = expandBtn.getAttribute('data-expanded') === 'true';
+
+            console.log(`Expand button clicked: rentalClassId=${rentalClassId}, commonName=${commonName}, targetId=${targetId}, isExpanded=${isExpanded} at ${new Date().toISOString()}`);
 
             if (!targetId) {
                 console.error(`Missing data-target-id on expand button at ${new Date().toISOString()}`);
@@ -901,27 +904,60 @@ console.log(`tab3.js version: 2025-07-10-v50 loaded at ${new Date().toISOString(
                 return;
             }
 
-            const collapseBtn = expandBtn.parentElement.querySelector(`.collapse-btn[data-collapse-target="${targetId}"]`);
-            const parentRow = container.closest('tr.item-name-row');
+            const row = expandBtn.closest('tr');
+            const collapseBtn = row.querySelector(`.collapse-btn[data-collapse-target="${targetId}"]`);
+            const parentRow = container.closest('tr');
 
-            if (isExpanded) {
-                container.classList.remove('expanded');
-                container.classList.add('collapsed');
-                container.style.display = 'none';
-                container.style.opacity = '0';
-                if (parentRow) {
-                    parentRow.classList.add('collapsed');
-                    parentRow.style.display = 'none';
+            if (commonName) {
+                // Child layer (items) expand
+                if (isExpanded) {
+                    container.classList.remove('expanded');
+                    container.classList.add('collapsed');
+                    container.style.display = 'none';
+                    container.style.opacity = '0';
+                    if (parentRow) {
+                        parentRow.classList.add('collapsed');
+                        parentRow.style.display = 'none';
+                    }
+                    if (expandBtn && collapseBtn) {
+                        expandBtn.style.display = 'inline-block';
+                        collapseBtn.style.display = 'none';
+                        expandBtn.setAttribute('data-expanded', 'false');
+                        expandBtn.textContent = 'Expand Items';
+                    }
+                } else {
+                    if (rentalClassId && commonName) {
+                        loadItems(rentalClassId, commonName, targetId);
+                        if (parentRow) {
+                            parentRow.classList.remove('collapsed');
+                            parentRow.style.display = '';
+                        }
+                        if (expandBtn && collapseBtn) {
+                            expandBtn.style.display = 'none';
+                            collapseBtn.style.display = 'inline-block';
+                            expandBtn.setAttribute('data-expanded', 'true');
+                        }
+                    }
                 }
-                if (expandBtn && collapseBtn) {
-                    expandBtn.style.display = 'inline-block';
-                    collapseBtn.style.display = 'none';
-                    expandBtn.setAttribute('data-expanded', 'false');
-                    expandBtn.textContent = 'Expand Items';
-                }
-            } else {
-                if (rentalClassId && commonName) {
-                    loadItems(rentalClassId, commonName, targetId);
+            } else if (rentalClassId) {
+                // Parent layer (rental class) expand
+                if (isExpanded) {
+                    container.classList.remove('expanded');
+                    container.classList.add('collapsed');
+                    container.style.display = 'none';
+                    container.style.opacity = '0';
+                    if (parentRow) {
+                        parentRow.classList.add('collapsed');
+                        parentRow.style.display = 'none';
+                    }
+                    if (expandBtn && collapseBtn) {
+                        expandBtn.style.display = 'inline-block';
+                        collapseBtn.style.display = 'none';
+                        expandBtn.setAttribute('data-expanded', 'false');
+                        expandBtn.textContent = 'Expand';
+                    }
+                } else {
+                    fetchCommonNames(rentalClassId, targetId);
                     if (parentRow) {
                         parentRow.classList.remove('collapsed');
                         parentRow.style.display = '';
@@ -953,6 +989,12 @@ console.log(`tab3.js version: 2025-07-10-v50 loaded at ${new Date().toISOString(
                     expandBtn.style.display = 'inline-block';
                     collapseBtn.style.display = 'none';
                     expandBtn.setAttribute('data-expanded', 'false');
+                    expandBtn.textContent = targetId.includes('items-') ? 'Expand Items' : 'Expand';
+                }
+                const parentRow = container.closest('tr');
+                if (parentRow) {
+                    parentRow.classList.add('collapsed');
+                    parentRow.style.display = 'none';
                 }
             }
             return;
