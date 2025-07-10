@@ -1,5 +1,5 @@
 # app/routes/tab3.py
-# tab3.py version: 2025-07-10-v85
+# tab3.py version: 2025-07-10-v86
 from flask import Blueprint, render_template, request, jsonify, current_app, make_response
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -68,7 +68,7 @@ if not os.path.exists(SHARED_DIR):
     os.chown(SHARED_DIR, pwd.getpwnam('tim').pw_uid, grp.getgrnam('tim').gr_gid)
 
 # Log deployment version
-logger.info("Deployed tab3.py version: 2025-07-10-v85")
+logger.info("Deployed tab3.py version: 2025-07-10-v86")
 
 # Define crew categories
 TENT_CATEGORIES = ['Frame Tent Tops', 'Pole Tent Tops', 'Tent Crates', 'Sidewall']
@@ -902,7 +902,7 @@ def sync_to_pc():
                     'is_new': False
                 })
                 existing_tag_ids.add(item.tag_id)
-                logger.debug(f"Added to synced_items: tag_id={item.tag_id}, common_name={item.common_name}, status={item.status}, rental_class_num={item.rental_class_num}")
+                logger.debug(f"Added to synced_items: tag пресёк_id={item.tag_id}, common_name={item.common_name}, status={item.status}, rental_class_num={item.rental_class_num}")
         except sqlalchemy.exc.DatabaseError as e:
             logger.error(f"Database error querying ItemMaster: {str(e)}", exc_info=True)
             return jsonify({'error': f"Database error querying ItemMaster: {str(e)}"}), 500
@@ -1340,7 +1340,7 @@ def update_quality():
 
         try:
             api_client = APIClient()
-            api_client.update_item(tag_id, {'quality': new_quality if new_quality else ''})
+            api_client.update_quality(tag_id, new_quality if new_quality else '')
             logger.info(f"Successfully updated API quality for tag_id {tag_id} to {new_quality}")
         except Exception as e:
             logger.error(f"Failed to update API quality for tag_id {tag_id}: {str(e)}", exc_info=True)
@@ -1445,7 +1445,7 @@ def update_mappings():
     """Update user rental class mappings."""
     session = None
     try:
-        logger.debug("Entering /tab/3/update_mappings endpoint at %s", datetime.now())
+        logger.debug("Entering /tab/3/update_mappings endpoint at %s", datetime.now()
         session = db.session()
         data = request.get_json()
         rental_class_id = data.get('rental_class_id')

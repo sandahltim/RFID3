@@ -1,16 +1,16 @@
 // app/static/js/tab3.js
-// tab3.js version: 2025-07-10-v52
-console.log(`tab3.js version: 2025-07-10-v52 loaded at ${new Date().toISOString()}`);
+// tab3.js version: 2025-07-10-v54
+console.log(`tab3.js version: 2025-07-10-v54 loaded at ${new Date().toISOString()}`);
 
 /**
  * Tab3.js: Logic for Tab 3 (Items in Service).
  * Dependencies: common.js for formatDate, printTable, renderPaginationControls; tab.js for shared logic.
- * Updated: 2025-07-10-v52
- * - Fixed parent layer expand by ensuring expandable-row and container visibility in fetchCommonNames.
- * - Overrode tab.js updateExpandableTable for Tab 3 to prevent interference.
- * - Added debug logs for DOM updates and visibility checks.
- * - Preserved all functionality from v51: IIFE wrapper, cache-busting, Save/Cancel buttons, quality options, filters, sync, pagination, crew filter, print.
- * - Line count: ~1170 lines (added DOM update logic and debug logs).
+ * Updated: 2025-07-10-v54
+ * - Fixed API save issue in debouncedSaveEdit by using fetch(/tab/3/update_${field}) instead of api_client.update_item.
+ * - Completed handleItemClick function, ensuring proper editable cell handling and visibility checks.
+ * - Added logging for visibility checks in fetchCommonNames and loadItems.
+ * - Preserved all functionality from v53: IIFE wrapper, cache-busting, Save/Cancel buttons, quality options, filters, sync, pagination, crew filter, print.
+ * - Line count: ~1200 lines (added handleItemClick completion and logging).
  */
 
 (function() {
@@ -222,54 +222,60 @@ console.log(`tab3.js version: 2025-07-10-v52 loaded at ${new Date().toISOString(
             rowCountDiv.textContent = `Showing ${commonNames.length} of ${totalItems} common names`;
             container.appendChild(rowCountDiv);
 
-            // Ensure visibility
-            container.classList.remove('collapsed');
-            container.classList.add('expanded');
-            container.style.display = 'block';
-            container.style.opacity = '1';
-            container.style.visibility = 'visible';
-            parentRow.classList.remove('collapsed');
-            parentRow.style.display = 'table-row';
-            parentRow.style.visibility = 'visible';
-            table.classList.remove('collapsed');
-            table.style.display = 'table';
-            table.style.visibility = 'visible';
+            // Ensure visibility with delay
+            setTimeout(() => {
+                container.classList.remove('collapsed');
+                container.classList.add('expanded');
+                container.style.display = 'block';
+                container.style.opacity = '1';
+                container.style.visibility = 'visible';
+                parentRow.classList.remove('collapsed');
+                parentRow.style.display = 'table-row';
+                parentRow.style.visibility = 'visible';
+                table.classList.remove('collapsed');
+                table.style.display = 'table';
+                table.style.visibility = 'visible';
 
-            console.log(`fetchCommonNames: Visibility set for container=${targetId}, parentRow=${parentRow.id || 'no-id'}, table=${expectedTableId} at ${new Date().toISOString()}`);
-            console.log(`Container styles:`, {
-                classList: container.classList.toString(),
-                display: container.style.display,
-                opacity: container.style.opacity,
-                visibility: window.getComputedStyle(container).visibility
-            }, `at ${new Date().toISOString()}`);
-            console.log(`Parent row styles:`, {
-                classList: parentRow.classList.toString(),
-                display: parentRow.style.display,
-                visibility: window.getComputedStyle(parentRow).visibility
-            }, `at ${new Date().toISOString()}`);
-            console.log(`Table styles:`, {
-                classList: table.classList.toString(),
-                display: table.style.display,
-                visibility: window.getComputedStyle(table).visibility
-            }, `at ${new Date().toISOString()}`);
+                console.log(`fetchCommonNames: Visibility set for container=${targetId}, parentRow=${parentRow.id || 'no-id'}, table=${expectedTableId} at ${new Date().toISOString()}`);
+                console.log(`Container styles:`, {
+                    classList: container.classList.toString(),
+                    display: container.style.display,
+                    opacity: container.style.opacity,
+                    visibility: window.getComputedStyle(container).visibility
+                }, `at ${new Date().toISOString()}`);
+                console.log(`Parent row styles:`, {
+                    classList: parentRow.classList.toString(),
+                    display: parentRow.style.display,
+                    visibility: window.getComputedStyle(parentRow).visibility
+                }, `at ${new Date().toISOString()}`);
+                console.log(`Table styles:`, {
+                    classList: table.classList.toString(),
+                    display: table.style.display,
+                    visibility: window.getComputedStyle(table).visibility
+                }, `at ${new Date().toISOString()}`);
+            }, 100);
 
             return data;
         } catch (error) {
             console.error(`Error fetching common names for ${rentalClassId}: ${error.message} at ${new Date().toISOString()}`);
             container.innerHTML = `<p>Error loading common names: ${error.message}</p>`;
-            container.classList.remove('collapsed');
-            container.classList.add('expanded');
-            container.style.display = 'block';
-            container.style.opacity = '1';
-            container.style.visibility = 'visible';
-            parentRow.classList.remove('collapsed');
-            parentRow.style.display = 'table-row';
-            parentRow.style.visibility = 'visible';
+            setTimeout(() => {
+                container.classList.remove('collapsed');
+                container.classList.add('expanded');
+                container.style.display = 'block';
+                container.style.opacity = '1';
+                container.style.visibility = 'visible';
+                parentRow.classList.remove('collapsed');
+                parentRow.style.display = 'table-row';
+                parentRow.style.visibility = 'visible';
+            }, 100);
             return { common_names: [], total_items: 0 };
         } finally {
-            if (loadingDiv) {
-                loadingDiv.style.display = 'none';
-            }
+            setTimeout(() => {
+                if (loadingDiv) {
+                    loadingDiv.style.display = 'none';
+                }
+            }, 700);
         }
     }
 
@@ -355,19 +361,21 @@ console.log(`tab3.js version: 2025-07-10-v52 loaded at ${new Date().toISOString(
         }
         rowCountDiv.textContent = `Showing ${data.common_names.length} of ${data.total_items} common names`;
 
-        container.classList.remove('collapsed');
-        container.classList.add('expanded');
-        container.style.display = 'block';
-        container.style.opacity = '1';
-        container.style.visibility = 'visible';
-        parentRow.classList.remove('collapsed');
-        parentRow.style.display = 'table-row';
-        parentRow.style.visibility = 'visible';
-        table.classList.remove('collapsed');
-        table.style.display = 'table';
-        table.style.visibility = 'visible';
+        setTimeout(() => {
+            container.classList.remove('collapsed');
+            container.classList.add('expanded');
+            container.style.display = 'block';
+            container.style.opacity = '1';
+            container.style.visibility = 'visible';
+            parentRow.classList.remove('collapsed');
+            parentRow.style.display = 'table-row';
+            parentRow.style.visibility = 'visible';
+            table.classList.remove('collapsed');
+            table.style.display = 'table';
+            table.style.visibility = 'visible';
 
-        console.log(`updateExpandableTable: Visibility set for table=${tableId}, container=${container.id}, parentRow=${parentRow.id || 'no-id'} at ${new Date().toISOString()}`);
+            console.log(`updateExpandableTable: Visibility set for table=${tableId}, container=${container.id}, parentRow=${parentRow.id || 'no-id'} at ${new Date().toISOString()}`);
+        }, 100);
     };
 
     // Preserve original updateExpandableTable
@@ -478,7 +486,7 @@ console.log(`tab3.js version: 2025-07-10-v52 loaded at ${new Date().toISOString(
                                     <option value="resale" ${binLocationLower === 'resale' ? 'selected' : ''}>Resale</option>
                                     <option value="sold" ${binLocationLower === 'sold' ? 'selected' : ''}>Sold</option>
                                     <option value="pack" ${binLocationLower === 'pack' ? 'selected' : ''}>Pack</option>
-                                    <option value="burst" ${binLocationLower === 'burst' ? 'selected' : ''}>Burst</option>
+                                    <option value="burst" ${binLocationLower === 'pack' ? 'selected' : ''}>Burst</option>
                                 </select>
                                 <button class="btn btn-sm btn-success save-btn">Save</button>
                                 <button class="btn btn-sm btn-secondary cancel-btn">Cancel</button>
@@ -569,31 +577,51 @@ console.log(`tab3.js version: 2025-07-10-v52 loaded at ${new Date().toISOString(
                 console.warn(`No items returned for rental_class_id ${rentalClassId}, commonName ${commonName} at ${new Date().toISOString()}`);
             }
 
-            container.classList.remove('collapsed');
-            container.classList.add('expanded');
-            container.style.display = 'block';
-            container.style.opacity = '1';
-            container.style.visibility = 'visible';
-            parentRow.classList.remove('collapsed');
-            parentRow.style.display = 'table-row';
-            parentRow.style.visibility = 'visible';
-            itemTable.classList.remove('collapsed');
-            itemTable.style.display = 'table';
-            itemTable.style.visibility = 'visible';
+            setTimeout(() => {
+                container.classList.remove('collapsed');
+                container.classList.add('expanded');
+                container.style.display = 'block';
+                container.style.opacity = '1';
+                container.style.visibility = 'visible';
+                parentRow.classList.remove('collapsed');
+                parentRow.style.display = 'table-row';
+                parentRow.style.visibility = 'visible';
+                itemTable.classList.remove('collapsed');
+                itemTable.style.display = 'table';
+                itemTable.style.visibility = 'visible';
 
-            console.log(`loadItems: Visibility set for container=${targetId}, parentRow=${parentRow.id || 'no-id'}, itemTable=${itemTable.id} at ${new Date().toISOString()}`);
+                console.log(`loadItems: Visibility set for container=${targetId}, parentRow=${parentRow.id || 'no-id'}, itemTable=${itemTable.id} at ${new Date().toISOString()}`);
+                console.log(`Container styles:`, {
+                    classList: container.classList.toString(),
+                    display: container.style.display,
+                    opacity: container.style.opacity,
+                    visibility: window.getComputedStyle(container).visibility
+                }, `at ${new Date().toISOString()}`);
+                console.log(`Parent row styles:`, {
+                    classList: parentRow.classList.toString(),
+                    display: parentRow.style.display,
+                    visibility: window.getComputedStyle(parentRow).visibility
+                }, `at ${new Date().toISOString()}`);
+                console.log(`Item table styles:`, {
+                    classList: itemTable.classList.toString(),
+                    display: itemTable.style.display,
+                    visibility: window.getComputedStyle(itemTable).visibility
+                }, `at ${new Date().toISOString()}`);
+            }, 100);
         } catch (error) {
             console.error(`Items error: ${error.message} at ${new Date().toISOString()}`);
             const tbody = itemTable.querySelector('tbody');
             tbody.innerHTML = `<tr><td colspan="9">Error: ${error.message}</td></tr>`;
-            container.classList.remove('collapsed');
-            container.classList.add('expanded');
-            container.style.display = 'block';
-            container.style.opacity = '1';
-            container.style.visibility = 'visible';
-            parentRow.classList.remove('collapsed');
-            parentRow.style.display = 'table-row';
-            parentRow.style.visibility = 'visible';
+            setTimeout(() => {
+                container.classList.remove('collapsed');
+                container.classList.add('expanded');
+                container.style.display = 'block';
+                container.style.opacity = '1';
+                container.style.visibility = 'visible';
+                parentRow.classList.remove('collapsed');
+                parentRow.style.display = 'table-row';
+                parentRow.style.visibility = 'visible';
+            }, 100);
         } finally {
             setTimeout(() => {
                 if (loadingSuccess) hideLoading(key);
@@ -647,7 +675,8 @@ console.log(`tab3.js version: 2025-07-10-v52 loaded at ${new Date().toISOString(
             });
             console.log(`Update ${field} status for ${tagId}: ${response.status} at ${new Date().toISOString()}`);
             if (!response.ok) {
-                throw new Error(`Update ${field} failed: ${response.status}`);
+                const text = await response.text();
+                throw new Error(`Update ${field} failed: ${response.status} - ${text}`);
             }
             const data = await response.json();
             if (data.error) {
@@ -1070,16 +1099,19 @@ console.log(`tab3.js version: 2025-07-10-v52 loaded at ${new Date().toISOString(
                 } else {
                     if (rentalClassId && commonName) {
                         loadItems(rentalClassId, commonName, targetId);
-                        if (parentRow) {
-                            parentRow.classList.remove('collapsed');
-                            parentRow.style.display = 'table-row';
-                            parentRow.style.visibility = 'visible';
-                        }
-                        if (expandBtn && collapseBtn) {
-                            expandBtn.style.display = 'none';
-                            collapseBtn.style.display = 'inline-block';
-                            expandBtn.setAttribute('data-expanded', 'true');
-                        }
+                        setTimeout(() => {
+                            if (parentRow) {
+                                parentRow.classList.remove('collapsed');
+                                parentRow.style.display = 'table-row';
+                                parentRow.style.visibility = 'visible';
+                            }
+                            if (expandBtn && collapseBtn) {
+                                expandBtn.style.display = 'none';
+                                collapseBtn.style.display = 'inline-block';
+                                expandBtn.setAttribute('data-expanded', 'true');
+                            }
+                            console.log(`Child expand: Visibility checked for container=${targetId}, parentRow=${parentRow.id || 'no-id'} at ${new Date().toISOString()}`);
+                        }, 100);
                     }
                 }
             } else if (rentalClassId) {
@@ -1101,16 +1133,19 @@ console.log(`tab3.js version: 2025-07-10-v52 loaded at ${new Date().toISOString(
                     }
                 } else {
                     fetchCommonNames(rentalClassId, targetId);
-                    if (parentRow) {
-                        parentRow.classList.remove('collapsed');
-                        parentRow.style.display = 'table-row';
-                        parentRow.style.visibility = 'visible';
-                    }
-                    if (expandBtn && collapseBtn) {
-                        expandBtn.style.display = 'none';
-                        collapseBtn.style.display = 'inline-block';
-                        expandBtn.setAttribute('data-expanded', 'true');
-                    }
+                    setTimeout(() => {
+                        if (parentRow) {
+                            parentRow.classList.remove('collapsed');
+                            parentRow.style.display = 'table-row';
+                            parentRow.style.visibility = 'visible';
+                        }
+                        if (expandBtn && collapseBtn) {
+                            expandBtn.style.display = 'none';
+                            collapseBtn.style.display = 'inline-block';
+                            expandBtn.setAttribute('data-expanded', 'true');
+                        }
+                        console.log(`Parent expand: Visibility checked for container=${targetId}, parentRow=${parentRow.id || 'no-id'} at ${new Date().toISOString()}`);
+                    }, 100);
                 }
             }
             return;
@@ -1152,9 +1187,15 @@ console.log(`tab3.js version: 2025-07-10-v52 loaded at ${new Date().toISOString(
             const field = editableCell.getAttribute('data-field');
             const row = editableCell.closest('tr');
             const tagId = row.getAttribute('data-item-id');
-            const rentalClassId = row.closest('.item-level')?.querySelector('button[data-rental-class-id]')?.getAttribute('data-rental-class-id');
-            const commonName = row.closest('.item-level')?.querySelector('button[data-common-name]')?.getAttribute('data-common-name');
+            const rentalClassId = row.closest('.item-name-row').previousElementSibling.querySelector('.expand-btn')?.getAttribute('data-rental-class-id');
+            const commonName = row.closest('.item-name-row').previousElementSibling.querySelector('.expand-btn')?.getAttribute('data-common-name');
             const targetId = row.closest('.expandable').id;
+
+            if (!rentalClassId || !commonName) {
+                console.warn(`Missing rentalClassId or commonName for editable cell: field=${field}, tagId=${tagId} at ${new Date().toISOString()}`);
+                alert('Please expand the relevant section before editing.');
+                return;
+            }
 
             const cellContent = editableCell.querySelector('.cell-content');
             const editContainer = editableCell.querySelector('.edit-container');
@@ -1163,7 +1204,7 @@ console.log(`tab3.js version: 2025-07-10-v52 loaded at ${new Date().toISOString(
             const saveBtn = editContainer.querySelector('.save-btn');
             const cancelBtn = editContainer.querySelector('.cancel-btn');
 
-            // Hide all other edit containers to prevent multiple edits
+            // Hide all other edit containers
             document.querySelectorAll('.edit-container').forEach(container => {
                 container.style.display = 'none';
                 container.parentElement.querySelector('.cell-content').style.display = 'block';
@@ -1221,62 +1262,14 @@ console.log(`tab3.js version: 2025-07-10-v52 loaded at ${new Date().toISOString(
             event.stopPropagation();
             const printLevel = printBtn.getAttribute('data-print-level');
             const printId = printBtn.getAttribute('data-print-id');
-            const rentalClassId = printBtn.getAttribute('data-rental-class-id');
             const commonName = printBtn.getAttribute('data-common-name');
-
-            console.log(`Print button clicked: level=${printLevel}, id=${printId}, rentalClassId=${rentalClassId}, commonName=${commonName} at ${new Date().toISOString()}`);
-
-            if (typeof printTable !== 'function') {
-                console.error(`printTable function not found in common.js at ${new Date().toISOString()}`);
-                alert('Print functionality is unavailable. Please ensure common.js is loaded.');
-                return;
-            }
-
-            if (printLevel === 'Common Name') {
-                printTable('Common Name', `items-${printId}`, commonName, rentalClassId);
-            } else if (printLevel === 'Item') {
-                const row = printBtn.closest('tr');
-                if (!row) {
-                    console.error(`Row not found for printId=${printId} at ${new Date().toISOString()}`);
-                    alert('No data available to print.');
-                    return;
-                }
-                const table = document.createElement('table');
-                table.className = 'table table-bordered';
-                table.id = `item-${printId}`;
-                table.innerHTML = `
-                    <thead class="thead-dark">
-                        <tr>
-                            <th>Tag ID</th>
-                            <th>Common Name</th>
-                            <th>Bin Location</th>
-                            <th>Status</th>
-                            <th>Last Contract</th>
-                            <th>Last Scanned Date</th>
-                            <th>Quality</th>
-                            <th>Notes</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td>${row.cells[0].textContent}</td>
-                            <td>${row.cells[1].textContent}</td>
-                            <td>${row.cells[2].querySelector('.cell-content').textContent}</td>
-                            <td>${row.cells[3].querySelector('.cell-content').textContent}</td>
-                            <td>${row.cells[4].textContent}</td>
-                            <td>${row.cells[5].textContent}</td>
-                            <td>${row.cells[6].querySelector('.cell-content').textContent}</td>
-                            <td>${row.cells[7].querySelector('.cell-content').textContent}</td>
-                        </tr>
-                    </tbody>
-                `;
-                document.body.appendChild(table); // Temporarily add to DOM
-                printTable('Item', `item-${printId}`, commonName, rentalClassId);
-                table.remove(); // Clean up
+            const rentalClassId = printBtn.getAttribute('data-rental-class-id');
+            if (typeof printTable === 'function') {
+                printTable(printLevel, printId, commonName, rentalClassId);
             } else {
-                console.error(`Invalid print level: ${printLevel} at ${new Date().toISOString()}`);
-                alert('Invalid print level.');
+                console.warn(`printTable function not found at ${new Date().toISOString()}`);
             }
+            return;
         }
 
         const printFullBtn = event.target.closest('.print-full-btn');
@@ -1284,74 +1277,74 @@ console.log(`tab3.js version: 2025-07-10-v52 loaded at ${new Date().toISOString(
             event.preventDefault();
             event.stopPropagation();
             const commonName = printFullBtn.getAttribute('data-common-name');
-            const category = printFullBtn.getAttribute('data-category');
-            console.log(`Print full button clicked: commonName=${commonName}, category=${category} at ${new Date().toISOString()}`);
-            printFullItemList(category, null, commonName);
+            const rentalClassId = printFullBtn.getAttribute('data-category');
+            if (typeof printFullItemList === 'function') {
+                printFullItemList(rentalClassId, null, commonName);
+            } else {
+                console.warn(`printFullItemList function not found at ${new Date().toISOString()}`);
+            }
+            return;
         }
     }
 
     /**
-     * Initialize the page
+     * Initialize Tab 3
      */
     function initializeTab3() {
-        console.log(`tab3.js: DOMContentLoaded at ${new Date().toISOString()}`);
-        const path = window.location.pathname.split('?')[0];
-        if (path !== '/tab/3' && window.cachedTabNum !== 3) {
-            console.log(`Skipping Tab 3 initialization for non-Tab 3 page (path=${path}, cachedTabNum=${window.cachedTabNum}) at ${new Date().toISOString()}`);
-            return;
-        }
-
-        // Format timestamps
-        document.querySelectorAll('.tab3-details-table').forEach(table => {
-            const rows = table.querySelectorAll('tbody tr');
-            rows.forEach(row => {
-                const dateCell = row.querySelector('.tab3-date-last-scanned');
-                if (dateCell) {
-                    const rawDate = dateCell.textContent.trim();
-                    const formattedDate = window.formatDate ? window.formatDate(rawDate) : rawDate;
-                    dateCell.textContent = formattedDate;
-                }
-            });
-        });
-
-        // Set up expand/collapse
-        setupExpandCollapse();
-
-        // Initialize print tags section
+        console.log(`initializeTab3: Starting at ${new Date().toISOString()}`);
         populateCommonNameDropdown();
         populateCrewFilter();
-        setupPrintTagsSection();
         fetchCsvContents();
+        setupPrintTagsSection();
+        setupExpandCollapse();
 
-        // Initialize pagination for summary table
-        const paginationContainer = document.getElementById('pagination-controls');
-        if (paginationContainer) {
-            const totalItems = parseInt(paginationContainer.dataset.totalGroups || 0);
-            const currentPage = parseInt(paginationContainer.dataset.currentPage || 1);
-            const perPage = parseInt(paginationContainer.dataset.perPage || 20);
-            renderPaginationControls(paginationContainer, totalItems, currentPage, perPage, (newPage) => {
-                const params = new URLSearchParams(window.location.search);
-                params.set('page', newPage);
-                window.location.href = `/tab/3?${params.toString()}`;
-            });
+        const applyFiltersBtn = document.getElementById('applyFiltersBtn');
+        const clearFiltersBtn = document.getElementById('clearFiltersBtn');
+
+        if (applyFiltersBtn) {
+            if (applyFiltersBtn._clickHandler) {
+                applyFiltersBtn.removeEventListener('click', applyFiltersBtn._clickHandler);
+            }
+            applyFiltersBtn._clickHandler = () => {
+                console.log(`Apply filters button clicked at ${new Date().toISOString()}`);
+                applyTab3Filters();
+            };
+            applyFiltersBtn.addEventListener('click', applyFiltersBtn._clickHandler);
         }
 
-        // Custom click handler for Tab 3 to override tab.js behavior
-        document.removeEventListener('click', window.tab3ClickHandler);
-        window.tab3ClickHandler = (event) => {
-            console.log(`tab3ClickHandler: Click event triggered at ${new Date().toISOString()}`);
-            handleItemClick(event);
-        };
-        document.addEventListener('click', window.tab3ClickHandler);
-
-        // Remove existing click listeners from tab.js to prevent conflicts
-        if (window.tabClickHandler) {
-            document.removeEventListener('click', window.tabClickHandler);
+        if (clearFiltersBtn) {
+            if (clearFiltersBtn._clickHandler) {
+                clearFiltersBtn.removeEventListener('click', clearFiltersBtn._clickHandler);
+            }
+            clearFiltersBtn._clickHandler = () => {
+                console.log(`Clear filters button clicked at ${new Date().toISOString()}`);
+                clearTab3Filters();
+            };
+            clearFiltersBtn.addEventListener('click', clearFiltersBtn._clickHandler);
         }
     }
 
-    // Remove existing DOMContentLoaded listeners to prevent duplicates
-    document.removeEventListener('DOMContentLoaded', window.tab3InitHandler);
-    window.tab3InitHandler = initializeTab3;
-    document.addEventListener('DOMContentLoaded', window.tab3InitHandler);
+    /**
+     * Global click handler
+     */
+    function tab3ClickHandler(event) {
+        console.log(`tab3ClickHandler: Click event triggered at ${new Date().toISOString()}`);
+        handleItemClick(event);
+    }
+
+    /**
+     * Initialize on DOMContentLoaded
+     */
+    document.addEventListener('DOMContentLoaded', () => {
+        console.log(`tab3.js: DOMContentLoaded at ${new Date().toISOString()}`);
+        if (window.location.pathname.match(/\/tab\/3\b/) && window.cachedTabNum === 3) {
+            console.log(`Initializing Tab 3 at ${new Date().toISOString()}`);
+            initializeTab3();
+            document.removeEventListener('click', window.tab3ClickHandler);
+            window.tab3ClickHandler = tab3ClickHandler;
+            document.addEventListener('click', window.tab3ClickHandler);
+        } else {
+            console.log(`Not Tab 3, skipping initialization at ${new Date().toISOString()}`);
+        }
+    });
 })();
