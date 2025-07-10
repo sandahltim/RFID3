@@ -2,31 +2,33 @@
 
 {% block title %}RFID Dashboard{% endblock %}
 {% block head %}
-    <link rel="stylesheet" href="/static/css/common.css?cb={{ 'timestamp' | timestamp }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}?v={{ '' | timestamp }}">
 {% endblock %}
 
 {% block content %}
-    <div class="container">
-        <h1>RFID Dashboard</h1>
-        <div class="row mb-4">
+    <div class="container mt-4">
+        <h2>RFID Dashboard</h2>
+
+        <div class="row mb-3">
             <div class="col-md-12">
-                <button id="full-refresh-btn" class="btn btn-primary">Full Refresh</button>
-                <button id="incremental-refresh-btn" class="btn btn-primary">Clear API Data and Refresh</button>
+                <button class="btn btn-primary mr-2" onclick="triggerFullRefresh()">Full Refresh</button>
+                <button class="btn btn-danger" onclick="clearApiData()">Clear API Data and Refresh</button>
             </div>
         </div>
+
         <div class="row">
             <div class="col-md-4">
                 <div class="card">
                     <div class="card-header">Inventory Summary</div>
                     <div class="card-body">
-                        <p><strong>Total Items:</strong> {{ total_items | default(0) }}</p>
-                        <p><strong>Items on Rent:</strong> {{ items_on_rent | default(0) }}</p>
-                        <p><strong>Items in Service:</strong> {{ items_in_service | default(0) }}</p>
-                        <p><strong>Items Available:</strong> {{ items_available | default(0) }}</p>
+                        <p><strong>Total Items:</strong> {{ total_items or 0 }}</p>
+                        <p><strong>Items on Rent:</strong> {{ items_on_rent or 0 }}</p>
+                        <p><strong>Items in Service:</strong> {{ items_in_service or 0 }}</p>
+                        <p><strong>Items Available:</strong> {{ items_available or 0 }}</p>
                         <p><strong>Status Counts:</strong></p>
                         <ul>
                             {% for status, count in status_counts %}
-                                <li>{{ status | default('Unknown') }}: {{ count | default(0) }}</li>
+                                <li>{{ status or 'Unknown' }}: {{ count or 0 }}</li>
                             {% endfor %}
                         </ul>
                     </div>
@@ -36,9 +38,9 @@
                 <div class="card">
                     <div class="card-header">Recent Scans (Last 10)</div>
                     <div class="card-body">
-                        {% if recent_scans and recent_scans|length > 0 %}
-                            <table id="recent-scans-table" class="table table-bordered">
-                                <thead class="thead-dark">
+                        {% if recent_scans %}
+                            <table class="table table-bordered">
+                                <thead>
                                     <tr>
                                         <th>Tag ID</th>
                                         <th>Common Name</th>
@@ -48,9 +50,9 @@
                                 <tbody>
                                     {% for scan in recent_scans %}
                                         <tr>
-                                            <td>{{ scan.tag_id if scan is mapping else scan[0] | default('N/A') }}</td>
-                                            <td>{{ scan.common_name if scan is mapping else scan[1] | default('N/A') }}</td>
-                                            <td>{{ (scan.date_last_scanned if scan is mapping else scan[2]) | datetimeformat }}</td>
+                                            <td>{{ scan.tag_id or 'N/A' }}</td>
+                                            <td>{{ scan.common_name or 'N/A' }}</td>
+                                            <td>{{ scan.date_last_scanned | datetimeformat if scan.date_last_scanned else 'No Scan Date' }}</td>
                                         </tr>
                                     {% endfor %}
                                 </tbody>
@@ -64,15 +66,46 @@
             <div class="col-md-4">
                 <div class="card">
                     <div class="card-header">Refresh Status</div>
-                    <div class="card-body">
-                        <p><strong>Last Refresh:</strong> {{ last_refresh | default('N/A') }}</p>
-                        <p><strong>Type:</strong> {{ refresh_type | default('N/A') }}</p>
+                    <div class="card-body" id="refreshStatus">
+                        <p><strong>Last Refresh:</strong> {{ last_refresh | datetimeformat if last_refresh != 'N/A' else 'N/A' }}</p>
+                        <p><strong>Type:</strong> {{ refresh_type or 'N/A' }}</p>
                     </div>
                 </div>
             </div>
         </div>
-        <div id="js-warning" class="alert alert-warning mt-4" style="display: none;">
+
+        <div class="alert alert-warning" role="alert" style="display: none;" id="jsDisabledWarning">
             JavaScript is disabled or failed to load. Please enable JavaScript to use the refresh functionality.
         </div>
     </div>
+
+    <script>
+    function triggerFullRefresh() {
+        fetch('/refresh/full', { method: 'POST' })
+            .then(response => response.json())
+            .then(data => {
+                alert(data.message);
+                window.location.reload();
+            })
+            .catch(error => {
+                console.error('Error triggering full refresh:', error);
+                alert('Failed to trigger full refresh');
+            });
+    }
+
+    function clearApiData() {
+        if (confirm('Are you sure you want to clear API data and perform a full refresh?')) {
+            fetch('/refresh/clear', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    alert(data.message);
+                    window.location.reload();
+                })
+                .catch(error => {
+                    console.error('Error clearing API data:', error);
+                    alert('Failed to clear API data');
+                });
+        }
+    }
+    </script>
 {% endblock %}
