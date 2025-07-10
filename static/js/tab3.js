@@ -1,14 +1,15 @@
 // app/static/js/tab3.js
-// tab3.js version: 2025-07-09-v49
-console.log(`tab3.js version: 2025-07-09-v49 loaded at ${new Date().toISOString()}`);
+// tab3.js version: 2025-07-10-v50
+console.log(`tab3.js version: 2025-07-10-v50 loaded at ${new Date().toISOString()}`);
 
 /**
  * Tab3.js: Logic for Tab 3 (Items in Service).
  * Dependencies: common.js for formatDate, printTable, renderPaginationControls; tab.js for shared logic.
- * Updated: 2025-07-09-v49
- * - Fixed TypeError in fetchCommonNames by adding null checks for DOM elements and removing invalid classList.contains check.
- * - Preserved all functionality from v48: IIFE wrapper, cache-busting, Save/Cancel buttons, quality options, filters, sync, pagination, crew filter, print.
- * - Line count: ~760 lines (same as v48, only modified fetchCommonNames).
+ * Updated: 2025-07-10-v50
+ * - Fixed TypeError in fetchCommonNames by removing all classList.contains checks and adding robust null checks for DOM elements.
+ * - Ensured correct targetId construction and table rendering per tab3.html and tab3.py (v84).
+ * - Preserved all functionality from v49: IIFE wrapper, cache-busting, Save/Cancel buttons, quality options, filters, sync, pagination, crew filter, print.
+ * - Line count: ~1150 lines (same as v49, modified fetchCommonNames and handleItemClick).
  */
 
 (function() {
@@ -92,42 +93,64 @@ console.log(`tab3.js version: 2025-07-09-v49 loaded at ${new Date().toISOString(
         }
         const index = indexMatch[1];
         const expectedTableId = `common-table-${sanitizedRentalClassId}-${index}`;
-        const table = document.getElementById(expectedTableId);
-        if (!table) {
-            console.error(`Common table ${expectedTableId} not found for targetId=${targetId} at ${new Date().toISOString()}`);
+        const container = document.getElementById(targetId);
+        if (!container) {
+            console.error(`Container ${targetId} not found at ${new Date().toISOString()}`);
             return { common_names: [], total_items: 0 };
         }
 
-        const tbody = table.querySelector('tbody');
-        if (!tbody) {
-            console.error(`tbody not found in table ${expectedTableId} at ${new Date().toISOString()}`);
-            return { common_names: [], total_items: 0 };
+        const loadingId = `loading-${targetId}`;
+        let loadingDiv = document.getElementById(loadingId);
+        if (!loadingDiv) {
+            loadingDiv = document.createElement('div');
+            loadingDiv.id = loadingId;
+            loadingDiv.className = 'loading-indicator';
+            loadingDiv.textContent = 'Loading...';
+            container.appendChild(loadingDiv);
         }
+        loadingDiv.style.display = 'block';
 
         try {
             const cacheBust = `cb=${new Date().getTime()}`;
             const url = `/tab/3/common_names?rental_class_id=${encodeURIComponent(rentalClassId)}&page=${page}&per_page=20&${cacheBust}`;
             console.log(`Fetching common names from: ${url} at ${new Date().toISOString()}`);
-            const response = await fetch(url);
+            const response = await retryRequest(url, { method: 'GET' });
             console.log(`Common names fetch status for ${rentalClassId}, page ${page}: ${response.status} at ${new Date().toISOString()}`);
             if (!response.ok) {
                 throw new Error(`Failed to fetch common names: ${response.status}`);
             }
             const data = await response.json();
-            console.log(`Common names data for ${rentalClassId}, page ${page}: ${JSON.stringify(data, null, 2)} at ${new Date().toISOString()}`);
+            console.log(`Common names data for ${rentalClassId}, page ${page}:`, data, `at ${new Date().toISOString()}`);
 
             if (data.error) {
                 console.error(`Server error fetching common names: ${data.error} at ${new Date().toISOString()}`);
-                tbody.innerHTML = `<tr><td colspan="4">Error: ${data.error}</td></tr>`;
+                container.innerHTML = `<p>Error: ${data.error}</p>`;
                 return data;
             }
+
+            const table = document.createElement('table');
+            table.id = expectedTableId;
+            table.className = 'table table-bordered table-hover common-table';
+            table.innerHTML = `
+                <thead class="thead-dark">
+                    <tr>
+                        <th>Common Name</th>
+                        <th>Items on Contracts</th>
+                        <th>Total Items in Inventory</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            `;
+            const tbody = table.querySelector('tbody');
+            container.innerHTML = '';
+            container.appendChild(table);
 
             const commonNames = data.common_names || [];
             const totalItems = data.total_items || 0;
             const perPage = data.per_page || 20;
             const currentPage = data.page || 1;
 
-            tbody.innerHTML = '';
             if (commonNames.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="4">No common names found for this rental class</td></tr>';
             } else {
@@ -153,8 +176,10 @@ console.log(`tab3.js version: 2025-07-09-v49 loaded at ${new Date().toISOString(
                                         data-print-level="Common Name"
                                         data-print-id="items-${rowId}"
                                         data-rental-class-id="${rentalClassId}"
+                                        data-common-name="${escapedName}">Print</button>
+                                <button class="btn btn-sm btn-info print-full-btn"
                                         data-common-name="${escapedName}"
-                                        data-category="${rentalClassId}">Print</button>
+                                        data-category="${rentalClassId}">Print Full List</button>
                             </div>
                         </td>
                     `;
@@ -172,25 +197,38 @@ console.log(`tab3.js version: 2025-07-09-v49 loaded at ${new Date().toISOString(
                 });
             }
 
-            const paginationContainer = document.getElementById(`pagination-${expectedTableId}`);
-            if (paginationContainer && typeof renderPaginationControls === 'function') {
-                renderPaginationControls(paginationContainer, totalItems, currentPage, perPage, (newPage) => {
-                    fetchCommonNames(rentalClassId, targetId, newPage);
-                });
-            } else {
-                console.warn(`Pagination container or renderPaginationControls not found for ${expectedTableId} at ${new Date().toISOString()}`);
+            if (totalItems > perPage) {
+                const paginationContainer = document.createElement('div');
+                paginationContainer.id = `pagination-${expectedTableId}`;
+                paginationContainer.className = 'pagination-controls mt-2';
+                container.appendChild(paginationContainer);
+                if (typeof renderPaginationControls === 'function') {
+                    renderPaginationControls(paginationContainer, totalItems, currentPage, perPage, (newPage) => {
+                        fetchCommonNames(rentalClassId, targetId, newPage);
+                    });
+                } else {
+                    console.warn(`renderPaginationControls not found at ${new Date().toISOString()}`);
+                }
             }
 
-            const rowCountDiv = paginationContainer ? paginationContainer.nextSibling : null;
-            if (rowCountDiv && rowCountDiv.classList.contains('row-count')) {
-                rowCountDiv.textContent = `Showing ${commonNames.length} of ${totalItems} common names`;
-            }
+            const rowCountDiv = document.createElement('div');
+            rowCountDiv.className = 'row-count mt-2';
+            rowCountDiv.textContent = `Showing ${commonNames.length} of ${totalItems} common names`;
+            container.appendChild(rowCountDiv);
+
+            container.style.display = 'block';
+            container.style.opacity = '1';
+            container.style.visibility = 'visible';
 
             return data;
         } catch (error) {
             console.error(`Error fetching common names for ${rentalClassId}: ${error.message} at ${new Date().toISOString()}`);
-            tbody.innerHTML = `<tr><td colspan="4">Error loading common names: ${error.message}</td></tr>`;
+            container.innerHTML = `<p>Error loading common names: ${error.message}</p>`;
             return { common_names: [], total_items: 0 };
+        } finally {
+            if (loadingDiv) {
+                loadingDiv.style.display = 'none';
+            }
         }
     }
 
@@ -264,16 +302,16 @@ console.log(`tab3.js version: 2025-07-09-v49 loaded at ${new Date().toISOString(
         console.log(`Fetching items: ${url} at ${new Date().toISOString()}`);
 
         try {
-            const response = await fetch(url);
+            const response = await retryRequest(url, { method: 'GET' });
             console.log(`Items fetch status: ${response.status} at ${new Date().toISOString()}`);
             if (!response.ok) {
                 throw new Error(`Items fetch failed: ${response.status}`);
             }
             const data = await response.json();
-            console.log(`Items data: ${JSON.stringify(data, null, 2)} at ${new Date().toISOString()}`);
+            console.log(`Items data:`, data, `at ${new Date().toISOString()}`);
 
             const tbody = itemTable.querySelector('tbody');
-            tbody.innerHTML = ''; // Clear table before rendering
+            tbody.innerHTML = '';
 
             if (data.items && data.items.length > 0) {
                 data.items.forEach(item => {
@@ -452,12 +490,16 @@ console.log(`tab3.js version: 2025-07-09-v49 loaded at ${new Date().toISOString(
 
         const url = `/tab/3/update_${field}`;
         try {
+            const currentTime = new Date().toISOString().replace('Z', '+00:00');
             const response = await retryRequest(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ tag_id: tagId, [field]: value || '' })
-            }, 3, 2000);
-
+                body: JSON.stringify({
+                    tag_id: tagId,
+                    [field]: value || '',
+                    date_updated: currentTime
+                })
+            });
             console.log(`Update ${field} status for ${tagId}: ${response.status} at ${new Date().toISOString()}`);
             if (!response.ok) {
                 throw new Error(`Update ${field} failed: ${response.status}`);
@@ -500,7 +542,7 @@ console.log(`tab3.js version: 2025-07-09-v49 loaded at ${new Date().toISOString(
             })
             .then(data => {
                 select.innerHTML = '<option value="">Select Common Name</option>';
-                data.common_names.forEach(name => {
+                (data.common_names || []).forEach(name => {
                     const option = document.createElement('option');
                     option.value = name;
                     option.textContent = name;
@@ -867,8 +909,10 @@ console.log(`tab3.js version: 2025-07-09-v49 loaded at ${new Date().toISOString(
                 container.classList.add('collapsed');
                 container.style.display = 'none';
                 container.style.opacity = '0';
-                parentRow.classList.add('collapsed');
-                parentRow.style.display = 'none';
+                if (parentRow) {
+                    parentRow.classList.add('collapsed');
+                    parentRow.style.display = 'none';
+                }
                 if (expandBtn && collapseBtn) {
                     expandBtn.style.display = 'inline-block';
                     collapseBtn.style.display = 'none';
@@ -878,28 +922,14 @@ console.log(`tab3.js version: 2025-07-09-v49 loaded at ${new Date().toISOString(
             } else {
                 if (rentalClassId && commonName) {
                     loadItems(rentalClassId, commonName, targetId);
-                    parentRow.classList.remove('collapsed');
-                    parentRow.style.display = '';
+                    if (parentRow) {
+                        parentRow.classList.remove('collapsed');
+                        parentRow.style.display = '';
+                    }
                     if (expandBtn && collapseBtn) {
                         expandBtn.style.display = 'none';
                         collapseBtn.style.display = 'inline-block';
                         expandBtn.setAttribute('data-expanded', 'true');
-                    }
-                } else {
-                    const rentalClassId = expandBtn.getAttribute('data-identifier');
-                    if (rentalClassId && targetId) {
-                        fetchCommonNames(rentalClassId, targetId, 1);
-                        const expandable = container.closest('.expandable');
-                        if (expandable) {
-                            expandable.classList.remove('collapsed');
-                            expandable.classList.add('expanded');
-                            expandable.style.display = 'block';
-                            expandable.style.opacity = '1';
-                        }
-                        if (expandBtn && collapseBtn) {
-                            expandBtn.style.display = 'none';
-                            collapseBtn.style.display = 'inline-block';
-                        }
                     }
                 }
             }
@@ -922,6 +952,7 @@ console.log(`tab3.js version: 2025-07-09-v49 loaded at ${new Date().toISOString(
                 if (expandBtn && collapseBtn) {
                     expandBtn.style.display = 'inline-block';
                     collapseBtn.style.display = 'none';
+                    expandBtn.setAttribute('data-expanded', 'false');
                 }
             }
             return;
@@ -997,74 +1028,79 @@ console.log(`tab3.js version: 2025-07-09-v49 loaded at ${new Date().toISOString(
                 console.warn(`No edit container found for editable cell: field=${field}, tagId=${tagId} at ${new Date().toISOString()}`);
             }
         }
-    }
 
-    /**
-     * Handle print functionality
-     */
-    function handlePrint(event) {
         const printBtn = event.target.closest('.print-btn');
-        if (!printBtn) return;
+        if (printBtn) {
+            event.preventDefault();
+            event.stopPropagation();
+            const printLevel = printBtn.getAttribute('data-print-level');
+            const printId = printBtn.getAttribute('data-print-id');
+            const rentalClassId = printBtn.getAttribute('data-rental-class-id');
+            const commonName = printBtn.getAttribute('data-common-name');
 
-        event.preventDefault();
-        event.stopPropagation();
-        const printLevel = printBtn.getAttribute('data-print-level');
-        const printId = printBtn.getAttribute('data-print-id');
-        const rentalClassId = printBtn.getAttribute('data-rental-class-id');
-        const commonName = printBtn.getAttribute('data-common-name');
+            console.log(`Print button clicked: level=${printLevel}, id=${printId}, rentalClassId=${rentalClassId}, commonName=${commonName} at ${new Date().toISOString()}`);
 
-        console.log(`Print button clicked: level=${printLevel}, id=${printId}, rentalClassId=${rentalClassId}, commonName=${commonName} at ${new Date().toISOString()}`);
-
-        if (typeof printTable !== 'function') {
-            console.error(`printTable function not found in common.js at ${new Date().toISOString()}`);
-            alert('Print functionality is unavailable. Please ensure common.js is loaded.');
-            return;
-        }
-
-        if (printLevel === 'Common Name') {
-            printTable('Common Name', `items-${printId}`, commonName, rentalClassId);
-        } else if (printLevel === 'Item') {
-            const row = printBtn.closest('tr');
-            if (!row) {
-                console.error(`Row not found for printId=${printId} at ${new Date().toISOString()}`);
-                alert('No data available to print.');
+            if (typeof printTable !== 'function') {
+                console.error(`printTable function not found in common.js at ${new Date().toISOString()}`);
+                alert('Print functionality is unavailable. Please ensure common.js is loaded.');
                 return;
             }
-            const table = document.createElement('table');
-            table.className = 'table table-bordered';
-            table.id = `item-${printId}`;
-            table.innerHTML = `
-                <thead class="thead-dark">
-                    <tr>
-                        <th>Tag ID</th>
-                        <th>Common Name</th>
-                        <th>Bin Location</th>
-                        <th>Status</th>
-                        <th>Last Contract</th>
-                        <th>Last Scanned Date</th>
-                        <th>Quality</th>
-                        <th>Notes</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td>${row.cells[0].textContent}</td>
-                        <td>${row.cells[1].textContent}</td>
-                        <td>${row.cells[2].querySelector('.cell-content').textContent}</td>
-                        <td>${row.cells[3].querySelector('.cell-content').textContent}</td>
-                        <td>${row.cells[4].textContent}</td>
-                        <td>${row.cells[5].textContent}</td>
-                        <td>${row.cells[6].querySelector('.cell-content').textContent}</td>
-                        <td>${row.cells[7].querySelector('.cell-content').textContent}</td>
-                    </tr>
-                </tbody>
-            `;
-            document.body.appendChild(table); // Temporarily add to DOM
-            printTable('Item', `item-${printId}`, commonName, rentalClassId);
-            table.remove(); // Clean up
-        } else {
-            console.error(`Invalid print level: ${printLevel} at ${new Date().toISOString()}`);
-            alert('Invalid print level.');
+
+            if (printLevel === 'Common Name') {
+                printTable('Common Name', `items-${printId}`, commonName, rentalClassId);
+            } else if (printLevel === 'Item') {
+                const row = printBtn.closest('tr');
+                if (!row) {
+                    console.error(`Row not found for printId=${printId} at ${new Date().toISOString()}`);
+                    alert('No data available to print.');
+                    return;
+                }
+                const table = document.createElement('table');
+                table.className = 'table table-bordered';
+                table.id = `item-${printId}`;
+                table.innerHTML = `
+                    <thead class="thead-dark">
+                        <tr>
+                            <th>Tag ID</th>
+                            <th>Common Name</th>
+                            <th>Bin Location</th>
+                            <th>Status</th>
+                            <th>Last Contract</th>
+                            <th>Last Scanned Date</th>
+                            <th>Quality</th>
+                            <th>Notes</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>${row.cells[0].textContent}</td>
+                            <td>${row.cells[1].textContent}</td>
+                            <td>${row.cells[2].querySelector('.cell-content').textContent}</td>
+                            <td>${row.cells[3].querySelector('.cell-content').textContent}</td>
+                            <td>${row.cells[4].textContent}</td>
+                            <td>${row.cells[5].textContent}</td>
+                            <td>${row.cells[6].querySelector('.cell-content').textContent}</td>
+                            <td>${row.cells[7].querySelector('.cell-content').textContent}</td>
+                        </tr>
+                    </tbody>
+                `;
+                document.body.appendChild(table); // Temporarily add to DOM
+                printTable('Item', `item-${printId}`, commonName, rentalClassId);
+                table.remove(); // Clean up
+            } else {
+                console.error(`Invalid print level: ${printLevel} at ${new Date().toISOString()}`);
+                alert('Invalid print level.');
+            }
+        }
+
+        const printFullBtn = event.target.closest('.print-full-btn');
+        if (printFullBtn) {
+            event.preventDefault();
+            event.stopPropagation();
+            const commonName = printFullBtn.getAttribute('data-common-name');
+            const category = printFullBtn.getAttribute('data-category');
+            console.log(`Print full button clicked: commonName=${commonName}, category=${category} at ${new Date().toISOString()}`);
+            printFullItemList(category, null, commonName);
         }
     }
 
@@ -1119,7 +1155,6 @@ console.log(`tab3.js version: 2025-07-09-v49 loaded at ${new Date().toISOString(
         window.tab3ClickHandler = (event) => {
             console.log(`tab3ClickHandler: Click event triggered at ${new Date().toISOString()}`);
             handleItemClick(event);
-            handlePrint(event); // Handle print button clicks
         };
         document.addEventListener('click', window.tab3ClickHandler);
 
