@@ -1,13 +1,15 @@
-/* tab3.css version: 2025-07-10-v1
- * - Defined specific styles for Tab 3 to ensure expandable-row and common-table visibility.
- * - Overrides conflicting styles from tab1.css and common.css.
- * - Matches Bootstrap classes used in tab3.html.
+/* tab3.css version: 2025-07-10-v2
+ * - Fixed header overlap by adjusting z-index and top values for sticky headers.
+ * - Added padding-top to expandable-row to prevent content overlap with headers.
+ * - Preserved styles from v1 for expandable-row, common-table, item-table, and responsive adjustments.
+ * - Matches Bootstrap 5.3.2 classes used in tab3.html.
  */
 
 /* Ensure expandable rows are visible when expanded */
 .expandable-row {
     display: table-row;
     visibility: visible;
+    padding-top: 100px; /* Prevent content overlap with sticky headers */
 }
 
 .expandable-row.collapsed {
@@ -44,8 +46,8 @@
 
 .common-table thead th {
     position: sticky;
-    top: 80px;
-    z-index: 5;
+    top: 0; /* Adjusted to prevent overlap */
+    z-index: 10; /* Higher z-index to stay above content */
     background-color: var(--bte-white);
     border-bottom: 2px solid var(--bte-gold);
     color: var(--bte-royal-blue);
@@ -90,8 +92,8 @@
 
 .item-table thead th {
     position: sticky;
-    top: 80px;
-    z-index: 5;
+    top: 0; /* Adjusted to prevent overlap */
+    z-index: 10; /* Higher z-index to stay above content */
     background-color: var(--bte-white);
     border-bottom: 2px solid var(--bte-gold);
     color: var(--bte-royal-blue);
