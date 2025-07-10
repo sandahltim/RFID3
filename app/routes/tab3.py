@@ -1,5 +1,5 @@
 # app/routes/tab3.py
-# tab3.py version: 2025-07-09-v84
+# tab3.py version: 2025-07-10-v85
 from flask import Blueprint, render_template, request, jsonify, current_app, make_response
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -68,7 +68,7 @@ if not os.path.exists(SHARED_DIR):
     os.chown(SHARED_DIR, pwd.getpwnam('tim').pw_uid, grp.getgrnam('tim').gr_gid)
 
 # Log deployment version
-logger.info("Deployed tab3.py version: 2025-07-09-v84")
+logger.info("Deployed tab3.py version: 2025-07-10-v85")
 
 # Define crew categories
 TENT_CATEGORIES = ['Frame Tent Tops', 'Pole Tent Tops', 'Tent Crates', 'Sidewall']
@@ -1150,9 +1150,9 @@ def update_synced_status():
             tag_id = item['tag_id']
             try:
                 params = {'filter[eq]': f"tag_id,eq,'{tag_id}'"}
-                existing_items = api_client._make_request("14223767938169344381", params, timeout=10)
+                existing_items = api_client._make_request("14223767938169344381", params)
                 if existing_items:
-                    api_client.update_status(tag_id, 'Ready to Rent', timeout=10)
+                    api_client.update_status(tag_id, 'Ready to Rent')
                     logger.debug(f"Updated status for tag_id {tag_id} in API")
                 else:
                     db_item = item_dict.get(tag_id, {})
@@ -1164,7 +1164,7 @@ def update_synced_status():
                         'date_last_scanned': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                         'rental_class_num': db_item.get('rental_class_num', '')
                     }
-                    api_client.insert_item(new_item, timeout=10)
+                    api_client.insert_item(new_item)
                     logger.debug(f"Inserted new item for tag_id {tag_id} in API")
             except Exception as api_error:
                 logger.error(f"Error updating/inserting tag_id {tag_id} in API: {str(api_error)}", exc_info=True)
@@ -1218,6 +1218,7 @@ def update_status():
         data = request.get_json()
         tag_id = data.get('tag_id')
         new_status = data.get('status')
+        date_updated = data.get('date_updated')
 
         if not tag_id or not new_status:
             logger.warning(f"Invalid input in update_status: tag_id={tag_id}, new_status={new_status}")
@@ -1238,12 +1239,12 @@ def update_status():
             return jsonify({'error': 'Status cannot be updated to "On Rent" or "Delivered" manually'}), 400
 
         item.status = new_status
-        item.date_updated = datetime.now()
+        item.date_updated = datetime.now() if not date_updated else datetime.fromisoformat(date_updated.replace('+00:00', 'Z'))
         session.commit()
 
         try:
             api_client = APIClient()
-            api_client.update_status(tag_id, new_status, timeout=10)
+            api_client.update_status(tag_id, new_status)
             logger.info(f"Successfully updated API status for tag_id {tag_id} to {new_status}")
         except Exception as e:
             logger.error(f"Failed to update API status for tag_id {tag_id}: {str(e)}", exc_info=True)
@@ -1272,6 +1273,7 @@ def update_notes():
         data = request.get_json()
         tag_id = data.get('tag_id')
         new_notes = data.get('notes')
+        date_updated = data.get('date_updated')
 
         if not tag_id:
             logger.warning(f"Invalid input in update_notes: tag_id={tag_id}")
@@ -1283,7 +1285,7 @@ def update_notes():
             return jsonify({'error': 'Item not found'}), 404
 
         item.notes = new_notes if new_notes else ''
-        item.date_updated = datetime.now()
+        item.date_updated = datetime.now() if not date_updated else datetime.fromisoformat(date_updated.replace('+00:00', 'Z'))
         session.commit()
 
         try:
@@ -1317,6 +1319,7 @@ def update_quality():
         data = request.get_json()
         tag_id = data.get('tag_id')
         new_quality = data.get('quality', '')
+        date_updated = data.get('date_updated')
 
         if not tag_id:
             logger.warning(f"Invalid input in update_quality: tag_id={tag_id}")
@@ -1332,7 +1335,7 @@ def update_quality():
             return jsonify({'error': 'Item not found'}), 404
 
         item.quality = new_quality if new_quality else None
-        item.date_updated = datetime.now()
+        item.date_updated = datetime.now() if not date_updated else datetime.fromisoformat(date_updated.replace('+00:00', 'Z'))
         session.commit()
 
         try:
@@ -1366,6 +1369,7 @@ def update_bin_location():
         data = request.get_json()
         tag_id = data.get('tag_id')
         new_bin_location = data.get('bin_location')
+        date_updated = data.get('date_updated')
 
         if not tag_id:
             logger.warning(f"Invalid input in update_bin_location: tag_id={tag_id}")
@@ -1382,12 +1386,12 @@ def update_bin_location():
             return jsonify({'error': 'Item not found'}), 404
 
         item.bin_location = new_bin_location if new_bin_location else None
-        item.date_updated = datetime.now()
+        item.date_updated = datetime.now() if not date_updated else datetime.fromisoformat(date_updated.replace('+00:00', 'Z'))
         session.commit()
 
         try:
             api_client = APIClient()
-            api_client.update_item(tag_id, {'bin_location': new_bin_location if new_bin_location else ''})
+            api_client.update_bin_location(tag_id, new_bin_location if new_bin_location else '')
             logger.info(f"Successfully updated API bin location for tag_id {tag_id} to {new_bin_location}")
         except Exception as e:
             logger.error(f"Failed to update API bin location for tag_id {tag_id}: {str(e)}", exc_info=True)
