@@ -1,9 +1,5 @@
-/* tab5.css version: 2025-07-10-v2
- * - Updated .common-name-row.collapsed to override display: table-row !important and ensure no space is occupied.
- * - Removed min-height from .common-table and .item-table when collapsed.
- * - Preserves all existing styles for Tab 5.
- * - Removed z-index and position from tbody to prevent overlapping issues.
- * - Adjusted sticky top values for headers to 56px, 96px, 136px assuming header height ~40px.
+/* tab5.css version: 2025-07-10-v3
+ * - Adjusted sticky top values for headers to 56px, 100px, 144px to account for potential header height of ~44px.
  */
 
 /* Style for common name table rows */
@@ -144,7 +140,7 @@
 
 .common-table thead th {
     position: sticky;
-    top: 96px;
+    top: 100px;
     z-index: 12;
     background: linear-gradient(90deg, var(--bte-royal-blue) 0%, #0047AB 100%);
     color: var(--bte-white);
@@ -153,7 +149,7 @@
 
 .item-table thead th {
     position: sticky;
-    top: 136px;
+    top: 144px;
     z-index: 11;
     background: linear-gradient(90deg, var(--bte-royal-blue) 0%, #0047AB 100%);
     color: var(--bte-white);
