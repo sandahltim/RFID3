@@ -1,4 +1,5 @@
-/* Shared styles for RFID Dashboard - Broadway Tent and Event */
+/* app/static/css/common.css */
+/* common.css version: 2025-07-10-v4 */
 
 /* Define Broadway Tent and Event colors */
 :root {
@@ -34,6 +35,7 @@
     position: sticky;
     top: 0;
     z-index: 1000;
+    height: 56px; /* Explicit height for consistency */
 }
 
 .navbar-brand, .navbar-nav .nav-link {
@@ -129,6 +131,16 @@ h4 {
     font-size: 1.6rem;
     margin: 15px 0;
     text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+/* Table header styling */
+.thead-dark {
+    position: sticky;
+    top: 56px; /* Matches navbar height */
+    z-index: 10; /* Above content, below navbar */
+    background: linear-gradient(90deg, var(--bte-royal-blue) 0%, #0047AB 100%);
+    color: var(--bte-white);
+    border-bottom: 2px solid var(--bte-gold);
 }
 
 /* Expandable sections */

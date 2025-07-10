@@ -2,7 +2,7 @@
 
 {% block title %}RFID Dashboard{% endblock %}
 {% block head %}
-    <link rel="stylesheet" href="/static/css/common.css">
+    <link rel="stylesheet" href="/static/css/common.css?cb={{ 'timestamp' | timestamp }}">
 {% endblock %}
 
 {% block content %}
@@ -48,9 +48,9 @@
                                 <tbody>
                                     {% for scan in recent_scans %}
                                         <tr>
-                                            <td>{{ scan.tag_id | default('N/A') }}</td>
-                                            <td>{{ scan.common_name | default('N/A') }}</td>
-                                            <td>{{ scan.date_last_scanned | datetimeformat }}</td>
+                                            <td>{{ scan.tag_id if scan is mapping else scan[0] | default('N/A') }}</td>
+                                            <td>{{ scan.common_name if scan is mapping else scan[1] | default('N/A') }}</td>
+                                            <td>{{ (scan.date_last_scanned if scan is mapping else scan[2]) | datetimeformat }}</td>
                                         </tr>
                                     {% endfor %}
                                 </tbody>

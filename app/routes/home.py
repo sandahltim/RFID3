@@ -1,5 +1,5 @@
 # app/routes/home.py
-# home.py version: 2025-07-10-v7
+# home.py version: 2025-07-10-v8
 from flask import Blueprint, render_template, current_app
 from .. import db, cache
 from ..models.db_models import ItemMaster, Transaction, RefreshState
@@ -34,7 +34,16 @@ def home():
     cached_data = cache.get(cache_key)
     if cached_data:
         logger.debug("Serving home page from cache")
-        return render_template('home.html', **json.loads(cached_data), cache_bust=int(time()))
+        cached_dict = json.loads(cached_data)
+        # Convert recent_scans tuples to objects for template compatibility
+        cached_dict['recent_scans'] = [
+            type('Scan', (), {
+                'tag_id': scan[0],
+                'common_name': scan[1],
+                'date_last_scanned': datetime.fromisoformat(scan[2]) if scan[2] else None
+            }) for scan in cached_dict['recent_scans']
+        ]
+        return render_template('home.html', **cached_dict, cache_bust=int(time()))
 
     try:
         session = db.session()

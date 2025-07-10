@@ -1,8 +1,5 @@
-/* tab1.css version: 2025-06-25-v2
- * - Strengthened .common-name-row.collapsed to collapse all related rows.
- * - Ensured .common-table.collapsed and .item-table.collapsed remove all space.
- * - Preserves all existing styles for Tab 1.
- */
+/* app/static/css/tab1.css */
+/* tab1.css version: 2025-07-10-v4 */
 
 /* Style for common name table rows */
 .common-name-row {
@@ -149,11 +146,11 @@ tr.common-name-row td table.common-table td {
 .common-table thead th,
 .item-table thead th {
     position: sticky;
-    top: 80px;
-    z-index: 5;
-    background-color: var(--bte-white);
+    top: 56px; /* Matches navbar height */
+    z-index: 10; /* Above content */
+    background: linear-gradient(90deg, var(--bte-royal-blue) 0%, #0047AB 100%);
+    color: var(--bte-white);
     border-bottom: 2px solid var(--bte-gold);
-    color: var(--bte-royal-blue);
 }
 
 /* Ensure table content stays below sticky headers */
@@ -283,6 +280,11 @@ tr.common-name-row td table.common-table td {
     display: none !important;
     visibility: hidden !important;
     opacity: 0 !important;
+}
+
+/* Expandable row padding */
+.expandable-row {
+    padding-top: 80px; /* Clears navbar and headers */
 }
 
 /* Pagination controls */
