@@ -58,11 +58,21 @@ body {
     margin-bottom: 20px;
 }
 
-.tab3-container .common-table thead th,
+.tab3-container .common-table thead th {
+    position: sticky;
+    top: 56px;
+    z-index: 13;
+    background: linear-gradient(to bottom, #343a40, #495057);
+    color: white;
+    padding: 12px;
+    text-align: left;
+    border-bottom: 2px solid #dee2e6;
+}
+
 .tab3-container .item-table thead th {
     position: sticky;
-    top: 56px; /* Matches navbar height from common.css */
-    z-index: 15; /* Increased to stay above content */
+    top: 106px;
+    z-index: 12;
     background: linear-gradient(to bottom, #343a40, #495057);
     color: white;
     padding: 12px;
