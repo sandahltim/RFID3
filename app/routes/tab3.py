@@ -902,7 +902,7 @@ def sync_to_pc():
                     'is_new': False
                 })
                 existing_tag_ids.add(item.tag_id)
-                logger.debug(f"Added to synced_items: tag пресёк_id={item.tag_id}, common_name={item.common_name}, status={item.status}, rental_class_num={item.rental_class_num}")
+                logger.debug(f"Added to synced_items: tag_id={item.tag_id}, common_name={item.common_name}, status={item.status}, rental_class_num={item.rental_class_num}")
         except sqlalchemy.exc.DatabaseError as e:
             logger.error(f"Database error querying ItemMaster: {str(e)}", exc_info=True)
             return jsonify({'error': f"Database error querying ItemMaster: {str(e)}"}), 500
@@ -1445,7 +1445,7 @@ def update_mappings():
     """Update user rental class mappings."""
     session = None
     try:
-        logger.debug("Entering /tab/3/update_mappings endpoint at %s", datetime.now()
+        logger.debug("Entering /tab/3/update_mappings endpoint at %s", datetime.now())
         session = db.session()
         data = request.get_json()
         rental_class_id = data.get('rental_class_id')
