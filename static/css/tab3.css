@@ -1,5 +1,5 @@
 /* app/static/css/tab3.css */
-/* tab3.css version: 2025-07-10-v3 */
+/* tab3.css version: 2025-07-10-v4 */
 body {
     font-family: 'Roboto', sans-serif;
     background-color: #f8f9fa;
@@ -71,7 +71,7 @@ body {
 
 .tab3-container .item-table thead th {
     position: sticky;
-    top: 106px;
+    top: 100px;
     z-index: 12;
     background: linear-gradient(to bottom, #343a40, #495057);
     color: white;
