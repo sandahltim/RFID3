@@ -1,5 +1,5 @@
-/* tab5.css version: 2025-07-10-v3
- * - Adjusted sticky top values for headers to 56px, 100px, 144px to account for potential header height of ~44px.
+/* tab5.css version: 2025-07-10-v4
+ * - Adjusted sticky top values for headers to 56px, 96px, 136px assuming header height 40px.
  */
 
 /* Style for common name table rows */
@@ -140,7 +140,7 @@
 
 .common-table thead th {
     position: sticky;
-    top: 100px;
+    top: 96px;
     z-index: 12;
     background: linear-gradient(90deg, var(--bte-royal-blue) 0%, #0047AB 100%);
     color: var(--bte-white);
@@ -149,7 +149,7 @@
 
 .item-table thead th {
     position: sticky;
-    top: 144px;
+    top: 136px;
     z-index: 11;
     background: linear-gradient(90deg, var(--bte-royal-blue) 0%, #0047AB 100%);
     color: var(--bte-white);
