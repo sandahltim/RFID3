@@ -1,5 +1,5 @@
 /* app/static/css/common.css */
-/* common.css version: 2025-07-10-v7 */
+/* common.css version: 2025-07-10-v8 */
 
 /* Define Broadway Tent and Event colors */
 :root {
@@ -136,8 +136,6 @@ h4 {
 
 /* Table header styling */
 .thead-dark {
-    position: sticky;
-    top: 56px; /* Matches navbar height */
     z-index: 10; /* Above content, below navbar */
     background: linear-gradient(90deg, var(--bte-royal-blue) 0%, #0047AB 100%);
     color: var(--bte-white);

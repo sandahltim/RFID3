@@ -1,5 +1,5 @@
 /* app/static/css/tab1.css */
-/* tab1.css version: 2025-07-10-v8 */
+/* tab1.css version: 2025-07-10-v9 */
 
 /* Style for common name table rows */
 .common-name-row {
@@ -141,10 +141,8 @@ tr.common-name-row td table.common-table td {
     word-wrap: break-word;
 }
 
-/* Sticky headers */
+/* Headers without sticky */
 .category-table thead th {
-    position: sticky;
-    top: 56px;
     z-index: 13;
     background: linear-gradient(90deg, var(--bte-royal-blue) 0%, #0047AB 100%);
     color: var(--bte-white);
@@ -152,8 +150,6 @@ tr.common-name-row td table.common-table td {
 }
 
 .common-table thead th {
-    position: sticky;
-    top: 96px;
     z-index: 12;
     background: linear-gradient(90deg, var(--bte-royal-blue) 0%, #0047AB 100%);
     color: var(--bte-white);
@@ -161,15 +157,13 @@ tr.common-name-row td table.common-table td {
 }
 
 .item-table thead th {
-    position: sticky;
-    top: 136px;
     z-index: 11;
     background: linear-gradient(90deg, var(--bte-royal-blue) 0%, #0047AB 100%);
     color: var(--bte-white);
     border-bottom: 2px solid var(--bte-gold);
 }
 
-/* Ensure table content stays below sticky headers */
+/* Ensure table content stays below headers */
 .category-table tbody,
 .common-table tbody,
 .item-table tbody {
