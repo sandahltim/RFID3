@@ -1,5 +1,5 @@
-/* tab5.css version: 2025-07-10-v4
- * - Adjusted sticky top values for headers to 56px, 96px, 136px assuming header height 40px.
+/* tab5.css version: 2025-07-10-v5
+ * - Removed position: sticky from all headers to prevent overlapping issues.
  */
 
 /* Style for common name table rows */
@@ -128,10 +128,8 @@
     word-wrap: break-word;
 }
 
-/* Sticky headers */
+/* Headers without sticky */
 .category-table thead th {
-    position: sticky;
-    top: 56px;
     z-index: 13;
     background: linear-gradient(90deg, var(--bte-royal-blue) 0%, #0047AB 100%);
     color: var(--bte-white);
@@ -139,8 +137,6 @@
 }
 
 .common-table thead th {
-    position: sticky;
-    top: 96px;
     z-index: 12;
     background: linear-gradient(90deg, var(--bte-royal-blue) 0%, #0047AB 100%);
     color: var(--bte-white);
@@ -148,8 +144,6 @@
 }
 
 .item-table thead th {
-    position: sticky;
-    top: 136px;
     z-index: 11;
     background: linear-gradient(90deg, var(--bte-royal-blue) 0%, #0047AB 100%);
     color: var(--bte-white);
