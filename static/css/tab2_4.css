@@ -8,9 +8,8 @@
 
 /* Styles specific to Tabs 2 and 4 */
 
-/* Ensure the category table has a fixed layout */
+/* Ensure the category table has a flexible layout with better content handling */
 .category-table {
-    table-layout: fixed;
     width: 100%;
     border-collapse: collapse;
     display: table !important;
@@ -18,9 +17,10 @@
     margin-bottom: 20px;
     background-color: #ffffff;
     font-family: 'Roboto', sans-serif;
+    table-layout: auto; /* Changed to auto for flexibility */
 }
 
-/* Center headers and cells with improved spacing */
+/* Center headers and cells with improved spacing and wrapping */
 .category-table thead th,
 .category-table td {
     text-align: center;
@@ -29,24 +29,27 @@
     border: 1px solid #dee2e6;
     display: table-cell !important;
     visibility: visible !important;
-    white-space: nowrap;
+    white-space: nowrap; /* Keep data nowrap, adjust headers separately */
     font-size: 0.95rem;
 }
 
-/* Enhance header readability */
+/* Enhance header readability with wrapping and smaller font */
 .category-table thead th {
-    font-size: 1rem;
+    font-size: 0.9rem; /* Reduced from 1rem for better fit */
     font-weight: 600;
     background-color: #e9ecef;
     padding: 12px 16px;
     z-index: 13;
+    word-wrap: break-word; /* Allow wrapping for long headers */
+    white-space: normal; /* Enable wrapping */
+    line-height: 1.2; /* Improve readability with wrapped text */
 }
 
 /* Column widths for the Open Contracts table (Tab 4 specific adjustments) */
 .category-table th:nth-child(1),
-.category-table td:nth-child(1) { width: 15%; } /* Contract Number */
+.category-table td:nth-child(1) { width: 14%; } /* Contract Number - Slightly reduced */
 .category-table th:nth-child(2),
-.category-table td:nth-child(2) { width: 25%; } /* Customer Name */
+.category-table td:nth-child(2) { width: 22%; } /* Customer Name - Slightly reduced */
 .category-table th:nth-child(3),
 .category-table td:nth-child(3) { width: 12%; } /* Items on Contract */
 .category-table th:nth-child(4),
@@ -54,9 +57,9 @@
 .category-table th:nth-child(5),
 .category-table td:nth-child(5) { width: 10%; } /* Hand-Counted Entries */
 .category-table th:nth-child(6),
-.category-table td:nth-child(6) { width: 16%; } /* Last Scanned Date */
+.category-table td:nth-child(6) { width: 15%; } /* Last Scanned Date - Slightly reduced */
 .category-table th:nth-child(7),
-.category-table td:nth-child(7) { width: 20%; min-width: 200px; } /* Actions - Increased width to accommodate buttons */
+.category-table td:nth-child(7) { width: 20%; min-width: 200px; } /* Actions - Kept for buttons */
 
 /* Ensure the table body is scrollable if needed */
 .category-table tbody {
@@ -94,6 +97,9 @@
     font-weight: 600;
     padding: 12px 16px;
     z-index: 12;
+    word-wrap: break-word; /* Allow wrapping for long headers */
+    white-space: normal; /* Enable wrapping */
+    line-height: 1.2; /* Improve readability */
 }
 
 .common-table td {
@@ -127,10 +133,13 @@
 
 .item-table thead th {
     background-color: #d4edda;
-    font-size: 0.95rem;
+    font-size: 0.9rem; /* Reduced for consistency */
     font-weight: 600;
     padding: 10px 12px;
     z-index: 11;
+    word-wrap: break-word; /* Allow wrapping */
+    white-space: normal; /* Enable wrapping */
+    line-height: 1.2; /* Improve readability */
 }
 
 .item-table td {
