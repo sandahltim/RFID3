@@ -1,6 +1,6 @@
 # .github/workflows/deploy.yml
-# Version: 2025-08-06-v12
-# Description: Deploys RFID Dashboard updates to Raspberry Pi via SSH on self-hosted runner
+# Version: 2025-08-06-v13
+# Description: Deploys RFID Dashboard updates on Raspberry Pi using self-hosted runner
 # Created: 2025-08-06
 # Author: Grok 3 (assisted by xAI)
 
@@ -20,34 +20,29 @@ jobs:
         with:
           fetch-depth: 0  # Fetch full history for git operations
 
-      - name: Debug secrets
+      - name: Debug environment
         run: |
-          echo "PI_USER: ${{ secrets.PI_USER }}"
-          echo "PI_HOST: ${{ secrets.PI_HOST }}"
-          echo "PI_DEPLOY_KEY exists: $(if [ -n '${{ secrets.PI_DEPLOY_KEY }}' ]; then echo 'yes'; else echo 'no'; fi)"
+          echo "User: $(whoami)"
+          echo "Host: $(hostname)"
+          echo "Working directory: $(pwd)"
 
-      - name: Set up SSH key
+      - name: Update repository
         run: |
-          set -x
-          mkdir -p ~/.ssh
-          echo "${{ secrets.PI_DEPLOY_KEY }}" > ~/.ssh/github_deploy_key
-          chmod 600 ~/.ssh/github_deploy_key
-          ls -l ~/.ssh
-          ssh-keyscan ${{ secrets.PI_HOST }} >> ~/.ssh/known_hosts || echo "ssh-keyscan failed"
+          set -e
+          cd /home/tim/RFID3
+          # Stash local changes, excluding database and config files
+          git stash push --include-untracked -- . ':!*.sql' ':!*.db' ':!config.py' ':!logs/*' || echo "No changes to stash"
+          git fetch origin
+          git reset --hard origin/main
 
-      - name: Test SSH to Pi
+      - name: Install dependencies
         run: |
-          ssh -i ~/.ssh/github_deploy_key -o StrictHostKeyChecking=no ${{ secrets.PI_USER }}@${{ secrets.PI_HOST }} 'hostname'
+          set -e
+          cd /home/tim/RFID3
+          source venv/bin/activate
+          pip install -r requirements.txt
 
-      - name: Deploy to Pi
+      - name: Restart service
         run: |
-          ssh -i ~/.ssh/github_deploy_key -o StrictHostKeyChecking=no ${{ secrets.PI_USER }}@${{ secrets.PI_HOST }} << 'EOF'
-            set -e
-            cd /home/tim/RFID3
-            git stash push --include-untracked -- . ':!*.sql' ':!*.db' ':!config.py' ':!logs/*'
-            git fetch origin
-            git reset --hard origin/main
-            source venv/bin/activate
-            pip install -r requirements.txt
-            sudo systemctl restart rfid_dash_dev.service
-          EOF
+          sudo systemctl restart rfid_dash_dev.service
+          sudo systemctl status rfid_dash_dev.service
