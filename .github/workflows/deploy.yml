@@ -1,6 +1,6 @@
 # .github/workflows/deploy.yml
-# Version: 2025-08-06-v7
-# Description: Deploys RFID Dashboard updates to Raspberry Pi via Tailscale on push to main branch
+# Version: 2025-08-06-v8
+# Description: Deploys RFID Dashboard updates to Raspberry Pi via SSH on push to main branch
 # Created: 2025-08-06
 # Author: Grok 3 (assisted by xAI)
 
@@ -20,20 +20,22 @@ jobs:
         with:
           fetch-depth: 0  # Fetch full history for git operations
 
-      - name: Set up Tailscale
-        uses: tailscale/github-action@v2
-        with:
-          oauth-client-id: ${{ secrets.TAILSCALE_CLIENT_ID }}
-          oauth-secret: ${{ secrets.TAILSCALE_CLIENT_SECRET }}
-
-      - name: Test Tailscale connection
+      - name: Set up SSH key
         run: |
-          tailscale status
-          ssh -o StrictHostKeyChecking=no ${{ secrets.PI_USER }}@${{ secrets.PI_TAILSCALE_IP }} 'hostname'
+          # Create SSH directory and store deploy key
+          mkdir -p ~/.ssh
+          echo "${{ secrets.PI_DEPLOY_KEY }}" > ~/.ssh/github_deploy_key
+          chmod 600 ~/.ssh/github_deploy_key
+          # Add Pi host to known_hosts
+          ssh-keyscan -H ${{ secrets.PI_HOST }} >> ~/.ssh/known_hosts || echo "ssh-keyscan failed, continuing..."
+
+      - name: Test SSH connection
+        run: |
+          ssh -i ~/.ssh/github_deploy_key -o StrictHostKeyChecking=no ${{ secrets.PI_USER }}@${{ secrets.PI_HOST }} 'hostname'
 
       - name: Deploy to Pi
         run: |
-          ssh -o StrictHostKeyChecking=no ${{ secrets.PI_USER }}@${{ secrets.PI_TAILSCALE_IP }} << 'EOF'
+          ssh -i ~/.ssh/github_deploy_key -o StrictHostKeyChecking=no ${{ secrets.PI_USER }}@${{ secrets.PI_HOST }} << 'EOF'
             set -e
             cd /home/tim/RFID3
             # Stash local changes, excluding database and config files
