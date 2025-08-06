@@ -1,3 +1,5 @@
+import { formatDate } from './utils.js';
+import { getCachedTabNum, setCachedTabNum } from './state.js';
 console.log('tab2.js version: 2025-05-29-v10 loaded');
 
 /**
@@ -376,17 +378,17 @@ window.expandItems = function(contractNumber, commonName, targetId, page = 1, ta
 
 // Load global filter from sessionStorage on page load and format timestamps
 document.addEventListener('DOMContentLoaded', function() {
-    // Set window.cachedTabNum
-    if (!window.cachedTabNum) {
+    // Set cached tab number if needed
+    if (!getCachedTabNum()) {
         const pathMatch = window.location.pathname.match(/\/tab\/(\d+)/);
-        window.cachedTabNum = pathMatch ? parseInt(pathMatch[1], 10) : (window.location.pathname === '/' ? 1 : null);
-        console.log('tab2.js: Set window.cachedTabNum:', window.cachedTabNum);
+        setCachedTabNum(pathMatch ? parseInt(pathMatch[1], 10) : (window.location.pathname === '/' ? 1 : null));
+        console.log('tab2.js: Set cachedTabNum:', getCachedTabNum());
     } else {
-        console.log('tab2.js: window.cachedTabNum already set:', window.cachedTabNum);
+        console.log('tab2.js: cachedTabNum already set:', getCachedTabNum());
     }
 
-    if (window.cachedTabNum !== 2) {
-        console.log(`Tab ${window.cachedTabNum} detected, skipping tab2.js`);
+    if (getCachedTabNum() !== 2) {
+        console.log(`Tab ${getCachedTabNum()} detected, skipping tab2.js`);
         return;
     }
 
@@ -445,7 +447,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (commonName) {
                 console.log(`Expanding items for ${contractNumber}, ${commonName}`);
                 window.expandItems(contractNumber, commonName, targetId, 1, 2);
-            } else if (contractNumber && window.cachedTabNum === 2) {
+            } else if (contractNumber && getCachedTabNum() === 2) {
                 console.log(`Expanding category for ${contractNumber}`);
                 window.expandCategory(category, targetId, contractNumber, 1, 2);
             }
