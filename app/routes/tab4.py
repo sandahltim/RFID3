@@ -15,7 +15,7 @@ logger.setLevel(logging.INFO)
 logger.handlers = []
 
 # File handler for tab4.log
-tab4_file_handler = logging.FileHandler('/home/tim/test_rfidpi/logs/tab4.log')
+tab4_file_handler = logging.FileHandler('/home/tim/RFID3/logs/tab4.log')
 tab4_file_handler.setLevel(logging.INFO)
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(message)s')
 tab4_file_handler.setFormatter(formatter)
@@ -28,7 +28,7 @@ console_handler.setFormatter(formatter)
 logger.addHandler(console_handler)
 
 # Also log to the main rfid_dashboard.log
-main_file_handler = logging.FileHandler('/home/tim/test_rfidpi/logs/rfid_dashboard.log')
+main_file_handler = logging.FileHandler('/home/tim/RFID3/logs/rfid_dashboard.log')
 main_file_handler.setLevel(logging.INFO)
 main_file_handler.setFormatter(formatter)
 logger.addHandler(main_file_handler)
