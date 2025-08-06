@@ -24,8 +24,8 @@ y
 y
 EOS
 
-# Check if rfid_inventory database exists, create if not
-sudo mysql -u root -prfid_root_password -e "CREATE DATABASE IF NOT EXISTS rfid_inventory;"
+# Check if rfid_inventory database exists, create if not with proper charset/collation
+sudo mysql -u root -prfid_root_password -e "CREATE DATABASE IF NOT EXISTS rfid_inventory CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
 
 # Create or update user and privileges
 sudo mysql -u root -prfid_root_password <<'EOS'
