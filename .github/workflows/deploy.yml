@@ -1,7 +1,8 @@
 # .github/workflows/deploy.yml
-# Version: 2025-08-06-v2
-# Deploys RFID3 to Raspberry Pi on main branch updates, preserving database and local configs
-# Uses Tailscale for secure SSH access and update_from_github.sh for deployment
+# Version: 2025-08-06-v6
+# Description: Deploys RFID Dashboard updates to Raspberry Pi via Tailscale on push to main branch
+# Created: 2025-08-06
+# Author: Grok 3 (assisted by xAI)
 
 name: Deploy to Pi
 
@@ -14,39 +15,33 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Repository
+      - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 1  # Shallow clone for faster checkout
+          fetch-depth: 0  # Fetch full history for git operations
 
       - name: Set up Tailscale
         uses: tailscale/github-action@v2
         with:
-          authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
-          hostname: github-action-deploy
+          oauth_client_id: ${{ secrets.TAILSCALE_CLIENT_ID }}
+          oauth_client_secret: ${{ secrets.TAILSCALE_CLIENT_SECRET }}
+          scopes: devices:core:read
 
-      - name: Deploy to Pi via SSH
+      - name: Test Tailscale connection
         run: |
-          ssh -o StrictHostKeyChecking=no tim@${{ secrets.PI_TAILSCALE_IP }} << 'EOF'
+          tailscale status
+          ssh -o StrictHostKeyChecking=no ${{ secrets.PI_USER }}@${{ secrets.PI_TAILSCALE_IP }} 'hostname'
+
+      - name: Deploy to Pi
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ secrets.PI_USER }}@${{ secrets.PI_TAILSCALE_IP }} << 'EOF'
             set -e
-            echo "Starting deployment to Pi"
             cd /home/tim/RFID3
-            # Stash any local changes to avoid conflicts
-            git stash push -m "Auto-stash before deploy $(date)"
-            # Pull latest changes from main
-            git fetch origin
-            git checkout main
-            git pull origin main
-            # Run update script without database operations
-            ./update_from_github.sh --no-db
-            # Restart service
+            # Stash local changes, excluding database and config files
+            git stash push --include-untracked -- . ':!*.sql' ':!*.db' ':!config.py' ':!logs/*'
+            /usr/bin/git fetch origin
+            /usr/bin/git reset --hard origin/main
+            source venv/bin/activate
+            pip install -r requirements.txt
             sudo systemctl restart rfid_dash_dev.service
-            echo "Deployment completed"
-          EOF
-
-      - name: Verify Deployment
-        run: |
-          ssh -o StrictHostKeyChecking=no tim@${{ secrets.PI_TAILSCALE_IP }} << 'EOF'
-            systemctl is-active rfid_dash_dev.service && echo "Service is running" || echo "Service failed to start"
-            git -C /home/tim/RFID3 log -1 --pretty=%H  # Log latest commit hash
           EOF
