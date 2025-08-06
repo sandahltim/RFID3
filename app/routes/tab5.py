@@ -24,14 +24,14 @@ logger.setLevel(logging.DEBUG)
 logger.handlers = []
 
 # File handler for rfid_dashboard.log
-file_handler = logging.FileHandler('/home/tim/test_rfidpi/logs/rfid_dashboard.log')
+file_handler = logging.FileHandler('/home/tim/RFID3/logs/rfid_dashboard.log')
 file_handler.setLevel(logging.DEBUG)
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 file_handler.setFormatter(formatter)
 logger.addHandler(file_handler)
 
 # Secondary file handler for debug.log
-debug_handler = logging.FileHandler('/home/tim/test_rfidpi/logs/debug.log')
+debug_handler = logging.FileHandler('/home/tim/RFID3/logs/debug.log')
 debug_handler.setLevel(logging.DEBUG)
 debug_handler.setFormatter(formatter)
 logger.addHandler(debug_handler)

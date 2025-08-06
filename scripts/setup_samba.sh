@@ -10,8 +10,8 @@
 set -e
 
 # Log file
-LOG_FILE="/home/tim/test_rfidpi/logs/samba_setup.log"
-mkdir -p /home/tim/test_rfidpi/logs
+LOG_FILE="/home/tim/RFID3/logs/samba_setup.log"
+mkdir -p /home/tim/RFID3/logs
 touch $LOG_FILE
 chown tim:tim $LOG_FILE
 chmod 640 $LOG_FILE
@@ -28,7 +28,7 @@ else
 fi
 
 # Create shared directory
-SHARED_DIR="/home/tim/test_rfidpi/shared"
+SHARED_DIR="/home/tim/RFID3/shared"
 echo "Creating shared directory: $SHARED_DIR"
 mkdir -p $SHARED_DIR
 chown tim:tim $SHARED_DIR
@@ -45,7 +45,7 @@ if ! grep -q "\[RFIDShare\]" /etc/samba/smb.conf; then
     # Append RFIDShare configuration
     cat << EOF >> /etc/samba/smb.conf
 [RFIDShare]
-path = /home/tim/test_rfidpi/shared
+path = /home/tim/RFID3/shared
 writable = yes
 browsable = yes
 guest ok = no
@@ -84,7 +84,7 @@ testparm -s
 
 # Set ownership and permissions for log directory
 echo "Setting log directory permissions"
-chown -R tim:tim /home/tim/test_rfidpi/logs
-chmod -R 750 /home/tim/test_rfidpi/logs
+chown -R tim:tim /home/tim/RFID3/logs
+chmod -R 750 /home/tim/RFID3/logs
 
 echo "$(date '+%Y-%m-%d %H:%M:%S') - Samba setup completed successfully"

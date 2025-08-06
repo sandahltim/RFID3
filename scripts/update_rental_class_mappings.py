@@ -1,4 +1,4 @@
-# update_rental_class_mappings.py version: 2025-06-19-v1
+# update_rental_class_mappings.py version: 2025-08-14-v2
 import sys
 import os
 
@@ -18,8 +18,13 @@ logger = logging.getLogger(__name__)
 
 # Database connection
 try:
-    db_url = f"mysql+mysqlconnector://{DB_CONFIG['user']}:{DB_CONFIG['password']}@{DB_CONFIG['host']}/{DB_CONFIG['database']}?charset={DB_CONFIG['charset']}"
-    engine = create_engine(db_url)
+    engine = create_engine(
+        f"mysql+mysqlconnector://{DB_CONFIG['user']}:{DB_CONFIG['password']}@{DB_CONFIG['host']}/{DB_CONFIG['database']}",
+        connect_args={
+            "charset": DB_CONFIG["charset"],
+            "collation": DB_CONFIG["collation"],
+        },
+    )
     Session = sessionmaker(bind=engine)
     session = Session()
 except Exception as e:

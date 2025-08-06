@@ -19,7 +19,7 @@ import json
 logger = logging.getLogger(f'refresh_{os.getpid()}')
 logger.setLevel(logging.INFO)  # Maintain INFO level to minimize disk I/O
 logger.handlers = []  # Clear existing handlers
-file_handler = logging.FileHandler('/home/tim/test_rfidpi/logs/rfid_dashboard.log')
+file_handler = logging.FileHandler('/home/tim/RFID3/logs/rfid_dashboard.log')
 file_handler.setLevel(logging.INFO)
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 file_handler.setFormatter(formatter)
@@ -83,7 +83,7 @@ def update_refresh_state(state_type, timestamp):
     finally:
         session.close()
 
-def update_user_mappings(session, csv_file_path='/home/tim/test_rfidpi/seeddata_20250425155406.csv'):
+def update_user_mappings(session, csv_file_path='/home/tim/RFID3/seeddata_20250425155406.csv'):
     """Populate user_rental_class_mappings from CSV, preserving existing user mappings.
     
     Creates a temporary table to back up user mappings, merges with CSV data
