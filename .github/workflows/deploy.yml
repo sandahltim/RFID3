@@ -1,5 +1,5 @@
 # .github/workflows/deploy.yml
-# Version: 2025-08-06-v6
+# Version: 2025-08-06-v7
 # Description: Deploys RFID Dashboard updates to Raspberry Pi via Tailscale on push to main branch
 # Created: 2025-08-06
 # Author: Grok 3 (assisted by xAI)
@@ -23,9 +23,8 @@ jobs:
       - name: Set up Tailscale
         uses: tailscale/github-action@v2
         with:
-          oauth_client_id: ${{ secrets.TAILSCALE_CLIENT_ID }}
-          oauth_client_secret: ${{ secrets.TAILSCALE_CLIENT_SECRET }}
-          scopes: devices:core:read
+          oauth-client-id: ${{ secrets.TAILSCALE_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TAILSCALE_CLIENT_SECRET }}
 
       - name: Test Tailscale connection
         run: |
