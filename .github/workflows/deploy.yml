@@ -1,22 +1,28 @@
-name: Deploy to Pi
-
+# .github/workflows/deploy.yml
+# Version: 2025-08-05-v1
+name: Auto-Deploy on Merge to Main
 on:
   push:
-    branches: [main]
+    branches:
+      - main
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout Repository
+        uses: actions/checkout@v3
 
-      - name: Connect to Tailscale
-        uses: tailscale/github-action@v1
+      - name: Set up Tailscale
+        uses: tailscale/github-action@v2
         with:
           authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
 
-      - name: Run update script on Pi
+      - name: SSH into Pi and Update
         run: |
-          tailscale ssh tim@${{ secrets.PI_TAILSCALE_IP }} \
-            '/home/tim/RFID3/update_from_github.sh'
+          ssh -o StrictHostKeyChecking=no tim@${{ secrets.PI_TAILSCALE_IP }} << 'EOF'
+            cd /home/tim/RFID3
+            ./update_from_github.sh
+            sudo systemctl restart rfid_dash_dev.service
+          EOF
 
