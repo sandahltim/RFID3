@@ -47,4 +47,3 @@ sudo systemctl restart rfid_dash_dev.service >> "$LOG_FILE" 2>&1
 
 # Log completion
 echo "$(date '+%Y-%m-%d %H:%M:%S') - Update completed successfully" >> "$LOG_FILE"
-
