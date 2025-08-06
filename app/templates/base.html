@@ -44,22 +44,22 @@
         {% block content %}{% endblock %}
     </div>
     {% block scripts %}
-        <script src="/static/js/common.js?cb={{ cache_bust }}"></script>
-        <script src="/static/js/tab.js?cb={{ cache_bust }}"></script>
+        <script type="module" src="/static/js/common.js?cb={{ cache_bust }}"></script>
+        <script type="module" src="/static/js/tab.js?cb={{ cache_bust }}"></script>
         {% if request.path == '/tab/1' %}
-            <script src="/static/js/tab1.js?cb={{ cache_bust }}"></script>
+            <script type="module" src="/static/js/tab1.js?cb={{ cache_bust }}"></script>
         {% elif request.path == '/tab/2' %}
-            <script src="/static/js/tab2.js?cb={{ cache_bust }}"></script>
+            <script type="module" src="/static/js/tab2.js?cb={{ cache_bust }}"></script>
         {% elif request.path == '/tab/3' %}
-            <script src="/static/js/tab3.js?cb={{ cache_bust }}"></script>
+            <script type="module" src="/static/js/tab3.js?cb={{ cache_bust }}"></script>
         {% elif request.path == '/tab/4' %}
-            <script src="/static/js/tab4.js?cb={{ cache_bust }}"></script>
+            <script type="module" src="/static/js/tab4.js?cb={{ cache_bust }}"></script>
         {% elif request.path == '/tab/5' %}
-            <script src="/static/js/tab5.js?cb={{ cache_bust }}"></script>
+            <script type="module" src="/static/js/tab5.js?cb={{ cache_bust }}"></script>
         {% elif request.path == '/categories' %}
-            <script src="/static/js/categories.js?cb={{ cache_bust }}"></script>
+            <script type="module" src="/static/js/categories.js?cb={{ cache_bust }}"></script>
         {% elif request.path == '/' or request.path == '/home' %}
-            <script src="/static/js/tab1.js?cb={{ cache_bust }}"></script>
+            <script type="module" src="/static/js/tab1.js?cb={{ cache_bust }}"></script>
         {% endif %}
         <script src="https://cdnjs.cloudflare.com/ajax/libs/mdb-ui-kit/7.1.0/mdb.min.js"></script>
     {% endblock %}

@@ -345,6 +345,15 @@ function applyFilterToTable(table) {
     rowCountDiv.textContent = `Showing ${visibleRows} of ${rows.length} rows`;
 }
 
+// Expose shared helpers for tab modules
+window.showLoading = showLoading;
+window.hideLoading = hideLoading;
+window.collapseSection = collapseSection;
+window.refreshTab = refreshTab;
+window.normalizeCommonName = normalizeCommonName;
+window.renderPaginationControls = renderPaginationControls;
+window.applyFilterToTable = applyFilterToTable;
+
 /**
  * Apply filter to all levels for Tabs 2 and 4
  * Used by: Tabs 2, 4
