@@ -1,4 +1,5 @@
 RFID3/ RFID6(needs update)
+The project now uses the MDB UI Kit (Material Design for Bootstrap) via CDN for responsive layouts. Previous Bootstrap bundles have been removed.
 ├── app/
 │   ├── __init__.py
 │   ├── routes/
@@ -45,12 +46,6 @@ RFID3/ RFID6(needs update)
 │   │   ├── tab4.js
 │   │   ├── tab5.js
 │   │   └── categories.js
-│   ├── lib/
-│   │   ├── htmx/
-│   │   │   └── htmx.min.js
-│   │   └── bootstrap/
-│   │       ├── bootstrap.min.css
-│   │       └── bootstrap.bundle.min.js
 ├── scripts/
 │   ├── migrate_db.sql
 │   ├── update_rental_class_mappings.py
@@ -1439,14 +1434,7 @@ RFID3/ RFID6
 │   │   ├── tab3.js
 │   │   ├── tab4.js
 │   │   ├── tab5.js
-│   │   ├── 
-│   │   └── 
-│   ├── lib/
-│   │   ├── htmx/
-│   │   │   └── htmx.min.js
-│   │   └── bootstrap/
-│   │       ├── bootstrap.min.css
-│   │       └── bootstrap.bundle.min.js
+│   │   └── categories.js
 ├── scripts/
 │   ├── migrate_db.sql
 │   ├── update_rental_class_mappings.py
