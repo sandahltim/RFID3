@@ -1,0 +1,12 @@
+apscheduler
+flask
+flask-caching
+Flask-Limiter
+Flask-Redis
+flask-sqlalchemy
+gunicorn
+mysql-connector-python>=8.4.0
+pymysql
+redis
+requests
+tenacity
