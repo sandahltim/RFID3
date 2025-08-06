@@ -1,4 +1,4 @@
-RFID3/ RFID6(needs update)
+RFID3-README NEEDS FULL COMPREHENSIVE UPDATE
 The project now uses the MDB UI Kit (Material Design for Bootstrap) via CDN for responsive layouts. Previous Bootstrap bundles have been removed.
 ├── app/
 │   ├── __init__.py
