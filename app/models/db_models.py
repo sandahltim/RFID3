@@ -5,6 +5,11 @@ from datetime import datetime
 
 class ItemMaster(db.Model):
     __tablename__ = 'id_item_master'
+    __table_args__ = (
+        db.Index('ix_item_master_rental_class_num', 'rental_class_num'),
+        db.Index('ix_item_master_status', 'status'),
+        db.Index('ix_item_master_bin_location', 'bin_location'),
+    )
 
     tag_id = db.Column(db.String(255), primary_key=True)
     uuid_accounts_fk = db.Column(db.String(255))
@@ -87,6 +92,11 @@ class Transaction(db.Model):
 
 class RFIDTag(db.Model):
     __tablename__ = 'id_rfidtag'
+    __table_args__ = (
+        db.Index('ix_rfidtag_rental_class_num', 'rental_class_num'),
+        db.Index('ix_rfidtag_status', 'status'),
+        db.Index('ix_rfidtag_bin_location', 'bin_location'),
+    )
 
     tag_id = db.Column(db.String(255), primary_key=True)
     uuid_accounts_fk = db.Column(db.String(255))
