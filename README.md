@@ -1,4 +1,4 @@
-test_rfidpi/ RFID6(needs update)
+RFID3/ RFID6(needs update)
 ├── app/
 │   ├── __init__.py
 │   ├── routes/
@@ -69,16 +69,16 @@ test_rfidpi/ RFID6(needs update)
 
 
 git pull origin 
-> /home/tim/test_rfidpi/logs/gunicorn_error.log
-> /home/tim/test_rfidpi/logs/gunicorn_access.log
-> /home/tim/test_rfidpi/logs/app.log
-> /home/tim/test_rfidpi/logs/sync.log
+> /home/tim/RFID3/logs/gunicorn_error.log
+> /home/tim/RFID3/logs/gunicorn_access.log
+> /home/tim/RFID3/logs/app.log
+> /home/tim/RFID3/logs/sync.log
 sudo systemctl stop rfid_dash_dev.service
 sudo systemctl start rfid_dash_dev.service
 sudo systemctl status rfid_dash_dev.service
-cat /home/tim/test_rfidpi/logs/gunicorn_error.log
-cat /home/tim/test_rfidpi/logs/app.log
-cat /home/tim/test_rfidpi/logs/sync.log
+cat /home/tim/RFID3/logs/gunicorn_error.log
+cat /home/tim/RFID3/logs/app.log
+cat /home/tim/RFID3/logs/sync.log
 
 source venv/bin/activate
 # rfid_samba_pass  samba shared server on pi
@@ -89,11 +89,11 @@ from app import create_app
 app = create_app()
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=3607, debug=True)
+    app.run(host='0.0.0.0', port=8101, debug=True)
 
 #!/bin/bash
-source /home/tim/test_rfidpi/venv/bin/activate
-exec gunicorn --workers 3 --timeout 300 --bind 127.0.0.1:3608 --chdir /home/tim/test_rfidpi run:app
+source /home/tim/RFID3/venv/bin/activate
+exec gunicorn --workers 3 --timeout 300 --bind 127.0.0.1:8101 --chdir /home/tim/RFID3 run:app
 
 
 ### setupmariadb.sh
@@ -147,9 +147,9 @@ sudo chmod 640 /var/log/mysql/error.log
 sudo usermod -aG mysql tim
 
 # Create logs directory for app
-sudo mkdir -p /home/tim/test_rfidpi/logs
-sudo chown tim:tim /home/tim/test_rfidpi/logs
-sudo chmod 750 /home/tim/test_rfidpi/logs
+sudo mkdir -p /home/tim/RFID3/logs
+sudo chown tim:tim /home/tim/RFID3/logs
+sudo chmod 750 /home/tim/RFID3/logs
 
 
 ### migrate_db.sql
@@ -304,9 +304,9 @@ After=network.target mariadb.service
 [Service]
 User=tim
 Group=www-data
-WorkingDirectory=/home/tim/test_rfidpi
-Environment="PATH=/home/tim/test_rfidpi/venv/bin:/usr/bin"
-ExecStart=/home/tim/test_rfidpi/venv/bin/gunicorn --workers 1 --threads 4 --timeout 600 --bind 0.0.0.0:3608 --error-logfile /home/tim/test_rfidpi/logs/gunicorn_error.log --access-logfile /home/tim/test_rfidpi/logs/gunicorn_access.log run:app
+WorkingDirectory=/home/tim/RFID3
+Environment="PATH=/home/tim/RFID3/venv/bin:/usr/bin"
+ExecStart=/home/tim/RFID3/venv/bin/gunicorn --workers 1 --threads 4 --timeout 600 --bind 0.0.0.0:8101 --error-logfile /home/tim/RFID3/logs/gunicorn_error.log --access-logfile /home/tim/RFID3/logs/gunicorn_access.log run:app
 ExecStop=/bin/kill -s KILL $MAINPID
 Restart=always
 KillMode=mixed
@@ -568,7 +568,7 @@ cache = FlaskRedis()
 
 def create_app():
     """Create and configure the Flask application."""
-    app = Flask(__name__, static_folder='/home/tim/test_rfidpi/static')
+    app = Flask(__name__, static_folder='/home/tim/RFID3/static')
 
     # Configure logging
     log_dir = os.path.dirname(LOG_FILE)
@@ -1046,8 +1046,8 @@ CREATE INDEX idx_user_rental_class_mappings_rental_class_id ON user_rental_class
 set -e
 
 # Log file
-LOG_FILE="/home/tim/test_rfidpi/logs/samba_setup.log"
-mkdir -p /home/tim/test_rfidpi/logs
+LOG_FILE="/home/tim/RFID3/logs/samba_setup.log"
+mkdir -p /home/tim/RFID3/logs
 touch $LOG_FILE
 chown tim:tim $LOG_FILE
 chmod 640 $LOG_FILE
@@ -1064,7 +1064,7 @@ else
 fi
 
 # Create shared directory
-SHARED_DIR="/home/tim/test_rfidpi/shared"
+SHARED_DIR="/home/tim/RFID3/shared"
 echo "Creating shared directory: $SHARED_DIR"
 mkdir -p $SHARED_DIR
 chown tim:tim $SHARED_DIR
@@ -1081,7 +1081,7 @@ if ! grep -q "\[RFIDShare\]" /etc/samba/smb.conf; then
     # Append RFIDShare configuration
     cat << EOF >> /etc/samba/smb.conf
 [RFIDShare]
-path = /home/tim/test_rfidpi/shared
+path = /home/tim/RFID3/shared
 writable = yes
 browsable = yes
 guest ok = no
@@ -1120,8 +1120,8 @@ testparm -s
 
 # Set ownership and permissions for log directory
 echo "Setting log directory permissions"
-chown -R tim:tim /home/tim/test_rfidpi/logs
-chmod -R 750 /home/tim/test_rfidpi/logs
+chown -R tim:tim /home/tim/RFID3/logs
+chmod -R 750 /home/tim/RFID3/logs
 
 echo "$(date '+%Y-%m-%d %H:%M:%S') - Samba setup completed successfully"
 
@@ -1300,7 +1300,7 @@ finally:
 Clone the Repository:
 
 git clone https://github.com/sandahltim/_rfidpi.git
-cd test_rfidpi
+cd RFID3
 git checkout RFID6
 
 Set Up Virtual Environment:
@@ -1363,11 +1363,11 @@ sudo systemctl status rfid_dash_dev.service
 
 Check Logs:
 
-cat /home/tim/test_rfidpi/logs/rfid_dashboard.log
-cat /home/tim/test_rfidpi/logs/gunicorn_error.log
-cat /home/tim/test_rfidpi/logs/gunicorn_access.log
-cat /home/tim/test_rfidpi/logs/app.log
-cat /home/tim/test_rfidpi/logs/sync.log
+cat /home/tim/RFID3/logs/rfid_dashboard.log
+cat /home/tim/RFID3/logs/gunicorn_error.log
+cat /home/tim/RFID3/logs/gunicorn_access.log
+cat /home/tim/RFID3/logs/app.log
+cat /home/tim/RFID3/logs/sync.log
 
 Configuration
 
@@ -1387,14 +1387,14 @@ API: Configured in config.py with endpoints for item master, transactions, and s
 
 
 
-Logging: Logs are stored in /home/tim/test_rfidpi/logs/
+Logging: Logs are stored in /home/tim/RFID3/logs/
 
 
 
 RFID Dashboard Application
 This Flask-based RFID dashboard application manages inventory, tracks contracts, and handles resale/rental packs for Broadway Tent and Event. It integrates with an external API for data synchronization and uses MariaDB and Redis for persistence and caching.
 Project Structure
-test_rfidpi/ RFID6
+RFID3/ RFID6
 ├── app/
 │   ├── __init__.py
 │   ├── routes/
@@ -1499,7 +1499,7 @@ Nginx (optional, for production)
 Installation
 Clone the Repository
 git clone https://github.com/sandahltim/_rfidpi.git
-cd test_rfidpi
+cd RFID3
 git checkout RFID6
 
 Set Up Virtual Environment
@@ -1541,13 +1541,13 @@ git push origin RFID6
 
 Pull and Restart on the Pi
 ssh tim@192.168.3.112
-cd /home/tim/test_rfidpi
+cd /home/tim/RFID3
 git pull origin RFID6
-> /home/tim/test_rfidpi/logs/gunicorn_error.log
-> /home/tim/test_rfidpi/logs/gunicorn_access.log
-> /home/tim/test_rfidpi/logs/app.log
-> /home/tim/test_rfidpi/logs/sync.log
-> /home/tim/test_rfidpi/logs/rfid_dashboard.log
+> /home/tim/RFID3/logs/gunicorn_error.log
+> /home/tim/RFID3/logs/gunicorn_access.log
+> /home/tim/RFID3/logs/app.log
+> /home/tim/RFID3/logs/sync.log
+> /home/tim/RFID3/logs/rfid_dashboard.log
 sudo systemctl stop rfid_dash_dev.service
 sudo systemctl start rfid_dash_dev.service
 sudo systemctl status rfid_dash_dev.service
@@ -1556,18 +1556,18 @@ sudo systemctl restart nginx
 sudo systemctl status nginx
 
 Check Logs
-cat /home/tim/test_rfidpi/logs/rfid_dashboard.log
-cat /home/tim/test_rfidpi/logs/gunicorn_error.log
-cat /home/tim/test_rfidpi/logs/gunicorn_access.log
-cat /home/tim/test_rfidpi/logs/app.log
-cat /home/tim/test_rfidpi/logs/sync.log
+cat /home/tim/RFID3/logs/rfid_dashboard.log
+cat /home/tim/RFID3/logs/gunicorn_error.log
+cat /home/tim/RFID3/logs/gunicorn_access.log
+cat /home/tim/RFID3/logs/app.log
+cat /home/tim/RFID3/logs/sync.log
 
 Configuration
 
 Database: MariaDB (rfid_inventory database, user: rfid_user, password: rfid_user_password).
 Redis: redis://localhost:6379/0.
 API: Configured in config.py with endpoints for item master, transactions, and seed rental classes.
-Logging: Logs are stored in /home/tim/test_rfidpi/logs/.
+Logging: Logs are stored in /home/tim/RFID3/logs/.
 
 Database Schemas
 Item Master (id_item_master)
@@ -1679,7 +1679,7 @@ id_hand_counted_items.contract_number ↔ id_item_master.last_contract_num (one-
 
 Usage
 
-Access the application at http://tim:3607/ (or http://tim:8000/ via Nginx).
+Access the application at http://tim:8101/ (or http://tim:8000/ via Nginx).
 Navigate through tabs to manage inventory, contracts, and categories.
 Use the "Full Refresh" and "Clear API Data and Refresh" buttons on the home page to sync data.
 Logs provide detailed debugging information for troubleshooting.
@@ -1721,7 +1721,7 @@ from .. import cache
 logger = logging.getLogger('api_client')
 logger.setLevel(logging.INFO)
 logger.handlers = []  # Clear existing handlers
-file_handler = logging.FileHandler('/home/tim/test_rfidpi/logs/rfid_dashboard.log')
+file_handler = logging.FileHandler('/home/tim/RFID3/logs/rfid_dashboard.log')
 file_handler.setLevel(logging.INFO)
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 file_handler.setFormatter(formatter)

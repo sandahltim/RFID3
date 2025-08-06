@@ -15,7 +15,7 @@ import sys
 logger = logging.getLogger('common')
 logger.setLevel(logging.INFO)
 logger.handlers = []  # Clear existing handlers
-file_handler = logging.FileHandler('/home/tim/test_rfidpi/logs/rfid_dashboard.log')
+file_handler = logging.FileHandler('/home/tim/RFID3/logs/rfid_dashboard.log')
 file_handler.setLevel(logging.INFO)
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 file_handler.setFormatter(formatter)
