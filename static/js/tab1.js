@@ -1083,3 +1083,8 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 });
+
+if (!window.tab1) {
+    window.tab1 = {};
+}
+window.tab1.loadCommonNames = loadCommonNames;

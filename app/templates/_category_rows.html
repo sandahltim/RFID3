@@ -2,7 +2,7 @@
 <tr class="category-row">
     <td>{{ category.category }}</td>
     <td>
-        <select class="subcategory-select form-control" data-category="{{ category.category | urlencode | replace('\'', '\\\'') | replace('\"', '\\\"') }}" onchange="loadCommonNames(this)">
+        <select class="subcategory-select form-control" data-category="{{ category.category | urlencode | replace('\'', '\\\'') | replace('\"', '\\\"') }}" onchange="tab1.loadCommonNames(this)">
             <option value="">Select a subcategory</option>
         </select>
         <div id="loading-subcat-{{ category.cat_id }}" class="loading-indicator" style="display: none;">Loading...</div>
