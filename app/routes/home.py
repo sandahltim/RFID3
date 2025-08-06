@@ -1,29 +1,19 @@
 # app/routes/home.py
 # home.py version: 2025-07-10-v7
-from flask import Blueprint, render_template, current_app
+from flask import Blueprint, render_template
 from .. import db, cache
 from ..models.db_models import ItemMaster, Transaction, RefreshState
 from sqlalchemy import func
 from time import time
 import logging
-import sys       
 from datetime import datetime
 import os
 import json
+from config import LOG_FILE
+from ..services.logger import get_logger
 
 # Configure logging with process ID
-logger = logging.getLogger(f'home_{os.getpid()}')
-logger.setLevel(logging.INFO)
-logger.handlers = []  # Clear existing handlers
-file_handler = logging.FileHandler('/home/tim/RFID3/logs/rfid_dashboard.log')
-file_handler.setLevel(logging.INFO)
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-file_handler.setFormatter(formatter)
-logger.addHandler(file_handler)
-console_handler = logging.StreamHandler(sys.stdout)
-console_handler.setLevel(logging.INFO)
-console_handler.setFormatter(formatter)
-logger.addHandler(console_handler)
+logger = get_logger(f'home_{os.getpid()}', level=logging.INFO, log_file=LOG_FILE)
 
 home_bp = Blueprint('home', __name__)
 

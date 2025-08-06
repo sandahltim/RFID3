@@ -2,30 +2,23 @@
 # scheduler.py version: 2025-06-27-v7
 from apscheduler.schedulers.background import BackgroundScheduler
 from redis import Redis
-from config import REDIS_URL, INCREMENTAL_REFRESH_INTERVAL
+from config import REDIS_URL, INCREMENTAL_REFRESH_INTERVAL, LOG_FILE
 from .. import db, cache
 from .refresh import full_refresh, incremental_refresh
 import logging
-import sys
 import os
 import time
 from sqlalchemy.sql import text
 from datetime import datetime
+from .logger import get_logger
 
 # Configure logging with process ID
-logger = logging.getLogger(f'scheduler_{os.getpid()}')
-logger.setLevel(logging.DEBUG)
-logger.handlers = []  # Clear existing handlers
-if os.getpid() == os.getppid():
-    file_handler = logging.FileHandler('/home/tim/RFID3/logs/rfid_dashboard.log')
-    file_handler.setLevel(logging.DEBUG)
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    file_handler.setFormatter(formatter)
-    logger.addHandler(file_handler)
-    console_handler = logging.StreamHandler(sys.stdout)
-    console_handler.setLevel(logging.DEBUG)
-    console_handler.setFormatter(formatter)
-    logger.addHandler(console_handler)
+logger = get_logger(
+    f'scheduler_{os.getpid()}',
+    level=logging.DEBUG,
+    log_file=LOG_FILE,
+    add_handlers=os.getpid() == os.getppid(),
+)
 
 scheduler = BackgroundScheduler()
 
