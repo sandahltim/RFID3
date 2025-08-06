@@ -8,11 +8,20 @@ sudo apt update && sudo apt upgrade -y
 sudo apt install -y git python3 python3-venv python3-pip mariadb-server mariadb-client redis-server
 ```
 
+If package installation fails with a message about `/boot/firmware`, mount the boot partition and retry:
+```bash
+sudo mount /boot/firmware
+sudo dpkg --configure -a
+```
+
+
 ## 2. Clone the repository
 ```bash
 mkdir -p /home/tim/RFID3
 cd /home/tim/RFID3
-git clone https://github.com/SMOK33Y3/BTErfid.git .
+
+git clone https://github.com/SMOK33Y3/BTErfid.git .   # note the final dot
+
 ```
 
 ## 3. Python environment
@@ -29,6 +38,10 @@ chmod +x scripts/setup_mariadb.sh
 sudo scripts/setup_mariadb.sh
 mysql -u rfid_user -prfid_user_password rfid_inventory < scripts/migrate_db.sql
 mysql -u rfid_user -prfid_user_password rfid_inventory < scripts/migrate_hand_counted_items.sql
+
+source venv/bin/activate
+python scripts/update_rental_class_mappings.py
+
 ```
 
 ## 5. Enable the systemd service
