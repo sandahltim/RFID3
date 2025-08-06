@@ -1,3 +1,5 @@
+import { formatDate } from './utils.js';
+import { getCachedTabNum, setCachedTabNum } from './state.js';
 // app/static/js/tab.js
 // tab.js version: 2025-07-08-v21
 console.log(`tab.js version: 2025-07-08-v21 loaded at ${new Date().toISOString()}`);
@@ -104,6 +106,8 @@ function updateExpandableTable(tableId, data, page, perPage, tabNum, identifier)
 /**
  * Initialize the page
  */
+let tabClickHandler;
+
 document.addEventListener('DOMContentLoaded', () => {
     console.log(`tab.js: DOMContentLoaded at ${new Date().toISOString()}`);
     try {
@@ -121,12 +125,12 @@ document.addEventListener('DOMContentLoaded', () => {
             console.warn(`No tab number found in URL, using default tab number 1 at ${new Date().toISOString()}`);
             tabNum = 1;
         }
-        window.cachedTabNum = tabNum;
-        console.log(`Set window.cachedTabNum=${window.cachedTabNum} at ${new Date().toISOString()}`);
+        setCachedTabNum(tabNum);
+        console.log(`Set cachedTabNum=${getCachedTabNum()} at ${new Date().toISOString()}`);
 
         // Remove any existing click listeners to prevent duplicates
-        document.removeEventListener('click', window.tabClickHandler);
-        window.tabClickHandler = (event) => {
+        document.removeEventListener('click', tabClickHandler);
+        tabClickHandler = (event) => {
             console.log(`Click event triggered at ${new Date().toISOString()}`);
             const printBtn = event.target.closest('.print-btn');
             const printFullBtn = event.target.closest('.print-full-btn');
@@ -226,7 +230,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
         };
-        document.addEventListener('click', window.tabClickHandler);
+        document.addEventListener('click', tabClickHandler);
     } catch (error) {
         console.error(`Initialization error: ${error} at ${new Date().toISOString()}`);
     }
@@ -243,7 +247,7 @@ async function printTable(level, id, commonName = null, category = null, subcate
         return;
     }
 
-    const tabNum = window.cachedTabNum || 1;
+    const tabNum = getCachedTabNum() || 1;
     const tabName = tabNum == 2 ? 'Open Contracts' : tabNum == 4 ? 'Laundry Contracts' : tabNum == 5 ? 'Resale/Rental Packs' : tabNum == 3 ? 'Service' : `Tab ${tabNum}`;
 
     let contractNumber = '';
@@ -598,7 +602,7 @@ function removeTotalItemsInventoryColumn(table, tabNum) {
  */
 async function printFullItemList(category, subcategory, commonName) {
     console.log(`Printing full item list for Category: ${category}, Subcategory: ${subcategory}, Common Name: ${commonName} at ${new Date().toISOString()}`);
-    const tabNum = window.cachedTabNum || 1;
+    const tabNum = getCachedTabNum() || 1;
     const tabName = tabNum == 2 ? 'Open Contracts' : tabNum == 4 ? 'Laundry Contracts' : tabNum == 5 ? 'Resale/Rental Packs' : tabNum == 3 ? 'Service' : `Tab ${tabNum}`;
 
     const normalizedCommonName = normalizeCommonName(commonName);

@@ -1,3 +1,5 @@
+import { formatDate } from './utils.js';
+import { getCachedTabNum } from './state.js';
 console.log('tab5.js version: 2025-06-25-v12 loaded');
 
 /**
@@ -11,12 +13,12 @@ console.log('tab5.js version: 2025-06-25-v12 loaded');
 
 function applyFilterToAllLevelsTab5() {
     console.log(`applyFilterToAllLevelsTab5: Starting at ${new Date().toISOString()}`);
-    if (window.cachedTabNum === 3 || !window.location.pathname.match(/\/tab\/\d+/)) {
+    if (getCachedTabNum() === 3 || !window.location.pathname.match(/\/tab\/\d+/)) {
         console.log(`Skipping applyFilterToAllLevels for Tab 3 or non-tab page at ${new Date().toISOString()}`);
         return;
     }
 
-    if (window.cachedTabNum === 1 || window.cachedTabNum === 5) {
+    if (getCachedTabNum() === 1 || getCachedTabNum() === 5) {
         const categoryTable = document.getElementById('category-table');
         if (!categoryTable) {
             console.warn(`Category table not found, skipping filter application at ${new Date().toISOString()}`);
@@ -76,7 +78,7 @@ function applyFilterToAllLevelsTab5() {
                                     const itemRows = itemTable.querySelectorAll('tbody tr') || [];
                                     itemRows.forEach(itemRow => {
                                         let showItemRow = true;
-                                        const colOffset = window.cachedTabNum == 5 ? 1 : 0;
+                                        const colOffset = getCachedTabNum() == 5 ? 1 : 0;
                                         const itemCommonNameCell = itemRow.querySelector(`td:nth-child(${2 + colOffset})`);
                                         const itemContractCell = itemRow.querySelector(`td:nth-child(${5 + colOffset})`);
                                         const itemCommonNameValue = itemCommonNameCell ? itemCommonNameCell.textContent.toLowerCase() : '';
@@ -955,9 +957,9 @@ function updateResalePackToSold() {
 document.addEventListener('DOMContentLoaded', function() {
     console.log(`tab5.js: DOMContentLoaded at ${new Date().toISOString()}`);
     const isTab5 = window.location.pathname.match(/\/tab\/5\b/);
-    console.log(`isTab5: ${isTab5}, window.cachedTabNum: ${window.cachedTabNum}, pathname: ${window.location.pathname} at ${new Date().toISOString()}`);
+    console.log(`isTab5: ${isTab5}, cachedTabNum: ${getCachedTabNum()}, pathname: ${window.location.pathname} at ${new Date().toISOString()}`);
 
-    if (!isTab5 && window.cachedTabNum !== 5) {
+    if (!isTab5 && getCachedTabNum() !== 5) {
         console.log(`Not Tab 5, skipping at ${new Date().toISOString()}`);
         return;
     }

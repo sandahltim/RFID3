@@ -1,3 +1,5 @@
+import { formatDate } from './utils.js';
+import { getCachedTabNum } from './state.js';
 // app/static/js/tab3.js
 // tab3.js version: 2025-07-10-v54
 console.log(`tab3.js version: 2025-07-10-v54 loaded at ${new Date().toISOString()}`);
@@ -469,7 +471,7 @@ console.log(`tab3.js version: 2025-07-10-v54 loaded at ${new Date().toISOString(
 
             if (data.items && data.items.length > 0) {
                 data.items.forEach(item => {
-                    const lastScanned = window.formatDate ? window.formatDate(item.date_last_scanned) : item.date_last_scanned || 'N/A';
+                    const lastScanned = formatDate(item.date_last_scanned);
                     const currentStatus = item.status || 'N/A';
                     const currentQuality = item.quality || '';
                     const binLocationLower = item.bin_location ? item.bin_location.toLowerCase() : '';
@@ -1337,7 +1339,7 @@ console.log(`tab3.js version: 2025-07-10-v54 loaded at ${new Date().toISOString(
      */
     document.addEventListener('DOMContentLoaded', () => {
         console.log(`tab3.js: DOMContentLoaded at ${new Date().toISOString()}`);
-        if (window.location.pathname.match(/\/tab\/3\b/) && window.cachedTabNum === 3) {
+        if (window.location.pathname.match(/\/tab\/3\b/) && getCachedTabNum() === 3) {
             console.log(`Initializing Tab 3 at ${new Date().toISOString()}`);
             initializeTab3();
             document.removeEventListener('click', window.tab3ClickHandler);
