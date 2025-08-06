@@ -5,7 +5,7 @@ import os
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
 # Application IP address
-APP_IP = os.environ.get('APP_IP', '192.168.3.112')
+APP_IP = os.environ.get('APP_IP', '192.168.3.110')
 
 # MariaDB configuration
 DB_CONFIG = {
@@ -48,3 +48,4 @@ SQLALCHEMY_ENGINE_OPTIONS = {
     'pool_recycle': 1800,  # Recycle connections every 30 minutes
     'connect_args': {'charset': 'utf8mb4', 'collation': 'utf8mb4_unicode_ci'}
 }
+
