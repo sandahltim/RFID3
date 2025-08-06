@@ -56,11 +56,18 @@ class APIClient:
         raise Exception("Failed to fetch access token after 5 attempts")
 
     def _make_request(self, endpoint_id, params=None, method='GET', data=None, timeout=20, user_operation=False):
+        """Make a request to the RFID API, capping the limit at the API's maximum of 200."""
         if not params:
             params = {}
         if method == 'GET':
             params['offset'] = params.get('offset', 0)
-            params['limit'] = params.get('limit', 200)
+            requested_limit = int(params.get('limit', 200))
+            if requested_limit > 200:
+                logger.warning(
+                    "Requested limit %s exceeds API maximum of 200; capping to 200",
+                    requested_limit,
+                )
+            params['limit'] = min(requested_limit, 200)  # API caps responses at 200 records
             params['returncount'] = params.get('returncount', True)
 
         if self.token_expiry and datetime.now() >= self.token_expiry:
