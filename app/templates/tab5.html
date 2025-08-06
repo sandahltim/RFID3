@@ -16,7 +16,7 @@
     <div class="card">
         <div class="card-body">
             <div class="btn-group">
-                <button class="btn btn-primary" onclick="updateResalePackToSold()">Update Resale/Pack to Sold</button>
+                <button class="btn btn-primary" onclick="tab5.updateResalePackToSold()">Update Resale/Pack to Sold</button>
                 <a class="btn btn-success" href="{{ url_for('tab5.export_sold_items_csv') }}">Export Sold Items CSV</a>
             </div>
         </div>
@@ -39,7 +39,7 @@
                 <tr class="category-row">
                     <td>{{ category.category }}</td>
                     <td>
-                        <select class="subcategory-select" data-category="{{ category.category }}" onchange="loadCommonNames(this)">
+                        <select class="subcategory-select" data-category="{{ category.category }}" onchange="tab5.loadCommonNames(this)">
                             <option value="">Select a subcategory</option>
                         </select>
                     </td>

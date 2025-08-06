@@ -1,3 +1,5 @@
+import { formatDate } from './utils.js';
+import { getCachedTabNum } from './state.js';
 // app/static/js/tab1.js
 // tab1.js version: 2025-07-10-v7
 console.log('tab1.js version: 2025-07-10-v7 loaded');
@@ -52,12 +54,12 @@ function debounce(func, wait) {
  */
 function applyFilterToAllLevelsTab1() {
     console.log(`applyFilterToAllLevelsTab1: Starting at ${new Date().toISOString()}`);
-    if (window.cachedTabNum === 3 || !window.location.pathname.match(/\/tab\/\d+/)) {
+    if (getCachedTabNum() === 3 || !window.location.pathname.match(/\/tab\/\d+/)) {
         console.log(`Skipping applyFilterToAllLevels for Tab 3 or non-tab page at ${new Date().toISOString()}`);
         return;
     }
 
-    if (window.cachedTabNum === 1 || window.cachedTabNum === 5) {
+    if (getCachedTabNum() === 1 || getCachedTabNum() === 5) {
         const categoryTable = document.getElementById('category-table');
         if (!categoryTable) {
             console.warn(`Category table not found, skipping filter application at ${new Date().toISOString()}`);
@@ -601,7 +603,7 @@ async function loadItems(category, subcategory, commonName, targetId, page = 1) 
 
         if (data.items && data.items.length > 0) {
             data.items.forEach(item => {
-                const lastScanned = formatDate ? formatDate(item.last_scanned_date) : item.last_scanned_date || 'N/A';
+                const lastScanned = formatDate(item.last_scanned_date);
                 const currentStatus = item.status || 'N/A';
                 const currentQuality = item.quality || '';
                 const binLocationLower = item.bin_location ? item.bin_location.toLowerCase() : '';
@@ -826,9 +828,9 @@ const debouncedSaveEdit = debounce(async (cell, tagId, field, category, subcateg
 document.addEventListener('DOMContentLoaded', function() {
     console.log(`tab1.js: DOMContentLoaded at ${new Date().toISOString()}`);
     const isTab1 = window.location.pathname.match(/\/tab\/1\b/);
-    console.log(`isTab1: ${isTab1}, window.cachedTabNum: ${window.cachedTabNum}, pathname: ${window.location.pathname} at ${new Date().toISOString()}`);
+    console.log(`isTab1: ${isTab1}, getCachedTabNum(): ${getCachedTabNum()}, pathname: ${window.location.pathname} at ${new Date().toISOString()}`);
 
-    if (!isTab1 && window.cachedTabNum !== 1) {
+    if (!isTab1 && getCachedTabNum() !== 1) {
         console.log(`Not Tab 1, skipping at ${new Date().toISOString()}`);
         return;
     }
@@ -1081,3 +1083,8 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 });
+
+if (!window.tab1) {
+    window.tab1 = {};
+}
+window.tab1.loadCommonNames = loadCommonNames;
