@@ -14,13 +14,13 @@ sudo mount /boot/firmware
 sudo dpkg --configure -a
 ```
 
-
 ## 2. Clone the repository
 ```bash
 mkdir -p /home/tim/RFID3
 cd /home/tim/RFID3
-
 git clone https://github.com/SMOK33Y3/BTErfid.git .   # note the final dot
+
+
 
 ```
 
@@ -41,10 +41,18 @@ mysql -u rfid_user -prfid_user_password rfid_inventory < scripts/migrate_hand_co
 
 source venv/bin/activate
 python scripts/update_rental_class_mappings.py
-
 ```
 
-## 5. Enable the systemd service
+## 5. Set up shared folder for CSV tag file
+The Service tab expects to read and write tag CSV files in a shared directory. Run the Samba setup script to
+create `/home/tim/RFID3/shared` and expose it on the network as `RFIDShare` so you can drop CSV files from another machine.
+```bash
+chmod +x scripts/setup_samba.sh
+sudo scripts/setup_samba.sh
+```
+
+## 6. Enable the systemd service
+
 ```bash
 sudo cp rfid_dash_dev.service /etc/systemd/system/
 sudo systemctl daemon-reload
@@ -54,10 +62,12 @@ sudo systemctl start rfid_dash_dev.service
 
 The dashboard is now available at `http://<pi-ip>:8101`.
 
-## 6. Optional: Nginx proxy
+
+## 7. Optional: Nginx proxy
 If you use Nginx, copy `rfid_dash_dev.conf` to `/etc/nginx/sites-available/` and enable it so Nginx listens on port 8101.
 
-## 7. Automatic updates via Tailscale
+## 8. Automatic updates via Tailscale
+
 1. Install Tailscale on the Pi and bring it up:
 ```bash
 curl -fsSL https://tailscale.com/install.sh | sh
@@ -67,13 +77,18 @@ sudo tailscale up --ssh
 2. Ensure repository secrets `TAILSCALE_AUTHKEY` and `PI_TAILSCALE_IP` are set in GitHub.
 3. The workflow `.github/workflows/deploy.yml` connects through Tailscale and runs `update_from_github.sh` on merges to `main`.
 
-## 8. Manual update
+
+## 9. Manual update
+
 To update manually:
 ```bash
 /home/tim/RFID3/update_from_github.sh
 ```
 
-## 9. Logs
+
+## 10. Logs
+
+
 Application logs are in `/home/tim/RFID3/logs/`.
 
 ---
