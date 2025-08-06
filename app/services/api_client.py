@@ -3,24 +3,20 @@
 import requests
 import time
 from datetime import datetime, timedelta
-from config import API_USERNAME, API_PASSWORD, LOGIN_URL, INCREMENTAL_FALLBACK_SECONDS
+from config import (
+    API_USERNAME,
+    API_PASSWORD,
+    LOGIN_URL,
+    INCREMENTAL_FALLBACK_SECONDS,
+    LOG_FILE,
+)
 import logging
 from urllib.parse import quote
 from .. import cache
+from .logger import get_logger
 
 # Configure logging
-logger = logging.getLogger('api_client')
-logger.setLevel(logging.INFO)
-logger.handlers = []  # Clear existing handlers
-file_handler = logging.FileHandler('/home/tim/RFID3/logs/rfid_dashboard.log')
-file_handler.setLevel(logging.INFO)
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-file_handler.setFormatter(formatter)
-logger.addHandler(file_handler)
-console_handler = logging.StreamHandler()
-console_handler.setLevel(logging.INFO)
-console_handler.setFormatter(formatter)
-logger.addHandler(console_handler)
+logger = get_logger('api_client', level=logging.INFO, log_file=LOG_FILE)
 
 class APIClient:
     def __init__(self):

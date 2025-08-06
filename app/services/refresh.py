@@ -6,28 +6,24 @@ from datetime import datetime, timedelta
 from sqlalchemy.exc import SQLAlchemyError, OperationalError
 from sqlalchemy.sql import text
 from .. import db
-from ..models.db_models import ItemMaster, Transaction, SeedRentalClass, RefreshState, UserRentalClassMapping
+from ..models.db_models import (
+    ItemMaster,
+    Transaction,
+    SeedRentalClass,
+    RefreshState,
+    UserRentalClassMapping,
+)
 from ..services.api_client import APIClient
 from flask import Blueprint, jsonify
-from config import INCREMENTAL_LOOKBACK_SECONDS
+from config import INCREMENTAL_LOOKBACK_SECONDS, LOG_FILE
 import time
 import os
 import csv
 import json
+from .logger import get_logger
 
 # Configure logging
-logger = logging.getLogger(f'refresh_{os.getpid()}')
-logger.setLevel(logging.INFO)  # Maintain INFO level to minimize disk I/O
-logger.handlers = []  # Clear existing handlers
-file_handler = logging.FileHandler('/home/tim/RFID3/logs/rfid_dashboard.log')
-file_handler.setLevel(logging.INFO)
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-file_handler.setFormatter(formatter)
-logger.addHandler(file_handler)
-console_handler = logging.StreamHandler()
-console_handler.setLevel(logging.INFO)
-console_handler.setFormatter(formatter)
-logger.addHandler(console_handler)
+logger = get_logger(f'refresh_{os.getpid()}', level=logging.INFO, log_file=LOG_FILE)
 
 refresh_bp = Blueprint('refresh', __name__)
 
