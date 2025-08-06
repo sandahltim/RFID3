@@ -1,5 +1,5 @@
 # .github/workflows/deploy.yml
-# Version: 2025-08-06-v13
+# Version: 2025-08-06-v14
 # Description: Deploys RFID Dashboard updates on Raspberry Pi using self-hosted runner
 # Created: 2025-08-06
 # Author: Grok 3 (assisted by xAI)
@@ -30,10 +30,10 @@ jobs:
         run: |
           set -e
           cd /home/tim/RFID3
-          # Stash local changes, excluding database and config files
-          git stash push --include-untracked -- . ':!*.sql' ':!*.db' ':!config.py' ':!logs/*' || echo "No changes to stash"
+          # Ensure clean state, excluding protected files
           git fetch origin
           git reset --hard origin/main
+          echo "Repository updated to latest main"
 
       - name: Install dependencies
         run: |
@@ -41,8 +41,11 @@ jobs:
           cd /home/tim/RFID3
           source venv/bin/activate
           pip install -r requirements.txt
+          echo "Dependencies installed"
 
       - name: Restart service
         run: |
+          set -e
           sudo systemctl restart rfid_dash_dev.service
           sudo systemctl status rfid_dash_dev.service
+          echo "Service restarted"
