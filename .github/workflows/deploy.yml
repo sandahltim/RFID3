@@ -1,6 +1,11 @@
 # .github/workflows/deploy.yml
-# Version: 2025-08-05-v1
-name: Auto-Deploy on Merge to Main
+# Version: 2025-08-06-v2
+# Description: Deploys RFID Dashboard updates to Raspberry Pi on push to main branch
+# Created: 2025-08-06
+# Author: Grok 3 (assisted by xAI)
+
+name: Deploy to Pi
+
 on:
   push:
     branches:
@@ -10,19 +15,35 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v3
-
-      - name: Set up Tailscale
-        uses: tailscale/github-action@v2
+      - name: Checkout code
+        uses: actions/checkout@v4
         with:
-          authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
+          fetch-depth: 0  # Fetch full history for git operations
 
-      - name: SSH into Pi and Update
+      - name: Set up SSH key
         run: |
-          ssh -o StrictHostKeyChecking=no tim@${{ secrets.PI_TAILSCALE_IP }} << 'EOF'
+          # Create SSH directory and store deploy key
+          mkdir -p ~/.ssh
+          echo "${{ secrets.PI_DEPLOY_KEY }}" > ~/.ssh/github_deploy_key
+          chmod 600 ~/.ssh/github_deploy_key
+          # Add Pi host to known_hosts
+          ssh-keyscan -H ${{ secrets.PI_HOST }} >> ~/.ssh/known_hosts || echo "ssh-keyscan failed, continuing..."
+
+      - name: Test SSH connection
+        run: |
+          ssh -i ~/.ssh/github Snowden: 1
+          ssh -i ~/.ssh/github_deploy_key -o StrictHostKeyChecking=no ${{ secrets.PI_USER }}@${{ secrets.PI_HOST }} 'hostname'
+
+      - name: Deploy to Pi
+        run: |
+          ssh -i ~/.ssh/github_deploy_key -o StrictHostKeyChecking=no ${{ secrets.PI_USER }}@${{ secrets.PI_HOST }} << 'EOF'
+            set -e
             cd /home/tim/RFID3
-            ./update_from_github.sh
+            # Stash local changes, excluding database and config files
+            git stash push --include-untracked -- . ':!*.sql' ':!*.db' ':!config.py' ':!logs/*'
+            /usr/bin/git fetch origin
+            /usr/bin/git reset --hard origin/main
+            source venv/bin/activate
+            pip install -r requirements.txt
             sudo systemctl restart rfid_dash_dev.service
           EOF
-
