@@ -1,3 +1,5 @@
+import { formatDate } from './utils.js';
+import { getCachedTabNum } from './state.js';
 console.log('tab5.js version: 2025-06-25-v12 loaded');
 
 /**
@@ -11,12 +13,12 @@ console.log('tab5.js version: 2025-06-25-v12 loaded');
 
 function applyFilterToAllLevelsTab5() {
     console.log(`applyFilterToAllLevelsTab5: Starting at ${new Date().toISOString()}`);
-    if (window.cachedTabNum === 3 || !window.location.pathname.match(/\/tab\/\d+/)) {
+    if (getCachedTabNum() === 3 || !window.location.pathname.match(/\/tab\/\d+/)) {
         console.log(`Skipping applyFilterToAllLevels for Tab 3 or non-tab page at ${new Date().toISOString()}`);
         return;
     }
 
-    if (window.cachedTabNum === 1 || window.cachedTabNum === 5) {
+    if (getCachedTabNum() === 1 || getCachedTabNum() === 5) {
         const categoryTable = document.getElementById('category-table');
         if (!categoryTable) {
             console.warn(`Category table not found, skipping filter application at ${new Date().toISOString()}`);
@@ -76,7 +78,7 @@ function applyFilterToAllLevelsTab5() {
                                     const itemRows = itemTable.querySelectorAll('tbody tr') || [];
                                     itemRows.forEach(itemRow => {
                                         let showItemRow = true;
-                                        const colOffset = window.cachedTabNum == 5 ? 1 : 0;
+                                        const colOffset = getCachedTabNum() == 5 ? 1 : 0;
                                         const itemCommonNameCell = itemRow.querySelector(`td:nth-child(${2 + colOffset})`);
                                         const itemContractCell = itemRow.querySelector(`td:nth-child(${5 + colOffset})`);
                                         const itemCommonNameValue = itemCommonNameCell ? itemCommonNameCell.textContent.toLowerCase() : '';
@@ -425,12 +427,12 @@ function loadCommonNames(selectElement, page = 1) {
                     paginationRow.innerHTML = `
                         <td colspan="7">
                             <div class="pagination-controls">
-                                <button class="btn btn-sm btn-secondary" 
-                                        onclick="loadCommonNames(document.querySelector('select[data-category=\"${category}\"]'), ${data.page - 1})" 
+                                <button class="btn btn-sm btn-secondary"
+                                        onclick="tab5.loadCommonNames(document.querySelector('select[data-category=\\\"${category}\\\"]'), ${data.page - 1})"
                                         ${data.page === 1 ? 'disabled' : ''}>Previous</button>
                                 <span>Page ${data.page} of ${totalPages}</span>
-                                <button class="btn btn-sm btn-secondary" 
-                                        onclick="loadCommonNames(document.querySelector('select[data-category=\"${category}\"]'), ${data.page + 1})" 
+                                <button class="btn btn-sm btn-secondary"
+                                        onclick="tab5.loadCommonNames(document.querySelector('select[data-category=\\\"${category}\\\"]'), ${data.page + 1})"
                                         ${data.page === totalPages ? 'disabled' : ''}>Next</button>
                             </div>
                         </td>
@@ -786,8 +788,8 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                         <td>${item.quality || 'N/A'}</td>
                         <td>${item.notes || 'N/A'}</td>
                         <td>
-                            <button class="btn btn-sm btn-primary save-btn" 
-                                    onclick="updateItem('${item.tag_id}', '${key}', '${category}', '${subcategory}', '${item.common_name}', '${targetId}')">Save</button>
+                            <button class="btn btn-sm btn-primary save-btn"
+                                    onclick="tab5.updateItem('${item.tag_id}', '${key}', '${category}', '${subcategory}', '${item.common_name}', '${targetId}')">Save</button>
                         </td>
                     `;
                     tbody.appendChild(row);
@@ -799,12 +801,12 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                     const totalPages = Math.ceil(data.total_items / data.per_page);
                     const escapedCommonName = commonName.replace(/'/g, "\\'").replace(/"/g, '\\"');
                     paginationDiv.innerHTML = `
-                        <button class="btn btn-sm btn-secondary" 
-                                onclick="loadItems('${category}', '${subcategory}', '${escapedCommonName}', '${targetId}', ${data.page - 1})" 
+                        <button class="btn btn-sm btn-secondary"
+                                onclick="tab5.loadItems('${category}', '${subcategory}', '${escapedCommonName}', '${targetId}', ${data.page - 1})"
                                 ${data.page === 1 ? 'disabled' : ''}>Previous</button>
                         <span>Page ${data.page} of ${totalPages}</span>
-                        <button class="btn btn-sm btn-secondary" 
-                                onclick="loadItems('${category}', '${subcategory}', '${escapedCommonName}', '${targetId}', ${data.page + 1})" 
+                        <button class="btn btn-sm btn-secondary"
+                                onclick="tab5.loadItems('${category}', '${subcategory}', '${escapedCommonName}', '${targetId}', ${data.page + 1})"
                                 ${data.page === totalPages ? 'disabled' : ''}>Next</button>
                     `;
                 }
@@ -816,7 +818,7 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                     <h5>Bulk Update All Items</h5>
                     <div class="form-group">
                         <label for="bulk-bin-location-${key}">Bin Location:</label>
-                        <select id="bulk-bin-location-${key}" onchange="updateBulkField('${key}', 'bin_location')">
+                        <select id="bulk-bin-location-${key}" onchange="tab5.updateBulkField('${key}', 'bin_location')">
                             <option value="">Select Bin Location</option>
                             <option value="resale">Resale</option>
                             <option value="sold">Sold</option>
@@ -826,13 +828,13 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                     </div>
                     <div class="form-group">
                         <label for="bulk-status-${key}">Status:</label>
-                        <select id="bulk-status-${key}" onchange="updateBulkField('${key}', 'status')">
+                        <select id="bulk-status-${key}" onchange="tab5.updateBulkField('${key}', 'status')">
                             <option value="">Select Status</option>
                             <option value="Ready to Rent">Ready to Rent</option>
                             <option value="Sold">Sold</option>
                         </select>
                     </div>
-                    <button class="btn btn-primary" onclick="bulkUpdateCommonName('${category}', '${subcategory}', '${targetId}', '${key}')">Update All</button>
+                    <button class="btn btn-primary" onclick="tab5.bulkUpdateCommonName('${category}', '${subcategory}', '${targetId}', '${key}')">Update All</button>
                     <h5 class="mt-3">Bulk Update Selected Items</h5>
                     <div class="form-group">
                         <label for="bulk-item-bin-location-${key}">Bin Location:</label>
@@ -852,7 +854,7 @@ function loadItems(category, subcategory, commonName, targetId, page = 1) {
                             <option value="Sold">Sold</option>
                         </select>
                     </div>
-                    <button class="btn btn-primary" onclick="bulkUpdateSelectedItems('${key}')">Update Selected</button>
+                    <button class="btn btn-primary" onclick="tab5.bulkUpdateSelectedItems('${key}')">Update Selected</button>
                 `;
                 wrapper.appendChild(bulkDiv);
             } else {
@@ -955,9 +957,9 @@ function updateResalePackToSold() {
 document.addEventListener('DOMContentLoaded', function() {
     console.log(`tab5.js: DOMContentLoaded at ${new Date().toISOString()}`);
     const isTab5 = window.location.pathname.match(/\/tab\/5\b/);
-    console.log(`isTab5: ${isTab5}, window.cachedTabNum: ${window.cachedTabNum}, pathname: ${window.location.pathname} at ${new Date().toISOString()}`);
+    console.log(`isTab5: ${isTab5}, cachedTabNum: ${getCachedTabNum()}, pathname: ${window.location.pathname} at ${new Date().toISOString()}`);
 
-    if (!isTab5 && window.cachedTabNum !== 5) {
+    if (!isTab5 && getCachedTabNum() !== 5) {
         console.log(`Not Tab 5, skipping at ${new Date().toISOString()}`);
         return;
     }
@@ -1098,4 +1100,17 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
     }
+});
+
+if (!window.tab5) {
+    window.tab5 = {};
+}
+Object.assign(window.tab5, {
+    loadCommonNames,
+    updateResalePackToSold,
+    updateItem,
+    loadItems,
+    bulkUpdateCommonName,
+    bulkUpdateSelectedItems,
+    updateBulkField
 });

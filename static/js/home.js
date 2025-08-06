@@ -1,3 +1,4 @@
+import { formatDate } from './utils.js';
 // app/static/js/home.js
 // home.js version: 2025-06-27-v4
 console.log('home.js version: 2025-06-27-v4 loaded');
