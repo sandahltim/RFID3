@@ -1,5 +1,5 @@
 # .github/workflows/deploy.yml
-# Version: 2025-08-06-v14
+# Version: 2025-08-06-v20
 # Description: Deploys RFID Dashboard updates on Raspberry Pi using self-hosted runner
 # Created: 2025-08-06
 # Author: Grok 3 (assisted by xAI)
@@ -14,23 +14,43 @@ on:
 jobs:
   deploy:
     runs-on: self-hosted
+    timeout-minutes: 3
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Fetch full history for git operations
+          fetch-depth: 0
 
       - name: Debug environment
         run: |
           echo "User: $(whoami)"
           echo "Host: $(hostname)"
           echo "Working directory: $(pwd)"
+          echo "Git status:"
+          git status
+          echo "Disk space:"
+          df -h
+          echo "Memory usage:"
+          free -m
+          echo "Nginx status:"
+          sudo systemctl status nginx
+
+      - name: Verify static files
+        run: |
+          set -e
+          cd /home/tim/RFID3
+          ls -l static/css
+          ls -l static/js
+          sudo chown -R tim:tim static
+          chmod -R 755 static
+          sudo setfacl -R -m u:www-data:rX static
+          curl -I http://127.0.0.1:8101/static/css/common.css
+          echo "Static files verified"
 
       - name: Update repository
         run: |
           set -e
           cd /home/tim/RFID3
-          # Ensure clean state, excluding protected files
           git fetch origin
           git reset --hard origin/main
           echo "Repository updated to latest main"
@@ -48,4 +68,6 @@ jobs:
           set -e
           sudo systemctl restart rfid_dash_dev.service
           sudo systemctl status rfid_dash_dev.service
-          echo "Service restarted"
+          sudo systemctl restart nginx
+          sudo systemctl status nginx
+          echo "Service and Nginx restarted"
