@@ -12,7 +12,7 @@ sudo systemctl start redis-server
 sudo systemctl enable redis-server
 
 # Secure MariaDB installation
-sudo mysql_secure_installation <<EOF
+sudo mysql_secure_installation <<'EOS'
 
 n
 rfid_root_password
@@ -22,17 +22,17 @@ y
 y
 y
 y
-EOF
+EOS
 
-# Check if rfid_inventory database exists, create if not
-sudo mysql -u root -prfid_root_password -e "CREATE DATABASE IF NOT EXISTS rfid_inventory;"
+# Check if rfid_inventory database exists, create if not with proper charset/collation
+sudo mysql -u root -prfid_root_password -e "CREATE DATABASE IF NOT EXISTS rfid_inventory CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
 
 # Create or update user and privileges
-sudo mysql -u root -prfid_root_password <<EOF
+sudo mysql -u root -prfid_root_password <<'EOS'
 CREATE USER IF NOT EXISTS 'rfid_user'@'localhost' IDENTIFIED BY 'rfid_user_password';
 GRANT ALL PRIVILEGES ON rfid_inventory.* TO 'rfid_user'@'localhost';
 FLUSH PRIVILEGES;
-EOF
+EOS
 
 # Set permissions for MariaDB
 sudo chown -R mysql:mysql /var/lib/mysql
@@ -48,6 +48,7 @@ sudo chmod 640 /var/log/mysql/error.log
 sudo usermod -aG mysql tim
 
 # Create logs directory for app
-sudo mkdir -p /home/tim/test_rfidpi/logs
-sudo chown tim:tim /home/tim/test_rfidpi/logs
-sudo chmod 750 /home/tim/test_rfidpi/logs
+sudo mkdir -p /home/tim/RFID3/logs
+sudo chown tim:tim /home/tim/RFID3/logs
+sudo chmod 750 /home/tim/RFID3/logs
+
