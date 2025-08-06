@@ -1,3 +1,4 @@
+import { getCachedTabNum } from './state.js';
 console.log('common.js version: 2025-05-29-v24 loaded');
 
 /**
@@ -351,7 +352,8 @@ function applyFilterToTable(table) {
  */
 function applyFilterToAllLevelsTabs2And4() {
     // Skip filtering for Tab 3 and non-tab pages
-    if (window.cachedTabNum === 3 || !window.location.pathname.match(/\/tab\/\d+/)) {
+    const tabNum = getCachedTabNum();
+    if (tabNum === 3 || !window.location.pathname.match(/\/tab\/\d+/)) {
         console.log('Skipping applyFilterToAllLevels for Tab 3 or non-tab page');
         return;
     }
@@ -549,7 +551,8 @@ function applyFilterToAllLevelsTabs2And4() {
  */
 window.applyGlobalFilter = function() {
     // Skip global filter for Tab 3 and non-tab pages (e.g., /categories)
-    if (window.cachedTabNum === 3 || !window.location.pathname.match(/\/tab\/\d+/)) {
+    const tabNum = getCachedTabNum();
+    if (tabNum === 3 || !window.location.pathname.match(/\/tab\/\d+/)) {
         console.log('Skipping global filter application for Tab 3 or non-tab page');
         return;
     }
@@ -568,11 +571,11 @@ window.applyGlobalFilter = function() {
     sessionStorage.setItem('globalFilter', JSON.stringify(window.globalFilter));
 
     // Apply filter based on the current tab
-    if (window.cachedTabNum === 1 && typeof applyFilterToAllLevelsTab1 === 'function') {
+    if (tabNum === 1 && typeof applyFilterToAllLevelsTab1 === 'function') {
         applyFilterToAllLevelsTab1();
-    } else if (window.cachedTabNum === 2 || window.cachedTabNum === 4) {
+    } else if (tabNum === 2 || tabNum === 4) {
         applyFilterToAllLevelsTabs2And4();
-    } else if (window.cachedTabNum === 5 && typeof applyFilterToAllLevelsTab5 === 'function') {
+    } else if (tabNum === 5 && typeof applyFilterToAllLevelsTab5 === 'function') {
         applyFilterToAllLevelsTab5();
     }
 };
@@ -837,7 +840,7 @@ async function printTable(level, id, commonName = null, category = null, subcate
         return;
     }
 
-    const tabNum = window.cachedTabNum || 1;
+    const tabNum = getCachedTabNum() || 1;
     const tabName = tabNum == 2 ? 'Open Contracts' : tabNum == 4 ? 'Laundry Contracts' : tabNum == 5 ? 'Resale/Rental Packs' : tabNum == 3 ? 'Service' : `Tab ${tabNum}`;
 
     let contractNumber = '';
@@ -1164,7 +1167,7 @@ function removeTotalItemsInventoryColumn(table, tabNum) {
  */
 async function printFullItemList(category, subcategory, commonName) {
     console.log(`Printing full item list for Category: ${category}, Subcategory: ${subcategory}, Common Name: ${commonName}`);
-    const tabNum = window.cachedTabNum || 1;
+    const tabNum = getCachedTabNum() || 1;
     const tabName = tabNum == 2 ? 'Open Contracts' : tabNum == 4 ? 'Laundry Contracts' : tabNum == 5 ? 'Resale/Rental Packs' : tabNum == 3 ? 'Service' : `Tab ${tabNum}`;
 
     const normalizedCommonName = normalizeCommonName(commonName);

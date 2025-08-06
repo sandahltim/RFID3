@@ -1,3 +1,4 @@
+import { getCachedTabNum, setCachedTabNum } from './state.js';
 console.log('tab4.js version: 2025-05-29-v7 loaded');
 
 /**
@@ -594,17 +595,17 @@ function refreshCommonNames(contractNumber) {
 
 // Load global filter from sessionStorage on page load and format timestamps
 document.addEventListener('DOMContentLoaded', function() {
-    // Set window.cachedTabNum
-    if (!window.cachedTabNum) {
+    // Set cached tab number if needed
+    if (!getCachedTabNum()) {
         const pathMatch = window.location.pathname.match(/\/tab\/(\d+)/);
-        window.cachedTabNum = pathMatch ? parseInt(pathMatch[1], 10) : (window.location.pathname === '/' ? 1 : null);
-        console.log('tab4.js: Set window.cachedTabNum:', window.cachedTabNum);
+        setCachedTabNum(pathMatch ? parseInt(pathMatch[1], 10) : (window.location.pathname === '/' ? 1 : null));
+        console.log('tab4.js: Set cachedTabNum:', getCachedTabNum());
     } else {
-        console.log('tab4.js: window.cachedTabNum already set:', window.cachedTabNum);
+        console.log('tab4.js: cachedTabNum already set:', getCachedTabNum());
     }
 
-    if (window.cachedTabNum !== 4) {
-        console.log(`Tab ${window.cachedTabNum} detected, skipping tab4.js`);
+    if (getCachedTabNum() !== 4) {
+        console.log(`Tab ${getCachedTabNum()} detected, skipping tab4.js`);
         return;
     }
 
@@ -657,7 +658,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (commonName) {
                 console.log(`Expanding items for ${contractNumber}, ${commonName}`);
                 window.expandItems(contractNumber, commonName, targetId, 1, 4);
-            } else if (contractNumber && window.cachedTabNum === 4) {
+            } else if (contractNumber && getCachedTabNum() === 4) {
                 console.log(`Expanding category for ${contractNumber}`);
                 window.expandCategory(category, targetId, contractNumber, 1, 4);
             }
