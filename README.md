@@ -65,16 +65,14 @@ The project now uses the MDB UI Kit (Material Design for Bootstrap) via CDN for 
 
 ## Database Migration: Create Tables and Indexes
 
-Before running `migrations/202407261200_add_indexes.py`, ensure the database contains the `id_item_master` and `id_rfidtag` tables by applying the SQL migration first:
+This project now uses **MariaDB** for persistence. Initialize the database and create the required tables with:
 
 ```bash
-sqlite3 rfid_inventory.db < scripts/migrate_db.sql
-```
-
-Then run the Python migration to add indexes:
-
-```bash
-python migrations/202407261200_add_indexes.py rfid_inventory.db
+chmod +x scripts/setup_mariadb.sh
+sudo scripts/setup_mariadb.sh
+mysql -u rfid_user -prfid_user_password rfid_inventory < scripts/migrate_db.sql
+mysql -u rfid_user -prfid_user_password rfid_inventory < scripts/migrate_hand_counted_items.sql
+python scripts/update_rental_class_mappings.py
 ```
 
 
@@ -99,11 +97,11 @@ from app import create_app
 app = create_app()
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=8101, debug=True)
+    app.run(host='0.0.0.0', port=8102, debug=True)
 
 #!/bin/bash
 source /home/tim/RFID3/venv/bin/activate
-exec gunicorn --workers 3 --timeout 300 --bind 127.0.0.1:8101 --chdir /home/tim/RFID3 run:app
+exec gunicorn --workers 3 --timeout 300 --bind 127.0.0.1:8102 --chdir /home/tim/RFID3 run:app
 
 
 ### setupmariadb.sh
@@ -316,7 +314,7 @@ User=tim
 Group=www-data
 WorkingDirectory=/home/tim/RFID3
 Environment="PATH=/home/tim/RFID3/venv/bin:/usr/bin"
-ExecStart=/home/tim/RFID3/venv/bin/gunicorn --workers 1 --threads 4 --timeout 600 --bind 0.0.0.0:8101 --error-logfile /home/tim/RFID3/logs/gunicorn_error.log --access-logfile /home/tim/RFID3/logs/gunicorn_access.log run:app
+ExecStart=/home/tim/RFID3/venv/bin/gunicorn --workers 1 --threads 4 --timeout 600 --bind 0.0.0.0:8102 --error-logfile /home/tim/RFID3/logs/gunicorn_error.log --access-logfile /home/tim/RFID3/logs/gunicorn_access.log run:app
 ExecStop=/bin/kill -s KILL $MAINPID
 Restart=always
 KillMode=mixed
@@ -1682,7 +1680,7 @@ id_hand_counted_items.contract_number ↔ id_item_master.last_contract_num (one-
 
 Usage
 
-Access the application at http://tim:8101/ (or http://tim:8000/ via Nginx).
+Access the application at http://tim:8101/ via Nginx (proxying to Gunicorn on port 8102).
 Navigate through tabs to manage inventory, contracts, and categories.
 Use the "Full Refresh" and "Clear API Data and Refresh" buttons on the home page to sync data.
 Logs provide detailed debugging information for troubleshooting.
