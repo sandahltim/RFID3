@@ -1,6 +1,6 @@
 # Installing RFID Dashboard on a New Raspberry Pi
 
-These steps install the project under `/home/tim/RFID3`, run it on port **8101**, and configure automatic updates via Tailscale and GitHub Actions.
+These steps install the project under `/home/tim/RFID3`, run Gunicorn on port **8102**, and expose Nginx on port **8101** for the user interface while configuring automatic updates via Tailscale and GitHub Actions.
 
 ## 1. Prepare the Pi
 ```bash
@@ -32,7 +32,8 @@ pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-## 4. Configure database and seed data
+## 4. Configure MariaDB and seed data
+The application uses MariaDB for its database. Run the helper script to install and secure MariaDB, create the database, and load the schema:
 ```bash
 chmod +x scripts/setup_mariadb.sh
 sudo scripts/setup_mariadb.sh
@@ -60,11 +61,11 @@ sudo systemctl enable rfid_dash_dev.service
 sudo systemctl start rfid_dash_dev.service
 ```
 
-The dashboard is now available at `http://<pi-ip>:8101`.
+The dashboard is now available at `http://<pi-ip>:8101` through Nginx, which proxies to Gunicorn on port 8102.
 
 
 ## 7. Optional: Nginx proxy
-If you use Nginx, copy `rfid_dash_dev.conf` to `/etc/nginx/sites-available/` and enable it so Nginx listens on port 8101.
+If you use Nginx, copy `rfid_dash_dev.conf` to `/etc/nginx/sites-available/` and enable it so Nginx listens on port 8101 and forwards traffic to Gunicorn on port 8102.
 
 ## 8. Automatic updates via Tailscale
 
