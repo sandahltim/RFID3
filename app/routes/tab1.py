@@ -47,8 +47,13 @@ logger.info("Deployed tab1.py version: 2025-07-10-v24")
 
 from ..services.mappings_cache import get_cached_mappings
 
+
 def get_category_data(session, filter_query='', sort='', status_filter='', bin_filter=''):
-    logger.debug(f"get_category_data: filter_query={filter_query}, sort={sort}, status_filter={status_filter}, bin_filter={bin_filter}")
+    """Return aggregated category counts using a single grouped query."""
+    logger.debug(
+        f"get_category_data: filter_query={filter_query}, sort={sort}, status_filter={status_filter}, bin_filter={bin_filter}"
+    )
+
     mappings_dict = get_cached_mappings(session)
     if not mappings_dict:
         logger.warning("No rental class mappings found")
@@ -56,29 +61,48 @@ def get_category_data(session, filter_query='', sort='', status_filter='', bin_f
 
     rc_ids = list(mappings_dict.keys())
 
-    category_case = case(
-        *[(func.trim(func.cast(ItemMaster.rental_class_num, db.String)) == rc_id, data['category']) for rc_id, data in mappings_dict.items()],
-        else_=None
-    ).label('category')
+    latest_txn_subq = (
+        session.query(
+            Transaction.tag_id.label('tag_id'),
+            func.max(Transaction.scan_date).label('max_date'),
+        )
+        .group_by(Transaction.tag_id)
+        .subquery()
+    )
 
-    latest_txn_subq = session.query(
-        Transaction.tag_id.label('tag_id'),
-        func.max(Transaction.scan_date).label('max_date')
-    ).group_by(Transaction.tag_id).subquery()
+    service_required_subq = (
+        session.query(Transaction.tag_id)
+        .join(
+            latest_txn_subq,
+            (Transaction.tag_id == latest_txn_subq.c.tag_id)
+            & (Transaction.scan_date == latest_txn_subq.c.max_date),
+        )
+        .filter(Transaction.service_required == True)
+        .subquery()
+    )
 
-    service_required_subq = session.query(Transaction.tag_id).join(
-        latest_txn_subq,
-        (Transaction.tag_id == latest_txn_subq.c.tag_id) & (Transaction.scan_date == latest_txn_subq.c.max_date)
-    ).filter(Transaction.service_required == True).subquery()
-
-    base_query = session.query(
-        category_case,
-        func.count(ItemMaster.tag_id).label('total_items'),
-        func.sum(case((ItemMaster.status.in_(['On Rent', 'Delivered']), 1), else_=0)).label('items_on_contracts'),
-        func.sum(case((or_(ItemMaster.status.notin_(['Ready to Rent', 'On Rent', 'Delivered']), ItemMaster.tag_id.in_(select(service_required_subq.c.tag_id))), 1), else_=0)).label('items_in_service'),
-        func.sum(case((ItemMaster.status == 'Ready to Rent', 1), else_=0)).label('items_available')
-    ).filter(
-        func.trim(func.cast(ItemMaster.rental_class_num, db.String)).in_(rc_ids)
+    base_query = (
+        session.query(
+            func.trim(func.cast(ItemMaster.rental_class_num, db.String)).label('rc_id'),
+            func.count(ItemMaster.tag_id).label('total_items'),
+            func.sum(
+                case((ItemMaster.status.in_(['On Rent', 'Delivered']), 1), else_=0)
+            ).label('items_on_contracts'),
+            func.sum(
+                case(
+                    (
+                        or_(
+                            ItemMaster.status.notin_(['Ready to Rent', 'On Rent', 'Delivered']),
+                            ItemMaster.tag_id.in_(select(service_required_subq.c.tag_id)),
+                        ),
+                        1,
+                    ),
+                    else_=0,
+                )
+            ).label('items_in_service'),
+            func.sum(case((ItemMaster.status == 'Ready to Rent', 1), else_=0)).label('items_available'),
+        )
+        .filter(func.trim(func.cast(ItemMaster.rental_class_num, db.String)).in_(rc_ids))
     )
 
     if status_filter:
@@ -88,23 +112,33 @@ def get_category_data(session, filter_query='', sort='', status_filter='', bin_f
             func.lower(func.trim(func.coalesce(ItemMaster.bin_location, ''))) == bin_filter.lower()
         )
 
-    base_query = base_query.group_by(category_case)
+    base_query = base_query.group_by('rc_id')
     results = base_query.all()
 
-    category_data = []
+    category_totals = {}
     for row in results:
-        cat = row.category or 'Unmapped'
+        rc_id = row.rc_id
+        mapping = mappings_dict.get(rc_id, {})
+        cat = mapping.get('category', 'Unmapped')
         if filter_query and filter_query not in cat.lower():
             continue
-        category_data.append({
-            'category': cat,
-            'cat_id': cat.lower().replace(' ', '_').replace('/', '_'),
-            'total_items': row.total_items or 0,
-            'items_on_contracts': row.items_on_contracts or 0,
-            'items_in_service': row.items_in_service or 0,
-            'items_available': row.items_available or 0
-        })
+        entry = category_totals.setdefault(
+            cat,
+            {
+                'category': cat,
+                'cat_id': cat.lower().replace(' ', '_').replace('/', '_'),
+                'total_items': 0,
+                'items_on_contracts': 0,
+                'items_in_service': 0,
+                'items_available': 0,
+            },
+        )
+        entry['total_items'] += row.total_items or 0
+        entry['items_on_contracts'] += row.items_on_contracts or 0
+        entry['items_in_service'] += row.items_in_service or 0
+        entry['items_available'] += row.items_available or 0
 
+    category_data = list(category_totals.values())
     if not sort:
         sort = 'category_asc'
 
