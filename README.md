@@ -63,7 +63,22 @@ The project now uses the MDB UI Kit (Material Design for Bootstrap) via CDN for 
 └── rfid_dash_dev.service
 
 
-git pull origin 
+## Database Migration: Create Tables and Indexes
+
+Before running `migrations/202407261200_add_indexes.py`, ensure the database contains the `id_item_master` and `id_rfidtag` tables by applying the SQL migration first:
+
+```bash
+sqlite3 rfid_inventory.db < scripts/migrate_db.sql
+```
+
+Then run the Python migration to add indexes:
+
+```bash
+python migrations/202407261200_add_indexes.py rfid_inventory.db
+```
+
+
+git pull origin
 > /home/tim/RFID3/logs/gunicorn_error.log
 > /home/tim/RFID3/logs/gunicorn_access.log
 > /home/tim/RFID3/logs/app.log
