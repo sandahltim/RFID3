@@ -2,7 +2,7 @@ from flask import Blueprint, render_template, request, jsonify, current_app, Res
 from .. import db, cache
 from ..models.db_models import ItemMaster, Transaction
 from ..services.api_client import APIClient
-from sqlalchemy import func, desc, or_, asc, text
+from sqlalchemy import func, desc, or_, asc, text, case, select
 import time
 from datetime import datetime, timedelta
 import logging
@@ -80,30 +80,55 @@ def get_category_data(session, filter_query='', sort='', status_filter='', bin_f
 
     rc_ids = list(mappings_dict.keys())
 
-    category_case = case(
-        *[(func.trim(func.cast(ItemMaster.rental_class_num, db.String)) == rc_id, data['category']) for rc_id, data in mappings_dict.items()],
-        else_=None
-    ).label('category')
+    latest_txn_subq = (
+        session.query(
+            Transaction.tag_id.label('tag_id'),
+            func.max(Transaction.scan_date).label('max_date'),
+        )
+        .group_by(Transaction.tag_id)
+        .subquery()
+    )
 
-    latest_txn_subq = session.query(
-        Transaction.tag_id.label('tag_id'),
-        func.max(Transaction.scan_date).label('max_date')
-    ).group_by(Transaction.tag_id).subquery()
+    service_required_subq = (
+        session.query(Transaction.tag_id)
+        .join(
+            latest_txn_subq,
+            (Transaction.tag_id == latest_txn_subq.c.tag_id)
+            & (Transaction.scan_date == latest_txn_subq.c.max_date),
+        )
+        .filter(Transaction.service_required == True)
+        .subquery()
+    )
 
-    service_required_subq = session.query(Transaction.tag_id).join(
-        latest_txn_subq,
-        (Transaction.tag_id == latest_txn_subq.c.tag_id) & (Transaction.scan_date == latest_txn_subq.c.max_date)
-    ).filter(Transaction.service_required == True).subquery()
-
-    base_query = session.query(
-        category_case,
-        func.count(ItemMaster.tag_id).label('total_items'),
-        func.sum(case((ItemMaster.status.in_(['On Rent', 'Delivered']), 1), else_=0)).label('items_on_contracts'),
-        func.sum(case((or_(ItemMaster.status.notin_(['Ready to Rent', 'On Rent', 'Delivered']), ItemMaster.tag_id.in_(select(service_required_subq.c.tag_id))), 1), else_=0)).label('items_in_service'),
-        func.sum(case((ItemMaster.status == 'Ready to Rent', 1), else_=0)).label('items_available')
-    ).filter(
-        func.trim(func.cast(ItemMaster.rental_class_num, db.String)).in_(rc_ids),
-        ItemMaster.bin_location.in_(['resale', 'sold', 'pack', 'burst'])
+    base_query = (
+        session.query(
+            func.trim(
+                func.cast(func.replace(ItemMaster.rental_class_num, '\x00', ''), db.String)
+            ).label('rc_id'),
+            func.count(ItemMaster.tag_id).label('total_items'),
+            func.sum(
+                case((ItemMaster.status.in_(['On Rent', 'Delivered']), 1), else_=0)
+            ).label('items_on_contracts'),
+            func.sum(
+                case(
+                    (
+                        or_(
+                            ItemMaster.status.notin_(['Ready to Rent', 'On Rent', 'Delivered']),
+                            ItemMaster.tag_id.in_(select(service_required_subq.c.tag_id)),
+                        ),
+                        1,
+                    ),
+                    else_=0,
+                )
+            ).label('items_in_service'),
+            func.sum(case((ItemMaster.status == 'Ready to Rent', 1), else_=0)).label('items_available'),
+        )
+        .filter(
+            func.trim(
+                func.cast(func.replace(ItemMaster.rental_class_num, '\x00', ''), db.String)
+            ).in_(rc_ids),
+            ItemMaster.bin_location.in_(['resale', 'sold', 'pack', 'burst']),
+        )
     )
 
     if status_filter:
@@ -111,22 +136,33 @@ def get_category_data(session, filter_query='', sort='', status_filter='', bin_f
     if bin_filter:
         base_query = base_query.filter(ItemMaster.bin_location == bin_filter.lower())
 
-    base_query = base_query.group_by(category_case)
+    base_query = base_query.group_by('rc_id')
     results = base_query.all()
 
-    category_data = []
+    category_totals = {}
     for row in results:
-        cat = row.category or 'Unmapped'
+        rc_id = row.rc_id
+        mapping = mappings_dict.get(rc_id, {})
+        cat = mapping.get('category', 'Unmapped')
         if filter_query and filter_query not in cat.lower():
             continue
-        category_data.append({
-            'category': cat,
-            'cat_id': cat.lower().replace(' ', '_').replace('/', '_'),
-            'total_items': row.total_items or 0,
-            'items_on_contracts': row.items_on_contracts or 0,
-            'items_in_service': row.items_in_service or 0,
-            'items_available': row.items_available or 0
-        })
+        entry = category_totals.setdefault(
+            cat,
+            {
+                'category': cat,
+                'cat_id': cat.lower().replace(' ', '_').replace('/', '_'),
+                'total_items': 0,
+                'items_on_contracts': 0,
+                'items_in_service': 0,
+                'items_available': 0,
+            },
+        )
+        entry['total_items'] += row.total_items or 0
+        entry['items_on_contracts'] += row.items_on_contracts or 0
+        entry['items_in_service'] += row.items_in_service or 0
+        entry['items_available'] += row.items_available or 0
+
+    category_data = list(category_totals.values())
 
     if sort == 'category_asc':
         category_data.sort(key=lambda x: x['category'].lower())
@@ -138,7 +174,10 @@ def get_category_data(session, filter_query='', sort='', status_filter='', bin_f
         category_data.sort(key=lambda x: x['total_items'], reverse=True)
 
     cache.set(cache_key, json.dumps(category_data), ex=60)
-    logger.info(f"Cached Tab 5 data with {len(category_data)} categories at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+    logger.info(
+        f"Cached Tab 5 data with {len(category_data)} categories at %s",
+        datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+    )
     return category_data
 
 @tab5_bp.route('/tab/5')
@@ -341,19 +380,21 @@ def tab5_common_names():
         session = db.session()
 
         mappings_dict = get_mappings(session, category=category, subcategory=subcategory)
-        if not mappings_dict:
-            logger.warning(f"No mappings found for category {category}, subcategory {subcategory} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+        rental_class_ids = list(mappings_dict.keys())
+        if not rental_class_ids:
+            logger.warning(
+                f"No mappings found for category {category}, subcategory {subcategory} at %s",
+                datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            )
             session.close()
-            return jsonify({
-                'common_names': [],
-                'total_common_names': 0,
-                'page': page,
-                'per_page': per_page
-            })
-
-        rental_class_ids = list(mappings_dict.keys())
-
-        rental_class_ids = list(mappings_dict.keys())
+            return jsonify(
+                {
+                    'common_names': [],
+                    'total_common_names': 0,
+                    'page': page,
+                    'per_page': per_page,
+                }
+            )
 
         common_names_query = session.query(
             ItemMaster.common_name,
