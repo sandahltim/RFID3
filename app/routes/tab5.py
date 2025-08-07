@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, request, jsonify, current_app, Response
 from .. import db, cache
-from ..models.db_models import ItemMaster, Transaction, RentalClassMapping, UserRentalClassMapping
+from ..models.db_models import ItemMaster, Transaction
 from ..services.api_client import APIClient
 from sqlalchemy import func, desc, or_, asc, text
 import time
@@ -15,6 +15,7 @@ import threading
 from sqlalchemy.orm import scoped_session, sessionmaker
 from config import BULK_UPDATE_BATCH_SIZE
 from ..services.scheduler import get_scheduler
+from ..services.mappings_cache import get_cached_mappings
 
 # Configure logging
 logger = logging.getLogger('tab5')
@@ -53,6 +54,18 @@ tab5_bp = Blueprint('tab5', __name__)
 # Version marker
 logger.info("Deployed tab5.py version: 2025-06-23-v44 at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
 
+
+def get_mappings(session, category=None, subcategory=None):
+    """Return cached mappings optionally filtered by category/subcategory."""
+    mappings = get_cached_mappings(session)
+    if category:
+        mappings = {rc_id: data for rc_id, data in mappings.items()
+                    if data.get('category') and data['category'].lower() == category.lower()}
+    if subcategory:
+        mappings = {rc_id: data for rc_id, data in mappings.items()
+                    if data.get('subcategory') and data['subcategory'].lower() == subcategory.lower()}
+    return mappings
+
 def get_category_data(session, filter_query='', sort='', status_filter='', bin_filter=''):
     cache_key = f'tab5_view_data_{filter_query}_{sort}_{status_filter}_{bin_filter}'
     cached_data = cache.get(cache_key)
@@ -60,165 +73,59 @@ def get_category_data(session, filter_query='', sort='', status_filter='', bin_f
         logger.info("Serving Tab 5 data from cache at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
         return json.loads(cached_data)
 
-    base_mappings = session.query(RentalClassMapping).all()
-    user_mappings = session.query(UserRentalClassMapping).all()
-    logger.debug(f"Fetched {len(base_mappings)} base mappings and {len(user_mappings)} user mappings at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-
-    mappings_dict = {m.rental_class_id: {'category': m.category, 'subcategory': m.subcategory} for m in base_mappings}
-    for um in user_mappings:
-        mappings_dict[um.rental_class_id] = {'category': um.category, 'subcategory': um.subcategory}
-
+    mappings_dict = get_mappings(session)
     if not mappings_dict:
-        logger.warning("No rental class mappings found, returning all items at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-        total_items_query = session.query(func.count(ItemMaster.tag_id)).filter(
-            ItemMaster.bin_location.in_(['resale', 'sold', 'pack', 'burst'])
-        )
-        if status_filter:
-            total_items_query = total_items_query.filter(func.lower(ItemMaster.status) == status_filter.lower())
-        if bin_filter:
-            total_items_query = total_items_query.filter(ItemMaster.bin_location == bin_filter.lower())
-        total_items = total_items_query.scalar() or 0
+        logger.warning("No rental class mappings found")
+        return []
 
-        items_on_contracts_query = session.query(func.count(ItemMaster.tag_id)).filter(
-            ItemMaster.status.in_(['On Rent', 'Delivered']),
-            ItemMaster.bin_location.in_(['resale', 'sold', 'pack', 'burst'])
-        )
-        if status_filter:
-            items_on_contracts_query = items_on_contracts_query.filter(func.lower(ItemMaster.status) == status_filter.lower())
-        if bin_filter:
-            items_on_contracts_query = items_on_contracts_query.filter(ItemMaster.bin_location == bin_filter.lower())
-        items_on_contracts = items_on_contracts_query.scalar() or 0
+    rc_ids = list(mappings_dict.keys())
 
-        items_in_service_query = session.query(func.count(ItemMaster.tag_id)).filter(
-            ItemMaster.bin_location.in_(['resale', 'sold', 'pack', 'burst']),
-            or_(
-                ItemMaster.status.notin_(['Ready to Rent', 'On Rent', 'Delivered']),
-                ItemMaster.tag_id.in_(
-                    session.query(Transaction.tag_id).filter(
-                        Transaction.scan_date == session.query(func.max(Transaction.scan_date)).filter(Transaction.tag_id == Transaction.tag_id).correlate(Transaction).scalar_subquery(),
-                        Transaction.service_required == True
-                    )
-                )
-            )
-        )
-        if status_filter:
-            items_in_service_query = items_in_service_query.filter(func.lower(ItemMaster.status) == status_filter.lower())
-        if bin_filter:
-            items_in_service_query = items_in_service_query.filter(ItemMaster.bin_location == bin_filter.lower())
-        items_in_service = items_in_service_query.scalar() or 0
+    category_case = case(
+        *[(func.trim(func.cast(ItemMaster.rental_class_num, db.String)) == rc_id, data['category']) for rc_id, data in mappings_dict.items()],
+        else_=None
+    ).label('category')
 
-        items_available_query = session.query(func.count(ItemMaster.tag_id)).filter(
-            ItemMaster.status == 'Ready to Rent',
-            ItemMaster.bin_location.in_(['resale', 'sold', 'pack', 'burst'])
-        )
-        if status_filter:
-            items_available_query = items_available_query.filter(func.lower(ItemMaster.status) == status_filter.lower())
-        if bin_filter:
-            items_available_query = items_available_query.filter(ItemMaster.bin_location == bin_filter.lower())
-        items_available = items_available_query.scalar() or 0
+    latest_txn_subq = session.query(
+        Transaction.tag_id.label('tag_id'),
+        func.max(Transaction.scan_date).label('max_date')
+    ).group_by(Transaction.tag_id).subquery()
 
-        category_data = [{
-            'category': 'All Items',
-            'cat_id': 'all_items',
-            'total_items': total_items,
-            'items_on_contracts': items_on_contracts,
-            'items_in_service': items_in_service,
-            'items_available': items_available
-        }]
-        cache.set(cache_key, json.dumps(category_data), ex=60)
-        logger.info("Cached Tab 5 fallback data at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-        return category_data
+    service_required_subq = session.query(Transaction.tag_id).join(
+        latest_txn_subq,
+        (Transaction.tag_id == latest_txn_subq.c.tag_id) & (Transaction.scan_date == latest_txn_subq.c.max_date)
+    ).filter(Transaction.service_required == True).subquery()
 
-    categories = {}
-    for rental_class_id, data in mappings_dict.items():
-        category = data['category']
-        if category not in categories:
-            categories[category] = []
-        categories[category].append({
-            'rental_class_id': rental_class_id,
-            'category': category,
-            'subcategory': data['subcategory']
-        })
+    base_query = session.query(
+        category_case,
+        func.count(ItemMaster.tag_id).label('total_items'),
+        func.sum(case((ItemMaster.status.in_(['On Rent', 'Delivered']), 1), else_=0)).label('items_on_contracts'),
+        func.sum(case((or_(ItemMaster.status.notin_(['Ready to Rent', 'On Rent', 'Delivered']), ItemMaster.tag_id.in_(select(service_required_subq.c.tag_id))), 1), else_=0)).label('items_in_service'),
+        func.sum(case((ItemMaster.status == 'Ready to Rent', 1), else_=0)).label('items_available')
+    ).filter(
+        func.trim(func.cast(ItemMaster.rental_class_num, db.String)).in_(rc_ids),
+        ItemMaster.bin_location.in_(['resale', 'sold', 'pack', 'burst'])
+    )
+
+    if status_filter:
+        base_query = base_query.filter(func.lower(ItemMaster.status) == status_filter.lower())
+    if bin_filter:
+        base_query = base_query.filter(ItemMaster.bin_location == bin_filter.lower())
+
+    base_query = base_query.group_by(category_case)
+    results = base_query.all()
 
     category_data = []
-    for cat, mappings in categories.items():
+    for row in results:
+        cat = row.category or 'Unmapped'
         if filter_query and filter_query not in cat.lower():
             continue
-        rental_class_ids = [str(m['rental_class_id']).strip() for m in mappings]
-
-        total_items_query = session.query(func.count(ItemMaster.tag_id)).filter(
-            func.trim(func.cast(func.replace(ItemMaster.rental_class_num, '\x00', '#pragma warning disable CS8632'), db.String)).in_(rental_class_ids),
-            ItemMaster.bin_location.in_(['resale', 'sold', 'pack', 'burst'])
-        )
-        if status_filter:
-            total_items_query = total_items_query.filter(func.lower(ItemMaster.status) == status_filter.lower())
-        if bin_filter:
-            total_items_query = total_items_query.filter(ItemMaster.bin_location == bin_filter.lower())
-        total_items = total_items_query.scalar() or 0
-        logger.debug(f"Category {cat}: total_items={total_items} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-
-        items_on_contracts_query = session.query(func.count(ItemMaster.tag_id)).filter(
-            func.trim(func.cast(func.replace(ItemMaster.rental_class_num, '\x00', ''), db.String)).in_(rental_class_ids),
-            ItemMaster.status.in_(['On Rent', 'Delivered']),
-            ItemMaster.bin_location.in_(['resale', 'sold', 'pack', 'burst'])
-        )
-        if status_filter:
-            items_on_contracts_query = items_on_contracts_query.filter(func.lower(ItemMaster.status) == status_filter.lower())
-        if bin_filter:
-            items_on_contracts_query = items_on_contracts_query.filter(ItemMaster.bin_location == bin_filter.lower())
-        items_on_contracts = items_on_contracts_query.scalar() or 0
-
-        subquery = session.query(
-            Transaction.tag_id,
-            Transaction.scan_date,
-            Transaction.service_required
-        ).filter(
-            Transaction.tag_id == ItemMaster.tag_id
-        ).order_by(
-            Transaction.scan_date.desc()
-        ).subquery()
-
-        items_in_service_query = session.query(func.count(ItemMaster.tag_id)).filter(
-            func.trim(func.cast(func.replace(ItemMaster.rental_class_num, '\x00', ''), db.String)).in_(rental_class_ids),
-            ItemMaster.bin_location.in_(['resale', 'sold', 'pack', 'burst']),
-            or_(
-                ItemMaster.status.notin_(['Ready to Rent', 'On Rent', 'Delivered']),
-                ItemMaster.tag_id.in_(
-                    session.query(subquery.c.tag_id).filter(
-                        subquery.c.scan_date == session.query(func.max(Transaction.scan_date)).filter(Transaction.tag_id == subquery.c.tag_id).correlate(subquery).scalar_subquery(),
-                        subquery.c.service_required == True
-                    )
-                )
-            )
-        )
-        if status_filter:
-            items_in_service_query = items_in_service_query.filter(func.lower(ItemMaster.status) == status_filter.lower())
-        if bin_filter:
-            items_in_service_query = items_in_service_query.filter(ItemMaster.bin_location == bin_filter.lower())
-        items_in_service = items_in_service_query.scalar() or 0
-
-        items_available_query = session.query(func.count(ItemMaster.tag_id)).filter(
-            func.trim(func.cast(func.replace(ItemMaster.rental_class_num, '\x00', ''), db.String)).in_(rental_class_ids),
-            ItemMaster.status == 'Ready to Rent',
-            ItemMaster.bin_location.in_(['resale', 'sold', 'pack', 'burst'])
-        )
-        if status_filter:
-            items_available_query = items_available_query.filter(func.lower(ItemMaster.status) == status_filter.lower())
-        if bin_filter:
-            items_available_query = items_available_query.filter(ItemMaster.bin_location == bin_filter.lower())
-        items_available = items_available_query.scalar() or 0
-
-        if total_items == 0:
-            logger.debug(f"Skipping category {cat} with zero items at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-            continue
-
         category_data.append({
             'category': cat,
             'cat_id': cat.lower().replace(' ', '_').replace('/', '_'),
-            'total_items': total_items,
-            'items_on_contracts': items_on_contracts,
-            'items_in_service': items_in_service,
-            'items_available': items_available
+            'total_items': row.total_items or 0,
+            'items_on_contracts': row.items_on_contracts or 0,
+            'items_in_service': row.items_in_service or 0,
+            'items_available': row.items_available or 0
         })
 
     if sort == 'category_asc':
@@ -229,9 +136,6 @@ def get_category_data(session, filter_query='', sort='', status_filter='', bin_f
         category_data.sort(key=lambda x: x['total_items'])
     elif sort == 'total_items_desc':
         category_data.sort(key=lambda x: x['total_items'], reverse=True)
-
-    if not category_data:
-        logger.warning(f"No categories found for filter_query={filter_query}, status_filter={status_filter}, bin_filter={bin_filter} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
 
     cache.set(cache_key, json.dumps(category_data), ex=60)
     logger.info(f"Cached Tab 5 data with {len(category_data)} categories at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
@@ -292,14 +196,8 @@ def tab5_subcat_data():
     try:
         session = db.session()
 
-        base_mappings = session.query(RentalClassMapping).filter(
-            func.lower(RentalClassMapping.category) == category.lower()
-        ).all()
-        user_mappings = session.query(UserRentalClassMapping).filter(
-            func.lower(UserRentalClassMapping.category) == category.lower()
-        ).all()
-
-        if not base_mappings and not user_mappings:
+        mappings_dict = get_mappings(session, category=category)
+        if not mappings_dict:
             logger.warning(f"No mappings found for category {category} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
             session.close()
             return jsonify({
@@ -309,10 +207,6 @@ def tab5_subcat_data():
                 'per_page': per_page,
                 'message': f"No mappings found for category '{category}'. Please add mappings in the Categories tab."
             })
-
-        mappings_dict = {str(m.rental_class_id): {'category': m.category, 'subcategory': m.subcategory} for m in base_mappings}
-        for um in user_mappings:
-            mappings_dict[str(um.rental_class_id)] = {'category': um.category, 'subcategory': um.subcategory}
 
         subcategories = {}
         for rental_class_id, data in mappings_dict.items():
@@ -446,16 +340,8 @@ def tab5_common_names():
     try:
         session = db.session()
 
-        base_mappings = session.query(RentalClassMapping).filter(
-            func.lower(RentalClassMapping.category) == category.lower(),
-            func.lower(RentalClassMapping.subcategory) == subcategory.lower()
-        ).all()
-        user_mappings = session.query(UserRentalClassMapping).filter(
-            func.lower(UserRentalClassMapping.category) == category.lower(),
-            func.lower(UserRentalClassMapping.subcategory) == subcategory.lower()
-        ).all()
-
-        if not base_mappings and not user_mappings:
+        mappings_dict = get_mappings(session, category=category, subcategory=subcategory)
+        if not mappings_dict:
             logger.warning(f"No mappings found for category {category}, subcategory {subcategory} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
             session.close()
             return jsonify({
@@ -465,9 +351,7 @@ def tab5_common_names():
                 'per_page': per_page
             })
 
-        mappings_dict = {str(m.rental_class_id): {'category': m.category, 'subcategory': m.subcategory} for m in base_mappings}
-        for um in user_mappings:
-            mappings_dict[str(um.rental_class_id)] = {'category': um.category, 'subcategory': um.subcategory}
+        rental_class_ids = list(mappings_dict.keys())
 
         rental_class_ids = list(mappings_dict.keys())
 
@@ -611,16 +495,8 @@ def tab5_data():
     try:
         session = db.session()
 
-        base_mappings = session.query(RentalClassMapping).filter(
-            func.lower(RentalClassMapping.category) == category.lower(),
-            func.lower(RentalClassMapping.subcategory) == subcategory.lower()
-        ).all()
-        user_mappings = session.query(UserRentalClassMapping).filter(
-            func.lower(UserRentalClassMapping.category) == category.lower(),
-            func.lower(UserRentalClassMapping.subcategory) == subcategory.lower()
-        ).all()
-
-        if not base_mappings and not user_mappings:
+        mappings_dict = get_mappings(session, category=category, subcategory=subcategory)
+        if not mappings_dict:
             logger.warning(f"No mappings found for category {category}, subcategory {subcategory} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
             session.close()
             return jsonify({
@@ -630,9 +506,7 @@ def tab5_data():
                 'per_page': per_page
             })
 
-        mappings_dict = {str(m.rental_class_id): {'category': m.category, 'subcategory': m.subcategory} for m in base_mappings}
-        for um in user_mappings:
-            mappings_dict[str(um.rental_class_id)] = {'category': um.category, 'subcategory': um.subcategory}
+        rental_class_ids = list(mappings_dict.keys())
 
         rental_class_ids = list(mappings_dict.keys())
 
@@ -899,11 +773,7 @@ def export_sold_items_csv():
         logger.info("Exporting sold items to CSV at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
         session = db.session()
 
-        base_mappings = session.query(RentalClassMapping).all()
-        user_mappings = session.query(UserRentalClassMapping).all()
-        mappings_dict = {str(m.rental_class_id).strip(): {'category': m.category, 'subcategory': m.subcategory, 'short_common_name': m.short_common_name} for m in base_mappings}
-        for um in user_mappings:
-            mappings_dict[str(um.rental_class_id)] = {'category': um.category, 'subcategory': um.subcategory, 'short_common_name': um.short_common_name}
+        mappings_dict = get_mappings(session)
 
         items = session.query(ItemMaster).filter(
             ItemMaster.bin_location.in_(['resale', 'sold', 'pack', 'burst']),
@@ -954,19 +824,7 @@ def full_items_by_rental_class():
     try:
         session = db.session()
 
-        base_mappings = session.query(RentalClassMapping).filter(
-            func.lower(RentalClassMapping.category) == category.lower(),
-            func.lower(RentalClassMapping.subcategory) == subcategory.lower()
-        ).all()
-        user_mappings = session.query(UserRentalClassMapping).filter(
-            func.lower(UserRentalClassMapping.category) == category.lower(),
-            func.lower(UserRentalClassMapping.subcategory) == subcategory.lower()
-        ).all()
-
-        mappings_dict = {str(m.rental_class_id): {'category': m.category, 'subcategory': m.subcategory} for m in base_mappings}
-        for um in user_mappings:
-            mappings_dict[str(um.rental_class_id)] = {'category': um.category, 'subcategory': um.subcategory}
-
+        mappings_dict = get_mappings(session, category=category, subcategory=subcategory)
         rental_class_ids = list(mappings_dict.keys())
 
         items_query = session.query(ItemMaster).filter(
@@ -1020,19 +878,7 @@ def bulk_update_common_name():
 
         session = db.session()
 
-        base_mappings = session.query(RentalClassMapping).filter(
-            func.lower(RentalClassMapping.category) == category.lower(),
-            func.lower(RentalClassMapping.subcategory) == subcategory.lower()
-        ).all()
-        user_mappings = session.query(UserRentalClassMapping).filter(
-            func.lower(UserRentalClassMapping.category) == category.lower(),
-            func.lower(UserRentalClassMapping.subcategory) == subcategory.lower()
-        ).all()
-
-        mappings_dict = {str(m.rental_class_id): {'category': m.category, 'subcategory': m.subcategory} for m in base_mappings}
-        for um in user_mappings:
-            mappings_dict[str(um.rental_class_id)] = {'category': um.category, 'subcategory': um.subcategory}
-
+        mappings_dict = get_mappings(session, category=category, subcategory=subcategory)
         rental_class_ids = list(mappings_dict.keys())
 
         query = session.query(ItemMaster).filter(
