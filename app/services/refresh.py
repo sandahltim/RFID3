@@ -379,8 +379,13 @@ def update_seed_data(session, seed_data):
     logger.info(f"Updated {len(seed_data) - skipped - failed} seed items, skipped {skipped}, failed {failed}")
 
 def full_refresh():
-    """Perform a full refresh of the database."""
-    logger.info("Starting full refresh")
+    """Perform a full refresh of the database.
+
+    Retrieves *all* available fields from the Item Master, Transactions,
+    and Seed Rental Class APIs and replaces the corresponding tables in the
+    local database.
+    """
+    logger.info("Starting full refresh of item master, transactions, and seed data")
     session = db.session()
     max_retries = 3
     for attempt in range(max_retries):
@@ -399,9 +404,9 @@ def full_refresh():
             transactions = api_client.get_transactions(since_date=None, full_refresh=True)
             seed_data = api_client.get_seed_data()
 
-            logger.info(f"Fetched {len(items)} items from item master")
-            logger.info(f"Fetched {len(transactions)} transactions")
-            logger.info(f"Fetched {len(seed_data)} items from seed data")
+            logger.info(f"Fetched {len(items)} item master records")
+            logger.info(f"Fetched {len(transactions)} transaction records")
+            logger.info(f"Fetched {len(seed_data)} seed rental class records")
 
             if not items:
                 logger.warning("No items fetched from item master API")
@@ -441,28 +446,34 @@ def full_refresh():
             session.close()
 
 def incremental_refresh():
-    """Perform an incremental refresh of the database."""
-    logger.info("Starting incremental refresh")
+    """Perform an incremental refresh of the database.
+
+    Fetches all fields for updated Item Master and Transaction records since
+    the configured lookback interval and applies them to the local database.
+    """
+    logger.info("Starting incremental refresh for item master and transactions")
     session = db.session()
     max_retries = 3
     for attempt in range(max_retries):
         try:
             with session.no_autoflush:
                 since_date = datetime.utcnow() - timedelta(seconds=INCREMENTAL_LOOKBACK_SECONDS)
-                logger.info(f"Checking for updates since: {since_date.strftime('%Y-%m-%d %H:%M:%S')}")
+                logger.info(
+                    f"Checking for item master and transaction updates since: {since_date.strftime('%Y-%m-%d %H:%M:%S')}"
+                )
 
                 items = api_client.get_item_master(since_date=since_date, full_refresh=False)
-                logger.info(f"Fetched {len(items)} items from item master")
+                logger.info(f"Fetched {len(items)} item master records")
                 if not items:
                     logger.info("No new items fetched from item master API")
 
                 transactions = api_client.get_transactions(since_date=since_date, full_refresh=False)
-                logger.info(f"Fetched {len(transactions)} transactions")
+                logger.info(f"Fetched {len(transactions)} transaction records")
                 if not transactions:
                     logger.info("No new transactions fetched from transactions API")
 
                 if not items and not transactions:
-                    logger.info("No new data to process, skipping database updates")
+                    logger.info("No new item master or transaction data to process, skipping database updates")
                     session.commit()
                     update_refresh_state('incremental_refresh', datetime.utcnow())
                     break
