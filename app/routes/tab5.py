@@ -3,6 +3,7 @@ from .. import db, cache
 from ..models.db_models import ItemMaster, Transaction
 from ..services.api_client import APIClient
 from sqlalchemy import func, desc, or_, asc, text, case, select
+from sqlalchemy.exc import SQLAlchemyError
 import time
 from datetime import datetime, timedelta
 import logging
@@ -66,11 +67,29 @@ def get_mappings(session, category=None, subcategory=None):
                     if data.get('subcategory') and data['subcategory'].lower() == subcategory.lower()}
     return mappings
 
+
+def resale_pack_condition(column):
+    """SQL expression matching bin locations that start with 'resale' or 'pack'."""
+    col = func.lower(func.trim(func.coalesce(column, '')))
+    return or_(col.like('resale%'), col.like('pack%'))
+
 def get_category_data(session, filter_query='', sort='', status_filter='', bin_filter=''):
     cache_key = f'tab5_view_data_{filter_query}_{sort}_{status_filter}_{bin_filter}'
-    cached_data = cache.get(cache_key)
+    cached_data = None
+    try:
+        cached_data = cache.get(cache_key)
+    except Exception as e:
+        logger.warning(
+            "Cache get failed for key %s: %s at %s",
+            cache_key,
+            str(e),
+            datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+        )
     if cached_data is not None:
-        logger.info("Serving Tab 5 data from cache at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+        logger.info(
+            "Serving Tab 5 data from cache at %s",
+            datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+        )
         return json.loads(cached_data)
 
     mappings_dict = get_mappings(session)
@@ -127,7 +146,7 @@ def get_category_data(session, filter_query='', sort='', status_filter='', bin_f
             func.trim(
                 func.cast(func.replace(ItemMaster.rental_class_num, '\x00', ''), db.String)
             ).in_(rc_ids),
-            func.lower(func.trim(func.coalesce(ItemMaster.bin_location, ''))).in_(['resale', 'pack']),
+            resale_pack_condition(ItemMaster.bin_location),
         )
     )
 
@@ -139,7 +158,16 @@ def get_category_data(session, filter_query='', sort='', status_filter='', bin_f
         )
 
     base_query = base_query.group_by('rc_id')
-    results = base_query.all()
+    try:
+        results = base_query.all()
+    except SQLAlchemyError as e:
+        logger.error(
+            "Database error fetching category data: %s at %s",
+            str(e),
+            datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            exc_info=True,
+        )
+        results = []
 
     category_totals = {}
     # Ensure categories appear even if no items are present
@@ -192,11 +220,19 @@ def get_category_data(session, filter_query='', sort='', status_filter='', bin_f
     elif sort == 'total_items_desc':
         category_data.sort(key=lambda x: x['total_items'], reverse=True)
 
-    cache.set(cache_key, json.dumps(category_data), ex=60)
-    logger.info(
-        f"Cached Tab 5 data with {len(category_data)} categories at %s",
-        datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-    )
+    try:
+        cache.set(cache_key, json.dumps(category_data), ex=60)
+        logger.info(
+            f"Cached Tab 5 data with {len(category_data)} categories at %s",
+            datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+        )
+    except Exception as e:
+        logger.warning(
+            "Cache set failed for key %s: %s at %s",
+            cache_key,
+            str(e),
+            datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+        )
     return category_data
 
 @tab5_bp.route('/tab/5')
@@ -233,8 +269,13 @@ def tab5_filter():
 
         return jsonify(category_data)
     except Exception as e:
-        logger.error(f"Error filtering Tab 5: {str(e)} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'), exc_info=True)
-        return jsonify({'error': 'Failed to filter categories'}), 500
+        logger.error(
+            f"Error filtering Tab 5: {str(e)} at %s",
+            datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            exc_info=True,
+        )
+        # Return an empty list rather than a server error so the UI can recover
+        return jsonify([])
 
 @tab5_bp.route('/tab/5/subcat_data')
 def tab5_subcat_data():
@@ -294,7 +335,7 @@ def tab5_subcat_data():
 
             total_items_query = session.query(func.count(ItemMaster.tag_id)).filter(
                 func.trim(func.cast(func.replace(ItemMaster.rental_class_num, '\x00', ''), db.String)).in_(rental_class_ids),
-                func.lower(func.trim(func.coalesce(ItemMaster.bin_location, ''))).in_(['resale', 'pack'])
+                resale_pack_condition(ItemMaster.bin_location)
             )
             if status_filter:
                 total_items_query = total_items_query.filter(func.lower(ItemMaster.status) == status_filter.lower())
@@ -308,7 +349,7 @@ def tab5_subcat_data():
             items_on_contracts_query = session.query(func.count(ItemMaster.tag_id)).filter(
                 func.trim(func.cast(func.replace(ItemMaster.rental_class_num, '\x00', ''), db.String)).in_(rental_class_ids),
                 ItemMaster.status.in_(['On Rent', 'Delivered']),
-                func.lower(func.trim(func.coalesce(ItemMaster.bin_location, ''))).in_(['resale', 'pack'])
+                resale_pack_condition(ItemMaster.bin_location)
             )
             if status_filter:
                 items_on_contracts_query = items_on_contracts_query.filter(func.lower(ItemMaster.status) == status_filter.lower())
@@ -330,7 +371,7 @@ def tab5_subcat_data():
 
             items_in_service_query = session.query(func.count(ItemMaster.tag_id)).filter(
                 func.trim(func.cast(func.replace(ItemMaster.rental_class_num, '\x00', ''), db.String)).in_(rental_class_ids),
-                func.lower(func.trim(func.coalesce(ItemMaster.bin_location, ''))).in_(['resale', 'pack']),
+                resale_pack_condition(ItemMaster.bin_location),
                 or_(
                     ItemMaster.status.notin_(['Ready to Rent', 'On Rent', 'Delivered']),
                     ItemMaster.tag_id.in_(
@@ -352,7 +393,7 @@ def tab5_subcat_data():
             items_available_query = session.query(func.count(ItemMaster.tag_id)).filter(
                 func.trim(func.cast(func.replace(ItemMaster.rental_class_num, '\x00', ''), db.String)).in_(rental_class_ids),
                 ItemMaster.status == 'Ready to Rent',
-                func.lower(func.trim(func.coalesce(ItemMaster.bin_location, ''))).in_(['resale', 'pack'])
+                resale_pack_condition(ItemMaster.bin_location)
             )
             if status_filter:
                 items_available_query = items_available_query.filter(func.lower(ItemMaster.status) == status_filter.lower())
@@ -428,7 +469,7 @@ def tab5_common_names():
             func.count(ItemMaster.tag_id).label('total_items')
         ).filter(
             func.trim(func.cast(func.replace(ItemMaster.rental_class_num, '\x00', ''), db.String)).in_(rental_class_ids),
-            func.lower(func.trim(func.coalesce(ItemMaster.bin_location, ''))).in_(['resale', 'pack'])
+            resale_pack_condition(ItemMaster.bin_location)
         )
         if filter_query:
             common_names_query = common_names_query.filter(
@@ -461,7 +502,7 @@ def tab5_common_names():
                 func.trim(func.cast(func.replace(ItemMaster.rental_class_num, '\x00', ''), db.String)).in_(rental_class_ids),
                 ItemMaster.common_name == name,
                 ItemMaster.status.in_(['On Rent', 'Delivered']),
-                func.lower(func.trim(func.coalesce(ItemMaster.bin_location, ''))).in_(['resale', 'pack'])
+                resale_pack_condition(ItemMaster.bin_location)
             )
             if filter_query:
                 items_on_contracts_query = items_on_contracts_query.filter(
@@ -488,7 +529,7 @@ def tab5_common_names():
             items_in_service_query = session.query(func.count(ItemMaster.tag_id)).filter(
                 func.trim(func.cast(func.replace(ItemMaster.rental_class_num, '\x00', ''), db.String)).in_(rental_class_ids),
                 ItemMaster.common_name == name,
-                func.lower(func.trim(func.coalesce(ItemMaster.bin_location, ''))).in_(['resale', 'pack']),
+                resale_pack_condition(ItemMaster.bin_location),
                 or_(
                     ItemMaster.status.notin_(['Ready to Rent', 'On Rent', 'Delivered']),
                     ItemMaster.tag_id.in_(
@@ -515,7 +556,7 @@ def tab5_common_names():
                 func.trim(func.cast(func.replace(ItemMaster.rental_class_num, '\x00', ''), db.String)).in_(rental_class_ids),
                 ItemMaster.common_name == name,
                 ItemMaster.status == 'Ready to Rent',
-                func.lower(func.trim(func.coalesce(ItemMaster.bin_location, ''))).in_(['resale', 'pack'])
+                resale_pack_condition(ItemMaster.bin_location)
             )
             if filter_query:
                 items_available_query = items_available_query.filter(
@@ -589,7 +630,7 @@ def tab5_data():
         items_query = session.query(ItemMaster).filter(
             func.trim(func.cast(func.replace(ItemMaster.rental_class_num, '\x00', ''), db.String)).in_(rental_class_ids),
             ItemMaster.common_name == common_name,
-            func.lower(func.trim(func.coalesce(ItemMaster.bin_location, ''))).in_(['resale', 'pack'])
+            resale_pack_condition(ItemMaster.bin_location)
         )
 
         total_items = items_query.count()
@@ -798,7 +839,7 @@ def update_resale_pack_to_sold():
         logger.debug("Querying items for update in batches at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
         while True:
             items_batch = session.query(ItemMaster.tag_id).filter(
-                ItemMaster.bin_location.in_(['resale', 'pack']),
+                resale_pack_condition(ItemMaster.bin_location),
                 ItemMaster.status.in_(['On Rent', 'Delivered']),
                 ItemMaster.date_last_scanned.isnot(None),
                 ItemMaster.date_last_scanned < four_days_ago
@@ -906,7 +947,7 @@ def full_items_by_rental_class():
         items_query = session.query(ItemMaster).filter(
             func.trim(func.cast(func.replace(ItemMaster.rental_class_num, '\x00', ''), db.String)).in_(rental_class_ids),
             ItemMaster.common_name == common_name,
-            func.lower(func.trim(func.coalesce(ItemMaster.bin_location, ''))).in_(['resale', 'pack'])
+            resale_pack_condition(ItemMaster.bin_location)
         ).order_by(ItemMaster.tag_id)
 
         items = items_query.all()
@@ -960,7 +1001,7 @@ def bulk_update_common_name():
         query = session.query(ItemMaster).filter(
             func.trim(func.cast(func.replace(ItemMaster.rental_class_num, '\x00', ''), db.String)).in_(rental_class_ids),
             ItemMaster.common_name == common_name,
-            func.lower(func.trim(func.coalesce(ItemMaster.bin_location, ''))).in_(['resale', 'pack'])
+            resale_pack_condition(ItemMaster.bin_location)
         )
 
         items = query.all()
