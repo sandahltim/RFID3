@@ -345,7 +345,7 @@ function filterHandCountedItems() {
     }
 }
 
-function toggleNewContractInput() {
+window.toggleNewContractInput = function toggleNewContractInput() {
     const contractDropdown = document.getElementById('hand-counted-contract-number');
     const newContractInput = document.getElementById('new-contract-number');
     if (newContractInput.style.display === 'none') {
@@ -355,11 +355,11 @@ function toggleNewContractInput() {
         newContractInput.style.display = 'none';
         newContractInput.value = '';
         contractDropdown.disabled = false;
-        updateItemDropdown();
+        window.updateItemDropdown();
     }
-}
+};
 
-function toggleNewItemInput() {
+window.toggleNewItemInput = function toggleNewItemInput() {
     const itemDropdown = document.getElementById('hand-counted-item-name');
     const newItemInput = document.getElementById('new-item-name');
     if (newItemInput.style.display === 'none') {
@@ -370,9 +370,9 @@ function toggleNewItemInput() {
         newItemInput.value = '';
         itemDropdown.disabled = false;
     }
-}
+};
 
-function updateItemDropdown() {
+window.updateItemDropdown = function updateItemDropdown() {
     const contractDropdown = document.getElementById('hand-counted-contract-number');
     const itemDropdown = document.getElementById('hand-counted-item-name');
     const newContractInput = document.getElementById('new-contract-number');
@@ -403,9 +403,9 @@ function updateItemDropdown() {
                 itemDropdown.innerHTML += '<option value="">No items available</option>';
             });
     }
-}
+};
 
-function addHandCountedItem() {
+window.addHandCountedItem = function addHandCountedItem() {
     const contractDropdown = document.getElementById('hand-counted-contract-number');
     const newContractInput = document.getElementById('new-contract-number');
     const itemDropdown = document.getElementById('hand-counted-item-name');
@@ -444,17 +444,17 @@ function addHandCountedItem() {
             alert('Error: ' + data.error);
         } else {
             alert(data.message);
-            if (newContractInput.style.display === 'block') toggleNewContractInput();
-            if (newItemInput.style.display === 'block') toggleNewItemInput();
+            if (newContractInput.style.display === 'block') window.toggleNewContractInput();
+            if (newItemInput.style.display === 'block') window.toggleNewItemInput();
             contractDropdown.value = '';
             itemDropdown.value = '';
             quantityInput.value = '';
             employeeInput.value = '';
-            filterHandCountedItems();
+            window.filterHandCountedItems?.();
             addContractToTable(contractNumber);
             updateContractCounts(contractNumber);
             refreshCommonNames(contractNumber);
-            updateItemDropdown(); // Refresh dropdown after successful add
+            window.updateItemDropdown(); // Refresh dropdown after successful add
         }
     })
     .catch(error => {
@@ -464,9 +464,9 @@ function addHandCountedItem() {
         updateContractCounts(contractNumber);
         refreshCommonNames(contractNumber);
     });
-}
+};
 
-function removeHandCountedItem() {
+window.removeHandCountedItem = function removeHandCountedItem() {
     const contractDropdown = document.getElementById('hand-counted-contract-number');
     const newContractInput = document.getElementById('new-contract-number');
     const itemDropdown = document.getElementById('hand-counted-item-name');
@@ -501,17 +501,17 @@ function removeHandCountedItem() {
             alert('Error: ' + data.error);
         } else {
             alert(data.message);
-            if (newContractInput.style.display === 'block') toggleNewContractInput();
-            if (newItemInput.style.display === 'block') toggleNewItemInput();
+            if (newContractInput.style.display === 'block') window.toggleNewContractInput();
+            if (newItemInput.style.display === 'block') window.toggleNewItemInput();
             contractDropdown.value = '';
             itemDropdown.value = '';
             quantityInput.value = '';
             employeeInput.value = '';
-            filterHandCountedItems();
+            window.filterHandCountedItems?.();
             addContractToTable(contractNumber);
             updateContractCounts(contractNumber);
             refreshCommonNames(contractNumber);
-            updateItemDropdown(); // Refresh dropdown after successful remove
+            window.updateItemDropdown(); // Refresh dropdown after successful remove
         }
     })
     .catch(error => {
@@ -521,29 +521,10 @@ function removeHandCountedItem() {
         updateContractCounts(contractNumber);
         refreshCommonNames(contractNumber);
     });
-}
-function syncContractOption(contractNumber, totalItems) {
-    const contractDropdown = document.getElementById('hand-counted-contract-number');
-    const option = Array.from(contractDropdown.options).find(opt => opt.value === contractNumber);
-    if (totalItems > 0) {
-        if (!option) {
-            const newOption = document.createElement('option');
-            newOption.value = contractNumber;
-            newOption.textContent = contractNumber;
-            contractDropdown.appendChild(newOption);
-        }
-    } else if (option) {
-        option.remove();
-    }
-}
+};
 
-// Expose functions globally for inline event handlers
-window.toggleNewContractInput = toggleNewContractInput;
-window.toggleNewItemInput = toggleNewItemInput;
-window.updateItemDropdown = updateItemDropdown;
-window.addHandCountedItem = addHandCountedItem;
-window.removeHandCountedItem = removeHandCountedItem;
-function syncContractOption(contractNumber, totalItems) {
+// Keep the hand-counted contract dropdown in sync with active items
+window.syncContractOption = function(contractNumber, totalItems) {
     const contractDropdown = document.getElementById('hand-counted-contract-number');
     const option = Array.from(contractDropdown.options).find(opt => opt.value === contractNumber);
     if (totalItems > 0) {
@@ -556,7 +537,7 @@ function syncContractOption(contractNumber, totalItems) {
     } else if (option) {
         option.remove();
     }
-}
+};
 
 function addContractToTable(contractNumber) {
     const tbody = document.getElementById('category-rows');
@@ -602,7 +583,7 @@ function updateContractCounts(contractNumber) {
             if (currentCountElement) {
                 currentCountElement.textContent = totalItems;
             }
-            syncContractOption(contractNumber, totalItems);
+            window.syncContractOption(contractNumber, totalItems);
             if (totalItems === 0) {
                 const row = document.querySelector(`#category-rows tr[data-contract-number="${contractNumber}"]`);
                 if (row) {
