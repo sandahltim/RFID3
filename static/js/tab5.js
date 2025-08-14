@@ -5,9 +5,8 @@ console.log('tab5.js version: 2025-08-14-v13 loaded');
 /**
  * Tab5.js: Logic for Tab 5 (Resale/Rental Packs).
  * Dependencies: common.js (for formatDate, showLoading, hideLoading, collapseSection, printTable, printFullItemList).
- * Updated: 2025-06-25-v12
- * - Enhanced handleClick collapse logic to add .collapsed class to parent <tr> and clear styles.
- * - Retained fetchAllSubcategories from v10 to prevent dropdown truncation.
+ * Updated: 2025-08-14-v13
+ * - Added fallback to fetch categories when subcategory selects are missing.
  * - Preserved all functionality (bulk updates, CSV export, pagination).
  */
 
@@ -233,10 +232,19 @@ async function loadCategoriesIfEmpty() {
     }
 }
 
-function populateSubcategories() {
+async function populateSubcategories() {
     console.log(`populateSubcategories: Starting at ${new Date().toISOString()}`);
-    const selects = document.querySelectorAll('.subcategory-select');
+    let selects = document.querySelectorAll('.subcategory-select');
     console.log(`populateSubcategories: Found ${selects.length} subcategory selects at ${new Date().toISOString()}`);
+    if (!selects.length) {
+        console.warn(`populateSubcategories: No subcategory selects found, attempting to fetch categories at ${new Date().toISOString()}`);
+        await loadCategoriesIfEmpty();
+        selects = document.querySelectorAll('.subcategory-select');
+        console.log(`populateSubcategories: After reload, found ${selects.length} subcategory selects at ${new Date().toISOString()}`);
+        if (!selects.length) {
+            return Promise.resolve();
+        }
+    }
     const promises = Array.from(selects).map(select => {
         const category = select.getAttribute('data-category');
         console.log(`Populating subcategories for ${category} at ${new Date().toISOString()}`);

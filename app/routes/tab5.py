@@ -170,22 +170,6 @@ def get_category_data(session, filter_query='', sort='', status_filter='', bin_f
         results = []
 
     category_totals = {}
-    # Ensure categories appear even if no items are present
-    for mapping in mappings_dict.values():
-        cat = mapping.get('category', 'Unmapped')
-        if filter_query and filter_query not in cat.lower():
-            continue
-        category_totals.setdefault(
-            cat,
-            {
-                'category': cat,
-                'cat_id': cat.lower().replace(' ', '_').replace('/', '_'),
-                'total_items': 0,
-                'items_on_contracts': 0,
-                'items_in_service': 0,
-                'items_available': 0,
-            },
-        )
 
     for row in results:
         rc_id = row.rc_id
@@ -209,7 +193,7 @@ def get_category_data(session, filter_query='', sort='', status_filter='', bin_f
         entry['items_in_service'] += row.items_in_service or 0
         entry['items_available'] += row.items_available or 0
 
-    category_data = list(category_totals.values())
+    category_data = [entry for entry in category_totals.values() if entry['total_items'] > 0]
 
     if sort == 'category_asc':
         category_data.sort(key=lambda x: x['category'].lower())
@@ -316,22 +300,8 @@ def tab5_subcat_data():
                 subcategories[subcategory] = []
             subcategories[subcategory].append(rental_class_id)
 
-        subcat_list = sorted(subcategories.keys())
-        if filter_query:
-            subcat_list = [s for s in subcat_list if filter_query in s.lower()]
-        if sort == 'subcategory_asc':
-            subcat_list.sort()
-        elif sort == 'subcategory_desc':
-            subcat_list.sort(reverse=True)
-
-        total_subcats = len(subcat_list)
-        start = (page - 1) * per_page
-        end = start + per_page
-        paginated_subcats = subcat_list[start:end]
-
         subcategory_data = []
-        for subcat in paginated_subcats:
-            rental_class_ids = subcategories[subcat]
+        for subcat, rental_class_ids in subcategories.items():
 
             total_items_query = session.query(func.count(ItemMaster.tag_id)).filter(
                 func.trim(func.cast(func.replace(ItemMaster.rental_class_num, '\x00', ''), db.String)).in_(rental_class_ids),
@@ -403,23 +373,35 @@ def tab5_subcat_data():
                 )
             items_available = items_available_query.scalar() or 0
 
-            subcategory_data.append({
-                'subcategory': subcat,
-                'total_items': total_items,
-                'items_on_contracts': items_on_contracts,
-                'items_in_service': items_in_service,
-                'items_available': items_available
-            })
+            if total_items > 0:
+                subcategory_data.append({
+                    'subcategory': subcat,
+                    'total_items': total_items,
+                    'items_on_contracts': items_on_contracts,
+                    'items_in_service': items_in_service,
+                    'items_available': items_available
+                })
 
-        if sort == 'total_items_asc':
+        if filter_query:
+            subcategory_data = [s for s in subcategory_data if filter_query in s['subcategory'].lower()]
+        if sort == 'subcategory_asc':
+            subcategory_data.sort(key=lambda x: x['subcategory'].lower())
+        elif sort == 'subcategory_desc':
+            subcategory_data.sort(key=lambda x: x['subcategory'].lower(), reverse=True)
+        elif sort == 'total_items_asc':
             subcategory_data.sort(key=lambda x: x['total_items'])
         elif sort == 'total_items_desc':
             subcategory_data.sort(key=lambda x: x['total_items'], reverse=True)
 
+        total_subcats = len(subcategory_data)
+        start = (page - 1) * per_page
+        end = start + per_page
+        paginated_subcats = subcategory_data[start:end]
+
         session.close()
-        logger.info(f"Returning {len(subcategory_data)} subcategories for category {category} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+        logger.info(f"Returning {len(paginated_subcats)} subcategories for category {category} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
         return jsonify({
-            'subcategories': subcategory_data,
+            'subcategories': paginated_subcats,
             'total_subcats': total_subcats,
             'page': page,
             'per_page': per_page
