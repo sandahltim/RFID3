@@ -229,52 +229,28 @@ def tab4_view():
 def hand_counted_contracts():
     session = db.session()
     try:
-        # Fetch all contracts starting with 'L' from HandCountedItems
+        # Fetch open laundry contracts from ItemMaster that currently have items
         contracts = session.query(
-            HandCountedItems.contract_number
+            ItemMaster.last_contract_num
         ).filter(
-            HandCountedItems.contract_number.ilike('L%')
-        ).distinct().all()
-
-        contract_list = [contract.contract_number for contract in contracts]
-
-        # Fetch "Added" quantities for these contracts
-        added_quantities = session.query(
-            HandCountedItems.contract_number,
-            func.sum(HandCountedItems.quantity).label('added_quantity')
-        ).filter(
-            HandCountedItems.contract_number.in_(contract_list),
-            HandCountedItems.action == 'Added'
+            ItemMaster.last_contract_num.isnot(None),
+            ItemMaster.last_contract_num != '00000',
+            ItemMaster.status.in_(['On Rent', 'Delivered']),
+            func.upper(ItemMaster.last_contract_num).like('L%')
         ).group_by(
-            HandCountedItems.contract_number
+            ItemMaster.last_contract_num
+        ).having(
+            func.count(ItemMaster.tag_id) > 0
+        ).order_by(
+            ItemMaster.last_contract_num
         ).all()
 
-        added_quantities_dict = {item.contract_number: item.added_quantity for item in added_quantities}
-
-        # Fetch "Removed" quantities for these contracts
-        removed_quantities = session.query(
-            HandCountedItems.contract_number,
-            func.sum(HandCountedItems.quantity).label('removed_quantity')
-        ).filter(
-            HandCountedItems.contract_number.in_(contract_list),
-            HandCountedItems.action == 'Removed'
-        ).group_by(
-            HandCountedItems.contract_number
-        ).all()
-
-        removed_quantities_dict = {item.contract_number: item.removed_quantity for item in removed_quantities}
-
-        # Calculate net quantities and filter contracts with net quantity > 0
-        filtered_contracts = []
-        for contract_number in contract_list:
-            added_qty = added_quantities_dict.get(contract_number, 0)
-            removed_qty = removed_quantities_dict.get(contract_number, 0)
-            net_qty = added_qty - removed_qty
-            if net_qty > 0:
-                filtered_contracts.append(contract_number)
-
+        filtered_contracts = [c.last_contract_num for c in contracts]
         session.close()
-        logger.info(f"Returned hand-counted contracts: {filtered_contracts} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+        logger.info(
+            f"Returned hand-counted contracts: {filtered_contracts} at %s",
+            datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        )
         return jsonify({'contracts': filtered_contracts})
     except Exception as e:
         logger.error(f"Error fetching hand-counted contracts: {str(e)} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'), exc_info=True)
