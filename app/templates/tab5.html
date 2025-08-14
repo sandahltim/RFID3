@@ -3,9 +3,9 @@
 {% block title %}Resale/Rental Packs{% endblock %}
 
 {% block extra_head %}
-    <!-- Version: 2025-06-25-v2
-         - Reverted `urlencode` filter on data-category to use plain text for compatibility with tab5.js.
-         - Ensures category names match expected format in populateSubcategories. -->
+    <!-- Version: 2025-08-14-v3
+         - Added item-level container and loading indicator for dynamic row rendering.
+         - Shows fallback row when no categories are available. -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/tab5.css') }}">
 {% endblock %}
 
@@ -52,7 +52,14 @@
                     </td>
                 </tr>
             {% endfor %}
+            {% if not categories or categories|length == 0 %}
+                <tr><td colspan="7">No data available</td></tr>
+            {% endif %}
         </tbody>
     </table>
+
+    <!-- Placeholder for dynamically loaded item rows -->
+    <div id="item-level-container" class="item-level-wrapper"></div>
+    <div id="loading-indicator" class="loading-indicator" style="display: none;">Loading...</div>
 
 {% endblock %}
