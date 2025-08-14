@@ -1,5 +1,5 @@
-/* tab5.css version: 2025-07-10-v5
- * - Removed position: sticky from all headers to prevent overlapping issues.
+/* tab5.css version: 2025-08-14-v6
+ * - Added error-message style and ensured item-level elements visible by default.
  */
 
 /* Style for common name table rows */
@@ -98,6 +98,18 @@
 
 .item-table.loaded {
     transform: translateZ(0);
+}
+
+/* Error message for fetch failures */
+.error-message {
+    color: var(--bte-accent-red);
+    font-weight: bold;
+    text-align: center;
+    padding: 1rem;
+    background-color: var(--bte-light-gray);
+    border: 1px solid var(--bte-medium-gray);
+    border-radius: 4px;
+    margin: 1rem;
 }
 
 /* Table styling */
