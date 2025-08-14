@@ -537,6 +537,27 @@ function syncContractOption(contractNumber, totalItems) {
     }
 }
 
+// Expose functions globally for inline event handlers
+window.toggleNewContractInput = toggleNewContractInput;
+window.toggleNewItemInput = toggleNewItemInput;
+window.updateItemDropdown = updateItemDropdown;
+window.addHandCountedItem = addHandCountedItem;
+window.removeHandCountedItem = removeHandCountedItem;
+function syncContractOption(contractNumber, totalItems) {
+    const contractDropdown = document.getElementById('hand-counted-contract-number');
+    const option = Array.from(contractDropdown.options).find(opt => opt.value === contractNumber);
+    if (totalItems > 0) {
+        if (!option) {
+            const newOption = document.createElement('option');
+            newOption.value = contractNumber;
+            newOption.textContent = contractNumber;
+            contractDropdown.appendChild(newOption);
+        }
+    } else if (option) {
+        option.remove();
+    }
+}
+
 function addContractToTable(contractNumber) {
     const tbody = document.getElementById('category-rows');
     const existingRow = tbody.querySelector(`tr[data-contract-number="${contractNumber}"]`);
