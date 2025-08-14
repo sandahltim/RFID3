@@ -142,6 +142,23 @@ def get_category_data(session, filter_query='', sort='', status_filter='', bin_f
     results = base_query.all()
 
     category_totals = {}
+    # Ensure categories appear even if no items are present
+    for mapping in mappings_dict.values():
+        cat = mapping.get('category', 'Unmapped')
+        if filter_query and filter_query not in cat.lower():
+            continue
+        category_totals.setdefault(
+            cat,
+            {
+                'category': cat,
+                'cat_id': cat.lower().replace(' ', '_').replace('/', '_'),
+                'total_items': 0,
+                'items_on_contracts': 0,
+                'items_in_service': 0,
+                'items_available': 0,
+            },
+        )
+
     for row in results:
         rc_id = row.rc_id
         mapping = mappings_dict.get(rc_id, {})
