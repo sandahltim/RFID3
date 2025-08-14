@@ -1,5 +1,6 @@
 /* tab5.css version: 2025-08-14-v6
- * - Added error-message style and ensured item-level elements visible by default.
+ * - Added error-message styling for failed fetches.
+ * - Removed position: sticky from all headers to prevent overlapping issues.
  */
 
 /* Style for common name table rows */
