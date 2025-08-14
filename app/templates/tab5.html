@@ -52,7 +52,14 @@
                     </td>
                 </tr>
             {% endfor %}
+            {% if not categories %}
+                <tr><td colspan="7">No data available</td></tr>
+            {% endif %}
         </tbody>
     </table>
+
+    <!-- Placeholder for dynamically loaded item-level data -->
+    <div id="item-level-container" class="item-level-wrapper"></div>
+    <div id="loading-indicator" class="loading-indicator" style="display: none;">Loading...</div>
 
 {% endblock %}

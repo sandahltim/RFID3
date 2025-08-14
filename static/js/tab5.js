@@ -1,13 +1,12 @@
 import { formatDate } from './utils.js';
 import { getCachedTabNum } from './state.js';
-console.log('tab5.js version: 2025-06-25-v12 loaded');
+console.log('tab5.js version: 2025-08-14-v13 loaded');
 
 /**
  * Tab5.js: Logic for Tab 5 (Resale/Rental Packs).
  * Dependencies: common.js (for formatDate, showLoading, hideLoading, collapseSection, printTable, printFullItemList).
- * Updated: 2025-06-25-v12
- * - Enhanced handleClick collapse logic to add .collapsed class to parent <tr> and clear styles.
- * - Retained fetchAllSubcategories from v10 to prevent dropdown truncation.
+ * Updated: 2025-08-14-v13
+ * - Added fallback to fetch categories when subcategory selects are missing.
  * - Preserved all functionality (bulk updates, CSV export, pagination).
  */
 
@@ -193,10 +192,59 @@ function applyFilterToAllLevelsTab5() {
     }
 }
 
-function populateSubcategories() {
+async function loadCategoriesIfEmpty() {
+    const tbody = document.querySelector('#category-table tbody');
+    if (!tbody || tbody.children.length > 0) {
+        return;
+    }
+    console.warn(`loadCategoriesIfEmpty: No categories found in DOM, fetching from server at ${new Date().toISOString()}`);
+    try {
+        const response = await fetch('/tab/5/filter', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams()
+        });
+        if (!response.ok) {
+            console.error(`loadCategoriesIfEmpty: fetch failed with ${response.status} at ${new Date().toISOString()}`);
+            return;
+        }
+        const categories = await response.json();
+        categories.forEach(category => {
+            const row = document.createElement('tr');
+            row.className = 'category-row';
+            row.innerHTML = `
+                <td>${category.category}</td>
+                <td>
+                    <select class="subcategory-select" data-category="${category.category}" onchange="tab5.loadCommonNames(this)">
+                        <option value="">Select a subcategory</option>
+                    </select>
+                </td>
+                <td>${category.total_items}</td>
+                <td>${category.items_on_contracts}</td>
+                <td>${category.items_in_service}</td>
+                <td>${category.items_available}</td>
+                <td><button class="btn btn-sm btn-info print-btn" data-print-level="Contract" data-print-id="category-${category.cat_id}">Print</button></td>`;
+            tbody.appendChild(row);
+        });
+        console.log(`loadCategoriesIfEmpty: Inserted ${categories.length} categories at ${new Date().toISOString()}`);
+    } catch (error) {
+        console.error(`loadCategoriesIfEmpty: ${error.message} at ${new Date().toISOString()}`);
+    }
+}
+
+async function populateSubcategories() {
     console.log(`populateSubcategories: Starting at ${new Date().toISOString()}`);
-    const selects = document.querySelectorAll('.subcategory-select');
+    let selects = document.querySelectorAll('.subcategory-select');
     console.log(`populateSubcategories: Found ${selects.length} subcategory selects at ${new Date().toISOString()}`);
+    if (!selects.length) {
+        console.warn(`populateSubcategories: No subcategory selects found, attempting to fetch categories at ${new Date().toISOString()}`);
+        await loadCategoriesIfEmpty();
+        selects = document.querySelectorAll('.subcategory-select');
+        console.log(`populateSubcategories: After reload, found ${selects.length} subcategory selects at ${new Date().toISOString()}`);
+        if (!selects.length) {
+            return Promise.resolve();
+        }
+    }
     const promises = Array.from(selects).map(select => {
         const category = select.getAttribute('data-category');
         console.log(`Populating subcategories for ${category} at ${new Date().toISOString()}`);
@@ -965,7 +1013,9 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     console.log(`Initializing Tab 5 at ${new Date().toISOString()}`);
-    populateSubcategories().then(() => {
+    loadCategoriesIfEmpty().then(() => {
+        return populateSubcategories();
+    }).then(() => {
         console.log(`Subcategories populated successfully at ${new Date().toISOString()}`);
         document.removeEventListener('click', handleClick);
         document.addEventListener('click', handleClick);
