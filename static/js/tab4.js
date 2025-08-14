@@ -523,6 +523,27 @@ function removeHandCountedItem() {
     });
 }
 
+// Expose functions globally for inline event handlers
+window.toggleNewContractInput = toggleNewContractInput;
+window.toggleNewItemInput = toggleNewItemInput;
+window.updateItemDropdown = updateItemDropdown;
+window.addHandCountedItem = addHandCountedItem;
+window.removeHandCountedItem = removeHandCountedItem;
+function syncContractOption(contractNumber, totalItems) {
+    const contractDropdown = document.getElementById('hand-counted-contract-number');
+    const option = Array.from(contractDropdown.options).find(opt => opt.value === contractNumber);
+    if (totalItems > 0) {
+        if (!option) {
+            const newOption = document.createElement('option');
+            newOption.value = contractNumber;
+            newOption.textContent = contractNumber;
+            contractDropdown.appendChild(newOption);
+        }
+    } else if (option) {
+        option.remove();
+    }
+}
+
 function addContractToTable(contractNumber) {
     const tbody = document.getElementById('category-rows');
     const existingRow = tbody.querySelector(`tr[data-contract-number="${contractNumber}"]`);
@@ -562,9 +583,21 @@ function updateContractCounts(contractNumber) {
             return response.json();
         })
         .then(data => {
+            const totalItems = data.total_items || 0;
             const currentCountElement = document.getElementById(`items-on-contract-${contractNumber}`);
             if (currentCountElement) {
-                currentCountElement.textContent = data.total_items || 0;
+                currentCountElement.textContent = totalItems;
+            }
+            syncContractOption(contractNumber, totalItems);
+            if (totalItems === 0) {
+                const row = document.querySelector(`#category-rows tr[data-contract-number="${contractNumber}"]`);
+                if (row) {
+                    const nextRow = row.nextElementSibling;
+                    if (nextRow && nextRow.querySelector(`#common-${contractNumber}`)) {
+                        nextRow.remove();
+                    }
+                    row.remove();
+                }
             }
         })
         .catch(error => console.error('Error updating Items on Contract count:', error));
