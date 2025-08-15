@@ -74,18 +74,41 @@ def health_check():
     # Check API
     try:
         client = APIClient()
-        auth_response = client.authenticate()
-        logger.info(f"API authentication response: {auth_response}")
-        current_app.logger.info(f"API authentication response: {auth_response}")
-        status["api"] = "healthy"
+        ping_url = f"{client.base_url}{client.item_master_endpoint}"
+        headers = {"Authorization": f"Bearer {client.token}"}
+        ping_response = requests.get(
+            ping_url,
+            headers=headers,
+            params={"limit": 1},
+            timeout=5,
+        )
+        logger.info(f"API ping response status: {ping_response.status_code}")
+        current_app.logger.info(
+            f"API ping response status: {ping_response.status_code}"
+        )
+        if ping_response.status_code == 200:
+            status["api"] = "healthy"
+        else:
+            status["api"] = (
+                f"unhealthy: status {ping_response.status_code}"
+            )
+            status["overall"] = "unhealthy"
     except requests.exceptions.RequestException as e:
-        logger.error(f"API health check failed (RequestException): {str(e)}", exc_info=True)
-        current_app.logger.error(f"API health check failed (RequestException): {str(e)}", exc_info=True)
+        logger.error(
+            f"API health check failed (RequestException): {str(e)}", exc_info=True
+        )
+        current_app.logger.error(
+            f"API health check failed (RequestException): {str(e)}", exc_info=True
+        )
         status["api"] = f"unhealthy: {str(e)}"
         status["overall"] = "unhealthy"
     except Exception as e:
-        logger.error(f"API health check failed (General Exception): {str(e)}", exc_info=True)
-        current_app.logger.error(f"API health check failed (General Exception): {str(e)}", exc_info=True)
+        logger.error(
+            f"API health check failed (General Exception): {str(e)}", exc_info=True
+        )
+        current_app.logger.error(
+            f"API health check failed (General Exception): {str(e)}", exc_info=True
+        )
         status["api"] = f"unhealthy: {str(e)}"
         status["overall"] = "unhealthy"
 
