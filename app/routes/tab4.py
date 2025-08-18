@@ -337,6 +337,7 @@ def hand_counted_catalog():
             logger.warning("hand_counted_catalog table missing; returning empty list")
             current_app.logger.warning("hand_counted_catalog table missing; returning empty list")
             items = []
+
         item_list = [i.item_name for i in items]
         logger.info(f"Returned hand-counted catalog items: {item_list} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
         return jsonify({'items': item_list})
