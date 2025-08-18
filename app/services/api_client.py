@@ -3,6 +3,8 @@
 import requests
 import time
 from datetime import datetime, timedelta
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 from config import (
     API_USERNAME,
     API_PASSWORD,
@@ -12,11 +14,19 @@ from config import (
 )
 import logging
 from urllib.parse import quote
+from contextlib import nullcontext
 from .. import cache
 from .logger import get_logger
 
 # Configure logging
 logger = get_logger('api_client', level=logging.INFO, log_file=LOG_FILE)
+
+# Configure a reusable session with retry strategy
+session = requests.Session()
+retry_strategy = Retry(total=5, backoff_factor=1, allowed_methods=["GET", "POST", "PATCH"], status_forcelist=[500, 502, 503, 504])
+adapter = HTTPAdapter(max_retries=retry_strategy)
+session.mount("https://", adapter)
+session.mount("http://", adapter)
 
 class APIClient:
     def __init__(self):
@@ -32,7 +42,7 @@ class APIClient:
         for attempt in range(5):
             try:
                 logger.debug(f"Requesting token from {self.auth_url}")
-                response = requests.post(self.auth_url, json=payload, timeout=20)
+                response = session.post(self.auth_url, json=payload, timeout=20)
                 data = response.json()
                 logger.debug(f"Token attempt {attempt + 1}: Status {response.status_code}")
                 if response.status_code == 200 and data.get('result'):
@@ -79,7 +89,7 @@ class APIClient:
                 full_url = f"{url}?{query_string}"
                 logger.debug(f"Making GET request: {full_url}")
                 try:
-                    response = requests.get(url, headers=headers, params=params, timeout=timeout)
+                    response = session.get(url, headers=headers, params=params, timeout=timeout)
                     data = response.json()
                     if response.status_code == 500:
                         logger.error(f"Server error: {data}")
@@ -107,9 +117,9 @@ class APIClient:
                     logger.debug(f"Making {method} request to URL: {url}")
                     try:
                         if method == 'POST':
-                            response = requests.post(url, headers=headers, json=data, timeout=timeout)
+                            response = session.post(url, headers=headers, json=data, timeout=timeout)
                         else:
-                            response = requests.patch(url, headers=headers, json=data, timeout=timeout)
+                            response = session.patch(url, headers=headers, json=data, timeout=timeout)
                         data = response.json()
                         if response.status_code == 500:
                             logger.error(f"Server error: {data}")
