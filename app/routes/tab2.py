@@ -1,8 +1,10 @@
 from flask import Blueprint, render_template, request, jsonify, current_app
 from .. import db, cache
 from ..models.db_models import Transaction, ItemMaster
+from ..services.api_client import APIClient
 from sqlalchemy import func, desc, asc, text
 from time import time
+from datetime import datetime, timedelta
 import logging
 import sys
 
@@ -80,6 +82,7 @@ def tab2_view():
         current_app.logger.info(f"Raw contracts query result: {[(c.last_contract_num, c.total_items) for c in contracts_query_results]}")
 
         contracts = []
+        now = datetime.utcnow()
         for contract_number, total_items in contracts_query_results:
             logger.debug(f"Processing contract: {contract_number}")
             latest_transaction = session.query(
@@ -93,8 +96,10 @@ def tab2_view():
             ).first()
 
             client_name = latest_transaction.client_name if latest_transaction else 'N/A'
-            scan_date = latest_transaction.scan_date.isoformat() if latest_transaction and latest_transaction.scan_date else 'N/A'
-            logger.debug(f"Contract {contract_number} - Client: {client_name}, Scan Date: {scan_date}")
+            scan_datetime = latest_transaction.scan_date if latest_transaction and latest_transaction.scan_date else None
+            scan_date = scan_datetime.isoformat() if scan_datetime else 'N/A'
+            is_stale = True if not scan_datetime else (now - scan_datetime > timedelta(days=12))
+            logger.debug(f"Contract {contract_number} - Client: {client_name}, Scan Date: {scan_date}, Stale: {is_stale}")
 
             items_on_contract = session.query(func.count(ItemMaster.tag_id)).filter(
                 ItemMaster.last_contract_num == contract_number,
@@ -110,7 +115,8 @@ def tab2_view():
                 'client_name': client_name,
                 'scan_date': scan_date,
                 'items_on_contract': items_on_contract or 0,
-                'total_items_inventory': total_items_inventory or 0
+                'total_items_inventory': total_items_inventory or 0,
+                'is_stale': is_stale
             })
 
         contracts.sort(key=lambda x: x['contract_number'])  # Default sort for initial load
@@ -189,6 +195,7 @@ def sort_contracts():
         current_app.logger.info(f"Sorted contracts query result: {[(c.last_contract_num, c.total_items) for c in contracts_query_results]}")
 
         contracts = []
+        now = datetime.utcnow()
         for contract_number, total_items in contracts_query_results:
             logger.debug(f"Processing contract: {contract_number}")
             latest_transaction = session.query(
@@ -202,8 +209,10 @@ def sort_contracts():
             ).first()
 
             client_name = latest_transaction.client_name if latest_transaction else 'N/A'
-            scan_date = latest_transaction.scan_date.isoformat() if latest_transaction and latest_transaction.scan_date else 'N/A'
-            logger.debug(f"Contract {contract_number} - Client: {client_name}, Scan Date: {scan_date}")
+            scan_datetime = latest_transaction.scan_date if latest_transaction and latest_transaction.scan_date else None
+            scan_date = scan_datetime.isoformat() if scan_datetime else 'N/A'
+            is_stale = True if not scan_datetime else (now - scan_datetime > timedelta(days=12))
+            logger.debug(f"Contract {contract_number} - Client: {client_name}, Scan Date: {scan_date}, Stale: {is_stale}")
 
             items_on_contract = session.query(func.count(ItemMaster.tag_id)).filter(
                 ItemMaster.last_contract_num == contract_number,
@@ -219,7 +228,8 @@ def sort_contracts():
                 'client_name': client_name,
                 'scan_date': scan_date,
                 'items_on_contract': items_on_contract or 0,
-                'total_items_inventory': total_items_inventory or 0
+                'total_items_inventory': total_items_inventory or 0,
+                'is_stale': is_stale
             })
 
         logger.info(f"Returned {len(contracts)} sorted contracts for tab2")
@@ -337,6 +347,100 @@ def tab2_common_names():
     finally:
         if session:
             session.rollback()
+            session.close()
+
+
+@tab2_bp.route('/tab/2/update_status', methods=['POST'])
+def update_status():
+    session = None
+    try:
+        data = request.get_json()
+        tag_id = data.get('tag_id')
+        new_status = data.get('status')
+
+        if not tag_id or not new_status:
+            return jsonify({'error': 'Tag ID and status are required'}), 400
+
+        valid_statuses = ['Ready to Rent', 'Sold', 'Repair', 'Needs to be Inspected', 'Wash', 'Wet']
+        if new_status not in valid_statuses:
+            return jsonify({'error': f'Status must be one of {", ".join(valid_statuses)}'}), 400
+
+        session = db.session()
+        item = session.query(ItemMaster).filter_by(tag_id=tag_id).first()
+        if not item:
+            return jsonify({'error': 'Item not found'}), 404
+
+        if new_status in ['On Rent', 'Delivered']:
+            return jsonify({'error': 'Status cannot be updated to "On Rent" or "Delivered" manually'}), 400
+
+        current_time = datetime.utcnow()
+        item.status = new_status
+        item.date_last_scanned = current_time
+        session.commit()
+
+        try:
+            api_client = APIClient()
+            api_client.update_status(tag_id, new_status)
+        except Exception as e:
+            logger.error(f"Failed to update API status for tag_id {tag_id}: {str(e)}", exc_info=True)
+            return jsonify({'error': f'Failed to update API: {str(e)}', 'local_update': 'success'}), 200
+
+        return jsonify({'message': 'Status updated successfully'})
+    except Exception as e:
+        if session:
+            session.rollback()
+        logger.error(f"Error updating status for tag {tag_id if 'tag_id' in locals() else ''}: {str(e)}", exc_info=True)
+        return jsonify({'error': 'Failed to update status'}), 500
+    finally:
+        if session:
+            session.close()
+
+
+@tab2_bp.route('/tab/2/bulk_update_status', methods=['POST'])
+def bulk_update_status():
+    session = None
+    try:
+        data = request.get_json()
+        contract_number = data.get('contract_number')
+        new_status = data.get('status')
+
+        if not contract_number or not new_status:
+            return jsonify({'error': 'Contract number and status are required'}), 400
+
+        valid_statuses = ['Ready to Rent', 'Sold', 'Repair', 'Needs to be Inspected', 'Wash', 'Wet']
+        if new_status not in valid_statuses:
+            return jsonify({'error': f'Status must be one of {", ".join(valid_statuses)}'}), 400
+
+        session = db.session()
+        items = session.query(ItemMaster).filter(
+            ItemMaster.last_contract_num == contract_number,
+            func.lower(ItemMaster.status).in_(['on rent', 'delivered'])
+        ).all()
+
+        if not items:
+            return jsonify({'error': 'No items found for the given contract'}), 404
+
+        current_time = datetime.utcnow()
+        api_client = APIClient()
+        updated = 0
+        for item in items:
+            item.status = new_status
+            item.date_last_scanned = current_time
+            try:
+                api_client.update_status(item.tag_id, new_status)
+                updated += 1
+            except Exception as e:
+                logger.error(f"Failed to update API status for tag_id {item.tag_id}: {str(e)}", exc_info=True)
+
+        session.commit()
+        return jsonify({'message': f'Updated {updated} items'})
+    except Exception as e:
+        if session:
+            session.rollback()
+        logger.error(f"Error bulk updating status for contract {contract_number if 'contract_number' in locals() else ''}: {str(e)}", exc_info=True)
+        return jsonify({'error': 'Failed to bulk update status'}), 500
+    finally:
+        if session:
             session.close()
 
 @tab2_bp.route('/tab/2/data')
