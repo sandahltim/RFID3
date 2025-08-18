@@ -158,6 +158,7 @@ def get_category_data(session, filter_query='', sort='', status_filter='', bin_f
 def tab1_view():
     logger.debug("Tab 1 route accessed")
     current_app.logger.debug("Tab 1 route accessed")
+    session = None
     try:
         session = db.session()
         filter_query = request.args.get('filter', '').lower()
@@ -169,16 +170,19 @@ def tab1_view():
         category_data = get_category_data(session, filter_query, sort, status_filter, bin_filter)
         logger.info(f"Fetched {len(category_data)} categories for tab1")
 
-        session.close()
         return render_template('common.html', categories=category_data, tab_num=1, cache_bust=int(time()))
     except Exception as e:
         logger.error(f"Error rendering Tab 1: {str(e)}", exc_info=True)
         current_app.logger.error(f"Error rendering Tab 1: {str(e)}", exc_info=True)
         return render_template('common.html', categories=[], tab_num=1, cache_bust=int(time()))
+    finally:
+        if session:
+            session.close()
 
 @tab1_bp.route('/tab/1/filter', methods=['POST'])
 def tab1_filter():
     logger.debug("Tab 1 filter route accessed")
+    session = None
     try:
         session = db.session()
         filter_query = request.form.get('category-filter', '').lower()
@@ -188,12 +192,14 @@ def tab1_filter():
         logger.debug(f"Filter parameters: filter_query={filter_query}, sort={sort}, status_filter={status_filter}, bin_filter={bin_filter}")
 
         category_data = get_category_data(session, filter_query, sort, status_filter, bin_filter)
-        session.close()
 
         return render_template('_category_rows.html', categories=category_data)
     except Exception as e:
         logger.error(f"Error filtering Tab 1: {str(e)}", exc_info=True)
         return jsonify({'error': 'Failed to filter categories'}), 500
+    finally:
+        if session:
+            session.close()
 
 @tab1_bp.route('/tab/1/subcat_data')
 def tab1_subcat_data():
@@ -211,6 +217,7 @@ def tab1_subcat_data():
         return jsonify({'error': 'Category is required'}), 400
 
     logger.info(f"Fetching subcategories for category: {category}")
+    session = None
     try:
         session = db.session()
 
@@ -221,7 +228,6 @@ def tab1_subcat_data():
         }
         if not category_mappings:
             logger.warning(f"No mappings found for category {category}")
-            session.close()
             return jsonify({
                 'subcategories': [],
                 'total_subcats': 0,
@@ -334,7 +340,6 @@ def tab1_subcat_data():
         elif sort == 'total_items_desc':
             subcategory_data.sort(key=lambda x: x['total_items'], reverse=True)
 
-        session.close()
         logger.debug(f"Returning subcategory_data: {subcategory_data}")
         return jsonify({
             'subcategories': subcategory_data,
@@ -345,6 +350,9 @@ def tab1_subcat_data():
     except Exception as e:
         logger.error(f"Error fetching subcategory data for category {category}: {str(e)}", exc_info=True)
         return jsonify({'error': 'Failed to fetch subcategory data', 'details': str(e)}), 500
+    finally:
+        if session:
+            session.close()
 
 @tab1_bp.route('/tab/1/common_names')
 def tab1_common_names():
@@ -362,6 +370,7 @@ def tab1_common_names():
         logger.error("Category and subcategory are required in common_names request")
         return jsonify({'error': 'Category and subcategory are required'}), 400
 
+    session = None
     try:
         session = db.session()
 
@@ -500,7 +509,6 @@ def tab1_common_names():
         paginated_common_names = common_names[start:end]
         logger.debug(f"Returning {len(paginated_common_names)} paginated common names out of {total_common_names}")
 
-        session.close()
         return jsonify({
             'common_names': paginated_common_names,
             'total_common_names': total_common_names,
@@ -510,6 +518,9 @@ def tab1_common_names():
     except Exception as e:
         logger.error(f"Error fetching common names for category {category}, subcategory {subcategory}: {str(e)}", exc_info=True)
         return jsonify({'error': 'Failed to fetch common names'}), 500
+    finally:
+        if session:
+            session.close()
 
 @tab1_bp.route('/tab/1/data')
 def tab1_data():
@@ -528,6 +539,7 @@ def tab1_data():
         logger.error("Category, subcategory, and common name are required in data request")
         return jsonify({'error': 'Category, subcategory, and common name are required'}), 400
 
+    session = None
     try:
         session = db.session()
 
@@ -595,7 +607,6 @@ def tab1_data():
                 'notes': item.notes
             })
 
-        session.close()
         logger.debug(f"Returning items_data: {len(items_data)} items")
         return jsonify({
             'items': items_data,
@@ -606,11 +617,15 @@ def tab1_data():
     except Exception as e:
         logger.error(f"Error fetching items for category {category}, subcategory {subcategory}, common_name {common_name}: {str(e)}", exc_info=True)
         return jsonify({'error': 'Failed to fetch items'}), 500
+    finally:
+        if session:
+            session.close()
 
 @tab1_bp.route('/tab/1/update_bin_location', methods=['POST'])
 @limiter.limit("10 per minute")
 def update_bin_location():
     logger.debug("update_bin_location route accessed")
+    session = None
     try:
         session = db.session()
         data = request.get_json()
@@ -650,15 +665,18 @@ def update_bin_location():
         return jsonify({'message': 'Bin location updated successfully'})
     except Exception as e:
         logger.error(f"Error updating bin location: {str(e)}", exc_info=True)
-        session.rollback()
+        if session:
+            session.rollback()
         return jsonify({'error': 'Failed to update bin location'}), 500
     finally:
-        session.close()
+        if session:
+            session.close()
 
 @tab1_bp.route('/tab/1/update_status', methods=['POST'])
 @limiter.limit("10 per minute")
 def update_status():
     logger.debug("update_status route accessed")
+    session = None
     try:
         session = db.session()
         data = request.get_json()
@@ -702,15 +720,18 @@ def update_status():
         return jsonify({'message': 'Status updated successfully'})
     except Exception as e:
         logger.error(f"Error updating status: {str(e)}", exc_info=True)
-        session.rollback()
+        if session:
+            session.rollback()
         return jsonify({'error': 'Failed to update status'}), 500
     finally:
-        session.close()
+        if session:
+            session.close()
 
 @tab1_bp.route('/tab/1/update_quality', methods=['POST'])
 @limiter.limit("10 per minute")
 def update_quality():
     logger.debug("update_quality route accessed")
+    session = None
     try:
         session = db.session()
         data = request.get_json()
@@ -749,15 +770,18 @@ def update_quality():
         return jsonify({'message': 'Quality updated successfully'})
     except Exception as e:
         logger.error(f"Error updating quality: {str(e)}", exc_info=True)
-        session.rollback()
+        if session:
+            session.rollback()
         return jsonify({'error': 'Failed to update quality'}), 500
     finally:
-        session.close()
+        if session:
+            session.close()
 
 @tab1_bp.route('/tab/1/update_notes', methods=['POST'])
 @limiter.limit("10 per minute")
 def update_notes():
     logger.debug("update_notes route accessed")
+    session = None
     try:
         session = db.session()
         data = request.get_json()
@@ -792,10 +816,12 @@ def update_notes():
         return jsonify({'message': 'Notes updated successfully'})
     except Exception as e:
         logger.error(f"Error updating notes: {str(e)}", exc_info=True)
-        session.rollback()
+        if session:
+            session.rollback()
         return jsonify({'error': 'Failed to update notes'}), 500
     finally:
-        session.close()
+        if session:
+            session.close()
 
 @tab1_bp.route('/tab/1/full_items_by_rental_class')
 def full_items_by_rental_class():
@@ -808,6 +834,7 @@ def full_items_by_rental_class():
         logger.error("Category, subcategory, and common name are required in full_items_by_rental_class request")
         return jsonify({'error': 'Category, subcategory, and common name are required'}), 400
 
+    session = None
     try:
         session = db.session()
 
@@ -850,7 +877,6 @@ def full_items_by_rental_class():
             })
 
         logger.debug(f"Returning {len(items_data)} items for common_name {common_name}")
-        session.close()
         return jsonify({
             'items': items_data,
             'total_items': len(items_data)
@@ -858,3 +884,6 @@ def full_items_by_rental_class():
     except Exception as e:
         logger.error(f"Error fetching full items for category {category}, subcategory {subcategory}, common_name {common_name}: {str(e)}", exc_info=True)
         return jsonify({'error': 'Failed to fetch full items'}), 500
+    finally:
+        if session:
+            session.close()

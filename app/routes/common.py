@@ -54,4 +54,8 @@ def get_contract_date():
         return jsonify({'error': 'Failed to fetch contract date'}), 500
     finally:
         if session:
+            try:
+                session.rollback()
+            except Exception as e:
+                logger.warning(f"Session rollback failed: {str(e)}")
             session.close()
