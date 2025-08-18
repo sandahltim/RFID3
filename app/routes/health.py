@@ -42,8 +42,10 @@ def health_check():
     }
 
     # Check database
+    session = None
     try:
-        db.session.execute(text("SELECT 1"))
+        session = db.session()
+        session.execute(text("SELECT 1"))
         status["database"] = "healthy"
         logger.info("Database health check passed")
         current_app.logger.info("Database health check passed")
@@ -52,6 +54,10 @@ def health_check():
         current_app.logger.error(f"Database health check failed: {str(e)}", exc_info=True)
         status["database"] = f"unhealthy: {str(e)}"
         status["overall"] = "unhealthy"
+    finally:
+        if session:
+            session.close()
+            logger.debug("Database session closed for health check")
 
     # Check Redis
     try:
