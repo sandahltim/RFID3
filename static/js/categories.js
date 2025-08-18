@@ -143,7 +143,7 @@ console.log('categories.js version: 2025-07-02-v6 loaded');
             case 'subcategory':
                 return row.querySelector('.subcategory-input')?.value?.toLowerCase() || '';
             case 'common_name':
-                return row.children[3]?.textContent?.trim().toLowerCase() || '';
+                return row.querySelector('.common-name-input')?.value?.toLowerCase() || '';
             default:
                 return '';
         }
