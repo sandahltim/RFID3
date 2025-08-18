@@ -75,6 +75,8 @@ mysql -u rfid_user -prfid_user_password rfid_inventory < scripts/migrate_hand_co
 python scripts/update_rental_class_mappings.py
 ```
 
+The `migrate_hand_counted_items.sql` script adds the `hand_counted_catalog` table, which powers the Hand Counted toggle in the Manage Categories screen. Run this script after pulling updates to enable the new feature.
+
 
 git pull origin
 > /home/tim/RFID3/logs/gunicorn_error.log

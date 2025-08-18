@@ -337,7 +337,6 @@ def hand_counted_catalog():
             logger.warning("hand_counted_catalog table missing; returning empty list")
             current_app.logger.warning("hand_counted_catalog table missing; returning empty list")
             items = []
-
         item_list = [i.item_name for i in items]
         logger.info(f"Returned hand-counted catalog items: {item_list} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
         return jsonify({'items': item_list})
@@ -450,7 +449,7 @@ def tab4_common_names():
     contract_number = request.args.get('contract_number')
     page = int(request.args.get('page', 1))
     per_page = 10
-    sort = request.args.get('sort', '')  # Keep for compatibility, but ignore
+    sort = request.args.get('sort', '')
     fetch_all = request.args.get('all', 'false').lower() == 'true'
 
     logger.info(f"Fetching common names for contract_number={contract_number}, page={page}, sort={sort}, fetch_all={fetch_all} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
@@ -547,7 +546,23 @@ def tab4_common_names():
 
         common_names_list = list(common_names.values())
 
-        # Handle pagination or fetch all (no sorting applied)
+        # Apply sorting
+        if sort:
+            try:
+                field, direction = sort.rsplit('_', 1)
+                reverse = direction == 'desc'
+                if field in ['name', 'on_contracts', 'total_items_inventory']:
+                    common_names_list.sort(
+                        key=lambda x: (x[field].lower() if isinstance(x[field], str) else x[field]),
+                        reverse=reverse
+                    )
+            except ValueError:
+                logger.warning(f"Invalid sort parameter '{sort}'")
+                current_app.logger.warning(f"Invalid sort parameter '{sort}'")
+        else:
+            common_names_list.sort(key=lambda x: x['name'].lower())
+
+        # Handle pagination or fetch all
         if fetch_all:
             paginated_common_names = common_names_list
             total_common_names = len(common_names_list)
