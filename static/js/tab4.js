@@ -349,6 +349,14 @@ window.toggleNewContractInput = function toggleNewContractInput() {
     const contractDropdown = document.getElementById('hand-counted-contract-number');
     const newContractInput = document.getElementById('new-contract-number');
     if (newContractInput.style.display === 'none') {
+        fetch('/tab/4/next_contract_number')
+            .then(response => response.json())
+            .then(data => {
+                newContractInput.value = data.next_contract_number || 'L1';
+            })
+            .catch(() => {
+                newContractInput.value = 'L1';
+            });
         newContractInput.style.display = 'block';
         contractDropdown.disabled = true;
     } else {
@@ -358,17 +366,14 @@ window.toggleNewContractInput = function toggleNewContractInput() {
         window.updateItemDropdown();
     }
 };
-
-window.toggleNewItemInput = function toggleNewItemInput() {
+window.handleItemSelection = function handleItemSelection() {
     const itemDropdown = document.getElementById('hand-counted-item-name');
     const newItemInput = document.getElementById('new-item-name');
-    if (newItemInput.style.display === 'none') {
+    if (itemDropdown.value === '__other') {
         newItemInput.style.display = 'block';
-        itemDropdown.disabled = true;
     } else {
         newItemInput.style.display = 'none';
         newItemInput.value = '';
-        itemDropdown.disabled = false;
     }
 };
 
@@ -378,31 +383,59 @@ window.updateItemDropdown = function updateItemDropdown() {
     const newContractInput = document.getElementById('new-contract-number');
     const contractNumber = newContractInput.style.display === 'block' ? newContractInput.value : contractDropdown.value;
     itemDropdown.innerHTML = '<option value="">Select Item...</option>';
-    if (contractNumber) {
-        console.log(`Fetching items for contract ${contractNumber}`);
-        fetch(`/tab/4/hand_counted_items_by_contract?contract_number=${encodeURIComponent(contractNumber)}`)
-            .then(response => {
-                if (!response.ok) throw new Error(`Failed to fetch items: ${response.status}`);
-                return response.json();
-            })
-            .then(data => {
-                console.log('Items data received:', data);
-                if (data.items && Array.isArray(data.items)) {
-                    data.items.forEach(item => {
-                        const option = document.createElement('option');
-                        option.value = item.item_name;
-                        option.textContent = `${item.item_name} (Qty: ${item.quantity})`;
-                        itemDropdown.appendChild(option);
+    fetch('/tab/4/hand_counted_catalog')
+        .then(response => {
+            if (!response.ok) throw new Error(`Failed to fetch catalog: ${response.status}`);
+            return response.json();
+        })
+        .then(catalogData => {
+            const catalogItems = catalogData.items || [];
+            const contractItems = {};
+            const populateOptions = () => {
+                const uniqueNames = new Set([...catalogItems, ...Object.keys(contractItems)]);
+                uniqueNames.forEach(name => {
+                    if (name.toLowerCase() === 'other') return;
+                    const option = document.createElement('option');
+                    const qty = contractItems[name];
+                    option.value = name;
+                    option.textContent = qty ? `${name} (Qty: ${qty})` : name;
+                    itemDropdown.appendChild(option);
+                });
+                const otherOption = document.createElement('option');
+                otherOption.value = '__other';
+                otherOption.textContent = 'Other';
+                itemDropdown.appendChild(otherOption);
+            };
+
+            if (contractNumber) {
+                console.log(`Fetching items for contract ${contractNumber}`);
+                fetch(`/tab/4/hand_counted_items_by_contract?contract_number=${encodeURIComponent(contractNumber)}`)
+                    .then(response => {
+                        if (!response.ok) throw new Error(`Failed to fetch items: ${response.status}`);
+                        return response.json();
+                    })
+                    .then(data => {
+                        if (data.items && Array.isArray(data.items)) {
+                            data.items.forEach(item => {
+                                contractItems[item.item_name] = item.quantity;
+                            });
+                        }
+                        populateOptions();
+                    })
+                    .catch(error => {
+                        console.error('Error fetching hand-counted items:', error);
+                        populateOptions();
                     });
-                } else {
-                    console.warn('No items found or invalid response format:', data);
-                }
-            })
-            .catch(error => {
-                console.error('Error fetching hand-counted items:', error);
-                itemDropdown.innerHTML += '<option value="">No items available</option>';
-            });
-    }
+            } else {
+                populateOptions();
+            }
+        })
+        .catch(error => {
+            console.error('Error fetching hand-counted catalog:', error);
+        })
+        .finally(() => {
+            handleItemSelection();
+        });
 };
 
 window.addHandCountedItem = function addHandCountedItem() {
@@ -413,11 +446,16 @@ window.addHandCountedItem = function addHandCountedItem() {
     const quantityInput = document.getElementById('hand-counted-quantity');
     const employeeInput = document.getElementById('hand-counted-employee');
     const contractNumber = newContractInput.style.display === 'block' ? newContractInput.value : contractDropdown.value;
-    const itemName = newItemInput.style.display === 'block' ? newItemInput.value : itemDropdown.value;
+    const itemValue = itemDropdown.value;
+    const itemName = itemValue === '__other' ? newItemInput.value : itemValue;
     const quantity = parseInt(quantityInput.value);
     const employeeName = employeeInput.value;
     if (!contractNumber || !itemName || !quantity || quantity < 1 || !employeeName) {
         alert('Please fill in all fields: Contract Number, Item Name, Quantity (positive number), and Employee Name.');
+        return;
+    }
+    if (itemValue === '__other' && !newItemInput.value) {
+        alert('Please enter an item name for "Other".');
         return;
     }
     if (!contractNumber.startsWith('L')) {
@@ -445,11 +483,11 @@ window.addHandCountedItem = function addHandCountedItem() {
         } else {
             alert(data.message);
             if (newContractInput.style.display === 'block') window.toggleNewContractInput();
-            if (newItemInput.style.display === 'block') window.toggleNewItemInput();
             contractDropdown.value = '';
             itemDropdown.value = '';
             quantityInput.value = '';
             employeeInput.value = '';
+            handleItemSelection();
             window.filterHandCountedItems?.();
             addContractToTable(contractNumber);
             updateContractCounts(contractNumber);
@@ -474,11 +512,16 @@ window.removeHandCountedItem = function removeHandCountedItem() {
     const quantityInput = document.getElementById('hand-counted-quantity');
     const employeeInput = document.getElementById('hand-counted-employee');
     const contractNumber = newContractInput.style.display === 'block' ? newContractInput.value : contractDropdown.value;
-    const itemName = newItemInput.style.display === 'block' ? newItemInput.value : itemDropdown.value;
+    const itemValue = itemDropdown.value;
+    const itemName = itemValue === '__other' ? newItemInput.value : itemValue;
     const quantity = parseInt(quantityInput.value);
     const employeeName = employeeInput.value;
     if (!contractNumber || !itemName || !quantity || quantity < 1 || !employeeName) {
         alert('Please fill in all fields: Contract Number, Item Name, Quantity (positive number), and Employee Name.');
+        return;
+    }
+    if (itemValue === '__other' && !newItemInput.value) {
+        alert('Please enter an item name for "Other".');
         return;
     }
     fetch('/tab/4/remove_hand_counted_item', {
@@ -502,11 +545,11 @@ window.removeHandCountedItem = function removeHandCountedItem() {
         } else {
             alert(data.message);
             if (newContractInput.style.display === 'block') window.toggleNewContractInput();
-            if (newItemInput.style.display === 'block') window.toggleNewItemInput();
             contractDropdown.value = '';
             itemDropdown.value = '';
             quantityInput.value = '';
             employeeInput.value = '';
+            handleItemSelection();
             window.filterHandCountedItems?.();
             addContractToTable(contractNumber);
             updateContractCounts(contractNumber);
