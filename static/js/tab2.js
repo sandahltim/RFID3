@@ -39,9 +39,24 @@ function renderContracts(contracts) {
 
     tbody.innerHTML = '';
     contracts.forEach(contract => {
-        const sanitizedId = `common-${contract.contract_number.replace(' ', '_')}`;
+        const sanitizedContractNumber = contract.contract_number.replace(/[^a-z0-9]/gi, '_');
+        const sanitizedId = `common-${sanitizedContractNumber}`;
+        const rowClass = contract.is_stale ? 'stale-contract' : '';
+        const bulkControls = contract.is_stale ? `
+                <select id="bulk-status-${sanitizedContractNumber}" class="form-control form-control-sm d-inline-block w-auto">
+                    <option value="">Status</option>
+                    <option value="Ready to Rent">Ready to Rent</option>
+                    <option value="Sold">Sold</option>
+                    <option value="Repair">Repair</option>
+                    <option value="Needs to be Inspected">Needs to be Inspected</option>
+                    <option value="Wash">Wash</option>
+                    <option value="Wet">Wet</option>
+                </select>
+                <button class="btn btn-sm btn-warning" onclick="window.updateContractStatus('${contract.contract_number}', '${sanitizedContractNumber}')">Update All</button>
+        ` : '';
+
         let html = `
-            <tr>
+            <tr class="${rowClass}">
                 <td>${contract.contract_number}</td>
                 <td>${contract.client_name}</td>
                 <td>${contract.items_on_contract}</td>
@@ -51,6 +66,7 @@ function renderContracts(contracts) {
                     <button class="btn btn-sm btn-secondary expand-btn" data-target-id="${sanitizedId}" data-contract-number="${contract.contract_number}">Expand</button>
                     <button class="btn btn-sm btn-secondary collapse-btn" data-collapse-target="${sanitizedId}" style="display:none;">Collapse</button>
                     <button class="btn btn-sm btn-info print-btn" data-print-level="Contract" data-print-id="${sanitizedId}" data-category="${contract.contract_number}">Print</button>
+                    ${bulkControls}
                     <div id="loading-${sanitizedId}" style="display:none;" class="loading-indicator">Loading...</div>
                 </td>
             </tr>
@@ -267,6 +283,7 @@ window.expandItems = function(contractNumber, commonName, targetId, page = 1, ta
 
     const sanitizedContractNumber = contractNumber.trim().replace(/[^a-z0-9]/g, '_').substring(0, 50);
     const url = `/tab/2/data?contract_number=${encodeURIComponent(sanitizedContractNumber)}&common_name=${encodeURIComponent(commonName)}&page=${page}`;
+    const escapedCommonName = commonName.replace(/'/g, "\\'").replace(/"/g, '\\"');
     console.log(`Fetching items: ${url}`);
 
     fetch(url)
@@ -303,6 +320,7 @@ window.expandItems = function(contractNumber, commonName, targetId, page = 1, ta
                                 <th onclick="window.sortItems('${sanitizedContractNumber}', '${commonName}', 'status', 2)">Status <span class="sort-arrow"></span></th>
                                 <th onclick="window.sortItems('${sanitizedContractNumber}', '${commonName}', 'last_contract_num', 2)">Last Contract <span class="sort-arrow"></span></th>
                                 <th onclick="window.sortItems('${sanitizedContractNumber}', '${commonName}', 'last_scanned_date', 2)">Last Scanned Date <span class="sort-arrow"></span></th>
+                                <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -318,6 +336,18 @@ window.expandItems = function(contractNumber, commonName, targetId, page = 1, ta
                         <td>${item.status}</td>
                         <td>${item.last_contract_num || 'N/A'}</td>
                         <td>${formattedScanDate}</td>
+                        <td>
+                            <select id="status-${item.tag_id}" class="form-control form-control-sm d-inline-block w-auto">
+                                <option value="">Status</option>
+                                <option value="Ready to Rent">Ready to Rent</option>
+                                <option value="Sold">Sold</option>
+                                <option value="Repair">Repair</option>
+                                <option value="Needs to be Inspected">Needs to be Inspected</option>
+                                <option value="Wash">Wash</option>
+                                <option value="Wet">Wet</option>
+                            </select>
+                            <button class="btn btn-sm btn-primary ml-1" onclick="window.updateItemStatus('${item.tag_id}', '${sanitizedContractNumber}', '${escapedCommonName}', '${targetId}', ${currentPage})">Update</button>
+                        </td>
                     </tr>
                 `;
             });
@@ -373,6 +403,65 @@ window.expandItems = function(contractNumber, commonName, targetId, page = 1, ta
         })
         .finally(() => {
             if (loadingSuccess) hideLoading(`loading-items-${commonId}`);
+        });
+};
+
+window.updateItemStatus = function(tagId, contractNumber, commonName, targetId, page = 1) {
+    const statusSelect = document.getElementById(`status-${tagId}`);
+    const status = statusSelect ? statusSelect.value : '';
+    if (!status) {
+        alert('Select a status.');
+        return;
+    }
+
+    fetch('/tab/2/update_status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tag_id: tagId, status })
+    })
+        .then(response => {
+            if (!response.ok) {
+                return response.text().then(text => { throw new Error(text || 'Failed to update status'); });
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.error) throw new Error(data.error);
+            window.expandItems(contractNumber, commonName, targetId, page, 2);
+        })
+        .catch(error => {
+            console.error('Status update error:', error.message);
+            alert('Error: ' + error.message);
+        });
+};
+
+window.updateContractStatus = function(contractNumber, sanitizedContractNumber) {
+    const select = document.getElementById(`bulk-status-${sanitizedContractNumber}`);
+    const status = select ? select.value : '';
+    if (!status) {
+        alert('Select a status.');
+        return;
+    }
+
+    fetch('/tab/2/bulk_update_status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contract_number: contractNumber, status })
+    })
+        .then(response => {
+            if (!response.ok) {
+                return response.text().then(text => { throw new Error(text || 'Failed to bulk update'); });
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.error) throw new Error(data.error);
+            alert('Bulk update successful!');
+            window.location.reload();
+        })
+        .catch(error => {
+            console.error('Bulk update error:', error.message);
+            alert('Error: ' + error.message);
         });
 };
 

@@ -8,6 +8,10 @@
 
 /* Styles specific to Tabs 2 and 4 */
 
+.stale-contract {
+    background-color: #f8d7da !important; /* Light red highlight for stale contracts */
+}
+
 /* Ensure the category table has a flexible layout with better content handling */
 .category-table {
     width: 100%;
@@ -55,11 +59,9 @@
 .category-table th:nth-child(4),
 .category-table td:nth-child(4) { width: 12%; } /* Total Items in Inventory */
 .category-table th:nth-child(5),
-.category-table td:nth-child(5) { width: 10%; } /* Hand-Counted Entries */
+.category-table td:nth-child(5) { width: 15%; } /* Last Scanned Date */
 .category-table th:nth-child(6),
-.category-table td:nth-child(6) { width: 15%; } /* Last Scanned Date - Slightly reduced */
-.category-table th:nth-child(7),
-.category-table td:nth-child(7) { width: 20%; min-width: 200px; } /* Actions - Kept for buttons */
+.category-table td:nth-child(6) { width: 25%; min-width: 200px; } /* Actions */
 
 /* Ensure the table body is scrollable if needed */
 .category-table tbody {
@@ -178,11 +180,9 @@
     .category-table th:nth-child(4),
     .category-table td:nth-child(4) { width: 15%; }
     .category-table th:nth-child(5),
-    .category-table td:nth-child(5) { width: 10%; }
+    .category-table td:nth-child(5) { width: 16%; }
     .category-table th:nth-child(6),
-    .category-table td:nth-child(6) { width: 16%; }
-    .category-table th:nth-child(7),
-    .category-table td:nth-child(7) { width: 25%; min-width: 200px; } /* Adjusted for smaller screens */
+    .category-table td:nth-child(6) { width: 25%; min-width: 200px; } /* Adjusted for smaller screens */
 
     .category-table,
     .common-table,
