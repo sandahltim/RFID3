@@ -1,7 +1,8 @@
 from flask import Blueprint, render_template, request, jsonify, current_app
 from .. import db, cache
-from ..models.db_models import ItemMaster, Transaction, HandCountedItems
+from ..models.db_models import ItemMaster, Transaction, HandCountedItems, HandCountedCatalog
 from sqlalchemy import func, desc, or_
+from sqlalchemy.exc import ProgrammingError
 from datetime import datetime
 import logging
 import sys
@@ -324,6 +325,28 @@ def hand_counted_items_by_contract():
         if session:
             session.close()
 
+@tab4_bp.route('/tab/4/hand_counted_catalog', methods=['GET'])
+def hand_counted_catalog():
+    session = None
+    try:
+        session = db.session()
+        try:
+            items = session.query(HandCountedCatalog.item_name).all()
+        except ProgrammingError:
+            session.rollback()
+            logger.warning("hand_counted_catalog table missing; returning empty list")
+            current_app.logger.warning("hand_counted_catalog table missing; returning empty list")
+            items = []
+        item_list = [i.item_name for i in items]
+        logger.info(f"Returned hand-counted catalog items: {item_list} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+        return jsonify({'items': item_list})
+    except Exception as e:
+        logger.error(f"Error fetching hand-counted catalog: {str(e)} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'), exc_info=True)
+        return jsonify({'error': str(e)}), 500
+    finally:
+        if session:
+            session.close()
+
 @tab4_bp.route('/tab/4/contract_items_count', methods=['GET'])
 def contract_items_count():
     contract_number = request.args.get('contract_number')
@@ -360,6 +383,30 @@ def contract_items_count():
         return jsonify({'total_items': total_items})
     except Exception as e:
         logger.error(f"Error calculating items on contract for {contract_number}: {str(e)} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'), exc_info=True)
+        return jsonify({'error': str(e)}), 500
+    finally:
+        if session:
+            session.close()
+
+@tab4_bp.route('/tab/4/next_contract_number', methods=['GET'])
+def next_contract_number():
+    session = None
+    try:
+        session = db.session()
+        latest_item = session.query(func.max(ItemMaster.last_contract_num)).filter(func.upper(ItemMaster.last_contract_num).like('L%')).scalar()
+        latest_hand = session.query(func.max(HandCountedItems.contract_number)).filter(func.upper(HandCountedItems.contract_number).like('L%')).scalar()
+        candidates = [c for c in [latest_item, latest_hand] if c]
+        if candidates:
+            latest = max(candidates)
+            try:
+                next_num = int(latest[1:]) + 1
+            except ValueError:
+                next_num = 1
+        else:
+            next_num = 1
+        return jsonify({'next_contract_number': f'L{next_num}'})
+    except Exception as e:
+        logger.error(f"Error calculating next contract number: {str(e)} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'), exc_info=True)
         return jsonify({'error': str(e)}), 500
     finally:
         if session:
