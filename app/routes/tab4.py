@@ -1,7 +1,8 @@
 from flask import Blueprint, render_template, request, jsonify, current_app
 from .. import db, cache
-from ..models.db_models import ItemMaster, Transaction, HandCountedItems
+from ..models.db_models import ItemMaster, Transaction, HandCountedItems, HandCountedCatalog
 from sqlalchemy import func, desc, or_
+from sqlalchemy.exc import ProgrammingError
 from datetime import datetime
 import logging
 import sys
@@ -324,6 +325,28 @@ def hand_counted_items_by_contract():
         if session:
             session.close()
 
+@tab4_bp.route('/tab/4/hand_counted_catalog', methods=['GET'])
+def hand_counted_catalog():
+    session = None
+    try:
+        session = db.session()
+        try:
+            items = session.query(HandCountedCatalog.item_name).all()
+        except ProgrammingError:
+            session.rollback()
+            logger.warning("hand_counted_catalog table missing; returning empty list")
+            current_app.logger.warning("hand_counted_catalog table missing; returning empty list")
+            items = []
+        item_list = [i.item_name for i in items]
+        logger.info(f"Returned hand-counted catalog items: {item_list} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+        return jsonify({'items': item_list})
+    except Exception as e:
+        logger.error(f"Error fetching hand-counted catalog: {str(e)} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'), exc_info=True)
+        return jsonify({'error': str(e)}), 500
+    finally:
+        if session:
+            session.close()
+
 @tab4_bp.route('/tab/4/contract_items_count', methods=['GET'])
 def contract_items_count():
     contract_number = request.args.get('contract_number')
@@ -360,6 +383,30 @@ def contract_items_count():
         return jsonify({'total_items': total_items})
     except Exception as e:
         logger.error(f"Error calculating items on contract for {contract_number}: {str(e)} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'), exc_info=True)
+        return jsonify({'error': str(e)}), 500
+    finally:
+        if session:
+            session.close()
+
+@tab4_bp.route('/tab/4/next_contract_number', methods=['GET'])
+def next_contract_number():
+    session = None
+    try:
+        session = db.session()
+        latest_item = session.query(func.max(ItemMaster.last_contract_num)).filter(func.upper(ItemMaster.last_contract_num).like('L%')).scalar()
+        latest_hand = session.query(func.max(HandCountedItems.contract_number)).filter(func.upper(HandCountedItems.contract_number).like('L%')).scalar()
+        candidates = [c for c in [latest_item, latest_hand] if c]
+        if candidates:
+            latest = max(candidates)
+            try:
+                next_num = int(latest[1:]) + 1
+            except ValueError:
+                next_num = 1
+        else:
+            next_num = 1
+        return jsonify({'next_contract_number': f'L{next_num}'})
+    except Exception as e:
+        logger.error(f"Error calculating next contract number: {str(e)} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'), exc_info=True)
         return jsonify({'error': str(e)}), 500
     finally:
         if session:
@@ -402,7 +449,7 @@ def tab4_common_names():
     contract_number = request.args.get('contract_number')
     page = int(request.args.get('page', 1))
     per_page = 10
-    sort = request.args.get('sort', '')  # Keep for compatibility, but ignore
+    sort = request.args.get('sort', '')
     fetch_all = request.args.get('all', 'false').lower() == 'true'
 
     logger.info(f"Fetching common names for contract_number={contract_number}, page={page}, sort={sort}, fetch_all={fetch_all} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
@@ -499,7 +546,23 @@ def tab4_common_names():
 
         common_names_list = list(common_names.values())
 
-        # Handle pagination or fetch all (no sorting applied)
+        # Apply sorting
+        if sort:
+            try:
+                field, direction = sort.rsplit('_', 1)
+                reverse = direction == 'desc'
+                if field in ['name', 'on_contracts', 'total_items_inventory']:
+                    common_names_list.sort(
+                        key=lambda x: (x[field].lower() if isinstance(x[field], str) else x[field]),
+                        reverse=reverse
+                    )
+            except ValueError:
+                logger.warning(f"Invalid sort parameter '{sort}'")
+                current_app.logger.warning(f"Invalid sort parameter '{sort}'")
+        else:
+            common_names_list.sort(key=lambda x: x['name'].lower())
+
+        # Handle pagination or fetch all
         if fetch_all:
             paginated_common_names = common_names_list
             total_common_names = len(common_names_list)
