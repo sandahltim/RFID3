@@ -8,7 +8,8 @@
 
 /* Styles specific to Tabs 2 and 4 */
 
-.stale-contract {
+.stale-contract,
+.stale-contract td {
     background-color: #f8d7da !important; /* Light red highlight for stale contracts */
 }
 
