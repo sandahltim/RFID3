@@ -643,7 +643,8 @@ window.sortCommonNames = function(contractNumber, column, tabNum) {
         }
     });
 
-    const url = `/tab/${tabNum}/common_names?contract_number=${encodeURIComponent(contractNumber)}&sort=${column}_${direction}`;
+    const sortColumn = column === 'common_name' ? 'name' : column;
+    const url = `/tab/${tabNum}/common_names?contract_number=${encodeURIComponent(contractNumber)}&sort=${sortColumn}_${direction}`;
     console.log(`Fetching sorted common names: ${url}`);
 
     fetch(url)
