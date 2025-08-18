@@ -14,7 +14,7 @@ console.log('categories.js version: 2025-07-02-v6 loaded');
     let mappings = [];
     let currentSort = { column: null, direction: 'asc' };
 
-    function addMappingRow(mapping = {category: '', subcategory: '', rental_class_id: '', common_name: 'N/A', short_common_name: ''}) {
+    function addMappingRow(mapping = {category: '', subcategory: '', rental_class_id: '', common_name: '', short_common_name: '', is_hand_counted: false}) {
         const table = document.getElementById('mappings-table');
         if (!table) {
             console.error(`Mappings table not found at ${new Date().toISOString()}`);
@@ -28,8 +28,9 @@ console.log('categories.js version: 2025-07-02-v6 loaded');
             <td><input type="text" class="form-control category-input" value="${mapping.category || ''}"></td>
             <td><input type="text" class="form-control subcategory-input" value="${mapping.subcategory || ''}"></td>
             <td><input type="text" class="form-control rental-class-id-input" value="${mapping.rental_class_id || ''}"></td>
-            <td>${mapping.common_name || 'N/A'}</td>
+            <td><input type="text" class="form-control common-name-input" value="${mapping.common_name || ''}" ${mapping.rental_class_id ? 'readonly' : ''}></td>
             <td><input type="text" class="form-control short-common-name-input" value="${mapping.short_common_name || ''}"></td>
+            <td class="text-center"><input type="checkbox" class="form-check-input hand-counted-checkbox" ${mapping.is_hand_counted ? 'checked' : ''}></td>
             <td>
                 <button class="btn btn-danger btn-sm remove-btn" onclick="window.categories.removeMappingRow(this)">Remove</button>
             </td>
@@ -63,8 +64,10 @@ console.log('categories.js version: 2025-07-02-v6 loaded');
         const category = row.querySelector('.category-input')?.value?.trim();
         const subcategory = row.querySelector('.subcategory-input')?.value?.trim();
         const rental_class_id = row.querySelector('.rental-class-id-input')?.value?.trim();
+        const common_name = row.querySelector('.common-name-input')?.value?.trim();
         const short_common_name = row.querySelector('.short-common-name-input')?.value?.trim();
-        return { rental_class_id, category, subcategory, short_common_name: short_common_name || '' };
+        const is_hand_counted = row.querySelector('.hand-counted-checkbox')?.checked || false;
+        return { rental_class_id, category, subcategory, common_name: common_name || '', short_common_name: short_common_name || '', is_hand_counted };
     }
 
     function collectMappings() {
@@ -72,7 +75,7 @@ console.log('categories.js version: 2025-07-02-v6 loaded');
         const validMappings = [];
         rows.forEach((row, index) => {
             const mapping = collectRowData(row);
-            if (mapping.rental_class_id && mapping.category && mapping.subcategory) {
+            if ((mapping.rental_class_id && mapping.category && mapping.subcategory) || (mapping.is_hand_counted && mapping.common_name)) {
                 validMappings.push(mapping);
                 console.log(`Collected edited mapping at row ${index}: ${JSON.stringify(mapping)} at ${new Date().toISOString()}`);
             } else {

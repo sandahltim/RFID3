@@ -174,6 +174,13 @@ class HandCountedItems(db.Model):
     timestamp = db.Column(db.DateTime, nullable=False)
     user = db.Column(db.String(50), nullable=False)
 
+class HandCountedCatalog(db.Model):
+    __tablename__ = 'hand_counted_catalog'
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    rental_class_id = db.Column(db.String(50))
+    item_name = db.Column(db.String(255), unique=True, nullable=False)
+
 class UserRentalClassMapping(db.Model):
     __tablename__ = 'user_rental_class_mappings'
 
