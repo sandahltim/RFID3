@@ -2,6 +2,7 @@ from flask import Blueprint, render_template, request, jsonify, current_app
 from .. import db, cache
 from ..models.db_models import ItemMaster, Transaction, HandCountedItems, HandCountedCatalog
 from sqlalchemy import func, desc, or_
+from sqlalchemy.exc import ProgrammingError
 from datetime import datetime
 import logging
 import sys
@@ -329,7 +330,14 @@ def hand_counted_catalog():
     session = None
     try:
         session = db.session()
-        items = session.query(HandCountedCatalog.item_name).all()
+        try:
+            items = session.query(HandCountedCatalog.item_name).all()
+        except ProgrammingError:
+            session.rollback()
+            logger.warning("hand_counted_catalog table missing; returning empty list")
+            current_app.logger.warning("hand_counted_catalog table missing; returning empty list")
+            items = []
+
         item_list = [i.item_name for i in items]
         logger.info(f"Returned hand-counted catalog items: {item_list} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
         return jsonify({'items': item_list})

@@ -7,7 +7,7 @@ from flask import Blueprint, render_template, request, jsonify, current_app
 from .. import db, cache
 from ..models.db_models import RentalClassMapping, UserRentalClassMapping, SeedRentalClass, HandCountedCatalog
 from ..services.api_client import APIClient
-from sqlalchemy.exc import SQLAlchemyError, IntegrityError
+from sqlalchemy.exc import SQLAlchemyError, IntegrityError, ProgrammingError
 from datetime import datetime
 from time import time
 
@@ -179,7 +179,13 @@ def manage_categories():
                 return jsonify({'error': 'Invalid action'}), 400
 
         # GET request
-        hand_counted_entries = session.query(HandCountedCatalog).all()
+        try:
+            hand_counted_entries = session.query(HandCountedCatalog).all()
+        except ProgrammingError:
+            session.rollback()
+            logger.warning("hand_counted_catalog table missing; continuing without entries")
+            current_app.logger.warning("hand_counted_catalog table missing; continuing without entries")
+            hand_counted_entries = []
         hand_counted_names = {entry.item_name for entry in hand_counted_entries}
         mappings = []
         for rental_class_id, mapping in mappings_dict.items():
@@ -296,7 +302,13 @@ def get_mappings():
             common_name_dict = {item['rental_class_id']: item['common_name'] for item in seed_data_copy}
             logger.info(f"Retrieved seed_rental_classes from cache with {len(common_name_dict)} entries")
 
-        hand_counted_entries = session.query(HandCountedCatalog).all()
+        try:
+            hand_counted_entries = session.query(HandCountedCatalog).all()
+        except ProgrammingError:
+            session.rollback()
+            logger.warning("hand_counted_catalog table missing; returning no hand-counted entries")
+            current_app.logger.warning("hand_counted_catalog table missing; returning no hand-counted entries")
+            hand_counted_entries = []
         hand_counted_names = {entry.item_name for entry in hand_counted_entries}
         mappings = []
         for rental_class_id, mapping in mappings_dict.items():
@@ -384,18 +396,23 @@ def update_mappings():
 
             # Handle hand-counted catalog updates
             if common_name:
-                existing_catalog = session.query(HandCountedCatalog).filter_by(item_name=common_name).first()
-                if is_hand_counted:
-                    if not existing_catalog:
-                        catalog_entry = HandCountedCatalog(rental_class_id=rental_class_id, item_name=common_name)
-                        session.add(catalog_entry)
-                        logger.debug(f"Added to hand-counted catalog: {common_name}")
-                    elif rental_class_id and existing_catalog.rental_class_id != rental_class_id:
-                        existing_catalog.rental_class_id = rental_class_id
-                else:
-                    if existing_catalog:
-                        session.delete(existing_catalog)
-                        logger.debug(f"Removed from hand-counted catalog: {common_name}")
+                try:
+                    existing_catalog = session.query(HandCountedCatalog).filter_by(item_name=common_name).first()
+                    if is_hand_counted:
+                        if not existing_catalog:
+                            catalog_entry = HandCountedCatalog(rental_class_id=rental_class_id, item_name=common_name)
+                            session.add(catalog_entry)
+                            logger.debug(f"Added to hand-counted catalog: {common_name}")
+                        elif rental_class_id and existing_catalog.rental_class_id != rental_class_id:
+                            existing_catalog.rental_class_id = rental_class_id
+                    else:
+                        if existing_catalog:
+                            session.delete(existing_catalog)
+                            logger.debug(f"Removed from hand-counted catalog: {common_name}")
+                except ProgrammingError:
+                    session.rollback()
+                    logger.warning("hand_counted_catalog table missing; skipping catalog updates")
+                    current_app.logger.warning("hand_counted_catalog table missing; skipping catalog updates")
 
         session.commit()
         logger.info("Successfully committed rental class mappings")
