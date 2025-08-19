@@ -52,8 +52,8 @@ jobs:
           set -e
           cd /home/tim/RFID3
           git fetch origin
-          git reset --hard origin/main
-          echo "Repository updated to latest main"
+          git reset --hard origin/RFID3dev
+          echo "Repository updated to latest RFID3dev"
 
       - name: Install dependencies
         run: |
