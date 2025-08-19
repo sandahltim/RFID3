@@ -1,13 +1,13 @@
 # app/routes/categories.py
-# categories.py version: 2025-06-26-v28
+# categories.py version: 2025-07-05-v29
 import logging
 import sys
 import json
 from flask import Blueprint, render_template, request, jsonify, current_app
 from .. import db, cache
-from ..models.db_models import RentalClassMapping, UserRentalClassMapping, SeedRentalClass
+from ..models.db_models import RentalClassMapping, UserRentalClassMapping, SeedRentalClass, HandCountedCatalog
 from ..services.api_client import APIClient
-from sqlalchemy.exc import SQLAlchemyError, IntegrityError
+from sqlalchemy.exc import SQLAlchemyError, IntegrityError, ProgrammingError
 from datetime import datetime
 from time import time
 
@@ -179,6 +179,14 @@ def manage_categories():
                 return jsonify({'error': 'Invalid action'}), 400
 
         # GET request
+        try:
+            hand_counted_entries = session.query(HandCountedCatalog).all()
+        except ProgrammingError:
+            session.rollback()
+            logger.warning("hand_counted_catalog table missing; continuing without entries")
+            current_app.logger.warning("hand_counted_catalog table missing; continuing without entries")
+            hand_counted_entries = []
+        hand_counted_names = {entry.item_name for entry in hand_counted_entries}
         mappings = []
         for rental_class_id, mapping in mappings_dict.items():
             common_name = common_name_dict.get(rental_class_id, 'Unknown')
@@ -187,8 +195,21 @@ def manage_categories():
                 'common_name': common_name,
                 'category': mapping['category'],
                 'subcategory': mapping['subcategory'],
-                'short_common_name': mapping['short_common_name']
+                'short_common_name': mapping['short_common_name'],
+                'is_hand_counted': common_name in hand_counted_names
             })
+
+        existing_names = {m['common_name'] for m in mappings}
+        for entry in hand_counted_entries:
+            if entry.item_name not in existing_names:
+                mappings.append({
+                    'rental_class_id': entry.rental_class_id or '',
+                    'common_name': entry.item_name,
+                    'category': '',
+                    'subcategory': '',
+                    'short_common_name': '',
+                    'is_hand_counted': True
+                })
         logger.info(f"Fetched {len(mappings)} category mappings")
         current_app.logger.info(f"Fetched {len(mappings)} category mappings")
         return render_template('categories.html', mappings=mappings, cache_bust=int(time()))
@@ -281,6 +302,14 @@ def get_mappings():
             common_name_dict = {item['rental_class_id']: item['common_name'] for item in seed_data_copy}
             logger.info(f"Retrieved seed_rental_classes from cache with {len(common_name_dict)} entries")
 
+        try:
+            hand_counted_entries = session.query(HandCountedCatalog).all()
+        except ProgrammingError:
+            session.rollback()
+            logger.warning("hand_counted_catalog table missing; returning no hand-counted entries")
+            current_app.logger.warning("hand_counted_catalog table missing; returning no hand-counted entries")
+            hand_counted_entries = []
+        hand_counted_names = {entry.item_name for entry in hand_counted_entries}
         mappings = []
         for rental_class_id, mapping in mappings_dict.items():
             common_name = common_name_dict.get(rental_class_id, 'Unknown')
@@ -289,8 +318,22 @@ def get_mappings():
                 'common_name': common_name,
                 'category': mapping['category'],
                 'subcategory': mapping['subcategory'],
-                'short_common_name': mapping['short_common_name']
+                'short_common_name': mapping['short_common_name'],
+                'is_hand_counted': common_name in hand_counted_names
             })
+
+        existing_names = {m['common_name'] for m in mappings}
+        for entry in hand_counted_entries:
+            if entry.item_name not in existing_names:
+                mappings.append({
+                    'rental_class_id': entry.rental_class_id or '',
+                    'common_name': entry.item_name,
+                    'category': '',
+                    'subcategory': '',
+                    'short_common_name': '',
+                    'is_hand_counted': True
+                })
+
         logger.info(f"Returning {len(mappings)} category mappings")
         current_app.logger.info(f"Returning {len(mappings)} category mappings")
         return jsonify(mappings)
@@ -324,30 +367,52 @@ def update_mappings():
             category = mapping.get('category')
             subcategory = mapping.get('subcategory', '')
             short_common_name = mapping.get('short_common_name', '')
+            common_name = mapping.get('common_name')
+            is_hand_counted = mapping.get('is_hand_counted', False)
 
-            if not rental_class_id or not category:
-                logger.warning(f"Skipping invalid mapping due to missing rental_class_id or category: {mapping}")
-                current_app.logger.warning(f"Skipping invalid mapping due to missing rental_class_id or category: {mapping}")
+            if rental_class_id and category:
+                existing = session.query(UserRentalClassMapping).filter_by(rental_class_id=rental_class_id).first()
+                if existing:
+                    existing.category = category
+                    existing.subcategory = subcategory
+                    existing.short_common_name = short_common_name
+                    existing.updated_at = datetime.now()
+                    logger.debug(f"Updated existing mapping: rental_class_id={rental_class_id}, category={category}, subcategory={subcategory}")
+                else:
+                    user_mapping = UserRentalClassMapping(
+                        rental_class_id=rental_class_id,
+                        category=category,
+                        subcategory=subcategory or '',
+                        short_common_name=short_common_name or '',
+                        created_at=datetime.now(),
+                        updated_at=datetime.now()
+                    )
+                    session.add(user_mapping)
+                    logger.debug(f"Added new mapping: rental_class_id={rental_class_id}, category={category}, subcategory={subcategory}")
+            elif not (is_hand_counted and common_name):
+                logger.warning(f"Skipping invalid mapping due to missing required fields: {mapping}")
+                current_app.logger.warning(f"Skipping invalid mapping due to missing required fields: {mapping}")
                 continue
 
-            existing = session.query(UserRentalClassMapping).filter_by(rental_class_id=rental_class_id).first()
-            if existing:
-                existing.category = category
-                existing.subcategory = subcategory
-                existing.short_common_name = short_common_name
-                existing.updated_at = datetime.now()
-                logger.debug(f"Updated existing mapping: rental_class_id={rental_class_id}, category={category}, subcategory={subcategory}")
-            else:
-                user_mapping = UserRentalClassMapping(
-                    rental_class_id=rental_class_id,
-                    category=category,
-                    subcategory=subcategory or '',
-                    short_common_name=short_common_name or '',
-                    created_at=datetime.now(),
-                    updated_at=datetime.now()
-                )
-                session.add(user_mapping)
-                logger.debug(f"Added new mapping: rental_class_id={rental_class_id}, category={category}, subcategory={subcategory}")
+            # Handle hand-counted catalog updates
+            if common_name:
+                try:
+                    existing_catalog = session.query(HandCountedCatalog).filter_by(item_name=common_name).first()
+                    if is_hand_counted:
+                        if not existing_catalog:
+                            catalog_entry = HandCountedCatalog(rental_class_id=rental_class_id, item_name=common_name)
+                            session.add(catalog_entry)
+                            logger.debug(f"Added to hand-counted catalog: {common_name}")
+                        elif rental_class_id and existing_catalog.rental_class_id != rental_class_id:
+                            existing_catalog.rental_class_id = rental_class_id
+                    else:
+                        if existing_catalog:
+                            session.delete(existing_catalog)
+                            logger.debug(f"Removed from hand-counted catalog: {common_name}")
+                except ProgrammingError:
+                    session.rollback()
+                    logger.warning("hand_counted_catalog table missing; skipping catalog updates")
+                    current_app.logger.warning("hand_counted_catalog table missing; skipping catalog updates")
 
         session.commit()
         logger.info("Successfully committed rental class mappings")

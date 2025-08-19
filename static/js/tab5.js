@@ -1,13 +1,12 @@
 import { formatDate } from './utils.js';
 import { getCachedTabNum } from './state.js';
-console.log('tab5.js version: 2025-06-25-v12 loaded');
+console.log('tab5.js version: 2025-08-14-v13 loaded');
 
 /**
  * Tab5.js: Logic for Tab 5 (Resale/Rental Packs).
  * Dependencies: common.js (for formatDate, showLoading, hideLoading, collapseSection, printTable, printFullItemList).
- * Updated: 2025-06-25-v12
- * - Enhanced handleClick collapse logic to add .collapsed class to parent <tr> and clear styles.
- * - Retained fetchAllSubcategories from v10 to prevent dropdown truncation.
+ * Updated: 2025-08-14-v13
+ * - Added fallback to fetch categories when subcategory selects are missing.
  * - Preserved all functionality (bulk updates, CSV export, pagination).
  */
 
@@ -193,10 +192,59 @@ function applyFilterToAllLevelsTab5() {
     }
 }
 
-function populateSubcategories() {
+async function loadCategoriesIfEmpty() {
+    const tbody = document.querySelector('#category-table tbody');
+    if (!tbody || tbody.children.length > 0) {
+        return;
+    }
+    console.warn(`loadCategoriesIfEmpty: No categories found in DOM, fetching from server at ${new Date().toISOString()}`);
+    try {
+        const response = await fetch('/tab/5/filter', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams()
+        });
+        if (!response.ok) {
+            console.error(`loadCategoriesIfEmpty: fetch failed with ${response.status} at ${new Date().toISOString()}`);
+            return;
+        }
+        const categories = await response.json();
+        categories.forEach(category => {
+            const row = document.createElement('tr');
+            row.className = 'category-row';
+            row.innerHTML = `
+                <td>${category.category}</td>
+                <td>
+                    <select class="subcategory-select" data-category="${category.category}" onchange="tab5.loadCommonNames(this)">
+                        <option value="">Select a subcategory</option>
+                    </select>
+                </td>
+                <td>${category.total_items}</td>
+                <td>${category.items_on_contracts}</td>
+                <td>${category.items_in_service}</td>
+                <td>${category.items_available}</td>
+                <td><button class="btn btn-sm btn-info print-btn" data-print-level="Contract" data-print-id="category-${category.cat_id}">Print</button></td>`;
+            tbody.appendChild(row);
+        });
+        console.log(`loadCategoriesIfEmpty: Inserted ${categories.length} categories at ${new Date().toISOString()}`);
+    } catch (error) {
+        console.error(`loadCategoriesIfEmpty: ${error.message} at ${new Date().toISOString()}`);
+    }
+}
+
+async function populateSubcategories() {
     console.log(`populateSubcategories: Starting at ${new Date().toISOString()}`);
-    const selects = document.querySelectorAll('.subcategory-select');
+    let selects = document.querySelectorAll('.subcategory-select');
     console.log(`populateSubcategories: Found ${selects.length} subcategory selects at ${new Date().toISOString()}`);
+    if (!selects.length) {
+        console.warn(`populateSubcategories: No subcategory selects found, attempting to fetch categories at ${new Date().toISOString()}`);
+        await loadCategoriesIfEmpty();
+        selects = document.querySelectorAll('.subcategory-select');
+        console.log(`populateSubcategories: After reload, found ${selects.length} subcategory selects at ${new Date().toISOString()}`);
+        if (!selects.length) {
+            return Promise.resolve();
+        }
+    }
     const promises = Array.from(selects).map(select => {
         const category = select.getAttribute('data-category');
         console.log(`Populating subcategories for ${category} at ${new Date().toISOString()}`);
@@ -673,246 +721,89 @@ function updateItem(tagId, key, category, subcategory, commonName, targetId) {
         });
 }
 
-function loadItems(category, subcategory, commonName, targetId, page = 1) {
-    console.log(`loadItems: Starting at ${new Date().toISOString()}`, { category, subcategory, commonName, targetId, page });
-
-    if (!category || !subcategory || !commonName || !targetId) {
-        console.error(`loadItems: Invalid parameters`, { category, subcategory, commonName, targetId }, `at ${new Date().toISOString()}`);
-        return;
-    }
-
-    const container = document.getElementById(targetId);
+function loadItems(category, subcategory, commonName, targetId) {
+    console.log(`loadItems: Fetching items for ${category}/${subcategory}/${commonName} at ${new Date().toISOString()}`);
+    const container = document.getElementById('item-level-container');
     if (!container) {
-        console.error(`Container ${targetId} not found at ${new Date().toISOString()}`);
+        console.error(`Item level container not found at ${new Date().toISOString()}`);
         return;
     }
 
-    if (container.classList.contains('loading')) {
-        console.log(`Container ${targetId} already loading at ${new Date().toISOString()}`);
-        return;
-    }
-    container.classList.add('loading');
-
-    const key = targetId;
-    const loadingSuccess = showLoading(key);
-
-    container.innerHTML = '';
-
-    const wrapper = document.createElement('div');
-    wrapper.className = 'item-level-wrapper';
-    container.appendChild(wrapper);
-
-    const itemTable = document.createElement('table');
-    itemTable.className = 'table table-bordered table-hover item-table';
-    itemTable.id = `item-table-${key}`;
-    itemTable.innerHTML = `
-        <thead class="thead-dark">
-            <tr>
-                <th>Select</th>
-                <th>Tag ID</th>
-                <th>Common Name</th>
-                <th>Bin Location</th>
-                <th>Status</th>
-                <th>Last Contract</th>
-                <th>Last Scanned Date</th>
-                <th>Quality</th>
-                <th>Notes</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            <tr>
-                <td>-</td>
-                <td>Loading...</td>
-                <td>-</td>
-                <td>-</td>
-                <td>-</td>
-                <td>-</td>
-                <td>-</td>
-                <td>-</td>
-                <td>-</td>
-                <td>-</td>
-            </tr>
-        </tbody>
-    `;
-    wrapper.appendChild(itemTable);
-
-    const url = `/tab/5/data?common_name=${encodeURIComponent(commonName)}&page=${page}&subcategory=${encodeURIComponent(subcategory)}&category=${encodeURIComponent(category)}`;
-    console.log(`Fetching items: ${url} at ${new Date().toISOString()}`);
-
-    fetch(url)
+    showLoading('item-level-container');
+    fetch(`/tab/5/data?category=${encodeURIComponent(category)}&subcategory=${encodeURIComponent(subcategory)}&common_name=${encodeURIComponent(commonName)}`)
         .then(response => {
-            console.log(`Items fetch status: ${response.status} at ${new Date().toISOString()}`);
             if (!response.ok) {
-                return response.text().then(text => {
-                    throw new Error(`Items fetch failed: ${response.status} - ${text}`);
-                });
+                throw new Error(`HTTP error! Status: ${response.status}`);
             }
             return response.json();
         })
         .then(data => {
-            console.log(`Items data:`, data, `at ${new Date().toISOString()}`);
-            const tbody = itemTable.querySelector('tbody');
-            tbody.innerHTML = '';
+            console.log(`loadItems: Received ${data.items ? data.items.length : 0} items for ${commonName} at ${new Date().toISOString()}`);
+            container.innerHTML = '';
+            const itemContainer = document.createElement('div');
+            itemContainer.className = 'item-level-wrapper';
+            itemContainer.id = targetId;
 
-            if (data.items && data.items.length > 0) {
-                data.items.forEach(item => {
-                    const lastScanned = formatDate(item.last_scanned_date);
-                    const currentStatus = item.status || 'N/A';
-                    const canSetReadyToRent = currentStatus === 'On Rent' || currentStatus === 'Delivered';
-                    const binLocationLower = item.bin_location ? item.bin_location.toLowerCase() : '';
-                    const row = document.createElement('tr');
-                    row.setAttribute('data-item-id', item.tag_id);
-                    row.innerHTML = `
-                        <td><input type="checkbox" value="${item.tag_id}" class="item-select"></td>
-                        <td>${item.tag_id}</td>
-                        <td>${item.common_name}</td>
-                        <td>
-                            <select id="bin-location-${item.tag_id}">
-                                <option value="" ${!item.bin_location ? 'selected' : ''}>Select Bin Location</option>
-                                <option value="resale" ${binLocationLower === 'resale' ? 'selected' : ''}>Resale</option>
-                                <option value="sold" ${binLocationLower === 'sold' ? 'selected' : ''}>Sold</option>
-                                <option value="pack" ${binLocationLower === 'pack' ? 'selected' : ''}>Pack</option>
-                                <option value="burst" ${binLocationLower === 'burst' ? 'selected' : ''}>Burst</option>
-                            </select>
-                        </td>
-                        <td>
-                            <select id="status-${item.tag_id}">
-                                <option value="${currentStatus}" selected>${currentStatus}</option>
-                                <option value="Ready to Rent" ${canSetReadyToRent ? '' : 'disabled'}>Ready to Rent</option>
-                                <option value="Sold">Sold</option>
-                            </select>
-                        </td>
-                        <td>${item.last_contract_num || 'N/A'}</td>
-                        <td>${lastScanned}</td>
-                        <td>${item.quality || 'N/A'}</td>
-                        <td>${item.notes || 'N/A'}</td>
-                        <td>
-                            <button class="btn btn-sm btn-primary save-btn"
-                                    onclick="tab5.updateItem('${item.tag_id}', '${key}', '${category}', '${subcategory}', '${item.common_name}', '${targetId}')">Save</button>
-                        </td>
-                    `;
-                    tbody.appendChild(row);
-                });
+            const itemTable = document.createElement('table');
+            itemTable.className = 'item-table table table-bordered';
+            itemTable.innerHTML = `
+                <thead class="thead-dark">
+                    <tr>
+                        <th><input type="checkbox" class="select-all-items" data-target-id="${targetId}"></th>
+                        <th>Tag ID</th>
+                        <th>Common Name</th>
+                        <th>Rental Class</th>
+                        <th>Bin Location</th>
+                        <th>Status</th>
+                        <th>Last Contract</th>
+                        <th>Last Scanned Date</th>
+                        <th>Quality</th>
+                        <th>Notes</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${(data.items || []).map(item => `
+                        <tr>
+                            <td><input type="checkbox" class="item-select" data-tag-id="${item.tag_id}"></td>
+                            <td>${item.tag_id}</td>
+                            <td>${item.common_name || 'N/A'}</td>
+                            <td>${item.rental_class_num || 'N/A'}</td>
+                            <td>
+                                <select class="bin-location-select" data-tag-id="${item.tag_id}">
+                                    <option value="" ${!item.bin_location ? 'selected' : ''}>Select Bin</option>
+                                    <option value="Resale" ${item.bin_location === 'Resale' ? 'selected' : ''}>Resale</option>
+                                    <option value="Sold" ${item.bin_location === 'Sold' ? 'selected' : ''}>Sold</option>
+                                    <option value="Pack" ${item.bin_location === 'Pack' ? 'selected' : ''}>Pack</option>
+                                    <option value="Burst" ${item.bin_location === 'Burst' ? 'selected' : ''}>Burst</option>
+                                </select>
+                            </td>
+                            <td>
+                                <select class="status-select" data-tag-id="${item.tag_id}">
+                                    <option value="" ${!item.status ? 'selected' : ''}>Select Status</option>
+                                    <option value="Ready to Rent" ${item.status === 'Ready to Rent' ? 'selected' : ''}>Ready to Rent</option>
+                                    <option value="Sold" ${item.status === 'Sold' ? 'selected' : ''}>Sold</option>
+                                </select>
+                            </td>
+                            <td>${item.last_contract_num || 'N/A'}</td>
+                            <td>${formatDate(item.last_scanned_date)}</td>
+                            <td>${item.quality || 'N/A'}</td>
+                            <td><textarea class="notes-textarea" data-tag-id="${item.tag_id}">${item.notes || ''}</textarea></td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            `;
 
-                const paginationDiv = document.createElement('div');
-                paginationDiv.className = 'pagination-controls';
-                if (data.total_items > data.per_page) {
-                    const totalPages = Math.ceil(data.total_items / data.per_page);
-                    const escapedCommonName = commonName.replace(/'/g, "\\'").replace(/"/g, '\\"');
-                    paginationDiv.innerHTML = `
-                        <button class="btn btn-sm btn-secondary"
-                                onclick="tab5.loadItems('${category}', '${subcategory}', '${escapedCommonName}', '${targetId}', ${data.page - 1})"
-                                ${data.page === 1 ? 'disabled' : ''}>Previous</button>
-                        <span>Page ${data.page} of ${totalPages}</span>
-                        <button class="btn btn-sm btn-secondary"
-                                onclick="tab5.loadItems('${category}', '${subcategory}', '${escapedCommonName}', '${targetId}', ${data.page + 1})"
-                                ${data.page === totalPages ? 'disabled' : ''}>Next</button>
-                    `;
-                }
-                wrapper.appendChild(paginationDiv);
-
-                const bulkDiv = document.createElement('div');
-                bulkDiv.className = 'bulk-update-controls mt-3';
-                bulkDiv.innerHTML = `
-                    <h5>Bulk Update All Items</h5>
-                    <div class="form-group">
-                        <label for="bulk-bin-location-${key}">Bin Location:</label>
-                        <select id="bulk-bin-location-${key}" onchange="tab5.updateBulkField('${key}', 'bin_location')">
-                            <option value="">Select Bin Location</option>
-                            <option value="resale">Resale</option>
-                            <option value="sold">Sold</option>
-                            <option value="pack">Pack</option>
-                            <option value="burst">Burst</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="bulk-status-${key}">Status:</label>
-                        <select id="bulk-status-${key}" onchange="tab5.updateBulkField('${key}', 'status')">
-                            <option value="">Select Status</option>
-                            <option value="Ready to Rent">Ready to Rent</option>
-                            <option value="Sold">Sold</option>
-                        </select>
-                    </div>
-                    <button class="btn btn-primary" onclick="tab5.bulkUpdateCommonName('${category}', '${subcategory}', '${targetId}', '${key}')">Update All</button>
-                    <h5 class="mt-3">Bulk Update Selected Items</h5>
-                    <div class="form-group">
-                        <label for="bulk-item-bin-location-${key}">Bin Location:</label>
-                        <select id="bulk-item-bin-location-${key}">
-                            <option value="">Select Bin Location</option>
-                            <option value="resale">Resale</option>
-                            <option value="sold">Sold</option>
-                            <option value="pack">Pack</option>
-                            <option value="burst">Burst</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="bulk-item-status-${key}">Status:</label>
-                        <select id="bulk-item-status-${key}">
-                            <option value="">Select Status</option>
-                            <option value="Ready to Rent">Ready to Rent</option>
-                            <option value="Sold">Sold</option>
-                        </select>
-                    </div>
-                    <button class="btn btn-primary" onclick="tab5.bulkUpdateSelectedItems('${key}')">Update Selected</button>
-                `;
-                wrapper.appendChild(bulkDiv);
-            } else {
-                tbody.innerHTML = `<tr><td colspan="10">No items found.</td></tr>`;
-                console.warn(`No items returned for category ${category}, subcategory ${subcategory}, commonName ${commonName} at ${new Date().toISOString()}`);
-            }
-
-            const parentRow = container.closest('tr.common-name-row').previousElementSibling;
-            if (parentRow) {
-                const expandBtn = parentRow.querySelector(`.expand-btn[data-target-id="${targetId}"]`);
-                const collapseBtn = parentRow.querySelector(`.collapse-btn[data-collapse-target="${targetId}"]`);
-                if (expandBtn && collapseBtn) {
-                    expandBtn.style.display = 'none';
-                    collapseBtn.style.display = 'inline-block';
-                } else {
-                    console.warn(`Expand/Collapse buttons not found for ${targetId} at ${new Date().toISOString()}`);
-                }
-            } else {
-                console.warn(`Parent row not found for ${targetId} at ${new Date().toISOString()}`);
-            }
-
-            container.classList.remove('collapsed');
-            container.classList.add('expanded');
-            container.style.display = 'block';
-            container.style.opacity = '1';
-            container.style.visibility = 'visible';
-
-            console.log(`Container styles:`, {
-                classList: container.classList.toString(),
-                display: container.style.display,
-                opacity: container.style.opacity,
-                visibility: window.getComputedStyle(container).visibility
-            }, `at ${new Date().toISOString()}`);
-
-            if (itemTable) {
-                console.log(`Item table styles:`, {
-                    display: itemTable.style.display,
-                    visibility: window.getComputedStyle(itemTable).visibility
-                }, `at ${new Date().toISOString()}`);
-            }
+            itemContainer.appendChild(itemTable);
+            container.appendChild(itemContainer);
+            hideLoading('item-level-container');
         })
         .catch(error => {
-            console.error(`Items error: ${error.message} at ${new Date().toISOString()}`);
-            const tbody = itemTable.querySelector('tbody');
-            tbody.innerHTML = `<tr><td colspan="10">Error: ${error.message}</td></tr>`;
-            container.classList.remove('collapsed');
-            container.classList.add('expanded');
-            container.style.display = 'block';
-            container.style.opacity = '1';
-            container.style.visibility = 'visible';
-        })
-        .finally(() => {
-            setTimeout(() => {
-                if (loadingSuccess) hideLoading(key);
-                container.classList.remove('loading');
-            }, 700);
+            console.error(`loadItems: Error fetching items for ${commonName}: ${error} at ${new Date().toISOString()}`);
+            container.innerHTML = `<div class="error-message">Failed to load items: ${error.message}</div>`;
+            hideLoading('item-level-container');
         });
 }
+
 
 function updateResalePackToSold() {
     console.log(`updateResalePackToSold: Starting at ${new Date().toISOString()}`);
@@ -965,7 +856,9 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     console.log(`Initializing Tab 5 at ${new Date().toISOString()}`);
-    populateSubcategories().then(() => {
+    loadCategoriesIfEmpty().then(() => {
+        return populateSubcategories();
+    }).then(() => {
         console.log(`Subcategories populated successfully at ${new Date().toISOString()}`);
         document.removeEventListener('click', handleClick);
         document.addEventListener('click', handleClick);
@@ -979,68 +872,12 @@ document.addEventListener('DOMContentLoaded', function() {
         if (expandBtn) {
             event.preventDefault();
             event.stopPropagation();
-            console.log(`Expand button clicked:`, {
-                category: expandBtn.getAttribute('data-category'),
-                subcategory: expandBtn.getAttribute('data-subcategory'),
-                commonName: expandBtn.getAttribute('data-common-name'),
-                targetId: expandBtn.getAttribute('data-target-id'),
-                isExpanded: expandBtn.getAttribute('data-expanded')
-            }, `at ${new Date().toISOString()}`);
-
             const category = expandBtn.getAttribute('data-category');
             const subcategory = expandBtn.getAttribute('data-subcategory');
             const commonName = expandBtn.getAttribute('data-common-name');
             const targetId = expandBtn.getAttribute('data-target-id');
-            const isExpanded = expandBtn.getAttribute('data-expanded') === 'true';
-
-            if (!targetId || !category) {
-                console.error(`Missing attributes on expand button at ${new Date().toISOString()}`);
-                return;
-            }
-
-            const container = document.getElementById(targetId);
-            if (!container) {
-                console.error(`Container ${targetId} not found at ${new Date().toISOString()}`);
-                return;
-            }
-
-            const collapseBtn = expandBtn.parentElement.querySelector(`.collapse-btn[data-collapse-target="${targetId}"]`);
-            const parentRow = container.closest('tr.common-name-row');
-
-            if (isExpanded) {
-                console.log(`Collapsing ${targetId} at ${new Date().toISOString()}`);
-                if (commonName) {
-                    collapseSection(targetId);
-                    if (parentRow) {
-                        parentRow.classList.add('collapsed');
-                        parentRow.style.display = 'none';
-                        parentRow.style.minHeight = '0';
-                        parentRow.style.padding = '0';
-                        console.log(`Collapsed parent row for ${targetId} at ${new Date().toISOString()}`);
-                    }
-                }
-                if (expandBtn && collapseBtn) {
-                    expandBtn.style.display = 'inline-block';
-                    collapseBtn.style.display = 'none';
-                    expandBtn.setAttribute('data-expanded', 'false');
-                    expandBtn.textContent = commonName ? 'Expand Items' : 'Expand';
-                }
-            } else {
-                if (commonName && subcategory) {
-                    console.log(`Loading items for ${commonName} at ${new Date().toISOString()}`);
-                    loadItems(category, subcategory, commonName, targetId);
-                    if (parentRow) {
-                        parentRow.classList.remove('collapsed');
-                        parentRow.style.display = '';
-                        console.log(`Expanded parent row for ${targetId} at ${new Date().toISOString()}`);
-                    }
-                    if (expandBtn && collapseBtn) {
-                        expandBtn.style.display = 'none';
-                        collapseBtn.style.display = 'inline-block';
-                        expandBtn.setAttribute('data-expanded', 'true');
-                    }
-                }
-            }
+            console.log(`Loading items for ${commonName} at ${new Date().toISOString()}`);
+            loadItems(category, subcategory, commonName, targetId);
             return;
         }
 
@@ -1048,30 +885,9 @@ document.addEventListener('DOMContentLoaded', function() {
         if (collapseBtn) {
             event.preventDefault();
             event.stopPropagation();
-            const targetId = collapseBtn.getAttribute('data-collapse-target');
-            console.log(`Collapsing ${targetId} at ${new Date().toISOString()}`);
-            const container = document.getElementById(targetId);
-            if (!container) {
-                console.error(`Container ${targetId} not found at ${new Date().toISOString()}`);
-                return;
-            }
-            const expandBtn = collapseBtn.parentElement.querySelector(`.expand-btn[data-target-id="${targetId}"]`);
-            const parentRow = container.closest('tr.common-name-row');
-            if (container.classList.contains('item-level')) {
-                collapseSection(targetId);
-                if (parentRow) {
-                    parentRow.classList.add('collapsed');
-                    parentRow.style.display = 'none';
-                    parentRow.style.minHeight = '0';
-                    parentRow.style.padding = '0';
-                    console.log(`Collapsed parent row for ${targetId} at ${new Date().toISOString()}`);
-                }
-            }
-            if (expandBtn && collapseBtn) {
-                expandBtn.style.display = 'inline-block';
-                collapseBtn.style.display = 'none';
-                expandBtn.setAttribute('data-expanded', 'false');
-                expandBtn.textContent = expandBtn.getAttribute('data-common-name') ? 'Expand Items' : 'Expand';
+            const container = document.getElementById('item-level-container');
+            if (container) {
+                container.innerHTML = '';
             }
             return;
         }

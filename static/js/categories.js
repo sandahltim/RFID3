@@ -1,20 +1,20 @@
-console.log('categories.js version: 2025-06-26-v5 loaded');
+console.log('categories.js version: 2025-07-02-v6 loaded');
 
 /**
  * categories.js: Logic for Manage Categories tab.
  * Dependencies: None (self-contained).
- * Updated: 2025-06-26-v5
- * - Fixed endpoint URL from /categories/mapping to /categories/mappings.
- * - Added tracking for edited rows with data-edited attribute.
- * - Modified collectMappings to send only edited mappings.
- * - Added clearEdits function for resetting changes.
- * - Preserved all existing functionality.
+ * Updated: 2025-07-02-v6
+ * - Fixed duplicate rows caused by array mutation during load.
+ * - Added client-side sorting for Category, Subcategory, and Common Name.
+ * - Implemented floating action buttons at the bottom of the view.
+ * - Preserved existing functionality.
  */
 
 (function() {
     let mappings = [];
+    let currentSort = { column: null, direction: 'asc' };
 
-    function addMappingRow(mapping = {category: '', subcategory: '', rental_class_id: '', common_name: 'N/A', short_common_name: ''}) {
+    function addMappingRow(mapping = {category: '', subcategory: '', rental_class_id: '', common_name: '', short_common_name: '', is_hand_counted: false}) {
         const table = document.getElementById('mappings-table');
         if (!table) {
             console.error(`Mappings table not found at ${new Date().toISOString()}`);
@@ -28,8 +28,9 @@ console.log('categories.js version: 2025-06-26-v5 loaded');
             <td><input type="text" class="form-control category-input" value="${mapping.category || ''}"></td>
             <td><input type="text" class="form-control subcategory-input" value="${mapping.subcategory || ''}"></td>
             <td><input type="text" class="form-control rental-class-id-input" value="${mapping.rental_class_id || ''}"></td>
-            <td>${mapping.common_name || 'N/A'}</td>
+            <td><input type="text" class="form-control common-name-input" value="${mapping.common_name || ''}" ${mapping.rental_class_id ? 'readonly' : ''}></td>
             <td><input type="text" class="form-control short-common-name-input" value="${mapping.short_common_name || ''}"></td>
+            <td class="text-center"><input type="checkbox" class="form-check-input hand-counted-checkbox" ${mapping.is_hand_counted ? 'checked' : ''}></td>
             <td>
                 <button class="btn btn-danger btn-sm remove-btn" onclick="window.categories.removeMappingRow(this)">Remove</button>
             </td>
@@ -63,8 +64,10 @@ console.log('categories.js version: 2025-06-26-v5 loaded');
         const category = row.querySelector('.category-input')?.value?.trim();
         const subcategory = row.querySelector('.subcategory-input')?.value?.trim();
         const rental_class_id = row.querySelector('.rental-class-id-input')?.value?.trim();
+        const common_name = row.querySelector('.common-name-input')?.value?.trim();
         const short_common_name = row.querySelector('.short-common-name-input')?.value?.trim();
-        return { rental_class_id, category, subcategory, short_common_name: short_common_name || '' };
+        const is_hand_counted = row.querySelector('.hand-counted-checkbox')?.checked || false;
+        return { rental_class_id, category, subcategory, common_name: common_name || '', short_common_name: short_common_name || '', is_hand_counted };
     }
 
     function collectMappings() {
@@ -72,7 +75,7 @@ console.log('categories.js version: 2025-06-26-v5 loaded');
         const validMappings = [];
         rows.forEach((row, index) => {
             const mapping = collectRowData(row);
-            if (mapping.rental_class_id && mapping.category && mapping.subcategory) {
+            if ((mapping.rental_class_id && mapping.category && mapping.subcategory) || (mapping.is_hand_counted && mapping.common_name)) {
                 validMappings.push(mapping);
                 console.log(`Collected edited mapping at row ${index}: ${JSON.stringify(mapping)} at ${new Date().toISOString()}`);
             } else {
@@ -133,6 +136,51 @@ console.log('categories.js version: 2025-06-26-v5 loaded');
         });
     }
 
+    function getCellValue(row, column) {
+        switch(column) {
+            case 'category':
+                return row.querySelector('.category-input')?.value?.toLowerCase() || '';
+            case 'subcategory':
+                return row.querySelector('.subcategory-input')?.value?.toLowerCase() || '';
+            case 'common_name':
+                return row.querySelector('.common-name-input')?.value?.toLowerCase() || '';
+            default:
+                return '';
+        }
+    }
+
+    function updateSortIndicators(column, direction) {
+        document.querySelectorAll('#mappings-table th.sortable').forEach(th => {
+            let arrow = th.querySelector('.sort-arrow');
+            if (!arrow) {
+                arrow = document.createElement('span');
+                arrow.className = 'sort-arrow';
+                th.appendChild(arrow);
+            }
+            if (th.dataset.column === column) {
+                arrow.textContent = direction === 'asc' ? '↑' : '↓';
+            } else {
+                arrow.textContent = '';
+            }
+        });
+    }
+
+    function sortTable(column) {
+        const table = document.getElementById('mappings-table');
+        if (!table) return;
+        const tbody = table.querySelector('tbody');
+        const rows = Array.from(tbody.querySelectorAll('tr'));
+        const direction = currentSort.column === column && currentSort.direction === 'asc' ? 'desc' : 'asc';
+        rows.sort((a, b) => {
+            const aVal = getCellValue(a, column);
+            const bVal = getCellValue(b, column);
+            return direction === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+        });
+        rows.forEach(row => tbody.appendChild(row));
+        currentSort = { column, direction };
+        updateSortIndicators(column, direction);
+    }
+
     document.addEventListener('DOMContentLoaded', () => {
         console.log(`categories.js: DOMContentLoaded triggered at ${new Date().toISOString()}`);
         const table = document.getElementById('mappings-table');
@@ -140,7 +188,12 @@ console.log('categories.js version: 2025-06-26-v5 loaded');
             console.error(`Mappings table not found on page load at ${new Date().toISOString()}`);
             return;
         }
-        table.innerHTML = '<tbody></tbody>'; // Ensure tbody exists
+        const existingTbody = table.querySelector('tbody');
+        if (existingTbody) {
+            existingTbody.innerHTML = '';
+        } else {
+            table.appendChild(document.createElement('tbody'));
+        }
         fetch('/categories/mappings', {
             method: 'GET',
             headers: {'Content-Type': 'application/json'}
@@ -160,14 +213,15 @@ console.log('categories.js version: 2025-06-26-v5 loaded');
                 console.error('Error loading mappings:', data.error, `at ${new Date().toISOString()}`);
                 return;
             }
-            mappings = data || [];
-            if (mappings.length === 0) {
+            mappings = [];
+            const dataMappings = data || [];
+            if (dataMappings.length === 0) {
                 console.warn(`No mappings returned from /categories/mappings at ${new Date().toISOString()}`);
                 addMappingRow(); // Add an empty row for user input
             } else {
-                mappings.forEach(mapping => addMappingRow(mapping));
+                dataMappings.forEach(mapping => addMappingRow(mapping));
             }
-            console.log(`Loaded ${mappings.length} mappings at ${new Date().toISOString()}`);
+            console.log(`Loaded ${dataMappings.length} mappings at ${new Date().toISOString()}`);
         })
         .then(() => {
             const addButton = document.getElementById('add-mapping-btn');
@@ -188,6 +242,9 @@ console.log('categories.js version: 2025-06-26-v5 loaded');
                 clearButton.addEventListener('click', clearEdits);
                 console.log('Clear changes button initialized');
             }
+            document.querySelectorAll('#mappings-table th.sortable').forEach(th => {
+                th.addEventListener('click', () => sortTable(th.dataset.column));
+            });
         })
         .catch(error => {
             console.error('Error loading mappings:', error, `at ${new Date().toISOString()}`);
@@ -201,6 +258,7 @@ console.log('categories.js version: 2025-06-26-v5 loaded');
         addMappingRow,
         removeMappingRow,
         confirmSaveMappings,
-        clearEdits
+        clearEdits,
+        sortTable
     };
 })();

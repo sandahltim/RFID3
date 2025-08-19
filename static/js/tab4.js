@@ -345,67 +345,100 @@ function filterHandCountedItems() {
     }
 }
 
-function toggleNewContractInput() {
+window.toggleNewContractInput = function toggleNewContractInput() {
     const contractDropdown = document.getElementById('hand-counted-contract-number');
     const newContractInput = document.getElementById('new-contract-number');
     if (newContractInput.style.display === 'none') {
+        fetch('/tab/4/next_contract_number')
+            .then(response => response.json())
+            .then(data => {
+                newContractInput.value = data.next_contract_number || 'L1';
+            })
+            .catch(() => {
+                newContractInput.value = 'L1';
+            });
         newContractInput.style.display = 'block';
         contractDropdown.disabled = true;
     } else {
         newContractInput.style.display = 'none';
         newContractInput.value = '';
         contractDropdown.disabled = false;
-        updateItemDropdown();
+        window.updateItemDropdown();
     }
-}
-
-function toggleNewItemInput() {
+};
+window.handleItemSelection = function handleItemSelection() {
     const itemDropdown = document.getElementById('hand-counted-item-name');
     const newItemInput = document.getElementById('new-item-name');
-    if (newItemInput.style.display === 'none') {
+    if (itemDropdown.value === '__other') {
         newItemInput.style.display = 'block';
-        itemDropdown.disabled = true;
     } else {
         newItemInput.style.display = 'none';
         newItemInput.value = '';
-        itemDropdown.disabled = false;
     }
-}
+};
 
-function updateItemDropdown() {
+window.updateItemDropdown = function updateItemDropdown() {
     const contractDropdown = document.getElementById('hand-counted-contract-number');
     const itemDropdown = document.getElementById('hand-counted-item-name');
     const newContractInput = document.getElementById('new-contract-number');
     const contractNumber = newContractInput.style.display === 'block' ? newContractInput.value : contractDropdown.value;
     itemDropdown.innerHTML = '<option value="">Select Item...</option>';
-    if (contractNumber) {
-        console.log(`Fetching items for contract ${contractNumber}`);
-        fetch(`/tab/4/hand_counted_items_by_contract?contract_number=${encodeURIComponent(contractNumber)}`)
-            .then(response => {
-                if (!response.ok) throw new Error(`Failed to fetch items: ${response.status}`);
-                return response.json();
-            })
-            .then(data => {
-                console.log('Items data received:', data);
-                if (data.items && Array.isArray(data.items)) {
-                    data.items.forEach(item => {
-                        const option = document.createElement('option');
-                        option.value = item.item_name;
-                        option.textContent = `${item.item_name} (Qty: ${item.quantity})`;
-                        itemDropdown.appendChild(option);
-                    });
-                } else {
-                    console.warn('No items found or invalid response format:', data);
-                }
-            })
-            .catch(error => {
-                console.error('Error fetching hand-counted items:', error);
-                itemDropdown.innerHTML += '<option value="">No items available</option>';
-            });
-    }
-}
+    fetch('/tab/4/hand_counted_catalog')
+        .then(response => {
+            if (!response.ok) throw new Error(`Failed to fetch catalog: ${response.status}`);
+            return response.json();
+        })
+        .then(catalogData => {
+            const catalogItems = catalogData.items || [];
+            const contractItems = {};
+            const populateOptions = () => {
+                const uniqueNames = new Set([...catalogItems, ...Object.keys(contractItems)]);
+                uniqueNames.forEach(name => {
+                    if (name.toLowerCase() === 'other') return;
+                    const option = document.createElement('option');
+                    const qty = contractItems[name];
+                    option.value = name;
+                    option.textContent = qty ? `${name} (Qty: ${qty})` : name;
+                    itemDropdown.appendChild(option);
+                });
+                const otherOption = document.createElement('option');
+                otherOption.value = '__other';
+                otherOption.textContent = 'Other';
+                itemDropdown.appendChild(otherOption);
+            };
 
-function addHandCountedItem() {
+            if (contractNumber) {
+                console.log(`Fetching items for contract ${contractNumber}`);
+                fetch(`/tab/4/hand_counted_items_by_contract?contract_number=${encodeURIComponent(contractNumber)}`)
+                    .then(response => {
+                        if (!response.ok) throw new Error(`Failed to fetch items: ${response.status}`);
+                        return response.json();
+                    })
+                    .then(data => {
+                        if (data.items && Array.isArray(data.items)) {
+                            data.items.forEach(item => {
+                                contractItems[item.item_name] = item.quantity;
+                            });
+                        }
+                        populateOptions();
+                    })
+                    .catch(error => {
+                        console.error('Error fetching hand-counted items:', error);
+                        populateOptions();
+                    });
+            } else {
+                populateOptions();
+            }
+        })
+        .catch(error => {
+            console.error('Error fetching hand-counted catalog:', error);
+        })
+        .finally(() => {
+            handleItemSelection();
+        });
+};
+
+window.addHandCountedItem = function addHandCountedItem() {
     const contractDropdown = document.getElementById('hand-counted-contract-number');
     const newContractInput = document.getElementById('new-contract-number');
     const itemDropdown = document.getElementById('hand-counted-item-name');
@@ -413,11 +446,16 @@ function addHandCountedItem() {
     const quantityInput = document.getElementById('hand-counted-quantity');
     const employeeInput = document.getElementById('hand-counted-employee');
     const contractNumber = newContractInput.style.display === 'block' ? newContractInput.value : contractDropdown.value;
-    const itemName = newItemInput.style.display === 'block' ? newItemInput.value : itemDropdown.value;
+    const itemValue = itemDropdown.value;
+    const itemName = itemValue === '__other' ? newItemInput.value : itemValue;
     const quantity = parseInt(quantityInput.value);
     const employeeName = employeeInput.value;
     if (!contractNumber || !itemName || !quantity || quantity < 1 || !employeeName) {
         alert('Please fill in all fields: Contract Number, Item Name, Quantity (positive number), and Employee Name.');
+        return;
+    }
+    if (itemValue === '__other' && !newItemInput.value) {
+        alert('Please enter an item name for "Other".');
         return;
     }
     if (!contractNumber.startsWith('L')) {
@@ -444,17 +482,17 @@ function addHandCountedItem() {
             alert('Error: ' + data.error);
         } else {
             alert(data.message);
-            if (newContractInput.style.display === 'block') toggleNewContractInput();
-            if (newItemInput.style.display === 'block') toggleNewItemInput();
+            if (newContractInput.style.display === 'block') window.toggleNewContractInput();
             contractDropdown.value = '';
             itemDropdown.value = '';
             quantityInput.value = '';
             employeeInput.value = '';
-            filterHandCountedItems();
+            handleItemSelection();
+            window.filterHandCountedItems?.();
             addContractToTable(contractNumber);
             updateContractCounts(contractNumber);
             refreshCommonNames(contractNumber);
-            updateItemDropdown(); // Refresh dropdown after successful add
+            window.updateItemDropdown(); // Refresh dropdown after successful add
         }
     })
     .catch(error => {
@@ -464,9 +502,9 @@ function addHandCountedItem() {
         updateContractCounts(contractNumber);
         refreshCommonNames(contractNumber);
     });
-}
+};
 
-function removeHandCountedItem() {
+window.removeHandCountedItem = function removeHandCountedItem() {
     const contractDropdown = document.getElementById('hand-counted-contract-number');
     const newContractInput = document.getElementById('new-contract-number');
     const itemDropdown = document.getElementById('hand-counted-item-name');
@@ -474,11 +512,16 @@ function removeHandCountedItem() {
     const quantityInput = document.getElementById('hand-counted-quantity');
     const employeeInput = document.getElementById('hand-counted-employee');
     const contractNumber = newContractInput.style.display === 'block' ? newContractInput.value : contractDropdown.value;
-    const itemName = newItemInput.style.display === 'block' ? newItemInput.value : itemDropdown.value;
+    const itemValue = itemDropdown.value;
+    const itemName = itemValue === '__other' ? newItemInput.value : itemValue;
     const quantity = parseInt(quantityInput.value);
     const employeeName = employeeInput.value;
     if (!contractNumber || !itemName || !quantity || quantity < 1 || !employeeName) {
         alert('Please fill in all fields: Contract Number, Item Name, Quantity (positive number), and Employee Name.');
+        return;
+    }
+    if (itemValue === '__other' && !newItemInput.value) {
+        alert('Please enter an item name for "Other".');
         return;
     }
     fetch('/tab/4/remove_hand_counted_item', {
@@ -501,17 +544,17 @@ function removeHandCountedItem() {
             alert('Error: ' + data.error);
         } else {
             alert(data.message);
-            if (newContractInput.style.display === 'block') toggleNewContractInput();
-            if (newItemInput.style.display === 'block') toggleNewItemInput();
+            if (newContractInput.style.display === 'block') window.toggleNewContractInput();
             contractDropdown.value = '';
             itemDropdown.value = '';
             quantityInput.value = '';
             employeeInput.value = '';
-            filterHandCountedItems();
+            handleItemSelection();
+            window.filterHandCountedItems?.();
             addContractToTable(contractNumber);
             updateContractCounts(contractNumber);
             refreshCommonNames(contractNumber);
-            updateItemDropdown(); // Refresh dropdown after successful remove
+            window.updateItemDropdown(); // Refresh dropdown after successful remove
         }
     })
     .catch(error => {
@@ -521,7 +564,23 @@ function removeHandCountedItem() {
         updateContractCounts(contractNumber);
         refreshCommonNames(contractNumber);
     });
-}
+};
+
+// Keep the hand-counted contract dropdown in sync with active items
+window.syncContractOption = function(contractNumber, totalItems) {
+    const contractDropdown = document.getElementById('hand-counted-contract-number');
+    const option = Array.from(contractDropdown.options).find(opt => opt.value === contractNumber);
+    if (totalItems > 0) {
+        if (!option) {
+            const newOption = document.createElement('option');
+            newOption.value = contractNumber;
+            newOption.textContent = contractNumber;
+            contractDropdown.appendChild(newOption);
+        }
+    } else if (option) {
+        option.remove();
+    }
+};
 
 function addContractToTable(contractNumber) {
     const tbody = document.getElementById('category-rows');
@@ -562,9 +621,21 @@ function updateContractCounts(contractNumber) {
             return response.json();
         })
         .then(data => {
+            const totalItems = data.total_items || 0;
             const currentCountElement = document.getElementById(`items-on-contract-${contractNumber}`);
             if (currentCountElement) {
-                currentCountElement.textContent = data.total_items || 0;
+                currentCountElement.textContent = totalItems;
+            }
+            window.syncContractOption(contractNumber, totalItems);
+            if (totalItems === 0) {
+                const row = document.querySelector(`#category-rows tr[data-contract-number="${contractNumber}"]`);
+                if (row) {
+                    const nextRow = row.nextElementSibling;
+                    if (nextRow && nextRow.querySelector(`#common-${contractNumber}`)) {
+                        nextRow.remove();
+                    }
+                    row.remove();
+                }
             }
         })
         .catch(error => console.error('Error updating Items on Contract count:', error));
