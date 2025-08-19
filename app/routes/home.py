@@ -26,6 +26,7 @@ def home():
         logger.debug("Serving home page from cache")
         return render_template('home.html', **json.loads(cached_data), cache_bust=int(time()))
 
+    session = None
     try:
         session = db.session()
         logger.info("Starting new session for home")
@@ -121,8 +122,7 @@ def home():
         }
         cache.set(cache_key, json.dumps(render_data), ex=60)  # Cache for 60 seconds
 
-        session.close()
-        return render_template('home.html', 
+        return render_template('home.html',
                               total_items=total_items or 0,
                               items_on_rent=items_on_rent or 0,
                               items_in_service=items_in_service or 0,
@@ -134,9 +134,7 @@ def home():
                               cache_bust=int(time()))
     except Exception as e:
         logger.error(f"Error rendering home page: {str(e)}", exc_info=True)
-        if 'session' in locals():
-            session.close()
-        return render_template('home.html', 
+        return render_template('home.html',
                               total_items=0,
                               items_on_rent=0,
                               items_in_service=0,
@@ -146,3 +144,6 @@ def home():
                               last_refresh='N/A',
                               refresh_type='N/A',
                               cache_bust=int(time()))
+    finally:
+        if session:
+            session.close()

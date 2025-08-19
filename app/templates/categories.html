@@ -1,42 +1,49 @@
 {% extends "base.html" %}
 {% block title %}Manage Categories{% endblock %}
-{% block scripts %}
-    {{ super() }}
-    <script src="{{ url_for('static', filename='js/categories.js') }}?v={{ cache_bust }}"></script>
+{% block extra_head %}
+<style>
+    .fixed-bottom-actions {
+        position: fixed;
+        bottom: 10px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(255,255,255,0.9);
+        padding: 10px;
+        border-radius: 8px;
+        box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        z-index: 1000;
+        display: flex;
+        gap: 10px;
+    }
+    .categories-container {
+        padding-bottom: 80px;
+    }
+    .sort-arrow {
+        margin-left: 4px;
+    }
+</style>
 {% endblock %}
 {% block content %}
-<div class="container mt-4">
+<div class="container mt-4 categories-container">
     <h1>Manage Categories</h1>
-    <div class="mb-3">
-        <button class="btn btn-primary" onclick="window.categories.addMappingRow()">Add Mapping</button>
-        <button class="btn btn-success" onclick="window.categories.confirmSaveMappings()">Save Mappings</button>
-        <button class="btn btn-secondary" onclick="window.categories.clearEdits()">Clear Changes</button>
-    </div>
     <table id="mappings-table" class="table table-bordered">
         <thead class="thead-dark">
             <tr>
-                <th>Category</th>
-                <th>Subcategory</th>
+                <th class="sortable" data-column="category">Category<span class="sort-arrow"></span></th>
+                <th class="sortable" data-column="subcategory">Subcategory<span class="sort-arrow"></span></th>
                 <th>Rental Class ID</th>
-                <th>Common Name</th>
+                <th class="sortable" data-column="common_name">Common Name<span class="sort-arrow"></span></th>
                 <th>Short Common Name</th>
+                <th>Hand Counted</th>
                 <th>Actions</th>
             </tr>
         </thead>
-        <tbody>
-            {% for mapping in categories %}
-            <tr data-edited="false">
-                <td><input type="text" class="form-control category-input" value="{{ mapping.category }}"></td>
-                <td><input type="text" class="form-control subcategory-input" value="{{ mapping.subcategory }}"></td>
-                <td><input type="text" class="form-control rental-class-id-input" value="{{ mapping.rental_class_id }}"></td>
-                <td>{{ mapping.common_name | default('N/A') }}</td>
-                <td><input type="text" class="form-control short-common-name-input" value="{{ mapping.short_common_name }}"></td>
-                <td>
-                    <button class="btn btn-danger btn-sm remove-btn" onclick="window.categories.removeMappingRow(this)">Remove</button>
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
+        <tbody></tbody>
     </table>
+</div>
+<div id="action-buttons" class="fixed-bottom-actions">
+    <button id="add-mapping-btn" class="btn btn-primary">Add Mapping</button>
+    <button id="save-mappings-btn" class="btn btn-success">Save Mappings</button>
+    <button id="clear-changes-btn" class="btn btn-secondary">Clear Changes</button>
 </div>
 {% endblock %}

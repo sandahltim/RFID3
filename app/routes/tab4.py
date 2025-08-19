@@ -1,7 +1,8 @@
 from flask import Blueprint, render_template, request, jsonify, current_app
 from .. import db, cache
-from ..models.db_models import ItemMaster, Transaction, HandCountedItems
+from ..models.db_models import ItemMaster, Transaction, HandCountedItems, HandCountedCatalog
 from sqlalchemy import func, desc, or_
+from sqlalchemy.exc import ProgrammingError
 from datetime import datetime
 import logging
 import sys
@@ -40,6 +41,7 @@ logger.info("Deployed tab4.py version: 2025-05-06-v36 at %s", datetime.now().str
 
 @tab4_bp.route('/tab/4')
 def tab4_view():
+    session = None
     try:
         session = db.session()
         logger.info("Starting new session for tab4 at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
@@ -216,76 +218,55 @@ def tab4_view():
         contracts.sort(key=lambda x: x['contract_number'])  # Default sort for initial load
         logger.info(f"Fetched {len(contracts)} contracts for tab4: {[c['contract_number'] for c in contracts]} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
         current_app.logger.info(f"Fetched {len(contracts)} contracts for tab4: {[c['contract_number'] for c in contracts]} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-        session.close()
         return render_template('tab4.html', contracts=contracts, cache_bust=int(time.time()))
     except Exception as e:
         logger.error(f"Error rendering Tab 4: {str(e)} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'), exc_info=True)
         current_app.logger.error(f"Error rendering Tab 4: {str(e)} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'), exc_info=True)
-        if 'session' in locals():
-            session.close()
         return render_template('tab4.html', contracts=[], cache_bust=int(time.time()))
+    finally:
+        if session:
+            session.close()
 
 @tab4_bp.route('/tab/4/hand_counted_contracts', methods=['GET'])
 def hand_counted_contracts():
-    session = db.session()
+    session = None
     try:
-        # Fetch all contracts starting with 'L' from HandCountedItems
+        session = db.session()
+        # Fetch open laundry contracts from ItemMaster that currently have items
         contracts = session.query(
-            HandCountedItems.contract_number
+            ItemMaster.last_contract_num
         ).filter(
-            HandCountedItems.contract_number.ilike('L%')
-        ).distinct().all()
-
-        contract_list = [contract.contract_number for contract in contracts]
-
-        # Fetch "Added" quantities for these contracts
-        added_quantities = session.query(
-            HandCountedItems.contract_number,
-            func.sum(HandCountedItems.quantity).label('added_quantity')
-        ).filter(
-            HandCountedItems.contract_number.in_(contract_list),
-            HandCountedItems.action == 'Added'
+            ItemMaster.last_contract_num.isnot(None),
+            ItemMaster.last_contract_num != '00000',
+            ItemMaster.status.in_(['On Rent', 'Delivered']),
+            func.upper(ItemMaster.last_contract_num).like('L%')
         ).group_by(
-            HandCountedItems.contract_number
+            ItemMaster.last_contract_num
+        ).having(
+            func.count(ItemMaster.tag_id) > 0
+        ).order_by(
+            ItemMaster.last_contract_num
         ).all()
 
-        added_quantities_dict = {item.contract_number: item.added_quantity for item in added_quantities}
-
-        # Fetch "Removed" quantities for these contracts
-        removed_quantities = session.query(
-            HandCountedItems.contract_number,
-            func.sum(HandCountedItems.quantity).label('removed_quantity')
-        ).filter(
-            HandCountedItems.contract_number.in_(contract_list),
-            HandCountedItems.action == 'Removed'
-        ).group_by(
-            HandCountedItems.contract_number
-        ).all()
-
-        removed_quantities_dict = {item.contract_number: item.removed_quantity for item in removed_quantities}
-
-        # Calculate net quantities and filter contracts with net quantity > 0
-        filtered_contracts = []
-        for contract_number in contract_list:
-            added_qty = added_quantities_dict.get(contract_number, 0)
-            removed_qty = removed_quantities_dict.get(contract_number, 0)
-            net_qty = added_qty - removed_qty
-            if net_qty > 0:
-                filtered_contracts.append(contract_number)
-
-        session.close()
-        logger.info(f"Returned hand-counted contracts: {filtered_contracts} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+        filtered_contracts = [c.last_contract_num for c in contracts]
+        logger.info(
+            f"Returned hand-counted contracts: {filtered_contracts} at %s",
+            datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        )
         return jsonify({'contracts': filtered_contracts})
     except Exception as e:
         logger.error(f"Error fetching hand-counted contracts: {str(e)} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'), exc_info=True)
-        session.close()
         return jsonify({'error': str(e)}), 500
+    finally:
+        if session:
+            session.close()
 
 @tab4_bp.route('/tab/4/hand_counted_items_by_contract', methods=['GET'])
 def hand_counted_items_by_contract():
     contract_number = request.args.get('contract_number')
-    session = db.session()
+    session = None
     try:
+        session = db.session()
         # Fetch "Added" quantities
         items = session.query(
             HandCountedItems.item_name,
@@ -335,19 +316,43 @@ def hand_counted_items_by_contract():
                 if added_qty > 0:  # Include items that have been added, even if fully removed
                     item_list.append({'item_name': item_name, 'quantity': net_qty})
 
-        session.close()
         logger.info(f"Returned hand-counted items for contract {contract_number}: {item_list} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
         return jsonify({'items': item_list})
     except Exception as e:
         logger.error(f"Error fetching hand-counted items for contract {contract_number}: {str(e)} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'), exc_info=True)
-        session.close()
         return jsonify({'error': str(e)}), 500
+    finally:
+        if session:
+            session.close()
+
+@tab4_bp.route('/tab/4/hand_counted_catalog', methods=['GET'])
+def hand_counted_catalog():
+    session = None
+    try:
+        session = db.session()
+        try:
+            items = session.query(HandCountedCatalog.item_name).all()
+        except ProgrammingError:
+            session.rollback()
+            logger.warning("hand_counted_catalog table missing; returning empty list")
+            current_app.logger.warning("hand_counted_catalog table missing; returning empty list")
+            items = []
+        item_list = [i.item_name for i in items]
+        logger.info(f"Returned hand-counted catalog items: {item_list} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+        return jsonify({'items': item_list})
+    except Exception as e:
+        logger.error(f"Error fetching hand-counted catalog: {str(e)} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'), exc_info=True)
+        return jsonify({'error': str(e)}), 500
+    finally:
+        if session:
+            session.close()
 
 @tab4_bp.route('/tab/4/contract_items_count', methods=['GET'])
 def contract_items_count():
     contract_number = request.args.get('contract_number')
-    session = db.session()
+    session = None
     try:
+        session = db.session()
         # Count items on contract (On Rent or Delivered)
         items_on_contract = session.query(
             func.count(ItemMaster.tag_id)
@@ -374,19 +379,45 @@ def contract_items_count():
         hand_counted_total = max(hand_counted_added - hand_counted_removed, 0)
         total_items = items_on_contract + hand_counted_total
 
-        session.close()
         logger.info(f"Returned contract items count for {contract_number}: {total_items} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
         return jsonify({'total_items': total_items})
     except Exception as e:
         logger.error(f"Error calculating items on contract for {contract_number}: {str(e)} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'), exc_info=True)
-        session.close()
         return jsonify({'error': str(e)}), 500
+    finally:
+        if session:
+            session.close()
+
+@tab4_bp.route('/tab/4/next_contract_number', methods=['GET'])
+def next_contract_number():
+    session = None
+    try:
+        session = db.session()
+        latest_item = session.query(func.max(ItemMaster.last_contract_num)).filter(func.upper(ItemMaster.last_contract_num).like('L%')).scalar()
+        latest_hand = session.query(func.max(HandCountedItems.contract_number)).filter(func.upper(HandCountedItems.contract_number).like('L%')).scalar()
+        candidates = [c for c in [latest_item, latest_hand] if c]
+        if candidates:
+            latest = max(candidates)
+            try:
+                next_num = int(latest[1:]) + 1
+            except ValueError:
+                next_num = 1
+        else:
+            next_num = 1
+        return jsonify({'next_contract_number': f'L{next_num}'})
+    except Exception as e:
+        logger.error(f"Error calculating next contract number: {str(e)} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'), exc_info=True)
+        return jsonify({'error': str(e)}), 500
+    finally:
+        if session:
+            session.close()
 
 @tab4_bp.route('/tab/4/hand_counted_entries', methods=['GET'])
 def hand_counted_entries():
     contract_number = request.args.get('contract_number')
-    session = db.session()
+    session = None
     try:
+        session = db.session()
         # Count hand-counted items (net quantity: Added - Removed)
         hand_counted_added = session.query(
             func.sum(HandCountedItems.quantity)
@@ -404,20 +435,21 @@ def hand_counted_entries():
 
         hand_counted_total = max(hand_counted_added - hand_counted_removed, 0)
 
-        session.close()
         logger.info(f"Returned hand-counted entries for {contract_number}: {hand_counted_total} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
         return jsonify({'hand_counted_entries': hand_counted_total})
     except Exception as e:
         logger.error(f"Error calculating hand-counted entries for {contract_number}: {str(e)} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'), exc_info=True)
-        session.close()
         return jsonify({'error': str(e)}), 500
+    finally:
+        if session:
+            session.close()
 
 @tab4_bp.route('/tab/4/common_names')
 def tab4_common_names():
     contract_number = request.args.get('contract_number')
     page = int(request.args.get('page', 1))
     per_page = 10
-    sort = request.args.get('sort', '')  # Keep for compatibility, but ignore
+    sort = request.args.get('sort', '')
     fetch_all = request.args.get('all', 'false').lower() == 'true'
 
     logger.info(f"Fetching common names for contract_number={contract_number}, page={page}, sort={sort}, fetch_all={fetch_all} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
@@ -514,7 +546,23 @@ def tab4_common_names():
 
         common_names_list = list(common_names.values())
 
-        # Handle pagination or fetch all (no sorting applied)
+        # Apply sorting
+        if sort:
+            try:
+                field, direction = sort.rsplit('_', 1)
+                reverse = direction == 'desc'
+                if field in ['name', 'on_contracts', 'total_items_inventory']:
+                    common_names_list.sort(
+                        key=lambda x: (x[field].lower() if isinstance(x[field], str) else x[field]),
+                        reverse=reverse
+                    )
+            except ValueError:
+                logger.warning(f"Invalid sort parameter '{sort}'")
+                current_app.logger.warning(f"Invalid sort parameter '{sort}'")
+        else:
+            common_names_list.sort(key=lambda x: x['name'].lower())
+
+        # Handle pagination or fetch all
         if fetch_all:
             paginated_common_names = common_names_list
             total_common_names = len(common_names_list)
@@ -526,7 +574,6 @@ def tab4_common_names():
             end = start + per_page
             paginated_common_names = common_names_list[start:end]
 
-        session.close()
         logger.info(f"Returning {len(paginated_common_names)} common names for contract {contract_number} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
         current_app.logger.info(f"Returning {len(paginated_common_names)} common names for contract {contract_number} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
         return jsonify({
@@ -538,9 +585,10 @@ def tab4_common_names():
     except Exception as e:
         logger.error(f"Error fetching common names for contract {contract_number}: {str(e)} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
         current_app.logger.error(f"Error fetching common names for contract {contract_number}: {str(e)} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-        if 'session' in locals():
-            session.close()
         return jsonify({'error': 'Failed to fetch common names'}), 500
+    finally:
+        if session:
+            session.close()
 
 @tab4_bp.route('/tab/4/data')
 def tab4_data():
@@ -616,7 +664,6 @@ def tab4_data():
         logger.info(f"Items for contract {contract_number}, common_name {common_name}: {len(items_data)} items at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
         current_app.logger.info(f"Items for contract {contract_number}, common_name {common_name}: {len(items_data)} items at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
 
-        session.close()
         return jsonify({
             'items': items_data,
             'total_items': total_items,
@@ -626,15 +673,17 @@ def tab4_data():
     except Exception as e:
         logger.error(f"Error fetching items for contract {contract_number}, common_name {common_name}: {str(e)} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
         current_app.logger.error(f"Error fetching items for contract {contract_number}, common_name {common_name}: {str(e)} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-        if 'session' in locals():
-            session.close()
         return jsonify({'error': 'Failed to fetch items'}), 500
+    finally:
+        if session:
+            session.close()
 
 @tab4_bp.route('/tab/4/hand_counted_items')
 def tab4_hand_counted_items():
     contract_number = request.args.get('contract_number', None)
     logger.info(f"Fetching hand-counted items for contract_number={contract_number} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
     current_app.logger.info(f"Fetching hand-counted items for contract_number={contract_number} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+    session = None
     try:
         session = db.session()
         query = session.query(HandCountedItems).order_by(HandCountedItems.timestamp.desc())
@@ -642,7 +691,6 @@ def tab4_hand_counted_items():
             query = query.filter(HandCountedItems.contract_number == contract_number)
         # Limit to the last 10 entries
         items = query.limit(10).all()
-        session.close()
         logger.info(f"Found {len(items)} hand-counted items for contract {contract_number} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
         current_app.logger.info(f"Found {len(items)} hand-counted items for contract {contract_number} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
 
@@ -667,9 +715,10 @@ def tab4_hand_counted_items():
     except Exception as e:
         logger.error(f"Error fetching hand-counted items for contract {contract_number}: {str(e)} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
         current_app.logger.error(f"Error fetching hand-counted items for contract {contract_number}: {str(e)} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-        if 'session' in locals():
-            session.close()
         return '<tr><td colspan="6">Error loading hand-counted items.</td></tr>'
+    finally:
+        if session:
+            session.close()
 
 @tab4_bp.route('/tab/4/add_hand_counted_item', methods=['POST'])
 def add_hand_counted_item():
@@ -700,6 +749,7 @@ def add_hand_counted_item():
         current_app.logger.error("Quantity must be a valid integer at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
         return jsonify({'error': 'Quantity must be a valid integer'}), 400
 
+    session = None
     try:
         session = db.session()
         hand_counted_item = HandCountedItems(
@@ -712,17 +762,16 @@ def add_hand_counted_item():
         )
         session.add(hand_counted_item)
         session.commit()
-        session.close()
         logger.info(f"Successfully added hand-counted item for contract {contract_number} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
         current_app.logger.info(f"Successfully added hand-counted item for contract {contract_number} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
         return jsonify({'message': f'Successfully added {quantity} {item_name} to {contract_number}'})
     except Exception as e:
         logger.error(f"Error adding hand-counted item: {str(e)} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
         current_app.logger.error(f"Error adding hand-counted item: {str(e)} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-        if 'session' in locals():
-            session.rollback()
-            session.close()
         return jsonify({'error': 'Failed to add item'}), 500
+    finally:
+        if session:
+            session.close()
 
 @tab4_bp.route('/tab/4/remove_hand_counted_item', methods=['POST'])
 def remove_hand_counted_item():
@@ -780,7 +829,6 @@ def remove_hand_counted_item():
 
         # Check if removal is possible
         if current_quantity < quantity:
-            session.close()
             logger.info(f"Cannot remove {quantity} items from {contract_number}/{item_name}: current_quantity={current_quantity} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
             current_app.logger.info(f"Cannot remove {quantity} items from {contract_number}/{item_name}: current_quantity={current_quantity} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
             return jsonify({'error': f'Cannot remove {quantity} items from {contract_number}/{item_name}. Quantity would be negative.'}), 400
@@ -796,17 +844,16 @@ def remove_hand_counted_item():
         )
         session.add(hand_counted_item)
         session.commit()
-        session.close()
         logger.info(f"Successfully removed {quantity} hand-counted items for contract {contract_number}, item {item_name} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
         current_app.logger.info(f"Successfully removed {quantity} hand-counted items for contract {contract_number}, item {item_name} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
         return jsonify({'message': f'Successfully removed {quantity} {item_name} from {contract_number}'})
     except Exception as e:
         logger.error(f"Error removing hand-counted item: {str(e)} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
         current_app.logger.error(f"Error removing hand-counted item: {str(e)} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-        if 'session' in locals():
-            session.rollback()
-            session.close()
         return jsonify({'error': 'Failed to remove item'}), 500
+    finally:
+        if session:
+            session.close()
 
 @tab4_bp.route('/tab/4/full_items_by_rental_class')
 def full_items_by_rental_class():
@@ -875,7 +922,6 @@ def full_items_by_rental_class():
                     'notes': item.notes
                 })
 
-        session.close()
         return jsonify({
             'items': items_data,
             'total_items': len(items_data)
@@ -884,6 +930,9 @@ def full_items_by_rental_class():
         logger.error(f"Error fetching full items for contract {contract_number}, common_name {common_name}: {str(e)} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
         current_app.logger.error(f"Error fetching full items for contract {contract_number}, common_name {common_name}: {str(e)} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
         return jsonify({'error': 'Failed to fetch full items'}), 500
+    finally:
+        if session:
+            session.close()
 
 @tab4_bp.route('/get_contract_date')
 def get_contract_date():
@@ -893,19 +942,20 @@ def get_contract_date():
         current_app.logger.error("Missing required parameter: contract_number is required at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
         return jsonify({'error': 'Contract number is required'}), 400
 
+    session = None
     try:
         session = db.session()
         latest_transaction = session.query(Transaction.scan_date).filter(
             Transaction.contract_number == contract_number,
             Transaction.scan_type == 'Rental'
         ).order_by(desc(Transaction.scan_date)).first()
-
-        session.close()
         if latest_transaction and latest_transaction.scan_date:
             return jsonify({'date': latest_transaction.scan_date.isoformat()})
         return jsonify({'date': 'N/A'})
     except Exception as e:
         logger.error(f"Error fetching contract date for {contract_number}: {str(e)} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
         current_app.logger.error(f"Error fetching contract date for {contract_number}: {str(e)} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-        session.close()
         return jsonify({'error': 'Failed to fetch contract date'}), 500
+    finally:
+        if session:
+            session.close()

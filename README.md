@@ -1,4 +1,4 @@
-RFID3-README NEEDS FULL COMPREHENSIVE UPDATE 8/5/25 test more and more and more
+RFID3-README NEEDS FULL COMPREHENSIVE UPDATE 8/19/25 test
 The project now uses the MDB UI Kit (Material Design for Bootstrap) via CDN for responsive layouts. Previous Bootstrap bundles have been removed.
 ├── app/
 │   ├── __init__.py
@@ -74,6 +74,8 @@ mysql -u rfid_user -prfid_user_password rfid_inventory < scripts/migrate_db.sql
 mysql -u rfid_user -prfid_user_password rfid_inventory < scripts/migrate_hand_counted_items.sql
 python scripts/update_rental_class_mappings.py
 ```
+
+The `migrate_hand_counted_items.sql` script adds the `hand_counted_catalog` table, which powers the Hand Counted toggle in the Manage Categories screen. Run this script after pulling updates to enable the new feature.
 
 
 git pull origin
