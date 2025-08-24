@@ -39,7 +39,7 @@
                             <button class="btn btn-sm btn-secondary expand-btn" data-target-id="common-{{ contract.contract_number|replace(' ', '_') }}" data-contract-number="{{ contract.contract_number }}">Expand</button>
                             <button class="btn btn-sm btn-secondary collapse-btn" data-collapse-target="common-{{ contract.contract_number|replace(' ', '_') }}" style="display:none;">Collapse</button>
                             <div class="dropdown">
-                                <button class="btn btn-sm btn-info print-btn" data-print-level="Contract" data-print-id="common-{{ contract.contract_number|replace(' ', '_') }}" data-contract-number="{{ contract.contract_number }}">Print Items</button>
+                                <button class="btn btn-sm btn-info print-items-btn" data-print-level="Contract" data-print-id="common-{{ contract.contract_number|replace(' ', '_') }}" data-contract-number="{{ contract.contract_number }}">Print Items</button>
                                 <button type="button" class="btn btn-sm btn-info dropdown-toggle dropdown-toggle-split" data-mdb-toggle="dropdown" aria-expanded="false">
                                     <span class="visually-hidden">Toggle Dropdown</span>
                                 </button>
