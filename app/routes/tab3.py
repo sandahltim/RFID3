@@ -7,7 +7,7 @@ from .. import db, cache
 from ..models.db_models import ItemMaster, Transaction, RentalClassMapping, UserRentalClassMapping, SeedRentalClass
 from ..services.api_client import APIClient
 from sqlalchemy import text, func, or_
-from datetime import datetime
+from datetime import datetime, timezone
 import logging
 import sys
 import csv
@@ -1474,7 +1474,7 @@ def update_mappings():
             existing_mapping.category = category
             existing_mapping.subcategory = subcategory
             existing_mapping.short_common_name = short_common_name if short_common_name else existing_mapping.short_common_name
-            existing_mapping.updated_at = datetime.utcnow()
+            existing_mapping.updated_at = datetime.now(timezone.utc)
             logger.debug(f"Updated existing mapping: rental_class_id={normalized_rental_class_id}")
         else:
             new_mapping = UserRentalClassMapping(
@@ -1482,8 +1482,8 @@ def update_mappings():
                 category=category,
                 subcategory=subcategory,
                 short_common_name=short_common_name if short_common_name else 'N/A',
-                created_at=datetime.utcnow(),
-                updated_at=datetime.utcnow()
+                created_at=datetime.now(timezone.utc),
+                updated_at=datetime.now(timezone.utc)
             )
             session.add(new_mapping)
             logger.debug(f"Created new mapping: rental_class_id={normalized_rental_class_id}")

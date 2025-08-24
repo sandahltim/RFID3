@@ -26,18 +26,16 @@ def home():
         logger.debug("Serving home page from cache")
         return render_template('home.html', **json.loads(cached_data), cache_bust=int(time()))
 
-    session = None
     try:
-        session = db.session()
         logger.info("Starting new session for home")
 
         # Total items
-        total_items = session.query(func.count(ItemMaster.tag_id)).scalar()
+        total_items = db.session.query(func.count(ItemMaster.tag_id)).scalar()
         logger.info(f'Total items details: {total_items}')
         logger.debug(f"Total items: {total_items}")
 
         # Status counts
-        status_counts = session.query(
+        status_counts = db.session.query(
             ItemMaster.status,
             func.count(ItemMaster.tag_id).label('count')
         ).group_by(ItemMaster.status).all()
@@ -72,7 +70,7 @@ def home():
         items_in_service = session.query(func.count(ItemMaster.tag_id)).filter(
             (ItemMaster.status.notin_(['Ready to Rent', 'On Rent', 'Delivered'])) |
             (ItemMaster.tag_id.in_(
-                session.query(subquery.c.tag_id).filter(
+                db.session.query(subquery.c.tag_id).filter(
                     subquery.c.scan_date == session.query(func.max(Transaction.scan_date)).filter(Transaction.tag_id == subquery.c.tag_id).correlate(subquery).scalar_subquery(),
                     subquery.c.service_required == True
                 )
@@ -145,5 +143,4 @@ def home():
                               refresh_type='N/A',
                               cache_bust=int(time()))
     finally:
-        if session:
-            session.close()
+        pass  # Flask-SQLAlchemy automatically manages session lifecycle
