@@ -42,10 +42,8 @@ def health_check():
     }
 
     # Check database
-    session = None
     try:
-        session = db.session()
-        session.execute(text("SELECT 1"))
+        db.session.execute(text("SELECT 1"))
         status["database"] = "healthy"
         logger.info("Database health check passed")
         current_app.logger.info("Database health check passed")
@@ -55,9 +53,7 @@ def health_check():
         status["database"] = f"unhealthy: {str(e)}"
         status["overall"] = "unhealthy"
     finally:
-        if session:
-            session.close()
-            logger.debug("Database session closed for health check")
+        pass  # Flask-SQLAlchemy automatically manages session lifecycle
 
     # Check Redis
     try:

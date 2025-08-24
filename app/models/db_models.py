@@ -1,7 +1,7 @@
 # app/models/db_models.py
 # db_models.py version: 2025-06-20-v3
 from app import db
-from datetime import datetime
+from datetime import datetime, timezone
 
 class ItemMaster(db.Model):
     __tablename__ = 'id_item_master'
@@ -188,5 +188,5 @@ class UserRentalClassMapping(db.Model):
     category = db.Column(db.String(100), nullable=False)
     subcategory = db.Column(db.String(100), nullable=False)
     short_common_name = db.Column(db.String(50))
-    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    updated_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))

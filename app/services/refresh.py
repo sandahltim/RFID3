@@ -2,7 +2,7 @@
 # refresh.py version: 2025-06-27-v9
 import logging
 import traceback
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from sqlalchemy.exc import SQLAlchemyError, OperationalError
 from sqlalchemy.sql import text
 from .. import db
@@ -143,8 +143,8 @@ def update_user_mappings(session, csv_file_path='/home/tim/RFID3/seeddata_202504
                         'category': category,
                         'subcategory': subcategory,
                         'short_common_name': row.get('short_common_name', '').strip() or 'N/A',
-                        'created_at': datetime.utcnow(),
-                        'updated_at': datetime.utcnow()
+                        'created_at': datetime.now(timezone.utc),
+                        'updated_at': datetime.now(timezone.utc)
                     }
                 except Exception as e:
                     logger.error(f"Error processing CSV row {row_count}: {str(e)}", exc_info=True)
@@ -420,7 +420,7 @@ def full_refresh():
             update_seed_data(session, seed_data)
             update_user_mappings(session)
 
-            update_refresh_state('full_refresh', datetime.utcnow())
+            update_refresh_state('full_refresh', datetime.now(timezone.utc))
             logger.info("Full refresh completed successfully")
             break
         except OperationalError as e:
@@ -457,7 +457,7 @@ def incremental_refresh():
     for attempt in range(max_retries):
         try:
             with session.no_autoflush:
-                since_date = datetime.utcnow() - timedelta(seconds=INCREMENTAL_LOOKBACK_SECONDS)
+                since_date = datetime.now(timezone.utc) - timedelta(seconds=INCREMENTAL_LOOKBACK_SECONDS)
                 logger.info(
                     f"Checking for item master and transaction updates since: {since_date.strftime('%Y-%m-%d %H:%M:%S')}"
                 )
@@ -475,14 +475,14 @@ def incremental_refresh():
                 if not items and not transactions:
                     logger.info("No new item master or transaction data to process, skipping database updates")
                     session.commit()
-                    update_refresh_state('incremental_refresh', datetime.utcnow())
+                    update_refresh_state('incremental_refresh', datetime.now(timezone.utc))
                     break
 
                 update_item_master(session, items)
                 update_transactions(session, transactions)
 
                 session.commit()
-                update_refresh_state('incremental_refresh', datetime.utcnow())
+                update_refresh_state('incremental_refresh', datetime.now(timezone.utc))
                 logger.info("Incremental refresh completed successfully")
                 break
         except OperationalError as e:

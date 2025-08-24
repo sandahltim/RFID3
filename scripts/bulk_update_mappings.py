@@ -3,7 +3,7 @@
 import sys
 import os
 import csv
-from datetime import datetime
+from datetime import datetime, timezone
 
 # Add the project directory to the Python path
 project_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
@@ -112,8 +112,8 @@ def bulk_update_mappings():
                     rental_class_id=mapping['rental_class_id'],
                     category=mapping['category'],
                     subcategory=mapping['subcategory'],
-                    created_at=datetime.utcnow(),
-                    updated_at=datetime.utcnow()
+                    created_at=datetime.now(timezone.utc),
+                    updated_at=datetime.now(timezone.utc)
                 )
                 session.add(user_mapping)
                 session.commit()  # Commit each insert individually

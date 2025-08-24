@@ -4,7 +4,7 @@ from ..models.db_models import Transaction, ItemMaster
 from ..services.api_client import APIClient
 from sqlalchemy import func, desc, asc, text
 from time import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import logging
 import sys
 
@@ -82,7 +82,7 @@ def tab2_view():
         current_app.logger.info(f"Raw contracts query result: {[(c.last_contract_num, c.total_items) for c in contracts_query_results]}")
 
         contracts = []
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         for contract_number, total_items in contracts_query_results:
             logger.debug(f"Processing contract: {contract_number}")
             latest_transaction = session.query(
@@ -195,7 +195,7 @@ def sort_contracts():
         current_app.logger.info(f"Sorted contracts query result: {[(c.last_contract_num, c.total_items) for c in contracts_query_results]}")
 
         contracts = []
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         for contract_number, total_items in contracts_query_results:
             logger.debug(f"Processing contract: {contract_number}")
             latest_transaction = session.query(
@@ -373,7 +373,7 @@ def update_status():
         if new_status in ['On Rent', 'Delivered']:
             return jsonify({'error': 'Status cannot be updated to "On Rent" or "Delivered" manually'}), 400
 
-        current_time = datetime.utcnow()
+        current_time = datetime.now(timezone.utc)
         item.status = new_status
         item.date_last_scanned = current_time
         session.commit()
@@ -420,7 +420,7 @@ def bulk_update_status():
         if not items:
             return jsonify({'error': 'No items found for the given contract'}), 404
 
-        current_time = datetime.utcnow()
+        current_time = datetime.now(timezone.utc)
         api_client = APIClient()
         updated = 0
         for item in items:
