@@ -1,7 +1,7 @@
 -- scripts/migrate_db.sql
 -- migrate_db.sql version: 2025-06-26-v5
 
--- Drop existing tables if they exist
+-- Drop existing tables if they exist (EXCEPT user_rental_class_mappings to preserve user data)
 DROP TABLE IF EXISTS id_transactions;
 DROP TABLE IF EXISTS id_item_master;
 DROP TABLE IF EXISTS id_rfidtag;
@@ -9,7 +9,7 @@ DROP TABLE IF EXISTS seed_rental_classes;
 DROP TABLE IF EXISTS refresh_state;
 DROP TABLE IF EXISTS rental_class_mappings;
 DROP TABLE IF EXISTS id_hand_counted_items;
-DROP TABLE IF EXISTS user_rental_class_mappings;
+-- NOTE: user_rental_class_mappings is NOT dropped to preserve user customizations
 
 -- Create id_transactions table
 CREATE TABLE id_transactions (
@@ -131,8 +131,8 @@ CREATE TABLE id_hand_counted_items (
     user VARCHAR(50) NOT NULL
 );
 
--- Create user_rental_class_mappings table
-CREATE TABLE user_rental_class_mappings (
+-- Create user_rental_class_mappings table (preserves existing data)
+CREATE TABLE IF NOT EXISTS user_rental_class_mappings (
     rental_class_id VARCHAR(50) PRIMARY KEY,
     category VARCHAR(100) NOT NULL,
     subcategory VARCHAR(100) NOT NULL,

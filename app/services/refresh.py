@@ -178,35 +178,48 @@ def update_user_mappings(session, csv_file_path='/home/tim/RFID3/seeddata_202504
 
         logger.info(f"Processed {row_count} CSV rows, {len(merged_mappings)} merged mappings (user mappings prioritized)")
 
-        # Clear existing user mappings
-        deleted_count = session.query(UserRentalClassMapping).delete()
-        logger.info(f"Deleted {deleted_count} existing user mappings")
+        # NO DELETE - preserve all existing user mappings, only add new ones
+        logger.info("Preserving all existing user mappings, only inserting new CSV mappings")
 
-        # Insert merged mappings
+        # Use safe upsert approach - only insert new CSV mappings, preserve existing user ones
         inserted_count = 0
+        skipped_count = 0
+        
+        # Get current rental_class_ids to avoid duplicates
+        existing_ids = {row[0] for row in session.query(UserRentalClassMapping.rental_class_id).all()}
+        
         for mapping in merged_mappings.values():
             try:
                 if 'rental_class_id' not in mapping or not mapping['rental_class_id']:
                     logger.warning(f"Skipping mapping with missing rental_class_id: {mapping}")
                     continue
+                    
+                rental_class_id = mapping['rental_class_id']
+                
+                # Only insert if it doesn't already exist (preserve user mappings)
+                if rental_class_id in existing_ids:
+                    logger.debug(f"Preserving existing user mapping for {rental_class_id}")
+                    skipped_count += 1
+                    continue
+                
                 user_mapping = UserRentalClassMapping(
                     rental_class_id=mapping['rental_class_id'],
                     category=mapping['category'],
                     subcategory=mapping['subcategory'],
-                    short_common_name=mapping['short_common_name'],
-                    created_at=mapping['created_at'],
-                    updated_at=mapping['updated_at']
+                    short_common_name=mapping.get('short_common_name', ''),
+                    created_at=mapping.get('created_at', datetime.now(timezone.utc)),
+                    updated_at=mapping.get('updated_at', datetime.now(timezone.utc))
                 )
                 session.add(user_mapping)
-                session.flush()
                 inserted_count += 1
-                logger.debug(f"Inserted mapping: {mapping['rental_class_id']}")
+                logger.debug(f"Inserted new CSV mapping: {mapping['rental_class_id']}")
+                
             except Exception as e:
-                logger.error(f"Error inserting mapping: {str(e)}", exc_info=True)
+                logger.error(f"Error processing mapping: {str(e)}", exc_info=True)
                 continue
 
         session.commit()
-        logger.info(f"Inserted {inserted_count} merged mappings into user_rental_class_mappings")
+        logger.info(f"Processed {len(merged_mappings)} mappings: {inserted_count} new CSV mappings inserted, {skipped_count} user mappings preserved")
 
         # Drop temporary table
         session.execute(text("DROP TABLE IF EXISTS temp_user_rental_class_mappings"))

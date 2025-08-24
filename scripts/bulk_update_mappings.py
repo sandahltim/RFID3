@@ -100,14 +100,28 @@ def bulk_update_mappings():
         mappings = list(mappings_dict.values())
         logger.info(f"Processed {row_count} total rows from CSV, {len(mappings)} unique mappings found")
 
-        # Clear existing user mappings
-        deleted_count = session.query(UserRentalClassMapping).delete()
-        logger.info(f"Deleted {deleted_count} existing user mappings")
+        # PRESERVE existing user mappings - only update new ones or merge
+        logger.info("Preserving existing user mappings, only updating/inserting new ones")
+        
+        # Get existing user mappings to preserve
+        existing_mappings = {m.rental_class_id: m for m in session.query(UserRentalClassMapping).all()}
+        logger.info(f"Found {len(existing_mappings)} existing user mappings to preserve")
 
-        # Insert new user mappings one at a time to handle errors gracefully
+        # Insert/update user mappings one at a time, preserving existing ones
         inserted_count = 0
+        updated_count = 0
+        skipped_count = 0
         for mapping in mappings:
             try:
+                rental_class_id = mapping['rental_class_id']
+                
+                # Check if user mapping already exists (preserve it)
+                if rental_class_id in existing_mappings:
+                    logger.debug(f"Preserving existing user mapping for rental_class_id {rental_class_id}")
+                    skipped_count += 1
+                    continue
+                
+                # Insert new mapping only if it doesn't exist
                 user_mapping = UserRentalClassMapping(
                     rental_class_id=mapping['rental_class_id'],
                     category=mapping['category'],
@@ -118,7 +132,8 @@ def bulk_update_mappings():
                 session.add(user_mapping)
                 session.commit()  # Commit each insert individually
                 inserted_count += 1
-                logger.debug(f"Inserted mapping: {mapping}")
+                logger.debug(f"Inserted new mapping: {mapping}")
+                
             except IntegrityError as integrity_error:
                 logger.error(f"Integrity error for mapping {mapping}: {str(integrity_error)}")
                 session.rollback()
@@ -128,7 +143,7 @@ def bulk_update_mappings():
                 session.rollback()
                 continue
 
-        logger.info(f"Successfully inserted {inserted_count} mappings into user_rental_class_mappings")
+        logger.info(f"Successfully processed {len(mappings)} mappings: {inserted_count} inserted, {skipped_count} preserved existing")
 
     except Exception as e:
         logger.error(f"Error during bulk update: {str(e)}", exc_info=True)
