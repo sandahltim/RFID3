@@ -901,16 +901,27 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
+        // Handle main Print Items button
+        const printItemsBtn = event.target.closest('.print-items-btn');
+        if (printItemsBtn) {
+            event.preventDefault();
+            event.stopPropagation();
+            const contractNumber = printItemsBtn.getAttribute('data-contract-number');
+            console.log(`Opening contract items print for: ${contractNumber}`);
+            const url = `/tab/4/contract_items_print?contract_number=${encodeURIComponent(contractNumber)}`;
+            window.open(url, '_blank', 'width=1200,height=800,scrollbars=yes,resizable=yes');
+            return;
+        }
+
+        // Handle dropdown Print Items button  
         const printBtn = event.target.closest('.print-btn');
         if (printBtn) {
             event.preventDefault();
             event.stopPropagation();
-            const level = printBtn.getAttribute('data-print-level');
-            const id = printBtn.getAttribute('data-print-id');
-            const commonName = printBtn.getAttribute('data-common-name');
-            const category = printBtn.getAttribute('data-category');
-            const subcategory = printBtn.getAttribute('data-subcategory');
-            printTable(level, id, commonName, category, subcategory);
+            const contractNumber = printBtn.getAttribute('data-contract-number');
+            console.log(`Opening contract items print from dropdown for: ${contractNumber}`);
+            const url = `/tab/4/contract_items_print?contract_number=${encodeURIComponent(contractNumber)}`;
+            window.open(url, '_blank', 'width=1200,height=800,scrollbars=yes,resizable=yes');
             return;
         }
 

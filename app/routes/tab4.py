@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, jsonify, current_app
+from flask import Blueprint, render_template, request, jsonify, current_app, make_response
 from .. import db, cache
 from ..models.db_models import ItemMaster, Transaction, HandCountedItems, HandCountedCatalog
 from sqlalchemy import func, desc, or_
@@ -918,6 +918,60 @@ def hand_counted_history_print():
         
     except Exception as e:
         logger.error(f"Error generating hand counted history print: {str(e)}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+    finally:
+        if session:
+            session.close()
+
+@tab4_bp.route('/tab/4/contract_items_print')
+def contract_items_print():
+    """Generate professional printable contract items list."""
+    contract_number = request.args.get('contract_number')
+    
+    if not contract_number:
+        return jsonify({'error': 'Contract number is required'}), 400
+    
+    session = None
+    try:
+        session = db.session()
+        
+        # Get contract info
+        contract_info = session.query(
+            Transaction.contract_number,
+            Transaction.client_name,
+            func.min(Transaction.scan_date).label('start_date'),
+            func.max(Transaction.scan_date).label('last_activity')
+        ).filter(
+            Transaction.contract_number == contract_number
+        ).group_by(Transaction.contract_number, Transaction.client_name).first()
+        
+        if not contract_info:
+            return jsonify({'error': f'Contract {contract_number} not found'}), 404
+        
+        # Get all items currently on this contract
+        items = session.query(ItemMaster).filter(
+            ItemMaster.last_contract_num == contract_number
+        ).order_by(ItemMaster.common_name, ItemMaster.tag_id).all()
+        
+        # Prepare data for template
+        items_data = {
+            'contract_number': contract_number,
+            'client_name': contract_info.client_name or 'N/A',
+            'start_date': contract_info.start_date.strftime('%Y-%m-%d') if contract_info.start_date else 'N/A',
+            'last_activity': contract_info.last_activity.strftime('%Y-%m-%d') if contract_info.last_activity else 'N/A',
+            'total_items': len(items),
+            'current_date': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            'items': items
+        }
+        
+        html = render_template('contract_items_print.html', data=items_data)
+        response = make_response(html)
+        response.headers['Content-Type'] = 'text/html'
+        response.headers['Content-Disposition'] = f'inline; filename=contract_items_{contract_number}.html'
+        return response
+        
+    except Exception as e:
+        logger.error(f"Error generating contract items print: {str(e)}", exc_info=True)
         return jsonify({'error': str(e)}), 500
     finally:
         if session:
