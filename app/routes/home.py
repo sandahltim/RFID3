@@ -30,12 +30,12 @@ def home():
         logger.info("Starting new session for home")
 
         # Total items
-        total_items = db.session.query(func.count(ItemMaster.tag_id)).scalar()
+        total_items = db.db.session.query(func.count(ItemMaster.tag_id)).scalar()
         logger.info(f'Total items details: {total_items}')
         logger.debug(f"Total items: {total_items}")
 
         # Status counts
-        status_counts = db.session.query(
+        status_counts = db.db.session.query(
             ItemMaster.status,
             func.count(ItemMaster.tag_id).label('count')
         ).group_by(ItemMaster.status).all()
@@ -43,14 +43,14 @@ def home():
         logger.debug(f"Status counts in id_item_master: {[(status, count) for status, count in status_counts]}")
 
         # Items on rent
-        items_on_rent = session.query(func.count(ItemMaster.tag_id)).filter(
+        items_on_rent = db.session.query(func.count(ItemMaster.tag_id)).filter(
             ItemMaster.status.in_(['On Rent', 'Delivered'])
         ).scalar()
         logger.info(f'Items on rent details: {items_on_rent}')
         logger.debug(f"Items on rent: {items_on_rent}")
 
         # Items in service
-        subquery = session.query(
+        subquery = db.session.query(
             Transaction.tag_id,
             Transaction.scan_date,
             Transaction.service_required
@@ -60,18 +60,18 @@ def home():
             Transaction.scan_date.desc()
         ).subquery()
 
-        service_required_counts = session.query(
+        service_required_counts = db.session.query(
             subquery.c.service_required,
             func.count(subquery.c.tag_id).label('count')
         ).group_by(subquery.c.service_required).all()
         logger.info(f'Service required counts details: {[(sr, count) for sr, count in service_required_counts]}')
         logger.debug(f"Service required counts in id_transactions: {[(sr, count) for sr, count in service_required_counts]}")
 
-        items_in_service = session.query(func.count(ItemMaster.tag_id)).filter(
+        items_in_service = db.session.query(func.count(ItemMaster.tag_id)).filter(
             (ItemMaster.status.notin_(['Ready to Rent', 'On Rent', 'Delivered'])) |
             (ItemMaster.tag_id.in_(
-                db.session.query(subquery.c.tag_id).filter(
-                    subquery.c.scan_date == session.query(func.max(Transaction.scan_date)).filter(Transaction.tag_id == subquery.c.tag_id).correlate(subquery).scalar_subquery(),
+                db.db.session.query(subquery.c.tag_id).filter(
+                    subquery.c.scan_date == db.session.query(func.max(Transaction.scan_date)).filter(Transaction.tag_id == subquery.c.tag_id).correlate(subquery).scalar_subquery(),
                     subquery.c.service_required == True
                 )
             ))
@@ -80,28 +80,28 @@ def home():
         logger.debug(f"Items in service: {items_in_service}")
 
         # Items available
-        items_available = session.query(func.count(ItemMaster.tag_id)).filter(
+        items_available = db.session.query(func.count(ItemMaster.tag_id)).filter(
             ItemMaster.status == 'Ready to Rent'
         ).scalar()
         logger.info(f'Items available details: {items_available}')
         logger.debug(f"Items available: {items_available}")
 
         # Status breakdown
-        status_breakdown = session.query(
+        status_breakdown = db.session.query(
             ItemMaster.status,
             func.count(ItemMaster.tag_id).label('count')
         ).group_by(ItemMaster.status).all()
         status_counts = [(status or 'Unknown', count) for status, count in status_breakdown]
 
         # Recent scans
-        recent_scans = db.session.query(ItemMaster).filter(ItemMaster.date_last_scanned.isnot(None)).order_by(
+        recent_scans = db.db.session.query(ItemMaster).filter(ItemMaster.date_last_scanned.isnot(None)).order_by(
             ItemMaster.date_last_scanned.desc()
         ).limit(10).all()
         logger.info(f'Recent scans details: {[(scan.tag_id, scan.common_name, scan.date_last_scanned) for scan in recent_scans]}')
         logger.debug(f"Recent scans sample: {[(item.tag_id, item.common_name, item.date_last_scanned) for item in recent_scans[:5]]}")
 
         # Last refresh state
-        refresh_state = db.session.query(RefreshState).first()
+        refresh_state = db.db.session.query(RefreshState).first()
         last_refresh = refresh_state.last_refresh.strftime('%Y-%m-%d %H:%M:%S') if refresh_state and refresh_state.last_refresh else 'N/A'
         refresh_type = refresh_state.state_type if refresh_state else 'N/A'
         logger.info(f'Last refresh details: {last_refresh}, Type: {refresh_type}')
