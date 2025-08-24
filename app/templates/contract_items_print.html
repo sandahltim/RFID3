@@ -336,39 +336,6 @@
         </div>
         {% endfor %}
     </div>
-    
-    <!-- Items Table -->
-    <div class="section-title">🏷️ Contract Items ({{ data.contract_items|length }})</div>
-    <table class="items-table">
-        <thead>
-            <tr>
-                <th style="width: 12%;">Tag ID</th>
-                <th style="width: 20%;">Item Name</th>
-                <th style="width: 12%;">Status</th>
-                <th style="width: 10%;">Quality</th>
-                <th style="width: 12%;">Location</th>
-                <th style="width: 12%;">Last Scanned</th>
-                <th style="width: 22%;">Notes</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for item in data.contract_items %}
-            <tr>
-                <td class="tag-id">{{ item.tag_id }}</td>
-                <td>{{ item.common_name or 'N/A' }}</td>
-                <td>
-                    <span class="status-badge {% if item.status == 'Ready to Rent' %}status-ready{% elif item.status in ['On Rent', 'Delivered'] %}status-rent{% else %}status-service{% endif %}">
-                        {{ item.status or 'Unknown' }}
-                    </span>
-                </td>
-                <td>{{ item.quality or 'N/A' }}</td>
-                <td>{{ item.bin_location or 'N/A' }}</td>
-                <td>{{ item.date_last_scanned.strftime('%Y-%m-%d') if item.date_last_scanned else 'Never' }}</td>
-                <td class="notes-cell">{{ item.notes or '' }}</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
     {% else %}
     <div style="text-align: center; padding: 40px; color: #666; font-style: italic;">
         <h3>No items found</h3>
