@@ -1,16 +1,13 @@
 {% extends "base.html" %}
 
 {% block content %}
+<div class="container mt-4">
+    <h2>Open Contracts</h2>
 
-    
-    <h2 class="tab-title">Open Contracts</h2>
-
-    
     {% if error %}
-    
-        Error loading contracts: {{ error }}
-    
-
+        <div class="alert alert-danger" role="alert">
+            Error loading contracts: {{ error }}
+        </div>
     {% endif %}
     
     	<table class="table table-bordered table-hover category-table" id="category-table">
@@ -65,6 +62,5 @@
                 {% endif %}
             </tbody>
         </table>
-    
-
+    </div>
 {% endblock %}
