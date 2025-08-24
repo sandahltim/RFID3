@@ -827,6 +827,9 @@ def contract_history_print():
             } for t in transactions[:10]]  # Latest 10 activities
         }
         
+        # Add current date to data
+        contract_data['current_date'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        
         html = render_template('contract_history_print.html', data=contract_data)
         response = make_response(html)
         response.headers['Content-Type'] = 'text/html'
@@ -887,6 +890,7 @@ def hand_counted_history_print():
             'contract_number': contract_number,
             'client_name': contract_info.client_name if contract_info else 'N/A',
             'total_entries': len(hand_counted_items),
+            'current_date': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
             'item_summary': [
                 {
                     'item_name': name,

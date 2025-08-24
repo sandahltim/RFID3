@@ -924,6 +924,29 @@ document.addEventListener('DOMContentLoaded', function() {
             printFullItemList(category, subcategory, commonName);
             return;
         }
+
+        // Handle new comprehensive print options
+        const printContractHistory = event.target.closest('.print-contract-history');
+        if (printContractHistory) {
+            event.preventDefault();
+            event.stopPropagation();
+            const contractNumber = printContractHistory.getAttribute('data-contract-number');
+            console.log(`Opening contract history for: ${contractNumber}`);
+            const url = `/tab/4/contract_history_print?contract_number=${encodeURIComponent(contractNumber)}`;
+            window.open(url, '_blank', 'width=1200,height=800,scrollbars=yes,resizable=yes');
+            return;
+        }
+
+        const printHandCountedHistory = event.target.closest('.print-hand-counted-history');
+        if (printHandCountedHistory) {
+            event.preventDefault();
+            event.stopPropagation();
+            const contractNumber = printHandCountedHistory.getAttribute('data-contract-number');
+            console.log(`Opening hand counted history for: ${contractNumber}`);
+            const url = `/tab/4/hand_counted_history_print?contract_number=${encodeURIComponent(contractNumber)}`;
+            window.open(url, '_blank', 'width=1200,height=800,scrollbars=yes,resizable=yes');
+            return;
+        }
     }
 
     // HTMX event listener for hand-counted items

@@ -281,25 +281,25 @@
     <div class="header">
         <div class="company-name">RFID Inventory Management</div>
         <div class="report-title">Hand Counted Items History</div>
-        <div style="font-size: 14px; color: #666;">Generated on {{ current_date }}</div>
+        <div style="font-size: 14px; color: #666;">Generated on {{ data.current_date if data.current_date else 'N/A' }}</div>
     </div>
     
     <div class="contract-info">
         <div class="info-group">
             <div class="info-label">Contract Number</div>
-            <div class="info-value">{{ contract_number }}</div>
+            <div class="info-value">{{ data.contract_number }}</div>
         </div>
         <div class="info-group">
-            <div class="info-label">Date Range</div>
-            <div class="info-value">{{ date_range }}</div>
+            <div class="info-label">Customer</div>
+            <div class="info-value">{{ data.client_name or 'N/A' }}</div>
         </div>
         <div class="info-group">
             <div class="info-label">Total Items</div>
-            <div class="info-value">{{ total_unique_items }}</div>
+            <div class="info-value">{{ data.item_summary|length }}</div>
         </div>
         <div class="info-group">
             <div class="info-label">Total Entries</div>
-            <div class="info-value">{{ total_entries }}</div>
+            <div class="info-value">{{ data.total_entries }}</div>
         </div>
     </div>
     
@@ -307,61 +307,57 @@
         <div class="section-title">📊 Summary Overview</div>
         <div class="summary-grid">
             <div class="summary-card">
-                <div class="summary-number">{{ total_unique_items }}</div>
+                <div class="summary-number">{{ data.item_summary|length }}</div>
                 <div class="summary-label">Different Items</div>
             </div>
             <div class="summary-card">
-                <div class="summary-number">{{ total_quantity }}</div>
-                <div class="summary-label">Total Quantity</div>
+                <div class="summary-number">{{ data.total_entries }}</div>
+                <div class="summary-label">Total Entries</div>
             </div>
             <div class="summary-card">
-                <div class="summary-number">{{ out_actions }}</div>
-                <div class="summary-label">Items Out</div>
-            </div>
-            <div class="summary-card">
-                <div class="summary-number">{{ in_actions }}</div>
-                <div class="summary-label">Items In</div>
-            </div>
-            <div class="summary-card">
-                <div class="summary-number">{{ total_entries }}</div>
+                <div class="summary-number">{{ data.chronological_history|length }}</div>
                 <div class="summary-label">Total Transactions</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-number">{{ data.contract_number }}</div>
+                <div class="summary-label">Contract Number</div>
+            </div>
+            <div class="summary-card" style="display: none;">
+                <div class="summary-number">0</div>
+                <div class="summary-label">Hidden</div>
             </div>
         </div>
     </div>
     
-    {% if items_summary %}
+    {% if data.item_summary %}
     <div class="section">
         <div class="section-title">📝 Items Summary</div>
-        {% for item_name, details in items_summary.items() %}
+        {% for item in data.item_summary %}
         <div class="item-summary">
             <div class="item-header">
-                {{ item_name }}
+                {{ item.item_name }}
                 <span style="float: right;">
-                    <span class="quantity-change quantity-{% if details.net_quantity > 0 %}positive{% elif details.net_quantity < 0 %}negative{% else %}neutral{% endif %}">
-                        Net: {{ details.net_quantity }}
+                    <span class="quantity-change quantity-{% if item.net_quantity > 0 %}positive{% elif item.net_quantity < 0 %}negative{% else %}neutral{% endif %}">
+                        Net: {{ item.net_quantity }}
                     </span>
                 </span>
             </div>
             <div class="item-details">
                 <div class="detail-row">
-                    <span class="detail-label">Total Transactions:</span>
-                    <span class="detail-value">{{ details.transaction_count }}</span>
+                    <span class="detail-label">Total Added:</span>
+                    <span class="detail-value">{{ item.total_added }}</span>
                 </div>
                 <div class="detail-row">
-                    <span class="detail-label">Items Out:</span>
-                    <span class="detail-value">{{ details.out_count }} ({{ details.out_quantity }} qty)</span>
+                    <span class="detail-label">Total Removed:</span>
+                    <span class="detail-value">{{ item.total_removed }}</span>
                 </div>
                 <div class="detail-row">
-                    <span class="detail-label">Items In:</span>
-                    <span class="detail-value">{{ details.in_count }} ({{ details.in_quantity }} qty)</span>
+                    <span class="detail-label">Net Quantity:</span>
+                    <span class="detail-value">{{ item.net_quantity }}</span>
                 </div>
                 <div class="detail-row">
                     <span class="detail-label">Last Activity:</span>
-                    <span class="detail-value">{{ details.last_timestamp.strftime('%Y-%m-%d %H:%M') if details.last_timestamp else 'N/A' }}</span>
-                </div>
-                <div class="detail-row">
-                    <span class="detail-label">Last User:</span>
-                    <span class="detail-value">{{ details.last_user or 'N/A' }}</span>
+                    <span class="detail-value">{{ item.last_activity }}</span>
                 </div>
             </div>
         </div>
@@ -369,14 +365,14 @@
     </div>
     {% endif %}
     
-    {% if chronological_history %}
+    {% if data.chronological_history %}
     <div class="section">
         <div class="section-title">📅 Chronological History</div>
         <div class="timeline">
-            {% for entry in chronological_history %}
+            {% for entry in data.chronological_history %}
             <div class="timeline-item">
                 <div class="timeline-date">
-                    {{ entry.timestamp.strftime('%m/%d/%Y<br>%H:%M') | safe }}
+                    {{ entry.timestamp }}
                 </div>
                 <div class="timeline-content">
                     <div class="timeline-action">
@@ -385,8 +381,8 @@
                     </div>
                     <div class="timeline-details">
                         <strong>Quantity:</strong> 
-                        <span class="quantity-change quantity-{% if entry.action == 'Out' %}negative{% elif entry.action == 'In' %}positive{% else %}neutral{% endif %}">
-                            {% if entry.action == 'Out' %}-{% elif entry.action == 'In' %}+{% endif %}{{ entry.quantity }}
+                        <span class="quantity-change quantity-{% if entry.action == 'Removed' %}negative{% elif entry.action == 'Added' %}positive{% else %}neutral{% endif %}">
+                            {% if entry.action == 'Removed' %}-{% elif entry.action == 'Added' %}+{% endif %}{{ entry.quantity }}
                         </span>
                         | <strong>User:</strong> {{ entry.user }}
                     </div>
@@ -404,7 +400,7 @@
     
     <div class="footer">
         <div>Hand Counted Items Report | RFID Inventory Management System</div>
-        <div>{{ current_date }} | Contract: {{ contract_number }}</div>
+        <div>{{ data.current_date if data.current_date else 'N/A' }} | Contract: {{ data.contract_number }}</div>
     </div>
 </body>
 </html>
