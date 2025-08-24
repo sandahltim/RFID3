@@ -215,19 +215,19 @@
     <div class="contract-info">
         <div class="info-group">
             <div class="info-label">Contract Number</div>
-            <div class="info-value">{{ contract_number }}</div>
+            <div class="info-value">{{ data.contract_number }}</div>
         </div>
         <div class="info-group">
             <div class="info-label">Customer</div>
-            <div class="info-value">{{ customer_name or 'N/A' }}</div>
+            <div class="info-value">{{ data.client_name or 'N/A' }}</div>
         </div>
         <div class="info-group">
             <div class="info-label">Date Range</div>
-            <div class="info-value">{{ date_range }}</div>
+            <div class="info-value">{{ data.start_date }} - {{ data.last_activity }}</div>
         </div>
         <div class="info-group">
-            <div class="info-label">Total Transactions</div>
-            <div class="info-value">{{ total_transactions }}</div>
+            <div class="info-label">Total Items</div>
+            <div class="info-value">{{ data.total_items }}</div>
         </div>
     </div>
     
@@ -235,27 +235,27 @@
         <div class="section-title">📊 Contract Summary</div>
         <div class="summary-grid">
             <div class="summary-card">
-                <div class="summary-number">{{ rfid_items|length }}</div>
+                <div class="summary-number">{{ data.total_rfid_items }}</div>
                 <div class="summary-label">RFID Items</div>
             </div>
             <div class="summary-card">
-                <div class="summary-number">{{ hand_counted_total }}</div>
+                <div class="summary-number">{{ data.total_hand_counted }}</div>
                 <div class="summary-label">Hand Counted Items</div>
             </div>
             <div class="summary-card">
-                <div class="summary-number">{{ transaction_count }}</div>
-                <div class="summary-label">Total Scans</div>
+                <div class="summary-number">{{ data.recent_activity|length }}</div>
+                <div class="summary-label">Recent Activities</div>
             </div>
             <div class="summary-card">
-                <div class="summary-number">{{ unique_items }}</div>
-                <div class="summary-label">Unique Items</div>
+                <div class="summary-number">{{ data.total_items }}</div>
+                <div class="summary-label">Total Items</div>
             </div>
         </div>
     </div>
     
-    {% if rfid_items %}
+    {% if data.rfid_items %}
     <div class="section">
-        <div class="section-title">🏷️ RFID Items ({{ rfid_items|length }})</div>
+        <div class="section-title">🏷️ RFID Items ({{ data.rfid_items|length }})</div>
         <table class="items-table">
             <thead>
                 <tr>
@@ -268,7 +268,7 @@
                 </tr>
             </thead>
             <tbody>
-                {% for item in rfid_items %}
+                {% for item in data.rfid_items %}
                 <tr>
                     <td>{{ item.tag_id }}</td>
                     <td>{{ item.common_name }}</td>
@@ -279,7 +279,7 @@
                     </td>
                     <td>{{ item.quality or 'N/A' }}</td>
                     <td>{{ item.bin_location or 'N/A' }}</td>
-                    <td>{{ item.date_last_scanned.strftime('%Y-%m-%d %H:%M') if item.date_last_scanned else 'Never' }}</td>
+                    <td>{{ item.last_scanned }}</td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -287,7 +287,7 @@
     </div>
     {% endif %}
     
-    {% if hand_counted_items %}
+    {% if data.hand_counted_items %}
     <div class="section">
         <div class="section-title">📝 Hand Counted Items</div>
         <table class="items-table">
@@ -301,13 +301,13 @@
                 </tr>
             </thead>
             <tbody>
-                {% for item_name, details in hand_counted_items.items() %}
+                {% for item in data.hand_counted_items %}
                 <tr>
-                    <td>{{ item_name }}</td>
-                    <td><strong>{{ details.total_quantity }}</strong></td>
-                    <td>{{ details.action_count }} entries</td>
-                    <td>{{ details.last_timestamp.strftime('%Y-%m-%d %H:%M') if details.last_timestamp else 'N/A' }}</td>
-                    <td>{{ details.last_user or 'N/A' }}</td>
+                    <td>{{ item.item_name }}</td>
+                    <td><strong>{{ item.quantity }}</strong></td>
+                    <td>{{ item.action }}</td>
+                    <td>{{ item.timestamp }}</td>
+                    <td>{{ item.user }}</td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -315,18 +315,18 @@
     </div>
     {% endif %}
     
-    {% if transaction_timeline %}
+    {% if data.recent_activity %}
     <div class="section">
-        <div class="section-title">📅 Transaction Timeline</div>
+        <div class="section-title">📅 Recent Activity Timeline</div>
         <div class="timeline">
-            {% for transaction in transaction_timeline %}
+            {% for activity in data.recent_activity %}
             <div class="timeline-item">
                 <div class="timeline-date">
-                    {{ transaction.timestamp.strftime('%m/%d/%Y %H:%M') }}
+                    {{ activity.scan_date }}
                 </div>
                 <div class="timeline-content">
-                    <div class="timeline-action">{{ transaction.action }}</div>
-                    <div>{{ transaction.details }}</div>
+                    <div class="timeline-action">{{ activity.scan_type }} - {{ activity.common_name }}</div>
+                    <div>Tag: {{ activity.tag_id }} | Status: {{ activity.status }} | By: {{ activity.scan_by }}</div>
                 </div>
             </div>
             {% endfor %}
@@ -336,7 +336,7 @@
     
     <div class="footer">
         <div>Report generated by RFID Inventory Management System</div>
-        <div>{{ current_date }} | Contract: {{ contract_number }}</div>
+        <div>{{ data.current_date if data.current_date else 'N/A' }} | Contract: {{ data.contract_number }}</div>
     </div>
 </body>
 </html>
