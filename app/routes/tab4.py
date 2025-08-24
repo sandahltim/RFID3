@@ -936,29 +936,49 @@ def contract_items_print():
         session = db.session()
         
         # Get contract info
-        contract_info = session.query(
-            Transaction.contract_number,
-            Transaction.client_name,
-            func.min(Transaction.scan_date).label('start_date'),
-            func.max(Transaction.scan_date).label('last_activity')
-        ).filter(
-            Transaction.contract_number == contract_number
-        ).group_by(Transaction.contract_number, Transaction.client_name).first()
+        try:
+            contract_info = session.query(Transaction).filter(
+                Transaction.contract_number == contract_number
+            ).first()
+            
+            if not contract_info:
+                return jsonify({'error': f'Contract {contract_number} not found'}), 404
+            
+            # Get date range
+            date_info = session.query(
+                func.min(Transaction.scan_date).label('start_date'),
+                func.max(Transaction.scan_date).label('last_activity')
+            ).filter(
+                Transaction.contract_number == contract_number
+            ).first()
+            
+        except Exception as e:
+            logger.error(f"Error querying contract info: {str(e)}", exc_info=True)
+            return jsonify({'error': 'Database error'}), 500
         
-        if not contract_info:
-            return jsonify({'error': f'Contract {contract_number} not found'}), 404
+        # Try to get items from contract snapshots first (for historical accuracy)
+        from ..models.db_models import ContractSnapshot
+        snapshot_items = session.query(ContractSnapshot).filter(
+            ContractSnapshot.contract_number == contract_number
+        ).order_by(ContractSnapshot.common_name, ContractSnapshot.tag_id).all()
         
-        # Get all items currently on this contract
-        items = session.query(ItemMaster).filter(
-            ItemMaster.last_contract_num == contract_number
-        ).order_by(ItemMaster.common_name, ItemMaster.tag_id).all()
+        if snapshot_items:
+            # Use historical snapshot data
+            items = snapshot_items
+            logger.info(f"Using {len(snapshot_items)} snapshot items for contract {contract_number}")
+        else:
+            # Fallback to current ItemMaster data  
+            items = session.query(ItemMaster).filter(
+                ItemMaster.last_contract_num == contract_number
+            ).order_by(ItemMaster.common_name, ItemMaster.tag_id).all()
+            logger.info(f"Using {len(items)} current items for contract {contract_number} (no snapshots found)")
         
         # Prepare data for template
         items_data = {
             'contract_number': contract_number,
             'client_name': contract_info.client_name or 'N/A',
-            'start_date': contract_info.start_date.strftime('%Y-%m-%d') if contract_info.start_date else 'N/A',
-            'last_activity': contract_info.last_activity.strftime('%Y-%m-%d') if contract_info.last_activity else 'N/A',
+            'start_date': date_info.start_date.strftime('%Y-%m-%d') if date_info and date_info.start_date else 'N/A',
+            'last_activity': date_info.last_activity.strftime('%Y-%m-%d') if date_info and date_info.last_activity else 'N/A',
             'total_items': len(items),
             'current_date': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
             'items': items
@@ -976,6 +996,34 @@ def contract_items_print():
     finally:
         if session:
             session.close()
+
+@tab4_bp.route('/tab/4/create_contract_snapshot', methods=['POST'])
+def create_contract_snapshot():
+    """Create a snapshot of all items on a contract for historical preservation."""
+    from ..services.contract_snapshots import ContractSnapshotService
+    
+    data = request.get_json()
+    contract_number = data.get('contract_number')
+    snapshot_type = data.get('snapshot_type', 'manual')
+    created_by = data.get('created_by', 'user')
+    
+    if not contract_number:
+        return jsonify({'error': 'Contract number is required'}), 400
+    
+    try:
+        snapshot_count = ContractSnapshotService.create_contract_snapshot(
+            contract_number, snapshot_type, created_by
+        )
+        
+        return jsonify({
+            'success': True,
+            'message': f'Created snapshot for contract {contract_number}',
+            'items_count': snapshot_count
+        })
+        
+    except Exception as e:
+        logger.error(f"Error creating contract snapshot: {str(e)}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
 
 @tab4_bp.route('/tab/4/hand_counted_items')
 def tab4_hand_counted_items():
