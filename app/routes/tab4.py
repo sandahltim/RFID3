@@ -347,6 +347,74 @@ def hand_counted_catalog():
         if session:
             session.close()
 
+@tab4_bp.route('/tab/4/hand_counted_catalog_categorized', methods=['GET'])
+def hand_counted_catalog_categorized():
+    """
+    Get hand counted catalog items organized by categories for improved UX
+    Returns items grouped by category and subcategory
+    """
+    session = None
+    try:
+        session = db.session()
+        try:
+            # Get items with their category information
+            # Join HandCountedCatalog with UserRentalClassMapping via rental_class_id
+            from ..models.db_models import UserRentalClassMapping, RentalClassMapping
+            
+            items_with_categories = session.query(
+                HandCountedCatalog.item_name,
+                UserRentalClassMapping.category,
+                UserRentalClassMapping.subcategory
+            ).outerjoin(
+                UserRentalClassMapping, 
+                HandCountedCatalog.rental_class_id == UserRentalClassMapping.rental_class_id
+            ).all()
+            
+            # If no user mappings, try system mappings
+            if not items_with_categories:
+                items_with_categories = session.query(
+                    HandCountedCatalog.item_name,
+                    RentalClassMapping.category,
+                    RentalClassMapping.subcategory
+                ).outerjoin(
+                    RentalClassMapping,
+                    HandCountedCatalog.rental_class_id == RentalClassMapping.rental_class_id
+                ).all()
+            
+        except ProgrammingError:
+            session.rollback()
+            logger.warning("hand_counted_catalog table missing; returning empty categorized list")
+            current_app.logger.warning("hand_counted_catalog table missing; returning empty categorized list")
+            items_with_categories = []
+        
+        # Organize items by category
+        categorized_items = {}
+        uncategorized_items = []
+        
+        for item_name, category, subcategory in items_with_categories:
+            if category and subcategory:
+                if category not in categorized_items:
+                    categorized_items[category] = {}
+                if subcategory not in categorized_items[category]:
+                    categorized_items[category][subcategory] = []
+                categorized_items[category][subcategory].append(item_name)
+            else:
+                uncategorized_items.append(item_name)
+        
+        # Add uncategorized items as a separate category
+        if uncategorized_items:
+            categorized_items['Uncategorized'] = {'General': uncategorized_items}
+        
+        logger.info(f"Returned categorized hand-counted catalog: {len(categorized_items)} categories")
+        return jsonify({'categories': categorized_items})
+        
+    except Exception as e:
+        logger.error(f"Error fetching categorized hand-counted catalog: {str(e)}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+    finally:
+        if session:
+            session.close()
+
 @tab4_bp.route('/tab/4/contract_items_count', methods=['GET'])
 def contract_items_count():
     contract_number = request.args.get('contract_number')

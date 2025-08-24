@@ -438,6 +438,151 @@ window.updateItemDropdown = function updateItemDropdown() {
         });
 };
 
+// Global variable to store categorized items
+let categorizedItemsData = {};
+
+// Load categorized items data on page load
+window.loadCategorizedItems = function loadCategorizedItems() {
+    fetch('/tab/4/hand_counted_catalog_categorized')
+        .then(response => {
+            if (!response.ok) throw new Error(`Failed to fetch categorized catalog: ${response.status}`);
+            return response.json();
+        })
+        .then(data => {
+            categorizedItemsData = data.categories || {};
+            populateCategoryDropdown();
+            console.log('Loaded categorized items data:', categorizedItemsData);
+        })
+        .catch(error => {
+            console.error('Error fetching categorized hand-counted catalog:', error);
+            // Fallback to original dropdown
+            window.updateItemDropdown();
+        });
+};
+
+// Populate the category dropdown
+function populateCategoryDropdown() {
+    const categoryDropdown = document.getElementById('hand-counted-category');
+    categoryDropdown.innerHTML = '<option value="">Select Category...</option>';
+    
+    Object.keys(categorizedItemsData).sort().forEach(category => {
+        const option = document.createElement('option');
+        option.value = category;
+        option.textContent = category;
+        categoryDropdown.appendChild(option);
+    });
+}
+
+// Update subcategory dropdown based on selected category
+window.updateSubcategoryDropdown = function updateSubcategoryDropdown() {
+    const categoryDropdown = document.getElementById('hand-counted-category');
+    const subcategoryDropdown = document.getElementById('hand-counted-subcategory');
+    const itemDropdown = document.getElementById('hand-counted-item-name');
+    
+    // Clear subcategory and item dropdowns
+    subcategoryDropdown.innerHTML = '<option value="">Select Subcategory...</option>';
+    itemDropdown.innerHTML = '<option value="">Select Item...</option>';
+    
+    const selectedCategory = categoryDropdown.value;
+    if (!selectedCategory || !categorizedItemsData[selectedCategory]) {
+        return;
+    }
+    
+    // Populate subcategory dropdown
+    Object.keys(categorizedItemsData[selectedCategory]).sort().forEach(subcategory => {
+        const option = document.createElement('option');
+        option.value = subcategory;
+        option.textContent = subcategory;
+        subcategoryDropdown.appendChild(option);
+    });
+};
+
+// Update item dropdown based on selected category and subcategory
+window.updateItemDropdownHierarchical = function updateItemDropdownHierarchical() {
+    const categoryDropdown = document.getElementById('hand-counted-category');
+    const subcategoryDropdown = document.getElementById('hand-counted-subcategory');
+    const itemDropdown = document.getElementById('hand-counted-item-name');
+    const contractDropdown = document.getElementById('hand-counted-contract-number');
+    const newContractInput = document.getElementById('new-contract-number');
+    
+    // Clear item dropdown
+    itemDropdown.innerHTML = '<option value="">Select Item...</option>';
+    
+    const selectedCategory = categoryDropdown.value;
+    const selectedSubcategory = subcategoryDropdown.value;
+    
+    if (!selectedCategory || !selectedSubcategory || 
+        !categorizedItemsData[selectedCategory] || 
+        !categorizedItemsData[selectedCategory][selectedSubcategory]) {
+        return;
+    }
+    
+    const items = categorizedItemsData[selectedCategory][selectedSubcategory];
+    const contractNumber = newContractInput.style.display === 'block' ? newContractInput.value : contractDropdown.value;
+    
+    // Get existing quantities for the contract if available
+    if (contractNumber) {
+        fetch(`/tab/4/hand_counted_items_by_contract?contract_number=${encodeURIComponent(contractNumber)}`)
+            .then(response => {
+                if (!response.ok) throw new Error(`Failed to fetch contract items: ${response.status}`);
+                return response.json();
+            })
+            .then(data => {
+                const contractItems = {};
+                if (data.items && Array.isArray(data.items)) {
+                    data.items.forEach(item => {
+                        contractItems[item.item_name] = item.quantity;
+                    });
+                }
+                
+                // Populate item dropdown with quantities if available
+                items.forEach(itemName => {
+                    const option = document.createElement('option');
+                    option.value = itemName;
+                    const qty = contractItems[itemName];
+                    option.textContent = qty ? `${itemName} (Qty: ${qty})` : itemName;
+                    itemDropdown.appendChild(option);
+                });
+                
+                // Add "Other" option
+                const otherOption = document.createElement('option');
+                otherOption.value = '__other';
+                otherOption.textContent = 'Other';
+                itemDropdown.appendChild(otherOption);
+            })
+            .catch(error => {
+                console.error('Error fetching contract items:', error);
+                // Populate without quantities
+                items.forEach(itemName => {
+                    const option = document.createElement('option');
+                    option.value = itemName;
+                    option.textContent = itemName;
+                    itemDropdown.appendChild(option);
+                });
+                
+                const otherOption = document.createElement('option');
+                otherOption.value = '__other';
+                otherOption.textContent = 'Other';
+                itemDropdown.appendChild(otherOption);
+            });
+    } else {
+        // No contract selected, just populate items
+        items.forEach(itemName => {
+            const option = document.createElement('option');
+            option.value = itemName;
+            option.textContent = itemName;
+            itemDropdown.appendChild(option);
+        });
+        
+        const otherOption = document.createElement('option');
+        otherOption.value = '__other';
+        otherOption.textContent = 'Other';
+        itemDropdown.appendChild(otherOption);
+    }
+    
+    handleItemSelection();
+};
+
 window.addHandCountedItem = function addHandCountedItem() {
     const contractDropdown = document.getElementById('hand-counted-contract-number');
     const newContractInput = document.getElementById('new-contract-number');
@@ -492,7 +637,7 @@ window.addHandCountedItem = function addHandCountedItem() {
             addContractToTable(contractNumber);
             updateContractCounts(contractNumber);
             refreshCommonNames(contractNumber);
-            window.updateItemDropdown(); // Refresh dropdown after successful add
+            window.loadCategorizedItems(); // Refresh dropdown after successful add
         }
     })
     .catch(error => {
@@ -554,7 +699,7 @@ window.removeHandCountedItem = function removeHandCountedItem() {
             addContractToTable(contractNumber);
             updateContractCounts(contractNumber);
             refreshCommonNames(contractNumber);
-            window.updateItemDropdown(); // Refresh dropdown after successful remove
+            window.loadCategorizedItems(); // Refresh dropdown after successful remove
         }
     })
     .catch(error => {
@@ -704,6 +849,9 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         })
         .catch(error => console.error('Error fetching hand-counted contracts:', error));
+
+    // Load categorized items for improved dropdown UX
+    window.loadCategorizedItems();
 
     // Attach event listeners
     document.removeEventListener('click', handleClick);
