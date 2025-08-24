@@ -94,14 +94,14 @@ def home():
         status_counts = [(status or 'Unknown', count) for status, count in status_breakdown]
 
         # Recent scans
-        recent_scans = session.query(ItemMaster).filter(ItemMaster.date_last_scanned.isnot(None)).order_by(
+        recent_scans = db.session.query(ItemMaster).filter(ItemMaster.date_last_scanned.isnot(None)).order_by(
             ItemMaster.date_last_scanned.desc()
         ).limit(10).all()
         logger.info(f'Recent scans details: {[(scan.tag_id, scan.common_name, scan.date_last_scanned) for scan in recent_scans]}')
         logger.debug(f"Recent scans sample: {[(item.tag_id, item.common_name, item.date_last_scanned) for item in recent_scans[:5]]}")
 
         # Last refresh state
-        refresh_state = session.query(RefreshState).first()
+        refresh_state = db.session.query(RefreshState).first()
         last_refresh = refresh_state.last_refresh.strftime('%Y-%m-%d %H:%M:%S') if refresh_state and refresh_state.last_refresh else 'N/A'
         refresh_type = refresh_state.state_type if refresh_state else 'N/A'
         logger.info(f'Last refresh details: {last_refresh}, Type: {refresh_type}')
