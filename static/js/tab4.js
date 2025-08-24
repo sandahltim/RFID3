@@ -1092,4 +1092,55 @@ document.addEventListener('DOMContentLoaded', function() {
             alert(`❌ Error creating snapshot: ${error.message}`);
         }
     };
+    
+    // Function to show snapshot automation status
+    window.showSnapshotStatus = async function() {
+        try {
+            const response = await fetch('/tab/4/snapshot_status');
+            const data = await response.json();
+            
+            if (data.error) {
+                alert(`❌ Error getting status: ${data.error}`);
+                return;
+            }
+            
+            const schedule = data.schedule_info;
+            const lastRun = data.last_run;
+            
+            let statusMessage = `📊 SNAPSHOT AUTOMATION STATUS\n\n`;
+            statusMessage += `🗓️  Schedule: ${schedule.schedule}\n`;
+            statusMessage += `📈 Recent snapshots (7 days): ${schedule.recent_periodic_count}\n`;
+            statusMessage += `🕐 Last periodic snapshot: ${schedule.last_periodic_snapshot || 'Never'}\n\n`;
+            
+            if (lastRun) {
+                statusMessage += `📋 LAST RUN SUMMARY:\n`;
+                statusMessage += `⏰ Timestamp: ${new Date(lastRun.timestamp).toLocaleString()}\n`;
+                
+                if (lastRun.results) {
+                    const results = lastRun.results;
+                    statusMessage += `✅ Successful: ${results.successful_snapshots}/${results.total_contracts}\n`;
+                    statusMessage += `📦 Items snapshotted: ${results.total_items_snapshotted}\n`;
+                    
+                    if (results.failed_snapshots > 0) {
+                        statusMessage += `❌ Failed: ${results.failed_snapshots}\n`;
+                    }
+                } else if (lastRun.error) {
+                    statusMessage += `❌ Error: ${lastRun.error}\n`;
+                }
+            } else {
+                statusMessage += `📋 No automation runs recorded yet\n`;
+            }
+            
+            statusMessage += `\n📁 Log files available on server:\n`;
+            statusMessage += `   • snapshot_automation.log (detailed)\n`;
+            statusMessage += `   • snapshot_cron.log (cron output)\n`;
+            statusMessage += `   • last_snapshot_run.json (status)\n`;
+            
+            alert(statusMessage);
+            
+        } catch (error) {
+            console.error('Error getting snapshot status:', error);
+            alert(`❌ Error getting status: ${error.message}`);
+        }
+    };
 });

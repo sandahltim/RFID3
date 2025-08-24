@@ -1025,6 +1025,43 @@ def create_contract_snapshot():
         logger.error(f"Error creating contract snapshot: {str(e)}", exc_info=True)
         return jsonify({'error': str(e)}), 500
 
+@tab4_bp.route('/tab/4/snapshot_status')
+def snapshot_status():
+    """Get status of automated snapshots and schedule info."""
+    try:
+        from ..services.scheduled_snapshots import ScheduledSnapshotService
+        import json
+        import os
+        
+        # Get schedule info
+        schedule_info = ScheduledSnapshotService.get_snapshot_schedule_info()
+        
+        # Try to read last run summary
+        last_run_file = '/home/tim/RFID3/logs/last_snapshot_run.json'
+        last_run_info = None
+        
+        if os.path.exists(last_run_file):
+            try:
+                with open(last_run_file, 'r') as f:
+                    last_run_info = json.load(f)
+            except Exception as e:
+                logger.warning(f"Could not read last run file: {str(e)}")
+        
+        return jsonify({
+            'schedule_info': schedule_info,
+            'last_run': last_run_info,
+            'automation_enabled': True,
+            'log_files': {
+                'detailed_log': '/home/tim/RFID3/logs/snapshot_automation.log',
+                'cron_log': '/home/tim/RFID3/logs/snapshot_cron.log',
+                'status_summary': '/home/tim/RFID3/logs/last_snapshot_run.json'
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting snapshot status: {str(e)}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
 @tab4_bp.route('/tab/4/hand_counted_items')
 def tab4_hand_counted_items():
     contract_number = request.args.get('contract_number', None)
