@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/home/tim/RFID3/venv/bin/python3
 """
 Weekly Contract Snapshots Script
 Version: 2025-08-24-v1
@@ -48,6 +48,9 @@ def main():
         logger.info("STARTING WEEKLY CONTRACT SNAPSHOTS")
         logger.info(f"Timestamp: {datetime.now(timezone.utc).isoformat()}")
         logger.info("=" * 60)
+        
+        # Set environment flag to skip API client initialization
+        os.environ['SNAPSHOT_AUTOMATION'] = '1'
         
         # Import Flask app and services
         from app import create_app
