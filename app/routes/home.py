@@ -144,3 +144,10 @@ def home():
                               cache_bust=int(time()))
     finally:
         pass  # Flask-SQLAlchemy automatically manages session lifecycle
+
+@home_bp.route('/refresh_status')
+def get_refresh_status():
+    """Get current refresh operation status."""
+    from flask import jsonify
+    from ..services.refresh import refresh_status
+    return jsonify(refresh_status)

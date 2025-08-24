@@ -162,6 +162,63 @@
             background: #138496;
         }
         
+        .aggregate-summary {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            border-left: 4px solid #17a2b8;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        
+        .aggregate-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: white;
+            padding: 8px 12px;
+            border-radius: 4px;
+            min-width: 200px;
+            flex: 1;
+        }
+        
+        .item-name {
+            font-weight: 500;
+            color: #495057;
+        }
+        
+        .item-count {
+            background: #17a2b8;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-weight: bold;
+            font-size: 12px;
+        }
+        
+        .signature-section {
+            margin-top: 40px;
+            padding: 20px;
+            border: 2px solid #e9ecef;
+            border-radius: 5px;
+            background: #f8f9fa;
+        }
+        
+        .signature-line {
+            border-bottom: 2px solid #495057;
+            width: 300px;
+            margin: 20px 0 10px 0;
+            display: inline-block;
+        }
+        
+        .signature-label {
+            font-weight: bold;
+            color: #495057;
+            margin-bottom: 5px;
+        }
+        
         .tag-id {
             font-family: 'Courier New', monospace;
             font-weight: bold;
@@ -246,12 +303,29 @@
         <div class="summary-label">Total Items on Contract</div>
     </div>
     
-    {% if data.items %}
+    {% if data.contract_items %}
+    <!-- Aggregate Summary -->
+    <div class="section-title">📊 Item Summary by Type</div>
+    <div class="aggregate-summary">
+        {% set item_counts = {} %}
+        {% for item in data.contract_items %}
+            {% set item_name = item.common_name or 'Unknown' %}
+            {% if item_counts.update({item_name: item_counts.get(item_name, 0) + 1}) %}{% endif %}
+        {% endfor %}
+        
+        {% for item_name, count in item_counts.items() | sort %}
+        <div class="aggregate-item">
+            <span class="item-name">{{ item_name }}</span>
+            <span class="item-count">{{ count }}</span>
+        </div>
+        {% endfor %}
+    </div>
+    
     <!-- Status Summary -->
     <div class="section-title">📊 Status Summary</div>
     <div class="status-summary">
         {% set status_counts = {} %}
-        {% for item in data.items %}
+        {% for item in data.contract_items %}
             {% if status_counts.update({item.status or 'Unknown': status_counts.get(item.status or 'Unknown', 0) + 1}) %}{% endif %}
         {% endfor %}
         
@@ -264,7 +338,7 @@
     </div>
     
     <!-- Items Table -->
-    <div class="section-title">🏷️ Contract Items ({{ data.items|length }})</div>
+    <div class="section-title">🏷️ Contract Items ({{ data.contract_items|length }})</div>
     <table class="items-table">
         <thead>
             <tr>
@@ -278,7 +352,7 @@
             </tr>
         </thead>
         <tbody>
-            {% for item in data.items %}
+            {% for item in data.contract_items %}
             <tr>
                 <td class="tag-id">{{ item.tag_id }}</td>
                 <td>{{ item.common_name or 'N/A' }}</td>
@@ -301,6 +375,18 @@
         <p>No items found on contract {{ data.contract_number }}</p>
     </div>
     {% endif %}
+    
+    <div class="signature-section">
+        <div class="signature-label">Customer Signature:</div>
+        <div class="signature-line"></div>
+        <div style="font-size: 12px; color: #666; margin-top: 5px;">Date: _____________</div>
+        
+        <div style="margin-top: 25px;">
+            <div class="signature-label">Company Representative:</div>
+            <div class="signature-line"></div>
+            <div style="font-size: 12px; color: #666; margin-top: 5px;">Date: _____________</div>
+        </div>
+    </div>
     
     <div class="footer">
         <div>Contract Items Report | RFID Inventory Management System</div>

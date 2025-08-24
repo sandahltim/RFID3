@@ -27,6 +27,9 @@ logger = get_logger(f'refresh_{os.getpid()}', level=logging.INFO, log_file=LOG_F
 
 refresh_bp = Blueprint('refresh', __name__)
 
+# Global refresh status tracking
+refresh_status = {'refreshing': False, 'start_time': None}
+
 api_client = APIClient()
 
 def validate_date(date_str, field_name, tag_id):
@@ -399,6 +402,11 @@ def full_refresh():
     local database.
     """
     logger.info("Starting full refresh of item master, transactions, and seed data")
+    
+    # Set refresh status to true
+    refresh_status['refreshing'] = True
+    refresh_status['start_time'] = datetime.now(timezone.utc).isoformat()
+    
     session = db.session()
     max_retries = 3
     for attempt in range(max_retries):
@@ -435,6 +443,10 @@ def full_refresh():
 
             update_refresh_state('full_refresh', datetime.now(timezone.utc))
             logger.info("Full refresh completed successfully")
+            
+            # Clear refresh status
+            refresh_status['refreshing'] = False
+            refresh_status['start_time'] = None
             break
         except OperationalError as e:
             if "Deadlock" in str(e):
@@ -452,6 +464,10 @@ def full_refresh():
         except Exception as e:
             logger.error(f"Full refresh failed: {str(e)}", exc_info=True)
             session.rollback()
+            
+            # Clear refresh status on error
+            refresh_status['refreshing'] = False
+            refresh_status['start_time'] = None
             raise
         finally:
             if session.is_active:
@@ -465,6 +481,11 @@ def incremental_refresh():
     the configured lookback interval and applies them to the local database.
     """
     logger.info("Starting incremental refresh for item master and transactions")
+    
+    # Set refresh status to true
+    refresh_status['refreshing'] = True
+    refresh_status['start_time'] = datetime.now(timezone.utc).isoformat()
+    
     session = db.session()
     max_retries = 3
     for attempt in range(max_retries):
@@ -489,6 +510,10 @@ def incremental_refresh():
                     logger.info("No new item master or transaction data to process, skipping database updates")
                     session.commit()
                     update_refresh_state('incremental_refresh', datetime.now(timezone.utc))
+                    
+                    # Clear refresh status (quick operation)
+                    refresh_status['refreshing'] = False
+                    refresh_status['start_time'] = None
                     break
 
                 update_item_master(session, items)
@@ -497,6 +522,10 @@ def incremental_refresh():
                 session.commit()
                 update_refresh_state('incremental_refresh', datetime.now(timezone.utc))
                 logger.info("Incremental refresh completed successfully")
+                
+                # Clear refresh status
+                refresh_status['refreshing'] = False
+                refresh_status['start_time'] = None
                 break
         except OperationalError as e:
             if "Lock wait timeout" in str(e) or "Deadlock" in str(e):
@@ -514,6 +543,10 @@ def incremental_refresh():
         except Exception as e:
             logger.error(f"Incremental refresh failed: {str(e)}", exc_info=True)
             session.rollback()
+            
+            # Clear refresh status on error
+            refresh_status['refreshing'] = False
+            refresh_status['start_time'] = None
             raise
         finally:
             session.close()
