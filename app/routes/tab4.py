@@ -981,7 +981,7 @@ def contract_items_print():
             'last_activity': date_info.last_activity.strftime('%Y-%m-%d') if date_info and date_info.last_activity else 'N/A',
             'total_items': len(items),
             'current_date': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-            'items': items
+            'contract_items': items
         }
         
         html = render_template('contract_items_print.html', data=items_data)
