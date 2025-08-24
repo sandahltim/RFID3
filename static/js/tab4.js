@@ -947,6 +947,35 @@ document.addEventListener('DOMContentLoaded', function() {
             window.open(url, '_blank', 'width=1200,height=800,scrollbars=yes,resizable=yes');
             return;
         }
+
+        // Handle print buttons for selected contract
+        const printSelectedContractHistory = event.target.closest('.print-selected-contract-history');
+        if (printSelectedContractHistory) {
+            event.preventDefault();
+            event.stopPropagation();
+            const contractSelector = document.getElementById('print-contract-selector');
+            const contractNumber = contractSelector.value;
+            if (contractNumber) {
+                console.log(`Opening contract history for selected: ${contractNumber}`);
+                const url = `/tab/4/contract_history_print?contract_number=${encodeURIComponent(contractNumber)}`;
+                window.open(url, '_blank', 'width=1200,height=800,scrollbars=yes,resizable=yes');
+            }
+            return;
+        }
+
+        const printSelectedHandCountedHistory = event.target.closest('.print-selected-hand-counted-history');
+        if (printSelectedHandCountedHistory) {
+            event.preventDefault();
+            event.stopPropagation();
+            const contractSelector = document.getElementById('print-contract-selector');
+            const contractNumber = contractSelector.value;
+            if (contractNumber) {
+                console.log(`Opening hand counted history for selected: ${contractNumber}`);
+                const url = `/tab/4/hand_counted_history_print?contract_number=${encodeURIComponent(contractNumber)}`;
+                window.open(url, '_blank', 'width=1200,height=800,scrollbars=yes,resizable=yes');
+            }
+            return;
+        }
     }
 
     // HTMX event listener for hand-counted items
@@ -963,4 +992,21 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
     });
+    
+    // Handle contract selector for print functionality
+    const printContractSelector = document.getElementById('print-contract-selector');
+    if (printContractSelector) {
+        printContractSelector.addEventListener('change', function() {
+            const contractHistoryBtn = document.querySelector('.print-selected-contract-history');
+            const handCountedHistoryBtn = document.querySelector('.print-selected-hand-counted-history');
+            
+            if (this.value) {
+                contractHistoryBtn.disabled = false;
+                handCountedHistoryBtn.disabled = false;
+            } else {
+                contractHistoryBtn.disabled = true;
+                handCountedHistoryBtn.disabled = true;
+            }
+        });
+    }
 });
