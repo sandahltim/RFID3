@@ -83,7 +83,7 @@ window.expandCategory = function(category, targetId, contractNumber, page = 1, t
                         <td>
                             <button class="btn btn-sm btn-secondary expand-btn" data-common-name="${escapedCommonName}" data-target-id="items-${commonId}" data-contract-number="${contractNumber}">Expand</button>
                             <button class="btn btn-sm btn-secondary collapse-btn" data-collapse-target="items-${commonId}" style="display:none;">Collapse</button>
-                            <button class="btn btn-sm btn-info print-btn" data-print-level="Common Name" data-print-id="items-${commonId}" data-common-name="${escapedCommonName}" data-category="${contractNumber}">Print</button>
+                            <button class="btn btn-sm btn-info print-common-name-btn" data-print-level="Common Name" data-print-id="items-${commonId}" data-common-name="${escapedCommonName}" data-category="${contractNumber}">Print</button>
                             <button class="btn btn-sm btn-info print-full-btn" data-common-name="${escapedCommonName}" data-category="${contractNumber}">Print Full List</button>
                             <div id="loading-items-${commonId}" style="display:none;" class="loading-indicator">Loading...</div>
                         </td>
@@ -745,7 +745,7 @@ function addContractToTable(contractNumber) {
                 <td>
                     <button class="btn btn-sm btn-secondary expand-btn" data-contract-number="${contractNumber}" data-target-id="common-${contractNumber}">Expand</button>
                     <button class="btn btn-sm btn-secondary collapse-btn" data-collapse-target="common-${contractNumber}" style="display:none;">Collapse</button>
-                    <button class="btn btn-sm btn-info print-btn" data-print-level="Contract" data-print-id="common-${contractNumber}" data-contract-number="${contractNumber}">Print</button>
+                    <button class="btn btn-sm btn-info print-contract-btn" data-print-level="Contract" data-print-id="common-${contractNumber}" data-contract-number="${contractNumber}">Print</button>
                     <div id="loading-${contractNumber}" style="display:none;" class="loading-indicator">Loading...</div>
                 </td>
             </tr>
@@ -913,15 +913,42 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        // Handle dropdown Print Items button  
-        const printBtn = event.target.closest('.print-btn');
-        if (printBtn) {
+        // Handle dropdown Print Items button (from dropdown menu only)
+        const dropdownPrintBtn = event.target.closest('.dropdown-item.print-btn');
+        if (dropdownPrintBtn) {
             event.preventDefault();
             event.stopPropagation();
-            const contractNumber = printBtn.getAttribute('data-contract-number');
+            const contractNumber = dropdownPrintBtn.getAttribute('data-contract-number');
             console.log(`Opening contract items print from dropdown for: ${contractNumber}`);
             const url = `/tab/4/contract_items_print?contract_number=${encodeURIComponent(contractNumber)}`;
             window.open(url, '_blank', 'width=1200,height=800,scrollbars=yes,resizable=yes');
+            return;
+        }
+        
+        // Handle expanded common name print button
+        const printCommonNameBtn = event.target.closest('.print-common-name-btn');
+        if (printCommonNameBtn) {
+            event.preventDefault();
+            event.stopPropagation();
+            const level = printCommonNameBtn.getAttribute('data-print-level');
+            const id = printCommonNameBtn.getAttribute('data-print-id');
+            const commonName = printCommonNameBtn.getAttribute('data-common-name');
+            const category = printCommonNameBtn.getAttribute('data-category');
+            console.log(`Using printTable for common name: ${commonName}`);
+            printTable(level, id, commonName, category);
+            return;
+        }
+        
+        // Handle expanded contract print button  
+        const printContractBtn = event.target.closest('.print-contract-btn');
+        if (printContractBtn) {
+            event.preventDefault();
+            event.stopPropagation();
+            const level = printContractBtn.getAttribute('data-print-level');
+            const id = printContractBtn.getAttribute('data-print-id');
+            const contractNumber = printContractBtn.getAttribute('data-contract-number');
+            console.log(`Using printTable for contract: ${contractNumber}`);
+            printTable(level, id, null, contractNumber);
             return;
         }
 
@@ -987,6 +1014,19 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             return;
         }
+        
+        // Handle create snapshot button
+        const createSnapshotBtn = event.target.closest('.create-contract-snapshot');
+        if (createSnapshotBtn) {
+            event.preventDefault();
+            event.stopPropagation();
+            const contractSelector = document.getElementById('print-contract-selector');
+            const contractNumber = contractSelector.value;
+            if (contractNumber) {
+                createContractSnapshot(contractNumber);
+            }
+            return;
+        }
     }
 
     // HTMX event listener for hand-counted items
@@ -1011,13 +1051,45 @@ document.addEventListener('DOMContentLoaded', function() {
             const contractHistoryBtn = document.querySelector('.print-selected-contract-history');
             const handCountedHistoryBtn = document.querySelector('.print-selected-hand-counted-history');
             
+            const snapshotBtn = document.querySelector('.create-contract-snapshot');
+            
             if (this.value) {
                 contractHistoryBtn.disabled = false;
                 handCountedHistoryBtn.disabled = false;
+                snapshotBtn.disabled = false;
             } else {
                 contractHistoryBtn.disabled = true;
                 handCountedHistoryBtn.disabled = true;
+                snapshotBtn.disabled = true;
             }
         });
     }
+    
+    // Function to create contract snapshot
+    window.createContractSnapshot = async function(contractNumber) {
+        try {
+            const response = await fetch('/tab/4/create_contract_snapshot', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    contract_number: contractNumber,
+                    snapshot_type: 'manual',
+                    created_by: 'user'
+                })
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                alert(`✅ Snapshot created successfully!\nContract: ${contractNumber}\nItems: ${data.items_count}`);
+            } else {
+                alert(`❌ Error creating snapshot: ${data.error}`);
+            }
+        } catch (error) {
+            console.error('Error creating snapshot:', error);
+            alert(`❌ Error creating snapshot: ${error.message}`);
+        }
+    };
 });
