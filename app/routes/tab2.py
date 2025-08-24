@@ -98,6 +98,9 @@ def tab2_view():
             client_name = latest_transaction.client_name if latest_transaction else 'N/A'
             scan_datetime = latest_transaction.scan_date if latest_transaction and latest_transaction.scan_date else None
             scan_date = scan_datetime.isoformat() if scan_datetime else 'N/A'
+            # Make scan_datetime timezone-aware for comparison with timezone-aware 'now'
+            if scan_datetime and scan_datetime.tzinfo is None:
+                scan_datetime = scan_datetime.replace(tzinfo=timezone.utc)
             is_stale = True if not scan_datetime else (now - scan_datetime > timedelta(days=12))
             logger.debug(f"Contract {contract_number} - Client: {client_name}, Scan Date: {scan_date}, Stale: {is_stale}")
 
@@ -211,6 +214,9 @@ def sort_contracts():
             client_name = latest_transaction.client_name if latest_transaction else 'N/A'
             scan_datetime = latest_transaction.scan_date if latest_transaction and latest_transaction.scan_date else None
             scan_date = scan_datetime.isoformat() if scan_datetime else 'N/A'
+            # Make scan_datetime timezone-aware for comparison with timezone-aware 'now'
+            if scan_datetime and scan_datetime.tzinfo is None:
+                scan_datetime = scan_datetime.replace(tzinfo=timezone.utc)
             is_stale = True if not scan_datetime else (now - scan_datetime > timedelta(days=12))
             logger.debug(f"Contract {contract_number} - Client: {client_name}, Scan Date: {scan_date}, Stale: {is_stale}")
 
