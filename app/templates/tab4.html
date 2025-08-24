@@ -62,11 +62,23 @@
             <form id="hand-counted-form">
                 <div class="form-group">
                     <label for="hand-counted-contract-number">Select Contract Number:</label>
-                    <select id="hand-counted-contract-number" class="form-control" onchange="updateItemDropdown()">
+                    <select id="hand-counted-contract-number" class="form-control" onchange="updateItemDropdownHierarchical()">
                         <option value="">Select Contract...</option>
                     </select>
                     <input type="text" id="new-contract-number" class="form-control mt-2" placeholder="Enter New Contract" style="display:none;">
                     <button type="button" class="btn btn-sm btn-secondary mt-2" onclick="toggleNewContractInput()">Toggle New Contract</button>
+                </div>
+                <div class="form-group">
+                    <label for="hand-counted-category">Select Category:</label>
+                    <select id="hand-counted-category" class="form-control" onchange="updateSubcategoryDropdown()">
+                        <option value="">Select Category...</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="hand-counted-subcategory">Select Subcategory:</label>
+                    <select id="hand-counted-subcategory" class="form-control" onchange="updateItemDropdownHierarchical()">
+                        <option value="">Select Subcategory...</option>
+                    </select>
                 </div>
                 <div class="form-group">
                     <label for="hand-counted-item-name">Select Item:</label>
@@ -74,6 +86,7 @@
                         <option value="">Select Item...</option>
                     </select>
                     <input type="text" id="new-item-name" class="form-control mt-2" placeholder="Enter Item Name" style="display:none;">
+                    <small class="form-text text-muted">Select category and subcategory first to see available items</small>
                 </div>
                 <div class="form-group">
                     <label for="hand-counted-quantity">Quantity:</label>
