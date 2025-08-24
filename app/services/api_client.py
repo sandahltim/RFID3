@@ -35,7 +35,10 @@ class APIClient:
         self.item_master_endpoint = "14223767938169344381"
         self.token = None
         self.token_expiry = None
-        self.authenticate()
+        # Only authenticate if we're not in a snapshot automation context
+        import os
+        if not os.environ.get('SNAPSHOT_AUTOMATION'):
+            self.authenticate()
 
     def authenticate(self):
         payload = {"username": API_USERNAME, "password": API_PASSWORD}
