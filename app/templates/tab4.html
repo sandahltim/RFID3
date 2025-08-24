@@ -38,9 +38,9 @@
                         <td>
                             <button class="btn btn-sm btn-secondary expand-btn" data-target-id="common-{{ contract.contract_number|replace(' ', '_') }}" data-contract-number="{{ contract.contract_number }}">Expand</button>
                             <button class="btn btn-sm btn-secondary collapse-btn" data-collapse-target="common-{{ contract.contract_number|replace(' ', '_') }}" style="display:none;">Collapse</button>
-                            <div class="btn-group">
+                            <div class="dropdown">
                                 <button class="btn btn-sm btn-info print-btn" data-print-level="Contract" data-print-id="common-{{ contract.contract_number|replace(' ', '_') }}" data-contract-number="{{ contract.contract_number }}">Print Items</button>
-                                <button type="button" class="btn btn-sm btn-info dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown" aria-expanded="false">
+                                <button type="button" class="btn btn-sm btn-info dropdown-toggle dropdown-toggle-split" data-mdb-toggle="dropdown" aria-expanded="false">
                                     <span class="visually-hidden">Toggle Dropdown</span>
                                 </button>
                                 <ul class="dropdown-menu">
@@ -68,6 +68,33 @@
     </table>
 
     <h4>Hand-Counted Items</h4>
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">📋 Print Contract Reports</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <label for="print-contract-selector">Select Contract for Printing:</label>
+                    <select id="print-contract-selector" class="form-control">
+                        <option value="">Select Contract...</option>
+                        {% if contracts %}
+                            {% for contract in contracts %}
+                                <option value="{{ contract.contract_number }}">{{ contract.contract_number }} - {{ contract.client_name }}</option>
+                            {% endfor %}
+                        {% endif %}
+                    </select>
+                </div>
+                <div class="col-md-6 d-flex align-items-end">
+                    <div class="btn-group">
+                        <button type="button" class="btn btn-success print-selected-contract-history" disabled>📋 Contract History</button>
+                        <button type="button" class="btn btn-info print-selected-hand-counted-history" disabled>📝 Hand Counted History</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
     <div class="card">
         <div class="card-body">
             <form id="hand-counted-form">
