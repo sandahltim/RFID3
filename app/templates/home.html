@@ -33,41 +33,48 @@
                 </div>
             </div>
         </div>
-        <div class="col-md-4">
+        <div class="col-md-8">
             <div class="card">
-                <div class="card-header">Recent Scans (Last 10)</div>
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span>Recent Scans (Last 50)</span>
+                        <div>
+                            <span id="scan-status" class="badge bg-secondary">Connecting...</span>
+                            <button id="pause-btn" class="btn btn-sm btn-outline-primary ms-2">⏸️ Pause</button>
+                        </div>
+                    </div>
+                </div>
                 <div class="card-body">
-                    {% if recent_scans %}
-                        <table class="table table-bordered">
-                            <thead>
+                    <div id="scan-table-container" style="max-height: 400px; overflow-y: auto;">
+                        <table class="table table-bordered table-striped" id="recent-scans-table">
+                            <thead class="table-dark sticky-top">
                                 <tr>
-                                    <th>Tag ID</th>
-                                    <th>Common Name</th>
-                                    <th>Scan Date</th>
+                                    <th width="20%">Tag ID</th>
+                                    <th width="25%">Common Name</th>
+                                    <th width="15%">Status</th>
+                                    <th width="15%">Contract</th>
+                                    <th width="25%">Scan Date</th>
                                 </tr>
                             </thead>
-                            <tbody>
-                                {% for scan in recent_scans %}
-                                    <tr>
-                                        <td>{{ scan.tag_id or 'N/A' }}</td>
-                                        <td>{{ scan.common_name or 'N/A' }}</td>
-                                        <td>{{ scan.date_last_scanned | datetimeformat if scan.date_last_scanned else 'No Scan Date' }}</td>
+                            <tbody id="recent-scans-tbody">
+                                {% if recent_scans %}
+                                    {% for scan in recent_scans %}
+                                        <tr data-timestamp="{{ scan.date_last_scanned | datetimeformat if scan.date_last_scanned else '' }}">
+                                            <td>{{ scan.tag_id or 'N/A' }}</td>
+                                            <td>{{ scan.common_name or 'N/A' }}</td>
+                                            <td><span class="badge bg-info">{{ scan.status or 'N/A' }}</span></td>
+                                            <td>{{ scan.last_contract_num or 'N/A' }}</td>
+                                            <td>{{ scan.date_last_scanned | datetimeformat if scan.date_last_scanned else 'No Scan Date' }}</td>
+                                        </tr>
+                                    {% endfor %}
+                                {% else %}
+                                    <tr id="no-scans-row">
+                                        <td colspan="5" class="text-center text-muted">No recent scans available.</td>
                                     </tr>
-                                {% endfor %}
+                                {% endif %}
                             </tbody>
                         </table>
-                    {% else %}
-                        <p>No recent scans available.</p>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-        <div class="col-md-4">
-            <div class="card">
-                <div class="card-header">Refresh Status</div>
-                <div class="card-body" id="refreshStatus">
-                    <p><strong>Last Refresh:</strong> {{ last_refresh | datetimeformat if last_refresh != 'N/A' else 'N/A' }}</p>
-                    <p><strong>Type:</strong> {{ refresh_type or 'N/A' }}</p>
+                    </div>
                 </div>
             </div>
         </div>
@@ -78,6 +85,190 @@
     </div>
 
     <script>
+    // Real-time scanning system
+    let pollingInterval = null;
+    let latestTimestamp = null;
+    let isPaused = false;
+    let errorCount = 0;
+    const MAX_ERRORS = 5;
+    const POLL_INTERVAL = 3000; // 3 seconds
+
+    // Initialize real-time scanning on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        initializeScans();
+        startPolling();
+        setupEventHandlers();
+    });
+
+    function initializeScans() {
+        // Get initial latest timestamp from existing data
+        const tbody = document.getElementById('recent-scans-tbody');
+        const firstRow = tbody.querySelector('tr[data-timestamp]');
+        if (firstRow) {
+            latestTimestamp = firstRow.getAttribute('data-timestamp');
+            // Convert display format back to ISO format for API
+            if (latestTimestamp && latestTimestamp !== '') {
+                try {
+                    const date = new Date(latestTimestamp);
+                    latestTimestamp = date.toISOString();
+                } catch (e) {
+                    console.warn('Could not parse initial timestamp:', latestTimestamp);
+                    latestTimestamp = null;
+                }
+            }
+        }
+        console.log('Initialized with latest timestamp:', latestTimestamp);
+    }
+
+    function setupEventHandlers() {
+        const pauseBtn = document.getElementById('pause-btn');
+        pauseBtn.addEventListener('click', function() {
+            if (isPaused) {
+                resumePolling();
+            } else {
+                pausePolling();
+            }
+        });
+    }
+
+    function startPolling() {
+        if (pollingInterval) {
+            clearInterval(pollingInterval);
+        }
+        
+        updateStatus('🟢 Live', 'bg-success');
+        errorCount = 0;
+        
+        // Poll immediately, then set interval
+        pollForNewScans();
+        pollingInterval = setInterval(pollForNewScans, POLL_INTERVAL);
+    }
+
+    function pausePolling() {
+        if (pollingInterval) {
+            clearInterval(pollingInterval);
+            pollingInterval = null;
+        }
+        isPaused = true;
+        updateStatus('⏸️ Paused', 'bg-warning');
+        document.getElementById('pause-btn').innerHTML = '▶️ Resume';
+    }
+
+    function resumePolling() {
+        isPaused = false;
+        document.getElementById('pause-btn').innerHTML = '⏸️ Pause';
+        startPolling();
+    }
+
+    function updateStatus(text, badgeClass) {
+        const statusBadge = document.getElementById('scan-status');
+        statusBadge.textContent = text;
+        statusBadge.className = `badge ${badgeClass}`;
+    }
+
+    async function pollForNewScans() {
+        if (isPaused) return;
+
+        try {
+            const url = latestTimestamp 
+                ? `/api/recent_scans?limit=50&since=${encodeURIComponent(latestTimestamp)}`
+                : '/api/recent_scans?limit=50';
+                
+            const response = await fetch(url);
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            const data = await response.json();
+            
+            if (data.scans && data.scans.length > 0) {
+                addNewScans(data.scans);
+                latestTimestamp = data.latest_timestamp;
+                console.log(`Added ${data.scans.length} new scans, latest: ${latestTimestamp}`);
+            }
+
+            // Reset error count on success
+            errorCount = 0;
+            updateStatus('🟢 Live', 'bg-success');
+
+        } catch (error) {
+            console.error('Polling error:', error);
+            errorCount++;
+            
+            if (errorCount >= MAX_ERRORS) {
+                updateStatus('🔴 Error', 'bg-danger');
+                pausePolling();
+                console.error('Too many errors, polling stopped');
+            } else {
+                updateStatus(`🟡 Retry ${errorCount}/${MAX_ERRORS}`, 'bg-warning');
+            }
+        }
+    }
+
+    function addNewScans(newScans) {
+        const tbody = document.getElementById('recent-scans-tbody');
+        const noScansRow = document.getElementById('no-scans-row');
+        
+        // Remove "no scans" row if it exists
+        if (noScansRow) {
+            noScansRow.remove();
+        }
+
+        // Add new scans to the top with animation
+        newScans.forEach((scan, index) => {
+            const row = createScanRow(scan);
+            row.style.backgroundColor = '#d4edda'; // Highlight new scans
+            tbody.insertBefore(row, tbody.firstChild);
+            
+            // Remove highlight after animation
+            setTimeout(() => {
+                row.style.backgroundColor = '';
+            }, 2000);
+        });
+
+        // Keep only the most recent 50 rows
+        const rows = tbody.querySelectorAll('tr');
+        for (let i = 50; i < rows.length; i++) {
+            rows[i].remove();
+        }
+    }
+
+    function createScanRow(scan) {
+        const row = document.createElement('tr');
+        row.setAttribute('data-timestamp', scan.date_last_scanned || '');
+        
+        const formatDate = (dateStr) => {
+            if (!dateStr) return 'No Scan Date';
+            try {
+                return new Date(dateStr).toLocaleString();
+            } catch (e) {
+                return dateStr;
+            }
+        };
+
+        const getStatusBadgeClass = (status) => {
+            switch (status?.toLowerCase()) {
+                case 'ready to rent': return 'bg-success';
+                case 'on rent': case 'delivered': return 'bg-primary';
+                case 'repair': case 'needs to be inspected': return 'bg-danger';
+                case 'wash': case 'wet': return 'bg-warning';
+                default: return 'bg-info';
+            }
+        };
+
+        row.innerHTML = `
+            <td>${scan.tag_id || 'N/A'}</td>
+            <td>${scan.common_name || 'N/A'}</td>
+            <td><span class="badge ${getStatusBadgeClass(scan.status)}">${scan.status || 'N/A'}</span></td>
+            <td>${scan.last_contract_num || 'N/A'}</td>
+            <td>${formatDate(scan.date_last_scanned)}</td>
+        `;
+        
+        return row;
+    }
+
+    // Legacy functions for full refresh buttons
     function triggerFullRefresh() {
         fetch('/refresh/full', { method: 'POST' })
             .then(response => response.json())
@@ -105,5 +296,12 @@
                 });
         }
     }
+
+    // Cleanup on page unload
+    window.addEventListener('beforeunload', function() {
+        if (pollingInterval) {
+            clearInterval(pollingInterval);
+        }
+    });
     </script>
 {% endblock %}
