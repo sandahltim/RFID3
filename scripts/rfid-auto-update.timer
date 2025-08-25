@@ -1,0 +1,11 @@
+[Unit]
+Description=Run RFID3 Auto Update Daily
+Requires=rfid-auto-update.service
+
+[Timer]
+OnCalendar=daily
+RandomizedDelaySec=300
+Persistent=true
+
+[Install]
+WantedBy=timers.target

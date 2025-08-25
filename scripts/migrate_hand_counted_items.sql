@@ -12,8 +12,8 @@ CREATE TABLE IF NOT EXISTS id_hand_counted_items (
 );
 
 -- Add indexes for faster lookups
-CREATE INDEX idx_hand_counted_items_contract_number ON id_hand_counted_items (contract_number);
-CREATE INDEX idx_hand_counted_items_timestamp ON id_hand_counted_items (timestamp);
+CREATE INDEX IF NOT EXISTS idx_hand_counted_items_contract_number ON id_hand_counted_items (contract_number);
+CREATE INDEX IF NOT EXISTS idx_hand_counted_items_timestamp ON id_hand_counted_items (timestamp);
 
 -- Table for catalog of common hand-counted items
 CREATE TABLE IF NOT EXISTS hand_counted_catalog (
@@ -21,3 +21,6 @@ CREATE TABLE IF NOT EXISTS hand_counted_catalog (
     rental_class_id VARCHAR(50),
     item_name VARCHAR(255) NOT NULL UNIQUE
 );
+
+-- Add index for hand_counted_catalog
+CREATE INDEX IF NOT EXISTS idx_hand_counted_catalog_rental_class_id ON hand_counted_catalog (rental_class_id);
