@@ -279,6 +279,135 @@ def calculate_inventory_health_score(session, metrics):
         logger.error(f"Error calculating health score: {str(e)}")
         return 50  # Return neutral score on error
 
+@inventory_analytics_bp.route('/api/inventory/generate_alerts', methods=['POST'])
+def generate_inventory_alerts():
+    """Generate health alerts from current inventory analysis."""
+    session = None
+    try:
+        session = db.session()
+        logger.info("Starting automatic alert generation")
+        
+        # Clear old alerts (keep resolved/dismissed ones)
+        old_alerts_deleted = session.query(InventoryHealthAlert).filter(
+            InventoryHealthAlert.status == 'active'
+        ).delete()
+        
+        alerts_created = 0
+        
+        # Get stale items and create alerts
+        stale_response = get_stale_items()
+        stale_data = stale_response.get_json()
+        
+        if stale_data and 'stale_items' in stale_data:
+            for item in stale_data['stale_items']:
+                # Determine severity based on days since scan
+                days = item['days_since_scan']
+                if days > 180:
+                    severity = 'critical'
+                    action = f"Item not scanned in {days} days. Verify location and condition immediately."
+                elif days > 90:
+                    severity = 'high'
+                    action = f"Item not scanned in {days} days. Schedule inspection and update location."
+                elif days > 60:
+                    severity = 'medium'
+                    action = f"Item overdue for scanning. Verify status and scan if available."
+                else:
+                    severity = 'low'
+                    action = f"Item approaching stale threshold. Consider scanning during next inventory check."
+                
+                alert = InventoryHealthAlert(
+                    tag_id=item['tag_id'],
+                    common_name=item['common_name'],
+                    category=item['category'],
+                    subcategory=item['subcategory'],
+                    alert_type='stale_item',
+                    severity=severity,
+                    days_since_last_scan=days,
+                    last_scan_date=datetime.fromisoformat(item['last_scan_date']) if item['last_scan_date'] else None,
+                    suggested_action=action,
+                    status='active'
+                )
+                session.add(alert)
+                alerts_created += 1
+        
+        # Check for low utilization categories
+        utilization_alerts = check_utilization_patterns(session)
+        alerts_created += utilization_alerts
+        
+        session.commit()
+        logger.info(f"Alert generation complete: {alerts_created} new alerts, {old_alerts_deleted} old alerts cleared")
+        
+        return jsonify({
+            'success': True,
+            'alerts_created': alerts_created,
+            'old_alerts_cleared': old_alerts_deleted,
+            'message': f'Generated {alerts_created} health alerts'
+        })
+        
+    except Exception as e:
+        logger.error(f"Error generating alerts: {str(e)}", exc_info=True)
+        if session:
+            session.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        if session:
+            session.close()
+
+def check_utilization_patterns(session):
+    """Check for utilization-based alerts and create them."""
+    try:
+        alerts_created = 0
+        
+        # Get category utilization data
+        category_stats = session.query(
+            UserRentalClassMapping.category,
+            UserRentalClassMapping.subcategory,
+            func.count(ItemMaster.tag_id).label('total_items'),
+            func.sum(func.case([(ItemMaster.status.in_(['On Rent', 'Delivered']), 1)], else_=0)).label('items_on_rent')
+        ).outerjoin(
+            ItemMaster,
+            UserRentalClassMapping.rental_class_id == ItemMaster.rental_class_num
+        ).group_by(
+            UserRentalClassMapping.category,
+            UserRentalClassMapping.subcategory
+        ).having(func.count(ItemMaster.tag_id) > 10).all()  # Only categories with 10+ items
+        
+        for stat in category_stats:
+            if stat.total_items and stat.total_items > 0:
+                utilization_rate = (stat.items_on_rent or 0) / stat.total_items
+                
+                # Create alert for very low utilization categories
+                if utilization_rate < 0.05 and stat.total_items > 50:  # Less than 5% utilization with 50+ items
+                    alert = InventoryHealthAlert(
+                        category=stat.category,
+                        subcategory=stat.subcategory,
+                        alert_type='low_usage',
+                        severity='medium',
+                        suggested_action=f'Category has {stat.total_items} items but only {utilization_rate:.1%} utilization. Consider reducing inventory or marketing push.',
+                        status='active'
+                    )
+                    session.add(alert)
+                    alerts_created += 1
+                    
+                # Create alert for very high utilization categories  
+                elif utilization_rate > 0.9:  # More than 90% utilization
+                    alert = InventoryHealthAlert(
+                        category=stat.category,
+                        subcategory=stat.subcategory,
+                        alert_type='high_usage',
+                        severity='high',
+                        suggested_action=f'Category has {utilization_rate:.1%} utilization. Consider expanding inventory to meet demand.',
+                        status='active'
+                    )
+                    session.add(alert)
+                    alerts_created += 1
+        
+        return alerts_created
+        
+    except Exception as e:
+        logger.error(f"Error checking utilization patterns: {str(e)}")
+        return 0
+
 def get_alert_config(session):
     """Get alert configuration from database."""
     try:

@@ -180,7 +180,10 @@
                             <div class="card">
                                 <div class="card-header d-flex justify-content-between align-items-center">
                                     <h5><i class="fas fa-bell"></i> Active Health Alerts</h5>
-                                    <div>
+                                    <div class="d-flex gap-2">
+                                        <button class="btn btn-primary btn-sm" id="generate-alerts-btn" onclick="generateAlerts()">
+                                            <i class="fas fa-sync"></i> Generate Alerts
+                                        </button>
                                         <select class="form-select form-select-sm" id="alert-severity-filter">
                                             <option value="">All Severities</option>
                                             <option value="critical">Critical</option>
@@ -493,12 +496,30 @@ class InventoryAnalytics {
         // Tab change handlers
         document.addEventListener('shown.bs.tab', (event) => {
             const targetTab = event.target.getAttribute('data-bs-target');
+            console.log('Tab changed to:', targetTab);
             
             if (targetTab === '#alerts') {
                 this.loadHealthAlerts();
             } else if (targetTab === '#stale-items') {
                 this.loadStaleItems();
             }
+        });
+        
+        // Alternative tab click handler for better compatibility
+        document.querySelectorAll('[data-bs-toggle="tab"]').forEach(tab => {
+            tab.addEventListener('click', (event) => {
+                const targetTab = event.target.getAttribute('data-bs-target');
+                console.log('Tab clicked:', targetTab);
+                
+                // Small delay to ensure tab is shown
+                setTimeout(() => {
+                    if (targetTab === '#alerts') {
+                        this.loadHealthAlerts();
+                    } else if (targetTab === '#stale-items') {
+                        this.loadStaleItems();
+                    }
+                }, 100);
+            });
         });
         
         // Alert filter change
@@ -508,6 +529,41 @@ class InventoryAnalytics {
         
         // Load initial tab content
         this.loadHealthAlerts();
+    }
+    
+    async generateAlerts() {
+        try {
+            const button = document.getElementById('generate-alerts-btn');
+            const originalText = button.innerHTML;
+            button.innerHTML = '<div class="loading-spinner"></div> Generating...';
+            button.disabled = true;
+            
+            const response = await fetch('/api/inventory/generate_alerts', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'}
+            });
+            const data = await response.json();
+            
+            if (response.ok) {
+                console.log('Alerts generated successfully:', data);
+                // Refresh the dashboard and alerts
+                this.loadDashboardData();
+                this.loadHealthAlerts();
+                
+                // Show success message
+                this.showSuccess(`Generated ${data.alerts_created} health alerts`);
+            } else {
+                console.error('Failed to generate alerts:', data.error);
+                this.showError('Failed to generate alerts: ' + data.error);
+            }
+        } catch (error) {
+            console.error('Error generating alerts:', error);
+            this.showError('Error generating alerts');
+        } finally {
+            const button = document.getElementById('generate-alerts-btn');
+            button.innerHTML = '<i class="fas fa-sync"></i> Generate Alerts';
+            button.disabled = false;
+        }
     }
     
     startAutoRefresh() {
@@ -527,6 +583,34 @@ class InventoryAnalytics {
             // Show in a toast or modal
             console.error(message);
         }
+    }
+    
+    showSuccess(message) {
+        // Create a temporary success message
+        const successDiv = document.createElement('div');
+        successDiv.className = 'alert alert-success alert-dismissible fade show position-fixed';
+        successDiv.style.top = '20px';
+        successDiv.style.right = '20px';
+        successDiv.style.zIndex = '9999';
+        successDiv.innerHTML = `
+            <i class="fas fa-check-circle"></i> ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        document.body.appendChild(successDiv);
+        
+        // Auto-remove after 5 seconds
+        setTimeout(() => {
+            if (successDiv.parentNode) {
+                successDiv.parentNode.removeChild(successDiv);
+            }
+        }, 5000);
+    }
+}
+
+// Make generateAlerts globally available
+function generateAlerts() {
+    if (window.inventoryAnalytics) {
+        window.inventoryAnalytics.generateAlerts();
     }
 }
 
