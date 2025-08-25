@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS laundry_contract_status (
     INDEX idx_finalized_date (finalized_date)
 );
 
--- Installation instructions for auto-finalization:
+-- Installation instructions for auto-finalization (runs Wed/Fri 7am same as snapshots):
 -- 1. Make the script executable:
 --    chmod +x /home/tim/RFID3/scripts/auto_finalize_laundry.py
 -- 2. Install systemd service and timer:
