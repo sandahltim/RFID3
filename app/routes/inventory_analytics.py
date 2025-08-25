@@ -171,7 +171,7 @@ def get_inventory_alerts():
 
 @inventory_analytics_bp.route('/api/inventory/stale_items', methods=['GET'])
 def get_stale_items():
-    """Get items that haven't been scanned recently based on configurable thresholds."""
+    """Get items that haven't been scanned recently based on configurable thresholds using BOTH ItemMaster and Transaction data."""
     session = None
     try:
         session = db.session()
@@ -186,41 +186,75 @@ def get_stale_items():
         resale_cutoff = now - timedelta(days=thresholds.get('resale', 7))
         pack_cutoff = now - timedelta(days=thresholds.get('pack', 14))
         
-        # Get items with category information
+        # Enhanced query: Use BOTH ItemMaster.date_last_scanned AND latest transaction date
         stale_items = session.query(
             ItemMaster,
             UserRentalClassMapping.category,
             UserRentalClassMapping.subcategory,
-            func.datediff(func.now(), ItemMaster.date_last_scanned).label('days_since_scan')
+            func.greatest(
+                func.coalesce(ItemMaster.date_last_scanned, '1900-01-01'),
+                func.coalesce(func.max(Transaction.scan_date), '1900-01-01')
+            ).label('actual_last_scan'),
+            func.datediff(
+                func.now(), 
+                func.greatest(
+                    func.coalesce(ItemMaster.date_last_scanned, '1900-01-01'),
+                    func.coalesce(func.max(Transaction.scan_date), '1900-01-01')
+                )
+            ).label('days_since_scan'),
+            func.count(Transaction.id).label('transaction_count')
         ).outerjoin(
             UserRentalClassMapping,
             ItemMaster.rental_class_num == UserRentalClassMapping.rental_class_id
-        ).filter(
+        ).outerjoin(
+            Transaction,
+            ItemMaster.tag_id == Transaction.tag_id
+        ).group_by(
+            ItemMaster.tag_id,
+            UserRentalClassMapping.category,
+            UserRentalClassMapping.subcategory
+        ).having(
             or_(
                 # Default threshold
                 and_(
                     or_(UserRentalClassMapping.category.is_(None), 
                         ~UserRentalClassMapping.category.in_(['Resale'])),
                     ItemMaster.bin_location != 'pack',
-                    ItemMaster.date_last_scanned < default_cutoff
+                    func.greatest(
+                        func.coalesce(ItemMaster.date_last_scanned, '1900-01-01'),
+                        func.coalesce(func.max(Transaction.scan_date), '1900-01-01')
+                    ) < default_cutoff
                 ),
                 # Resale items - shorter threshold
                 and_(
                     UserRentalClassMapping.category == 'Resale',
-                    ItemMaster.date_last_scanned < resale_cutoff
+                    func.greatest(
+                        func.coalesce(ItemMaster.date_last_scanned, '1900-01-01'),
+                        func.coalesce(func.max(Transaction.scan_date), '1900-01-01')
+                    ) < resale_cutoff
                 ),
                 # Pack items - medium threshold
                 and_(
                     ItemMaster.bin_location == 'pack',
-                    ItemMaster.date_last_scanned < pack_cutoff
+                    func.greatest(
+                        func.coalesce(ItemMaster.date_last_scanned, '1900-01-01'),
+                        func.coalesce(func.max(Transaction.scan_date), '1900-01-01')
+                    ) < pack_cutoff
                 )
             )
-        ).filter(
-            ItemMaster.date_last_scanned.is_not(None)
-        ).order_by(ItemMaster.date_last_scanned.asc()).limit(100).all()
+        ).order_by(
+            func.greatest(
+                func.coalesce(ItemMaster.date_last_scanned, '1900-01-01'),
+                func.coalesce(func.max(Transaction.scan_date), '1900-01-01')
+            ).asc()
+        ).limit(100).all()
         
         result = []
-        for item, category, subcategory, days_since_scan in stale_items:
+        for item, category, subcategory, actual_last_scan, days_since_scan, transaction_count in stale_items:
+            # Determine data source for last scan
+            master_date = item.date_last_scanned
+            transaction_date = actual_last_scan if actual_last_scan != master_date else None
+            
             result.append({
                 'tag_id': item.tag_id,
                 'common_name': item.common_name,
@@ -228,17 +262,173 @@ def get_stale_items():
                 'bin_location': item.bin_location,
                 'category': category,
                 'subcategory': subcategory,
-                'last_scan_date': item.date_last_scanned.isoformat() if item.date_last_scanned else None,
+                'last_scan_date': actual_last_scan.isoformat() if actual_last_scan and actual_last_scan.year > 1900 else None,
+                'master_last_scan': master_date.isoformat() if master_date else None,
+                'transaction_last_scan': transaction_date.isoformat() if transaction_date else None,
                 'days_since_scan': days_since_scan,
+                'transaction_count': transaction_count,
                 'last_contract': item.last_contract_num,
-                'quality': item.quality
+                'quality': item.quality,
+                'data_source': 'transaction' if transaction_date else ('master' if master_date else 'none')
             })
         
-        logger.info(f"Found {len(result)} stale items")
+        logger.info(f"Found {len(result)} stale items using enhanced transaction analysis")
         return jsonify({'stale_items': result, 'thresholds_used': thresholds})
         
     except Exception as e:
-        logger.error(f"Error fetching stale items: {str(e)}", exc_info=True)
+        logger.error(f"Error fetching stale items with transaction data: {str(e)}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+    finally:
+        if session:
+            session.close()
+
+@inventory_analytics_bp.route('/api/inventory/usage_patterns', methods=['GET'])
+def get_usage_patterns():
+    """Get comprehensive usage patterns based on transaction history."""
+    session = None
+    try:
+        session = db.session()
+        days_back = int(request.args.get('days', 90))
+        cutoff_date = datetime.now() - timedelta(days=days_back)
+        
+        # Simplified usage patterns by category
+        usage_patterns = session.query(
+            UserRentalClassMapping.category,
+            UserRentalClassMapping.subcategory,
+            func.count(func.distinct(ItemMaster.tag_id)).label('total_items'),
+            func.count(Transaction.id).label('total_transactions')
+        ).join(
+            ItemMaster,
+            UserRentalClassMapping.rental_class_id == ItemMaster.rental_class_num
+        ).outerjoin(
+            Transaction,
+            and_(
+                ItemMaster.tag_id == Transaction.tag_id,
+                Transaction.scan_date >= cutoff_date
+            )
+        ).group_by(
+            UserRentalClassMapping.category,
+            UserRentalClassMapping.subcategory
+        ).having(
+            func.count(func.distinct(ItemMaster.tag_id)) > 5  # Only categories with 5+ items
+        ).order_by(
+            desc('total_transactions')
+        ).limit(20).all()  # Limit results for performance
+        
+        patterns = []
+        for pattern in usage_patterns:
+            activity_rate = (pattern.total_transactions or 0) / max(pattern.total_items, 1)
+            patterns.append({
+                'category': pattern.category,
+                'subcategory': pattern.subcategory,
+                'total_items': pattern.total_items,
+                'total_transactions': pattern.total_transactions or 0,
+                'activity_rate': round(activity_rate, 2),
+                'transactions_per_item': round(activity_rate, 2)
+            })
+        
+        logger.info(f"Generated usage patterns for {len(patterns)} categories over {days_back} days")
+        return jsonify({
+            'usage_patterns': patterns,
+            'analysis_period_days': days_back,
+            'generated_at': datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        logger.error(f"Error generating usage patterns: {str(e)}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+    finally:
+        if session:
+            session.close()
+
+@inventory_analytics_bp.route('/api/inventory/data_discrepancies', methods=['GET'])
+def get_data_discrepancies():
+    """Identify discrepancies between ItemMaster and Transaction data."""
+    session = None
+    try:
+        session = db.session()
+        
+        # Items with transactions but outdated date_last_scanned
+        outdated_items = session.query(
+            ItemMaster.tag_id,
+            ItemMaster.common_name,
+            ItemMaster.date_last_scanned,
+            func.max(Transaction.scan_date).label('latest_transaction')
+        ).join(
+            Transaction,
+            ItemMaster.tag_id == Transaction.tag_id
+        ).group_by(
+            ItemMaster.tag_id
+        ).having(
+            or_(
+                ItemMaster.date_last_scanned.is_(None),
+                func.max(Transaction.scan_date) > ItemMaster.date_last_scanned
+            )
+        ).limit(50).all()
+        
+        # Items in master with no transactions  
+        no_transactions = session.query(
+            ItemMaster.tag_id,
+            ItemMaster.common_name,
+            ItemMaster.status,
+            ItemMaster.date_created
+        ).outerjoin(
+            Transaction,
+            ItemMaster.tag_id == Transaction.tag_id
+        ).filter(
+            Transaction.tag_id.is_(None)
+        ).limit(50).all()
+        
+        # Transaction orphans (transactions without master records)
+        orphaned_transactions = session.query(
+            Transaction.tag_id,
+            func.max(Transaction.scan_date).label('latest_scan'),
+            func.count(Transaction.id).label('transaction_count')
+        ).outerjoin(
+            ItemMaster,
+            Transaction.tag_id == ItemMaster.tag_id
+        ).filter(
+            ItemMaster.tag_id.is_(None)
+        ).group_by(
+            Transaction.tag_id
+        ).limit(50).all()
+        
+        discrepancies = {
+            'outdated_master_records': [
+                {
+                    'tag_id': item.tag_id,
+                    'common_name': item.common_name,
+                    'master_last_scan': item.date_last_scanned.isoformat() if item.date_last_scanned else None,
+                    'transaction_last_scan': item.latest_transaction.isoformat() if item.latest_transaction else None,
+                    'days_difference': (item.latest_transaction - (item.date_last_scanned or item.latest_transaction)).days if item.latest_transaction else None
+                }
+                for item in outdated_items
+            ],
+            'items_without_transactions': [
+                {
+                    'tag_id': item.tag_id,
+                    'common_name': item.common_name,
+                    'status': item.status,
+                    'created_date': item.date_created.isoformat() if item.date_created else None
+                }
+                for item in no_transactions
+            ],
+            'orphaned_transactions': [
+                {
+                    'tag_id': trans.tag_id,
+                    'latest_scan': trans.latest_scan.isoformat() if trans.latest_scan else None,
+                    'transaction_count': trans.transaction_count
+                }
+                for trans in orphaned_transactions
+            ]
+        }
+        
+        logger.info(f"Found data discrepancies: {len(discrepancies['outdated_master_records'])} outdated, {len(discrepancies['items_without_transactions'])} without transactions, {len(discrepancies['orphaned_transactions'])} orphaned")
+        
+        return jsonify(discrepancies)
+        
+    except Exception as e:
+        logger.error(f"Error analyzing data discrepancies: {str(e)}", exc_info=True)
         return jsonify({'error': str(e)}), 500
     finally:
         if session:
