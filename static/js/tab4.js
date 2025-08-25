@@ -1146,8 +1146,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // ===== LAUNDRY CONTRACT STATUS MANAGEMENT =====
     
-    // Filter contracts by status
-    window.filterContractsByStatus = function(status) {
+    // Filter contracts by status - expose globally for onclick handlers
+    function filterContractsByStatus(status) {
         console.log('Filtering contracts by status:', status);
         
         const rows = document.querySelectorAll('.contract-row');
@@ -1174,10 +1174,10 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         console.log(`Showing ${visibleCount} contracts with status: ${status}`);
-    };
+    }
     
-    // Finalize contract
-    window.finalizeContract = async function(contractNumber) {
+    // Finalize contract - expose globally for onclick handlers  
+    async function finalizeContract(contractNumber) {
         const user = prompt('Enter your name to finalize this contract:');
         if (!user || user.trim() === '') return;
         
@@ -1206,10 +1206,10 @@ document.addEventListener('DOMContentLoaded', function() {
             console.error('Error finalizing contract:', error);
             alert(`❌ Error finalizing contract: ${error.message}`);
         }
-    };
+    }
     
-    // Mark contract as returned
-    window.markReturned = async function(contractNumber) {
+    // Mark contract as returned - expose globally for onclick handlers
+    async function markReturned(contractNumber) {
         const user = prompt('Enter your name to mark this contract as returned:');
         if (!user || user.trim() === '') return;
         
@@ -1238,10 +1238,10 @@ document.addEventListener('DOMContentLoaded', function() {
             console.error('Error marking contract as returned:', error);
             alert(`❌ Error marking contract as returned: ${error.message}`);
         }
-    };
+    }
     
-    // Reactivate contract
-    window.reactivateContract = async function(contractNumber) {
+    // Reactivate contract - expose globally for onclick handlers
+    async function reactivateContract(contractNumber) {
         if (!confirm(`Are you sure you want to reactivate contract ${contractNumber}? This will reset its status to active.`)) {
             return;
         }
@@ -1274,39 +1274,84 @@ document.addEventListener('DOMContentLoaded', function() {
             console.error('Error reactivating contract:', error);
             alert(`❌ Error reactivating contract: ${error.message}`);
         }
-    };
+    }
 
     // Initialize event listeners when page loads
-    document.addEventListener('DOMContentLoaded', function() {
+    function initializeStatusManagement() {
+        console.log('Initializing status management...');
+        
         // Status filter radio buttons
-        document.querySelectorAll('input[name="status-filter"]').forEach(radio => {
+        const filterRadios = document.querySelectorAll('input[name="status-filter"]');
+        console.log('Found filter radios:', filterRadios.length);
+        
+        filterRadios.forEach(radio => {
             radio.addEventListener('change', function() {
+                console.log('Filter changed to:', this.value);
                 filterContractsByStatus(this.value);
             });
         });
         
         // Status action buttons
-        document.querySelectorAll('.finalize-btn').forEach(btn => {
-            btn.addEventListener('click', function() {
+        const finalizeButtons = document.querySelectorAll('.finalize-btn');
+        console.log('Found finalize buttons:', finalizeButtons.length);
+        
+        finalizeButtons.forEach(btn => {
+            btn.addEventListener('click', function(e) {
+                e.preventDefault();
+                console.log('Finalize button clicked for:', this.dataset.contractNumber);
                 finalizeContract(this.dataset.contractNumber);
             });
         });
         
-        document.querySelectorAll('.return-btn').forEach(btn => {
-            btn.addEventListener('click', function() {
+        const returnButtons = document.querySelectorAll('.return-btn');
+        console.log('Found return buttons:', returnButtons.length);
+        
+        returnButtons.forEach(btn => {
+            btn.addEventListener('click', function(e) {
+                e.preventDefault();
+                console.log('Return button clicked for:', this.dataset.contractNumber);
                 markReturned(this.dataset.contractNumber);
             });
         });
         
-        document.querySelectorAll('.reactivate-btn').forEach(btn => {
-            btn.addEventListener('click', function() {
+        const reactivateButtons = document.querySelectorAll('.reactivate-btn');
+        console.log('Found reactivate buttons:', reactivateButtons.length);
+        
+        reactivateButtons.forEach(btn => {
+            btn.addEventListener('click', function(e) {
+                e.preventDefault();
+                console.log('Reactivate button clicked for:', this.dataset.contractNumber);
                 reactivateContract(this.dataset.contractNumber);
             });
         });
         
         // Initialize with active filter (default)
-        filterContractsByStatus('active');
+        setTimeout(() => {
+            console.log('Setting initial filter to active');
+            filterContractsByStatus('active');
+        }, 100);
         
         console.log('Laundry contract status management initialized');
+    }
+
+    // Expose functions globally for onclick handlers
+    window.filterContractsByStatus = filterContractsByStatus;
+    window.finalizeContract = finalizeContract;
+    window.markReturned = markReturned;
+    window.reactivateContract = reactivateContract;
+
+    // Run initialization when DOM is ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initializeStatusManagement);
+    } else {
+        initializeStatusManagement();
+    }
+    
+    // Also run when tab becomes active (for tab switching)
+    document.addEventListener('tabActivated', function(e) {
+        if (e.detail && e.detail.tabNum === 4) {
+            console.log('Tab 4 activated, reinitializing status management');
+            setTimeout(initializeStatusManagement, 100);
+        }
     });
 });
