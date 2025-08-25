@@ -6,76 +6,76 @@
 {% endblock %}
 
 {% block content %}
-        <h2>RFID Dashboard</h2>
+    <h2>RFID Dashboard</h2>
 
-        <div class="row mb-3">
-            <div class="col-md-12">
-                <button class="btn btn-primary mr-2" onclick="triggerFullRefresh()">Full Refresh</button>
-                <button class="btn btn-danger" onclick="clearApiData()">Clear API Data and Refresh</button>
-            </div>
+    <div class="row mb-3">
+        <div class="col-md-12">
+            <button class="btn btn-primary mr-2" onclick="triggerFullRefresh()">Full Refresh</button>
+            <button class="btn btn-danger" onclick="clearApiData()">Clear API Data and Refresh</button>
         </div>
+    </div>
 
-        <div class="row">
-            <div class="col-md-4">
-                <div class="card">
-                    <div class="card-header">Inventory Summary</div>
-                    <div class="card-body">
-                        <p><strong>Total Items:</strong> {{ total_items or 0 }}</p>
-                        <p><strong>Items on Rent:</strong> {{ items_on_rent or 0 }}</p>
-                        <p><strong>Items in Service:</strong> {{ items_in_service or 0 }}</p>
-                        <p><strong>Items Available:</strong> {{ items_available or 0 }}</p>
-                        <p><strong>Status Counts:</strong></p>
-                        <ul>
-                            {% for status, count in status_counts %}
-                                <li>{{ status or 'Unknown' }}: {{ count or 0 }}</li>
-                            {% endfor %}
-                        </ul>
-                    </div>
+    <div class="row">
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">Inventory Summary</div>
+                <div class="card-body">
+                    <p><strong>Total Items:</strong> {{ total_items or 0 }}</p>
+                    <p><strong>Items on Rent:</strong> {{ items_on_rent or 0 }}</p>
+                    <p><strong>Items in Service:</strong> {{ items_in_service or 0 }}</p>
+                    <p><strong>Items Available:</strong> {{ items_available or 0 }}</p>
+                    <p><strong>Status Counts:</strong></p>
+                    <ul>
+                        {% for status, count in status_counts %}
+                            <li>{{ status or 'Unknown' }}: {{ count or 0 }}</li>
+                        {% endfor %}
+                    </ul>
                 </div>
             </div>
-            <div class="col-md-4">
-                <div class="card">
-                    <div class="card-header">Recent Scans (Last 10)</div>
-                    <div class="card-body">
-                        {% if recent_scans %}
-                            <table class="table table-bordered">
-                                <thead>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">Recent Scans (Last 10)</div>
+                <div class="card-body">
+                    {% if recent_scans %}
+                        <table class="table table-bordered">
+                            <thead>
+                                <tr>
+                                    <th>Tag ID</th>
+                                    <th>Common Name</th>
+                                    <th>Scan Date</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for scan in recent_scans %}
                                     <tr>
-                                        <th>Tag ID</th>
-                                        <th>Common Name</th>
-                                        <th>Scan Date</th>
+                                        <td>{{ scan.tag_id or 'N/A' }}</td>
+                                        <td>{{ scan.common_name or 'N/A' }}</td>
+                                        <td>{{ scan.date_last_scanned | datetimeformat if scan.date_last_scanned else 'No Scan Date' }}</td>
                                     </tr>
-                                </thead>
-                                <tbody>
-                                    {% for scan in recent_scans %}
-                                        <tr>
-                                            <td>{{ scan.tag_id or 'N/A' }}</td>
-                                            <td>{{ scan.common_name or 'N/A' }}</td>
-                                            <td>{{ scan.date_last_scanned | datetimeformat if scan.date_last_scanned else 'No Scan Date' }}</td>
-                                        </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        {% else %}
-                            <p>No recent scans available.</p>
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="card">
-                    <div class="card-header">Refresh Status</div>
-                    <div class="card-body" id="refreshStatus">
-                        <p><strong>Last Refresh:</strong> {{ last_refresh | datetimeformat if last_refresh != 'N/A' else 'N/A' }}</p>
-                        <p><strong>Type:</strong> {{ refresh_type or 'N/A' }}</p>
-                    </div>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    {% else %}
+                        <p>No recent scans available.</p>
+                    {% endif %}
                 </div>
             </div>
         </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">Refresh Status</div>
+                <div class="card-body" id="refreshStatus">
+                    <p><strong>Last Refresh:</strong> {{ last_refresh | datetimeformat if last_refresh != 'N/A' else 'N/A' }}</p>
+                    <p><strong>Type:</strong> {{ refresh_type or 'N/A' }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
 
-        <div class="alert alert-warning" role="alert" style="display: none;" id="jsDisabledWarning">
-            JavaScript is disabled or failed to load. Please enable JavaScript to use the refresh functionality.
-        </div>
+    <div class="alert alert-warning" role="alert" style="display: none;" id="jsDisabledWarning">
+        JavaScript is disabled or failed to load. Please enable JavaScript to use the refresh functionality.
+    </div>
 
     <script>
     function triggerFullRefresh() {
