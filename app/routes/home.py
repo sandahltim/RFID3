@@ -93,11 +93,11 @@ def home():
         ).group_by(ItemMaster.status).all()
         status_counts = [(status or 'Unknown', count) for status, count in status_breakdown]
 
-        # Recent scans
+        # Recent scans - increased to 50 for better real-time experience
         recent_scans = db.session.query(ItemMaster).filter(ItemMaster.date_last_scanned.isnot(None)).order_by(
             ItemMaster.date_last_scanned.desc()
-        ).limit(10).all()
-        logger.info(f'Recent scans details: {[(scan.tag_id, scan.common_name, scan.date_last_scanned) for scan in recent_scans]}')
+        ).limit(50).all()
+        logger.info(f'Recent scans count: {len(recent_scans)}')
         logger.debug(f"Recent scans sample: {[(item.tag_id, item.common_name, item.date_last_scanned) for item in recent_scans[:5]]}")
 
         # Last refresh state
@@ -114,7 +114,13 @@ def home():
             'items_in_service': items_in_service or 0,
             'items_available': items_available or 0,
             'status_counts': status_counts,
-            'recent_scans': [(item.tag_id, item.common_name, item.date_last_scanned.isoformat() if item.date_last_scanned else None) for item in recent_scans],
+            'recent_scans': [{
+                'tag_id': item.tag_id, 
+                'common_name': item.common_name,
+                'date_last_scanned': item.date_last_scanned.isoformat() if item.date_last_scanned else None,
+                'status': item.status,
+                'last_contract_num': item.last_contract_num
+            } for item in recent_scans],
             'last_refresh': last_refresh,
             'refresh_type': refresh_type
         }
@@ -151,3 +157,112 @@ def get_refresh_status():
     from flask import jsonify
     from ..services.refresh import refresh_status
     return jsonify(refresh_status)
+
+@home_bp.route('/api/recent_scans')
+def get_recent_scans():
+    """Get recent scans with optional timestamp filtering for real-time updates."""
+    from flask import request, jsonify
+    from datetime import datetime, timedelta
+    
+    try:
+        # Get parameters
+        limit = int(request.args.get('limit', 50))
+        since_timestamp = request.args.get('since')  # ISO timestamp string
+        
+        # Build query for recent scans
+        query = db.session.query(
+            ItemMaster.tag_id,
+            ItemMaster.common_name,
+            ItemMaster.date_last_scanned,
+            ItemMaster.status,
+            ItemMaster.last_contract_num,
+            ItemMaster.rental_class_num
+        ).filter(ItemMaster.date_last_scanned.isnot(None))
+        
+        # Apply timestamp filter if provided
+        if since_timestamp:
+            try:
+                since_dt = datetime.fromisoformat(since_timestamp.replace('Z', '+00:00'))
+                query = query.filter(ItemMaster.date_last_scanned > since_dt)
+                logger.debug(f"Filtering scans since {since_dt}")
+            except ValueError:
+                logger.warning(f"Invalid since_timestamp format: {since_timestamp}")
+        
+        # Order by most recent first and limit
+        recent_items = query.order_by(ItemMaster.date_last_scanned.desc()).limit(limit).all()
+        
+        # Format response
+        scans = []
+        for item in recent_items:
+            scans.append({
+                'tag_id': item.tag_id,
+                'common_name': item.common_name or 'N/A',
+                'date_last_scanned': item.date_last_scanned.isoformat() if item.date_last_scanned else None,
+                'status': item.status or 'N/A',
+                'last_contract_num': item.last_contract_num or 'N/A',
+                'rental_class_num': item.rental_class_num or 'N/A'
+            })
+        
+        # Get latest timestamp for next poll
+        latest_timestamp = None
+        if scans:
+            latest_timestamp = scans[0]['date_last_scanned']
+        
+        logger.debug(f"Returning {len(scans)} recent scans, latest timestamp: {latest_timestamp}")
+        
+        return jsonify({
+            'scans': scans,
+            'count': len(scans),
+            'latest_timestamp': latest_timestamp,
+            'timestamp': datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        logger.error(f"Error fetching recent scans: {str(e)}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+@home_bp.route('/api/summary_stats')
+def get_summary_stats():
+    """Get summary statistics with caching for better performance."""
+    from flask import jsonify
+    
+    cache_key = 'home_summary_stats'
+    cached_data = cache.get(cache_key)
+    if cached_data:
+        return jsonify(json.loads(cached_data))
+    
+    try:
+        # Get summary stats (these change less frequently)
+        total_items = db.session.query(func.count(ItemMaster.tag_id)).scalar()
+        items_on_rent = db.session.query(func.count(ItemMaster.tag_id)).filter(
+            ItemMaster.status.in_(['On Rent', 'Delivered'])
+        ).scalar()
+        items_available = db.session.query(func.count(ItemMaster.tag_id)).filter(
+            ItemMaster.status == 'Ready to Rent'
+        ).scalar()
+        
+        # Status breakdown
+        status_counts = db.session.query(
+            ItemMaster.status,
+            func.count(ItemMaster.tag_id).label('count')
+        ).group_by(ItemMaster.status).all()
+        
+        items_in_service = total_items - items_on_rent - items_available if total_items else 0
+        
+        stats = {
+            'total_items': total_items or 0,
+            'items_on_rent': items_on_rent or 0,
+            'items_in_service': items_in_service,
+            'items_available': items_available or 0,
+            'status_counts': [(status or 'Unknown', count) for status, count in status_counts],
+            'timestamp': datetime.now().isoformat()
+        }
+        
+        # Cache for 30 seconds (summary stats change less frequently)
+        cache.set(cache_key, json.dumps(stats), ex=30)
+        
+        return jsonify(stats)
+        
+    except Exception as e:
+        logger.error(f"Error fetching summary stats: {str(e)}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
