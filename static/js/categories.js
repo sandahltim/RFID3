@@ -14,7 +14,7 @@ console.log('categories.js version: 2025-07-02-v6 loaded');
     let mappings = [];
     let currentSort = { column: null, direction: 'asc' };
 
-    function addMappingRow(mapping = {category: '', subcategory: '', rental_class_id: '', common_name: '', short_common_name: '', is_hand_counted: false}) {
+    function addMappingRow(mapping = {category: '', subcategory: '', rental_class_id: '', common_name: '', short_common_name: '', is_hand_counted: false, hand_counted_name: ''}) {
         const table = document.getElementById('mappings-table');
         if (!table) {
             console.error(`Mappings table not found at ${new Date().toISOString()}`);
@@ -31,6 +31,7 @@ console.log('categories.js version: 2025-07-02-v6 loaded');
             <td><input type="text" class="form-control common-name-input" value="${mapping.common_name || ''}" ${mapping.rental_class_id ? 'readonly' : ''}></td>
             <td><input type="text" class="form-control short-common-name-input" value="${mapping.short_common_name || ''}"></td>
             <td class="text-center"><input type="checkbox" class="form-check-input hand-counted-checkbox" ${mapping.is_hand_counted ? 'checked' : ''}></td>
+            <td><input type="text" class="form-control hand-counted-name-input" value="${mapping.hand_counted_name || ''}" placeholder="Optional display name"></td>
             <td>
                 <button class="btn btn-danger btn-sm remove-btn" onclick="window.categories.removeMappingRow(this)">Remove</button>
             </td>
@@ -67,7 +68,8 @@ console.log('categories.js version: 2025-07-02-v6 loaded');
         const common_name = row.querySelector('.common-name-input')?.value?.trim();
         const short_common_name = row.querySelector('.short-common-name-input')?.value?.trim();
         const is_hand_counted = row.querySelector('.hand-counted-checkbox')?.checked || false;
-        return { rental_class_id, category, subcategory, common_name: common_name || '', short_common_name: short_common_name || '', is_hand_counted };
+        const hand_counted_name = row.querySelector('.hand-counted-name-input')?.value?.trim();
+        return { rental_class_id, category, subcategory, common_name: common_name || '', short_common_name: short_common_name || '', is_hand_counted, hand_counted_name: hand_counted_name || '' };
     }
 
     function collectMappings() {

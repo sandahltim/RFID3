@@ -180,6 +180,7 @@ class HandCountedCatalog(db.Model):
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     rental_class_id = db.Column(db.String(50))
     item_name = db.Column(db.String(255), unique=True, nullable=False)
+    hand_counted_name = db.Column(db.String(255))  # Custom display name for hand counted items
 
 class UserRentalClassMapping(db.Model):
     __tablename__ = 'user_rental_class_mappings'
