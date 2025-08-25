@@ -1146,16 +1146,30 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // ===== LAUNDRY CONTRACT STATUS MANAGEMENT =====
     
-    // Filter contracts by status - expose globally for onclick handlers
-    function filterContractsByStatus(status) {
-        console.log('Filtering contracts by status:', status);
+    // Track which statuses are currently visible
+    let visibleStatuses = new Set(['active', 'finalized']); // Default: show both active statuses
+    
+    // Toggle status filter - expose globally for onclick handlers
+    function toggleStatusFilter(status, isChecked) {
+        console.log(`Toggling ${status}: ${isChecked}`);
         
+        if (isChecked) {
+            visibleStatuses.add(status);
+        } else {
+            visibleStatuses.delete(status);
+        }
+        
+        updateContractVisibility();
+    }
+    
+    // Update contract visibility based on selected statuses
+    function updateContractVisibility() {
         const rows = document.querySelectorAll('.contract-row');
         let visibleCount = 0;
         
         rows.forEach(row => {
             const contractStatus = row.dataset.contractStatus || 'active';
-            const shouldShow = status === 'all' || contractStatus === status;
+            const shouldShow = visibleStatuses.has(contractStatus);
             
             if (shouldShow) {
                 row.style.display = '';
@@ -1173,7 +1187,46 @@ document.addEventListener('DOMContentLoaded', function() {
             countElement.textContent = visibleCount;
         }
         
-        console.log(`Showing ${visibleCount} contracts with status: ${status}`);
+        console.log(`Showing ${visibleCount} contracts with statuses:`, Array.from(visibleStatuses));
+    }
+    
+    // Show all contracts
+    function showAllContracts() {
+        console.log('Showing all contracts');
+        
+        // Check all checkboxes
+        document.getElementById('filter-active').checked = true;
+        document.getElementById('filter-finalized').checked = true;
+        document.getElementById('filter-returned').checked = true;
+        
+        // Update visible statuses
+        visibleStatuses = new Set(['active', 'finalized', 'returned']);
+        updateContractVisibility();
+    }
+    
+    // Show only active contracts (PreWash + Sent to Laundry)
+    function showActiveOnly() {
+        console.log('Showing active contracts only');
+        
+        // Set checkboxes to active only state
+        document.getElementById('filter-active').checked = true;
+        document.getElementById('filter-finalized').checked = true;
+        document.getElementById('filter-returned').checked = false;
+        
+        // Update visible statuses
+        visibleStatuses = new Set(['active', 'finalized']);
+        updateContractVisibility();
+    }
+    
+    // Legacy function for compatibility
+    function filterContractsByStatus(status) {
+        if (status === 'all') {
+            showAllContracts();
+        } else {
+            // Single status mode (legacy)
+            visibleStatuses = new Set([status]);
+            updateContractVisibility();
+        }
     }
     
     // Finalize contract - expose globally for onclick handlers  
@@ -1280,14 +1333,14 @@ document.addEventListener('DOMContentLoaded', function() {
     function initializeStatusManagement() {
         console.log('Initializing status management...');
         
-        // Status filter radio buttons
-        const filterRadios = document.querySelectorAll('input[name="status-filter"]');
-        console.log('Found filter radios:', filterRadios.length);
+        // Status filter checkboxes
+        const filterCheckboxes = document.querySelectorAll('#status-filter input[type="checkbox"]');
+        console.log('Found filter checkboxes:', filterCheckboxes.length);
         
-        filterRadios.forEach(radio => {
-            radio.addEventListener('change', function() {
-                console.log('Filter changed to:', this.value);
-                filterContractsByStatus(this.value);
+        filterCheckboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', function() {
+                console.log('Filter checkbox changed:', this.value, this.checked);
+                toggleStatusFilter(this.value, this.checked);
             });
         });
         
@@ -1325,17 +1378,20 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
         
-        // Initialize with active filter (default)
+        // Initialize with default view (PreWash + Sent to Laundry)
         setTimeout(() => {
-            console.log('Setting initial filter to active');
-            filterContractsByStatus('active');
+            console.log('Setting initial filter to show active contracts (PreWash + Sent to Laundry)');
+            showActiveOnly(); // This sets the checkboxes and visibility correctly
         }, 100);
         
         console.log('Laundry contract status management initialized');
     }
 
     // Expose functions globally for onclick handlers
-    window.filterContractsByStatus = filterContractsByStatus;
+    window.toggleStatusFilter = toggleStatusFilter;
+    window.showAllContracts = showAllContracts;
+    window.showActiveOnly = showActiveOnly;
+    window.filterContractsByStatus = filterContractsByStatus; // Legacy compatibility
     window.finalizeContract = finalizeContract;
     window.markReturned = markReturned;
     window.reactivateContract = reactivateContract;

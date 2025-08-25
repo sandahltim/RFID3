@@ -17,23 +17,23 @@
     <div class="row mb-3">
         <div class="col-md-8">
             <div class="btn-group btn-group-sm" role="group" id="status-filter">
-                <input type="radio" class="btn-check" name="status-filter" id="filter-active" value="active" checked onclick="filterContractsByStatus('active')">
+                <input type="checkbox" class="btn-check" id="filter-active" value="active" checked onclick="toggleStatusFilter('active', this.checked)">
                 <label class="btn btn-outline-success" for="filter-active">
                     <span class="badge bg-success rounded-pill me-1">●</span> PreWash Count
                 </label>
                 
-                <input type="radio" class="btn-check" name="status-filter" id="filter-finalized" value="finalized" onclick="filterContractsByStatus('finalized')">
+                <input type="checkbox" class="btn-check" id="filter-finalized" value="finalized" checked onclick="toggleStatusFilter('finalized', this.checked)">
                 <label class="btn btn-outline-warning" for="filter-finalized">
                     <span class="badge bg-warning rounded-pill me-1">●</span> Sent to Laundry
                 </label>
                 
-                <input type="radio" class="btn-check" name="status-filter" id="filter-returned" value="returned" onclick="filterContractsByStatus('returned')">
+                <input type="checkbox" class="btn-check" id="filter-returned" value="returned" onclick="toggleStatusFilter('returned', this.checked)">
                 <label class="btn btn-outline-info" for="filter-returned">
                     <span class="badge bg-info rounded-pill me-1">●</span> Returned
                 </label>
                 
-                <input type="radio" class="btn-check" name="status-filter" id="filter-all" value="all" onclick="filterContractsByStatus('all')">
-                <label class="btn btn-outline-secondary" for="filter-all">All Contracts</label>
+                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="showAllContracts()">Show All</button>
+                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="showActiveOnly()">Active Only</button>
             </div>
         </div>
         <div class="col-md-4 text-end">
