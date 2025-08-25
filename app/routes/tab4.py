@@ -407,13 +407,17 @@ def hand_counted_catalog():
     try:
         session = db.session()
         try:
-            items = session.query(HandCountedCatalog.item_name).all()
+            items = session.query(HandCountedCatalog.item_name, HandCountedCatalog.hand_counted_name).all()
         except ProgrammingError:
             session.rollback()
             logger.warning("hand_counted_catalog table missing; returning empty list")
             current_app.logger.warning("hand_counted_catalog table missing; returning empty list")
             items = []
-        item_list = [i.item_name for i in items]
+        # Use hand_counted_name if available, otherwise fall back to item_name
+        item_list = []
+        for item in items:
+            display_name = item.hand_counted_name if item.hand_counted_name else item.item_name
+            item_list.append(display_name)
         logger.info(f"Returned hand-counted catalog items: {item_list} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
         return jsonify({'items': item_list})
     except Exception as e:
@@ -439,6 +443,7 @@ def hand_counted_catalog_categorized():
             
             items_with_categories = session.query(
                 HandCountedCatalog.item_name,
+                HandCountedCatalog.hand_counted_name,
                 UserRentalClassMapping.category,
                 UserRentalClassMapping.subcategory
             ).outerjoin(
@@ -450,6 +455,7 @@ def hand_counted_catalog_categorized():
             if not items_with_categories:
                 items_with_categories = session.query(
                     HandCountedCatalog.item_name,
+                    HandCountedCatalog.hand_counted_name,
                     RentalClassMapping.category,
                     RentalClassMapping.subcategory
                 ).outerjoin(
@@ -467,15 +473,18 @@ def hand_counted_catalog_categorized():
         categorized_items = {}
         uncategorized_items = []
         
-        for item_name, category, subcategory in items_with_categories:
+        for item_name, hand_counted_name, category, subcategory in items_with_categories:
+            # Use hand_counted_name if available, otherwise fall back to item_name
+            display_name = hand_counted_name if hand_counted_name else item_name
+            
             if category and subcategory:
                 if category not in categorized_items:
                     categorized_items[category] = {}
                 if subcategory not in categorized_items[category]:
                     categorized_items[category][subcategory] = []
-                categorized_items[category][subcategory].append(item_name)
+                categorized_items[category][subcategory].append(display_name)
             else:
-                uncategorized_items.append(item_name)
+                uncategorized_items.append(display_name)
         
         # Add uncategorized items as a separate category
         if uncategorized_items:
@@ -853,8 +862,14 @@ def contract_history_print():
             ItemMaster.status.in_(['On Rent', 'Delivered', 'Ready to Return'])
         ).all()
         
-        # Get hand counted items history
-        hand_counted_items = session.query(HandCountedItems).filter(
+        # Get hand counted items history with custom names
+        hand_counted_items = session.query(
+            HandCountedItems,
+            HandCountedCatalog.hand_counted_name
+        ).outerjoin(
+            HandCountedCatalog,
+            HandCountedItems.item_name == HandCountedCatalog.item_name
+        ).filter(
             HandCountedItems.contract_number == contract_number
         ).order_by(HandCountedItems.timestamp.desc()).all()
         
@@ -865,8 +880,8 @@ def contract_history_print():
         
         # Calculate totals
         total_rfid_items = len(rfid_items)
-        total_hand_counted = sum(item.quantity for item in hand_counted_items if item.action == 'Added')
-        total_hand_counted -= sum(item.quantity for item in hand_counted_items if item.action == 'Removed')
+        total_hand_counted = sum(item_tuple.HandCountedItems.quantity for item_tuple in hand_counted_items if item_tuple.HandCountedItems.action == 'Added')
+        total_hand_counted -= sum(item_tuple.HandCountedItems.quantity for item_tuple in hand_counted_items if item_tuple.HandCountedItems.action == 'Removed')
         
         # Prepare data for template
         contract_data = {
@@ -887,12 +902,12 @@ def contract_history_print():
                 'notes': item.notes or ''
             } for item in rfid_items],
             'hand_counted_items': [{
-                'item_name': item.item_name,
-                'quantity': item.quantity,
-                'action': item.action,
-                'timestamp': item.timestamp.strftime('%Y-%m-%d %H:%M') if item.timestamp else 'N/A',
-                'user': item.user or 'N/A'
-            } for item in hand_counted_items],
+                'item_name': item_tuple.HandCountedCatalog.hand_counted_name if item_tuple.HandCountedCatalog and item_tuple.HandCountedCatalog.hand_counted_name else item_tuple.HandCountedItems.item_name,
+                'quantity': item_tuple.HandCountedItems.quantity,
+                'action': item_tuple.HandCountedItems.action,
+                'timestamp': item_tuple.HandCountedItems.timestamp.strftime('%Y-%m-%d %H:%M') if item_tuple.HandCountedItems.timestamp else 'N/A',
+                'user': item_tuple.HandCountedItems.user or 'N/A'
+            } for item_tuple in hand_counted_items],
             'recent_activity': [{
                 'tag_id': t.tag_id or 'N/A',
                 'scan_type': t.scan_type or 'N/A',
@@ -938,29 +953,38 @@ def hand_counted_history_print():
             Transaction.contract_number == contract_number
         ).first()
         
-        # Get all hand counted items for this contract
-        hand_counted_items = session.query(HandCountedItems).filter(
+        # Get all hand counted items for this contract with custom names
+        hand_counted_items = session.query(
+            HandCountedItems,
+            HandCountedCatalog.hand_counted_name
+        ).outerjoin(
+            HandCountedCatalog,
+            HandCountedItems.item_name == HandCountedCatalog.item_name
+        ).filter(
             HandCountedItems.contract_number == contract_number
         ).order_by(HandCountedItems.timestamp.desc()).all()
         
         if not hand_counted_items:
             return jsonify({'error': f'No hand counted items found for contract {contract_number}'}), 404
         
-        # Group by item name for summary
+        # Group by item name for summary (using custom names when available)
         item_summary = {}
-        for item in hand_counted_items:
-            if item.item_name not in item_summary:
-                item_summary[item.item_name] = {'added': 0, 'removed': 0, 'net': 0, 'last_activity': None}
+        for item_tuple in hand_counted_items:
+            item = item_tuple.HandCountedItems
+            display_name = item_tuple.HandCountedCatalog.hand_counted_name if item_tuple.HandCountedCatalog and item_tuple.HandCountedCatalog.hand_counted_name else item.item_name
+            
+            if display_name not in item_summary:
+                item_summary[display_name] = {'added': 0, 'removed': 0, 'net': 0, 'last_activity': None}
             
             if item.action == 'Added':
-                item_summary[item.item_name]['added'] += item.quantity
+                item_summary[display_name]['added'] += item.quantity
             elif item.action == 'Removed':
-                item_summary[item.item_name]['removed'] += item.quantity
+                item_summary[display_name]['removed'] += item.quantity
                 
-            item_summary[item.item_name]['net'] = item_summary[item.item_name]['added'] - item_summary[item.item_name]['removed']
+            item_summary[display_name]['net'] = item_summary[display_name]['added'] - item_summary[display_name]['removed']
             
-            if not item_summary[item.item_name]['last_activity'] or item.timestamp > item_summary[item.item_name]['last_activity']:
-                item_summary[item.item_name]['last_activity'] = item.timestamp
+            if not item_summary[display_name]['last_activity'] or item.timestamp > item_summary[display_name]['last_activity']:
+                item_summary[display_name]['last_activity'] = item.timestamp
         
         history_data = {
             'contract_number': contract_number,
@@ -978,12 +1002,12 @@ def hand_counted_history_print():
                 for name, summary in sorted(item_summary.items())
             ],
             'chronological_history': [{
-                'item_name': item.item_name,
-                'quantity': item.quantity,
-                'action': item.action,
-                'timestamp': item.timestamp.strftime('%Y-%m-%d %H:%M:%S') if item.timestamp else 'N/A',
-                'user': item.user or 'N/A'
-            } for item in hand_counted_items]
+                'item_name': item_tuple.HandCountedCatalog.hand_counted_name if item_tuple.HandCountedCatalog and item_tuple.HandCountedCatalog.hand_counted_name else item_tuple.HandCountedItems.item_name,
+                'quantity': item_tuple.HandCountedItems.quantity,
+                'action': item_tuple.HandCountedItems.action,
+                'timestamp': item_tuple.HandCountedItems.timestamp.strftime('%Y-%m-%d %H:%M:%S') if item_tuple.HandCountedItems.timestamp else 'N/A',
+                'user': item_tuple.HandCountedItems.user or 'N/A'
+            } for item_tuple in hand_counted_items]
         }
         
         html = render_template('hand_counted_history_print.html', data=history_data)

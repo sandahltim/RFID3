@@ -369,6 +369,7 @@ def update_mappings():
             short_common_name = mapping.get('short_common_name', '')
             common_name = mapping.get('common_name')
             is_hand_counted = mapping.get('is_hand_counted', False)
+            hand_counted_name = mapping.get('hand_counted_name', '')
 
             if rental_class_id and category:
                 existing = session.query(UserRentalClassMapping).filter_by(rental_class_id=rental_class_id).first()
@@ -400,11 +401,19 @@ def update_mappings():
                     existing_catalog = session.query(HandCountedCatalog).filter_by(item_name=common_name).first()
                     if is_hand_counted:
                         if not existing_catalog:
-                            catalog_entry = HandCountedCatalog(rental_class_id=rental_class_id, item_name=common_name)
+                            catalog_entry = HandCountedCatalog(
+                                rental_class_id=rental_class_id, 
+                                item_name=common_name,
+                                hand_counted_name=hand_counted_name
+                            )
                             session.add(catalog_entry)
-                            logger.debug(f"Added to hand-counted catalog: {common_name}")
-                        elif rental_class_id and existing_catalog.rental_class_id != rental_class_id:
-                            existing_catalog.rental_class_id = rental_class_id
+                            logger.debug(f"Added to hand-counted catalog: {common_name} with hand_counted_name: {hand_counted_name}")
+                        else:
+                            # Update existing catalog entry
+                            if rental_class_id and existing_catalog.rental_class_id != rental_class_id:
+                                existing_catalog.rental_class_id = rental_class_id
+                            existing_catalog.hand_counted_name = hand_counted_name
+                            logger.debug(f"Updated hand-counted catalog: {common_name} with hand_counted_name: {hand_counted_name}")
                     else:
                         if existing_catalog:
                             session.delete(existing_catalog)
@@ -543,7 +552,8 @@ def export_categories():
             for item in hand_counted_items:
                 hand_counted_data.append({
                     'rental_class_id': item.rental_class_id,
-                    'item_name': item.item_name
+                    'item_name': item.item_name,
+                    'hand_counted_name': item.hand_counted_name
                 })
             export_data['hand_counted_catalog'] = hand_counted_data
             export_data['counts']['hand_counted_items'] = len(hand_counted_data)
@@ -645,12 +655,14 @@ def import_categories():
             if existing:
                 # Update existing item (same behavior for both merge and replace)
                 existing.rental_class_id = item_data.get('rental_class_id')
+                existing.hand_counted_name = item_data.get('hand_counted_name')
                 results['hand_counted']['updated'] += 1
             else:
                 # Create new item
                 new_item = HandCountedCatalog(
                     rental_class_id=item_data.get('rental_class_id'),
-                    item_name=item_name
+                    item_name=item_name,
+                    hand_counted_name=item_data.get('hand_counted_name')
                 )
                 session.add(new_item)
                 results['hand_counted']['added'] += 1
