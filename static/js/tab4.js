@@ -1178,10 +1178,10 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Finalize contract - expose globally for onclick handlers  
     async function finalizeContract(contractNumber) {
-        const user = prompt('Enter your name to finalize this contract:');
+        const user = prompt('Enter your name to send this contract to laundry:');
         if (!user || user.trim() === '') return;
         
-        const notes = prompt('Optional notes about finalization (e.g., "Picked up by ABC Cleaners"):') || '';
+        const notes = prompt('Optional notes about sending to laundry (e.g., "Picked up by ABC Cleaners"):') || '';
         
         try {
             const response = await fetch('/tab/4/finalize_contract', {
@@ -1197,14 +1197,14 @@ document.addEventListener('DOMContentLoaded', function() {
             const data = await response.json();
             
             if (data.success) {
-                alert(`✅ ${data.message}`);
+                alert(`✅ Contract ${contractNumber} has been sent to laundry`);
                 location.reload(); // Refresh to show updated status
             } else {
                 alert(`❌ Error: ${data.error}`);
             }
         } catch (error) {
-            console.error('Error finalizing contract:', error);
-            alert(`❌ Error finalizing contract: ${error.message}`);
+            console.error('Error sending contract to laundry:', error);
+            alert(`❌ Error sending contract to laundry: ${error.message}`);
         }
     }
     

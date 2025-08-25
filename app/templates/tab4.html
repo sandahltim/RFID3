@@ -19,12 +19,12 @@
             <div class="btn-group btn-group-sm" role="group" id="status-filter">
                 <input type="radio" class="btn-check" name="status-filter" id="filter-active" value="active" checked onclick="filterContractsByStatus('active')">
                 <label class="btn btn-outline-success" for="filter-active">
-                    <span class="badge bg-success rounded-pill me-1">●</span> Active
+                    <span class="badge bg-success rounded-pill me-1">●</span> PreWash Count
                 </label>
                 
                 <input type="radio" class="btn-check" name="status-filter" id="filter-finalized" value="finalized" onclick="filterContractsByStatus('finalized')">
                 <label class="btn btn-outline-warning" for="filter-finalized">
-                    <span class="badge bg-warning rounded-pill me-1">●</span> Finalized
+                    <span class="badge bg-warning rounded-pill me-1">●</span> Sent to Laundry
                 </label>
                 
                 <input type="radio" class="btn-check" name="status-filter" id="filter-returned" value="returned" onclick="filterContractsByStatus('returned')">
@@ -60,9 +60,9 @@
                         <td>
                             <!-- Compact status indicator -->
                             {% if contract.status == 'active' %}
-                                <span class="badge bg-success rounded-pill me-2" title="Active">●</span>
+                                <span class="badge bg-success rounded-pill me-2" title="PreWash Count - Items being counted before sending to laundry">●</span>
                             {% elif contract.status == 'finalized' %}
-                                <span class="badge bg-warning rounded-pill me-2" title="Finalized - Picked up by cleaning service">●</span>
+                                <span class="badge bg-warning rounded-pill me-2" title="Sent to Laundry - Final count taken, picked up by cleaning service">●</span>
                             {% elif contract.status == 'returned' %}
                                 <span class="badge bg-info rounded-pill me-2" title="Returned from cleaning service">●</span>
                             {% else %}
@@ -71,7 +71,7 @@
                             {{ contract.contract_number }}
                             <!-- Show finalized/returned dates subtly -->
                             {% if contract.finalized_date and contract.status == 'finalized' %}
-                                <br><small class="text-muted">Finalized: {{ contract.finalized_date[:10] }}</small>
+                                <br><small class="text-muted">Sent: {{ contract.finalized_date[:10] }}</small>
                             {% elif contract.returned_date and contract.status == 'returned' %}
                                 <br><small class="text-muted">Returned: {{ contract.returned_date[:10] }}</small>
                             {% endif %}
@@ -91,8 +91,8 @@
                                 <button class="btn btn-sm btn-warning finalize-btn" 
                                         data-contract-number="{{ contract.contract_number }}" 
                                         onclick="finalizeContract('{{ contract.contract_number }}')"
-                                        title="Mark as finalized and picked up">
-                                    Finalize
+                                        title="Mark final count and send to laundry">
+                                    Send to Laundry
                                 </button>
                             {% elif contract.status == 'finalized' %}
                                 <button class="btn btn-sm btn-info return-btn" 
