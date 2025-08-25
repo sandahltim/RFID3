@@ -2,7 +2,7 @@
 # refresh.py version: 2025-06-27-v9
 import logging
 import traceback
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from sqlalchemy.exc import SQLAlchemyError, OperationalError
 from sqlalchemy.sql import text
 from .. import db
@@ -26,6 +26,9 @@ from .logger import get_logger
 logger = get_logger(f'refresh_{os.getpid()}', level=logging.INFO, log_file=LOG_FILE)
 
 refresh_bp = Blueprint('refresh', __name__)
+
+# Global refresh status tracking
+refresh_status = {'refreshing': False, 'start_time': None}
 
 api_client = APIClient()
 
@@ -143,8 +146,8 @@ def update_user_mappings(session, csv_file_path='/home/tim/RFID3/seeddata_202504
                         'category': category,
                         'subcategory': subcategory,
                         'short_common_name': row.get('short_common_name', '').strip() or 'N/A',
-                        'created_at': datetime.utcnow(),
-                        'updated_at': datetime.utcnow()
+                        'created_at': datetime.now(timezone.utc),
+                        'updated_at': datetime.now(timezone.utc)
                     }
                 except Exception as e:
                     logger.error(f"Error processing CSV row {row_count}: {str(e)}", exc_info=True)
@@ -178,35 +181,48 @@ def update_user_mappings(session, csv_file_path='/home/tim/RFID3/seeddata_202504
 
         logger.info(f"Processed {row_count} CSV rows, {len(merged_mappings)} merged mappings (user mappings prioritized)")
 
-        # Clear existing user mappings
-        deleted_count = session.query(UserRentalClassMapping).delete()
-        logger.info(f"Deleted {deleted_count} existing user mappings")
+        # NO DELETE - preserve all existing user mappings, only add new ones
+        logger.info("Preserving all existing user mappings, only inserting new CSV mappings")
 
-        # Insert merged mappings
+        # Use safe upsert approach - only insert new CSV mappings, preserve existing user ones
         inserted_count = 0
+        skipped_count = 0
+        
+        # Get current rental_class_ids to avoid duplicates
+        existing_ids = {row[0] for row in session.query(UserRentalClassMapping.rental_class_id).all()}
+        
         for mapping in merged_mappings.values():
             try:
                 if 'rental_class_id' not in mapping or not mapping['rental_class_id']:
                     logger.warning(f"Skipping mapping with missing rental_class_id: {mapping}")
                     continue
+                    
+                rental_class_id = mapping['rental_class_id']
+                
+                # Only insert if it doesn't already exist (preserve user mappings)
+                if rental_class_id in existing_ids:
+                    logger.debug(f"Preserving existing user mapping for {rental_class_id}")
+                    skipped_count += 1
+                    continue
+                
                 user_mapping = UserRentalClassMapping(
                     rental_class_id=mapping['rental_class_id'],
                     category=mapping['category'],
                     subcategory=mapping['subcategory'],
-                    short_common_name=mapping['short_common_name'],
-                    created_at=mapping['created_at'],
-                    updated_at=mapping['updated_at']
+                    short_common_name=mapping.get('short_common_name', ''),
+                    created_at=mapping.get('created_at', datetime.now(timezone.utc)),
+                    updated_at=mapping.get('updated_at', datetime.now(timezone.utc))
                 )
                 session.add(user_mapping)
-                session.flush()
                 inserted_count += 1
-                logger.debug(f"Inserted mapping: {mapping['rental_class_id']}")
+                logger.debug(f"Inserted new CSV mapping: {mapping['rental_class_id']}")
+                
             except Exception as e:
-                logger.error(f"Error inserting mapping: {str(e)}", exc_info=True)
+                logger.error(f"Error processing mapping: {str(e)}", exc_info=True)
                 continue
 
         session.commit()
-        logger.info(f"Inserted {inserted_count} merged mappings into user_rental_class_mappings")
+        logger.info(f"Processed {len(merged_mappings)} mappings: {inserted_count} new CSV mappings inserted, {skipped_count} user mappings preserved")
 
         # Drop temporary table
         session.execute(text("DROP TABLE IF EXISTS temp_user_rental_class_mappings"))
@@ -386,6 +402,11 @@ def full_refresh():
     local database.
     """
     logger.info("Starting full refresh of item master, transactions, and seed data")
+    
+    # Set refresh status to true
+    refresh_status['refreshing'] = True
+    refresh_status['start_time'] = datetime.now(timezone.utc).isoformat()
+    
     session = db.session()
     max_retries = 3
     for attempt in range(max_retries):
@@ -420,8 +441,12 @@ def full_refresh():
             update_seed_data(session, seed_data)
             update_user_mappings(session)
 
-            update_refresh_state('full_refresh', datetime.utcnow())
+            update_refresh_state('full_refresh', datetime.now(timezone.utc))
             logger.info("Full refresh completed successfully")
+            
+            # Clear refresh status
+            refresh_status['refreshing'] = False
+            refresh_status['start_time'] = None
             break
         except OperationalError as e:
             if "Deadlock" in str(e):
@@ -439,6 +464,10 @@ def full_refresh():
         except Exception as e:
             logger.error(f"Full refresh failed: {str(e)}", exc_info=True)
             session.rollback()
+            
+            # Clear refresh status on error
+            refresh_status['refreshing'] = False
+            refresh_status['start_time'] = None
             raise
         finally:
             if session.is_active:
@@ -452,12 +481,17 @@ def incremental_refresh():
     the configured lookback interval and applies them to the local database.
     """
     logger.info("Starting incremental refresh for item master and transactions")
+    
+    # Set refresh status to true
+    refresh_status['refreshing'] = True
+    refresh_status['start_time'] = datetime.now(timezone.utc).isoformat()
+    
     session = db.session()
     max_retries = 3
     for attempt in range(max_retries):
         try:
             with session.no_autoflush:
-                since_date = datetime.utcnow() - timedelta(seconds=INCREMENTAL_LOOKBACK_SECONDS)
+                since_date = datetime.now(timezone.utc) - timedelta(seconds=INCREMENTAL_LOOKBACK_SECONDS)
                 logger.info(
                     f"Checking for item master and transaction updates since: {since_date.strftime('%Y-%m-%d %H:%M:%S')}"
                 )
@@ -475,15 +509,23 @@ def incremental_refresh():
                 if not items and not transactions:
                     logger.info("No new item master or transaction data to process, skipping database updates")
                     session.commit()
-                    update_refresh_state('incremental_refresh', datetime.utcnow())
+                    update_refresh_state('incremental_refresh', datetime.now(timezone.utc))
+                    
+                    # Clear refresh status (quick operation)
+                    refresh_status['refreshing'] = False
+                    refresh_status['start_time'] = None
                     break
 
                 update_item_master(session, items)
                 update_transactions(session, transactions)
 
                 session.commit()
-                update_refresh_state('incremental_refresh', datetime.utcnow())
+                update_refresh_state('incremental_refresh', datetime.now(timezone.utc))
                 logger.info("Incremental refresh completed successfully")
+                
+                # Clear refresh status
+                refresh_status['refreshing'] = False
+                refresh_status['start_time'] = None
                 break
         except OperationalError as e:
             if "Lock wait timeout" in str(e) or "Deadlock" in str(e):
@@ -501,6 +543,10 @@ def incremental_refresh():
         except Exception as e:
             logger.error(f"Incremental refresh failed: {str(e)}", exc_info=True)
             session.rollback()
+            
+            # Clear refresh status on error
+            refresh_status['refreshing'] = False
+            refresh_status['start_time'] = None
             raise
         finally:
             session.close()

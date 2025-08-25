@@ -83,7 +83,7 @@ window.expandCategory = function(category, targetId, contractNumber, page = 1, t
                         <td>
                             <button class="btn btn-sm btn-secondary expand-btn" data-common-name="${escapedCommonName}" data-target-id="items-${commonId}" data-contract-number="${contractNumber}">Expand</button>
                             <button class="btn btn-sm btn-secondary collapse-btn" data-collapse-target="items-${commonId}" style="display:none;">Collapse</button>
-                            <button class="btn btn-sm btn-info print-btn" data-print-level="Common Name" data-print-id="items-${commonId}" data-common-name="${escapedCommonName}" data-category="${contractNumber}">Print</button>
+                            <button class="btn btn-sm btn-info print-common-name-btn" data-print-level="Common Name" data-print-id="items-${commonId}" data-common-name="${escapedCommonName}" data-category="${contractNumber}">Print</button>
                             <button class="btn btn-sm btn-info print-full-btn" data-common-name="${escapedCommonName}" data-category="${contractNumber}">Print Full List</button>
                             <div id="loading-items-${commonId}" style="display:none;" class="loading-indicator">Loading...</div>
                         </td>
@@ -438,6 +438,151 @@ window.updateItemDropdown = function updateItemDropdown() {
         });
 };
 
+// Global variable to store categorized items
+let categorizedItemsData = {};
+
+// Load categorized items data on page load
+window.loadCategorizedItems = function loadCategorizedItems() {
+    fetch('/tab/4/hand_counted_catalog_categorized')
+        .then(response => {
+            if (!response.ok) throw new Error(`Failed to fetch categorized catalog: ${response.status}`);
+            return response.json();
+        })
+        .then(data => {
+            categorizedItemsData = data.categories || {};
+            populateCategoryDropdown();
+            console.log('Loaded categorized items data:', categorizedItemsData);
+        })
+        .catch(error => {
+            console.error('Error fetching categorized hand-counted catalog:', error);
+            // Fallback to original dropdown
+            window.updateItemDropdown();
+        });
+};
+
+// Populate the category dropdown
+function populateCategoryDropdown() {
+    const categoryDropdown = document.getElementById('hand-counted-category');
+    categoryDropdown.innerHTML = '<option value="">Select Category...</option>';
+    
+    Object.keys(categorizedItemsData).sort().forEach(category => {
+        const option = document.createElement('option');
+        option.value = category;
+        option.textContent = category;
+        categoryDropdown.appendChild(option);
+    });
+}
+
+// Update subcategory dropdown based on selected category
+window.updateSubcategoryDropdown = function updateSubcategoryDropdown() {
+    const categoryDropdown = document.getElementById('hand-counted-category');
+    const subcategoryDropdown = document.getElementById('hand-counted-subcategory');
+    const itemDropdown = document.getElementById('hand-counted-item-name');
+    
+    // Clear subcategory and item dropdowns
+    subcategoryDropdown.innerHTML = '<option value="">Select Subcategory...</option>';
+    itemDropdown.innerHTML = '<option value="">Select Item...</option>';
+    
+    const selectedCategory = categoryDropdown.value;
+    if (!selectedCategory || !categorizedItemsData[selectedCategory]) {
+        return;
+    }
+    
+    // Populate subcategory dropdown
+    Object.keys(categorizedItemsData[selectedCategory]).sort().forEach(subcategory => {
+        const option = document.createElement('option');
+        option.value = subcategory;
+        option.textContent = subcategory;
+        subcategoryDropdown.appendChild(option);
+    });
+};
+
+// Update item dropdown based on selected category and subcategory
+window.updateItemDropdownHierarchical = function updateItemDropdownHierarchical() {
+    const categoryDropdown = document.getElementById('hand-counted-category');
+    const subcategoryDropdown = document.getElementById('hand-counted-subcategory');
+    const itemDropdown = document.getElementById('hand-counted-item-name');
+    const contractDropdown = document.getElementById('hand-counted-contract-number');
+    const newContractInput = document.getElementById('new-contract-number');
+    
+    // Clear item dropdown
+    itemDropdown.innerHTML = '<option value="">Select Item...</option>';
+    
+    const selectedCategory = categoryDropdown.value;
+    const selectedSubcategory = subcategoryDropdown.value;
+    
+    if (!selectedCategory || !selectedSubcategory || 
+        !categorizedItemsData[selectedCategory] || 
+        !categorizedItemsData[selectedCategory][selectedSubcategory]) {
+        return;
+    }
+    
+    const items = categorizedItemsData[selectedCategory][selectedSubcategory];
+    const contractNumber = newContractInput.style.display === 'block' ? newContractInput.value : contractDropdown.value;
+    
+    // Get existing quantities for the contract if available
+    if (contractNumber) {
+        fetch(`/tab/4/hand_counted_items_by_contract?contract_number=${encodeURIComponent(contractNumber)}`)
+            .then(response => {
+                if (!response.ok) throw new Error(`Failed to fetch contract items: ${response.status}`);
+                return response.json();
+            })
+            .then(data => {
+                const contractItems = {};
+                if (data.items && Array.isArray(data.items)) {
+                    data.items.forEach(item => {
+                        contractItems[item.item_name] = item.quantity;
+                    });
+                }
+                
+                // Populate item dropdown with quantities if available
+                items.forEach(itemName => {
+                    const option = document.createElement('option');
+                    option.value = itemName;
+                    const qty = contractItems[itemName];
+                    option.textContent = qty ? `${itemName} (Qty: ${qty})` : itemName;
+                    itemDropdown.appendChild(option);
+                });
+                
+                // Add "Other" option
+                const otherOption = document.createElement('option');
+                otherOption.value = '__other';
+                otherOption.textContent = 'Other';
+                itemDropdown.appendChild(otherOption);
+            })
+            .catch(error => {
+                console.error('Error fetching contract items:', error);
+                // Populate without quantities
+                items.forEach(itemName => {
+                    const option = document.createElement('option');
+                    option.value = itemName;
+                    option.textContent = itemName;
+                    itemDropdown.appendChild(option);
+                });
+                
+                const otherOption = document.createElement('option');
+                otherOption.value = '__other';
+                otherOption.textContent = 'Other';
+                itemDropdown.appendChild(otherOption);
+            });
+    } else {
+        // No contract selected, just populate items
+        items.forEach(itemName => {
+            const option = document.createElement('option');
+            option.value = itemName;
+            option.textContent = itemName;
+            itemDropdown.appendChild(option);
+        });
+        
+        const otherOption = document.createElement('option');
+        otherOption.value = '__other';
+        otherOption.textContent = 'Other';
+        itemDropdown.appendChild(otherOption);
+    }
+    
+    handleItemSelection();
+};
+
 window.addHandCountedItem = function addHandCountedItem() {
     const contractDropdown = document.getElementById('hand-counted-contract-number');
     const newContractInput = document.getElementById('new-contract-number');
@@ -492,7 +637,7 @@ window.addHandCountedItem = function addHandCountedItem() {
             addContractToTable(contractNumber);
             updateContractCounts(contractNumber);
             refreshCommonNames(contractNumber);
-            window.updateItemDropdown(); // Refresh dropdown after successful add
+            window.loadCategorizedItems(); // Refresh dropdown after successful add
         }
     })
     .catch(error => {
@@ -554,7 +699,7 @@ window.removeHandCountedItem = function removeHandCountedItem() {
             addContractToTable(contractNumber);
             updateContractCounts(contractNumber);
             refreshCommonNames(contractNumber);
-            window.updateItemDropdown(); // Refresh dropdown after successful remove
+            window.loadCategorizedItems(); // Refresh dropdown after successful remove
         }
     })
     .catch(error => {
@@ -600,7 +745,7 @@ function addContractToTable(contractNumber) {
                 <td>
                     <button class="btn btn-sm btn-secondary expand-btn" data-contract-number="${contractNumber}" data-target-id="common-${contractNumber}">Expand</button>
                     <button class="btn btn-sm btn-secondary collapse-btn" data-collapse-target="common-${contractNumber}" style="display:none;">Collapse</button>
-                    <button class="btn btn-sm btn-info print-btn" data-print-level="Contract" data-print-id="common-${contractNumber}" data-contract-number="${contractNumber}">Print</button>
+                    <button class="btn btn-sm btn-info print-contract-btn" data-print-level="Contract" data-print-id="common-${contractNumber}" data-contract-number="${contractNumber}">Print</button>
                     <div id="loading-${contractNumber}" style="display:none;" class="loading-indicator">Loading...</div>
                 </td>
             </tr>
@@ -705,6 +850,9 @@ document.addEventListener('DOMContentLoaded', function() {
         })
         .catch(error => console.error('Error fetching hand-counted contracts:', error));
 
+    // Load categorized items for improved dropdown UX
+    window.loadCategorizedItems();
+
     // Attach event listeners
     document.removeEventListener('click', handleClick);
     console.log('Attaching click event listener');
@@ -753,16 +901,54 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        const printBtn = event.target.closest('.print-btn');
-        if (printBtn) {
+        // Handle main Print Items button
+        const printItemsBtn = event.target.closest('.print-items-btn');
+        if (printItemsBtn) {
             event.preventDefault();
             event.stopPropagation();
-            const level = printBtn.getAttribute('data-print-level');
-            const id = printBtn.getAttribute('data-print-id');
-            const commonName = printBtn.getAttribute('data-common-name');
-            const category = printBtn.getAttribute('data-category');
-            const subcategory = printBtn.getAttribute('data-subcategory');
-            printTable(level, id, commonName, category, subcategory);
+            const contractNumber = printItemsBtn.getAttribute('data-contract-number');
+            console.log(`Opening contract items print for: ${contractNumber}`);
+            const url = `/tab/4/contract_items_print?contract_number=${encodeURIComponent(contractNumber)}`;
+            window.open(url, '_blank', 'width=1200,height=800,scrollbars=yes,resizable=yes');
+            return;
+        }
+
+        // Handle dropdown Print Items button (from dropdown menu only)
+        const dropdownPrintBtn = event.target.closest('.dropdown-item.print-btn');
+        if (dropdownPrintBtn) {
+            event.preventDefault();
+            event.stopPropagation();
+            const contractNumber = dropdownPrintBtn.getAttribute('data-contract-number');
+            console.log(`Opening contract items print from dropdown for: ${contractNumber}`);
+            const url = `/tab/4/contract_items_print?contract_number=${encodeURIComponent(contractNumber)}`;
+            window.open(url, '_blank', 'width=1200,height=800,scrollbars=yes,resizable=yes');
+            return;
+        }
+        
+        // Handle expanded common name print button
+        const printCommonNameBtn = event.target.closest('.print-common-name-btn');
+        if (printCommonNameBtn) {
+            event.preventDefault();
+            event.stopPropagation();
+            const level = printCommonNameBtn.getAttribute('data-print-level');
+            const id = printCommonNameBtn.getAttribute('data-print-id');
+            const commonName = printCommonNameBtn.getAttribute('data-common-name');
+            const category = printCommonNameBtn.getAttribute('data-category');
+            console.log(`Using printTable for common name: ${commonName}`);
+            printTable(level, id, commonName, category);
+            return;
+        }
+        
+        // Handle expanded contract print button  
+        const printContractBtn = event.target.closest('.print-contract-btn');
+        if (printContractBtn) {
+            event.preventDefault();
+            event.stopPropagation();
+            const level = printContractBtn.getAttribute('data-print-level');
+            const id = printContractBtn.getAttribute('data-print-id');
+            const contractNumber = printContractBtn.getAttribute('data-contract-number');
+            console.log(`Using printTable for contract: ${contractNumber}`);
+            printTable(level, id, null, contractNumber);
             return;
         }
 
@@ -774,6 +960,71 @@ document.addEventListener('DOMContentLoaded', function() {
             const category = printFullBtn.getAttribute('data-category');
             const subcategory = printFullBtn.getAttribute('data-subcategory');
             printFullItemList(category, subcategory, commonName);
+            return;
+        }
+
+        // Handle new comprehensive print options
+        const printContractHistory = event.target.closest('.print-contract-history');
+        if (printContractHistory) {
+            event.preventDefault();
+            event.stopPropagation();
+            const contractNumber = printContractHistory.getAttribute('data-contract-number');
+            console.log(`Opening contract history for: ${contractNumber}`);
+            const url = `/tab/4/contract_history_print?contract_number=${encodeURIComponent(contractNumber)}`;
+            window.open(url, '_blank', 'width=1200,height=800,scrollbars=yes,resizable=yes');
+            return;
+        }
+
+        const printHandCountedHistory = event.target.closest('.print-hand-counted-history');
+        if (printHandCountedHistory) {
+            event.preventDefault();
+            event.stopPropagation();
+            const contractNumber = printHandCountedHistory.getAttribute('data-contract-number');
+            console.log(`Opening hand counted history for: ${contractNumber}`);
+            const url = `/tab/4/hand_counted_history_print?contract_number=${encodeURIComponent(contractNumber)}`;
+            window.open(url, '_blank', 'width=1200,height=800,scrollbars=yes,resizable=yes');
+            return;
+        }
+
+        // Handle print buttons for selected contract
+        const printSelectedContractHistory = event.target.closest('.print-selected-contract-history');
+        if (printSelectedContractHistory) {
+            event.preventDefault();
+            event.stopPropagation();
+            const contractSelector = document.getElementById('print-contract-selector');
+            const contractNumber = contractSelector.value;
+            if (contractNumber) {
+                console.log(`Opening contract history for selected: ${contractNumber}`);
+                const url = `/tab/4/contract_history_print?contract_number=${encodeURIComponent(contractNumber)}`;
+                window.open(url, '_blank', 'width=1200,height=800,scrollbars=yes,resizable=yes');
+            }
+            return;
+        }
+
+        const printSelectedHandCountedHistory = event.target.closest('.print-selected-hand-counted-history');
+        if (printSelectedHandCountedHistory) {
+            event.preventDefault();
+            event.stopPropagation();
+            const contractSelector = document.getElementById('print-contract-selector');
+            const contractNumber = contractSelector.value;
+            if (contractNumber) {
+                console.log(`Opening hand counted history for selected: ${contractNumber}`);
+                const url = `/tab/4/hand_counted_history_print?contract_number=${encodeURIComponent(contractNumber)}`;
+                window.open(url, '_blank', 'width=1200,height=800,scrollbars=yes,resizable=yes');
+            }
+            return;
+        }
+        
+        // Handle create snapshot button
+        const createSnapshotBtn = event.target.closest('.create-contract-snapshot');
+        if (createSnapshotBtn) {
+            event.preventDefault();
+            event.stopPropagation();
+            const contractSelector = document.getElementById('print-contract-selector');
+            const contractNumber = contractSelector.value;
+            if (contractNumber) {
+                createContractSnapshot(contractNumber);
+            }
             return;
         }
     }
@@ -792,4 +1043,104 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
     });
+    
+    // Handle contract selector for print functionality
+    const printContractSelector = document.getElementById('print-contract-selector');
+    if (printContractSelector) {
+        printContractSelector.addEventListener('change', function() {
+            const contractHistoryBtn = document.querySelector('.print-selected-contract-history');
+            const handCountedHistoryBtn = document.querySelector('.print-selected-hand-counted-history');
+            
+            const snapshotBtn = document.querySelector('.create-contract-snapshot');
+            
+            if (this.value) {
+                contractHistoryBtn.disabled = false;
+                handCountedHistoryBtn.disabled = false;
+                snapshotBtn.disabled = false;
+            } else {
+                contractHistoryBtn.disabled = true;
+                handCountedHistoryBtn.disabled = true;
+                snapshotBtn.disabled = true;
+            }
+        });
+    }
+    
+    // Function to create contract snapshot
+    window.createContractSnapshot = async function(contractNumber) {
+        try {
+            const response = await fetch('/tab/4/create_contract_snapshot', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    contract_number: contractNumber,
+                    snapshot_type: 'manual',
+                    created_by: 'user'
+                })
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                alert(`✅ Snapshot created successfully!\nContract: ${contractNumber}\nItems: ${data.items_count}`);
+            } else {
+                alert(`❌ Error creating snapshot: ${data.error}`);
+            }
+        } catch (error) {
+            console.error('Error creating snapshot:', error);
+            alert(`❌ Error creating snapshot: ${error.message}`);
+        }
+    };
+    
+    // Function to show snapshot automation status
+    window.showSnapshotStatus = async function() {
+        try {
+            const response = await fetch('/tab/4/snapshot_status');
+            const data = await response.json();
+            
+            if (data.error) {
+                alert(`❌ Error getting status: ${data.error}`);
+                return;
+            }
+            
+            const schedule = data.schedule_info;
+            const lastRun = data.last_run;
+            
+            let statusMessage = `📊 SNAPSHOT AUTOMATION STATUS\n\n`;
+            statusMessage += `🗓️  Schedule: ${schedule.schedule}\n`;
+            statusMessage += `📈 Recent snapshots (7 days): ${schedule.recent_periodic_count}\n`;
+            statusMessage += `🕐 Last periodic snapshot: ${schedule.last_periodic_snapshot || 'Never'}\n\n`;
+            
+            if (lastRun) {
+                statusMessage += `📋 LAST RUN SUMMARY:\n`;
+                statusMessage += `⏰ Timestamp: ${new Date(lastRun.timestamp).toLocaleString()}\n`;
+                
+                if (lastRun.results) {
+                    const results = lastRun.results;
+                    statusMessage += `✅ Successful: ${results.successful_snapshots}/${results.total_contracts}\n`;
+                    statusMessage += `📦 Items snapshotted: ${results.total_items_snapshotted}\n`;
+                    
+                    if (results.failed_snapshots > 0) {
+                        statusMessage += `❌ Failed: ${results.failed_snapshots}\n`;
+                    }
+                } else if (lastRun.error) {
+                    statusMessage += `❌ Error: ${lastRun.error}\n`;
+                }
+            } else {
+                statusMessage += `📋 No automation runs recorded yet\n`;
+            }
+            
+            statusMessage += `\n📁 Log files available on server:\n`;
+            statusMessage += `   • snapshot_automation.log (detailed)\n`;
+            statusMessage += `   • snapshot_cron.log (cron output)\n`;
+            statusMessage += `   • last_snapshot_run.json (status)\n`;
+            
+            alert(statusMessage);
+            
+        } catch (error) {
+            console.error('Error getting snapshot status:', error);
+            alert(`❌ Error getting status: ${error.message}`);
+        }
+    };
 });

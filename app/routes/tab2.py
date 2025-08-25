@@ -4,7 +4,7 @@ from ..models.db_models import Transaction, ItemMaster
 from ..services.api_client import APIClient
 from sqlalchemy import func, desc, asc, text
 from time import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import logging
 import sys
 
@@ -82,7 +82,7 @@ def tab2_view():
         current_app.logger.info(f"Raw contracts query result: {[(c.last_contract_num, c.total_items) for c in contracts_query_results]}")
 
         contracts = []
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         for contract_number, total_items in contracts_query_results:
             logger.debug(f"Processing contract: {contract_number}")
             latest_transaction = session.query(
@@ -98,6 +98,9 @@ def tab2_view():
             client_name = latest_transaction.client_name if latest_transaction else 'N/A'
             scan_datetime = latest_transaction.scan_date if latest_transaction and latest_transaction.scan_date else None
             scan_date = scan_datetime.isoformat() if scan_datetime else 'N/A'
+            # Make scan_datetime timezone-aware for comparison with timezone-aware 'now'
+            if scan_datetime and scan_datetime.tzinfo is None:
+                scan_datetime = scan_datetime.replace(tzinfo=timezone.utc)
             is_stale = True if not scan_datetime else (now - scan_datetime > timedelta(days=12))
             logger.debug(f"Contract {contract_number} - Client: {client_name}, Scan Date: {scan_date}, Stale: {is_stale}")
 
@@ -195,7 +198,7 @@ def sort_contracts():
         current_app.logger.info(f"Sorted contracts query result: {[(c.last_contract_num, c.total_items) for c in contracts_query_results]}")
 
         contracts = []
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         for contract_number, total_items in contracts_query_results:
             logger.debug(f"Processing contract: {contract_number}")
             latest_transaction = session.query(
@@ -211,6 +214,9 @@ def sort_contracts():
             client_name = latest_transaction.client_name if latest_transaction else 'N/A'
             scan_datetime = latest_transaction.scan_date if latest_transaction and latest_transaction.scan_date else None
             scan_date = scan_datetime.isoformat() if scan_datetime else 'N/A'
+            # Make scan_datetime timezone-aware for comparison with timezone-aware 'now'
+            if scan_datetime and scan_datetime.tzinfo is None:
+                scan_datetime = scan_datetime.replace(tzinfo=timezone.utc)
             is_stale = True if not scan_datetime else (now - scan_datetime > timedelta(days=12))
             logger.debug(f"Contract {contract_number} - Client: {client_name}, Scan Date: {scan_date}, Stale: {is_stale}")
 
@@ -373,7 +379,7 @@ def update_status():
         if new_status in ['On Rent', 'Delivered']:
             return jsonify({'error': 'Status cannot be updated to "On Rent" or "Delivered" manually'}), 400
 
-        current_time = datetime.utcnow()
+        current_time = datetime.now(timezone.utc)
         item.status = new_status
         item.date_last_scanned = current_time
         session.commit()
@@ -420,7 +426,7 @@ def bulk_update_status():
         if not items:
             return jsonify({'error': 'No items found for the given contract'}), 404
 
-        current_time = datetime.utcnow()
+        current_time = datetime.now(timezone.utc)
         api_client = APIClient()
         updated = 0
         for item in items:

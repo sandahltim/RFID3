@@ -1,7 +1,7 @@
 # app/models/db_models.py
 # db_models.py version: 2025-06-20-v3
 from app import db
-from datetime import datetime
+from datetime import datetime, timezone
 
 class ItemMaster(db.Model):
     __tablename__ = 'id_item_master'
@@ -188,5 +188,50 @@ class UserRentalClassMapping(db.Model):
     category = db.Column(db.String(100), nullable=False)
     subcategory = db.Column(db.String(100), nullable=False)
     short_common_name = db.Column(db.String(50))
-    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    updated_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+class ContractSnapshot(db.Model):
+    __tablename__ = 'contract_snapshots'
+    __table_args__ = (
+        db.Index('ix_contract_snapshots_contract_number', 'contract_number'),
+        db.Index('ix_contract_snapshots_snapshot_date', 'snapshot_date'),
+        db.Index('ix_contract_snapshots_tag_id', 'tag_id'),
+    )
+
+    id = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
+    contract_number = db.Column(db.String(255), nullable=False)
+    tag_id = db.Column(db.String(255), nullable=False)
+    client_name = db.Column(db.String(255))
+    common_name = db.Column(db.String(255))
+    rental_class_num = db.Column(db.String(255))
+    status = db.Column(db.String(50))
+    quality = db.Column(db.String(50))
+    bin_location = db.Column(db.String(255))
+    serial_number = db.Column(db.String(255))
+    notes = db.Column(db.Text)
+    snapshot_date = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    snapshot_type = db.Column(db.String(50), nullable=False)  # 'contract_start', 'contract_end', 'status_change', 'periodic'
+    created_by = db.Column(db.String(255))
+    latitude = db.Column(db.DECIMAL(9, 6))
+    longitude = db.Column(db.DECIMAL(9, 6))
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'contract_number': self.contract_number,
+            'tag_id': self.tag_id,
+            'client_name': self.client_name,
+            'common_name': self.common_name,
+            'rental_class_num': self.rental_class_num,
+            'status': self.status,
+            'quality': self.quality,
+            'bin_location': self.bin_location,
+            'serial_number': self.serial_number,
+            'notes': self.notes,
+            'snapshot_date': self.snapshot_date.isoformat() if self.snapshot_date else None,
+            'snapshot_type': self.snapshot_type,
+            'created_by': self.created_by,
+            'latitude': float(self.latitude) if self.latitude else None,
+            'longitude': float(self.longitude) if self.longitude else None
+        }

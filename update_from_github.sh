@@ -28,10 +28,10 @@ cd "$PROJECT_DIR" || { echo "Failed to cd to $PROJECT_DIR" >> "$LOG_FILE"; exit 
 echo "Stashing local changes" >> "$LOG_FILE"
 /usr/bin/git stash push --include-untracked -- . ':!*.sql' ':!*.db' ':!config.py' ':!logs/*' >> "$LOG_FILE" 2>&1
 
-# Fetch and reset to latest main branch
-echo "Fetching and resetting to origin/main" >> "$LOG_FILE"
+# Fetch and reset to latest dev branch
+echo "Fetching and resetting to origin/RFID3dev" >> "$LOG_FILE"
 /usr/bin/git fetch origin >> "$LOG_FILE" 2>&1
-/usr/bin/git reset --hard origin/main >> "$LOG_FILE" 2>&1
+/usr/bin/git reset --hard origin/RFID3dev >> "$LOG_FILE" 2>&1
 
 # Activate virtual environment
 echo "Activating virtual environment" >> "$LOG_FILE"

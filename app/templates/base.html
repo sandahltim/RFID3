@@ -29,13 +29,13 @@
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav ms-auto">
-                    <li class="nav-item"><a class="nav-link" href="/home">Home</a></li>
-                    <li class="nav-item"><a class="nav-link" href="/tab/1">Rental Inventory</a></li>
-                    <li class="nav-item"><a class="nav-link" href="/tab/2">Open Contracts</a></li>
-                    <li class="nav-item"><a class="nav-link" href="/tab/3">Service</a></li>
-                    <li class="nav-item"><a class="nav-link" href="/tab/4">Laundry Contracts</a></li>
-                    <li class="nav-item"><a class="nav-link" href="/tab/5">Resale</a></li>
-                    <li class="nav-item"><a class="nav-link" href="/categories">Manage Categories</a></li>
+                    <li class="nav-item"><a class="nav-link {% if request.path == '/' or request.path == '/home' %}active{% endif %}" href="/home">Home</a></li>
+                    <li class="nav-item"><a class="nav-link {% if request.path == '/tab/1' %}active{% endif %}" href="/tab/1">Rental Inventory</a></li>
+                    <li class="nav-item"><a class="nav-link {% if request.path == '/tab/2' %}active{% endif %}" href="/tab/2">Open Contracts</a></li>
+                    <li class="nav-item"><a class="nav-link {% if request.path == '/tab/3' %}active{% endif %}" href="/tab/3">Service</a></li>
+                    <li class="nav-item"><a class="nav-link {% if request.path == '/tab/4' %}active{% endif %}" href="/tab/4">Laundry Contracts</a></li>
+                    <li class="nav-item"><a class="nav-link {% if request.path == '/tab/5' %}active{% endif %}" href="/tab/5">Resale</a></li>
+                    <li class="nav-item"><a class="nav-link {% if request.path == '/categories' %}active{% endif %}" href="/categories">Manage Categories</a></li>
                 </ul>
             </div>
         </div>
@@ -43,6 +43,8 @@
     <div class="container mt-3">
         {% block content %}{% endblock %}
     </div>
+    
+    {% include 'refresh_status.html' %}
     {% block scripts %}
         <script type="module" src="/static/js/common.js?cb={{ cache_bust }}"></script>
         <script type="module" src="/static/js/tab.js?cb={{ cache_bust }}"></script>

@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Service Items Report - {{ rental_class_id }} - {{ common_name }}</title>
+    <style>
+        @media print {
+            body { margin: 0; }
+            .no-print { display: none; }
+            .page-break { page-break-before: always; }
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.4;
+            color: #333;
+            max-width: 8.5in;
+            margin: 0 auto;
+            padding: 20px;
+            background: white;
+        }
+        
+        .header {
+            text-align: center;
+            border-bottom: 3px solid #dc3545;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .company-name {
+            font-size: 28px;
+            font-weight: bold;
+            color: #dc3545;
+            margin-bottom: 5px;
+        }
+        
+        .report-title {
+            font-size: 20px;
+            color: #666;
+            margin-bottom: 10px;
+        }
+        
+        .item-info {
+            display: flex;
+            justify-content: space-between;
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 25px;
+            border-left: 4px solid #dc3545;
+        }
+        
+        .info-group {
+            flex: 1;
+        }
+        
+        .info-label {
+            font-weight: bold;
+            color: #dc3545;
+            font-size: 14px;
+        }
+        
+        .info-value {
+            font-size: 16px;
+            margin-bottom: 10px;
+        }
+        
+        .summary-card {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            text-align: center;
+            border-left: 4px solid #dc3545;
+            margin-bottom: 20px;
+        }
+        
+        .summary-number {
+            font-size: 24px;
+            font-weight: bold;
+            color: #dc3545;
+        }
+        
+        .summary-label {
+            font-size: 14px;
+            color: #666;
+            margin-top: 5px;
+        }
+        
+        .items-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+            font-size: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        
+        .items-table th {
+            background: #dc3545;
+            color: white;
+            padding: 12px 8px;
+            text-align: left;
+            font-weight: bold;
+        }
+        
+        .items-table td {
+            padding: 10px 8px;
+            border-bottom: 1px solid #e9ecef;
+        }
+        
+        .items-table tr:nth-child(even) {
+            background: #f8f9fa;
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 3px;
+            font-size: 11px;
+            font-weight: bold;
+        }
+        
+        .status-ready { background: #d4edda; color: #155724; }
+        .status-rent { background: #fff3cd; color: #856404; }
+        .status-delivered { background: #cce5ff; color: #004085; }
+        .status-service { background: #f8d7da; color: #721c24; }
+        
+        .footer {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 2px solid #e9ecef;
+            text-align: center;
+            color: #666;
+            font-size: 12px;
+        }
+        
+        .no-print {
+            margin-bottom: 20px;
+        }
+        
+        .print-button {
+            background: #dc3545;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        
+        .print-button:hover {
+            background: #c82333;
+        }
+    </style>
+</head>
+<body>
+    <div class="no-print">
+        <button class="print-button" onclick="window.print()">🖨️ Print Report</button>
+        <button class="print-button" onclick="window.close()" style="background: #6c757d; margin-left: 10px;">❌ Close</button>
+    </div>
+    
+    <div class="header">
+        <div class="company-name">RFID Inventory Management</div>
+        <div class="report-title">Service Items Report</div>
+        <div style="font-size: 14px; color: #666;">Generated on {{ moment().format('YYYY-MM-DD HH:mm:ss') }}</div>
+    </div>
+    
+    <div class="item-info">
+        <div class="info-group">
+            <div class="info-label">Rental Class ID</div>
+            <div class="info-value">{{ rental_class_id }}</div>
+        </div>
+        <div class="info-group">
+            <div class="info-label">Common Name</div>
+            <div class="info-value">{{ common_name }}</div>
+        </div>
+        <div class="info-group">
+            <div class="info-label">Total Items</div>
+            <div class="info-value">{{ items|length }}</div>
+        </div>
+        <div class="info-group">
+            <div class="info-label">Report Type</div>
+            <div class="info-value">Service Items</div>
+        </div>
+    </div>
+    
+    <div class="summary-card">
+        <div class="summary-number">{{ items|length }}</div>
+        <div class="summary-label">Total Service Items</div>
+    </div>
+    
+    {% if items %}
+    <table class="items-table">
+        <thead>
+            <tr>
+                <th>Tag ID</th>
+                <th>Common Name</th>
+                <th>Status</th>
+                <th>Quality</th>
+                <th>Bin Location</th>
+                <th>Last Contract</th>
+                <th>Last Scanned</th>
+                <th>Notes</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in items %}
+            <tr>
+                <td>{{ item.tag_id }}</td>
+                <td>{{ item.common_name }}</td>
+                <td>
+                    <span class="status-badge {% if item.status == 'Ready to Rent' %}status-ready{% elif item.status in ['On Rent', 'Delivered'] %}status-rent{% else %}status-service{% endif %}">
+                        {{ item.status }}
+                    </span>
+                </td>
+                <td>{{ item.quality }}</td>
+                <td>{{ item.bin_location }}</td>
+                <td>{{ item.last_contract_num }}</td>
+                <td>{{ item.date_last_scanned if item.date_last_scanned != 'N/A' else 'Never' }}</td>
+                <td>{{ item.notes if item.notes else '' }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div style="text-align: center; padding: 40px; color: #666; font-style: italic;">
+        <h3>No items found</h3>
+        <p>No service items found for {{ rental_class_id }} - {{ common_name }}</p>
+    </div>
+    {% endif %}
+    
+    <div class="footer">
+        <div>Service Items Report | RFID Inventory Management System</div>
+        <div>{{ moment().format('YYYY-MM-DD HH:mm:ss') }} | {{ rental_class_id }} - {{ common_name }}</div>
+    </div>
+</body>
+</html>

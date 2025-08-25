@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Contract Items List - {{ data.contract_number }}</title>
+    <style>
+        @media print {
+            body { margin: 0; }
+            .no-print { display: none; }
+            .page-break { page-break-before: always; }
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.4;
+            color: #333;
+            max-width: 8.5in;
+            margin: 0 auto;
+            padding: 20px;
+            background: white;
+        }
+        
+        .header {
+            text-align: center;
+            border-bottom: 3px solid #17a2b8;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .company-name {
+            font-size: 28px;
+            font-weight: bold;
+            color: #17a2b8;
+            margin-bottom: 5px;
+        }
+        
+        .report-title {
+            font-size: 20px;
+            color: #666;
+            margin-bottom: 10px;
+        }
+        
+        .contract-info {
+            display: flex;
+            justify-content: space-between;
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 25px;
+            border-left: 4px solid #17a2b8;
+        }
+        
+        .info-group {
+            flex: 1;
+        }
+        
+        .info-label {
+            font-weight: bold;
+            color: #17a2b8;
+            font-size: 14px;
+        }
+        
+        .info-value {
+            font-size: 16px;
+            margin-bottom: 10px;
+        }
+        
+        .summary-card {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            border-left: 4px solid #17a2b8;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .summary-number {
+            font-size: 36px;
+            font-weight: bold;
+            color: #17a2b8;
+            margin-bottom: 5px;
+        }
+        
+        .summary-label {
+            font-size: 16px;
+            color: #666;
+            font-weight: 500;
+        }
+        
+        .items-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 30px;
+            font-size: 11px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        
+        .items-table th {
+            background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);
+            color: white;
+            padding: 12px 8px;
+            text-align: left;
+            font-weight: bold;
+            font-size: 12px;
+        }
+        
+        .items-table td {
+            padding: 8px;
+            border-bottom: 1px solid #e9ecef;
+            vertical-align: top;
+        }
+        
+        .items-table tr:nth-child(even) {
+            background: #f8f9fa;
+        }
+        
+        .items-table tr:hover {
+            background: #e8f4f8;
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 10px;
+            font-weight: bold;
+        }
+        
+        .status-ready { background: #d4edda; color: #155724; }
+        .status-rent { background: #fff3cd; color: #856404; }
+        .status-delivered { background: #cce5ff; color: #004085; }
+        .status-service { background: #f8d7da; color: #721c24; }
+        
+        .footer {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 2px solid #e9ecef;
+            text-align: center;
+            color: #666;
+            font-size: 12px;
+        }
+        
+        .no-print {
+            margin-bottom: 20px;
+        }
+        
+        .print-button {
+            background: #17a2b8;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        
+        .print-button:hover {
+            background: #138496;
+        }
+        
+        .aggregate-summary {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            border-left: 4px solid #17a2b8;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        
+        .aggregate-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: white;
+            padding: 8px 12px;
+            border-radius: 4px;
+            min-width: 200px;
+            flex: 1;
+        }
+        
+        .item-name {
+            font-weight: 500;
+            color: #495057;
+        }
+        
+        .item-count {
+            background: #17a2b8;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-weight: bold;
+            font-size: 12px;
+        }
+        
+        .signature-section {
+            margin-top: 40px;
+            padding: 20px;
+            border: 2px solid #e9ecef;
+            border-radius: 5px;
+            background: #f8f9fa;
+        }
+        
+        .signature-line {
+            border-bottom: 2px solid #495057;
+            width: 300px;
+            margin: 20px 0 10px 0;
+            display: inline-block;
+        }
+        
+        .signature-label {
+            font-weight: bold;
+            color: #495057;
+            margin-bottom: 5px;
+        }
+        
+        .tag-id {
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            color: #495057;
+        }
+        
+        .notes-cell {
+            max-width: 150px;
+            word-wrap: break-word;
+            font-size: 10px;
+        }
+        
+        .section-title {
+            font-size: 18px;
+            font-weight: bold;
+            color: #17a2b8;
+            border-bottom: 2px solid #e9ecef;
+            padding-bottom: 8px;
+            margin-bottom: 15px;
+        }
+        
+        .status-summary {
+            display: flex;
+            justify-content: space-around;
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            border-left: 4px solid #17a2b8;
+        }
+        
+        .status-item {
+            text-align: center;
+        }
+        
+        .status-count {
+            font-size: 18px;
+            font-weight: bold;
+            color: #17a2b8;
+        }
+        
+        .status-label {
+            font-size: 12px;
+            color: #666;
+            margin-top: 2px;
+        }
+    </style>
+</head>
+<body>
+    <div class="no-print">
+        <button class="print-button" onclick="window.print()">🖨️ Print Report</button>
+        <button class="print-button" onclick="window.close()" style="background: #6c757d; margin-left: 10px;">❌ Close</button>
+    </div>
+    
+    <div class="header">
+        <div class="company-name">RFID Inventory Management</div>
+        <div class="report-title">Laundry Contract Items List</div>
+        <div style="font-size: 14px; color: #666;">Generated on {{ data.current_date }}</div>
+    </div>
+    
+    <div class="contract-info">
+        <div class="info-group">
+            <div class="info-label">Contract Number</div>
+            <div class="info-value">{{ data.contract_number }}</div>
+        </div>
+        <div class="info-group">
+            <div class="info-label">Customer</div>
+            <div class="info-value">{{ data.client_name }}</div>
+        </div>
+        <div class="info-group">
+            <div class="info-label">Contract Start</div>
+            <div class="info-value">{{ data.start_date }}</div>
+        </div>
+        <div class="info-group">
+            <div class="info-label">Last Activity</div>
+            <div class="info-value">{{ data.last_activity }}</div>
+        </div>
+    </div>
+    
+    <div class="summary-card">
+        <div class="summary-number">{{ data.total_items }}</div>
+        <div class="summary-label">Total Items on Contract</div>
+    </div>
+    
+    {% if data.contract_items %}
+    <!-- Aggregate Summary -->
+    <div class="section-title">📊 Item Summary by Type</div>
+    <div class="aggregate-summary">
+        {% set item_counts = {} %}
+        {% for item in data.contract_items %}
+            {% set item_name = item.common_name or 'Unknown' %}
+            {% if item_counts.update({item_name: item_counts.get(item_name, 0) + 1}) %}{% endif %}
+        {% endfor %}
+        
+        {% for item_name, count in item_counts.items() | sort %}
+        <div class="aggregate-item">
+            <span class="item-name">{{ item_name }}</span>
+            <span class="item-count">{{ count }}</span>
+        </div>
+        {% endfor %}
+    </div>
+    
+    <!-- Status Summary -->
+    <div class="section-title">📊 Status Summary</div>
+    <div class="status-summary">
+        {% set status_counts = {} %}
+        {% for item in data.contract_items %}
+            {% if status_counts.update({item.status or 'Unknown': status_counts.get(item.status or 'Unknown', 0) + 1}) %}{% endif %}
+        {% endfor %}
+        
+        {% for status, count in status_counts.items() %}
+        <div class="status-item">
+            <div class="status-count">{{ count }}</div>
+            <div class="status-label">{{ status }}</div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div style="text-align: center; padding: 40px; color: #666; font-style: italic;">
+        <h3>No items found</h3>
+        <p>No items found on contract {{ data.contract_number }}</p>
+    </div>
+    {% endif %}
+    
+    <div class="signature-section">
+        <div class="signature-label">Customer Signature:</div>
+        <div class="signature-line"></div>
+        <div style="font-size: 12px; color: #666; margin-top: 5px;">Date: _____________</div>
+        
+        <div style="margin-top: 25px;">
+            <div class="signature-label">Company Representative:</div>
+            <div class="signature-line"></div>
+            <div style="font-size: 12px; color: #666; margin-top: 5px;">Date: _____________</div>
+        </div>
+    </div>
+    
+    <div class="footer">
+        <div>Contract Items Report | RFID Inventory Management System</div>
+        <div>{{ data.current_date }} | Contract: {{ data.contract_number }}</div>
+    </div>
+</body>
+</html>

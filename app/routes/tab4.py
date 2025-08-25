@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, jsonify, current_app
+from flask import Blueprint, render_template, request, jsonify, current_app, make_response
 from .. import db, cache
 from ..models.db_models import ItemMaster, Transaction, HandCountedItems, HandCountedCatalog
 from sqlalchemy import func, desc, or_
@@ -347,6 +347,74 @@ def hand_counted_catalog():
         if session:
             session.close()
 
+@tab4_bp.route('/tab/4/hand_counted_catalog_categorized', methods=['GET'])
+def hand_counted_catalog_categorized():
+    """
+    Get hand counted catalog items organized by categories for improved UX
+    Returns items grouped by category and subcategory
+    """
+    session = None
+    try:
+        session = db.session()
+        try:
+            # Get items with their category information
+            # Join HandCountedCatalog with UserRentalClassMapping via rental_class_id
+            from ..models.db_models import UserRentalClassMapping, RentalClassMapping
+            
+            items_with_categories = session.query(
+                HandCountedCatalog.item_name,
+                UserRentalClassMapping.category,
+                UserRentalClassMapping.subcategory
+            ).outerjoin(
+                UserRentalClassMapping, 
+                HandCountedCatalog.rental_class_id == UserRentalClassMapping.rental_class_id
+            ).all()
+            
+            # If no user mappings, try system mappings
+            if not items_with_categories:
+                items_with_categories = session.query(
+                    HandCountedCatalog.item_name,
+                    RentalClassMapping.category,
+                    RentalClassMapping.subcategory
+                ).outerjoin(
+                    RentalClassMapping,
+                    HandCountedCatalog.rental_class_id == RentalClassMapping.rental_class_id
+                ).all()
+            
+        except ProgrammingError:
+            session.rollback()
+            logger.warning("hand_counted_catalog table missing; returning empty categorized list")
+            current_app.logger.warning("hand_counted_catalog table missing; returning empty categorized list")
+            items_with_categories = []
+        
+        # Organize items by category
+        categorized_items = {}
+        uncategorized_items = []
+        
+        for item_name, category, subcategory in items_with_categories:
+            if category and subcategory:
+                if category not in categorized_items:
+                    categorized_items[category] = {}
+                if subcategory not in categorized_items[category]:
+                    categorized_items[category][subcategory] = []
+                categorized_items[category][subcategory].append(item_name)
+            else:
+                uncategorized_items.append(item_name)
+        
+        # Add uncategorized items as a separate category
+        if uncategorized_items:
+            categorized_items['Uncategorized'] = {'General': uncategorized_items}
+        
+        logger.info(f"Returned categorized hand-counted catalog: {len(categorized_items)} categories")
+        return jsonify({'categories': categorized_items})
+        
+    except Exception as e:
+        logger.error(f"Error fetching categorized hand-counted catalog: {str(e)}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+    finally:
+        if session:
+            session.close()
+
 @tab4_bp.route('/tab/4/contract_items_count', methods=['GET'])
 def contract_items_count():
     contract_number = request.args.get('contract_number')
@@ -677,6 +745,322 @@ def tab4_data():
     finally:
         if session:
             session.close()
+
+@tab4_bp.route('/tab/4/contract_history_print')
+def contract_history_print():
+    """Generate comprehensive printable contract history report."""
+    contract_number = request.args.get('contract_number')
+    
+    if not contract_number:
+        return jsonify({'error': 'Contract number is required'}), 400
+    
+    session = None
+    try:
+        session = db.session()
+        
+        # Get contract overview from latest transaction
+        contract_info = session.query(
+            Transaction.contract_number,
+            Transaction.client_name,
+            func.min(Transaction.scan_date).label('start_date'),
+            func.max(Transaction.scan_date).label('last_activity')
+        ).filter(
+            Transaction.contract_number == contract_number
+        ).group_by(Transaction.contract_number, Transaction.client_name).first()
+        
+        if not contract_info:
+            return jsonify({'error': f'Contract {contract_number} not found'}), 404
+        
+        # Get RFID items on contract
+        rfid_items = session.query(ItemMaster).filter(
+            ItemMaster.last_contract_num == contract_number,
+            ItemMaster.status.in_(['On Rent', 'Delivered', 'Ready to Return'])
+        ).all()
+        
+        # Get hand counted items history
+        hand_counted_items = session.query(HandCountedItems).filter(
+            HandCountedItems.contract_number == contract_number
+        ).order_by(HandCountedItems.timestamp.desc()).all()
+        
+        # Get transaction history for timeline
+        transactions = session.query(Transaction).filter(
+            Transaction.contract_number == contract_number
+        ).order_by(Transaction.scan_date.desc()).limit(50).all()
+        
+        # Calculate totals
+        total_rfid_items = len(rfid_items)
+        total_hand_counted = sum(item.quantity for item in hand_counted_items if item.action == 'Added')
+        total_hand_counted -= sum(item.quantity for item in hand_counted_items if item.action == 'Removed')
+        
+        # Prepare data for template
+        contract_data = {
+            'contract_number': contract_number,
+            'client_name': contract_info.client_name or 'N/A',
+            'start_date': contract_info.start_date.strftime('%Y-%m-%d %H:%M') if contract_info.start_date else 'N/A',
+            'last_activity': contract_info.last_activity.strftime('%Y-%m-%d %H:%M') if contract_info.last_activity else 'N/A',
+            'total_rfid_items': total_rfid_items,
+            'total_hand_counted': total_hand_counted,
+            'total_items': total_rfid_items + total_hand_counted,
+            'rfid_items': [{
+                'tag_id': item.tag_id,
+                'common_name': item.common_name or 'N/A',
+                'status': item.status or 'N/A',
+                'bin_location': item.bin_location or 'N/A',
+                'quality': item.quality or 'N/A',
+                'last_scanned': item.date_last_scanned.strftime('%Y-%m-%d %H:%M') if item.date_last_scanned else 'N/A',
+                'notes': item.notes or ''
+            } for item in rfid_items],
+            'hand_counted_items': [{
+                'item_name': item.item_name,
+                'quantity': item.quantity,
+                'action': item.action,
+                'timestamp': item.timestamp.strftime('%Y-%m-%d %H:%M') if item.timestamp else 'N/A',
+                'user': item.user or 'N/A'
+            } for item in hand_counted_items],
+            'recent_activity': [{
+                'tag_id': t.tag_id or 'N/A',
+                'scan_type': t.scan_type or 'N/A',
+                'scan_date': t.scan_date.strftime('%Y-%m-%d %H:%M') if t.scan_date else 'N/A',
+                'common_name': t.common_name or 'N/A',
+                'status': t.status or 'N/A',
+                'scan_by': t.scan_by or 'N/A'
+            } for t in transactions[:10]]  # Latest 10 activities
+        }
+        
+        # Add current date to data
+        contract_data['current_date'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        
+        html = render_template('contract_history_print.html', data=contract_data)
+        response = make_response(html)
+        response.headers['Content-Type'] = 'text/html'
+        response.headers['Content-Disposition'] = f'inline; filename=contract_{contract_number}_history.html'
+        return response
+        
+    except Exception as e:
+        logger.error(f"Error generating contract history print: {str(e)}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+    finally:
+        if session:
+            session.close()
+
+@tab4_bp.route('/tab/4/hand_counted_history_print')
+def hand_counted_history_print():
+    """Generate printable hand counted items history by contract."""
+    contract_number = request.args.get('contract_number')
+    
+    if not contract_number:
+        return jsonify({'error': 'Contract number is required'}), 400
+        
+    session = None
+    try:
+        session = db.session()
+        
+        # Get contract basic info
+        contract_info = session.query(
+            Transaction.client_name
+        ).filter(
+            Transaction.contract_number == contract_number
+        ).first()
+        
+        # Get all hand counted items for this contract
+        hand_counted_items = session.query(HandCountedItems).filter(
+            HandCountedItems.contract_number == contract_number
+        ).order_by(HandCountedItems.timestamp.desc()).all()
+        
+        if not hand_counted_items:
+            return jsonify({'error': f'No hand counted items found for contract {contract_number}'}), 404
+        
+        # Group by item name for summary
+        item_summary = {}
+        for item in hand_counted_items:
+            if item.item_name not in item_summary:
+                item_summary[item.item_name] = {'added': 0, 'removed': 0, 'net': 0, 'last_activity': None}
+            
+            if item.action == 'Added':
+                item_summary[item.item_name]['added'] += item.quantity
+            elif item.action == 'Removed':
+                item_summary[item.item_name]['removed'] += item.quantity
+                
+            item_summary[item.item_name]['net'] = item_summary[item.item_name]['added'] - item_summary[item.item_name]['removed']
+            
+            if not item_summary[item.item_name]['last_activity'] or item.timestamp > item_summary[item.item_name]['last_activity']:
+                item_summary[item.item_name]['last_activity'] = item.timestamp
+        
+        history_data = {
+            'contract_number': contract_number,
+            'client_name': contract_info.client_name if contract_info else 'N/A',
+            'total_entries': len(hand_counted_items),
+            'current_date': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            'item_summary': [
+                {
+                    'item_name': name,
+                    'total_added': summary['added'],
+                    'total_removed': summary['removed'],
+                    'net_quantity': summary['net'],
+                    'last_activity': summary['last_activity'].strftime('%Y-%m-%d %H:%M') if summary['last_activity'] else 'N/A'
+                }
+                for name, summary in sorted(item_summary.items())
+            ],
+            'chronological_history': [{
+                'item_name': item.item_name,
+                'quantity': item.quantity,
+                'action': item.action,
+                'timestamp': item.timestamp.strftime('%Y-%m-%d %H:%M:%S') if item.timestamp else 'N/A',
+                'user': item.user or 'N/A'
+            } for item in hand_counted_items]
+        }
+        
+        html = render_template('hand_counted_history_print.html', data=history_data)
+        response = make_response(html)
+        response.headers['Content-Type'] = 'text/html'
+        response.headers['Content-Disposition'] = f'inline; filename=hand_counted_history_{contract_number}.html'
+        return response
+        
+    except Exception as e:
+        logger.error(f"Error generating hand counted history print: {str(e)}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+    finally:
+        if session:
+            session.close()
+
+@tab4_bp.route('/tab/4/contract_items_print')
+def contract_items_print():
+    """Generate professional printable contract items list."""
+    contract_number = request.args.get('contract_number')
+    
+    if not contract_number:
+        return jsonify({'error': 'Contract number is required'}), 400
+    
+    session = None
+    try:
+        session = db.session()
+        
+        # Get contract info
+        try:
+            contract_info = session.query(Transaction).filter(
+                Transaction.contract_number == contract_number
+            ).first()
+            
+            if not contract_info:
+                return jsonify({'error': f'Contract {contract_number} not found'}), 404
+            
+            # Get date range
+            date_info = session.query(
+                func.min(Transaction.scan_date).label('start_date'),
+                func.max(Transaction.scan_date).label('last_activity')
+            ).filter(
+                Transaction.contract_number == contract_number
+            ).first()
+            
+        except Exception as e:
+            logger.error(f"Error querying contract info: {str(e)}", exc_info=True)
+            return jsonify({'error': 'Database error'}), 500
+        
+        # Try to get items from contract snapshots first (for historical accuracy)
+        from ..models.db_models import ContractSnapshot
+        snapshot_items = session.query(ContractSnapshot).filter(
+            ContractSnapshot.contract_number == contract_number
+        ).order_by(ContractSnapshot.common_name, ContractSnapshot.tag_id).all()
+        
+        if snapshot_items:
+            # Use historical snapshot data
+            items = snapshot_items
+            logger.info(f"Using {len(snapshot_items)} snapshot items for contract {contract_number}")
+        else:
+            # Fallback to current ItemMaster data  
+            items = session.query(ItemMaster).filter(
+                ItemMaster.last_contract_num == contract_number
+            ).order_by(ItemMaster.common_name, ItemMaster.tag_id).all()
+            logger.info(f"Using {len(items)} current items for contract {contract_number} (no snapshots found)")
+        
+        # Prepare data for template
+        items_data = {
+            'contract_number': contract_number,
+            'client_name': contract_info.client_name or 'N/A',
+            'start_date': date_info.start_date.strftime('%Y-%m-%d') if date_info and date_info.start_date else 'N/A',
+            'last_activity': date_info.last_activity.strftime('%Y-%m-%d') if date_info and date_info.last_activity else 'N/A',
+            'total_items': len(items),
+            'current_date': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            'contract_items': items
+        }
+        
+        html = render_template('contract_items_print.html', data=items_data)
+        response = make_response(html)
+        response.headers['Content-Type'] = 'text/html'
+        response.headers['Content-Disposition'] = f'inline; filename=contract_items_{contract_number}.html'
+        return response
+        
+    except Exception as e:
+        logger.error(f"Error generating contract items print: {str(e)}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+    finally:
+        if session:
+            session.close()
+
+@tab4_bp.route('/tab/4/create_contract_snapshot', methods=['POST'])
+def create_contract_snapshot():
+    """Create a snapshot of all items on a contract for historical preservation."""
+    from ..services.contract_snapshots import ContractSnapshotService
+    
+    data = request.get_json()
+    contract_number = data.get('contract_number')
+    snapshot_type = data.get('snapshot_type', 'manual')
+    created_by = data.get('created_by', 'user')
+    
+    if not contract_number:
+        return jsonify({'error': 'Contract number is required'}), 400
+    
+    try:
+        snapshot_count = ContractSnapshotService.create_contract_snapshot(
+            contract_number, snapshot_type, created_by
+        )
+        
+        return jsonify({
+            'success': True,
+            'message': f'Created snapshot for contract {contract_number}',
+            'items_count': snapshot_count
+        })
+        
+    except Exception as e:
+        logger.error(f"Error creating contract snapshot: {str(e)}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+@tab4_bp.route('/tab/4/snapshot_status')
+def snapshot_status():
+    """Get status of automated snapshots and schedule info."""
+    try:
+        from ..services.scheduled_snapshots import ScheduledSnapshotService
+        import json
+        import os
+        
+        # Get schedule info
+        schedule_info = ScheduledSnapshotService.get_snapshot_schedule_info()
+        
+        # Try to read last run summary
+        last_run_file = '/home/tim/RFID3/logs/last_snapshot_run.json'
+        last_run_info = None
+        
+        if os.path.exists(last_run_file):
+            try:
+                with open(last_run_file, 'r') as f:
+                    last_run_info = json.load(f)
+            except Exception as e:
+                logger.warning(f"Could not read last run file: {str(e)}")
+        
+        return jsonify({
+            'schedule_info': schedule_info,
+            'last_run': last_run_info,
+            'automation_enabled': True,
+            'log_files': {
+                'detailed_log': '/home/tim/RFID3/logs/snapshot_automation.log',
+                'cron_log': '/home/tim/RFID3/logs/snapshot_cron.log',
+                'status_summary': '/home/tim/RFID3/logs/last_snapshot_run.json'
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting snapshot status: {str(e)}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
 
 @tab4_bp.route('/tab/4/hand_counted_items')
 def tab4_hand_counted_items():

@@ -596,12 +596,23 @@ def tab1_data():
         items_data = []
         for item in items:
             last_scanned_date = item.date_last_scanned.isoformat() if item.date_last_scanned else 'N/A'
+            
+            # Get customer name from latest transaction for this item
+            customer_name = 'N/A'
+            if item.last_contract_num:
+                latest_transaction = db.session.query(Transaction.client_name).filter(
+                    Transaction.tag_id == item.tag_id,
+                    Transaction.contract_number == item.last_contract_num
+                ).order_by(desc(Transaction.scan_date)).first()
+                customer_name = latest_transaction.client_name if latest_transaction and latest_transaction.client_name else 'N/A'
+            
             items_data.append({
                 'tag_id': item.tag_id,
                 'common_name': item.common_name,
                 'bin_location': item.bin_location,
                 'status': item.status,
                 'last_contract_num': item.last_contract_num,
+                'customer_name': customer_name,
                 'last_scanned_date': last_scanned_date,
                 'quality': item.quality,
                 'notes': item.notes

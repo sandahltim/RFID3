@@ -842,7 +842,7 @@ window.sortItems = function(contractNumber, commonName, column, tabNum) {
  * Used by: All tabs
  * Dependency: formatDateTime, removeTotalItemsInventoryColumn
  */
-async function printTable(level, id, commonName = null, category = null, subcategory = null) {
+window.printTable = async function printTable(level, id, commonName = null, category = null, subcategory = null) {
     console.log(`Printing table: ${level}, ID: ${id}, Common Name: ${commonName}, Category: ${category}, Subcategory: ${subcategory}`);
     const element = document.getElementById(id);
     if (!element) {
@@ -1175,7 +1175,7 @@ function removeTotalItemsInventoryColumn(table, tabNum) {
  * Used by: All tabs
  * Dependency: normalizeCommonName, formatDateTime
  */
-async function printFullItemList(category, subcategory, commonName) {
+window.printFullItemList = async function printFullItemList(category, subcategory, commonName) {
     console.log(`Printing full item list for Category: ${category}, Subcategory: ${subcategory}, Common Name: ${commonName}`);
     const tabNum = getCachedTabNum() || 1;
     const tabName = tabNum == 2 ? 'Open Contracts' : tabNum == 4 ? 'Laundry Contracts' : tabNum == 5 ? 'Resale/Rental Packs' : tabNum == 3 ? 'Service' : `Tab ${tabNum}`;

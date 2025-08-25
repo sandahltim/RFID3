@@ -2,7 +2,7 @@
 # api_client.py version: 2025-06-27-v6
 import requests
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 from config import (
@@ -35,7 +35,10 @@ class APIClient:
         self.item_master_endpoint = "14223767938169344381"
         self.token = None
         self.token_expiry = None
-        self.authenticate()
+        # Only authenticate if we're not in a snapshot automation context
+        import os
+        if not os.environ.get('SNAPSHOT_AUTOMATION'):
+            self.authenticate()
 
     def authenticate(self):
         payload = {"username": API_USERNAME, "password": API_PASSWORD}
@@ -173,7 +176,7 @@ class APIClient:
         if since_date and full_refresh:
             since_dt = self.validate_date(since_date_str, 'since_date')
             if since_dt:
-                fallback_dt = datetime.utcnow() - timedelta(seconds=INCREMENTAL_FALLBACK_SECONDS)
+                fallback_dt = datetime.now(timezone.utc) - timedelta(seconds=INCREMENTAL_FALLBACK_SECONDS)
                 all_data = [
                     item for item in all_data
                     if item.get('date_last_scanned') is None or 
@@ -208,7 +211,7 @@ class APIClient:
         if since_date and full_refresh:
             since_dt = self.validate_date(since_date_str, 'since_date')
             if since_dt:
-                fallback_dt = datetime.utcnow() - timedelta(seconds=INCREMENTAL_FALLBACK_SECONDS)
+                fallback_dt = datetime.now(timezone.utc) - timedelta(seconds=INCREMENTAL_FALLBACK_SECONDS)
                 all_data = [
                     item for item in all_data
                     if item.get('scan_date') is None or 

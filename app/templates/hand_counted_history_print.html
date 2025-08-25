@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hand Counted Items History - {{ contract_number }}</title>
+    <style>
+        @media print {
+            body { margin: 0; }
+            .no-print { display: none; }
+            .page-break { page-break-before: always; }
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.4;
+            color: #333;
+            max-width: 8.5in;
+            margin: 0 auto;
+            padding: 20px;
+            background: white;
+        }
+        
+        .header {
+            text-align: center;
+            border-bottom: 3px solid #28a745;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .company-name {
+            font-size: 28px;
+            font-weight: bold;
+            color: #28a745;
+            margin-bottom: 5px;
+        }
+        
+        .report-title {
+            font-size: 20px;
+            color: #666;
+            margin-bottom: 10px;
+        }
+        
+        .contract-info {
+            display: flex;
+            justify-content: space-between;
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 25px;
+            border-left: 4px solid #28a745;
+        }
+        
+        .info-group {
+            flex: 1;
+        }
+        
+        .info-label {
+            font-weight: bold;
+            color: #28a745;
+            font-size: 14px;
+        }
+        
+        .info-value {
+            font-size: 16px;
+            margin-bottom: 10px;
+        }
+        
+        .section {
+            margin-bottom: 30px;
+        }
+        
+        .section-title {
+            font-size: 18px;
+            font-weight: bold;
+            color: #28a745;
+            border-bottom: 2px solid #e9ecef;
+            padding-bottom: 8px;
+            margin-bottom: 15px;
+        }
+        
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+        
+        .summary-card {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            border-left: 4px solid #28a745;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .summary-number {
+            font-size: 28px;
+            font-weight: bold;
+            color: #28a745;
+            margin-bottom: 5px;
+        }
+        
+        .summary-label {
+            font-size: 13px;
+            color: #666;
+            font-weight: 500;
+        }
+        
+        .items-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 25px;
+            font-size: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        
+        .items-table th {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+            padding: 12px 10px;
+            text-align: left;
+            font-weight: bold;
+            font-size: 13px;
+        }
+        
+        .items-table td {
+            padding: 10px;
+            border-bottom: 1px solid #e9ecef;
+        }
+        
+        .items-table tr:nth-child(even) {
+            background: #f8f9fa;
+        }
+        
+        .items-table tr:hover {
+            background: #e8f5e8;
+        }
+        
+        .timeline {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #28a745;
+        }
+        
+        .timeline-item {
+            display: flex;
+            margin-bottom: 15px;
+            padding: 12px;
+            background: white;
+            border-radius: 6px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            border-left: 3px solid #28a745;
+        }
+        
+        .timeline-date {
+            font-weight: bold;
+            color: #28a745;
+            min-width: 130px;
+            font-size: 12px;
+        }
+        
+        .timeline-content {
+            flex: 1;
+            font-size: 12px;
+        }
+        
+        .timeline-action {
+            font-weight: bold;
+            margin-bottom: 4px;
+            color: #495057;
+        }
+        
+        .timeline-details {
+            color: #666;
+        }
+        
+        .action-badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 10px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        
+        .action-out { background: #fff3cd; color: #856404; }
+        .action-in { background: #d4edda; color: #155724; }
+        .action-update { background: #cce5ff; color: #004085; }
+        
+        .quantity-change {
+            font-weight: bold;
+            font-size: 14px;
+        }
+        
+        .quantity-positive { color: #28a745; }
+        .quantity-negative { color: #dc3545; }
+        .quantity-neutral { color: #6c757d; }
+        
+        .footer {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 2px solid #e9ecef;
+            text-align: center;
+            color: #666;
+            font-size: 12px;
+        }
+        
+        .no-print {
+            margin-bottom: 20px;
+        }
+        
+        .print-button {
+            background: #28a745;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        
+        .print-button:hover {
+            background: #218838;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #666;
+            font-style: italic;
+        }
+        
+        .item-summary {
+            background: white;
+            border: 1px solid #e9ecef;
+            border-radius: 6px;
+            margin-bottom: 15px;
+            overflow: hidden;
+        }
+        
+        .item-header {
+            background: #f8f9fa;
+            padding: 12px 15px;
+            font-weight: bold;
+            color: #495057;
+            border-bottom: 1px solid #e9ecef;
+        }
+        
+        .item-details {
+            padding: 15px;
+        }
+        
+        .detail-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+        
+        .detail-label {
+            color: #666;
+            font-size: 13px;
+        }
+        
+        .detail-value {
+            font-weight: 500;
+            color: #495057;
+        }
+    </style>
+</head>
+<body>
+    <div class="no-print">
+        <button class="print-button" onclick="window.print()">🖨️ Print Report</button>
+        <button class="print-button" onclick="window.close()" style="background: #6c757d; margin-left: 10px;">❌ Close</button>
+    </div>
+    
+    <div class="header">
+        <div class="company-name">RFID Inventory Management</div>
+        <div class="report-title">Hand Counted Items History</div>
+        <div style="font-size: 14px; color: #666;">Generated on {{ data.current_date if data.current_date else 'N/A' }}</div>
+    </div>
+    
+    <div class="contract-info">
+        <div class="info-group">
+            <div class="info-label">Contract Number</div>
+            <div class="info-value">{{ data.contract_number }}</div>
+        </div>
+        <div class="info-group">
+            <div class="info-label">Customer</div>
+            <div class="info-value">{{ data.client_name or 'N/A' }}</div>
+        </div>
+        <div class="info-group">
+            <div class="info-label">Total Items</div>
+            <div class="info-value">{{ data.item_summary|length }}</div>
+        </div>
+        <div class="info-group">
+            <div class="info-label">Total Entries</div>
+            <div class="info-value">{{ data.total_entries }}</div>
+        </div>
+    </div>
+    
+    <div class="section">
+        <div class="section-title">📊 Summary Overview</div>
+        <div class="summary-grid">
+            <div class="summary-card">
+                <div class="summary-number">{{ data.item_summary|length }}</div>
+                <div class="summary-label">Different Items</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-number">{{ data.total_entries }}</div>
+                <div class="summary-label">Total Entries</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-number">{{ data.chronological_history|length }}</div>
+                <div class="summary-label">Total Transactions</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-number">{{ data.contract_number }}</div>
+                <div class="summary-label">Contract Number</div>
+            </div>
+            <div class="summary-card" style="display: none;">
+                <div class="summary-number">0</div>
+                <div class="summary-label">Hidden</div>
+            </div>
+        </div>
+    </div>
+    
+    {% if data.item_summary %}
+    <div class="section">
+        <div class="section-title">📝 Items Summary</div>
+        {% for item in data.item_summary %}
+        <div class="item-summary">
+            <div class="item-header">
+                {{ item.item_name }}
+                <span style="float: right;">
+                    <span class="quantity-change quantity-{% if item.net_quantity > 0 %}positive{% elif item.net_quantity < 0 %}negative{% else %}neutral{% endif %}">
+                        Net: {{ item.net_quantity }}
+                    </span>
+                </span>
+            </div>
+            <div class="item-details">
+                <div class="detail-row">
+                    <span class="detail-label">Total Added:</span>
+                    <span class="detail-value">{{ item.total_added }}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Total Removed:</span>
+                    <span class="detail-value">{{ item.total_removed }}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Net Quantity:</span>
+                    <span class="detail-value">{{ item.net_quantity }}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Last Activity:</span>
+                    <span class="detail-value">{{ item.last_activity }}</span>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+    
+    {% if data.chronological_history %}
+    <div class="section">
+        <div class="section-title">📅 Chronological History</div>
+        <div class="timeline">
+            {% for entry in data.chronological_history %}
+            <div class="timeline-item">
+                <div class="timeline-date">
+                    {{ entry.timestamp }}
+                </div>
+                <div class="timeline-content">
+                    <div class="timeline-action">
+                        <span class="action-badge action-{{ entry.action.lower() }}">{{ entry.action }}</span>
+                        {{ entry.item_name }}
+                    </div>
+                    <div class="timeline-details">
+                        <strong>Quantity:</strong> 
+                        <span class="quantity-change quantity-{% if entry.action == 'Removed' %}negative{% elif entry.action == 'Added' %}positive{% else %}neutral{% endif %}">
+                            {% if entry.action == 'Removed' %}-{% elif entry.action == 'Added' %}+{% endif %}{{ entry.quantity }}
+                        </span>
+                        | <strong>User:</strong> {{ entry.user }}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <h3>No hand counted items found for this contract</h3>
+        <p>This contract does not have any recorded hand counted item transactions.</p>
+    </div>
+    {% endif %}
+    
+    <div class="footer">
+        <div>Hand Counted Items Report | RFID Inventory Management System</div>
+        <div>{{ data.current_date if data.current_date else 'N/A' }} | Contract: {{ data.contract_number }}</div>
+    </div>
+</body>
+</html>

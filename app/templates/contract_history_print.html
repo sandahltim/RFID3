@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Contract History Report - {{ contract_number }}</title>
+    <style>
+        @media print {
+            body { margin: 0; }
+            .no-print { display: none; }
+            .page-break { page-break-before: always; }
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.4;
+            color: #333;
+            max-width: 8.5in;
+            margin: 0 auto;
+            padding: 20px;
+            background: white;
+        }
+        
+        .header {
+            text-align: center;
+            border-bottom: 3px solid #2c5aa0;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .company-name {
+            font-size: 28px;
+            font-weight: bold;
+            color: #2c5aa0;
+            margin-bottom: 5px;
+        }
+        
+        .report-title {
+            font-size: 20px;
+            color: #666;
+            margin-bottom: 10px;
+        }
+        
+        .contract-info {
+            display: flex;
+            justify-content: space-between;
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 25px;
+        }
+        
+        .info-group {
+            flex: 1;
+        }
+        
+        .info-label {
+            font-weight: bold;
+            color: #2c5aa0;
+            font-size: 14px;
+        }
+        
+        .info-value {
+            font-size: 16px;
+            margin-bottom: 10px;
+        }
+        
+        .section {
+            margin-bottom: 30px;
+        }
+        
+        .section-title {
+            font-size: 18px;
+            font-weight: bold;
+            color: #2c5aa0;
+            border-bottom: 2px solid #e9ecef;
+            padding-bottom: 8px;
+            margin-bottom: 15px;
+        }
+        
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .summary-card {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            text-align: center;
+            border-left: 4px solid #2c5aa0;
+        }
+        
+        .summary-number {
+            font-size: 24px;
+            font-weight: bold;
+            color: #2c5aa0;
+        }
+        
+        .summary-label {
+            font-size: 14px;
+            color: #666;
+            margin-top: 5px;
+        }
+        
+        .items-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+            font-size: 12px;
+        }
+        
+        .items-table th {
+            background: #2c5aa0;
+            color: white;
+            padding: 10px 8px;
+            text-align: left;
+            font-weight: bold;
+        }
+        
+        .items-table td {
+            padding: 8px;
+            border-bottom: 1px solid #e9ecef;
+        }
+        
+        .items-table tr:nth-child(even) {
+            background: #f8f9fa;
+        }
+        
+        .timeline {
+            margin-top: 20px;
+        }
+        
+        .timeline-item {
+            display: flex;
+            margin-bottom: 15px;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 5px;
+            border-left: 4px solid #28a745;
+        }
+        
+        .timeline-date {
+            font-weight: bold;
+            color: #2c5aa0;
+            min-width: 120px;
+            font-size: 12px;
+        }
+        
+        .timeline-content {
+            flex: 1;
+            font-size: 12px;
+        }
+        
+        .timeline-action {
+            font-weight: bold;
+            margin-bottom: 3px;
+        }
+        
+        .footer {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 2px solid #e9ecef;
+            text-align: center;
+            color: #666;
+            font-size: 12px;
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 3px;
+            font-size: 11px;
+            font-weight: bold;
+        }
+        
+        .status-ready { background: #d4edda; color: #155724; }
+        .status-rent { background: #fff3cd; color: #856404; }
+        .status-delivered { background: #cce5ff; color: #004085; }
+        .status-service { background: #f8d7da; color: #721c24; }
+        
+        .no-print {
+            margin-bottom: 20px;
+        }
+        
+        .print-button {
+            background: #2c5aa0;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        
+        .print-button:hover {
+            background: #1e3d6f;
+        }
+    </style>
+</head>
+<body>
+    <div class="no-print">
+        <button class="print-button" onclick="window.print()">🖨️ Print Report</button>
+        <button class="print-button" onclick="window.close()" style="background: #6c757d; margin-left: 10px;">❌ Close</button>
+    </div>
+    
+    <div class="header">
+        <div class="company-name">RFID Inventory Management</div>
+        <div class="report-title">Laundry Contract History Report</div>
+        <div style="font-size: 14px; color: #666;">Generated on {{ current_date }}</div>
+    </div>
+    
+    <div class="contract-info">
+        <div class="info-group">
+            <div class="info-label">Contract Number</div>
+            <div class="info-value">{{ data.contract_number }}</div>
+        </div>
+        <div class="info-group">
+            <div class="info-label">Customer</div>
+            <div class="info-value">{{ data.client_name or 'N/A' }}</div>
+        </div>
+        <div class="info-group">
+            <div class="info-label">Date Range</div>
+            <div class="info-value">{{ data.start_date }} - {{ data.last_activity }}</div>
+        </div>
+        <div class="info-group">
+            <div class="info-label">Total Items</div>
+            <div class="info-value">{{ data.total_items }}</div>
+        </div>
+    </div>
+    
+    <div class="section">
+        <div class="section-title">📊 Contract Summary</div>
+        <div class="summary-grid">
+            <div class="summary-card">
+                <div class="summary-number">{{ data.total_rfid_items }}</div>
+                <div class="summary-label">RFID Items</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-number">{{ data.total_hand_counted }}</div>
+                <div class="summary-label">Hand Counted Items</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-number">{{ data.recent_activity|length }}</div>
+                <div class="summary-label">Recent Activities</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-number">{{ data.total_items }}</div>
+                <div class="summary-label">Total Items</div>
+            </div>
+        </div>
+    </div>
+    
+    {% if data.rfid_items %}
+    <div class="section">
+        <div class="section-title">🏷️ RFID Items ({{ data.rfid_items|length }})</div>
+        <table class="items-table">
+            <thead>
+                <tr>
+                    <th>Tag ID</th>
+                    <th>Item Name</th>
+                    <th>Current Status</th>
+                    <th>Quality</th>
+                    <th>Location</th>
+                    <th>Last Scanned</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in data.rfid_items %}
+                <tr>
+                    <td>{{ item.tag_id }}</td>
+                    <td>{{ item.common_name }}</td>
+                    <td>
+                        <span class="status-badge {% if item.status == 'Ready to Rent' %}status-ready{% elif item.status in ['On Rent', 'Delivered'] %}status-rent{% else %}status-service{% endif %}">
+                            {{ item.status }}
+                        </span>
+                    </td>
+                    <td>{{ item.quality or 'N/A' }}</td>
+                    <td>{{ item.bin_location or 'N/A' }}</td>
+                    <td>{{ item.last_scanned }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+    
+    {% if data.hand_counted_items %}
+    <div class="section">
+        <div class="section-title">📝 Hand Counted Items</div>
+        <table class="items-table">
+            <thead>
+                <tr>
+                    <th>Item Name</th>
+                    <th>Total Quantity</th>
+                    <th>Actions</th>
+                    <th>Last Updated</th>
+                    <th>Updated By</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in data.hand_counted_items %}
+                <tr>
+                    <td>{{ item.item_name }}</td>
+                    <td><strong>{{ item.quantity }}</strong></td>
+                    <td>{{ item.action }}</td>
+                    <td>{{ item.timestamp }}</td>
+                    <td>{{ item.user }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+    
+    {% if data.recent_activity %}
+    <div class="section">
+        <div class="section-title">📅 Recent Activity Timeline</div>
+        <div class="timeline">
+            {% for activity in data.recent_activity %}
+            <div class="timeline-item">
+                <div class="timeline-date">
+                    {{ activity.scan_date }}
+                </div>
+                <div class="timeline-content">
+                    <div class="timeline-action">{{ activity.scan_type }} - {{ activity.common_name }}</div>
+                    <div>Tag: {{ activity.tag_id }} | Status: {{ activity.status }} | By: {{ activity.scan_by }}</div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+    
+    <div class="footer">
+        <div>Report generated by RFID Inventory Management System</div>
+        <div>{{ data.current_date if data.current_date else 'N/A' }} | Contract: {{ data.contract_number }}</div>
+    </div>
+</body>
+</html>
