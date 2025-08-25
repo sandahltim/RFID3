@@ -20,6 +20,7 @@ from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_excep
 import requests.exceptions
 import re
 import json
+import time
 from urllib.parse import unquote
 
 # Configure logging for Tab 3
@@ -789,6 +790,8 @@ def remove_csv_item():
             for item in items:
                 writer.writerow(item)
 
+        # AUDIT LOG: Manual CSV item removal
+        logger.info(f"AUDIT: CSV_ITEM_REMOVED - tag_id={tag_id}, operation=manual_removal, removed_from_print_queue=true, timestamp={datetime.now().isoformat()}")
         logger.info(f"Removed item with tag_id {tag_id} from CSV")
         return jsonify({'message': f"Removed item with tag_id {tag_id}"}), 200
     except Exception as e:
@@ -812,12 +815,24 @@ def sync_to_pc():
         logger.info("Entering /tab/3/sync_to_pc route")
 
         lock_file = open(LOCK_FILE_PATH, 'w')
-        try:
-            fcntl.flock(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            logger.debug("Acquired lock for sync_to_pc")
-        except BlockingIOError:
-            logger.warning("Another sync_to_pc operation is in progress")
-            return jsonify({'error': 'Another sync operation is in progress'}), 429
+        lock_acquired = False
+        max_lock_attempts = 10
+        lock_wait_time = 0.5
+        
+        for attempt in range(max_lock_attempts):
+            try:
+                fcntl.flock(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                lock_acquired = True
+                logger.debug(f"Acquired lock for sync_to_pc on attempt {attempt + 1}")
+                break
+            except BlockingIOError:
+                if attempt == max_lock_attempts - 1:
+                    logger.warning(f"Could not acquire lock after {max_lock_attempts} attempts")
+                    lock_file.close()
+                    return jsonify({'error': 'System busy - another sync operation is in progress. Please try again.'}), 429
+                logger.debug(f"Lock attempt {attempt + 1} failed, waiting {lock_wait_time}s")
+                time.sleep(lock_wait_time)
+                lock_wait_time *= 1.5  # Exponential backoff
 
         data = request.get_json()
         logger.debug(f"Received request data: {data}")
@@ -936,8 +951,16 @@ def sync_to_pc():
                 session.add(new_item)
                 session.flush()
 
-            with session.no_autoflush:
-                for i in range(remaining_quantity):
+            # Generate all tag IDs first with proper collision handling
+            new_tag_ids = []
+            max_retries = 5
+            
+            for attempt in range(max_retries):
+                try:
+                    # Use database lock to prevent race conditions
+                    session.execute(text("LOCK TABLES id_item_master WRITE"))
+                    
+                    # Get max tag ID under lock
                     max_tag_id = session.query(func.max(ItemMaster.tag_id))\
                         .filter(ItemMaster.tag_id.startswith('425445'))\
                         .scalar()
@@ -947,43 +970,75 @@ def sync_to_pc():
                         try:
                             incremental_part = int(max_tag_id[6:], 16)
                             new_num = incremental_part + 1
+                            logger.debug(f"Starting tag generation from incremental_part: {incremental_part}, new_num: {new_num}")
                         except ValueError:
                             logger.warning(f"Invalid incremental part in max_tag_id: {max_tag_id}, starting from 1")
 
-                    while True:
-                        incremental_hex = format(new_num, 'x').zfill(18)
+                    # Generate consecutive tag IDs to avoid conflicts
+                    for i in range(remaining_quantity):
+                        # Validate hex doesn't overflow
+                        if new_num > 0xFFFFFFFFFFFFFFFFFF:  # Max 18 hex digits (72 bits)
+                            raise ValueError("Tag ID sequence overflow - too many tags generated")
+                            
+                        incremental_hex = format(new_num, '018x')  # Always 18 digits
                         tag_id = f"425445{incremental_hex}"
-                        if tag_id not in existing_tag_ids:
-                            break
+                        
+                        if len(tag_id) != 24:
+                            raise ValueError(f"Generated tag_id {tag_id} must be 24 characters long, got {len(tag_id)}")
+                        
+                        # Double-check uniqueness
+                        if tag_id in existing_tag_ids:
+                            logger.warning(f"Generated tag_id {tag_id} already exists in existing_tag_ids")
+                            new_num += 1
+                            continue
+                            
+                        new_tag_ids.append(tag_id)
+                        existing_tag_ids.add(tag_id)
                         new_num += 1
 
-                    if len(tag_id) != 24:
-                        raise ValueError(f"Generated tag_id {tag_id} must be 24 characters long")
+                    session.execute(text("UNLOCK TABLES"))
+                    break  # Success, exit retry loop
+                    
+                except Exception as e:
+                    session.execute(text("UNLOCK TABLES"))
+                    if attempt == max_retries - 1:
+                        raise e
+                    logger.warning(f"Tag ID generation attempt {attempt + 1} failed: {e}, retrying...")
+                    new_tag_ids.clear()  # Clear partial results
+                    continue
 
+            if len(new_tag_ids) != remaining_quantity:
+                raise ValueError(f"Failed to generate {remaining_quantity} unique tag IDs, only got {len(new_tag_ids)}")
+
+            # Create database items with generated tag IDs
+            with session.no_autoflush:
+                for i, tag_id in enumerate(new_tag_ids):
                     synced_items.append({
                         'tag_id': tag_id,
                         'common_name': common_name,
                         'subcategory': 'Unknown',
                         'short_common_name': common_name,
-                        'status': 'Ready to Rent',
+                        'status': 'Sold',  # Start as 'Sold' until printed and updated
                         'bin_location': bin_location,
                         'rental_class_num': rental_class_num,
                         'is_new': True
                     })
-                    existing_tag_ids.add(tag_id)
 
                     new_item = ItemMaster(
                         tag_id=tag_id,
                         common_name=common_name,
                         rental_class_num=rental_class_num,
                         bin_location=bin_location,
-                        status='Ready to Rent',
+                        status='Sold',  # Start as 'Sold' until printed and updated
                         date_created=datetime.now(),
                         date_updated=datetime.now()
                     )
                     insert_new_item(new_item)
                     new_items.append(new_item)
-                    logger.debug(f"Generated new item: tag_id={tag_id}, common_name={common_name}, rental_class_num={rental_class_num}")
+                    
+                    # AUDIT LOG: Tag creation
+                    logger.info(f"AUDIT: TAG_CREATED - tag_id={tag_id}, common_name={common_name}, rental_class_num={rental_class_num}, initial_status=Sold, created_by=sync_to_pc, timestamp={datetime.now().isoformat()}")
+                    logger.debug(f"Generated new item: tag_id={tag_id}, common_name={common_name}, rental_class_num={rental_class_num}, status=Sold")
 
         if len(synced_items) > quantity:
             synced_items = synced_items[:quantity]
@@ -1017,28 +1072,76 @@ def sync_to_pc():
             item['short_common_name'] = mapping.get('short_common_name', item['common_name'])
             logger.debug(f"Mapping for item: tag_id={item['tag_id']}, rental_class_num={normalized_rental_class}, short_common_name={item['short_common_name']}")
 
-        # Write to CSV
+        # Write to CSV with atomic operations for Zebra printer
         all_items = [item for item in existing_items if item['tag_id'] not in {i['tag_id'] for i in synced_items}]
         all_items.extend(synced_items)
 
-        with open(CSV_FILE_PATH, 'w', newline='') as csvfile:
-            fieldnames = ['tag_id', 'common_name', 'subcategory', 'short_common_name', 'status', 'bin_location']
-            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-            writer.writeheader()
-            for item in all_items:
-                writer.writerow({
-                    'tag_id': item['tag_id'],
-                    'common_name': item['common_name'],
-                    'subcategory': item['subcategory'],
-                    'short_common_name': item['short_common_name'],
-                    'status': item['status'],
-                    'bin_location': item['bin_location']
-                })
+        # Use atomic write with temporary file for Zebra printer safety
+        temp_csv_path = CSV_FILE_PATH + '.tmp'
+        try:
+            with open(temp_csv_path, 'w', newline='') as csvfile:
+                fieldnames = ['tag_id', 'common_name', 'subcategory', 'short_common_name', 'status', 'bin_location']
+                writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+                writer.writeheader()
+                for item in all_items:
+                    writer.writerow({
+                        'tag_id': item['tag_id'],
+                        'common_name': item['common_name'],
+                        'subcategory': item['subcategory'],
+                        'short_common_name': item['short_common_name'],
+                        'status': item['status'],
+                        'bin_location': item['bin_location']
+                    })
+                # Force write to disk
+                csvfile.flush()
+                os.fsync(csvfile.fileno())
+            
+            # Atomic move to final location
+            os.rename(temp_csv_path, CSV_FILE_PATH)
+            
+            # Set permissions for Samba share access
+            os.chmod(CSV_FILE_PATH, 0o666)
+            try:
+                os.chown(CSV_FILE_PATH, pwd.getpwnam('tim').pw_uid, grp.getgrnam('tim').gr_gid)
+            except (KeyError, OSError) as e:
+                logger.warning(f"Could not set CSV file ownership: {e}")
+                
+            # AUDIT LOG: CSV sync operation
+            new_items_in_csv = [item for item in synced_items if item.get('is_new', False)]
+            existing_items_in_csv = [item for item in synced_items if not item.get('is_new', False)]
+            logger.info(f"AUDIT: CSV_SYNCED - total_items={len(all_items)}, new_items={len(new_items_in_csv)}, existing_items={len(existing_items_in_csv)}, operation=sync_to_pc, timestamp={datetime.now().isoformat()}")
+            for item in new_items_in_csv:
+                logger.info(f"AUDIT: CSV_ITEM_ADDED - tag_id={item['tag_id']}, common_name={item['common_name']}, status={item['status']}, ready_for_printing=true, timestamp={datetime.now().isoformat()}")
+                
+            logger.info(f"CSV file written successfully with {len(all_items)} items")
+            
+        except Exception as e:
+            # Cleanup temp file on error
+            if os.path.exists(temp_csv_path):
+                try:
+                    os.remove(temp_csv_path)
+                except OSError:
+                    pass
+            raise e
 
+        # Only commit database changes after CSV is successfully written
         if new_items:
-            session.commit()
+            try:
+                session.commit()
+                logger.info(f"Database committed: {len(new_items)} new items created")
+            except Exception as e:
+                logger.error(f"Database commit failed: {e}")
+                session.rollback()
+                # Try to remove the CSV file since database failed
+                try:
+                    if os.path.exists(CSV_FILE_PATH):
+                        os.remove(CSV_FILE_PATH)
+                        logger.info("Removed CSV file due to database commit failure")
+                except Exception as csv_cleanup_error:
+                    logger.warning(f"Could not cleanup CSV after database failure: {csv_cleanup_error}")
+                raise e
 
-        logger.info(f"Successfully synced {len(synced_items)} items to CSV")
+        logger.info(f"Successfully synced {len(synced_items)} items to CSV and database")
         return jsonify({'synced_items': len(synced_items)}), 200
     except Exception as e:
         logger.error(f"Uncaught exception in sync_to_pc: {str(e)}", exc_info=True)
@@ -1064,12 +1167,24 @@ def update_synced_status():
         logger.info("Received request for /tab/3/update_synced_status")
 
         lock_file = open(LOCK_FILE_PATH, 'w')
-        try:
-            fcntl.flock(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            logger.debug("Acquired lock for update_synced_status")
-        except BlockingIOError:
-            logger.warning("Another update_synced_status operation is in progress")
-            return jsonify({'error': 'Another update operation is in progress'}), 429
+        lock_acquired = False
+        max_lock_attempts = 10
+        lock_wait_time = 0.5
+        
+        for attempt in range(max_lock_attempts):
+            try:
+                fcntl.flock(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                lock_acquired = True
+                logger.debug(f"Acquired lock for update_synced_status on attempt {attempt + 1}")
+                break
+            except BlockingIOError:
+                if attempt == max_lock_attempts - 1:
+                    logger.warning(f"Could not acquire lock for update_synced_status after {max_lock_attempts} attempts")
+                    lock_file.close()
+                    return jsonify({'error': 'System busy - another update operation is in progress. Please try again.'}), 429
+                logger.debug(f"Update lock attempt {attempt + 1} failed, waiting {lock_wait_time}s")
+                time.sleep(lock_wait_time)
+                lock_wait_time *= 1.5  # Exponential backoff
 
         if not os.path.exists(CSV_FILE_PATH):
             logger.info("No synced items found in CSV file")
@@ -1141,11 +1256,18 @@ def update_synced_status():
                 .update({ItemMaster.status: 'Ready to Rent', ItemMaster.date_updated: datetime.now()}, synchronize_session='fetch')
             updated_items += updated
             session.flush()
+            
+            # AUDIT LOG: Status updates for this batch
+            for tag_id in batch_tags:
+                logger.info(f"AUDIT: STATUS_UPDATED - tag_id={tag_id}, old_status=Sold, new_status=Ready to Rent, operation=post_print_update, timestamp={datetime.now().isoformat()}")
+                
         logger.info(f"Updated {updated_items} items in ItemMaster")
 
-        # Batch API updates
+        # Batch API updates with improved error handling
         api_client = APIClient()
         failed_items = []
+        api_success_count = 0
+        
         for item in items_to_update:
             tag_id = item['tag_id']
             try:
@@ -1166,6 +1288,9 @@ def update_synced_status():
                     }
                     api_client.insert_item(new_item)
                     logger.debug(f"Inserted new item for tag_id {tag_id} in API")
+                
+                api_success_count += 1
+                
                 # Invalidate cache for this tag_id
                 cache.delete(f"tab3_items_{db_item.get('rental_class_num', '')}_{item['common_name']}")
             except Exception as api_error:
@@ -1173,19 +1298,52 @@ def update_synced_status():
                 failed_items.append(tag_id)
                 continue
 
+        # Check if we should proceed with CSV clearing based on API success rate
+        api_failure_rate = len(failed_items) / len(items_to_update) if items_to_update else 0
+        if api_failure_rate > 0.5:  # More than 50% API failures
+            logger.error(f"API failure rate too high ({api_failure_rate:.1%}), aborting CSV clear to prevent data loss")
+            session.rollback()
+            return jsonify({
+                'error': f'Too many API failures ({len(failed_items)}/{len(items_to_update)}). CSV not cleared to prevent data loss.',
+                'failed_items': failed_items
+            }), 500
+            
         if failed_items:
-            logger.warning(f"Failed to update {len(failed_items)} items in API: {failed_items}")
+            logger.warning(f"API partial success: {api_success_count}/{len(items_to_update)} items updated, {len(failed_items)} failed: {failed_items}")
 
-        # Clear CSV
+        # Clear CSV with atomic operation for Zebra printer safety
         logger.debug("Clearing CSV file")
+        temp_csv_path = CSV_FILE_PATH + '.clear_tmp'
         try:
-            with open(CSV_FILE_PATH, 'w', newline='') as csvfile:
+            # Create empty CSV with headers
+            with open(temp_csv_path, 'w', newline='') as csvfile:
                 fieldnames = ['tag_id', 'common_name', 'subcategory', 'short_common_name', 'status', 'bin_location']
                 writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
                 writer.writeheader()
-            logger.info("CSV file cleared successfully")
+                csvfile.flush()
+                os.fsync(csvfile.fileno())
+            
+            # Atomic move to clear the file
+            os.rename(temp_csv_path, CSV_FILE_PATH)
+            
+            # Set permissions for Samba share
+            os.chmod(CSV_FILE_PATH, 0o666)
+            try:
+                os.chown(CSV_FILE_PATH, pwd.getpwnam('tim').pw_uid, grp.getgrnam('tim').gr_gid)
+            except (KeyError, OSError) as e:
+                logger.warning(f"Could not set cleared CSV file ownership: {e}")
+                
+            # AUDIT LOG: CSV cleared after successful print operations
+            logger.info(f"AUDIT: CSV_CLEARED - operation=post_print_status_update, processed_tags={len(tag_ids)}, successful_api_updates={api_success_count}, failed_api_updates={len(failed_items)}, timestamp={datetime.now().isoformat()}")
+            logger.info("CSV file cleared successfully with atomic operation")
         except Exception as e:
             logger.error(f"Error clearing CSV file: {str(e)}", exc_info=True)
+            # Cleanup temp file
+            if os.path.exists(temp_csv_path):
+                try:
+                    os.remove(temp_csv_path)
+                except OSError:
+                    pass
             session.rollback()
             return jsonify({'error': f"Error clearing CSV file: {str(e)}"}), 500
 
