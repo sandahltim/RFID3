@@ -483,62 +483,93 @@ def delete_mapping():
 
 @categories_bp.route('/categories/export', methods=['GET'])
 def export_categories():
-    """Export user mappings and hand-counted catalog as JSON"""
+    """Export user mappings and hand-counted catalog as JSON with optional selective export"""
     session = None
     try:
         session = db.session()
         
-        # Get all user rental class mappings
-        user_mappings = session.query(UserRentalClassMapping).all()
-        user_mappings_data = []
-        for mapping in user_mappings:
-            user_mappings_data.append({
-                'rental_class_id': mapping.rental_class_id,
-                'category': mapping.category,
-                'subcategory': mapping.subcategory,
-                'short_common_name': mapping.short_common_name,
-                'created_at': mapping.created_at.isoformat() if mapping.created_at else None,
-                'updated_at': mapping.updated_at.isoformat() if mapping.updated_at else None
-            })
+        # Get what to include from query parameters (default: all)
+        include_params = request.args.getlist('include')
+        if not include_params:
+            include_params = ['user_mappings', 'hand_counted', 'rental_mappings']
         
-        # Get all hand-counted catalog items
-        hand_counted_items = session.query(HandCountedCatalog).all()
-        hand_counted_data = []
-        for item in hand_counted_items:
-            hand_counted_data.append({
-                'rental_class_id': item.rental_class_id,
-                'item_name': item.item_name
-            })
+        # Build description based on what's included
+        description_parts = []
+        if 'user_mappings' in include_params:
+            description_parts.append('User Mappings')
+        if 'hand_counted' in include_params:
+            description_parts.append('Hand-Counted Catalog')
+        if 'rental_mappings' in include_params:
+            description_parts.append('Base Rental Mappings')
         
-        # Get base rental class mappings (in case user has customized any)
-        rental_mappings = session.query(RentalClassMapping).all()
-        rental_mappings_data = []
-        for mapping in rental_mappings:
-            rental_mappings_data.append({
-                'rental_class_id': mapping.rental_class_id,
-                'category': mapping.category,
-                'subcategory': mapping.subcategory,
-                'short_common_name': mapping.short_common_name
-            })
+        if len(description_parts) == 3:
+            description = 'RFID3 Complete Configuration Backup'
+        else:
+            description = f"RFID3 Backup - {', '.join(description_parts)}"
         
-        # Create export data structure
         export_data = {
             'export_info': {
                 'exported_at': datetime.now().isoformat(),
-                'version': '1.0',
-                'description': 'RFID3 Categories Export - User Mappings and Hand-Counted Catalog'
+                'version': '2.0',
+                'description': description,
+                'included_data': include_params
             },
-            'user_rental_class_mappings': user_mappings_data,
-            'hand_counted_catalog': hand_counted_data,
-            'rental_class_mappings': rental_mappings_data,
-            'counts': {
-                'user_mappings': len(user_mappings_data),
-                'hand_counted_items': len(hand_counted_data),
-                'rental_mappings': len(rental_mappings_data)
-            }
+            'counts': {}
         }
         
-        logger.info(f"Exported {len(user_mappings_data)} user mappings, {len(hand_counted_data)} hand-counted items, {len(rental_mappings_data)} rental mappings")
+        # Export user rental class mappings
+        if 'user_mappings' in include_params:
+            user_mappings = session.query(UserRentalClassMapping).all()
+            user_mappings_data = []
+            for mapping in user_mappings:
+                user_mappings_data.append({
+                    'rental_class_id': mapping.rental_class_id,
+                    'category': mapping.category,
+                    'subcategory': mapping.subcategory,
+                    'short_common_name': mapping.short_common_name,
+                    'created_at': mapping.created_at.isoformat() if mapping.created_at else None,
+                    'updated_at': mapping.updated_at.isoformat() if mapping.updated_at else None
+                })
+            export_data['user_rental_class_mappings'] = user_mappings_data
+            export_data['counts']['user_mappings'] = len(user_mappings_data)
+        else:
+            export_data['user_rental_class_mappings'] = []
+            export_data['counts']['user_mappings'] = 0
+        
+        # Export hand-counted catalog
+        if 'hand_counted' in include_params:
+            hand_counted_items = session.query(HandCountedCatalog).all()
+            hand_counted_data = []
+            for item in hand_counted_items:
+                hand_counted_data.append({
+                    'rental_class_id': item.rental_class_id,
+                    'item_name': item.item_name
+                })
+            export_data['hand_counted_catalog'] = hand_counted_data
+            export_data['counts']['hand_counted_items'] = len(hand_counted_data)
+        else:
+            export_data['hand_counted_catalog'] = []
+            export_data['counts']['hand_counted_items'] = 0
+        
+        # Export base rental class mappings
+        if 'rental_mappings' in include_params:
+            rental_mappings = session.query(RentalClassMapping).all()
+            rental_mappings_data = []
+            for mapping in rental_mappings:
+                rental_mappings_data.append({
+                    'rental_class_id': mapping.rental_class_id,
+                    'category': mapping.category,
+                    'subcategory': mapping.subcategory,
+                    'short_common_name': mapping.short_common_name
+                })
+            export_data['rental_class_mappings'] = rental_mappings_data
+            export_data['counts']['rental_mappings'] = len(rental_mappings_data)
+        else:
+            export_data['rental_class_mappings'] = []
+            export_data['counts']['rental_mappings'] = 0
+        
+        total_items = sum(export_data['counts'].values())
+        logger.info(f"Exported {total_items} total items: {export_data['counts']}")
         
         return jsonify(export_data)
         
@@ -576,11 +607,6 @@ def import_categories():
         }
         
         # Import user rental class mappings
-        if import_mode == 'replace':
-            # Clear existing user mappings
-            session.query(UserRentalClassMapping).delete()
-            logger.info("Cleared existing user rental class mappings for replace mode")
-        
         for mapping_data in import_data['user_rental_class_mappings']:
             rental_class_id = mapping_data['rental_class_id']
             
@@ -590,15 +616,12 @@ def import_categories():
             ).first()
             
             if existing:
-                if import_mode == 'merge':
-                    # Update existing mapping
-                    existing.category = mapping_data['category']
-                    existing.subcategory = mapping_data['subcategory']
-                    existing.short_common_name = mapping_data.get('short_common_name')
-                    existing.updated_at = datetime.now()
-                    results['user_mappings']['updated'] += 1
-                else:
-                    results['user_mappings']['skipped'] += 1
+                # Update existing mapping (same behavior for both merge and replace)
+                existing.category = mapping_data['category']
+                existing.subcategory = mapping_data['subcategory']
+                existing.short_common_name = mapping_data.get('short_common_name')
+                existing.updated_at = datetime.now()
+                results['user_mappings']['updated'] += 1
             else:
                 # Create new mapping
                 new_mapping = UserRentalClassMapping(
@@ -611,11 +634,6 @@ def import_categories():
                 results['user_mappings']['added'] += 1
         
         # Import hand-counted catalog
-        if import_mode == 'replace':
-            # Clear existing hand-counted catalog
-            session.query(HandCountedCatalog).delete()
-            logger.info("Cleared existing hand-counted catalog for replace mode")
-        
         for item_data in import_data['hand_counted_catalog']:
             item_name = item_data['item_name']
             
@@ -625,12 +643,9 @@ def import_categories():
             ).first()
             
             if existing:
-                if import_mode == 'merge':
-                    # Update existing item
-                    existing.rental_class_id = item_data.get('rental_class_id')
-                    results['hand_counted']['updated'] += 1
-                else:
-                    results['hand_counted']['skipped'] += 1
+                # Update existing item (same behavior for both merge and replace)
+                existing.rental_class_id = item_data.get('rental_class_id')
+                results['hand_counted']['updated'] += 1
             else:
                 # Create new item
                 new_item = HandCountedCatalog(
@@ -640,27 +655,41 @@ def import_categories():
                 session.add(new_item)
                 results['hand_counted']['added'] += 1
         
-        # Import rental class mappings (if provided and in replace mode)
-        if 'rental_class_mappings' in import_data and import_mode == 'replace':
-            # Only import these in replace mode to avoid conflicts
-            session.query(RentalClassMapping).delete()
-            logger.info("Cleared existing rental class mappings for replace mode")
-            
+        # Import rental class mappings (if provided)
+        # Note: Base rental mappings are typically system-managed, so we're cautious here
+        if 'rental_class_mappings' in import_data and import_data['rental_class_mappings']:
+            logger.info(f"Importing {len(import_data['rental_class_mappings'])} rental class mappings")
             for mapping_data in import_data['rental_class_mappings']:
-                new_mapping = RentalClassMapping(
-                    rental_class_id=mapping_data['rental_class_id'],
-                    category=mapping_data['category'],
-                    subcategory=mapping_data['subcategory'],
-                    short_common_name=mapping_data.get('short_common_name')
-                )
-                session.add(new_mapping)
-                results['rental_mappings']['added'] += 1
+                rental_class_id = mapping_data['rental_class_id']
+                
+                # Check if mapping already exists
+                existing = session.query(RentalClassMapping).filter(
+                    RentalClassMapping.rental_class_id == rental_class_id
+                ).first()
+                
+                if existing:
+                    # Update existing mapping
+                    existing.category = mapping_data['category']
+                    existing.subcategory = mapping_data['subcategory']
+                    existing.short_common_name = mapping_data.get('short_common_name')
+                    results['rental_mappings']['updated'] += 1
+                else:
+                    # Create new mapping
+                    new_mapping = RentalClassMapping(
+                        rental_class_id=rental_class_id,
+                        category=mapping_data['category'],
+                        subcategory=mapping_data['subcategory'],
+                        short_common_name=mapping_data.get('short_common_name')
+                    )
+                    session.add(new_mapping)
+                    results['rental_mappings']['added'] += 1
         
         # Commit all changes
         session.commit()
         
         # Clear cache to force reload
-        cache.clear()
+        cache.delete('rental_class_mappings')
+        cache.delete('seed_rental_classes')
         
         logger.info(f"Import completed: {results}")
         
