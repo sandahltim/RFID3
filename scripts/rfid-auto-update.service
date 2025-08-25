@@ -1,0 +1,13 @@
+[Unit]
+Description=RFID3 Auto Update Service
+Wants=rfid-auto-update.timer
+
+[Service]
+Type=oneshot
+User=root
+ExecStart=/home/tim/RFID3/scripts/auto_update.sh
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
