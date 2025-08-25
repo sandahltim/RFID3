@@ -313,6 +313,7 @@ def get_mappings():
             current_app.logger.warning("hand_counted_catalog table missing; returning no hand-counted entries")
             hand_counted_entries = []
         hand_counted_names = {entry.item_name for entry in hand_counted_entries}
+        hand_counted_custom_names = {entry.item_name: entry.hand_counted_name for entry in hand_counted_entries}
         mappings = []
         for rental_class_id, mapping in mappings_dict.items():
             common_name = common_name_dict.get(rental_class_id, 'Unknown')
@@ -322,7 +323,8 @@ def get_mappings():
                 'category': mapping['category'],
                 'subcategory': mapping['subcategory'],
                 'short_common_name': mapping['short_common_name'],
-                'is_hand_counted': common_name in hand_counted_names
+                'is_hand_counted': common_name in hand_counted_names,
+                'hand_counted_name': hand_counted_custom_names.get(common_name, '')
             })
 
         existing_names = {m['common_name'] for m in mappings}
