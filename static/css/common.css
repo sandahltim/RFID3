@@ -56,6 +56,13 @@
     transform: translateY(-2px);
 }
 
+.navbar-nav .nav-link.active {
+    color: var(--bte-white) !important;
+    background-color: rgba(255, 193, 7, 0.3);
+    border-radius: 4px;
+    font-weight: 900;
+}
+
 .navbar-nav {
     display: flex;
     flex-wrap: wrap;
