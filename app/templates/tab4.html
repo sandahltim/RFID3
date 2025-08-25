@@ -13,6 +13,34 @@
         </div>
     {% endif %}
 
+    <!-- Clean Filter Controls (defaults to Active only) -->
+    <div class="row mb-3">
+        <div class="col-md-8">
+            <div class="btn-group btn-group-sm" role="group" id="status-filter">
+                <input type="radio" class="btn-check" name="status-filter" id="filter-active" value="active" checked>
+                <label class="btn btn-outline-success" for="filter-active">
+                    <span class="badge bg-success rounded-pill me-1">●</span> Active
+                </label>
+                
+                <input type="radio" class="btn-check" name="status-filter" id="filter-finalized" value="finalized">
+                <label class="btn btn-outline-warning" for="filter-finalized">
+                    <span class="badge bg-warning rounded-pill me-1">●</span> Finalized
+                </label>
+                
+                <input type="radio" class="btn-check" name="status-filter" id="filter-returned" value="returned">
+                <label class="btn btn-outline-info" for="filter-returned">
+                    <span class="badge bg-info rounded-pill me-1">●</span> Returned
+                </label>
+                
+                <input type="radio" class="btn-check" name="status-filter" id="filter-all" value="all">
+                <label class="btn btn-outline-secondary" for="filter-all">All Contracts</label>
+            </div>
+        </div>
+        <div class="col-md-4 text-end">
+            <small class="text-muted"><span id="contract-count">{{ contracts|length }}</span> contracts shown</small>
+        </div>
+    </div>
+
     <table class="table table-bordered table-hover category-table" id="category-table">
         <thead class="thead-dark">
             <tr>
@@ -28,17 +56,53 @@
         <tbody id="category-rows">
             {% if contracts %}
                 {% for contract in contracts %}
-                    <tr>
-                        <td>{{ contract.contract_number }}</td>
+                    <tr data-contract-status="{{ contract.status }}" class="contract-row">
+                        <td>
+                            <!-- Compact status indicator -->
+                            {% if contract.status == 'active' %}
+                                <span class="badge bg-success rounded-pill me-2" title="Active">●</span>
+                            {% elif contract.status == 'finalized' %}
+                                <span class="badge bg-warning rounded-pill me-2" title="Finalized - Picked up by cleaning service">●</span>
+                            {% elif contract.status == 'returned' %}
+                                <span class="badge bg-info rounded-pill me-2" title="Returned from cleaning service">●</span>
+                            {% else %}
+                                <span class="badge bg-secondary rounded-pill me-2" title="Unknown status">●</span>
+                            {% endif %}
+                            {{ contract.contract_number }}
+                            <!-- Show finalized/returned dates subtly -->
+                            {% if contract.finalized_date and contract.status == 'finalized' %}
+                                <br><small class="text-muted">Finalized: {{ contract.finalized_date[:10] }}</small>
+                            {% elif contract.returned_date and contract.status == 'returned' %}
+                                <br><small class="text-muted">Returned: {{ contract.returned_date[:10] }}</small>
+                            {% endif %}
+                        </td>
                         <td>{{ contract.client_name }}</td>
                         <td>{{ contract.items_on_contract }}</td>
                         <td>{{ contract.total_items_inventory }}</td>
                         <td>{{ contract.hand_counted_items }}</td>
                         <td>{{ contract.scan_date }}</td>
-                        <td>
+                        <td class="action-buttons">
+                            <!-- Core actions always available -->
                             <button class="btn btn-sm btn-secondary expand-btn" data-target-id="common-{{ contract.contract_number|replace(' ', '_') }}" data-contract-number="{{ contract.contract_number }}">Expand</button>
                             <button class="btn btn-sm btn-secondary collapse-btn" data-collapse-target="common-{{ contract.contract_number|replace(' ', '_') }}" style="display:none;">Collapse</button>
-                            <div class="dropdown">
+                            
+                            <!-- Contextual status actions (only show when relevant) -->
+                            {% if contract.status == 'active' %}
+                                <button class="btn btn-sm btn-warning finalize-btn" data-contract-number="{{ contract.contract_number }}" title="Mark as finalized and picked up">
+                                    Finalize
+                                </button>
+                            {% elif contract.status == 'finalized' %}
+                                <button class="btn btn-sm btn-info return-btn" data-contract-number="{{ contract.contract_number }}" title="Mark as returned from cleaning service">
+                                    Mark Returned
+                                </button>
+                            {% elif contract.status == 'returned' %}
+                                <button class="btn btn-sm btn-outline-secondary reactivate-btn" data-contract-number="{{ contract.contract_number }}" title="Reactivate contract">
+                                    Reactivate
+                                </button>
+                            {% endif %}
+                            
+                            <!-- Print dropdown -->
+                            <div class="dropdown d-inline">
                                 <button class="btn btn-sm btn-info print-items-btn" data-print-level="Contract" data-print-id="common-{{ contract.contract_number|replace(' ', '_') }}" data-contract-number="{{ contract.contract_number }}">Print Items</button>
                                 <button type="button" class="btn btn-sm btn-info dropdown-toggle dropdown-toggle-split" data-mdb-toggle="dropdown" aria-expanded="false">
                                     <span class="visually-hidden">Toggle Dropdown</span>
