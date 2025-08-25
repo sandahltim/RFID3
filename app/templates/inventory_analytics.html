@@ -1,0 +1,538 @@
+{% extends "base.html" %}
+{% block title %}Inventory & Analytics{% endblock %}
+{% block extra_head %}
+<style>
+    .dashboard-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 10px;
+        color: white;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+    
+    .metric-card {
+        background: white;
+        border-radius: 8px;
+        padding: 15px;
+        margin-bottom: 15px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        transition: transform 0.2s;
+    }
+    
+    .metric-card:hover {
+        transform: translateY(-2px);
+    }
+    
+    .metric-value {
+        font-size: 2.5rem;
+        font-weight: bold;
+        color: #2c3e50;
+    }
+    
+    .metric-label {
+        font-size: 0.9rem;
+        color: #7f8c8d;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+    
+    .health-score {
+        font-size: 3rem;
+        font-weight: bold;
+        text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+    }
+    
+    .alert-badge {
+        display: inline-block;
+        padding: 0.25rem 0.5rem;
+        font-size: 0.75rem;
+        font-weight: 600;
+        border-radius: 0.25rem;
+        text-transform: uppercase;
+    }
+    
+    .alert-critical { background-color: #dc3545; color: white; }
+    .alert-high { background-color: #fd7e14; color: white; }
+    .alert-medium { background-color: #ffc107; color: black; }
+    .alert-low { background-color: #28a745; color: white; }
+    
+    .stale-item {
+        padding: 10px;
+        border-left: 4px solid #e74c3c;
+        background-color: #fdf2f2;
+        margin-bottom: 8px;
+        border-radius: 4px;
+    }
+    
+    .loading-spinner {
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        border: 3px solid #f3f3f3;
+        border-top: 3px solid #3498db;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    }
+    
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+    
+    .tab-content {
+        margin-top: 20px;
+    }
+    
+    .nav-tabs .nav-link.active {
+        background-color: #667eea;
+        color: white;
+        border-color: #667eea;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-3">
+    <!-- Dashboard Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="dashboard-card text-center">
+                <h1><i class="fas fa-chart-line"></i> Inventory & Analytics Dashboard</h1>
+                <p class="mb-0">Real-time inventory health monitoring and usage analysis</p>
+                <div class="row mt-3">
+                    <div class="col-md-4">
+                        <div class="health-score" id="health-score">--</div>
+                        <div>Overall Health Score</div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="health-score" id="total-items">--</div>
+                        <div>Total Items</div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="health-score" id="active-alerts">--</div>
+                        <div>Active Alerts</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Key Metrics Row -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="metric-card text-center">
+                <div class="metric-value text-success" id="items-on-rent">--</div>
+                <div class="metric-label">On Rent</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="metric-card text-center">
+                <div class="metric-value text-primary" id="items-available">--</div>
+                <div class="metric-label">Available</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="metric-card text-center">
+                <div class="metric-value text-warning" id="items-in-service">--</div>
+                <div class="metric-label">In Service</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="metric-card text-center">
+                <div class="metric-value text-info" id="utilization-rate">--%</div>
+                <div class="metric-label">Utilization Rate</div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Tabs for Different Views -->
+    <div class="row">
+        <div class="col-12">
+            <ul class="nav nav-tabs" id="analyticsTab" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="alerts-tab" data-bs-toggle="tab" data-bs-target="#alerts" type="button" role="tab">
+                        <i class="fas fa-exclamation-triangle"></i> Health Alerts
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="stale-items-tab" data-bs-toggle="tab" data-bs-target="#stale-items" type="button" role="tab">
+                        <i class="fas fa-clock"></i> Stale Items
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="usage-analysis-tab" data-bs-toggle="tab" data-bs-target="#usage-analysis" type="button" role="tab">
+                        <i class="fas fa-chart-bar"></i> Usage Analysis
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="resale-tracking-tab" data-bs-toggle="tab" data-bs-target="#resale-tracking" type="button" role="tab">
+                        <i class="fas fa-shopping-cart"></i> Resale Tracking
+                    </button>
+                </li>
+            </ul>
+            
+            <div class="tab-content" id="analyticsTabContent">
+                <!-- Health Alerts Tab -->
+                <div class="tab-pane fade show active" id="alerts" role="tabpanel">
+                    <div class="row">
+                        <div class="col-md-8">
+                            <div class="card">
+                                <div class="card-header d-flex justify-content-between align-items-center">
+                                    <h5><i class="fas fa-bell"></i> Active Health Alerts</h5>
+                                    <div>
+                                        <select class="form-select form-select-sm" id="alert-severity-filter">
+                                            <option value="">All Severities</option>
+                                            <option value="critical">Critical</option>
+                                            <option value="high">High</option>
+                                            <option value="medium">Medium</option>
+                                            <option value="low">Low</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="card-body">
+                                    <div id="alerts-loading" class="text-center">
+                                        <div class="loading-spinner"></div> Loading alerts...
+                                    </div>
+                                    <div id="alerts-list" style="display: none;"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5><i class="fas fa-chart-pie"></i> Alert Summary</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="mb-2">
+                                        <span class="alert-badge alert-critical" id="critical-count">0</span> Critical
+                                    </div>
+                                    <div class="mb-2">
+                                        <span class="alert-badge alert-high" id="high-count">0</span> High
+                                    </div>
+                                    <div class="mb-2">
+                                        <span class="alert-badge alert-medium" id="medium-count">0</span> Medium
+                                    </div>
+                                    <div class="mb-2">
+                                        <span class="alert-badge alert-low" id="low-count">0</span> Low
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Stale Items Tab -->
+                <div class="tab-pane fade" id="stale-items" role="tabpanel">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="fas fa-clock"></i> Items Not Recently Scanned</h5>
+                            <small class="text-muted">Items that haven't been scanned recently based on category-specific thresholds</small>
+                        </div>
+                        <div class="card-body">
+                            <div id="stale-items-loading" class="text-center">
+                                <div class="loading-spinner"></div> Analyzing scan history...
+                            </div>
+                            <div id="stale-items-list" style="display: none;"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Usage Analysis Tab -->
+                <div class="tab-pane fade" id="usage-analysis" role="tabpanel">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="fas fa-chart-bar"></i> Usage Analytics</h5>
+                        </div>
+                        <div class="card-body">
+                            <p class="text-muted">Advanced usage pattern analysis and forecasting features coming in Phase 2...</p>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h6>Planned Features:</h6>
+                                    <ul>
+                                        <li>Usage pattern analysis by category</li>
+                                        <li>Seasonal trend identification</li>
+                                        <li>Item lifecycle tracking</li>
+                                        <li>Revenue per item analysis</li>
+                                    </ul>
+                                </div>
+                                <div class="col-md-6">
+                                    <h6>Predictive Analytics:</h6>
+                                    <ul>
+                                        <li>Maintenance scheduling predictions</li>
+                                        <li>Demand forecasting</li>
+                                        <li>Optimal inventory level recommendations</li>
+                                        <li>Quality degradation patterns</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Resale Tracking Tab -->
+                <div class="tab-pane fade" id="resale-tracking" role="tabpanel">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="fas fa-shopping-cart"></i> Resale & Pack Status Tracking</h5>
+                        </div>
+                        <div class="card-body">
+                            <p class="text-muted">Specialized tracking for resale items and pack status management coming in Phase 2...</p>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h6>Resale Item Features:</h6>
+                                    <ul>
+                                        <li>Automatic restock alerts (7-day threshold)</li>
+                                        <li>Consumption rate tracking</li>
+                                        <li>Low inventory warnings</li>
+                                        <li>Supplier order suggestions</li>
+                                    </ul>
+                                </div>
+                                <div class="col-md-6">
+                                    <h6>Pack Status Management:</h6>
+                                    <ul>
+                                        <li>Pack/unpack recommendations based on demand</li>
+                                        <li>Storage optimization alerts</li>
+                                        <li>Bulk item tracking</li>
+                                        <li>Space utilization analysis</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+class InventoryAnalytics {
+    constructor() {
+        this.refreshInterval = null;
+        this.init();
+    }
+    
+    init() {
+        console.log('Initializing Inventory Analytics dashboard');
+        this.loadDashboardData();
+        this.setupEventHandlers();
+        this.startAutoRefresh();
+    }
+    
+    async loadDashboardData() {
+        try {
+            console.log('Loading dashboard summary data');
+            const response = await fetch('/api/inventory/dashboard_summary');
+            const data = await response.json();
+            
+            if (response.ok) {
+                this.updateDashboardMetrics(data);
+            } else {
+                console.error('Failed to load dashboard data:', data.error);
+                this.showError('Failed to load dashboard data');
+            }
+        } catch (error) {
+            console.error('Error loading dashboard data:', error);
+            this.showError('Error loading dashboard data');
+        }
+    }
+    
+    updateDashboardMetrics(data) {
+        const inventory = data.inventory_overview;
+        const health = data.health_metrics;
+        
+        // Update main dashboard cards
+        document.getElementById('health-score').textContent = health.health_score;
+        document.getElementById('total-items').textContent = inventory.total_items.toLocaleString();
+        document.getElementById('active-alerts').textContent = health.active_alerts;
+        
+        // Update metric cards
+        document.getElementById('items-on-rent').textContent = inventory.items_on_rent.toLocaleString();
+        document.getElementById('items-available').textContent = inventory.items_available.toLocaleString();
+        document.getElementById('items-in-service').textContent = inventory.items_in_service.toLocaleString();
+        document.getElementById('utilization-rate').textContent = inventory.utilization_rate + '%';
+        
+        // Update alert counts
+        document.getElementById('critical-count').textContent = health.critical_alerts;
+        document.getElementById('high-count').textContent = health.high_alerts;
+        document.getElementById('medium-count').textContent = health.medium_alerts;
+        document.getElementById('low-count').textContent = health.low_alerts;
+        
+        // Apply health score color coding
+        const healthScoreEl = document.getElementById('health-score');
+        if (health.health_score >= 90) {
+            healthScoreEl.style.color = '#28a745'; // Green
+        } else if (health.health_score >= 70) {
+            healthScoreEl.style.color = '#ffc107'; // Yellow
+        } else {
+            healthScoreEl.style.color = '#dc3545'; // Red
+        }
+        
+        console.log('Dashboard metrics updated successfully');
+    }
+    
+    async loadHealthAlerts() {
+        try {
+            document.getElementById('alerts-loading').style.display = 'block';
+            document.getElementById('alerts-list').style.display = 'none';
+            
+            const severityFilter = document.getElementById('alert-severity-filter').value;
+            const queryParams = new URLSearchParams();
+            if (severityFilter) queryParams.append('severity', severityFilter);
+            
+            const response = await fetch(`/api/inventory/alerts?${queryParams}`);
+            const data = await response.json();
+            
+            if (response.ok) {
+                this.displayHealthAlerts(data.alerts);
+            } else {
+                console.error('Failed to load alerts:', data.error);
+                this.showError('Failed to load alerts', 'alerts-list');
+            }
+        } catch (error) {
+            console.error('Error loading health alerts:', error);
+            this.showError('Error loading health alerts', 'alerts-list');
+        } finally {
+            document.getElementById('alerts-loading').style.display = 'none';
+            document.getElementById('alerts-list').style.display = 'block';
+        }
+    }
+    
+    displayHealthAlerts(alerts) {
+        const container = document.getElementById('alerts-list');
+        
+        if (alerts.length === 0) {
+            container.innerHTML = '<p class="text-muted text-center">No active alerts found.</p>';
+            return;
+        }
+        
+        let html = '<div class="table-responsive"><table class="table table-sm"><thead><tr>';
+        html += '<th>Severity</th><th>Type</th><th>Item/Category</th><th>Description</th><th>Created</th></tr></thead><tbody>';
+        
+        alerts.forEach(alert => {
+            const severityBadge = `<span class="alert-badge alert-${alert.severity}">${alert.severity}</span>`;
+            const itemInfo = alert.tag_id ? 
+                `${alert.common_name} (${alert.tag_id})` : 
+                `${alert.category}/${alert.subcategory}`;
+            const createdDate = new Date(alert.created_at).toLocaleDateString();
+            
+            html += `<tr>
+                <td>${severityBadge}</td>
+                <td>${alert.alert_type.replace('_', ' ')}</td>
+                <td>${itemInfo}</td>
+                <td>${alert.suggested_action || 'Review required'}</td>
+                <td>${createdDate}</td>
+            </tr>`;
+        });
+        
+        html += '</tbody></table></div>';
+        container.innerHTML = html;
+    }
+    
+    async loadStaleItems() {
+        try {
+            document.getElementById('stale-items-loading').style.display = 'block';
+            document.getElementById('stale-items-list').style.display = 'none';
+            
+            const response = await fetch('/api/inventory/stale_items');
+            const data = await response.json();
+            
+            if (response.ok) {
+                this.displayStaleItems(data.stale_items, data.thresholds_used);
+            } else {
+                console.error('Failed to load stale items:', data.error);
+                this.showError('Failed to load stale items', 'stale-items-list');
+            }
+        } catch (error) {
+            console.error('Error loading stale items:', error);
+            this.showError('Error loading stale items', 'stale-items-list');
+        } finally {
+            document.getElementById('stale-items-loading').style.display = 'none';
+            document.getElementById('stale-items-list').style.display = 'block';
+        }
+    }
+    
+    displayStaleItems(items, thresholds) {
+        const container = document.getElementById('stale-items-list');
+        
+        if (items.length === 0) {
+            container.innerHTML = '<p class="text-success text-center"><i class="fas fa-check-circle"></i> All items are within scan thresholds!</p>';
+            return;
+        }
+        
+        let html = `<div class="alert alert-info"><strong>Scan Thresholds:</strong> Default: ${thresholds.default} days, Resale: ${thresholds.resale} days, Pack: ${thresholds.pack} days</div>`;
+        html += '<div class="row">';
+        
+        items.forEach(item => {
+            const lastScanDate = new Date(item.last_scan_date).toLocaleDateString();
+            const categoryInfo = item.category ? `${item.category}/${item.subcategory}` : 'Uncategorized';
+            
+            html += `<div class="col-md-6 mb-3">
+                <div class="stale-item">
+                    <div class="d-flex justify-content-between">
+                        <strong>${item.common_name}</strong>
+                        <span class="badge bg-danger">${item.days_since_scan} days</span>
+                    </div>
+                    <div class="small text-muted">
+                        <div>Tag: ${item.tag_id} | Status: ${item.status}</div>
+                        <div>Category: ${categoryInfo} | Location: ${item.bin_location || 'N/A'}</div>
+                        <div>Last Scan: ${lastScanDate} | Contract: ${item.last_contract || 'N/A'}</div>
+                    </div>
+                </div>
+            </div>`;
+        });
+        
+        html += '</div>';
+        container.innerHTML = html;
+    }
+    
+    setupEventHandlers() {
+        // Tab change handlers
+        document.addEventListener('shown.bs.tab', (event) => {
+            const targetTab = event.target.getAttribute('data-bs-target');
+            
+            if (targetTab === '#alerts') {
+                this.loadHealthAlerts();
+            } else if (targetTab === '#stale-items') {
+                this.loadStaleItems();
+            }
+        });
+        
+        // Alert filter change
+        document.getElementById('alert-severity-filter').addEventListener('change', () => {
+            this.loadHealthAlerts();
+        });
+        
+        // Load initial tab content
+        this.loadHealthAlerts();
+    }
+    
+    startAutoRefresh() {
+        // Refresh dashboard data every 5 minutes
+        this.refreshInterval = setInterval(() => {
+            console.log('Auto-refreshing dashboard data');
+            this.loadDashboardData();
+        }, 5 * 60 * 1000);
+    }
+    
+    showError(message, containerId = null) {
+        const errorHtml = `<div class="alert alert-danger"><i class="fas fa-exclamation-triangle"></i> ${message}</div>`;
+        
+        if (containerId) {
+            document.getElementById(containerId).innerHTML = errorHtml;
+        } else {
+            // Show in a toast or modal
+            console.error(message);
+        }
+    }
+}
+
+// Initialize when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    window.inventoryAnalytics = new InventoryAnalytics();
+});
+</script>
+{% endblock %}

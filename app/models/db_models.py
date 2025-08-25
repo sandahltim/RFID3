@@ -268,3 +268,105 @@ class LaundryContractStatus(db.Model):
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }
+
+class ItemUsageHistory(db.Model):
+    __tablename__ = 'item_usage_history'
+    
+    id = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
+    tag_id = db.Column(db.String(255), nullable=False, index=True)
+    event_type = db.Column(db.Enum('rental', 'return', 'service', 'status_change', 'location_change', 'quality_change'), nullable=False)
+    contract_number = db.Column(db.String(255), nullable=True, index=True)
+    event_date = db.Column(db.DateTime, nullable=False, index=True)
+    duration_days = db.Column(db.Integer, nullable=True)
+    previous_status = db.Column(db.String(50), nullable=True)
+    new_status = db.Column(db.String(50), nullable=True)
+    previous_location = db.Column(db.String(255), nullable=True)
+    new_location = db.Column(db.String(255), nullable=True)
+    previous_quality = db.Column(db.String(50), nullable=True)
+    new_quality = db.Column(db.String(50), nullable=True)
+    utilization_score = db.Column(db.Numeric(5, 2), nullable=True)
+    notes = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'tag_id': self.tag_id,
+            'event_type': self.event_type,
+            'contract_number': self.contract_number,
+            'event_date': self.event_date.isoformat() if self.event_date else None,
+            'duration_days': self.duration_days,
+            'previous_status': self.previous_status,
+            'new_status': self.new_status,
+            'previous_location': self.previous_location,
+            'new_location': self.new_location,
+            'previous_quality': self.previous_quality,
+            'new_quality': self.new_quality,
+            'utilization_score': float(self.utilization_score) if self.utilization_score else None,
+            'notes': self.notes,
+            'created_at': self.created_at.isoformat() if self.created_at else None
+        }
+
+class InventoryHealthAlert(db.Model):
+    __tablename__ = 'inventory_health_alerts'
+    
+    id = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
+    tag_id = db.Column(db.String(255), nullable=True, index=True)
+    rental_class_id = db.Column(db.String(255), nullable=True, index=True)
+    common_name = db.Column(db.String(255), nullable=True)
+    category = db.Column(db.String(100), nullable=True, index=True)
+    subcategory = db.Column(db.String(100), nullable=True, index=True)
+    alert_type = db.Column(db.Enum('stale_item', 'high_usage', 'low_usage', 'missing', 'quality_decline', 'resale_restock', 'pack_status_review'), nullable=False, index=True)
+    severity = db.Column(db.Enum('low', 'medium', 'high', 'critical'), nullable=False, index=True)
+    days_since_last_scan = db.Column(db.Integer, nullable=True)
+    last_scan_date = db.Column(db.DateTime, nullable=True)
+    suggested_action = db.Column(db.Text, nullable=True)
+    status = db.Column(db.Enum('active', 'acknowledged', 'resolved', 'dismissed'), nullable=False, default='active', index=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
+    acknowledged_at = db.Column(db.DateTime, nullable=True)
+    acknowledged_by = db.Column(db.String(255), nullable=True)
+    resolved_at = db.Column(db.DateTime, nullable=True)
+    resolved_by = db.Column(db.String(255), nullable=True)
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'tag_id': self.tag_id,
+            'rental_class_id': self.rental_class_id,
+            'common_name': self.common_name,
+            'category': self.category,
+            'subcategory': self.subcategory,
+            'alert_type': self.alert_type,
+            'severity': self.severity,
+            'days_since_last_scan': self.days_since_last_scan,
+            'last_scan_date': self.last_scan_date.isoformat() if self.last_scan_date else None,
+            'suggested_action': self.suggested_action,
+            'status': self.status,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'acknowledged_at': self.acknowledged_at.isoformat() if self.acknowledged_at else None,
+            'acknowledged_by': self.acknowledged_by,
+            'resolved_at': self.resolved_at.isoformat() if self.resolved_at else None,
+            'resolved_by': self.resolved_by
+        }
+
+class InventoryConfig(db.Model):
+    __tablename__ = 'inventory_config'
+    
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    config_key = db.Column(db.String(100), nullable=False, unique=True, index=True)
+    config_value = db.Column(db.JSON, nullable=False)
+    description = db.Column(db.Text, nullable=True)
+    category = db.Column(db.String(50), nullable=True, index=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'config_key': self.config_key,
+            'config_value': self.config_value,
+            'description': self.description,
+            'category': self.category,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+        }
