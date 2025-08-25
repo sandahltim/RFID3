@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, request, jsonify, current_app, make_response
 from .. import db, cache
-from ..models.db_models import ItemMaster, Transaction, HandCountedItems, HandCountedCatalog
+from ..models.db_models import ItemMaster, Transaction, HandCountedItems, HandCountedCatalog, LaundryContractStatus
 from sqlalchemy import func, desc, or_
 from sqlalchemy.exc import ProgrammingError
 from datetime import datetime
@@ -206,14 +206,90 @@ def tab4_view():
                 }
 
         # Step 6: Filter out contracts with no items on contract and no inventory
+        # BUT: Keep contracts that have had hand-counted items added (even if net is 0)
         contracts = []
         for contract in contracts_dict.values():
             total_items_on_contract = contract['items_on_contract']
             total_items_inventory = contract['total_items_inventory']
-            if total_items_on_contract == 0 and total_items_inventory == 0:
-                logger.info(f"Skipping contract {contract['contract_number']}: No items on contract and no items in inventory at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+            hand_counted_items = contract['hand_counted_items']
+            
+            # Check if contract has any history of hand-counted items (even if net is 0)
+            contract_number = contract['contract_number']
+            has_hand_counted_history = False
+            if hand_counted_items == 0:
+                # Check if there were any hand-counted items added historically
+                hand_counted_history = session.query(HandCountedItems).filter(
+                    HandCountedItems.contract_number == contract_number,
+                    HandCountedItems.action == 'Added'
+                ).first()
+                has_hand_counted_history = hand_counted_history is not None
+            
+            # Skip only if no items AND no inventory AND no hand-counted history
+            if total_items_on_contract == 0 and total_items_inventory == 0 and not has_hand_counted_history:
+                logger.info(f"Skipping contract {contract['contract_number']}: No items, no inventory, no hand-counted history at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
                 continue
             contracts.append(contract)
+
+        # Step 7: Add laundry contract status information and include completed contracts
+        contract_numbers = [c['contract_number'] for c in contracts]
+        
+        # Also fetch contracts that are finalized/returned but might not have current items
+        completed_status_records = session.query(LaundryContractStatus).filter(
+            LaundryContractStatus.status.in_(['finalized', 'returned']),
+            LaundryContractStatus.contract_number.like('L%')
+        ).all()
+        
+        # Add completed contracts to the list if they're not already there
+        existing_contract_numbers = set(contract_numbers)
+        for status_record in completed_status_records:
+            if status_record.contract_number not in existing_contract_numbers:
+                # Get basic info for completed contract
+                latest_transaction = session.query(
+                    Transaction.client_name,
+                    Transaction.scan_date
+                ).filter(
+                    Transaction.contract_number == status_record.contract_number,
+                    Transaction.scan_type == 'Rental'
+                ).order_by(desc(Transaction.scan_date)).first()
+                
+                # Get inventory count
+                total_items_inventory = session.query(func.count(ItemMaster.tag_id)).filter(
+                    ItemMaster.last_contract_num == status_record.contract_number
+                ).scalar() or 0
+                
+                # Add the completed contract to the list
+                contracts.append({
+                    'contract_number': status_record.contract_number,
+                    'client_name': latest_transaction.client_name if latest_transaction else 'N/A',
+                    'scan_date': latest_transaction.scan_date.isoformat() if latest_transaction and latest_transaction.scan_date else 'N/A',
+                    'items_on_contract': 0,  # No current items (completed)
+                    'total_items_inventory': total_items_inventory,
+                    'hand_counted_items': 0  # No current hand-counted items (completed)
+                })
+                contract_numbers.append(status_record.contract_number)
+        
+        # Now add status information to all contracts
+        if contract_numbers:
+            status_query = session.query(LaundryContractStatus).filter(
+                LaundryContractStatus.contract_number.in_(contract_numbers)
+            ).all()
+            status_dict = {s.contract_number: s for s in status_query}
+            
+            # Add status information to each contract
+            for contract in contracts:
+                contract_number = contract['contract_number']
+                status_info = status_dict.get(contract_number)
+                if status_info:
+                    contract['status'] = status_info.status
+                    contract['finalized_date'] = status_info.finalized_date.isoformat() if status_info.finalized_date else None
+                    contract['returned_date'] = status_info.returned_date.isoformat() if status_info.returned_date else None
+                    contract['status_notes'] = status_info.notes
+                else:
+                    # Default status for new contracts
+                    contract['status'] = 'active'
+                    contract['finalized_date'] = None
+                    contract['returned_date'] = None
+                    contract['status_notes'] = None
 
         contracts.sort(key=lambda x: x['contract_number'])  # Default sort for initial load
         logger.info(f"Fetched {len(contracts)} contracts for tab4: {[c['contract_number'] for c in contracts]} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
@@ -1340,6 +1416,179 @@ def get_contract_date():
         logger.error(f"Error fetching contract date for {contract_number}: {str(e)} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
         current_app.logger.error(f"Error fetching contract date for {contract_number}: {str(e)} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
         return jsonify({'error': 'Failed to fetch contract date'}), 500
+    finally:
+        if session:
+            session.close()
+
+@tab4_bp.route('/tab/4/finalize_contract', methods=['POST'])
+def finalize_contract():
+    """Mark a laundry contract as finalized (final count, picked up by cleaning service)"""
+    data = request.get_json()
+    contract_number = data.get('contract_number')
+    user = data.get('user', 'user')
+    notes = data.get('notes', '')
+    
+    if not contract_number:
+        return jsonify({'error': 'Contract number is required'}), 400
+    
+    session = None
+    try:
+        session = db.session()
+        
+        # Check if status record already exists
+        status_record = session.query(LaundryContractStatus).filter(
+            LaundryContractStatus.contract_number == contract_number
+        ).first()
+        
+        if status_record:
+            # Update existing record
+            status_record.status = 'finalized'
+            status_record.finalized_date = datetime.now()
+            status_record.finalized_by = user
+            if notes:
+                status_record.notes = notes
+        else:
+            # Create new record
+            status_record = LaundryContractStatus(
+                contract_number=contract_number,
+                status='finalized',
+                finalized_date=datetime.now(),
+                finalized_by=user,
+                notes=notes
+            )
+            session.add(status_record)
+        
+        session.commit()
+        logger.info(f"Contract {contract_number} finalized by {user}")
+        
+        return jsonify({
+            'success': True,
+            'message': f'Contract {contract_number} has been finalized',
+            'status': 'finalized',
+            'finalized_date': status_record.finalized_date.isoformat()
+        })
+        
+    except Exception as e:
+        if session:
+            session.rollback()
+        logger.error(f"Error finalizing contract {contract_number}: {str(e)}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+    finally:
+        if session:
+            session.close()
+
+@tab4_bp.route('/tab/4/mark_returned', methods=['POST'])
+def mark_returned():
+    """Mark a laundry contract as returned from cleaning service"""
+    data = request.get_json()
+    contract_number = data.get('contract_number')
+    user = data.get('user', 'user')
+    notes = data.get('notes', '')
+    
+    if not contract_number:
+        return jsonify({'error': 'Contract number is required'}), 400
+    
+    session = None
+    try:
+        session = db.session()
+        
+        # Check if status record already exists
+        status_record = session.query(LaundryContractStatus).filter(
+            LaundryContractStatus.contract_number == contract_number
+        ).first()
+        
+        if status_record:
+            # Update existing record
+            status_record.status = 'returned'
+            status_record.returned_date = datetime.now()
+            status_record.returned_by = user
+            if notes:
+                existing_notes = status_record.notes or ''
+                status_record.notes = f"{existing_notes}\n{notes}" if existing_notes else notes
+        else:
+            # Create new record (shouldn't happen, but handle it)
+            status_record = LaundryContractStatus(
+                contract_number=contract_number,
+                status='returned',
+                returned_date=datetime.now(),
+                returned_by=user,
+                notes=notes
+            )
+            session.add(status_record)
+        
+        session.commit()
+        logger.info(f"Contract {contract_number} marked as returned by {user}")
+        
+        return jsonify({
+            'success': True,
+            'message': f'Contract {contract_number} has been marked as returned',
+            'status': 'returned',
+            'returned_date': status_record.returned_date.isoformat()
+        })
+        
+    except Exception as e:
+        if session:
+            session.rollback()
+        logger.error(f"Error marking contract {contract_number} as returned: {str(e)}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+    finally:
+        if session:
+            session.close()
+
+@tab4_bp.route('/tab/4/reactivate_contract', methods=['POST'])
+def reactivate_contract():
+    """Reactivate a finalized or returned contract"""
+    data = request.get_json()
+    contract_number = data.get('contract_number')
+    user = data.get('user', 'user')
+    notes = data.get('notes', '')
+    
+    if not contract_number:
+        return jsonify({'error': 'Contract number is required'}), 400
+    
+    session = None
+    try:
+        session = db.session()
+        
+        # Check if status record exists
+        status_record = session.query(LaundryContractStatus).filter(
+            LaundryContractStatus.contract_number == contract_number
+        ).first()
+        
+        if status_record:
+            # Update to active status
+            status_record.status = 'active'
+            # Clear finalized/returned dates if reactivating
+            status_record.finalized_date = None
+            status_record.finalized_by = None
+            status_record.returned_date = None
+            status_record.returned_by = None
+            if notes:
+                existing_notes = status_record.notes or ''
+                status_record.notes = f"{existing_notes}\nReactivated by {user}: {notes}" if existing_notes else f"Reactivated by {user}: {notes}"
+        else:
+            # Create new active record
+            status_record = LaundryContractStatus(
+                contract_number=contract_number,
+                status='active',
+                notes=f"Reactivated by {user}: {notes}" if notes else f"Reactivated by {user}"
+            )
+            session.add(status_record)
+        
+        session.commit()
+        logger.info(f"Contract {contract_number} reactivated by {user}")
+        
+        return jsonify({
+            'success': True,
+            'message': f'Contract {contract_number} has been reactivated',
+            'status': 'active'
+        })
+        
+    except Exception as e:
+        if session:
+            session.rollback()
+        logger.error(f"Error reactivating contract {contract_number}: {str(e)}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
     finally:
         if session:
             session.close()

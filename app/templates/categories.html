@@ -25,7 +25,57 @@
 {% endblock %}
 {% block content %}
 <div class="categories-container">
-    <h2>Manage Categories</h2>
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2>Manage Categories</h2>
+        <div class="btn-group">
+            <button class="btn btn-outline-info btn-sm" onclick="exportCategories()">
+                📤 Export Categories
+            </button>
+            <button class="btn btn-outline-success btn-sm" onclick="document.getElementById('import-file').click()">
+                📥 Import Categories
+            </button>
+        </div>
+    </div>
+    
+    <!-- Hidden file input for import -->
+    <input type="file" id="import-file" accept=".json" style="display: none;" onchange="handleImportFile(this)">
+    
+    <!-- Import options modal (hidden by default) -->
+    <div id="import-modal" class="modal fade" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Import Categories</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <p><strong>Import file:</strong> <span id="import-filename"></span></p>
+                        <div id="import-preview"></div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Import mode:</label>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="import-mode" id="merge-mode" value="merge" checked>
+                            <label class="form-check-label" for="merge-mode">
+                                <strong>Merge</strong> - Add new items, update existing ones
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="import-mode" id="replace-mode" value="replace">
+                            <label class="form-check-label" for="replace-mode">
+                                <strong>Replace</strong> - Replace all existing data (⚠️ Destructive)
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-success" onclick="confirmImport()">Import Categories</button>
+                </div>
+            </div>
+        </div>
+    </div>
     <table id="mappings-table" class="table table-bordered">
         <thead class="thead-dark">
             <tr>

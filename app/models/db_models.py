@@ -235,3 +235,35 @@ class ContractSnapshot(db.Model):
             'latitude': float(self.latitude) if self.latitude else None,
             'longitude': float(self.longitude) if self.longitude else None
         }
+
+class LaundryContractStatus(db.Model):
+    __tablename__ = 'laundry_contract_status'
+    
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    contract_number = db.Column(db.String(50), unique=True, nullable=False)
+    status = db.Column(db.String(50), nullable=False, default='active')
+    finalized_date = db.Column(db.DateTime)
+    finalized_by = db.Column(db.String(100))
+    returned_date = db.Column(db.DateTime)
+    returned_by = db.Column(db.String(100))
+    pickup_date = db.Column(db.DateTime)
+    pickup_by = db.Column(db.String(100))
+    notes = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'contract_number': self.contract_number,
+            'status': self.status,
+            'finalized_date': self.finalized_date.isoformat() if self.finalized_date else None,
+            'finalized_by': self.finalized_by,
+            'returned_date': self.returned_date.isoformat() if self.returned_date else None,
+            'returned_by': self.returned_by,
+            'pickup_date': self.pickup_date.isoformat() if self.pickup_date else None,
+            'pickup_by': self.pickup_by,
+            'notes': self.notes,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+        }
