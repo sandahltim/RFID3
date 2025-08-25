@@ -1354,30 +1354,42 @@ sudo systemctl start rfid_dash_dev.service
 
 
 
-Commit changes to Git:
+## Development Workflow
 
+For development deployments using GitHub Actions (like the current pi):
+
+```bash
+# Development branch workflow (current pi setup)
 git add .
 git commit -m "Update files"
-git push origin RFID6
+git push origin RFID3dev  # or your development branch
+```
 
+For production deployments using auto-update:
 
+```bash
+# Production workflow (auto-updates from main)
+git add .
+git commit -m "Update files"
+git push origin main  # Auto-update system pulls from main
+```
 
-Pull and restart on the Pi:
+## Monitoring & Logs
 
-git pull origin RFID6
-sudo systemctl stop rfid_dash_dev.service
-sudo systemctl start rfid_dash_dev.service
-sudo systemctl status rfid_dash_dev.service
-
-
-
-Check Logs:
-
+```bash
+# Application logs
 cat /home/tim/RFID3/logs/rfid_dashboard.log
 cat /home/tim/RFID3/logs/gunicorn_error.log
-cat /home/tim/RFID3/logs/gunicorn_access.log
 cat /home/tim/RFID3/logs/app.log
 cat /home/tim/RFID3/logs/sync.log
+
+# Auto-update logs
+cat /home/tim/RFID3/logs/auto_update.log
+
+# System status
+sudo systemctl status rfid_dash_dev.service
+sudo systemctl list-timers rfid-auto-update.timer
+```
 
 Configuration
 
@@ -1399,9 +1411,31 @@ API: Configured in config.py with endpoints for item master, transactions, and s
 
 Logging: Logs are stored in /home/tim/RFID3/logs/
 
+## New Features in Enhanced Installation
 
+1. **Complete Database Setup**: Single script creates all tables including hand_counted_catalog
+2. **Daily Auto-Updates**: Automatic GitHub synchronization with backup and rollback capability
+3. **Enhanced Error Handling**: Comprehensive logging and error recovery
+4. **Backup System**: Automatic backups before updates, retention of last 5 backups
+5. **Service Auto-Restart**: Systemd configuration ensures application restarts on boot and failures
+6. **Installation Validation**: Database connection testing and table verification
 
-RFID Dashboard Application
+## Auto-Update System Details
+
+The auto-update system (`scripts/auto_update.sh`) includes:
+
+- **Daily Schedule**: Runs via systemd timer at midnight with randomized delay
+- **Smart Updates**: Only updates when changes are detected in GitHub repo
+- **Automatic Backups**: Creates timestamped backups before applying updates
+- **Service Management**: Stops service during update, restarts after completion
+- **Error Recovery**: Rollback capability if updates fail
+- **Dependency Updates**: Automatically updates Python packages when requirements.txt changes
+- **Database Migrations**: Applies new database schema changes automatically
+- **Comprehensive Logging**: Detailed logs for troubleshooting
+
+---
+
+# RFID Dashboard Application
 This Flask-based RFID dashboard application manages inventory, tracks contracts, and handles resale/rental packs for Broadway Tent and Event. It integrates with an external API for data synchronization and uses MariaDB and Redis for persistence and caching.
 Project Structure
 RFID3/ RFID6
