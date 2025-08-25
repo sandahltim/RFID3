@@ -17,22 +17,22 @@
     <div class="row mb-3">
         <div class="col-md-8">
             <div class="btn-group btn-group-sm" role="group" id="status-filter">
-                <input type="radio" class="btn-check" name="status-filter" id="filter-active" value="active" checked>
+                <input type="radio" class="btn-check" name="status-filter" id="filter-active" value="active" checked onclick="filterContractsByStatus('active')">
                 <label class="btn btn-outline-success" for="filter-active">
                     <span class="badge bg-success rounded-pill me-1">●</span> Active
                 </label>
                 
-                <input type="radio" class="btn-check" name="status-filter" id="filter-finalized" value="finalized">
+                <input type="radio" class="btn-check" name="status-filter" id="filter-finalized" value="finalized" onclick="filterContractsByStatus('finalized')">
                 <label class="btn btn-outline-warning" for="filter-finalized">
                     <span class="badge bg-warning rounded-pill me-1">●</span> Finalized
                 </label>
                 
-                <input type="radio" class="btn-check" name="status-filter" id="filter-returned" value="returned">
+                <input type="radio" class="btn-check" name="status-filter" id="filter-returned" value="returned" onclick="filterContractsByStatus('returned')">
                 <label class="btn btn-outline-info" for="filter-returned">
                     <span class="badge bg-info rounded-pill me-1">●</span> Returned
                 </label>
                 
-                <input type="radio" class="btn-check" name="status-filter" id="filter-all" value="all">
+                <input type="radio" class="btn-check" name="status-filter" id="filter-all" value="all" onclick="filterContractsByStatus('all')">
                 <label class="btn btn-outline-secondary" for="filter-all">All Contracts</label>
             </div>
         </div>
@@ -88,15 +88,24 @@
                             
                             <!-- Contextual status actions (only show when relevant) -->
                             {% if contract.status == 'active' %}
-                                <button class="btn btn-sm btn-warning finalize-btn" data-contract-number="{{ contract.contract_number }}" title="Mark as finalized and picked up">
+                                <button class="btn btn-sm btn-warning finalize-btn" 
+                                        data-contract-number="{{ contract.contract_number }}" 
+                                        onclick="finalizeContract('{{ contract.contract_number }}')"
+                                        title="Mark as finalized and picked up">
                                     Finalize
                                 </button>
                             {% elif contract.status == 'finalized' %}
-                                <button class="btn btn-sm btn-info return-btn" data-contract-number="{{ contract.contract_number }}" title="Mark as returned from cleaning service">
+                                <button class="btn btn-sm btn-info return-btn" 
+                                        data-contract-number="{{ contract.contract_number }}"
+                                        onclick="markReturned('{{ contract.contract_number }}')" 
+                                        title="Mark as returned from cleaning service">
                                     Mark Returned
                                 </button>
                             {% elif contract.status == 'returned' %}
-                                <button class="btn btn-sm btn-outline-secondary reactivate-btn" data-contract-number="{{ contract.contract_number }}" title="Reactivate contract">
+                                <button class="btn btn-sm btn-outline-secondary reactivate-btn" 
+                                        data-contract-number="{{ contract.contract_number }}"
+                                        onclick="reactivateContract('{{ contract.contract_number }}')" 
+                                        title="Reactivate contract">
                                     Reactivate
                                 </button>
                             {% endif %}
