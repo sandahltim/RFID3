@@ -1143,4 +1143,170 @@ document.addEventListener('DOMContentLoaded', function() {
             alert(`❌ Error getting status: ${error.message}`);
         }
     };
+
+    // ===== LAUNDRY CONTRACT STATUS MANAGEMENT =====
+    
+    // Filter contracts by status
+    window.filterContractsByStatus = function(status) {
+        console.log('Filtering contracts by status:', status);
+        
+        const rows = document.querySelectorAll('.contract-row');
+        let visibleCount = 0;
+        
+        rows.forEach(row => {
+            const contractStatus = row.dataset.contractStatus || 'active';
+            const shouldShow = status === 'all' || contractStatus === status;
+            
+            if (shouldShow) {
+                row.style.display = '';
+                row.nextElementSibling.style.display = ''; // Show the expandable row too
+                visibleCount++;
+            } else {
+                row.style.display = 'none';
+                row.nextElementSibling.style.display = 'none'; // Hide the expandable row too
+            }
+        });
+        
+        // Update contract count
+        const countElement = document.getElementById('contract-count');
+        if (countElement) {
+            countElement.textContent = visibleCount;
+        }
+        
+        console.log(`Showing ${visibleCount} contracts with status: ${status}`);
+    };
+    
+    // Finalize contract
+    window.finalizeContract = async function(contractNumber) {
+        const user = prompt('Enter your name to finalize this contract:');
+        if (!user || user.trim() === '') return;
+        
+        const notes = prompt('Optional notes about finalization (e.g., "Picked up by ABC Cleaners"):') || '';
+        
+        try {
+            const response = await fetch('/tab/4/finalize_contract', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    contract_number: contractNumber, 
+                    user: user.trim(),
+                    notes: notes.trim()
+                })
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                alert(`✅ ${data.message}`);
+                location.reload(); // Refresh to show updated status
+            } else {
+                alert(`❌ Error: ${data.error}`);
+            }
+        } catch (error) {
+            console.error('Error finalizing contract:', error);
+            alert(`❌ Error finalizing contract: ${error.message}`);
+        }
+    };
+    
+    // Mark contract as returned
+    window.markReturned = async function(contractNumber) {
+        const user = prompt('Enter your name to mark this contract as returned:');
+        if (!user || user.trim() === '') return;
+        
+        const notes = prompt('Optional notes about return (e.g., "Missing 2 napkin packs"):') || '';
+        
+        try {
+            const response = await fetch('/tab/4/mark_returned', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    contract_number: contractNumber, 
+                    user: user.trim(),
+                    notes: notes.trim()
+                })
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                alert(`✅ ${data.message}`);
+                location.reload(); // Refresh to show updated status
+            } else {
+                alert(`❌ Error: ${data.error}`);
+            }
+        } catch (error) {
+            console.error('Error marking contract as returned:', error);
+            alert(`❌ Error marking contract as returned: ${error.message}`);
+        }
+    };
+    
+    // Reactivate contract
+    window.reactivateContract = async function(contractNumber) {
+        if (!confirm(`Are you sure you want to reactivate contract ${contractNumber}? This will reset its status to active.`)) {
+            return;
+        }
+        
+        const user = prompt('Enter your name to reactivate this contract:');
+        if (!user || user.trim() === '') return;
+        
+        const notes = prompt('Optional notes about reactivation:') || '';
+        
+        try {
+            const response = await fetch('/tab/4/reactivate_contract', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    contract_number: contractNumber, 
+                    user: user.trim(),
+                    notes: notes.trim()
+                })
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                alert(`✅ ${data.message}`);
+                location.reload(); // Refresh to show updated status
+            } else {
+                alert(`❌ Error: ${data.error}`);
+            }
+        } catch (error) {
+            console.error('Error reactivating contract:', error);
+            alert(`❌ Error reactivating contract: ${error.message}`);
+        }
+    };
+
+    // Initialize event listeners when page loads
+    document.addEventListener('DOMContentLoaded', function() {
+        // Status filter radio buttons
+        document.querySelectorAll('input[name="status-filter"]').forEach(radio => {
+            radio.addEventListener('change', function() {
+                filterContractsByStatus(this.value);
+            });
+        });
+        
+        // Status action buttons
+        document.querySelectorAll('.finalize-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                finalizeContract(this.dataset.contractNumber);
+            });
+        });
+        
+        document.querySelectorAll('.return-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                markReturned(this.dataset.contractNumber);
+            });
+        });
+        
+        document.querySelectorAll('.reactivate-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                reactivateContract(this.dataset.contractNumber);
+            });
+        });
+        
+        // Initialize with active filter (default)
+        filterContractsByStatus('active');
+        
+        console.log('Laundry contract status management initialized');
+    });
 });

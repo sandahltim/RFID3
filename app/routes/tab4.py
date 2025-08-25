@@ -230,8 +230,45 @@ def tab4_view():
                 continue
             contracts.append(contract)
 
-        # Step 7: Add laundry contract status information
+        # Step 7: Add laundry contract status information and include completed contracts
         contract_numbers = [c['contract_number'] for c in contracts]
+        
+        # Also fetch contracts that are finalized/returned but might not have current items
+        completed_status_records = session.query(LaundryContractStatus).filter(
+            LaundryContractStatus.status.in_(['finalized', 'returned']),
+            LaundryContractStatus.contract_number.like('L%')
+        ).all()
+        
+        # Add completed contracts to the list if they're not already there
+        existing_contract_numbers = set(contract_numbers)
+        for status_record in completed_status_records:
+            if status_record.contract_number not in existing_contract_numbers:
+                # Get basic info for completed contract
+                latest_transaction = session.query(
+                    Transaction.client_name,
+                    Transaction.scan_date
+                ).filter(
+                    Transaction.contract_number == status_record.contract_number,
+                    Transaction.scan_type == 'Rental'
+                ).order_by(desc(Transaction.scan_date)).first()
+                
+                # Get inventory count
+                total_items_inventory = session.query(func.count(ItemMaster.tag_id)).filter(
+                    ItemMaster.last_contract_num == status_record.contract_number
+                ).scalar() or 0
+                
+                # Add the completed contract to the list
+                contracts.append({
+                    'contract_number': status_record.contract_number,
+                    'client_name': latest_transaction.client_name if latest_transaction else 'N/A',
+                    'scan_date': latest_transaction.scan_date.isoformat() if latest_transaction and latest_transaction.scan_date else 'N/A',
+                    'items_on_contract': 0,  # No current items (completed)
+                    'total_items_inventory': total_items_inventory,
+                    'hand_counted_items': 0  # No current hand-counted items (completed)
+                })
+                contract_numbers.append(status_record.contract_number)
+        
+        # Now add status information to all contracts
         if contract_numbers:
             status_query = session.query(LaundryContractStatus).filter(
                 LaundryContractStatus.contract_number.in_(contract_numbers)
