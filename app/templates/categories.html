@@ -28,17 +28,57 @@
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h2>Manage Categories</h2>
         <div class="btn-group">
-            <button class="btn btn-outline-info btn-sm" onclick="exportCategories()">
-                📤 Export Categories
+            <button class="btn btn-outline-info btn-sm" onclick="showExportModal()">
+                📤 Export All Data
             </button>
             <button class="btn btn-outline-success btn-sm" onclick="document.getElementById('import-file').click()">
-                📥 Import Categories
+                📥 Import All Data
             </button>
         </div>
     </div>
     
     <!-- Hidden file input for import -->
     <input type="file" id="import-file" accept=".json" style="display: none;" onchange="handleImportFile(this)">
+    
+    <!-- Export options modal -->
+    <div id="export-modal" class="modal fade" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Export Configuration Data</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Select what data to include in your export file:</p>
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="checkbox" id="export-user-mappings" checked>
+                        <label class="form-check-label" for="export-user-mappings">
+                            <strong>User Category Mappings</strong> - Your custom category classifications
+                        </label>
+                    </div>
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="checkbox" id="export-hand-counted" checked>
+                        <label class="form-check-label" for="export-hand-counted">
+                            <strong>Hand-Counted Catalog</strong> - Napkins, sashes, and other non-RFID items
+                        </label>
+                    </div>
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" id="export-rental-mappings" checked>
+                        <label class="form-check-label" for="export-rental-mappings">
+                            <strong>Base Rental Mappings</strong> - System category mappings (if customized)
+                        </label>
+                    </div>
+                    <div class="alert alert-info">
+                        <strong>💡 Recommended:</strong> Export all data for complete backup and easy setup on new installations.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="exportCategoriesWithOptions()">Export Selected Data</button>
+                </div>
+            </div>
+        </div>
+    </div>
     
     <!-- Import options modal (hidden by default) -->
     <div id="import-modal" class="modal fade" tabindex="-1" aria-hidden="true">
@@ -58,13 +98,13 @@
                         <div class="form-check">
                             <input class="form-check-input" type="radio" name="import-mode" id="merge-mode" value="merge" checked>
                             <label class="form-check-label" for="merge-mode">
-                                <strong>Merge</strong> - Add new items, update existing ones
+                                <strong>Smart Import</strong> - Add new items and update existing ones (recommended)
                             </label>
                         </div>
                         <div class="form-check">
                             <input class="form-check-input" type="radio" name="import-mode" id="replace-mode" value="replace">
                             <label class="form-check-label" for="replace-mode">
-                                <strong>Replace</strong> - Replace all existing data (⚠️ Destructive)
+                                <strong>Overwrite Import</strong> - Same as Smart Import (updates matching items)
                             </label>
                         </div>
                     </div>

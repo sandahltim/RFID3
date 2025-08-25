@@ -256,10 +256,72 @@ console.log('categories.js version: 2025-07-02-v6 loaded');
     // Export/Import functionality
     let pendingImportData = null;
     
-    async function exportCategories() {
+    function hideModal(modalId) {
+        // Hide modal reliably
+        const modalElement = document.getElementById(modalId);
+        if (modalElement) {
+            modalElement.style.display = 'none';
+            modalElement.classList.remove('show');
+            modalElement.setAttribute('aria-hidden', 'true');
+            document.body.classList.remove('modal-open');
+            
+            // Remove backdrop
+            const backdrop = document.getElementById(modalId + '-backdrop');
+            if (backdrop) {
+                backdrop.remove();
+            }
+        }
+    }
+    
+    function showModal(modalId) {
+        // Show modal reliably
+        const modalElement = document.getElementById(modalId);
+        if (modalElement) {
+            modalElement.style.display = 'block';
+            modalElement.classList.add('show');
+            modalElement.setAttribute('aria-hidden', 'false');
+            document.body.classList.add('modal-open');
+            
+            // Add backdrop
+            const backdrop = document.createElement('div');
+            backdrop.className = 'modal-backdrop fade show';
+            backdrop.id = modalId + '-backdrop';
+            backdrop.onclick = () => hideModal(modalId); // Close on backdrop click
+            document.body.appendChild(backdrop);
+            
+            // Add close functionality to close buttons
+            const closeButtons = modalElement.querySelectorAll('[data-bs-dismiss="modal"], .btn-close');
+            closeButtons.forEach(btn => {
+                btn.onclick = () => hideModal(modalId);
+            });
+        }
+    }
+    
+    function showExportModal() {
+        showModal('export-modal');
+    }
+    
+    async function exportCategoriesWithOptions() {
         try {
-            console.log('Starting export...');
-            const response = await fetch('/categories/export');
+            console.log('Starting export with options...');
+            
+            // Get selected options
+            const includeUserMappings = document.getElementById('export-user-mappings').checked;
+            const includeHandCounted = document.getElementById('export-hand-counted').checked;
+            const includeRentalMappings = document.getElementById('export-rental-mappings').checked;
+            
+            if (!includeUserMappings && !includeHandCounted && !includeRentalMappings) {
+                alert('❌ Please select at least one data type to export');
+                return;
+            }
+            
+            // Build query parameters
+            const params = new URLSearchParams();
+            if (includeUserMappings) params.append('include', 'user_mappings');
+            if (includeHandCounted) params.append('include', 'hand_counted');
+            if (includeRentalMappings) params.append('include', 'rental_mappings');
+            
+            const response = await fetch(`/categories/export?${params.toString()}`);
             if (!response.ok) {
                 throw new Error(`Export failed: ${response.status} ${response.statusText}`);
             }
@@ -269,23 +331,49 @@ console.log('categories.js version: 2025-07-02-v6 loaded');
                 throw new Error(data.error);
             }
             
-            // Create download
+            // Create download with descriptive filename
+            const selectedTypes = [];
+            if (includeUserMappings) selectedTypes.push('mappings');
+            if (includeHandCounted) selectedTypes.push('handcounted');
+            if (includeRentalMappings) selectedTypes.push('rentals');
+            
+            const typeString = selectedTypes.length === 3 ? 'complete' : selectedTypes.join('-');
+            const filename = `rfid3-${typeString}-backup-${new Date().toISOString().split('T')[0]}.json`;
+            
             const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `rfid3-categories-export-${new Date().toISOString().split('T')[0]}.json`;
+            a.download = filename;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
             window.URL.revokeObjectURL(url);
             
-            alert(`✅ Export completed!\n\nExported:\n• ${data.counts.user_mappings} user mappings\n• ${data.counts.hand_counted_items} hand-counted items\n• ${data.counts.rental_mappings} rental mappings`);
+            // Show success message
+            const exportedItems = [];
+            if (data.counts.user_mappings) exportedItems.push(`${data.counts.user_mappings} user mappings`);
+            if (data.counts.hand_counted_items) exportedItems.push(`${data.counts.hand_counted_items} hand-counted items`);
+            if (data.counts.rental_mappings) exportedItems.push(`${data.counts.rental_mappings} rental mappings`);
+            
+            alert(`✅ Export completed!\n\nFile: ${filename}\n\nExported:\n• ${exportedItems.join('\n• ')}`);
+            
+            // Hide modal
+            hideModal('export-modal');
             
         } catch (error) {
             console.error('Export error:', error);
             alert(`❌ Export failed: ${error.message}`);
         }
+    }
+    
+    // Legacy function for direct export (all data)
+    async function exportCategories() {
+        // Set all checkboxes to true and export
+        document.getElementById('export-user-mappings').checked = true;
+        document.getElementById('export-hand-counted').checked = true;
+        document.getElementById('export-rental-mappings').checked = true;
+        await exportCategoriesWithOptions();
     }
     
     function handleImportFile(fileInput) {
@@ -327,8 +415,7 @@ console.log('categories.js version: 2025-07-02-v6 loaded');
                 `;
                 
                 // Show modal
-                const modal = new bootstrap.Modal(document.getElementById('import-modal'));
-                modal.show();
+                showModal('import-modal');
                 
             } catch (error) {
                 console.error('File parse error:', error);
@@ -387,8 +474,7 @@ console.log('categories.js version: 2025-07-02-v6 loaded');
             alert(summary.join('\n'));
             
             // Hide modal and reload page
-            const modal = bootstrap.Modal.getInstance(document.getElementById('import-modal'));
-            modal.hide();
+            hideModal('import-modal');
             
             // Reload the categories
             location.reload();
@@ -415,6 +501,8 @@ console.log('categories.js version: 2025-07-02-v6 loaded');
     };
     
     // Also expose key functions globally for onclick handlers
+    window.showExportModal = showExportModal;
+    window.exportCategoriesWithOptions = exportCategoriesWithOptions;
     window.exportCategories = exportCategories;
     window.handleImportFile = handleImportFile;
     window.confirmImport = confirmImport;
