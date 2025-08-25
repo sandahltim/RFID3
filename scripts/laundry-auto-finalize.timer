@@ -1,10 +1,10 @@
 [Unit]
-Description=Run RFID3 Laundry Auto-Finalization on Tuesday and Thursday at 7am
+Description=Run RFID3 Laundry Auto-Finalization on Wednesday and Friday at 7am
 Requires=laundry-auto-finalize.service
 
 [Timer]
-# Run at 7:00 AM on Tuesday and Thursday
-OnCalendar=Tue,Thu *-*-* 07:00:00
+# Run at 7:00 AM on Wednesday and Friday (same as snapshots)
+OnCalendar=Wed,Fri *-*-* 07:00:00
 Persistent=true
 RandomizedDelaySec=60
 

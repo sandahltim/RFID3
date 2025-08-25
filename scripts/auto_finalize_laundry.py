@@ -149,10 +149,10 @@ def main():
     """Main execution function"""
     logger.info("Starting auto-finalization process")
     
-    # Check if today is Tuesday (1) or Thursday (3)
+    # Check if today is Wednesday (2) or Friday (4)
     today = datetime.now().weekday()
-    if today not in [1, 3]:  # 0=Monday, 1=Tuesday, 2=Wednesday, 3=Thursday, etc.
-        logger.info(f"Today is not Tuesday or Thursday (weekday={today}). Skipping auto-finalization.")
+    if today not in [2, 4]:  # 0=Monday, 1=Tuesday, 2=Wednesday, 3=Thursday, 4=Friday, etc.
+        logger.info(f"Today is not Wednesday or Friday (weekday={today}). Skipping auto-finalization.")
         return
     
     session = None
