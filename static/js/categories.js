@@ -253,12 +253,170 @@ console.log('categories.js version: 2025-07-02-v6 loaded');
         });
     });
 
+    // Export/Import functionality
+    let pendingImportData = null;
+    
+    async function exportCategories() {
+        try {
+            console.log('Starting export...');
+            const response = await fetch('/categories/export');
+            if (!response.ok) {
+                throw new Error(`Export failed: ${response.status} ${response.statusText}`);
+            }
+            
+            const data = await response.json();
+            if (data.error) {
+                throw new Error(data.error);
+            }
+            
+            // Create download
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `rfid3-categories-export-${new Date().toISOString().split('T')[0]}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+            
+            alert(`✅ Export completed!\n\nExported:\n• ${data.counts.user_mappings} user mappings\n• ${data.counts.hand_counted_items} hand-counted items\n• ${data.counts.rental_mappings} rental mappings`);
+            
+        } catch (error) {
+            console.error('Export error:', error);
+            alert(`❌ Export failed: ${error.message}`);
+        }
+    }
+    
+    function handleImportFile(fileInput) {
+        const file = fileInput.files[0];
+        if (!file) return;
+        
+        if (!file.name.endsWith('.json')) {
+            alert('❌ Please select a JSON file');
+            fileInput.value = '';
+            return;
+        }
+        
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const data = JSON.parse(e.target.result);
+                
+                // Validate file structure
+                if (!data.export_info || !data.user_rental_class_mappings || !data.hand_counted_catalog) {
+                    throw new Error('Invalid export file format');
+                }
+                
+                // Store data and show modal
+                pendingImportData = data;
+                document.getElementById('import-filename').textContent = file.name;
+                
+                // Show preview
+                const preview = document.getElementById('import-preview');
+                preview.innerHTML = `
+                    <div class="alert alert-info">
+                        <strong>Export Info:</strong><br>
+                        • Exported: ${new Date(data.export_info.exported_at).toLocaleString()}<br>
+                        • Version: ${data.export_info.version}<br><br>
+                        <strong>Contains:</strong><br>
+                        • ${data.user_rental_class_mappings.length} user mappings<br>
+                        • ${data.hand_counted_catalog.length} hand-counted items<br>
+                        • ${(data.rental_class_mappings || []).length} rental mappings
+                    </div>
+                `;
+                
+                // Show modal
+                const modal = new bootstrap.Modal(document.getElementById('import-modal'));
+                modal.show();
+                
+            } catch (error) {
+                console.error('File parse error:', error);
+                alert(`❌ Invalid file: ${error.message}`);
+                fileInput.value = '';
+            }
+        };
+        
+        reader.readAsText(file);
+    }
+    
+    async function confirmImport() {
+        if (!pendingImportData) {
+            alert('❌ No import data available');
+            return;
+        }
+        
+        try {
+            const mode = document.querySelector('input[name="import-mode"]:checked').value;
+            console.log(`Starting import in ${mode} mode...`);
+            
+            const response = await fetch(`/categories/import?mode=${mode}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(pendingImportData)
+            });
+            
+            const result = await response.json();
+            
+            if (!result.success) {
+                throw new Error(result.error || 'Import failed');
+            }
+            
+            // Show success message
+            const results = result.results;
+            const summary = [
+                `✅ Import completed successfully!`,
+                ``,
+                `User Mappings:`,
+                `• Added: ${results.user_mappings.added}`,
+                `• Updated: ${results.user_mappings.updated}`,
+                `• Skipped: ${results.user_mappings.skipped}`,
+                ``,
+                `Hand-Counted Items:`,
+                `• Added: ${results.hand_counted.added}`,
+                `• Updated: ${results.hand_counted.updated}`,
+                `• Skipped: ${results.hand_counted.skipped}`
+            ];
+            
+            if (results.rental_mappings.added > 0) {
+                summary.push(``, `Rental Mappings:`, `• Added: ${results.rental_mappings.added}`);
+            }
+            
+            alert(summary.join('\n'));
+            
+            // Hide modal and reload page
+            const modal = bootstrap.Modal.getInstance(document.getElementById('import-modal'));
+            modal.hide();
+            
+            // Reload the categories
+            location.reload();
+            
+        } catch (error) {
+            console.error('Import error:', error);
+            alert(`❌ Import failed: ${error.message}`);
+        } finally {
+            pendingImportData = null;
+            document.getElementById('import-file').value = '';
+        }
+    }
+
     // Expose functions to global scope safely
     window.categories = {
         addMappingRow,
         removeMappingRow,
         confirmSaveMappings,
         clearEdits,
-        sortTable
+        sortTable,
+        exportCategories,
+        handleImportFile,
+        confirmImport
     };
+    
+    // Also expose key functions globally for onclick handlers
+    window.exportCategories = exportCategories;
+    window.handleImportFile = handleImportFile;
+    window.confirmImport = confirmImport;
+    
 })();
