@@ -1,12 +1,17 @@
 import os
+import sys
 import logging
+import types
 import pytest
+
+# Ensure root directory is on sys.path for config and app imports
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from config import LOGIN_URL
 
 # Ensure log directory exists before importing the client module
 os.makedirs('/home/tim/RFID3/logs', exist_ok=True)
 
-from app.services.api_client import APIClient, session
+from app.services.api_client import APIClient
 
 class DummyAuthResponse:
     status_code = 200
@@ -25,14 +30,26 @@ class DummyPostResponse:
 
 
 def test_limit_capped(monkeypatch, caplog):
-    monkeypatch.setattr(session, 'post', lambda *args, **kwargs: DummyAuthResponse())
-    monkeypatch.setattr(session, 'get', lambda *args, **kwargs: DummyGetResponse())
+    captured = {}
+
+    def dummy_get(url, headers=None, params=None, timeout=None):
+        captured['limit'] = params.get('limit')
+        return DummyGetResponse()
+
+    dummy_session = types.SimpleNamespace(
+        post=lambda *args, **kwargs: DummyAuthResponse(),
+        get=dummy_get,
+    )
+    monkeypatch.setattr(
+        'app.services.api_client.create_session', lambda: dummy_session
+    )
 
     client = APIClient()
     params = {'limit': 500}
     with caplog.at_level(logging.WARNING, logger='api_client'):
         client._make_request('dummy', params=params)
-    assert params['limit'] == 200
+    assert params['limit'] == 500
+    assert captured['limit'] == 200
     assert "exceeds API maximum of 200" in caplog.text
 
 
@@ -45,7 +62,11 @@ def test_post_uses_session(monkeypatch):
             return DummyAuthResponse()
         return DummyPostResponse()
 
-    monkeypatch.setattr(session, 'post', mock_post)
+    dummy_session = types.SimpleNamespace(post=mock_post)
+    monkeypatch.setattr(
+        'app.services.api_client.create_session', lambda: dummy_session
+    )
+
     client = APIClient()
     response = client._make_request('dummy', method='POST', data={'foo': 'bar'})
     assert response == {'result': 'ok'}
