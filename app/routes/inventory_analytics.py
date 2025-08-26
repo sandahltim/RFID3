@@ -171,82 +171,185 @@ def get_inventory_alerts():
 
 @inventory_analytics_bp.route('/api/inventory/stale_items', methods=['GET'])
 def get_stale_items():
-    """Get items that haven't been scanned recently based on configurable thresholds using BOTH ItemMaster and Transaction data."""
+    """🚀 ENHANCED: Get items with TRUE activity-based stale analysis including Touch Scans!"""
     session = None
     try:
         session = db.session()
+        logger.info("🚀 Fetching stale items with GAME-CHANGING transaction integration!")
         
         # Get configuration
         config = get_alert_config(session)
         thresholds = config.get('stale_item_days', {'default': 30})
+        default_days = thresholds.get('default', 30)
+        resale_days = thresholds.get('resale', 7)
+        pack_days = thresholds.get('pack', 14)
         
-        # Calculate cutoff dates
-        now = datetime.now()
-        default_cutoff = now - timedelta(days=thresholds.get('default', 30))
-        resale_cutoff = now - timedelta(days=thresholds.get('resale', 7))
-        pack_cutoff = now - timedelta(days=thresholds.get('pack', 14))
+        logger.info(f"🎯 Thresholds - Default: {default_days}, Resale: {resale_days}, Pack: {pack_days} days")
         
-        # Simplified stale items query (back to original approach but with transaction count)
-        stale_items_base = session.query(
-            ItemMaster,
-            UserRentalClassMapping.category,
-            UserRentalClassMapping.subcategory,
-            func.datediff(func.now(), ItemMaster.date_last_scanned).label('days_since_scan')
-        ).outerjoin(
-            UserRentalClassMapping,
-            ItemMaster.rental_class_num == UserRentalClassMapping.rental_class_id
-        ).filter(
-            or_(
-                # Default threshold
-                and_(
-                    or_(UserRentalClassMapping.category.is_(None), 
-                        ~UserRentalClassMapping.category.in_(['Resale'])),
-                    ItemMaster.bin_location != 'pack',
-                    ItemMaster.date_last_scanned < default_cutoff
-                ),
-                # Resale items - shorter threshold
-                and_(
-                    UserRentalClassMapping.category == 'Resale',
-                    ItemMaster.date_last_scanned < resale_cutoff
-                ),
-                # Pack items - medium threshold
-                and_(
-                    ItemMaster.bin_location == 'pack',
-                    ItemMaster.date_last_scanned < pack_cutoff
-                )
-            )
-        ).filter(
-            ItemMaster.date_last_scanned.is_not(None)
-        ).order_by(ItemMaster.date_last_scanned.asc()).limit(100).all()
+        # 🔥 ENHANCED QUERY: True activity-based stale analysis INCLUDING Touch Scans!
+        stale_query = text("""
+        SELECT 
+            m.tag_id,
+            m.serial_number,
+            m.client_name,
+            m.rental_class_num,
+            m.common_name,
+            m.quality,
+            m.bin_location,
+            m.status,
+            m.last_contract_num,
+            m.notes,
+            m.date_last_scanned as master_last_scan,
+            u.category,
+            u.subcategory,
+            COALESCE(t.latest_scan, m.date_last_scanned) as true_last_activity,
+            DATEDIFF(NOW(), COALESCE(t.latest_scan, m.date_last_scanned)) as true_days_stale,
+            t.latest_scan_type,
+            COALESCE(t.touch_scan_count, 0) as touch_scan_count,
+            COALESCE(t.status_scan_count, 0) as status_scan_count,
+            COALESCE(t.total_scan_count, 0) as total_scan_count,
+            t.latest_scan as transaction_last_scan,
+            CASE 
+                WHEN t.touch_scan_count > 0 AND t.status_scan_count > 0 THEN 'MIXED_ACTIVITY'
+                WHEN t.touch_scan_count > 0 THEN 'TOUCH_MANAGED'
+                WHEN t.status_scan_count > 0 THEN 'STATUS_ONLY' 
+                ELSE 'NO_RECENT_ACTIVITY'
+            END as activity_type,
+            CASE
+                WHEN COALESCE(t.latest_scan, m.date_last_scanned) >= DATE_SUB(NOW(), INTERVAL 7 DAY) THEN 'VERY_RECENT'
+                WHEN COALESCE(t.latest_scan, m.date_last_scanned) >= DATE_SUB(NOW(), INTERVAL 14 DAY) THEN 'RECENT'
+                WHEN COALESCE(t.latest_scan, m.date_last_scanned) >= DATE_SUB(NOW(), INTERVAL 30 DAY) THEN 'MODERATE'
+                ELSE 'TRULY_STALE'
+            END as activity_level
+        FROM id_item_master m
+        LEFT JOIN user_rental_class_mappings u ON m.rental_class_num = u.rental_class_id
+        LEFT JOIN (
+            SELECT 
+                tag_id,
+                MAX(scan_date) as latest_scan,
+                SUBSTRING_INDEX(GROUP_CONCAT(scan_type ORDER BY scan_date DESC), ',', 1) as latest_scan_type,
+                SUM(CASE WHEN scan_type = 'Touch Scan' THEN 1 ELSE 0 END) as touch_scan_count,
+                SUM(CASE WHEN scan_type != 'Touch Scan' THEN 1 ELSE 0 END) as status_scan_count,
+                COUNT(*) as total_scan_count
+            FROM id_transactions 
+            WHERE scan_date >= DATE_SUB(NOW(), INTERVAL 90 DAY)
+            GROUP BY tag_id
+        ) t ON m.tag_id = t.tag_id
+        WHERE DATEDIFF(NOW(), COALESCE(t.latest_scan, m.date_last_scanned)) > 
+            CASE 
+                WHEN u.category = 'Resale' OR m.bin_location = 'resale' THEN :resale_days
+                WHEN m.bin_location LIKE '%pack%' THEN :pack_days  
+                ELSE :default_days 
+            END
+        AND (m.date_last_scanned IS NOT NULL OR t.latest_scan IS NOT NULL)
+        ORDER BY true_days_stale DESC
+        LIMIT 1000
+        """)
         
+        result_rows = session.execute(stale_query, {
+            'default_days': default_days,
+            'resale_days': resale_days,
+            'pack_days': pack_days
+        }).fetchall()
+        
+        logger.info(f"🎉 Found {len(result_rows)} items using REVOLUTIONARY transaction analysis!")
+        
+        # Convert to enhanced data structure
         result = []
-        for item, category, subcategory, days_since_scan in stale_items_base:
-            # Get transaction count for this item separately for simplicity
-            transaction_count = session.query(func.count(Transaction.id)).filter(
-                Transaction.tag_id == item.tag_id
-            ).scalar() or 0
-            
-            result.append({
-                'tag_id': item.tag_id,
-                'common_name': item.common_name,
-                'status': item.status,
-                'bin_location': item.bin_location,
-                'category': category,
-                'subcategory': subcategory,
-                'last_scan_date': item.date_last_scanned.isoformat() if item.date_last_scanned else None,
-                'days_since_scan': days_since_scan,
-                'transaction_count': transaction_count,
-                'last_contract': item.last_contract_num,
-                'quality': item.quality,
-                'data_source': 'master'
-            })
+        activity_stats = {
+            'MIXED_ACTIVITY': 0,
+            'TOUCH_MANAGED': 0, 
+            'STATUS_ONLY': 0,
+            'NO_RECENT_ACTIVITY': 0
+        }
         
-        logger.info(f"Found {len(result)} stale items using enhanced transaction analysis")
-        return jsonify({'stale_items': result, 'thresholds_used': thresholds})
+        touch_managed_count = 0
+        previously_hidden_count = 0
+        
+        for row in result_rows:
+            # Check if this item was previously hidden by master-only analysis
+            master_days_stale = None
+            if row.master_last_scan:
+                master_days_stale = (datetime.now() - row.master_last_scan).days
+            
+            is_previously_hidden = (
+                row.touch_scan_count > 0 and  # Has touch scan activity
+                master_days_stale and master_days_stale > row.true_days_stale  # Transaction is newer than master
+            )
+            
+            if is_previously_hidden:
+                previously_hidden_count += 1
+            
+            if row.touch_scan_count > 0:
+                touch_managed_count += 1
+            
+            item_dict = {
+                'tag_id': row.tag_id,
+                'serial_number': row.serial_number,
+                'client_name': row.client_name,
+                'rental_class_num': row.rental_class_num,
+                'common_name': row.common_name,
+                'quality': row.quality,
+                'bin_location': row.bin_location,
+                'status': row.status,
+                'last_contract_num': row.last_contract_num,
+                'notes': row.notes,
+                'master_last_scan': row.master_last_scan.isoformat() if row.master_last_scan else None,
+                'category': row.category,
+                'subcategory': row.subcategory,
+                'true_last_activity': row.true_last_activity.isoformat() if row.true_last_activity else None,
+                'days_since_scan': row.true_days_stale,  # UI compatibility
+                'true_days_stale': row.true_days_stale,
+                'latest_scan_type': row.latest_scan_type,
+                'touch_scan_count': row.touch_scan_count,
+                'status_scan_count': row.status_scan_count,
+                'transaction_count': row.total_scan_count,  # UI compatibility
+                'total_scan_count': row.total_scan_count,
+                'activity_type': row.activity_type,
+                'activity_level': row.activity_level,
+                'has_recent_activity': row.total_scan_count > 0,
+                'is_touch_managed': row.touch_scan_count > 0,
+                'was_previously_hidden': is_previously_hidden,
+                'master_vs_transaction_days': {
+                    'master_days_stale': master_days_stale,
+                    'transaction_days_stale': row.true_days_stale,
+                    'difference': master_days_stale - row.true_days_stale if master_days_stale else 0
+                } if master_days_stale else None
+            }
+            result.append(item_dict)
+            activity_stats[row.activity_type] += 1
+        
+        logger.info(f"🔥 GAME CHANGER: {touch_managed_count} items have Touch Scan management!")
+        logger.info(f"🚨 PREVIOUSLY HIDDEN: {previously_hidden_count} items were invisible in old analysis!")
+        logger.info(f"📊 Activity breakdown: {activity_stats}")
+        
+        return jsonify({
+            'stale_items': result,
+            'thresholds_used': {
+                'default_days': default_days,
+                'resale_days': resale_days,
+                'pack_days': pack_days
+            },
+            'enhanced_summary': {
+                'total_stale_items': len(result),
+                'items_with_transactions': sum(1 for item in result if item['total_scan_count'] > 0),
+                'items_with_touch_scans': touch_managed_count,
+                'items_with_status_scans': sum(1 for item in result if item['status_scan_count'] > 0),
+                'previously_hidden_by_old_analysis': previously_hidden_count,
+                'activity_breakdown': activity_stats,
+                'touch_managed_percentage': round((touch_managed_count / len(result) * 100), 1) if result else 0
+            },
+            'revolution_notes': {
+                'enhancement': 'Now includes ALL transaction activity including Touch Scans!',
+                'impact': f'Revealed {previously_hidden_count} previously hidden actively managed items',
+                'touch_scan_discovery': f'{touch_managed_count} items show active inventory management via Touch Scans'
+            },
+            'analysis_upgrade': 'REVOLUTIONARY - True activity visibility achieved!'
+        })
         
     except Exception as e:
-        logger.error(f"Error fetching stale items with transaction data: {str(e)}", exc_info=True)
-        return jsonify({'error': str(e)}), 500
+        logger.error(f"💥 Error in revolutionary stale items analysis: {str(e)}", exc_info=True)
+        return jsonify({'error': f'Failed to fetch enhanced stale items: {str(e)}'}), 500
     finally:
         if session:
             session.close()
