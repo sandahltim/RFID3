@@ -3,6 +3,7 @@
 import logging
 import sys
 import json
+import config
 from flask import Blueprint, render_template, request, jsonify, current_app
 from .. import db, cache
 from ..models.db_models import RentalClassMapping, UserRentalClassMapping, SeedRentalClass, HandCountedCatalog
@@ -15,7 +16,7 @@ from time import time
 logger = logging.getLogger('categories')
 logger.setLevel(logging.INFO)
 logger.handlers = []
-file_handler = logging.FileHandler('/home/tim/RFID3/logs/rfid_dashboard.log')
+file_handler = logging.FileHandler(config.LOG_FILE)
 file_handler.setLevel(logging.INFO)
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 file_handler.setFormatter(formatter)

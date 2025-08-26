@@ -11,6 +11,7 @@ from time import time
 from urllib.parse import unquote
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+import config
 
 # Configure logging
 logger = logging.getLogger('tab1')
@@ -18,7 +19,7 @@ logger.setLevel(logging.DEBUG)
 logger.handlers = []
 
 # File handler for rfid_dashboard.log
-file_handler = logging.FileHandler('/home/tim/RFID3/logs/rfid_dashboard.log')
+file_handler = logging.FileHandler(config.LOG_FILE)
 file_handler.setLevel(logging.DEBUG)
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 file_handler.setFormatter(formatter)

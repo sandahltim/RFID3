@@ -9,6 +9,8 @@ from sqlalchemy.exc import SQLAlchemyError
 from datetime import datetime, timedelta
 import logging
 import json
+import os
+import config
 
 # Configure logging for Inventory & Analytics
 logger = logging.getLogger('inventory_analytics')
@@ -18,7 +20,8 @@ logger.setLevel(logging.INFO)
 logger.handlers = []
 
 # File handler for inventory_analytics.log
-file_handler = logging.FileHandler('/home/tim/RFID3/logs/inventory_analytics.log')
+inventory_log_file = os.path.join(config.BASE_DIR, 'logs', 'inventory_analytics.log')
+file_handler = logging.FileHandler(inventory_log_file)
 file_handler.setLevel(logging.INFO)
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 file_handler.setFormatter(formatter)
