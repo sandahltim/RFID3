@@ -2,8 +2,8 @@
 # home.py version: 2025-07-10-v7
 from flask import Blueprint, render_template
 from .. import db, cache
-from ..models.db_models import ItemMaster, Transaction, RefreshState
-from sqlalchemy import func
+from ..models.db_models import ItemMaster, RefreshState
+from sqlalchemy import func, case
 from time import time
 import logging
 from datetime import datetime
@@ -29,68 +29,29 @@ def home():
     try:
         logger.info("Starting new session for home")
 
-        # Total items
-        total_items = db.session.query(func.count(ItemMaster.tag_id)).scalar()
-        logger.info(f'Total items details: {total_items}')
-        logger.debug(f"Total items: {total_items}")
+        counts_row = db.session.query(
+            func.count(ItemMaster.tag_id).label('total'),
+            func.sum(case((ItemMaster.status.in_(['On Rent', 'Delivered']), 1), else_=0)).label('on_rent'),
+            func.sum(case((ItemMaster.status == 'Ready to Rent', 1), else_=0)).label('available'),
+            func.sum(case((ItemMaster.status.notin_(['Ready to Rent', 'On Rent', 'Delivered']), 1), else_=0)).label('in_service')
+        ).one()
+        counts = {
+            'total': counts_row.total or 0,
+            'on_rent': counts_row.on_rent or 0,
+            'available': counts_row.available or 0,
+            'in_service': counts_row.in_service or 0
+        }
+        logger.info(
+            f"Inventory counts - total: {counts['total']}, on_rent: {counts['on_rent']}, "
+            f"available: {counts['available']}, in_service: {counts['in_service']}"
+        )
 
-        # Status counts
-        status_counts = db.session.query(
-            ItemMaster.status,
-            func.count(ItemMaster.tag_id).label('count')
-        ).group_by(ItemMaster.status).all()
-        logger.info(f'Status counts details: {[(status, count) for status, count in status_counts]}')
-        logger.debug(f"Status counts in id_item_master: {[(status, count) for status, count in status_counts]}")
-
-        # Items on rent
-        items_on_rent = db.session.query(func.count(ItemMaster.tag_id)).filter(
-            ItemMaster.status.in_(['On Rent', 'Delivered'])
-        ).scalar()
-        logger.info(f'Items on rent details: {items_on_rent}')
-        logger.debug(f"Items on rent: {items_on_rent}")
-
-        # Items in service
-        subquery = db.session.query(
-            Transaction.tag_id,
-            Transaction.scan_date,
-            Transaction.service_required
-        ).filter(
-            Transaction.tag_id == ItemMaster.tag_id
-        ).order_by(
-            Transaction.scan_date.desc()
-        ).subquery()
-
-        service_required_counts = db.session.query(
-            subquery.c.service_required,
-            func.count(subquery.c.tag_id).label('count')
-        ).group_by(subquery.c.service_required).all()
-        logger.info(f'Service required counts details: {[(sr, count) for sr, count in service_required_counts]}')
-        logger.debug(f"Service required counts in id_transactions: {[(sr, count) for sr, count in service_required_counts]}")
-
-        items_in_service = db.session.query(func.count(ItemMaster.tag_id)).filter(
-            (ItemMaster.status.notin_(['Ready to Rent', 'On Rent', 'Delivered'])) |
-            (ItemMaster.tag_id.in_(
-                db.session.query(subquery.c.tag_id).filter(
-                    subquery.c.scan_date == db.session.query(func.max(Transaction.scan_date)).filter(Transaction.tag_id == subquery.c.tag_id).correlate(subquery).scalar_subquery(),
-                    subquery.c.service_required == True
-                )
-            ))
-        ).scalar()
-        logger.info(f'Items in service details: {items_in_service}')
-        logger.debug(f"Items in service: {items_in_service}")
-
-        # Items available
-        items_available = db.session.query(func.count(ItemMaster.tag_id)).filter(
-            ItemMaster.status == 'Ready to Rent'
-        ).scalar()
-        logger.info(f'Items available details: {items_available}')
-        logger.debug(f"Items available: {items_available}")
-
-        # Status breakdown
         status_breakdown = db.session.query(
             ItemMaster.status,
             func.count(ItemMaster.tag_id).label('count')
         ).group_by(ItemMaster.status).all()
+        logger.info(f'Status counts details: {[(status, count) for status, count in status_breakdown]}')
+        logger.debug(f"Status counts in id_item_master: {[(status, count) for status, count in status_breakdown]}")
         status_counts = [(status or 'Unknown', count) for status, count in status_breakdown]
 
         # Recent scans - increased to 50 for better real-time experience
@@ -109,13 +70,10 @@ def home():
 
         # Cache the response
         render_data = {
-            'total_items': total_items or 0,
-            'items_on_rent': items_on_rent or 0,
-            'items_in_service': items_in_service or 0,
-            'items_available': items_available or 0,
+            'counts': counts,
             'status_counts': status_counts,
             'recent_scans': [{
-                'tag_id': item.tag_id, 
+                'tag_id': item.tag_id,
                 'common_name': item.common_name,
                 'date_last_scanned': item.date_last_scanned.isoformat() if item.date_last_scanned else None,
                 'status': item.status,
@@ -127,10 +85,7 @@ def home():
         cache.set(cache_key, json.dumps(render_data), ex=60)  # Cache for 60 seconds
 
         return render_template('home.html',
-                              total_items=total_items or 0,
-                              items_on_rent=items_on_rent or 0,
-                              items_in_service=items_in_service or 0,
-                              items_available=items_available or 0,
+                              counts=counts,
                               status_counts=status_counts,
                               recent_scans=recent_scans,
                               last_refresh=last_refresh,
@@ -139,10 +94,7 @@ def home():
     except Exception as e:
         logger.error(f"Error rendering home page: {str(e)}", exc_info=True)
         return render_template('home.html',
-                              total_items=0,
-                              items_on_rent=0,
-                              items_in_service=0,
-                              items_available=0,
+                              counts={'total': 0, 'on_rent': 0, 'in_service': 0, 'available': 0},
                               status_counts=[],
                               recent_scans=[],
                               last_refresh='N/A',
@@ -232,28 +184,23 @@ def get_summary_stats():
         return jsonify(json.loads(cached_data))
     
     try:
-        # Get summary stats (these change less frequently)
-        total_items = db.session.query(func.count(ItemMaster.tag_id)).scalar()
-        items_on_rent = db.session.query(func.count(ItemMaster.tag_id)).filter(
-            ItemMaster.status.in_(['On Rent', 'Delivered'])
-        ).scalar()
-        items_available = db.session.query(func.count(ItemMaster.tag_id)).filter(
-            ItemMaster.status == 'Ready to Rent'
-        ).scalar()
-        
-        # Status breakdown
+        counts_row = db.session.query(
+            func.count(ItemMaster.tag_id).label('total'),
+            func.sum(case((ItemMaster.status.in_(['On Rent', 'Delivered']), 1), else_=0)).label('on_rent'),
+            func.sum(case((ItemMaster.status == 'Ready to Rent', 1), else_=0)).label('available'),
+            func.sum(case((ItemMaster.status.notin_(['Ready to Rent', 'On Rent', 'Delivered']), 1), else_=0)).label('in_service')
+        ).one()
+
         status_counts = db.session.query(
             ItemMaster.status,
             func.count(ItemMaster.tag_id).label('count')
         ).group_by(ItemMaster.status).all()
-        
-        items_in_service = total_items - items_on_rent - items_available if total_items else 0
-        
+
         stats = {
-            'total_items': total_items or 0,
-            'items_on_rent': items_on_rent or 0,
-            'items_in_service': items_in_service,
-            'items_available': items_available or 0,
+            'total_items': counts_row.total or 0,
+            'items_on_rent': counts_row.on_rent or 0,
+            'items_in_service': counts_row.in_service or 0,
+            'items_available': counts_row.available or 0,
             'status_counts': [(status or 'Unknown', count) for status, count in status_counts],
             'timestamp': datetime.now().isoformat()
         }
