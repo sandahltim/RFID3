@@ -151,27 +151,27 @@
         <div class="col-12">
             <ul class="nav nav-tabs" id="analyticsTab" role="tablist">
                 <li class="nav-item" role="presentation">
-                    <button class="nav-link active" id="alerts-tab" data-bs-toggle="tab" data-bs-target="#alerts" type="button" role="tab">
+                    <button class="nav-link active" id="alerts-tab" data-mdb-toggle="tab" data-mdb-target="#alerts" type="button" role="tab" aria-controls="alerts" aria-selected="true">
                         <i class="fas fa-exclamation-triangle"></i> Health Alerts
                     </button>
                 </li>
                 <li class="nav-item" role="presentation">
-                    <button class="nav-link" id="stale-items-tab" data-bs-toggle="tab" data-bs-target="#stale-items" type="button" role="tab">
+                    <button class="nav-link" id="stale-items-tab" data-mdb-toggle="tab" data-mdb-target="#stale-items" type="button" role="tab" aria-controls="stale-items" aria-selected="false">
                         <i class="fas fa-clock"></i> Stale Items
                     </button>
                 </li>
                 <li class="nav-item" role="presentation">
-                    <button class="nav-link" id="usage-analysis-tab" data-bs-toggle="tab" data-bs-target="#usage-analysis" type="button" role="tab">
+                    <button class="nav-link" id="usage-analysis-tab" data-mdb-toggle="tab" data-mdb-target="#usage-analysis" type="button" role="tab" aria-controls="usage-analysis" aria-selected="false">
                         <i class="fas fa-chart-bar"></i> Usage Analysis
                     </button>
                 </li>
                 <li class="nav-item" role="presentation">
-                    <button class="nav-link" id="resale-tracking-tab" data-bs-toggle="tab" data-bs-target="#resale-tracking" type="button" role="tab">
+                    <button class="nav-link" id="resale-tracking-tab" data-mdb-toggle="tab" data-mdb-target="#resale-tracking" type="button" role="tab" aria-controls="resale-tracking" aria-selected="false">
                         <i class="fas fa-shopping-cart"></i> Resale Tracking
                     </button>
                 </li>
                 <li class="nav-item" role="presentation">
-                    <button class="nav-link" id="configuration-tab" data-bs-toggle="tab" data-bs-target="#configuration" type="button" role="tab">
+                    <button class="nav-link" id="configuration-tab" data-mdb-toggle="tab" data-mdb-target="#configuration" type="button" role="tab" aria-controls="configuration" aria-selected="false">
                         <i class="fas fa-cog"></i> Configuration
                     </button>
                 </li>
@@ -179,23 +179,36 @@
             
             <div class="tab-content" id="analyticsTabContent">
                 <!-- Health Alerts Tab -->
-                <div class="tab-pane fade show active" id="alerts" role="tabpanel">
+                <div class="tab-pane fade show active" id="alerts" role="tabpanel" aria-labelledby="alerts-tab">
                     <div class="row">
                         <div class="col-md-8">
                             <div class="card">
-                                <div class="card-header d-flex justify-content-between align-items-center">
-                                    <h5><i class="fas fa-bell"></i> Active Health Alerts</h5>
-                                    <div class="d-flex gap-2">
+                                <div class="card-header">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <h5><i class="fas fa-bell"></i> Active Health Alerts</h5>
                                         <button class="btn btn-primary btn-sm" id="generate-alerts-btn" onclick="generateAlerts()" 
                                                 title="Scans stale items and creates health alerts based on current configuration thresholds. This creates alert records in the database for proactive inventory management.">
                                             <i class="fas fa-sync"></i> Generate Alerts
                                         </button>
-                                        <select class="form-select form-select-sm" id="alert-severity-filter">
+                                    </div>
+                                    <div class="d-flex gap-2 mt-2">
+                                        <select class="form-select form-select-sm" id="alert-category-filter" onchange="filterHealthAlerts()">
+                                            <option value="">All Categories</option>
+                                        </select>
+                                        <select class="form-select form-select-sm" id="alert-severity-filter" onchange="filterHealthAlerts()">
                                             <option value="">All Severities</option>
                                             <option value="critical">Critical</option>
                                             <option value="high">High</option>
                                             <option value="medium">Medium</option>
                                             <option value="low">Low</option>
+                                        </select>
+                                        <select class="form-select form-select-sm" id="alert-type-filter" onchange="filterHealthAlerts()">
+                                            <option value="">All Types</option>
+                                            <option value="stale_item">Stale Items</option>
+                                            <option value="high_usage">High Usage</option>
+                                            <option value="low_usage">Low Usage</option>
+                                            <option value="missing">Missing</option>
+                                            <option value="quality_decline">Quality Decline</option>
                                         </select>
                                     </div>
                                 </div>
@@ -203,7 +216,21 @@
                                     <div id="alerts-loading" class="text-center">
                                         <div class="loading-spinner"></div> Loading alerts...
                                     </div>
-                                    <div id="alerts-list" style="display: none;"></div>
+                                    <div id="alerts-content" style="display: none;">
+                                        <div class="d-flex justify-content-between align-items-center mb-3">
+                                            <div id="alerts-count" class="text-muted">Loading...</div>
+                                            <div class="d-flex align-items-center gap-2">
+                                                <label class="form-label mb-0">Items per page:</label>
+                                                <select class="form-select form-select-sm" id="alerts-per-page" onchange="updateAlertsPagination()" style="width: auto;">
+                                                    <option value="10">10</option>
+                                                    <option value="25" selected>25</option>
+                                                    <option value="50">50</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div id="alerts-list"></div>
+                                        <div id="alerts-pagination" class="d-flex justify-content-center mt-3"></div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -232,23 +259,57 @@
                 </div>
                 
                 <!-- Stale Items Tab -->
-                <div class="tab-pane fade" id="stale-items" role="tabpanel">
+                <div class="tab-pane fade" id="stale-items" role="tabpanel" aria-labelledby="stale-items-tab">
                     <div class="card">
                         <div class="card-header">
-                            <h5><i class="fas fa-clock"></i> Items Not Recently Scanned</h5>
-                            <small class="text-muted">Items that haven't been scanned recently based on category-specific thresholds</small>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h5><i class="fas fa-clock"></i> Items Not Recently Scanned</h5>
+                                    <small class="text-muted">Items that haven't been scanned recently based on category-specific thresholds</small>
+                                </div>
+                                <div class="d-flex gap-2">
+                                    <select class="form-select form-select-sm" id="stale-category-filter" onchange="filterStaleItems()">
+                                        <option value="">All Categories</option>
+                                    </select>
+                                    <select class="form-select form-select-sm" id="stale-subcategory-filter" onchange="filterStaleItems()">
+                                        <option value="">All Subcategories</option>
+                                    </select>
+                                    <select class="form-select form-select-sm" id="stale-days-filter" onchange="filterStaleItems()">
+                                        <option value="">All Days</option>
+                                        <option value="7">7+ Days</option>
+                                        <option value="30">30+ Days</option>
+                                        <option value="90">90+ Days</option>
+                                        <option value="180">180+ Days</option>
+                                    </select>
+                                </div>
+                            </div>
                         </div>
                         <div class="card-body">
                             <div id="stale-items-loading" class="text-center">
                                 <div class="loading-spinner"></div> Analyzing scan history...
                             </div>
-                            <div id="stale-items-list" style="display: none;"></div>
+                            <div id="stale-items-content" style="display: none;">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <div id="stale-items-count" class="text-muted">Loading...</div>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <label class="form-label mb-0">Items per page:</label>
+                                        <select class="form-select form-select-sm" id="stale-items-per-page" onchange="updateStaleItemsPagination()" style="width: auto;">
+                                            <option value="10">10</option>
+                                            <option value="25" selected>25</option>
+                                            <option value="50">50</option>
+                                            <option value="100">100</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div id="stale-items-list"></div>
+                                <div id="stale-items-pagination" class="d-flex justify-content-center mt-3"></div>
+                            </div>
                         </div>
                     </div>
                 </div>
                 
                 <!-- Usage Analysis Tab -->
-                <div class="tab-pane fade" id="usage-analysis" role="tabpanel">
+                <div class="tab-pane fade" id="usage-analysis" role="tabpanel" aria-labelledby="usage-analysis-tab">
                     <div class="row">
                         <div class="col-md-6">
                             <div class="card mb-3">
@@ -325,7 +386,7 @@
                 </div>
                 
                 <!-- Resale Tracking Tab -->
-                <div class="tab-pane fade" id="resale-tracking" role="tabpanel">
+                <div class="tab-pane fade" id="resale-tracking" role="tabpanel" aria-labelledby="resale-tracking-tab">
                     <div class="card">
                         <div class="card-header">
                             <h5><i class="fas fa-shopping-cart"></i> Resale & Pack Status Tracking</h5>
@@ -357,7 +418,7 @@
                 </div>
                 
                 <!-- Configuration Tab -->
-                <div class="tab-pane fade" id="configuration" role="tabpanel">
+                <div class="tab-pane fade" id="configuration" role="tabpanel" aria-labelledby="configuration-tab">
                     <div class="card">
                         <div class="card-header">
                             <h5><i class="fas fa-cog"></i> Inventory Analytics Configuration</h5>
@@ -499,17 +560,25 @@ class InventoryAnalytics {
     async loadHealthAlerts() {
         try {
             document.getElementById('alerts-loading').style.display = 'block';
-            document.getElementById('alerts-list').style.display = 'none';
+            document.getElementById('alerts-content').style.display = 'none';
             
-            const severityFilter = document.getElementById('alert-severity-filter').value;
-            const queryParams = new URLSearchParams();
-            if (severityFilter) queryParams.append('severity', severityFilter);
-            
-            const response = await fetch(`/api/inventory/alerts?${queryParams}`);
+            const response = await fetch('/api/inventory/alerts');
             const data = await response.json();
             
             if (response.ok) {
-                this.displayHealthAlerts(data.alerts);
+                // Store all alerts globally
+                allHealthAlerts = data.alerts || [];
+                
+                // Populate category filter
+                const categories = [...new Set(allHealthAlerts.map(alert => alert.category).filter(Boolean))];
+                const categorySelect = document.getElementById('alert-category-filter');
+                categorySelect.innerHTML = '<option value="">All Categories</option>';
+                categories.forEach(cat => {
+                    categorySelect.innerHTML += `<option value="${cat}">${cat}</option>`;
+                });
+                
+                // Display filtered alerts
+                filterHealthAlerts();
             } else {
                 console.error('Failed to load alerts:', data.error);
                 this.showError('Failed to load alerts', 'alerts-list');
@@ -519,7 +588,7 @@ class InventoryAnalytics {
             this.showError('Error loading health alerts', 'alerts-list');
         } finally {
             document.getElementById('alerts-loading').style.display = 'none';
-            document.getElementById('alerts-list').style.display = 'block';
+            document.getElementById('alerts-content').style.display = 'block';
         }
     }
     
@@ -557,13 +626,32 @@ class InventoryAnalytics {
     async loadStaleItems() {
         try {
             document.getElementById('stale-items-loading').style.display = 'block';
-            document.getElementById('stale-items-list').style.display = 'none';
+            document.getElementById('stale-items-content').style.display = 'none';
             
             const response = await fetch('/api/inventory/stale_items');
             const data = await response.json();
             
             if (response.ok) {
-                this.displayStaleItems(data.stale_items, data.thresholds_used);
+                // Store all stale items globally
+                allStaleItems = data.stale_items || [];
+                
+                // Populate category and subcategory filters
+                const categories = [...new Set(allStaleItems.map(item => item.category).filter(Boolean))];
+                const categorySelect = document.getElementById('stale-category-filter');
+                categorySelect.innerHTML = '<option value="">All Categories</option>';
+                categories.forEach(cat => {
+                    categorySelect.innerHTML += `<option value="${cat}">${cat}</option>`;
+                });
+                
+                const subcategories = [...new Set(allStaleItems.map(item => item.subcategory).filter(Boolean))];
+                const subcategorySelect = document.getElementById('stale-subcategory-filter');
+                subcategorySelect.innerHTML = '<option value="">All Subcategories</option>';
+                subcategories.forEach(sub => {
+                    subcategorySelect.innerHTML += `<option value="${sub}">${sub}</option>`;
+                });
+                
+                // Display filtered items
+                filterStaleItems();
             } else {
                 console.error('Failed to load stale items:', data.error);
                 this.showError('Failed to load stale items', 'stale-items-list');
@@ -573,7 +661,7 @@ class InventoryAnalytics {
             this.showError('Error loading stale items', 'stale-items-list');
         } finally {
             document.getElementById('stale-items-loading').style.display = 'none';
-            document.getElementById('stale-items-list').style.display = 'block';
+            document.getElementById('stale-items-content').style.display = 'block';
         }
     }
     
@@ -944,13 +1032,271 @@ function refreshAnalysisData() {
     loadDataDiscrepancies();
 }
 
+// Global data storage and pagination state
+let allHealthAlerts = [];
+let allStaleItems = [];
+let currentAlertsPage = 1;
+let currentStaleItemsPage = 1;
+
+// Health Alerts filtering and pagination
+function filterHealthAlerts() {
+    const categoryFilter = document.getElementById('alert-category-filter').value;
+    const severityFilter = document.getElementById('alert-severity-filter').value;
+    const typeFilter = document.getElementById('alert-type-filter').value;
+    
+    let filteredAlerts = allHealthAlerts.filter(alert => {
+        if (categoryFilter && alert.category !== categoryFilter) return false;
+        if (severityFilter && alert.severity !== severityFilter) return false;
+        if (typeFilter && alert.alert_type !== typeFilter) return false;
+        return true;
+    });
+    
+    currentAlertsPage = 1; // Reset to first page
+    displayHealthAlerts(filteredAlerts);
+}
+
+function displayHealthAlerts(alerts) {
+    const perPage = parseInt(document.getElementById('alerts-per-page').value) || 25;
+    const totalPages = Math.ceil(alerts.length / perPage);
+    const startIndex = (currentAlertsPage - 1) * perPage;
+    const endIndex = startIndex + perPage;
+    const pageAlerts = alerts.slice(startIndex, endIndex);
+    
+    // Update count
+    document.getElementById('alerts-count').textContent = 
+        `Showing ${startIndex + 1}-${Math.min(endIndex, alerts.length)} of ${alerts.length} alerts`;
+    
+    // Display alerts
+    let html = '';
+    if (pageAlerts.length > 0) {
+        pageAlerts.forEach(alert => {
+            const severityColor = {
+                'critical': 'danger',
+                'high': 'warning',
+                'medium': 'info',
+                'low': 'secondary'
+            }[alert.severity] || 'secondary';
+            
+            html += `
+                <div class="alert alert-${severityColor} d-flex justify-content-between align-items-start">
+                    <div>
+                        <strong>${alert.alert_type?.replace('_', ' ').toUpperCase() || 'ALERT'}</strong>
+                        ${alert.tag_id ? ` - ${alert.tag_id}` : ''}
+                        ${alert.category ? ` (${alert.category})` : ''}
+                        <div class="mt-1">
+                            <small>${alert.suggested_action || 'No action suggested'}</small>
+                        </div>
+                        <div class="mt-1">
+                            <small class="text-muted">Created: ${new Date(alert.created_at).toLocaleDateString()}</small>
+                        </div>
+                    </div>
+                    <span class="badge bg-${severityColor}">${alert.severity?.toUpperCase()}</span>
+                </div>
+            `;
+        });
+    } else {
+        html = '<div class="alert alert-info">No alerts match the current filters.</div>';
+    }
+    
+    document.getElementById('alerts-list').innerHTML = html;
+    
+    // Update pagination
+    updatePagination('alerts-pagination', currentAlertsPage, totalPages, (page) => {
+        currentAlertsPage = page;
+        displayHealthAlerts(alerts);
+    });
+}
+
+function updateAlertsPagination() {
+    filterHealthAlerts(); // Refresh display with new page size
+}
+
+// Stale Items filtering and pagination  
+function filterStaleItems() {
+    const categoryFilter = document.getElementById('stale-category-filter').value;
+    const subcategoryFilter = document.getElementById('stale-subcategory-filter').value;
+    const daysFilter = parseInt(document.getElementById('stale-days-filter').value);
+    
+    let filteredItems = allStaleItems.filter(item => {
+        if (categoryFilter && item.category !== categoryFilter) return false;
+        if (subcategoryFilter && item.subcategory !== subcategoryFilter) return false;
+        if (daysFilter && item.days_since_scan < daysFilter) return false;
+        return true;
+    });
+    
+    // Update subcategory options based on selected category
+    if (categoryFilter) {
+        const subcategories = [...new Set(allStaleItems
+            .filter(item => item.category === categoryFilter)
+            .map(item => item.subcategory)
+            .filter(Boolean))];
+        
+        const subcategorySelect = document.getElementById('stale-subcategory-filter');
+        subcategorySelect.innerHTML = '<option value="">All Subcategories</option>';
+        subcategories.forEach(sub => {
+            subcategorySelect.innerHTML += `<option value="${sub}"${subcategory === subcategoryFilter ? ' selected' : ''}>${sub}</option>`;
+        });
+    }
+    
+    currentStaleItemsPage = 1; // Reset to first page
+    displayStaleItems(filteredItems);
+}
+
+function displayStaleItems(items) {
+    const perPage = parseInt(document.getElementById('stale-items-per-page').value) || 25;
+    const totalPages = Math.ceil(items.length / perPage);
+    const startIndex = (currentStaleItemsPage - 1) * perPage;
+    const endIndex = startIndex + perPage;
+    const pageItems = items.slice(startIndex, endIndex);
+    
+    // Update count
+    document.getElementById('stale-items-count').textContent = 
+        `Showing ${startIndex + 1}-${Math.min(endIndex, items.length)} of ${items.length} stale items`;
+    
+    // Display items
+    let html = '';
+    if (pageItems.length > 0) {
+        pageItems.forEach(item => {
+            const hasTransactions = item.transaction_count > 0;
+            const daysBadgeColor = item.days_since_scan > 180 ? 'danger' : 
+                                  item.days_since_scan > 90 ? 'warning' : 'info';
+                                  
+            html += `
+                <div class="col-md-6 mb-3">
+                    <div class="stale-item border rounded p-3">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <strong>${item.common_name || 'Unknown Item'}</strong>
+                                <div class="text-muted small">
+                                    ${item.category || 'No Category'} > ${item.subcategory || 'No Subcategory'}
+                                </div>
+                                <div class="text-muted small">
+                                    Tag: ${item.tag_id} • Location: ${item.bin_location || 'Unknown'}
+                                </div>
+                            </div>
+                            <div class="text-end">
+                                <span class="badge bg-${daysBadgeColor}">${item.days_since_scan} days</span>
+                                ${hasTransactions ? 
+                                    `<span class="badge bg-info ms-1">${item.transaction_count} transactions</span>` : 
+                                    '<span class="badge bg-warning ms-1">No transactions</span>'
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+    } else {
+        html = '<div class="col-12"><div class="alert alert-info">No stale items match the current filters.</div></div>';
+    }
+    
+    document.getElementById('stale-items-list').innerHTML = `<div class="row">${html}</div>`;
+    
+    // Update pagination
+    updatePagination('stale-items-pagination', currentStaleItemsPage, totalPages, (page) => {
+        currentStaleItemsPage = page;
+        displayStaleItems(items);
+    });
+}
+
+function updateStaleItemsPagination() {
+    filterStaleItems(); // Refresh display with new page size
+}
+
+// Generic pagination component
+function updatePagination(containerId, currentPage, totalPages, onPageChange) {
+    const container = document.getElementById(containerId);
+    if (!container || totalPages <= 1) {
+        container.innerHTML = '';
+        return;
+    }
+    
+    let html = '<nav><ul class="pagination pagination-sm">';
+    
+    // Previous button
+    html += `<li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
+        <a class="page-link" href="#" onclick="event.preventDefault(); ${currentPage > 1 ? `(${onPageChange})(${currentPage - 1})` : ''}">Previous</a>
+    </li>`;
+    
+    // Page numbers (show max 5 pages around current)
+    const startPage = Math.max(1, currentPage - 2);
+    const endPage = Math.min(totalPages, currentPage + 2);
+    
+    if (startPage > 1) {
+        html += `<li class="page-item"><a class="page-link" href="#" onclick="event.preventDefault(); (${onPageChange})(1)">1</a></li>`;
+        if (startPage > 2) {
+            html += '<li class="page-item disabled"><span class="page-link">...</span></li>';
+        }
+    }
+    
+    for (let page = startPage; page <= endPage; page++) {
+        html += `<li class="page-item ${page === currentPage ? 'active' : ''}">
+            <a class="page-link" href="#" onclick="event.preventDefault(); (${onPageChange})(${page})">${page}</a>
+        </li>`;
+    }
+    
+    if (endPage < totalPages) {
+        if (endPage < totalPages - 1) {
+            html += '<li class="page-item disabled"><span class="page-link">...</span></li>';
+        }
+        html += `<li class="page-item"><a class="page-link" href="#" onclick="event.preventDefault(); (${onPageChange})(${totalPages})">${totalPages}</a></li>`;
+    }
+    
+    // Next button
+    html += `<li class="page-item ${currentPage === totalPages ? 'disabled' : ''}">
+        <a class="page-link" href="#" onclick="event.preventDefault(); ${currentPage < totalPages ? `(${onPageChange})(${currentPage + 1})` : ''}">Next</a>
+    </li>`;
+    
+    html += '</ul></nav>';
+    container.innerHTML = html;
+}
+
 // Initialize when page loads
 document.addEventListener('DOMContentLoaded', function() {
     window.inventoryAnalytics = new InventoryAnalytics();
     
+    // Initialize tabs with fallback for MDB
+    function initializeTabs() {
+        const triggerTabList = [].slice.call(document.querySelectorAll('#analyticsTab button[data-mdb-toggle="tab"]'));
+        
+        triggerTabList.forEach(function (triggerEl) {
+            triggerEl.addEventListener('click', function (event) {
+                event.preventDefault();
+                
+                // Remove active class from all tabs and content
+                document.querySelectorAll('#analyticsTab .nav-link').forEach(tab => tab.classList.remove('active'));
+                document.querySelectorAll('#analyticsTabContent .tab-pane').forEach(pane => {
+                    pane.classList.remove('show', 'active');
+                });
+                
+                // Add active class to clicked tab
+                triggerEl.classList.add('active');
+                
+                // Show corresponding content
+                const targetId = triggerEl.getAttribute('data-mdb-target');
+                if (targetId) {
+                    const targetPane = document.querySelector(targetId);
+                    if (targetPane) {
+                        targetPane.classList.add('show', 'active');
+                    }
+                }
+            });
+        });
+    }
+    
+    // Initialize tabs immediately
+    initializeTabs();
+    
     // Load configuration when configuration tab is clicked
     document.getElementById('configuration-tab').addEventListener('click', function() {
         loadConfiguration();
+    });
+    
+    // Load stale items when stale items tab is clicked  
+    document.getElementById('stale-items-tab').addEventListener('click', function() {
+        if (window.inventoryAnalytics) {
+            window.inventoryAnalytics.loadStaleItems();
+        }
     });
     
     // Load usage analysis when usage analysis tab is clicked
