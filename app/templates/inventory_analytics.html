@@ -1149,23 +1149,65 @@ function displayStaleItems(items) {
     const endIndex = startIndex + perPage;
     const pageItems = items.slice(startIndex, endIndex);
     
-    // Update count
-    document.getElementById('stale-items-count').textContent = 
-        `Showing ${startIndex + 1}-${Math.min(endIndex, items.length)} of ${items.length} stale items`;
+    // Update count with enhanced statistics
+    const touchManagedCount = items.filter(item => item.is_touch_managed).length;
+    const previouslyHiddenCount = items.filter(item => item.was_previously_hidden).length;
     
-    // Display items
+    document.getElementById('stale-items-count').innerHTML = `
+        <div>Showing ${startIndex + 1}-${Math.min(endIndex, items.length)} of ${items.length} stale items</div>
+        <div class="small text-muted mt-1">
+            🚀 <strong>${touchManagedCount}</strong> items have Touch Scan activity • 
+            ⚡ <strong>${previouslyHiddenCount}</strong> were hidden in old analysis
+        </div>
+    `;
+    
+    // Display items with enhanced activity information
     let html = '';
     if (pageItems.length > 0) {
         pageItems.forEach(item => {
-            const hasTransactions = item.transaction_count > 0;
-            const daysBadgeColor = item.days_since_scan > 180 ? 'danger' : 
-                                  item.days_since_scan > 90 ? 'warning' : 'info';
+            const hasTransactions = item.total_scan_count > 0;
+            const touchScans = item.touch_scan_count || 0;
+            const statusScans = item.status_scan_count || 0;
+            
+            // Enhanced day badges with activity awareness
+            let daysBadgeColor, daysBadgeText;
+            if (item.activity_type === 'TOUCH_MANAGED') {
+                daysBadgeColor = item.days_since_scan > 180 ? 'warning' : 'info';
+                daysBadgeText = `${item.days_since_scan}d (Touch Managed)`;
+            } else if (item.activity_type === 'MIXED_ACTIVITY') {
+                daysBadgeColor = 'success';
+                daysBadgeText = `${item.days_since_scan}d (Active)`;
+            } else {
+                daysBadgeColor = item.days_since_scan > 180 ? 'danger' : 
+                                item.days_since_scan > 90 ? 'warning' : 'info';
+                daysBadgeText = `${item.days_since_scan} days`;
+            }
+            
+            // Activity type badge
+            let activityBadge = '';
+            switch(item.activity_type) {
+                case 'MIXED_ACTIVITY':
+                    activityBadge = '<span class="badge bg-success ms-1">Mixed Activity</span>';
+                    break;
+                case 'TOUCH_MANAGED':
+                    activityBadge = '<span class="badge bg-primary ms-1">Touch Managed</span>';
+                    break;
+                case 'STATUS_ONLY':
+                    activityBadge = '<span class="badge bg-secondary ms-1">Status Only</span>';
+                    break;
+                default:
+                    activityBadge = '<span class="badge bg-light text-dark ms-1">No Recent Activity</span>';
+            }
+            
+            // Previously hidden indicator
+            const hiddenIndicator = item.was_previously_hidden ? 
+                '<span class="badge bg-warning ms-1" title="Previously hidden by old analysis">🔍 Newly Visible</span>' : '';
                                   
             html += `
                 <div class="col-md-6 mb-3">
-                    <div class="stale-item border rounded p-3">
+                    <div class="stale-item border rounded p-3 ${item.was_previously_hidden ? 'border-warning' : ''}">
                         <div class="d-flex justify-content-between">
-                            <div>
+                            <div class="flex-grow-1">
                                 <strong>${item.common_name || 'Unknown Item'}</strong>
                                 <div class="text-muted small">
                                     ${item.category || 'No Category'} > ${item.subcategory || 'No Subcategory'}
@@ -1173,15 +1215,37 @@ function displayStaleItems(items) {
                                 <div class="text-muted small">
                                     Tag: ${item.tag_id} • Location: ${item.bin_location || 'Unknown'}
                                 </div>
-                            </div>
-                            <div class="text-end">
-                                <span class="badge bg-${daysBadgeColor}">${item.days_since_scan} days</span>
-                                ${hasTransactions ? 
-                                    `<span class="badge bg-info ms-1">${item.transaction_count} transactions</span>` : 
-                                    '<span class="badge bg-warning ms-1">No transactions</span>'
+                                ${item.latest_scan_type ? 
+                                    `<div class="text-muted small">Latest: ${item.latest_scan_type}</div>` : ''
                                 }
                             </div>
+                            <div class="text-end">
+                                <div class="mb-1">
+                                    <span class="badge bg-${daysBadgeColor}">${daysBadgeText}</span>
+                                </div>
+                                <div class="mb-1">
+                                    ${activityBadge}
+                                    ${hiddenIndicator}
+                                </div>
+                                <div class="small">
+                                    ${touchScans > 0 ? 
+                                        `<span class="badge bg-info" title="Touch Scans">📱 ${touchScans}</span> ` : ''
+                                    }
+                                    ${statusScans > 0 ? 
+                                        `<span class="badge bg-success" title="Status Scans">📋 ${statusScans}</span> ` : ''
+                                    }
+                                    ${!hasTransactions ? 
+                                        '<span class="badge bg-light text-dark" title="No Recent Transactions">📭 None</span>' : ''
+                                    }
+                                </div>
+                            </div>
                         </div>
+                        ${item.master_vs_transaction_days && item.master_vs_transaction_days.difference > 0 ? 
+                            `<div class="mt-2 p-2 bg-light rounded small">
+                                <strong>Data Insight:</strong> Transaction shows ${item.master_vs_transaction_days.difference} days 
+                                more recent activity than master record
+                            </div>` : ''
+                        }
                     </div>
                 </div>
             `;
