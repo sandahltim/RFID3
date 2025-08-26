@@ -20,10 +20,10 @@
             <div class="card">
                 <div class="card-header">Inventory Summary</div>
                 <div class="card-body">
-                    <p><strong>Total Items:</strong> {{ total_items or 0 }}</p>
-                    <p><strong>Items on Rent:</strong> {{ items_on_rent or 0 }}</p>
-                    <p><strong>Items in Service:</strong> {{ items_in_service or 0 }}</p>
-                    <p><strong>Items Available:</strong> {{ items_available or 0 }}</p>
+                    <p><strong>Total Items:</strong> {{ counts.total or 0 }}</p>
+                    <p><strong>Items on Rent:</strong> {{ counts.on_rent or 0 }}</p>
+                    <p><strong>Items in Service:</strong> {{ counts.in_service or 0 }}</p>
+                    <p><strong>Items Available:</strong> {{ counts.available or 0 }}</p>
                     <p><strong>Status Counts:</strong></p>
                     <ul>
                         {% for status, count in status_counts %}
