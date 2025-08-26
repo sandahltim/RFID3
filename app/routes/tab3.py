@@ -22,13 +22,14 @@ import re
 import json
 import time
 from urllib.parse import unquote
+import config
 
 # Configure logging for Tab 3
 logger = logging.getLogger('tab3')
 logger.setLevel(logging.INFO)
 logger.handlers = []
 
-tab3_log_file = '/home/tim/RFID3/logs/rfid_dashboard.log'
+tab3_log_file = config.LOG_FILE
 try:
     if not os.path.exists(tab3_log_file):
         open(tab3_log_file, 'a').close()
@@ -58,7 +59,7 @@ limiter = Limiter(
     storage_uri="memory://"
 )
 
-SHARED_DIR = '/home/tim/RFID3/shared'
+SHARED_DIR = os.path.join(config.BASE_DIR, 'shared')
 CSV_FILE_PATH = os.path.join(SHARED_DIR, 'rfid_tags.csv')
 LOCK_FILE_PATH = os.path.join(SHARED_DIR, 'rfid_tags.lock')
 

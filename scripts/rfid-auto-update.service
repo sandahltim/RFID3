@@ -5,7 +5,8 @@ Wants=rfid-auto-update.timer
 [Service]
 Type=oneshot
 User=root
-ExecStart=/home/tim/RFID3/scripts/auto_update.sh
+Environment=PROJECT_DIR=/opt/RFID3
+ExecStart=${PROJECT_DIR}/scripts/auto_update.sh
 StandardOutput=journal
 StandardError=journal
 

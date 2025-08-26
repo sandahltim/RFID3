@@ -1,4 +1,4 @@
-#!/home/tim/RFID3/venv/bin/python3
+#!/usr/bin/env python3
 """
 Weekly Contract Snapshots Script
 Version: 2025-08-24-v1
@@ -7,15 +7,16 @@ This script creates snapshots of all active contracts for historical preservatio
 Designed to run on Wednesdays and Fridays at 7:00 AM via cron.
 
 Usage:
-    python3 /home/tim/RFID3/scripts/create_weekly_snapshots.py
+    python3 scripts/create_weekly_snapshots.py
 
 Cron entry:
     # Contract snapshots on Wed/Fri at 7 AM
-    0 7 * * 3,5 cd /home/tim/RFID3 && /home/tim/RFID3/venv/bin/python3 scripts/create_weekly_snapshots.py >> logs/snapshot_cron.log 2>&1
+    0 7 * * 3,5 cd /path/to/project && /path/to/project/venv/bin/python3 scripts/create_weekly_snapshots.py >> logs/snapshot_cron.log 2>&1
 """
 
 import sys
 import os
+import config
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from datetime import datetime, timezone
@@ -24,7 +25,7 @@ import logging
 
 def setup_logging():
     """Set up logging for the cron job."""
-    log_file = '/home/tim/RFID3/logs/snapshot_automation.log'
+    log_file = os.path.join(config.BASE_DIR, 'logs', 'snapshot_automation.log')
     
     # Create logs directory if it doesn't exist
     os.makedirs(os.path.dirname(log_file), exist_ok=True)
@@ -89,7 +90,7 @@ def main():
                 logger.error(f"Error during cleanup: {str(e)}")
             
             # Write summary to JSON file for monitoring
-            summary_file = '/home/tim/RFID3/logs/last_snapshot_run.json'
+            summary_file = os.path.join(config.BASE_DIR, 'logs', 'last_snapshot_run.json')
             summary = {
                 'timestamp': datetime.now(timezone.utc).isoformat(),
                 'results': results,
@@ -115,7 +116,7 @@ def main():
                 'error': str(e),
                 'success': False
             }
-            with open('/home/tim/RFID3/logs/last_snapshot_run.json', 'w') as f:
+            with open(os.path.join(config.BASE_DIR, 'logs', 'last_snapshot_run.json'), 'w') as f:
                 json.dump(error_summary, f, indent=2)
         except:
             pass
