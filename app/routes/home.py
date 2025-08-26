@@ -37,11 +37,11 @@ def home():
             func.sum(case((ItemMaster.status.notin_(['Ready to Rent', 'On Rent', 'Delivered']), 1), else_=0)).label("in_service")
         ).one()
         
-        # Extract aggregated values
-        total_items = counts.total or 0
-        items_on_rent = counts.on_rent or 0
-        items_available = counts.available or 0
-        items_in_service = counts.in_service or 0
+        # Extract aggregated values (convert to int for JSON serialization)
+        total_items = int(counts.total or 0)
+        items_on_rent = int(counts.on_rent or 0)
+        items_available = int(counts.available or 0)
+        items_in_service = int(counts.in_service or 0)
         
         logger.info(f'Aggregated counts - Total: {total_items}, On Rent: {items_on_rent}, Available: {items_available}, In Service: {items_in_service}')
         logger.debug(f"Performance optimized: Single query replaced multiple COUNT queries")
@@ -200,11 +200,11 @@ def get_summary_stats():
             func.sum(case((ItemMaster.status.notin_(['Ready to Rent', 'On Rent', 'Delivered']), 1), else_=0)).label("in_service")
         ).one()
         
-        # Extract aggregated values
-        total_items = counts.total or 0
-        items_on_rent = counts.on_rent or 0
-        items_available = counts.available or 0
-        items_in_service = counts.in_service or 0
+        # Extract aggregated values (convert to int for JSON serialization)
+        total_items = int(counts.total or 0)
+        items_on_rent = int(counts.on_rent or 0)
+        items_available = int(counts.available or 0)
+        items_in_service = int(counts.in_service or 0)
         
         # Status breakdown
         status_counts = db.session.query(
