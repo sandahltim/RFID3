@@ -6,7 +6,7 @@ from logging.handlers import RotatingFileHandler
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_redis import FlaskRedis
-from config import DB_CONFIG, REDIS_URL, LOG_FILE, APP_IP
+from config import DB_CONFIG, REDIS_URL, LOG_FILE, APP_IP, BASE_DIR, validate_config
 from datetime import datetime
 import re
 
@@ -16,24 +16,21 @@ cache = FlaskRedis()
 
 def create_app():
     """Create and configure the Flask application."""
-    app = Flask(__name__, static_folder='/home/tim/RFID3/static')
+    app = Flask(__name__, static_folder=os.path.join(BASE_DIR, 'static'))
 
-    # Configure logging
-    log_dir = os.path.dirname(LOG_FILE)
-    if not os.path.exists(log_dir):
-        os.makedirs(log_dir)
-    handler = RotatingFileHandler(LOG_FILE, maxBytes=1000000, backupCount=5)
-    handler.setLevel(logging.DEBUG)
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    handler.setFormatter(formatter)
-    logging.getLogger('').handlers = []
-    app.logger.handlers = []
-    logging.getLogger('').addHandler(handler)
-    app.logger.addHandler(handler)
-    app.logger.setLevel(logging.DEBUG)
-    app.logger.propagate = False
+    # Configure logging using centralized system
+    from app.services.logger import setup_app_logging
+    setup_app_logging(app)
     app.logger.info("Application starting up - logging initialized")
     app.logger.debug(f"Static folder path: {app.static_folder}")
+
+    # Validate configuration
+    try:
+        validate_config()
+        app.logger.info("Configuration validation passed")
+    except ValueError as e:
+        app.logger.error(f"Configuration validation failed: {str(e)}")
+        raise
 
     # Database configuration
     try:
@@ -51,7 +48,7 @@ def create_app():
         app.config['REDIS_URL'] = REDIS_URL
         app.config['APP_IP'] = APP_IP
         app.logger.info("Database and Redis configuration set successfully")
-    except Exception as e:
+    except (KeyError, TypeError) as e:
         app.logger.error(f"Failed to set database/Redis configuration: {str(e)}", exc_info=True)
         raise
 
@@ -60,7 +57,7 @@ def create_app():
         db.init_app(app)
         cache.init_app(app)
         app.logger.info("Extensions initialized successfully")
-    except Exception as e:
+    except (ImportError, AttributeError, RuntimeError) as e:
         app.logger.error(f"Failed to initialize extensions: {str(e)}", exc_info=True)
         raise
 
@@ -87,15 +84,8 @@ def create_app():
         return re.sub(pattern, replace, str(value))
     app.jinja_env.filters['regex_replace'] = regex_replace
 
-    # Create database tables
-    try:
-        with app.app_context():
-            app.logger.info("Creating database tables")
-            db.create_all()
-            app.logger.info("Database tables created")
-    except Exception as e:
-        app.logger.error(f"Failed to create database tables: {str(e)}", exc_info=True)
-        raise
+    # Note: Database table creation should be handled explicitly via migration scripts
+    # or administrative commands, not automatically on every application startup
 
     # Import and register blueprints
     try:
@@ -123,7 +113,7 @@ def create_app():
         app.register_blueprint(tabs_bp)
         app.register_blueprint(refresh_bp)
         app.logger.info("Blueprints registered successfully")
-    except Exception as e:
+    except (ImportError, AttributeError) as e:
         app.logger.error(f"Failed to register blueprints: {str(e)}", exc_info=True)
         raise
 
@@ -132,7 +122,7 @@ def create_app():
         from app.services.scheduler import init_scheduler
         init_scheduler(app)
         app.logger.info("Scheduler initialized successfully")
-    except Exception as e:
+    except (ImportError, RuntimeError) as e:
         app.logger.error(f"Failed to initialize scheduler: {str(e)}", exc_info=True)
         raise
 
