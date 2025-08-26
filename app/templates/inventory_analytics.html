@@ -170,6 +170,11 @@
                         <i class="fas fa-shopping-cart"></i> Resale Tracking
                     </button>
                 </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="configuration-tab" data-bs-toggle="tab" data-bs-target="#configuration" type="button" role="tab">
+                        <i class="fas fa-cog"></i> Configuration
+                    </button>
+                </li>
             </ul>
             
             <div class="tab-content" id="analyticsTabContent">
@@ -181,7 +186,8 @@
                                 <div class="card-header d-flex justify-content-between align-items-center">
                                     <h5><i class="fas fa-bell"></i> Active Health Alerts</h5>
                                     <div class="d-flex gap-2">
-                                        <button class="btn btn-primary btn-sm" id="generate-alerts-btn" onclick="generateAlerts()">
+                                        <button class="btn btn-primary btn-sm" id="generate-alerts-btn" onclick="generateAlerts()" 
+                                                title="Scans stale items and creates health alerts based on current configuration thresholds. This creates alert records in the database for proactive inventory management.">
                                             <i class="fas fa-sync"></i> Generate Alerts
                                         </button>
                                         <select class="form-select form-select-sm" id="alert-severity-filter">
@@ -243,30 +249,75 @@
                 
                 <!-- Usage Analysis Tab -->
                 <div class="tab-pane fade" id="usage-analysis" role="tabpanel">
-                    <div class="card">
-                        <div class="card-header">
-                            <h5><i class="fas fa-chart-bar"></i> Usage Analytics</h5>
-                        </div>
-                        <div class="card-body">
-                            <p class="text-muted">Advanced usage pattern analysis and forecasting features coming in Phase 2...</p>
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <h6>Planned Features:</h6>
-                                    <ul>
-                                        <li>Usage pattern analysis by category</li>
-                                        <li>Seasonal trend identification</li>
-                                        <li>Item lifecycle tracking</li>
-                                        <li>Revenue per item analysis</li>
-                                    </ul>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="card mb-3">
+                                <div class="card-header">
+                                    <h5><i class="fas fa-chart-line"></i> Usage Patterns</h5>
                                 </div>
-                                <div class="col-md-6">
-                                    <h6>Predictive Analytics:</h6>
-                                    <ul>
-                                        <li>Maintenance scheduling predictions</li>
-                                        <li>Demand forecasting</li>
-                                        <li>Optimal inventory level recommendations</li>
-                                        <li>Quality degradation patterns</li>
-                                    </ul>
+                                <div class="card-body">
+                                    <div id="usage-patterns-loading" class="text-center">
+                                        <div class="loading-spinner"></div> Loading usage patterns...
+                                    </div>
+                                    <div id="usage-patterns-content" style="display: none;">
+                                        <div id="usage-patterns-list"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card mb-3">
+                                <div class="card-header">
+                                    <h5><i class="fas fa-exclamation-circle"></i> Data Discrepancies</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div id="discrepancies-loading" class="text-center">
+                                        <div class="loading-spinner"></div> Analyzing data discrepancies...
+                                    </div>
+                                    <div id="discrepancies-content" style="display: none;">
+                                        <div id="discrepancies-summary"></div>
+                                        <div id="discrepancies-list" class="mt-3"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="card">
+                                <div class="card-header d-flex justify-content-between align-items-center">
+                                    <h5><i class="fas fa-database"></i> Database Health Summary</h5>
+                                    <button class="btn btn-primary btn-sm" onclick="refreshAnalysisData()">
+                                        <i class="fas fa-refresh"></i> Refresh Analysis
+                                    </button>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row text-center">
+                                        <div class="col-md-3">
+                                            <div class="metric-card">
+                                                <div class="metric-value text-info" id="total-master-items">--</div>
+                                                <div class="metric-label">Items in Master</div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="metric-card">
+                                                <div class="metric-value text-success" id="items-with-transactions">--</div>
+                                                <div class="metric-label">Items with Transactions</div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="metric-card">
+                                                <div class="metric-value text-warning" id="orphaned-transactions">--</div>
+                                                <div class="metric-label">Orphaned Transactions</div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="metric-card">
+                                                <div class="metric-value text-danger" id="data-sync-issues">--</div>
+                                                <div class="metric-label">Data Sync Issues</div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -299,6 +350,74 @@
                                         <li>Bulk item tracking</li>
                                         <li>Space utilization analysis</li>
                                     </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Configuration Tab -->
+                <div class="tab-pane fade" id="configuration" role="tabpanel">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="fas fa-cog"></i> Inventory Analytics Configuration</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h6><i class="fas fa-bell"></i> Alert Thresholds</h6>
+                                    <div class="mb-3">
+                                        <label class="form-label">Stale Item Days (Default Categories)</label>
+                                        <input type="number" class="form-control config-input" id="stale-default" value="30" min="1" max="365">
+                                        <small class="form-text text-muted">Days without scan before item is flagged as stale</small>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Stale Item Days (Resale Categories)</label>
+                                        <input type="number" class="form-control config-input" id="stale-resale" value="7" min="1" max="90">
+                                        <small class="form-text text-muted">Shorter threshold for resale items</small>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Stale Item Days (Pack Location)</label>
+                                        <input type="number" class="form-control config-input" id="stale-pack" value="14" min="1" max="180">
+                                        <small class="form-text text-muted">Threshold for items in pack locations</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <h6><i class="fas fa-chart-line"></i> Usage Thresholds</h6>
+                                    <div class="mb-3">
+                                        <label class="form-label">High Usage Threshold</label>
+                                        <input type="number" class="form-control config-input" id="high-usage" value="0.8" min="0.1" max="1.0" step="0.1">
+                                        <small class="form-text text-muted">Utilization rate above this triggers high usage alerts</small>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Low Usage Threshold</label>
+                                        <input type="number" class="form-control config-input" id="low-usage" value="0.2" min="0.0" max="0.9" step="0.1">
+                                        <small class="form-text text-muted">Utilization rate below this triggers low usage alerts</small>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Quality Decline Threshold</label>
+                                        <input type="number" class="form-control config-input" id="quality-decline" value="2" min="1" max="5">
+                                        <small class="form-text text-muted">Grade drops triggering quality decline alerts</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row mt-3">
+                                <div class="col-12">
+                                    <h6><i class="fas fa-save"></i> Configuration Management</h6>
+                                    <div class="d-flex gap-2">
+                                        <button class="btn btn-success" id="save-config-btn" onclick="saveConfiguration()">
+                                            <i class="fas fa-save"></i> Save Configuration
+                                        </button>
+                                        <button class="btn btn-secondary" id="reset-config-btn" onclick="resetConfiguration()">
+                                            <i class="fas fa-undo"></i> Reset to Defaults
+                                        </button>
+                                        <button class="btn btn-info" id="load-config-btn" onclick="loadConfiguration()">
+                                            <i class="fas fa-refresh"></i> Reload Current
+                                        </button>
+                                    </div>
+                                    <div class="mt-2">
+                                        <div class="alert alert-info" id="config-status" style="display: none;"></div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -473,16 +592,23 @@ class InventoryAnalytics {
             const lastScanDate = new Date(item.last_scan_date).toLocaleDateString();
             const categoryInfo = item.category ? `${item.category}/${item.subcategory}` : 'Uncategorized';
             
+            const transactionCount = item.transaction_count || 0;
+            const hasTransactions = transactionCount > 0;
+            
             html += `<div class="col-md-6 mb-3">
                 <div class="stale-item">
                     <div class="d-flex justify-content-between">
                         <strong>${item.common_name}</strong>
-                        <span class="badge bg-danger">${item.days_since_scan} days</span>
+                        <div>
+                            <span class="badge bg-danger">${item.days_since_scan} days</span>
+                            ${hasTransactions ? `<span class="badge bg-info ms-1">${transactionCount} transactions</span>` : '<span class="badge bg-warning ms-1">No transactions</span>'}
+                        </div>
                     </div>
                     <div class="small text-muted">
                         <div>Tag: ${item.tag_id} | Status: ${item.status}</div>
                         <div>Category: ${categoryInfo} | Location: ${item.bin_location || 'N/A'}</div>
                         <div>Last Scan: ${lastScanDate} | Contract: ${item.last_contract || 'N/A'}</div>
+                        <div>Data Source: ${item.data_source || 'master'} | Quality: ${item.quality || 'N/A'}</div>
                     </div>
                 </div>
             </div>`;
@@ -550,11 +676,18 @@ class InventoryAnalytics {
                 this.loadDashboardData();
                 this.loadHealthAlerts();
                 
-                // Show success message
-                this.showSuccess(`Generated ${data.alerts_created} health alerts`);
+                // Show detailed success message
+                let message = `Alert Generation Complete: ${data.alerts_created} alerts created`;
+                if (data.stale_items_processed) {
+                    message += ` from ${data.stale_items_processed} stale items analyzed`;
+                }
+                if (data.existing_alerts_updated) {
+                    message += `, ${data.existing_alerts_updated} existing alerts updated`;
+                }
+                this.showSuccess(message);
             } else {
                 console.error('Failed to generate alerts:', data.error);
-                this.showError('Failed to generate alerts: ' + data.error);
+                this.showError('Failed to generate alerts: ' + (data.error || 'Unknown error'));
             }
         } catch (error) {
             console.error('Error generating alerts:', error);
@@ -614,9 +747,217 @@ function generateAlerts() {
     }
 }
 
+// Configuration management functions
+async function loadConfiguration() {
+    try {
+        const response = await fetch('/api/inventory/configuration');
+        if (response.ok) {
+            const config = await response.json();
+            
+            // Load alert thresholds
+            const alertThresholds = config.alert_thresholds || {};
+            document.getElementById('stale-default').value = alertThresholds.stale_item_days?.default || 30;
+            document.getElementById('stale-resale').value = alertThresholds.stale_item_days?.resale || 7;
+            document.getElementById('stale-pack').value = alertThresholds.stale_item_days?.pack || 14;
+            document.getElementById('high-usage').value = alertThresholds.high_usage_threshold || 0.8;
+            document.getElementById('low-usage').value = alertThresholds.low_usage_threshold || 0.2;
+            document.getElementById('quality-decline').value = alertThresholds.quality_decline_threshold || 2;
+            
+            showConfigStatus('Configuration loaded successfully', 'success');
+        } else {
+            showConfigStatus('Failed to load configuration', 'error');
+        }
+    } catch (error) {
+        console.error('Error loading configuration:', error);
+        showConfigStatus('Error loading configuration', 'error');
+    }
+}
+
+async function saveConfiguration() {
+    try {
+        const config = {
+            alert_thresholds: {
+                stale_item_days: {
+                    default: parseInt(document.getElementById('stale-default').value),
+                    resale: parseInt(document.getElementById('stale-resale').value),
+                    pack: parseInt(document.getElementById('stale-pack').value)
+                },
+                high_usage_threshold: parseFloat(document.getElementById('high-usage').value),
+                low_usage_threshold: parseFloat(document.getElementById('low-usage').value),
+                quality_decline_threshold: parseInt(document.getElementById('quality-decline').value)
+            }
+        };
+        
+        const response = await fetch('/api/inventory/configuration', {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(config)
+        });
+        
+        if (response.ok) {
+            showConfigStatus('Configuration saved successfully', 'success');
+        } else {
+            const error = await response.json();
+            showConfigStatus('Failed to save: ' + (error.message || 'Unknown error'), 'error');
+        }
+    } catch (error) {
+        console.error('Error saving configuration:', error);
+        showConfigStatus('Error saving configuration', 'error');
+    }
+}
+
+function resetConfiguration() {
+    // Reset to default values
+    document.getElementById('stale-default').value = 30;
+    document.getElementById('stale-resale').value = 7;
+    document.getElementById('stale-pack').value = 14;
+    document.getElementById('high-usage').value = 0.8;
+    document.getElementById('low-usage').value = 0.2;
+    document.getElementById('quality-decline').value = 2;
+    showConfigStatus('Configuration reset to defaults', 'info');
+}
+
+function showConfigStatus(message, type) {
+    const statusDiv = document.getElementById('config-status');
+    statusDiv.className = `alert alert-${type === 'error' ? 'danger' : type === 'success' ? 'success' : 'info'}`;
+    statusDiv.textContent = message;
+    statusDiv.style.display = 'block';
+    
+    setTimeout(() => {
+        statusDiv.style.display = 'none';
+    }, 3000);
+}
+
+// Usage Analysis functions
+async function loadUsagePatterns() {
+    try {
+        document.getElementById('usage-patterns-loading').style.display = 'block';
+        document.getElementById('usage-patterns-content').style.display = 'none';
+        
+        const response = await fetch('/api/inventory/usage_patterns');
+        const data = await response.json();
+        
+        if (response.ok) {
+            displayUsagePatterns(data.patterns);
+        } else {
+            document.getElementById('usage-patterns-list').innerHTML = 
+                `<div class="alert alert-danger">Error loading patterns: ${data.error}</div>`;
+        }
+    } catch (error) {
+        console.error('Error loading usage patterns:', error);
+        document.getElementById('usage-patterns-list').innerHTML = 
+            '<div class="alert alert-danger">Error loading usage patterns</div>';
+    } finally {
+        document.getElementById('usage-patterns-loading').style.display = 'none';
+        document.getElementById('usage-patterns-content').style.display = 'block';
+    }
+}
+
+function displayUsagePatterns(patterns) {
+    let html = '';
+    if (patterns && patterns.length > 0) {
+        patterns.slice(0, 10).forEach(pattern => {
+            const percentage = ((pattern.usage_rate || 0) * 100).toFixed(1);
+            html += `
+                <div class="border-bottom pb-2 mb-2">
+                    <div class="d-flex justify-content-between">
+                        <strong>${pattern.category || 'Unknown'}</strong>
+                        <span class="badge bg-${percentage > 70 ? 'success' : percentage > 40 ? 'warning' : 'secondary'}">${percentage}%</span>
+                    </div>
+                    <small class="text-muted">${pattern.subcategory || ''}</small>
+                    <div class="mt-1">
+                        <small>${pattern.total_items || 0} items • ${pattern.rental_count || 0} rentals</small>
+                    </div>
+                </div>
+            `;
+        });
+    } else {
+        html = '<p class="text-muted">No usage patterns found.</p>';
+    }
+    document.getElementById('usage-patterns-list').innerHTML = html;
+}
+
+async function loadDataDiscrepancies() {
+    try {
+        document.getElementById('discrepancies-loading').style.display = 'block';
+        document.getElementById('discrepancies-content').style.display = 'none';
+        
+        const response = await fetch('/api/inventory/data_discrepancies');
+        const data = await response.json();
+        
+        if (response.ok) {
+            displayDataDiscrepancies(data);
+        } else {
+            document.getElementById('discrepancies-list').innerHTML = 
+                `<div class="alert alert-danger">Error loading discrepancies: ${data.error}</div>`;
+        }
+    } catch (error) {
+        console.error('Error loading data discrepancies:', error);
+        document.getElementById('discrepancies-list').innerHTML = 
+            '<div class="alert alert-danger">Error loading data discrepancies</div>';
+    } finally {
+        document.getElementById('discrepancies-loading').style.display = 'none';
+        document.getElementById('discrepancies-content').style.display = 'block';
+    }
+}
+
+function displayDataDiscrepancies(data) {
+    // Update summary metrics
+    document.getElementById('total-master-items').textContent = data.summary?.total_master_items || '--';
+    document.getElementById('items-with-transactions').textContent = data.summary?.items_with_transactions || '--';
+    document.getElementById('orphaned-transactions').textContent = data.summary?.orphaned_transactions || '--';
+    document.getElementById('data-sync-issues').textContent = data.summary?.data_sync_issues || '--';
+    
+    // Display summary
+    let summaryHtml = '<div class="alert alert-info">';
+    summaryHtml += `<h6>Data Quality Overview</h6>`;
+    summaryHtml += `<p>Found ${data.summary?.data_sync_issues || 0} items with potential sync issues out of ${data.summary?.total_master_items || 0} total items.</p>`;
+    summaryHtml += '</div>';
+    document.getElementById('discrepancies-summary').innerHTML = summaryHtml;
+    
+    // Display discrepancy details
+    let html = '';
+    if (data.discrepancies && data.discrepancies.length > 0) {
+        html += '<h6>Top Data Discrepancies:</h6>';
+        data.discrepancies.slice(0, 5).forEach(disc => {
+            html += `
+                <div class="border-left-warning p-2 mb-2 bg-light">
+                    <div class="d-flex justify-content-between">
+                        <strong>${disc.tag_id}</strong>
+                        <span class="badge bg-warning">${disc.issue_type}</span>
+                    </div>
+                    <small class="text-muted">${disc.common_name || 'Unknown Item'}</small>
+                    <div class="mt-1">
+                        <small>Master: ${disc.master_last_scan || 'None'} • Transactions: ${disc.latest_transaction || 'None'}</small>
+                    </div>
+                </div>
+            `;
+        });
+    } else {
+        html = '<p class="text-success"><i class="fas fa-check"></i> No significant data discrepancies found.</p>';
+    }
+    document.getElementById('discrepancies-list').innerHTML = html;
+}
+
+function refreshAnalysisData() {
+    loadUsagePatterns();
+    loadDataDiscrepancies();
+}
+
 // Initialize when page loads
 document.addEventListener('DOMContentLoaded', function() {
     window.inventoryAnalytics = new InventoryAnalytics();
+    
+    // Load configuration when configuration tab is clicked
+    document.getElementById('configuration-tab').addEventListener('click', function() {
+        loadConfiguration();
+    });
+    
+    // Load usage analysis when usage analysis tab is clicked
+    document.getElementById('usage-analysis-tab').addEventListener('click', function() {
+        loadUsagePatterns();
+        loadDataDiscrepancies();
+    });
 });
 </script>
 {% endblock %}

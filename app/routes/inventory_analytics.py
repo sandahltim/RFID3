@@ -186,74 +186,45 @@ def get_stale_items():
         resale_cutoff = now - timedelta(days=thresholds.get('resale', 7))
         pack_cutoff = now - timedelta(days=thresholds.get('pack', 14))
         
-        # Enhanced query: Use BOTH ItemMaster.date_last_scanned AND latest transaction date
-        stale_items = session.query(
+        # Simplified stale items query (back to original approach but with transaction count)
+        stale_items_base = session.query(
             ItemMaster,
             UserRentalClassMapping.category,
             UserRentalClassMapping.subcategory,
-            func.greatest(
-                func.coalesce(ItemMaster.date_last_scanned, '1900-01-01'),
-                func.coalesce(func.max(Transaction.scan_date), '1900-01-01')
-            ).label('actual_last_scan'),
-            func.datediff(
-                func.now(), 
-                func.greatest(
-                    func.coalesce(ItemMaster.date_last_scanned, '1900-01-01'),
-                    func.coalesce(func.max(Transaction.scan_date), '1900-01-01')
-                )
-            ).label('days_since_scan'),
-            func.count(Transaction.id).label('transaction_count')
+            func.datediff(func.now(), ItemMaster.date_last_scanned).label('days_since_scan')
         ).outerjoin(
             UserRentalClassMapping,
             ItemMaster.rental_class_num == UserRentalClassMapping.rental_class_id
-        ).outerjoin(
-            Transaction,
-            ItemMaster.tag_id == Transaction.tag_id
-        ).group_by(
-            ItemMaster.tag_id,
-            UserRentalClassMapping.category,
-            UserRentalClassMapping.subcategory
-        ).having(
+        ).filter(
             or_(
                 # Default threshold
                 and_(
                     or_(UserRentalClassMapping.category.is_(None), 
                         ~UserRentalClassMapping.category.in_(['Resale'])),
                     ItemMaster.bin_location != 'pack',
-                    func.greatest(
-                        func.coalesce(ItemMaster.date_last_scanned, '1900-01-01'),
-                        func.coalesce(func.max(Transaction.scan_date), '1900-01-01')
-                    ) < default_cutoff
+                    ItemMaster.date_last_scanned < default_cutoff
                 ),
                 # Resale items - shorter threshold
                 and_(
                     UserRentalClassMapping.category == 'Resale',
-                    func.greatest(
-                        func.coalesce(ItemMaster.date_last_scanned, '1900-01-01'),
-                        func.coalesce(func.max(Transaction.scan_date), '1900-01-01')
-                    ) < resale_cutoff
+                    ItemMaster.date_last_scanned < resale_cutoff
                 ),
                 # Pack items - medium threshold
                 and_(
                     ItemMaster.bin_location == 'pack',
-                    func.greatest(
-                        func.coalesce(ItemMaster.date_last_scanned, '1900-01-01'),
-                        func.coalesce(func.max(Transaction.scan_date), '1900-01-01')
-                    ) < pack_cutoff
+                    ItemMaster.date_last_scanned < pack_cutoff
                 )
             )
-        ).order_by(
-            func.greatest(
-                func.coalesce(ItemMaster.date_last_scanned, '1900-01-01'),
-                func.coalesce(func.max(Transaction.scan_date), '1900-01-01')
-            ).asc()
-        ).limit(100).all()
+        ).filter(
+            ItemMaster.date_last_scanned.is_not(None)
+        ).order_by(ItemMaster.date_last_scanned.asc()).limit(100).all()
         
         result = []
-        for item, category, subcategory, actual_last_scan, days_since_scan, transaction_count in stale_items:
-            # Determine data source for last scan
-            master_date = item.date_last_scanned
-            transaction_date = actual_last_scan if actual_last_scan != master_date else None
+        for item, category, subcategory, days_since_scan in stale_items_base:
+            # Get transaction count for this item separately for simplicity
+            transaction_count = session.query(func.count(Transaction.id)).filter(
+                Transaction.tag_id == item.tag_id
+            ).scalar() or 0
             
             result.append({
                 'tag_id': item.tag_id,
@@ -262,14 +233,12 @@ def get_stale_items():
                 'bin_location': item.bin_location,
                 'category': category,
                 'subcategory': subcategory,
-                'last_scan_date': actual_last_scan.isoformat() if actual_last_scan and actual_last_scan.year > 1900 else None,
-                'master_last_scan': master_date.isoformat() if master_date else None,
-                'transaction_last_scan': transaction_date.isoformat() if transaction_date else None,
+                'last_scan_date': item.date_last_scanned.isoformat() if item.date_last_scanned else None,
                 'days_since_scan': days_since_scan,
                 'transaction_count': transaction_count,
                 'last_contract': item.last_contract_num,
                 'quality': item.quality,
-                'data_source': 'transaction' if transaction_date else ('master' if master_date else 'none')
+                'data_source': 'master'
             })
         
         logger.info(f"Found {len(result)} stale items using enhanced transaction analysis")
@@ -618,3 +587,134 @@ def get_alert_config(session):
     except Exception as e:
         logger.error(f"Error fetching alert config: {str(e)}")
         return {'stale_item_days': {'default': 30, 'resale': 7, 'pack': 14}}
+
+@inventory_analytics_bp.route('/api/inventory/configuration', methods=['GET'])
+def get_configuration():
+    """Get current inventory analytics configuration."""
+    session = None
+    try:
+        session = db.session()
+        logger.info("Fetching inventory configuration")
+        
+        # Get alert thresholds configuration
+        alert_config = get_alert_config(session)
+        
+        # Get business rules configuration
+        business_config_record = session.query(InventoryConfig).filter(
+            InventoryConfig.config_key == 'business_rules'
+        ).first()
+        
+        business_rules = business_config_record.config_value if business_config_record else {
+            'resale_categories': ['Resale'],
+            'pack_bin_locations': ['pack'],
+            'rental_statuses': ['On Rent', 'Delivered'],
+            'available_statuses': ['Ready to Rent'],
+            'service_statuses': ['Repair', 'Needs to be Inspected']
+        }
+        
+        # Get dashboard settings
+        dashboard_config_record = session.query(InventoryConfig).filter(
+            InventoryConfig.config_key == 'dashboard_settings'
+        ).first()
+        
+        dashboard_settings = dashboard_config_record.config_value if dashboard_config_record else {
+            'default_date_range': 30,
+            'critical_alert_limit': 50,
+            'refresh_interval_minutes': 15,
+            'show_resolved_alerts': False
+        }
+        
+        configuration = {
+            'alert_thresholds': alert_config,
+            'business_rules': business_rules,
+            'dashboard_settings': dashboard_settings
+        }
+        
+        logger.info("Successfully fetched configuration")
+        return jsonify(configuration)
+        
+    except Exception as e:
+        logger.error(f"Error fetching configuration: {str(e)}")
+        return jsonify({'error': f'Failed to fetch configuration: {str(e)}'}), 500
+    finally:
+        if session:
+            session.close()
+
+@inventory_analytics_bp.route('/api/inventory/configuration', methods=['PUT'])
+def update_configuration():
+    """Update inventory analytics configuration."""
+    session = None
+    try:
+        session = db.session()
+        data = request.get_json()
+        logger.info(f"Updating inventory configuration with data: {data}")
+        
+        if not data:
+            return jsonify({'error': 'No configuration data provided'}), 400
+            
+        # Update alert thresholds if provided
+        if 'alert_thresholds' in data:
+            alert_config_record = session.query(InventoryConfig).filter(
+                InventoryConfig.config_key == 'alert_thresholds'
+            ).first()
+            
+            if alert_config_record:
+                alert_config_record.config_value = data['alert_thresholds']
+                alert_config_record.updated_at = datetime.now()
+            else:
+                alert_config_record = InventoryConfig(
+                    config_key='alert_thresholds',
+                    config_value=data['alert_thresholds'],
+                    description='Threshold settings for generating inventory alerts',
+                    category='alerting'
+                )
+                session.add(alert_config_record)
+        
+        # Update business rules if provided
+        if 'business_rules' in data:
+            business_config_record = session.query(InventoryConfig).filter(
+                InventoryConfig.config_key == 'business_rules'
+            ).first()
+            
+            if business_config_record:
+                business_config_record.config_value = data['business_rules']
+                business_config_record.updated_at = datetime.now()
+            else:
+                business_config_record = InventoryConfig(
+                    config_key='business_rules',
+                    config_value=data['business_rules'],
+                    description='Business rule definitions for inventory categorization',
+                    category='business'
+                )
+                session.add(business_config_record)
+        
+        # Update dashboard settings if provided
+        if 'dashboard_settings' in data:
+            dashboard_config_record = session.query(InventoryConfig).filter(
+                InventoryConfig.config_key == 'dashboard_settings'
+            ).first()
+            
+            if dashboard_config_record:
+                dashboard_config_record.config_value = data['dashboard_settings']
+                dashboard_config_record.updated_at = datetime.now()
+            else:
+                dashboard_config_record = InventoryConfig(
+                    config_key='dashboard_settings',
+                    config_value=data['dashboard_settings'],
+                    description='Dashboard display and behavior settings',
+                    category='ui'
+                )
+                session.add(dashboard_config_record)
+        
+        session.commit()
+        logger.info("Configuration updated successfully")
+        return jsonify({'message': 'Configuration updated successfully'})
+        
+    except Exception as e:
+        if session:
+            session.rollback()
+        logger.error(f"Error updating configuration: {str(e)}")
+        return jsonify({'error': f'Failed to update configuration: {str(e)}'}), 500
+    finally:
+        if session:
+            session.close()
