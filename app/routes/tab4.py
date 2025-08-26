@@ -1,38 +1,13 @@
 from flask import Blueprint, render_template, request, jsonify, current_app, make_response
 from .. import db, cache
 from ..models.db_models import ItemMaster, Transaction, HandCountedItems, HandCountedCatalog, LaundryContractStatus
+from ..services.logger import get_logger
 from sqlalchemy import func, desc, or_
 from sqlalchemy.exc import ProgrammingError
 from datetime import datetime
-import logging
-import sys
 import time  # Ensure the time module is imported
 
-# Configure logging for Tab 4
-logger = logging.getLogger('tab4')
-logger.setLevel(logging.INFO)
-
-# Remove existing handlers to avoid duplicates
-logger.handlers = []
-
-# File handler for tab4.log
-tab4_file_handler = logging.FileHandler('/home/tim/RFID3/logs/tab4.log')
-tab4_file_handler.setLevel(logging.INFO)
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(message)s')
-tab4_file_handler.setFormatter(formatter)
-logger.addHandler(tab4_file_handler)
-
-# Console handler
-console_handler = logging.StreamHandler(sys.stdout)
-console_handler.setLevel(logging.INFO)
-console_handler.setFormatter(formatter)
-logger.addHandler(console_handler)
-
-# Also log to the main rfid_dashboard.log
-main_file_handler = logging.FileHandler('/home/tim/RFID3/logs/rfid_dashboard.log')
-main_file_handler.setLevel(logging.INFO)
-main_file_handler.setFormatter(formatter)
-logger.addHandler(main_file_handler)
+logger = get_logger(__name__)
 
 tab4_bp = Blueprint('tab4', __name__)
 
@@ -1137,7 +1112,7 @@ def snapshot_status():
         schedule_info = ScheduledSnapshotService.get_snapshot_schedule_info()
         
         # Try to read last run summary
-        last_run_file = '/home/tim/RFID3/logs/last_snapshot_run.json'
+        last_run_file = LOG_DIR / 'last_snapshot_run.json'
         last_run_info = None
         
         if os.path.exists(last_run_file):
@@ -1152,9 +1127,9 @@ def snapshot_status():
             'last_run': last_run_info,
             'automation_enabled': True,
             'log_files': {
-                'detailed_log': '/home/tim/RFID3/logs/snapshot_automation.log',
-                'cron_log': '/home/tim/RFID3/logs/snapshot_cron.log',
-                'status_summary': '/home/tim/RFID3/logs/last_snapshot_run.json'
+                'detailed_log': str(LOG_DIR / 'snapshot_automation.log'),
+                'cron_log': str(LOG_DIR / 'snapshot_cron.log'),
+                'status_summary': str(LOG_DIR / 'last_snapshot_run.json')
             }
         })
         

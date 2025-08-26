@@ -7,23 +7,10 @@ Common.py: Shared server-side utilities for all tabs.
 from flask import Blueprint, request, jsonify, current_app
 from .. import db
 from ..models.db_models import Transaction
+from ..services.logger import get_logger
 from sqlalchemy import func
-import logging
-import sys
 
-# Configure logging
-logger = logging.getLogger('common')
-logger.setLevel(logging.INFO)
-logger.handlers = []  # Clear existing handlers
-file_handler = logging.FileHandler('/home/tim/RFID3/logs/rfid_dashboard.log')
-file_handler.setLevel(logging.INFO)
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-file_handler.setFormatter(formatter)
-logger.addHandler(file_handler)
-console_handler = logging.StreamHandler(sys.stdout)
-console_handler.setLevel(logging.INFO)
-console_handler.setFormatter(formatter)
-logger.addHandler(console_handler)
+logger = get_logger(__name__)
 
 common_bp = Blueprint('common', __name__)
 

@@ -4,6 +4,7 @@ import logging
 import traceback
 from datetime import datetime, timedelta, timezone
 from sqlalchemy.exc import SQLAlchemyError, OperationalError
+from requests.exceptions import RequestException
 from sqlalchemy.sql import text
 from .. import db
 from ..models.db_models import (
@@ -82,7 +83,11 @@ def update_refresh_state(state_type, timestamp):
     finally:
         session.close()
 
-def update_user_mappings(session, csv_file_path='/home/tim/RFID3/seeddata_20250425155406.csv'):
+def update_user_mappings(session, csv_file_path=None):
+    """Update user mappings from CSV file. If no path provided, use default from BASE_DIR."""
+    if csv_file_path is None:
+        from config import BASE_DIR
+        csv_file_path = BASE_DIR / 'seeddata_20250425155406.csv'
     """Populate user_rental_class_mappings from CSV, preserving existing user mappings.
     
     Creates a temporary table to back up user mappings, merges with CSV data

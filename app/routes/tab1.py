@@ -1,34 +1,18 @@
 # app/routes/tab1.py
 # tab1.py version: 2025-07-10-v24
-import logging
 from datetime import datetime
 from flask import Blueprint, request, jsonify, current_app, render_template
 from .. import db
 from ..models.db_models import ItemMaster, Transaction, RentalClassMapping, UserRentalClassMapping
 from ..services.api_client import APIClient
+from ..services.logger import get_logger
 from sqlalchemy import func, desc, or_, asc, case, select
 from time import time
 from urllib.parse import unquote
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 
-# Configure logging
-logger = logging.getLogger('tab1')
-logger.setLevel(logging.DEBUG)
-logger.handlers = []
-
-# File handler for rfid_dashboard.log
-file_handler = logging.FileHandler('/home/tim/RFID3/logs/rfid_dashboard.log')
-file_handler.setLevel(logging.DEBUG)
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-file_handler.setFormatter(formatter)
-logger.addHandler(file_handler)
-
-# Console handler
-console_handler = logging.StreamHandler()
-console_handler.setLevel(logging.DEBUG)
-console_handler.setFormatter(formatter)
-logger.addHandler(console_handler)
+logger = get_logger(__name__)
 
 tab1_bp = Blueprint('tab1', __name__)
 

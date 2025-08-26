@@ -16,6 +16,7 @@ import time
 from sqlalchemy.sql import text
 from datetime import datetime
 from .logger import get_logger
+from contextlib import contextmanager
 
 # Configure logging with process ID
 logger = get_logger(
@@ -26,6 +27,21 @@ logger = get_logger(
 )
 
 scheduler = BackgroundScheduler()
+
+class LockError(Exception):
+    """Raised when a Redis lock cannot be acquired."""
+    pass
+
+@contextmanager
+def acquire_lock(redis_client, name, timeout):
+    """Context manager for Redis locks with automatic cleanup."""
+    if not redis_client.setnx(name, "1"):
+        raise LockError(f"Could not acquire lock: {name}")
+    try:
+        redis_client.expire(name, timeout)
+        yield
+    finally:
+        redis_client.delete(name)
 
 def init_scheduler(app):
     logger.info("Initializing background scheduler")
@@ -52,39 +68,28 @@ def init_scheduler(app):
     with app.app_context():
         if retry_database_connection():
             logger.debug("Checking for full refresh lock")
-            if redis_client.setnx(lock_key, 1):
-                try:
-                    redis_client.expire(lock_key, lock_timeout)
+            try:
+                with acquire_lock(redis_client, lock_key, lock_timeout):
                     logger.info("Triggering full refresh on startup")
                     full_refresh()
                     logger.info("Full refresh on startup completed successfully")
-                except Exception as e:
-                    logger.error(f"Full refresh on startup failed: {str(e)}", exc_info=True)
-                finally:
-                    redis_client.delete(lock_key)
-                    logger.debug("Released full refresh lock")
-            else:
+            except LockError:
+                logger.info("Full refresh lock exists, waiting for release")
                 max_wait = 120
                 waited = 0
-                logger.info("Full refresh lock exists, waiting for release")
                 while redis_client.exists(lock_key) and waited < max_wait:
                     time.sleep(1)
                     waited += 1
                     logger.debug(f"Waiting for lock release, elapsed: {waited}s")
-                if not redis_client.exists(lock_key):
-                    if redis_client.setnx(lock_key, 1):
-                        try:
-                            redis_client.expire(lock_key, lock_timeout)
-                            logger.info("Triggering full refresh on startup (after wait)")
-                            full_refresh()
-                            logger.info("Full refresh on startup completed successfully")
-                        except Exception as e:
-                            logger.error(f"Full refresh on startup failed: {str(e)}", exc_info=True)
-                        finally:
-                            redis_client.delete(lock_key)
-                            logger.debug("Released full refresh lock")
-                else:
-                    logger.warning("Full refresh lock not released after 120s, forcing release and skipping startup refresh")
+                
+                # Try again after waiting
+                try:
+                    with acquire_lock(redis_client, lock_key, lock_timeout):
+                        logger.info("Triggering full refresh on startup (after wait)")
+                        full_refresh()
+                        logger.info("Full refresh on startup completed successfully")
+                except LockError:
+                    logger.warning("Full refresh lock still exists after waiting, forcing release and skipping startup refresh")
                     redis_client.delete(lock_key)
         else:
             logger.warning("Skipping full refresh due to database connection failure")
@@ -95,19 +100,15 @@ def init_scheduler(app):
                 logger.debug("Full refresh or incremental refresh in progress, skipping incremental refresh")
                 return
             if retry_database_connection():
-                if redis_client.setnx(incremental_lock_key, 1):
-                    try:
-                        redis_client.expire(incremental_lock_key, lock_timeout)
+                try:
+                    with acquire_lock(redis_client, incremental_lock_key, lock_timeout):
                         logger.debug("Starting scheduled incremental refresh (item master + transactions)")
                         incremental_refresh()
                         logger.info("Scheduled incremental refresh completed successfully")
-                    except Exception as e:
-                        logger.error(f"Incremental refresh failed: {str(e)}", exc_info=True)
-                    finally:
-                        redis_client.delete(incremental_lock_key)
-                        logger.debug("Released incremental refresh lock")
-                else:
+                except LockError:
                     logger.debug("Incremental refresh lock exists, skipping refresh")
+                except Exception as e:
+                    logger.error(f"Incremental refresh failed: {str(e)}", exc_info=True)
             else:
                 logger.error("Skipping incremental refresh due to database connection failure")
 
@@ -117,19 +118,15 @@ def init_scheduler(app):
                 logger.debug("Incremental refresh in progress, skipping full refresh")
                 return
             if retry_database_connection():
-                if redis_client.setnx(lock_key, 1):
-                    try:
-                        redis_client.expire(lock_key, lock_timeout)
+                try:
+                    with acquire_lock(redis_client, lock_key, lock_timeout):
                         logger.debug("Starting scheduled full refresh (item master, transactions, seed data)")
                         full_refresh()
                         logger.info("Scheduled full refresh completed successfully")
-                    except Exception as e:
-                        logger.error(f"Full refresh failed: {str(e)}", exc_info=True)
-                    finally:
-                        redis_client.delete(lock_key)
-                        logger.debug("Released full refresh lock")
-                else:
+                except LockError:
                     logger.debug("Full refresh lock exists, skipping refresh")
+                except Exception as e:
+                    logger.error(f"Full refresh failed: {str(e)}", exc_info=True)
             else:
                 logger.error("Skipping full refresh due to database connection failure")
 

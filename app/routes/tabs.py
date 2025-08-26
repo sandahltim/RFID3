@@ -1,23 +1,10 @@
 # app/routes/tabs.py
 # Version: 2025-06-27-v5
 from flask import Blueprint, redirect, url_for, jsonify, current_app, render_template
+from ..services.logger import get_logger
 from datetime import datetime
-import logging
-import sys
 
-# Configure logging
-logger = logging.getLogger('tabs')
-logger.setLevel(logging.INFO)
-logger.handlers = []  # Clear existing handlers
-file_handler = logging.FileHandler('/home/tim/RFID3/logs/rfid_dashboard.log')
-file_handler.setLevel(logging.INFO)
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-file_handler.setFormatter(formatter)
-logger.addHandler(file_handler)
-console_handler = logging.StreamHandler(sys.stdout)
-console_handler.setLevel(logging.INFO)
-console_handler.setFormatter(formatter)
-logger.addHandler(console_handler)
+logger = get_logger(__name__)
 
 tabs_bp = Blueprint('tabs', __name__)
 

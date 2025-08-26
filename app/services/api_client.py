@@ -38,6 +38,13 @@ def create_session():
     return session
 
 class APIClient:
+    """
+    RFID API client for handling authentication and requests.
+    
+    Note: This client is not thread-safe. Each thread should use its own instance
+    since the session and token are instance attributes that may be modified
+    during requests (e.g., token refresh).
+    """
     def __init__(self):
         self.base_url = "https://cs.iot.ptshome.com/api/v1/data/"
         self.auth_url = LOGIN_URL
@@ -74,9 +81,10 @@ class APIClient:
         logger.error("Failed to fetch access token after 5 attempts")
         raise Exception("Failed to fetch access token after 5 attempts")
 
-    def _make_request(self, endpoint_id, params=None, method='GET', data=None, timeout=20, user_operation=False):
+    def _make_request(self, endpoint_id, params=None, method='GET', data=None, timeout=20, user_operation=False, headers=None):
         """Make a request to the RFID API, capping the limit at the API's maximum of 200."""
         params = dict(params or {})
+        headers = dict(headers or {})
         if method == 'GET':
             params['offset'] = params.get('offset', 0)
             requested_limit = int(params.get('limit', 200))
@@ -91,7 +99,7 @@ class APIClient:
         if self.token_expiry and datetime.now() >= self.token_expiry:
             self.authenticate()
 
-        headers = {"Authorization": f"Bearer {self.token}"}
+        headers.update({"Authorization": f"Bearer {self.token}"})
         url = f"{self.base_url}{endpoint_id}"
 
         if method == 'GET':
