@@ -55,7 +55,7 @@ class APIClient:
         for attempt in range(5):
             try:
                 logger.debug(f"Requesting token from {self.auth_url}")
-                response = session.post(self.auth_url, json=payload, timeout=20)
+                response = self.session.post(self.auth_url, json=payload, timeout=20)
                 data = response.json()
                 logger.debug(f"Token attempt {attempt + 1}: Status {response.status_code}")
                 if response.status_code == 200 and data.get('result'):
@@ -76,8 +76,7 @@ class APIClient:
 
     def _make_request(self, endpoint_id, params=None, method='GET', data=None, timeout=20, user_operation=False):
         """Make a request to the RFID API, capping the limit at the API's maximum of 200."""
-        if not params:
-            params = {}
+        params = dict(params or {})
         if method == 'GET':
             params['offset'] = params.get('offset', 0)
             requested_limit = int(params.get('limit', 200))
@@ -102,7 +101,7 @@ class APIClient:
                 full_url = f"{url}?{query_string}"
                 logger.debug(f"Making GET request: {full_url}")
                 try:
-                    response = session.get(url, headers=headers, params=params, timeout=timeout)
+                    response = self.session.get(url, headers=headers, params=params, timeout=timeout)
                     data = response.json()
                     if response.status_code == 500:
                         logger.error(f"Server error: {data}")
@@ -130,9 +129,9 @@ class APIClient:
                     logger.debug(f"Making {method} request to URL: {url}")
                     try:
                         if method == 'POST':
-                            response = session.post(url, headers=headers, json=data, timeout=timeout)
+                            response = self.session.post(url, headers=headers, json=data, timeout=timeout)
                         else:
-                            response = session.patch(url, headers=headers, json=data, timeout=timeout)
+                            response = self.session.patch(url, headers=headers, json=data, timeout=timeout)
                         data = response.json()
                         if response.status_code == 500:
                             logger.error(f"Server error: {data}")
