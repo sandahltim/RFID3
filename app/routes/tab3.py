@@ -6,14 +6,11 @@ from flask_limiter.util import get_remote_address
 from .. import db, cache
 from ..models.db_models import ItemMaster, Transaction, RentalClassMapping, UserRentalClassMapping, SeedRentalClass
 from ..services.api_client import APIClient
+from ..services.logger import get_logger
 from sqlalchemy import text, func, or_
 from datetime import datetime, timezone
-import logging
-import sys
 import csv
 import os
-import pwd
-import grp
 import sqlalchemy.exc
 import fcntl
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
@@ -23,31 +20,7 @@ import json
 import time
 from urllib.parse import unquote
 
-# Configure logging for Tab 3
-logger = logging.getLogger('tab3')
-logger.setLevel(logging.INFO)
-logger.handlers = []
-
-tab3_log_file = '/home/tim/RFID3/logs/rfid_dashboard.log'
-try:
-    if not os.path.exists(tab3_log_file):
-        open(tab3_log_file, 'a').close()
-    os.chmod(tab3_log_file, 0o666)
-    os.chown(tab3_log_file, pwd.getpwnam('tim').pw_uid, grp.getgrnam('tim').gr_gid)
-except Exception as e:
-    print(f"ERROR: Failed to set up Tab 3 log file {tab3_log_file}: {str(e)}")
-    sys.stderr.write(f"ERROR: Failed to set up Tab 3 log file {tab3_log_file}: {str(e)}\n")
-
-file_handler = logging.FileHandler(tab3_log_file)
-file_handler.setLevel(logging.INFO)
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-file_handler.setFormatter(formatter)
-logger.addHandler(file_handler)
-
-console_handler = logging.StreamHandler(sys.stdout)
-console_handler.setLevel(logging.INFO)
-console_handler.setFormatter(formatter)
-logger.addHandler(console_handler)
+logger = get_logger(__name__)
 
 tab3_bp = Blueprint('tab3', __name__)
 
@@ -58,7 +31,7 @@ limiter = Limiter(
     storage_uri="memory://"
 )
 
-SHARED_DIR = '/home/tim/RFID3/shared'
+from config import SHARED_DIR
 CSV_FILE_PATH = os.path.join(SHARED_DIR, 'rfid_tags.csv')
 LOCK_FILE_PATH = os.path.join(SHARED_DIR, 'rfid_tags.lock')
 

@@ -2,12 +2,11 @@ from flask import Blueprint, render_template, request, jsonify, current_app, Res
 from .. import db, cache
 from ..models.db_models import ItemMaster, Transaction
 from ..services.api_client import APIClient
+from ..services.logger import get_logger
 from sqlalchemy import func, desc, or_, asc, text, case, select
 from sqlalchemy.exc import SQLAlchemyError
 import time
 from datetime import datetime, timedelta
-import logging
-import sys
 from urllib.parse import unquote
 import csv
 from io import StringIO
@@ -18,37 +17,7 @@ from config import BULK_UPDATE_BATCH_SIZE
 from ..services.scheduler import get_scheduler
 from ..services.mappings_cache import get_cached_mappings
 
-# Configure logging
-logger = logging.getLogger('tab5')
-logger.setLevel(logging.DEBUG)
-
-# Remove existing handlers to avoid duplicates
-logger.handlers = []
-
-# File handler for rfid_dashboard.log
-file_handler = logging.FileHandler('/home/tim/RFID3/logs/rfid_dashboard.log')
-file_handler.setLevel(logging.DEBUG)
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-file_handler.setFormatter(formatter)
-logger.addHandler(file_handler)
-
-# Secondary file handler for debug.log
-debug_handler = logging.FileHandler('/home/tim/RFID3/logs/debug.log')
-debug_handler.setLevel(logging.DEBUG)
-debug_handler.setFormatter(formatter)
-logger.addHandler(debug_handler)
-
-# Console handler
-console_handler = logging.StreamHandler(sys.stdout)
-console_handler.setLevel(logging.INFO)
-console_handler.setFormatter(formatter)
-logger.addHandler(console_handler)
-
-# Also add logs to the root logger (which Gunicorn might capture)
-root_logger = logging.getLogger()
-root_logger.setLevel(logging.DEBUG)
-if not any(isinstance(h, logging.StreamHandler) for h in root_logger.handlers):
-    root_logger.addHandler(console_handler)
+logger = get_logger(__name__)
 
 tab5_bp = Blueprint('tab5', __name__)
 

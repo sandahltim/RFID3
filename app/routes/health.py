@@ -1,31 +1,12 @@
 from flask import Blueprint, jsonify, current_app
 from app import db, cache
 from app.services.api_client import APIClient
+from app.services.logger import get_logger
 from sqlalchemy.sql import text
 import redis
 import requests
-import logging
-import sys
 
-# Configure logging
-logger = logging.getLogger('health')
-logger.setLevel(logging.INFO)
-
-# Remove existing handlers to avoid duplicates
-logger.handlers = []
-
-# File handler for rfid_dashboard.log
-file_handler = logging.FileHandler('/home/tim/RFID3/logs/rfid_dashboard.log')
-file_handler.setLevel(logging.INFO)
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-file_handler.setFormatter(formatter)
-logger.addHandler(file_handler)
-
-# Console handler
-console_handler = logging.StreamHandler(sys.stdout)
-console_handler.setLevel(logging.INFO)
-console_handler.setFormatter(formatter)
-logger.addHandler(console_handler)
+logger = get_logger(__name__)
 
 health_bp = Blueprint('health', __name__)
 

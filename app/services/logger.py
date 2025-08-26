@@ -1,25 +1,32 @@
 import logging
 import os
 from logging.handlers import RotatingFileHandler
-from config import LOG_FILE
+from config import LOG_FILE, LOG_DIR
 
 _formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
-def get_logger(name: str, level: int = logging.INFO, log_file: str = LOG_FILE, add_handlers: bool = True) -> logging.Logger:
+def get_logger(name: str = None, level: int = logging.INFO, log_file: str = None, add_handlers: bool = True) -> logging.Logger:
     """Return a configured logger with rotating file and console handlers.
 
     Parameters:
-        name: Logger name.
+        name: Logger name (optional, defaults to caller's module name).
         level: Logging level.
-        log_file: Path to the log file.
+        log_file: Path to the log file (optional, uses default from config).
         add_handlers: Whether to attach handlers. Useful when the caller
             wants to rely on existing global handlers.
     """
-    logger = logging.getLogger(name)
+    # Use default log file if not specified
+    if log_file is None:
+        log_file = LOG_FILE
+        
+    # Use the provided name or default to main logger
+    logger_name = name if name is not None else __name__
+    logger = logging.getLogger(logger_name)
     logger.setLevel(level)
+    
     if add_handlers and not logger.handlers:
-        log_dir = os.path.dirname(log_file)
-        os.makedirs(log_dir, exist_ok=True)
+        # Ensure log directory exists
+        os.makedirs(LOG_DIR, exist_ok=True)
 
         # Use rotating file handler to prevent log files from growing too large
         file_handler = RotatingFileHandler(log_file, maxBytes=1000000, backupCount=5)

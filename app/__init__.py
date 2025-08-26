@@ -6,7 +6,7 @@ from logging.handlers import RotatingFileHandler
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_redis import FlaskRedis
-from config import DB_CONFIG, REDIS_URL, LOG_FILE, APP_IP, BASE_DIR, validate_config
+from config import DB_CONFIG, REDIS_URL, LOG_FILE, APP_IP, BASE_DIR, STATIC_DIR, validate_config
 from datetime import datetime
 import re
 
@@ -16,7 +16,7 @@ cache = FlaskRedis()
 
 def create_app():
     """Create and configure the Flask application."""
-    app = Flask(__name__, static_folder=os.path.join(BASE_DIR, 'static'))
+    app = Flask(__name__, static_folder=str(STATIC_DIR))
 
     # Configure logging using centralized system
     from app.services.logger import setup_app_logging

@@ -1,8 +1,12 @@
 # config.py version: 2025-06-26-v8
 import os
+from pathlib import Path
 
-# Base directory
-BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+# Base directory - using Path for better path handling
+BASE_DIR = Path(__file__).resolve().parent
+LOG_DIR = BASE_DIR / "logs"
+STATIC_DIR = BASE_DIR / "static"
+SHARED_DIR = BASE_DIR / "shared"
 
 # Application IP address
 APP_IP = os.environ.get('APP_IP', '192.168.3.110')
@@ -11,7 +15,7 @@ APP_IP = os.environ.get('APP_IP', '192.168.3.110')
 DB_CONFIG = {
     'host': os.environ.get('DB_HOST', 'localhost'),
     'user': os.environ.get('DB_USER', 'rfid_user'),
-    'password': os.environ.get('DB_PASSWORD', 'rfid_user_password'),
+    'password': os.environ.get('DB_PASSWORD'),
     'database': os.environ.get('DB_DATABASE', 'rfid_inventory'),
     'charset': os.environ.get('DB_CHARSET', 'utf8mb4'),
     'collation': os.environ.get('DB_COLLATION', 'utf8mb4_unicode_ci')
@@ -21,8 +25,8 @@ DB_CONFIG = {
 REDIS_URL = 'redis://localhost:6379/0'
 
 # API configuration
-API_USERNAME = os.environ.get('API_USERNAME', 'api')
-API_PASSWORD = os.environ.get('API_PASSWORD', 'Broadway8101')
+API_USERNAME = os.environ.get("API_USERNAME")  # no default
+API_PASSWORD = os.environ.get("API_PASSWORD")
 LOGIN_URL = 'https://login.cloud.ptshome.com/api/v1/login'
 ITEM_MASTER_URL = 'https://cs.iot.ptshome.com/api/v1/data/14223767938169344381'
 TRANSACTION_URL = 'https://cs.iot.ptshome.com/api/v1/data/14223767938169346196'
@@ -38,7 +42,7 @@ INCREMENTAL_FALLBACK_SECONDS = 172800  # Fall back to 2 days if API filter fails
 BULK_UPDATE_BATCH_SIZE = 50  # Batch size for bulk updates in tab5.py
 
 # Logging
-LOG_FILE = os.path.join(BASE_DIR, 'logs', 'rfid_dashboard.log')
+LOG_FILE = LOG_DIR / 'rfid_dashboard.log'
 
 # SQLAlchemy configuration
 SQLALCHEMY_ENGINE_OPTIONS = {
@@ -53,27 +57,11 @@ SQLALCHEMY_ENGINE_OPTIONS = {
 def validate_config():
     """
     Validate that all required configuration is present.
-    Raises ValueError if any required configuration is missing.
-    
-    Note: Temporarily using defaults for backwards compatibility.
-    Consider setting environment variables for production security.
+    Raises RuntimeError if any required environment variables are missing.
     """
-    # Check for environment-based configuration (optional for now)
-    env_vars = [
-        ('DB_USER', os.environ.get('DB_USER')),
-        ('DB_PASSWORD', os.environ.get('DB_PASSWORD')),
-        ('DB_DATABASE', os.environ.get('DB_DATABASE')),
-        ('API_USERNAME', os.environ.get('API_USERNAME')),
-        ('API_PASSWORD', os.environ.get('API_PASSWORD')),
-    ]
+    required_vars = ['API_USERNAME', 'API_PASSWORD', 'DB_PASSWORD']
     
-    # Log if using defaults vs environment variables
-    import logging
-    for name, value in env_vars:
-        if value:
-            logging.info(f"Using environment variable for {name}")
-        else:
-            logging.info(f"Using default configuration for {name}")
-    
-    # Configuration is valid (using defaults if needed)
+    for var in required_vars:
+        if not globals()[var]:
+            raise RuntimeError(f"{var} environment variable required")
 

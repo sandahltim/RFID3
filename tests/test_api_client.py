@@ -9,7 +9,8 @@ sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from config import LOGIN_URL
 
 # Ensure log directory exists before importing the client module
-os.makedirs('/home/tim/RFID3/logs', exist_ok=True)
+from config import LOG_DIR
+os.makedirs(LOG_DIR, exist_ok=True)
 
 from app.services.api_client import APIClient
 

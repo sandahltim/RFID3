@@ -1,29 +1,16 @@
 # app/routes/categories.py
 # categories.py version: 2025-07-05-v29
-import logging
-import sys
 import json
 from flask import Blueprint, render_template, request, jsonify, current_app
 from .. import db, cache
 from ..models.db_models import RentalClassMapping, UserRentalClassMapping, SeedRentalClass, HandCountedCatalog
 from ..services.api_client import APIClient
+from ..services.logger import get_logger
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError, ProgrammingError
 from datetime import datetime
 from time import time
 
-# Configure logging
-logger = logging.getLogger('categories')
-logger.setLevel(logging.INFO)
-logger.handlers = []
-file_handler = logging.FileHandler('/home/tim/RFID3/logs/rfid_dashboard.log')
-file_handler.setLevel(logging.INFO)
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-file_handler.setFormatter(formatter)
-logger.addHandler(file_handler)
-console_handler = logging.StreamHandler(sys.stdout)
-console_handler.setLevel(logging.INFO)
-console_handler.setFormatter(formatter)
-logger.addHandler(console_handler)
+logger = get_logger(__name__)
 
 categories_bp = Blueprint('categories', __name__)
 

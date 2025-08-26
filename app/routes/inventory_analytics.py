@@ -4,31 +4,13 @@ from ..models.db_models import (
     ItemMaster, Transaction, ItemUsageHistory, InventoryHealthAlert, 
     InventoryConfig, UserRentalClassMapping, RentalClassMapping
 )
+from ..services.logger import get_logger
 from sqlalchemy import func, desc, and_, or_, text
 from sqlalchemy.exc import SQLAlchemyError
 from datetime import datetime, timedelta
-import logging
 import json
 
-# Configure logging for Inventory & Analytics
-logger = logging.getLogger('inventory_analytics')
-logger.setLevel(logging.INFO)
-
-# Remove existing handlers to avoid duplicates
-logger.handlers = []
-
-# File handler for inventory_analytics.log
-file_handler = logging.FileHandler('/home/tim/RFID3/logs/inventory_analytics.log')
-file_handler.setLevel(logging.INFO)
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-file_handler.setFormatter(formatter)
-logger.addHandler(file_handler)
-
-# Console handler
-console_handler = logging.StreamHandler()
-console_handler.setLevel(logging.INFO)
-console_handler.setFormatter(formatter)
-logger.addHandler(console_handler)
+logger = get_logger(__name__)
 
 inventory_analytics_bp = Blueprint('inventory_analytics', __name__)
 

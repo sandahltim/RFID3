@@ -2,31 +2,12 @@ from flask import Blueprint, render_template, request, jsonify, current_app
 from .. import db, cache
 from ..models.db_models import Transaction, ItemMaster
 from ..services.api_client import APIClient
+from ..services.logger import get_logger
 from sqlalchemy import func, desc, asc, text
 from time import time
 from datetime import datetime, timedelta, timezone
-import logging
-import sys
 
-# Configure logging
-logger = logging.getLogger('tab2')
-logger.setLevel(logging.DEBUG)
-
-# Remove existing handlers to avoid duplicates
-logger.handlers = []
-
-# File handler for rfid_dashboard.log
-file_handler = logging.FileHandler('/home/tim/RFID3/logs/rfid_dashboard.log')
-file_handler.setLevel(logging.DEBUG)
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-file_handler.setFormatter(formatter)
-logger.addHandler(file_handler)
-
-# Console handler
-console_handler = logging.StreamHandler(sys.stdout)
-console_handler.setLevel(logging.DEBUG)
-console_handler.setFormatter(formatter)
-logger.addHandler(console_handler)
+logger = get_logger(__name__)
 
 tab2_bp = Blueprint('tab2', __name__)
 
