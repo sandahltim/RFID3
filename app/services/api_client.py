@@ -2,6 +2,8 @@
 # api_client.py version: 2025-06-27-v6
 import requests
 import time
+import copy
+import redis
 from datetime import datetime, timedelta, timezone
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
@@ -21,12 +23,19 @@ from .logger import get_logger
 # Configure logging
 logger = get_logger('api_client', level=logging.INFO, log_file=LOG_FILE)
 
-# Configure a reusable session with retry strategy
-session = requests.Session()
-retry_strategy = Retry(total=5, backoff_factor=1, allowed_methods=["GET", "POST", "PATCH"], status_forcelist=[500, 502, 503, 504])
-adapter = HTTPAdapter(max_retries=retry_strategy)
-session.mount("https://", adapter)
-session.mount("http://", adapter)
+def create_session():
+    """Create a new requests session with retry strategy."""
+    session = requests.Session()
+    retry_strategy = Retry(
+        total=5, 
+        backoff_factor=1, 
+        allowed_methods=["GET", "POST", "PATCH"], 
+        status_forcelist=[500, 502, 503, 504]
+    )
+    adapter = HTTPAdapter(max_retries=retry_strategy)
+    session.mount("https://", adapter)
+    session.mount("http://", adapter)
+    return session
 
 class APIClient:
     def __init__(self):
@@ -35,6 +44,7 @@ class APIClient:
         self.item_master_endpoint = "14223767938169344381"
         self.token = None
         self.token_expiry = None
+        self.session = create_session()  # Instance-specific session
         # Only authenticate if we're not in a snapshot automation context
         import os
         if not os.environ.get('SNAPSHOT_AUTOMATION'):

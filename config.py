@@ -7,22 +7,22 @@ BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 # Application IP address
 APP_IP = os.environ.get('APP_IP', '192.168.3.110')
 
-# MariaDB configuration
+# MariaDB configuration - requires environment variables
 DB_CONFIG = {
-    'host': 'localhost',
-    'user': 'rfid_user',
-    'password': 'rfid_user_password',
-    'database': 'rfid_inventory',
-    'charset': 'utf8mb4',
-    'collation': 'utf8mb4_unicode_ci'
+    'host': os.environ.get('DB_HOST', 'localhost'),
+    'user': os.environ.get('DB_USER'),  # Required - no default
+    'password': os.environ.get('DB_PASSWORD'),  # Required - no default
+    'database': os.environ.get('DB_DATABASE'),  # Required - no default
+    'charset': os.environ.get('DB_CHARSET', 'utf8mb4'),
+    'collation': os.environ.get('DB_COLLATION', 'utf8mb4_unicode_ci')
 }
 
 # Redis configuration
 REDIS_URL = 'redis://localhost:6379/0'
 
-# API configuration
-API_USERNAME = os.environ.get('API_USERNAME', 'api')
-API_PASSWORD = os.environ.get('API_PASSWORD', 'Broadway8101')
+# API configuration - requires environment variables
+API_USERNAME = os.environ.get('API_USERNAME')  # Required - no default
+API_PASSWORD = os.environ.get('API_PASSWORD')  # Required - no default
 LOGIN_URL = 'https://login.cloud.ptshome.com/api/v1/login'
 ITEM_MASTER_URL = 'https://cs.iot.ptshome.com/api/v1/data/14223767938169344381'
 TRANSACTION_URL = 'https://cs.iot.ptshome.com/api/v1/data/14223767938169346196'
@@ -48,4 +48,23 @@ SQLALCHEMY_ENGINE_OPTIONS = {
     'pool_recycle': 1800,  # Recycle connections every 30 minutes
     'connect_args': {'charset': 'utf8mb4', 'collation': 'utf8mb4_unicode_ci'}
 }
+
+
+def validate_config():
+    """
+    Validate that all required configuration is present.
+    Raises ValueError if any required configuration is missing.
+    """
+    required_vars = [
+        ('DB_USER', DB_CONFIG['user']),
+        ('DB_PASSWORD', DB_CONFIG['password']),
+        ('DB_DATABASE', DB_CONFIG['database']),
+        ('API_USERNAME', API_USERNAME),
+        ('API_PASSWORD', API_PASSWORD),
+    ]
+    
+    missing = [name for name, value in required_vars if not value]
+    
+    if missing:
+        raise ValueError(f"Missing required environment variables: {', '.join(missing)}")
 

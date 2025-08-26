@@ -1108,15 +1108,49 @@ function displayHealthAlerts(alerts) {
         alerts = [];
     }
     
+    // Group alerts by tag_id to eliminate duplicates
+    const groupedAlerts = {};
+    alerts.forEach(alert => {
+        const key = alert.tag_id || `${alert.category}_${alert.subcategory}_${Math.random()}`;
+        if (!groupedAlerts[key]) {
+            groupedAlerts[key] = {
+                ...alert,
+                alertCount: 1,
+                severities: [alert.severity],
+                alertTypes: [alert.alert_type],
+                suggestions: [alert.suggested_action]
+            };
+        } else {
+            // Merge duplicate alerts
+            groupedAlerts[key].alertCount++;
+            if (!groupedAlerts[key].severities.includes(alert.severity)) {
+                groupedAlerts[key].severities.push(alert.severity);
+            }
+            if (!groupedAlerts[key].alertTypes.includes(alert.alert_type)) {
+                groupedAlerts[key].alertTypes.push(alert.alert_type);
+            }
+            if (!groupedAlerts[key].suggestions.includes(alert.suggested_action)) {
+                groupedAlerts[key].suggestions.push(alert.suggested_action);
+            }
+            // Use highest priority severity
+            const severityPriority = { 'critical': 4, 'high': 3, 'medium': 2, 'low': 1 };
+            if (severityPriority[alert.severity] > severityPriority[groupedAlerts[key].severity]) {
+                groupedAlerts[key].severity = alert.severity;
+            }
+        }
+    });
+    
+    const uniqueAlerts = Object.values(groupedAlerts);
+    
     const perPage = parseInt(document.getElementById('alerts-per-page').value) || 25;
-    const totalPages = Math.ceil(alerts.length / perPage);
+    const totalPages = Math.ceil(uniqueAlerts.length / perPage);
     const startIndex = (currentAlertsPage - 1) * perPage;
     const endIndex = startIndex + perPage;
-    const pageAlerts = alerts.slice(startIndex, endIndex);
+    const pageAlerts = uniqueAlerts.slice(startIndex, endIndex);
     
     // Update count
     document.getElementById('alerts-count').textContent = 
-        `Showing ${startIndex + 1}-${Math.min(endIndex, alerts.length)} of ${alerts.length} alerts`;
+        `Showing ${startIndex + 1}-${Math.min(endIndex, uniqueAlerts.length)} of ${uniqueAlerts.length} unique items (${alerts.length} total alerts)`;
     
     // Display alerts
     let html = '';
@@ -1129,24 +1163,41 @@ function displayHealthAlerts(alerts) {
                 'low': 'secondary'
             }[alert.severity] || 'secondary';
             
+            // Create badges for all severities
+            const severityBadges = alert.severities.map(sev => {
+                const color = {'critical': 'danger', 'high': 'warning', 'medium': 'info', 'low': 'secondary'}[sev] || 'secondary';
+                return `<span class="badge bg-${color} me-1">${sev.toUpperCase()}</span>`;
+            }).join('');
+            
+            // Create combined suggestions
+            const suggestions = alert.suggestions.filter(s => s && s.trim()).join(' • ');
+            
             html += `
                 <div class="alert alert-${severityColor} d-flex justify-content-between align-items-start">
                     <div class="flex-grow-1">
-                        <strong>${alert.common_name || alert.category || 'Unknown Item'}</strong>
-                        ${alert.tag_id ? ` (${alert.tag_id})` : ''}
-                        <div class="small text-muted">${alert.category || 'No Category'} > ${alert.subcategory || 'No Subcategory'}</div>
+                        <div class="d-flex align-items-center mb-1">
+                            <strong class="me-2">${alert.common_name || alert.category || 'Unknown Item'}</strong>
+                            ${alert.alertCount > 1 ? `<span class="badge bg-info">${alert.alertCount} alerts</span>` : ''}
+                        </div>
+                        ${alert.tag_id ? `<div class="small text-muted mb-1">Tag ID: ${alert.tag_id}</div>` : ''}
+                        <div class="small text-muted mb-1">${alert.category || 'No Category'} > ${alert.subcategory || 'No Subcategory'}</div>
                         <div class="mt-1">
-                            <small>${alert.suggested_action || 'No action suggested'}</small>
+                            <small>${suggestions || 'No action suggested'}</small>
                         </div>
                         <div class="mt-1">
-                            <small class="text-muted">Created: ${new Date(alert.created_at).toLocaleDateString()}</small>
+                            <small class="text-muted">
+                                Created: ${new Date(alert.created_at).toLocaleDateString()}
+                                ${alert.alertCount > 1 ? ` (Latest of ${alert.alertCount} similar alerts)` : ''}
+                            </small>
                         </div>
                     </div>
                     <div class="d-flex flex-column align-items-end">
-                        <span class="badge bg-${severityColor} mb-2">${alert.severity?.toUpperCase()}</span>
+                        <div class="mb-2">
+                            ${severityBadges}
+                        </div>
                         ${alert.tag_id ? `
                             <button class="btn btn-outline-primary btn-sm" onclick="navigateToItem('${alert.tag_id}')" 
-                                    title="View item details on Open Contracts tab">
+                                    title="View item in Rental Inventory tab">
                                 <i class="fas fa-external-link-alt"></i> View Item
                             </button>
                         ` : ''}
@@ -1389,19 +1440,19 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 
-// Navigate to specific item on Tab 2 (Open Contracts)
+// Navigate to specific item on Tab 1 (Rental Inventory)
 function navigateToItem(tagId) {
     try {
-        // Switch to Tab 2 (Open Contracts)
-        const tab2Link = document.querySelector('a[data-bs-target="#tab2"]');
-        if (tab2Link) {
+        // Switch to Tab 1 (Rental Inventory)
+        const tab1Link = document.querySelector('a[data-bs-target="#tab1"], a[href="#tab1"], .nav-link[onclick*="tab1"], .nav-link[onclick*="showTab(1)"]');
+        if (tab1Link) {
             // Trigger tab switch
-            tab2Link.click();
+            tab1Link.click();
             
             // Wait for tab to load, then search for the item
             setTimeout(() => {
-                // Try to find and scroll to the item in Tab 2
-                const itemElements = document.querySelectorAll('#tab2 [data-tag-id], #tab2 .contract-item, #tab2 .item-row');
+                // Try to find and scroll to the item in Tab 1
+                const itemElements = document.querySelectorAll('#tab1 [data-tag-id], #tab1 .item-row, #tab1 .inventory-item, #tab1 tr, #tab1 .card');
                 let foundItem = null;
                 
                 // Search through various possible selectors
@@ -1425,12 +1476,12 @@ function navigateToItem(tagId) {
                     }, 3000);
                 } else {
                     // If not found, show search hint
-                    alert(`Switched to Open Contracts tab. Please search for item: ${tagId}`);
+                    alert(`Switched to Rental Inventory tab. Please search for item: ${tagId}`);
                 }
             }, 500);
         } else {
-            console.error('Could not find Tab 2 link');
-            alert('Could not navigate to Open Contracts tab');
+            console.error('Could not find Tab 1 link');
+            alert('Could not navigate to Rental Inventory tab');
         }
     } catch (error) {
         console.error('Error navigating to item:', error);
