@@ -15,7 +15,7 @@ from ..models.db_models import (
 )
 from ..services.api_client import APIClient
 from flask import Blueprint, jsonify
-from config import INCREMENTAL_LOOKBACK_SECONDS, LOG_FILE
+from config import INCREMENTAL_LOOKBACK_SECONDS, LOG_FILE, BASE_DIR
 import time
 import os
 import csv
@@ -82,7 +82,7 @@ def update_refresh_state(state_type, timestamp):
     finally:
         session.close()
 
-def update_user_mappings(session, csv_file_path='/home/tim/RFID3/seeddata_20250425155406.csv'):
+def update_user_mappings(session, csv_file_path=os.path.join(BASE_DIR, 'seeddata_20250425155406.csv')):
     """Populate user_rental_class_mappings from CSV, preserving existing user mappings.
     
     Creates a temporary table to back up user mappings, merges with CSV data

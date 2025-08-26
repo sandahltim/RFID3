@@ -9,12 +9,15 @@
 # Exit on error
 set -e
 
+# Determine project directory
+PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")"/.. && pwd)"
+
 # Log file
-LOG_FILE="/home/tim/RFID3/logs/samba_setup.log"
-mkdir -p /home/tim/RFID3/logs
-touch $LOG_FILE
-chown tim:tim $LOG_FILE
-chmod 640 $LOG_FILE
+LOG_FILE="$PROJECT_DIR/logs/samba_setup.log"
+mkdir -p "$PROJECT_DIR/logs"
+touch "$LOG_FILE"
+chown tim:tim "$LOG_FILE"
+chmod 640 "$LOG_FILE"
 exec 1>>$LOG_FILE 2>&1
 echo "$(date '+%Y-%m-%d %H:%M:%S') - Starting Samba setup"
 
@@ -28,11 +31,11 @@ else
 fi
 
 # Create shared directory
-SHARED_DIR="/home/tim/RFID3/shared"
+SHARED_DIR="$PROJECT_DIR/shared"
 echo "Creating shared directory: $SHARED_DIR"
-mkdir -p $SHARED_DIR
-chown tim:tim $SHARED_DIR
-chmod 770 $SHARED_DIR
+mkdir -p "$SHARED_DIR"
+chown tim:tim "$SHARED_DIR"
+chmod 770 "$SHARED_DIR"
 
 # Verify Samba configuration includes RFIDShare
 if ! grep -q "\[RFIDShare\]" /etc/samba/smb.conf; then
@@ -45,7 +48,7 @@ if ! grep -q "\[RFIDShare\]" /etc/samba/smb.conf; then
     # Append RFIDShare configuration
     cat << EOF >> /etc/samba/smb.conf
 [RFIDShare]
-path = /home/tim/RFID3/shared
+path = $PROJECT_DIR/shared
 writable = yes
 browsable = yes
 guest ok = no
@@ -84,7 +87,7 @@ testparm -s
 
 # Set ownership and permissions for log directory
 echo "Setting log directory permissions"
-chown -R tim:tim /home/tim/RFID3/logs
-chmod -R 750 /home/tim/RFID3/logs
+chown -R tim:tim "$PROJECT_DIR/logs"
+chmod -R 750 "$PROJECT_DIR/logs"
 
 echo "$(date '+%Y-%m-%d %H:%M:%S') - Samba setup completed successfully"

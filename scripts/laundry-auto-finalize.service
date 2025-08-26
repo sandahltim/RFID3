@@ -5,9 +5,10 @@ Wants=laundry-auto-finalize.timer
 [Service]
 Type=oneshot
 User=tim
-WorkingDirectory=/home/tim/RFID3
-Environment=PATH=/home/tim/RFID3/venv/bin:/usr/bin
-ExecStart=/home/tim/RFID3/venv/bin/python /home/tim/RFID3/scripts/auto_finalize_laundry.py
+Environment=PROJECT_DIR=/opt/RFID3
+WorkingDirectory=${PROJECT_DIR}
+Environment=PATH=${PROJECT_DIR}/venv/bin:/usr/bin
+ExecStart=${PROJECT_DIR}/venv/bin/python ${PROJECT_DIR}/scripts/auto_finalize_laundry.py
 StandardOutput=journal
 StandardError=journal
 

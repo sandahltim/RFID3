@@ -77,12 +77,12 @@ sudo usermod -aG mysql tim
 
 # Create logs and backup directories for app
 echo "Creating application directories..."
-sudo mkdir -p /home/tim/RFID3/logs
-sudo mkdir -p /home/tim/RFID3/backups
-sudo chown -R tim:tim /home/tim/RFID3/logs
-sudo chown -R tim:tim /home/tim/RFID3/backups
-sudo chmod 750 /home/tim/RFID3/logs
-sudo chmod 750 /home/tim/RFID3/backups
+sudo mkdir -p "$PROJECT_DIR/logs"
+sudo mkdir -p "$PROJECT_DIR/backups"
+sudo chown -R tim:tim "$PROJECT_DIR/logs"
+sudo chown -R tim:tim "$PROJECT_DIR/backups"
+sudo chmod 750 "$PROJECT_DIR/logs"
+sudo chmod 750 "$PROJECT_DIR/backups"
 
 # Test database connection
 echo "Testing database connection..."

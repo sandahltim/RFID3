@@ -7,6 +7,7 @@ from time import time
 from datetime import datetime, timedelta, timezone
 import logging
 import sys
+import config
 
 # Configure logging
 logger = logging.getLogger('tab2')
@@ -16,7 +17,7 @@ logger.setLevel(logging.DEBUG)
 logger.handlers = []
 
 # File handler for rfid_dashboard.log
-file_handler = logging.FileHandler('/home/tim/RFID3/logs/rfid_dashboard.log')
+file_handler = logging.FileHandler(config.LOG_FILE)
 file_handler.setLevel(logging.DEBUG)
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 file_handler.setFormatter(formatter)
