@@ -592,119 +592,31 @@ class InventoryAnalytics {
         }
     }
     
-    displayHealthAlerts(alerts) {
-        const container = document.getElementById('alerts-list');
-        
-        if (alerts.length === 0) {
-            container.innerHTML = '<p class="text-muted text-center">No active alerts found.</p>';
-            return;
-        }
-        
-        let html = '<div class="table-responsive"><table class="table table-sm"><thead><tr>';
-        html += '<th>Severity</th><th>Type</th><th>Item/Category</th><th>Description</th><th>Created</th></tr></thead><tbody>';
-        
-        alerts.forEach(alert => {
-            const severityBadge = `<span class="alert-badge alert-${alert.severity}">${alert.severity}</span>`;
-            const itemInfo = alert.tag_id ? 
-                `${alert.common_name} (${alert.tag_id})` : 
-                `${alert.category}/${alert.subcategory}`;
-            const createdDate = new Date(alert.created_at).toLocaleDateString();
-            
-            html += `<tr>
-                <td>${severityBadge}</td>
-                <td>${alert.alert_type.replace('_', ' ')}</td>
-                <td>${itemInfo}</td>
-                <td>${alert.suggested_action || 'Review required'}</td>
-                <td>${createdDate}</td>
-            </tr>`;
-        });
-        
-        html += '</tbody></table></div>';
-        container.innerHTML = html;
-    }
+    // Class method removed - using standalone function instead
     
     async loadStaleItems() {
-        try {
-            document.getElementById('stale-items-loading').style.display = 'block';
-            document.getElementById('stale-items-content').style.display = 'none';
+        // Redirect to standalone function
+        return loadAllStaleItems().then(() => {
+            // Populate filters after loading
+            const categories = [...new Set(allStaleItems.map(item => item.category).filter(Boolean))];
+            const categorySelect = document.getElementById('stale-category-filter');
+            categorySelect.innerHTML = '<option value="">All Categories</option>';
+            categories.forEach(cat => {
+                categorySelect.innerHTML += `<option value="${cat}">${cat}</option>`;
+            });
             
-            const response = await fetch('/api/inventory/stale_items');
-            const data = await response.json();
+            const subcategories = [...new Set(allStaleItems.map(item => item.subcategory).filter(Boolean))];
+            const subcategorySelect = document.getElementById('stale-subcategory-filter');
+            subcategorySelect.innerHTML = '<option value="">All Subcategories</option>';
+            subcategories.forEach(sub => {
+                subcategorySelect.innerHTML += `<option value="${sub}">${sub}</option>`;
+            });
             
-            if (response.ok) {
-                // Store all stale items globally
-                allStaleItems = data.stale_items || [];
-                
-                // Populate category and subcategory filters
-                const categories = [...new Set(allStaleItems.map(item => item.category).filter(Boolean))];
-                const categorySelect = document.getElementById('stale-category-filter');
-                categorySelect.innerHTML = '<option value="">All Categories</option>';
-                categories.forEach(cat => {
-                    categorySelect.innerHTML += `<option value="${cat}">${cat}</option>`;
-                });
-                
-                const subcategories = [...new Set(allStaleItems.map(item => item.subcategory).filter(Boolean))];
-                const subcategorySelect = document.getElementById('stale-subcategory-filter');
-                subcategorySelect.innerHTML = '<option value="">All Subcategories</option>';
-                subcategories.forEach(sub => {
-                    subcategorySelect.innerHTML += `<option value="${sub}">${sub}</option>`;
-                });
-                
-                // Display filtered items
-                filterStaleItems();
-            } else {
-                console.error('Failed to load stale items:', data.error);
-                this.showError('Failed to load stale items', 'stale-items-list');
-            }
-        } catch (error) {
-            console.error('Error loading stale items:', error);
-            this.showError('Error loading stale items', 'stale-items-list');
-        } finally {
-            document.getElementById('stale-items-loading').style.display = 'none';
-            document.getElementById('stale-items-content').style.display = 'block';
-        }
+            filterStaleItems();
+        });
     }
     
-    displayStaleItems(items, thresholds) {
-        const container = document.getElementById('stale-items-list');
-        
-        if (items.length === 0) {
-            container.innerHTML = '<p class="text-success text-center"><i class="fas fa-check-circle"></i> All items are within scan thresholds!</p>';
-            return;
-        }
-        
-        let html = `<div class="alert alert-info"><strong>Scan Thresholds:</strong> Default: ${thresholds.default} days, Resale: ${thresholds.resale} days, Pack: ${thresholds.pack} days</div>`;
-        html += '<div class="row">';
-        
-        items.forEach(item => {
-            const lastScanDate = new Date(item.last_scan_date).toLocaleDateString();
-            const categoryInfo = item.category ? `${item.category}/${item.subcategory}` : 'Uncategorized';
-            
-            const transactionCount = item.transaction_count || 0;
-            const hasTransactions = transactionCount > 0;
-            
-            html += `<div class="col-md-6 mb-3">
-                <div class="stale-item">
-                    <div class="d-flex justify-content-between">
-                        <strong>${item.common_name}</strong>
-                        <div>
-                            <span class="badge bg-danger">${item.days_since_scan} days</span>
-                            ${hasTransactions ? `<span class="badge bg-info ms-1">${transactionCount} transactions</span>` : '<span class="badge bg-warning ms-1">No transactions</span>'}
-                        </div>
-                    </div>
-                    <div class="small text-muted">
-                        <div>Tag: ${item.tag_id} | Status: ${item.status}</div>
-                        <div>Category: ${categoryInfo} | Location: ${item.bin_location || 'N/A'}</div>
-                        <div>Last Scan: ${lastScanDate} | Contract: ${item.last_contract || 'N/A'}</div>
-                        <div>Data Source: ${item.data_source || 'master'} | Quality: ${item.quality || 'N/A'}</div>
-                    </div>
-                </div>
-            </div>`;
-        });
-        
-        html += '</div>';
-        container.innerHTML = html;
-    }
+    // Class method removed - using standalone function instead
     
     setupEventHandlers() {
         // Tab change handlers
@@ -713,9 +625,26 @@ class InventoryAnalytics {
             console.log('Tab changed to:', targetTab);
             
             if (targetTab === '#alerts') {
-                this.loadHealthAlerts();
+                loadAllHealthAlerts();
             } else if (targetTab === '#stale-items') {
-                this.loadStaleItems();
+                loadAllStaleItems().then(() => {
+                    // Populate filters after loading
+                    const categories = [...new Set(allStaleItems.map(item => item.category).filter(Boolean))];
+                    const categorySelect = document.getElementById('stale-category-filter');
+                    categorySelect.innerHTML = '<option value="">All Categories</option>';
+                    categories.forEach(cat => {
+                        categorySelect.innerHTML += `<option value="${cat}">${cat}</option>`;
+                    });
+                    
+                    const subcategories = [...new Set(allStaleItems.map(item => item.subcategory).filter(Boolean))];
+                    const subcategorySelect = document.getElementById('stale-subcategory-filter');
+                    subcategorySelect.innerHTML = '<option value="">All Subcategories</option>';
+                    subcategories.forEach(sub => {
+                        subcategorySelect.innerHTML += `<option value="${sub}">${sub}</option>`;
+                    });
+                    
+                    filterStaleItems();
+                });
             }
         });
         
@@ -728,21 +657,39 @@ class InventoryAnalytics {
                 // Small delay to ensure tab is shown
                 setTimeout(() => {
                     if (targetTab === '#alerts') {
-                        this.loadHealthAlerts();
+                        loadAllHealthAlerts();
                     } else if (targetTab === '#stale-items') {
-                        this.loadStaleItems();
+                        loadAllStaleItems().then(() => {
+                            // Populate filters after loading
+                            const categories = [...new Set(allStaleItems.map(item => item.category).filter(Boolean))];
+                            const categorySelect = document.getElementById('stale-category-filter');
+                            categorySelect.innerHTML = '<option value="">All Categories</option>';
+                            categories.forEach(cat => {
+                                categorySelect.innerHTML += `<option value="${cat}">${cat}</option>`;
+                            });
+                            
+                            const subcategories = [...new Set(allStaleItems.map(item => item.subcategory).filter(Boolean))];
+                            const subcategorySelect = document.getElementById('stale-subcategory-filter');
+                            subcategorySelect.innerHTML = '<option value="">All Subcategories</option>';
+                            subcategories.forEach(sub => {
+                                subcategorySelect.innerHTML += `<option value="${sub}">${sub}</option>`;
+                            });
+                            
+                            filterStaleItems();
+                        });
                     }
                 }, 100);
             });
         });
         
-        // Alert filter change
-        document.getElementById('alert-severity-filter').addEventListener('change', () => {
-            this.loadHealthAlerts();
-        });
+        // Alert filter change handled by HTML onchange attribute
         
         // Load initial tab content
-        this.loadHealthAlerts();
+        setTimeout(() => {
+            if (document.querySelector('#alerts.show.active')) {
+                loadAllHealthAlerts();
+            }
+        }, 100);
     }
     
     async generateAlerts() {
@@ -1038,6 +985,102 @@ let allStaleItems = [];
 let currentAlertsPage = 1;
 let currentStaleItemsPage = 1;
 
+// Load ALL health alerts by making multiple API calls if needed
+async function loadAllHealthAlerts() {
+    try {
+        document.getElementById('alerts-loading').style.display = 'block';
+        document.getElementById('alerts-content').style.display = 'none';
+        
+        let allAlerts = [];
+        let offset = 0;
+        const limit = 200; // API max limit
+        let hasMore = true;
+        
+        while (hasMore) {
+            const response = await fetch(`/api/inventory/alerts?limit=${limit}&offset=${offset}`);
+            const data = await response.json();
+            
+            if (response.ok && data.alerts) {
+                allAlerts = allAlerts.concat(data.alerts);
+                hasMore = data.pagination.has_more;
+                offset += limit;
+                
+                // Show progress
+                console.log(`Loaded ${allAlerts.length} alerts so far...`);
+            } else {
+                hasMore = false;
+                console.error('Failed to load alerts:', data.error);
+            }
+        }
+        
+        console.log(`Loaded ${allAlerts.length} total alerts`);
+        allHealthAlerts = allAlerts;
+        
+        // Populate category filter
+        const categories = [...new Set(allHealthAlerts.map(alert => alert.category).filter(Boolean))];
+        const categorySelect = document.getElementById('alert-category-filter');
+        categorySelect.innerHTML = '<option value="">All Categories</option>';
+        categories.forEach(cat => {
+            categorySelect.innerHTML += `<option value="${cat}">${cat}</option>`;
+        });
+        
+        // Display filtered alerts
+        filterHealthAlerts();
+        
+    } catch (error) {
+        console.error('Error loading all health alerts:', error);
+        document.getElementById('alerts-list').innerHTML = '<div class="alert alert-danger">Error loading alerts</div>';
+    } finally {
+        document.getElementById('alerts-loading').style.display = 'none';
+        document.getElementById('alerts-content').style.display = 'block';
+    }
+}
+
+// Load ALL stale items by making multiple API calls if needed
+async function loadAllStaleItems() {
+    try {
+        // Show loading state
+        document.getElementById('stale-items-loading').style.display = 'block';
+        document.getElementById('stale-items-content').style.display = 'none';
+        
+        let allItems = [];
+        let offset = 0;
+        const limit = 100; // API max limit for stale items
+        const maxItems = 2000; // Reasonable limit - load first 2000 stale items
+        let hasMore = true;
+        
+        while (hasMore && allItems.length < maxItems) {
+            const response = await fetch(`/api/inventory/stale_items_simple?limit=${limit}&offset=${offset}`);
+            const data = await response.json();
+            
+            if (response.ok && data.items) {
+                allItems = allItems.concat(data.items);
+                hasMore = data.pagination.has_more;
+                offset += limit;
+                
+                // Show progress - but limit to avoid spam
+                if (allItems.length % 1000 === 0 || !hasMore) {
+                    console.log(`Loaded ${allItems.length} stale items so far...`);
+                }
+            } else {
+                hasMore = false;
+                console.error('Failed to load stale items:', data.error);
+            }
+        }
+        
+        console.log(`Loaded ${allItems.length} total stale items`);
+        allStaleItems = allItems;
+        
+    } catch (error) {
+        console.error('Error loading all stale items:', error);
+        allStaleItems = [];
+    } finally {
+        // Hide loading state
+        document.getElementById('stale-items-loading').style.display = 'none';
+        document.getElementById('stale-items-content').style.display = 'block';
+    }
+}
+
 // Health Alerts filtering and pagination
 function filterHealthAlerts() {
     const categoryFilter = document.getElementById('alert-category-filter').value;
@@ -1056,6 +1099,12 @@ function filterHealthAlerts() {
 }
 
 function displayHealthAlerts(alerts) {
+    // Ensure alerts is an array
+    if (!Array.isArray(alerts)) {
+        console.error('displayHealthAlerts: alerts is not an array:', alerts);
+        alerts = [];
+    }
+    
     const perPage = parseInt(document.getElementById('alerts-per-page').value) || 25;
     const totalPages = Math.ceil(alerts.length / perPage);
     const startIndex = (currentAlertsPage - 1) * perPage;
@@ -1080,9 +1129,9 @@ function displayHealthAlerts(alerts) {
             html += `
                 <div class="alert alert-${severityColor} d-flex justify-content-between align-items-start">
                     <div>
-                        <strong>${alert.alert_type?.replace('_', ' ').toUpperCase() || 'ALERT'}</strong>
-                        ${alert.tag_id ? ` - ${alert.tag_id}` : ''}
-                        ${alert.category ? ` (${alert.category})` : ''}
+                        <strong>${alert.common_name || alert.category || 'Unknown Item'}</strong>
+                        ${alert.tag_id ? ` (${alert.tag_id})` : ''}
+                        <div class="small text-muted">${alert.category || 'No Category'} > ${alert.subcategory || 'No Subcategory'}</div>
                         <div class="mt-1">
                             <small>${alert.suggested_action || 'No action suggested'}</small>
                         </div>
@@ -1103,7 +1152,7 @@ function displayHealthAlerts(alerts) {
     // Update pagination
     updatePagination('alerts-pagination', currentAlertsPage, totalPages, (page) => {
         currentAlertsPage = page;
-        displayHealthAlerts(alerts);
+        filterHealthAlerts(); // Re-filter and display with new page
     });
 }
 
@@ -1149,63 +1198,30 @@ function displayStaleItems(items) {
     const endIndex = startIndex + perPage;
     const pageItems = items.slice(startIndex, endIndex);
     
-    // Update count with enhanced statistics
-    const touchManagedCount = items.filter(item => item.is_touch_managed).length;
-    const previouslyHiddenCount = items.filter(item => item.was_previously_hidden).length;
-    
+    // Update count
     document.getElementById('stale-items-count').innerHTML = `
         <div>Showing ${startIndex + 1}-${Math.min(endIndex, items.length)} of ${items.length} stale items</div>
-        <div class="small text-muted mt-1">
-            🚀 <strong>${touchManagedCount}</strong> items have Touch Scan activity • 
-            ⚡ <strong>${previouslyHiddenCount}</strong> were hidden in old analysis
-        </div>
     `;
     
     // Display items with enhanced activity information
     let html = '';
     if (pageItems.length > 0) {
         pageItems.forEach(item => {
-            const hasTransactions = item.total_scan_count > 0;
-            const touchScans = item.touch_scan_count || 0;
-            const statusScans = item.status_scan_count || 0;
+            // Simplified display for debugging
+            const daysStale = item.days_since_scan || 0;
             
-            // Enhanced day badges with activity awareness
-            let daysBadgeColor, daysBadgeText;
-            if (item.activity_type === 'TOUCH_MANAGED') {
-                daysBadgeColor = item.days_since_scan > 180 ? 'warning' : 'info';
-                daysBadgeText = `${item.days_since_scan}d (Touch Managed)`;
-            } else if (item.activity_type === 'MIXED_ACTIVITY') {
-                daysBadgeColor = 'success';
-                daysBadgeText = `${item.days_since_scan}d (Active)`;
+            let daysBadgeColor = 'danger';
+            if (daysStale <= 7) {
+                daysBadgeColor = 'warning';
+            } else if (daysStale <= 14) {
+                daysBadgeColor = 'danger'; 
             } else {
-                daysBadgeColor = item.days_since_scan > 180 ? 'danger' : 
-                                item.days_since_scan > 90 ? 'warning' : 'info';
-                daysBadgeText = `${item.days_since_scan} days`;
+                daysBadgeColor = 'dark';
             }
-            
-            // Activity type badge
-            let activityBadge = '';
-            switch(item.activity_type) {
-                case 'MIXED_ACTIVITY':
-                    activityBadge = '<span class="badge bg-success ms-1">Mixed Activity</span>';
-                    break;
-                case 'TOUCH_MANAGED':
-                    activityBadge = '<span class="badge bg-primary ms-1">Touch Managed</span>';
-                    break;
-                case 'STATUS_ONLY':
-                    activityBadge = '<span class="badge bg-secondary ms-1">Status Only</span>';
-                    break;
-                default:
-                    activityBadge = '<span class="badge bg-light text-dark ms-1">No Recent Activity</span>';
-            }
-            
-            // Previously hidden indicator
-            const hiddenIndicator = item.was_previously_hidden ? 
-                '<span class="badge bg-warning ms-1" title="Previously hidden by old analysis">🔍 Newly Visible</span>' : '';
                                   
             html += `
                 <div class="col-md-6 mb-3">
-                    <div class="stale-item border rounded p-3 ${item.was_previously_hidden ? 'border-warning' : ''}">
+                    <div class="stale-item border rounded p-3">
                         <div class="d-flex justify-content-between">
                             <div class="flex-grow-1">
                                 <strong>${item.common_name || 'Unknown Item'}</strong>
@@ -1215,37 +1231,11 @@ function displayStaleItems(items) {
                                 <div class="text-muted small">
                                     Tag: ${item.tag_id} • Location: ${item.bin_location || 'Unknown'}
                                 </div>
-                                ${item.latest_scan_type ? 
-                                    `<div class="text-muted small">Latest: ${item.latest_scan_type}</div>` : ''
-                                }
                             </div>
                             <div class="text-end">
-                                <div class="mb-1">
-                                    <span class="badge bg-${daysBadgeColor}">${daysBadgeText}</span>
-                                </div>
-                                <div class="mb-1">
-                                    ${activityBadge}
-                                    ${hiddenIndicator}
-                                </div>
-                                <div class="small">
-                                    ${touchScans > 0 ? 
-                                        `<span class="badge bg-info" title="Touch Scans">📱 ${touchScans}</span> ` : ''
-                                    }
-                                    ${statusScans > 0 ? 
-                                        `<span class="badge bg-success" title="Status Scans">📋 ${statusScans}</span> ` : ''
-                                    }
-                                    ${!hasTransactions ? 
-                                        '<span class="badge bg-light text-dark" title="No Recent Transactions">📭 None</span>' : ''
-                                    }
-                                </div>
+                                <span class="badge bg-${daysBadgeColor}">${daysStale} days</span>
                             </div>
                         </div>
-                        ${item.master_vs_transaction_days && item.master_vs_transaction_days.difference > 0 ? 
-                            `<div class="mt-2 p-2 bg-light rounded small">
-                                <strong>Data Insight:</strong> Transaction shows ${item.master_vs_transaction_days.difference} days 
-                                more recent activity than master record
-                            </div>` : ''
-                        }
                     </div>
                 </div>
             `;
@@ -1279,7 +1269,7 @@ function updatePagination(containerId, currentPage, totalPages, onPageChange) {
     
     // Previous button
     html += `<li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
-        <a class="page-link" href="#" onclick="event.preventDefault(); ${currentPage > 1 ? `(${onPageChange})(${currentPage - 1})` : ''}">Previous</a>
+        <a class="page-link" href="#" data-page="${currentPage - 1}">Previous</a>
     </li>`;
     
     // Page numbers (show max 5 pages around current)
@@ -1287,7 +1277,7 @@ function updatePagination(containerId, currentPage, totalPages, onPageChange) {
     const endPage = Math.min(totalPages, currentPage + 2);
     
     if (startPage > 1) {
-        html += `<li class="page-item"><a class="page-link" href="#" onclick="event.preventDefault(); (${onPageChange})(1)">1</a></li>`;
+        html += `<li class="page-item"><a class="page-link" href="#" data-page="1">1</a></li>`;
         if (startPage > 2) {
             html += '<li class="page-item disabled"><span class="page-link">...</span></li>';
         }
@@ -1295,7 +1285,7 @@ function updatePagination(containerId, currentPage, totalPages, onPageChange) {
     
     for (let page = startPage; page <= endPage; page++) {
         html += `<li class="page-item ${page === currentPage ? 'active' : ''}">
-            <a class="page-link" href="#" onclick="event.preventDefault(); (${onPageChange})(${page})">${page}</a>
+            <a class="page-link" href="#" data-page="${page}">${page}</a>
         </li>`;
     }
     
@@ -1303,16 +1293,27 @@ function updatePagination(containerId, currentPage, totalPages, onPageChange) {
         if (endPage < totalPages - 1) {
             html += '<li class="page-item disabled"><span class="page-link">...</span></li>';
         }
-        html += `<li class="page-item"><a class="page-link" href="#" onclick="event.preventDefault(); (${onPageChange})(${totalPages})">${totalPages}</a></li>`;
+        html += `<li class="page-item"><a class="page-link" href="#" data-page="${totalPages}">${totalPages}</a></li>`;
     }
     
     // Next button
     html += `<li class="page-item ${currentPage === totalPages ? 'disabled' : ''}">
-        <a class="page-link" href="#" onclick="event.preventDefault(); ${currentPage < totalPages ? `(${onPageChange})(${currentPage + 1})` : ''}">Next</a>
+        <a class="page-link" href="#" data-page="${currentPage + 1}">Next</a>
     </li>`;
     
     html += '</ul></nav>';
     container.innerHTML = html;
+    
+    // Add event listeners to pagination links
+    container.querySelectorAll('a.page-link[data-page]').forEach(link => {
+        link.addEventListener('click', (event) => {
+            event.preventDefault();
+            const page = parseInt(link.getAttribute('data-page'));
+            if (page >= 1 && page <= totalPages && page !== currentPage) {
+                onPageChange(page);
+            }
+        });
+    });
 }
 
 // Initialize when page loads
