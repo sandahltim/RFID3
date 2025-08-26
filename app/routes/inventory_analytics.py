@@ -354,6 +354,114 @@ def get_stale_items():
         if session:
             session.close()
 
+@inventory_analytics_bp.route('/api/inventory/stale_items_simple', methods=['GET'])
+def get_stale_items_simple():
+    """Get stale inventory items - SIMPLIFIED VERSION FOR DEBUGGING."""
+    session = None
+    try:
+        session = db.session()
+        
+        # Get query parameters
+        limit = min(int(request.args.get('limit', 25)), 100)
+        offset = int(request.args.get('offset', 0))
+        
+        # Simple hardcoded thresholds for now
+        default_days = 30
+        resale_days = 7
+        pack_days = 14
+        
+        logger.info(f"Fetching stale items with thresholds - Default: {default_days}, Resale: {resale_days}, Pack: {pack_days} days")
+        
+        # Simplified query for debugging
+        stale_query = text("""
+        SELECT 
+            m.tag_id,
+            m.common_name,
+            u.category,
+            u.subcategory,
+            m.date_last_scanned as master_last_scan,
+            DATEDIFF(NOW(), m.date_last_scanned) as days_since_scan,
+            m.bin_location,
+            m.status
+        FROM id_item_master m
+        LEFT JOIN user_rental_class_mappings u ON m.rental_class_num = u.rental_class_id
+        WHERE m.date_last_scanned IS NOT NULL
+          AND DATEDIFF(NOW(), m.date_last_scanned) > 
+            CASE 
+                WHEN u.category = 'Resale' OR m.bin_location = 'resale' THEN :resale_days
+                WHEN m.bin_location LIKE '%pack%' THEN :pack_days  
+                ELSE :default_days 
+            END
+        ORDER BY m.date_last_scanned ASC
+        LIMIT :limit OFFSET :offset
+        """)
+        
+        result_rows = session.execute(stale_query, {
+            'resale_days': resale_days,
+            'pack_days': pack_days,
+            'default_days': default_days,
+            'limit': limit,
+            'offset': offset
+        })
+        
+        rows = result_rows.fetchall()
+        items = []
+        for row in rows:
+            items.append({
+                'tag_id': row.tag_id,
+                'common_name': row.common_name,
+                'category': row.category,
+                'subcategory': row.subcategory, 
+                'master_last_scan': row.master_last_scan.isoformat() if row.master_last_scan else None,
+                'days_since_scan': row.days_since_scan,
+                'bin_location': row.bin_location,
+                'status': row.status
+            })
+        
+        # Get total count for pagination
+        count_query = text("""
+        SELECT COUNT(*) as total
+        FROM id_item_master m
+        LEFT JOIN user_rental_class_mappings u ON m.rental_class_num = u.rental_class_id
+        WHERE m.date_last_scanned IS NOT NULL
+          AND DATEDIFF(NOW(), m.date_last_scanned) > 
+            CASE 
+                WHEN u.category = 'Resale' OR m.bin_location = 'resale' THEN :resale_days
+                WHEN m.bin_location LIKE '%pack%' THEN :pack_days  
+                ELSE :default_days 
+            END
+        """)
+        
+        total_result = session.execute(count_query, {
+            'resale_days': resale_days,
+            'pack_days': pack_days,
+            'default_days': default_days
+        })
+        total_count = total_result.scalar()
+        
+        logger.info(f"Found {total_count} total stale items, returning {len(items)}")
+        
+        return jsonify({
+            'items': items,
+            'pagination': {
+                'total': total_count,
+                'limit': limit,
+                'offset': offset,
+                'has_more': offset + len(items) < total_count
+            },
+            'summary': {
+                'total_stale_items': total_count,
+                'showing': len(items)
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting stale items: {str(e)}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+    finally:
+        if session:
+            session.close()
+
 @inventory_analytics_bp.route('/api/inventory/usage_patterns', methods=['GET'])
 def get_usage_patterns():
     """Get comprehensive usage patterns based on transaction history."""
@@ -556,12 +664,12 @@ def generate_inventory_alerts():
         
         alerts_created = 0
         
-        # Get stale items and create alerts
-        stale_response = get_stale_items()
+        # Get stale items and create alerts  
+        stale_response = get_stale_items_simple()
         stale_data = stale_response.get_json()
         
-        if stale_data and 'stale_items' in stale_data:
-            for item in stale_data['stale_items']:
+        if stale_data and 'items' in stale_data:
+            for item in stale_data['items']:
                 # Determine severity based on days since scan
                 days = item['days_since_scan']
                 if days > 180:
@@ -577,6 +685,9 @@ def generate_inventory_alerts():
                     severity = 'low'
                     action = f"Item approaching stale threshold. Consider scanning during next inventory check."
                 
+                # Use the correct field names from simplified API
+                last_scan_field = item.get('master_last_scan')
+                
                 alert = InventoryHealthAlert(
                     tag_id=item['tag_id'],
                     common_name=item['common_name'],
@@ -585,7 +696,7 @@ def generate_inventory_alerts():
                     alert_type='stale_item',
                     severity=severity,
                     days_since_last_scan=days,
-                    last_scan_date=datetime.fromisoformat(item['last_scan_date']) if item['last_scan_date'] else None,
+                    last_scan_date=datetime.fromisoformat(last_scan_field) if last_scan_field else None,
                     suggested_action=action,
                     status='active'
                 )
