@@ -4,7 +4,9 @@
 # Created: 2025-08-25
 
 # Configuration
-INSTALL_DIR="/home/tim/RFID3"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+INSTALL_DIR="$PROJECT_DIR"
 LOG_DIR="$INSTALL_DIR/logs"
 LOG_FILE="$LOG_DIR/auto_update.log"
 SERVICE_NAME="rfid_dash_dev.service"

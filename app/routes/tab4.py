@@ -7,6 +7,8 @@ from datetime import datetime
 import logging
 import sys
 import time  # Ensure the time module is imported
+import os
+import config
 
 # Configure logging for Tab 4
 logger = logging.getLogger('tab4')
@@ -16,7 +18,8 @@ logger.setLevel(logging.INFO)
 logger.handlers = []
 
 # File handler for tab4.log
-tab4_file_handler = logging.FileHandler('/home/tim/RFID3/logs/tab4.log')
+tab4_log_file = os.path.join(config.BASE_DIR, 'logs', 'tab4.log')
+tab4_file_handler = logging.FileHandler(tab4_log_file)
 tab4_file_handler.setLevel(logging.INFO)
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(message)s')
 tab4_file_handler.setFormatter(formatter)
@@ -29,7 +32,7 @@ console_handler.setFormatter(formatter)
 logger.addHandler(console_handler)
 
 # Also log to the main rfid_dashboard.log
-main_file_handler = logging.FileHandler('/home/tim/RFID3/logs/rfid_dashboard.log')
+main_file_handler = logging.FileHandler(config.LOG_FILE)
 main_file_handler.setLevel(logging.INFO)
 main_file_handler.setFormatter(formatter)
 logger.addHandler(main_file_handler)
@@ -1137,7 +1140,7 @@ def snapshot_status():
         schedule_info = ScheduledSnapshotService.get_snapshot_schedule_info()
         
         # Try to read last run summary
-        last_run_file = '/home/tim/RFID3/logs/last_snapshot_run.json'
+        last_run_file = os.path.join(config.BASE_DIR, 'logs', 'last_snapshot_run.json')
         last_run_info = None
         
         if os.path.exists(last_run_file):
@@ -1152,9 +1155,9 @@ def snapshot_status():
             'last_run': last_run_info,
             'automation_enabled': True,
             'log_files': {
-                'detailed_log': '/home/tim/RFID3/logs/snapshot_automation.log',
-                'cron_log': '/home/tim/RFID3/logs/snapshot_cron.log',
-                'status_summary': '/home/tim/RFID3/logs/last_snapshot_run.json'
+                'detailed_log': os.path.join(config.BASE_DIR, 'logs', 'snapshot_automation.log'),
+                'cron_log': os.path.join(config.BASE_DIR, 'logs', 'snapshot_cron.log'),
+                'status_summary': os.path.join(config.BASE_DIR, 'logs', 'last_snapshot_run.json')
             }
         })
         

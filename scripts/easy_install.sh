@@ -15,10 +15,12 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-INSTALL_DIR="/home/tim/RFID3"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+INSTALL_DIR="$PROJECT_DIR"
 VENV_DIR="$INSTALL_DIR/venv"
 SERVICE_NAME="rfid3"
-BACKUP_DIR="/home/tim/RFID3_backup_$(date +%Y%m%d_%H%M%S)"
+BACKUP_DIR="${PROJECT_DIR}_backup_$(date +%Y%m%d_%H%M%S)"
 
 echo -e "${BLUE}================================================${NC}"
 echo -e "${BLUE}    RFID3 Easy Installation Script v1.0        ${NC}"
@@ -132,6 +134,9 @@ if [ ! -f "$INSTALL_DIR/config.py" ]; then
 # RFID3 Configuration
 import os
 
+# Base directory
+BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+
 # Database configuration
 DB_CONFIG = {
     'host': 'localhost',
@@ -150,7 +155,7 @@ API_PASSWORD = 'your_api_password'
 LOGIN_URL = 'https://cs.iot.ptshome.com/api/v1/login'
 
 # Logging
-LOG_FILE = '/home/tim/RFID3/logs/rfid3.log'
+LOG_FILE = os.path.join(BASE_DIR, 'logs', 'rfid3.log')
 
 # Application settings
 APP_IP = '0.0.0.0'

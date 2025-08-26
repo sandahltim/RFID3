@@ -4,12 +4,13 @@ from flask import Blueprint, redirect, url_for, jsonify, current_app, render_tem
 from datetime import datetime
 import logging
 import sys
+import config
 
 # Configure logging
 logger = logging.getLogger('tabs')
 logger.setLevel(logging.INFO)
 logger.handlers = []  # Clear existing handlers
-file_handler = logging.FileHandler('/home/tim/RFID3/logs/rfid_dashboard.log')
+file_handler = logging.FileHandler(config.LOG_FILE)
 file_handler.setLevel(logging.INFO)
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 file_handler.setFormatter(formatter)

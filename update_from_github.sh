@@ -9,7 +9,7 @@
 set -e  # Exit on any error
 
 # Define project directory and log file
-PROJECT_DIR="/home/tim/RFID3"
+PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LOG_FILE="$PROJECT_DIR/logs/update.log"
 
 # Ensure log directory exists
