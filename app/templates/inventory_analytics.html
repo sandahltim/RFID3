@@ -1082,12 +1082,15 @@ async function loadAllStaleItems() {
 }
 
 // Health Alerts filtering and pagination
+// Store current filtered alerts globally for pagination
+let currentFilteredAlerts = [];
+
 function filterHealthAlerts() {
     const categoryFilter = document.getElementById('alert-category-filter').value;
     const severityFilter = document.getElementById('alert-severity-filter').value;
     const typeFilter = document.getElementById('alert-type-filter').value;
     
-    let filteredAlerts = allHealthAlerts.filter(alert => {
+    currentFilteredAlerts = allHealthAlerts.filter(alert => {
         if (categoryFilter && alert.category !== categoryFilter) return false;
         if (severityFilter && alert.severity !== severityFilter) return false;
         if (typeFilter && alert.alert_type !== typeFilter) return false;
@@ -1095,7 +1098,7 @@ function filterHealthAlerts() {
     });
     
     currentAlertsPage = 1; // Reset to first page
-    displayHealthAlerts(filteredAlerts);
+    displayHealthAlerts(currentFilteredAlerts);
 }
 
 function displayHealthAlerts(alerts) {
@@ -1128,7 +1131,7 @@ function displayHealthAlerts(alerts) {
             
             html += `
                 <div class="alert alert-${severityColor} d-flex justify-content-between align-items-start">
-                    <div>
+                    <div class="flex-grow-1">
                         <strong>${alert.common_name || alert.category || 'Unknown Item'}</strong>
                         ${alert.tag_id ? ` (${alert.tag_id})` : ''}
                         <div class="small text-muted">${alert.category || 'No Category'} > ${alert.subcategory || 'No Subcategory'}</div>
@@ -1139,7 +1142,15 @@ function displayHealthAlerts(alerts) {
                             <small class="text-muted">Created: ${new Date(alert.created_at).toLocaleDateString()}</small>
                         </div>
                     </div>
-                    <span class="badge bg-${severityColor}">${alert.severity?.toUpperCase()}</span>
+                    <div class="d-flex flex-column align-items-end">
+                        <span class="badge bg-${severityColor} mb-2">${alert.severity?.toUpperCase()}</span>
+                        ${alert.tag_id ? `
+                            <button class="btn btn-outline-primary btn-sm" onclick="navigateToItem('${alert.tag_id}')" 
+                                    title="View item details on Open Contracts tab">
+                                <i class="fas fa-external-link-alt"></i> View Item
+                            </button>
+                        ` : ''}
+                    </div>
                 </div>
             `;
         });
@@ -1150,9 +1161,11 @@ function displayHealthAlerts(alerts) {
     document.getElementById('alerts-list').innerHTML = html;
     
     // Update pagination
+    console.log(`Health alerts pagination: page ${currentAlertsPage} of ${totalPages}, showing ${pageAlerts.length} alerts`);
     updatePagination('alerts-pagination', currentAlertsPage, totalPages, (page) => {
+        console.log(`Health alerts pagination clicked: page ${page}`);
         currentAlertsPage = page;
-        filterHealthAlerts(); // Re-filter and display with new page
+        displayHealthAlerts(currentFilteredAlerts); // Display same filtered data, different page
     });
 }
 
@@ -1259,8 +1272,13 @@ function updateStaleItemsPagination() {
 
 // Generic pagination component
 function updatePagination(containerId, currentPage, totalPages, onPageChange) {
+    console.log(`updatePagination called: ${containerId}, page ${currentPage} of ${totalPages}`);
     const container = document.getElementById(containerId);
-    if (!container || totalPages <= 1) {
+    if (!container) {
+        console.error(`Pagination container not found: ${containerId}`);
+        return;
+    }
+    if (totalPages <= 1) {
         container.innerHTML = '';
         return;
     }
@@ -1370,5 +1388,54 @@ document.addEventListener('DOMContentLoaded', function() {
         loadDataDiscrepancies();
     });
 });
+
+// Navigate to specific item on Tab 2 (Open Contracts)
+function navigateToItem(tagId) {
+    try {
+        // Switch to Tab 2 (Open Contracts)
+        const tab2Link = document.querySelector('a[data-bs-target="#tab2"]');
+        if (tab2Link) {
+            // Trigger tab switch
+            tab2Link.click();
+            
+            // Wait for tab to load, then search for the item
+            setTimeout(() => {
+                // Try to find and scroll to the item in Tab 2
+                const itemElements = document.querySelectorAll('#tab2 [data-tag-id], #tab2 .contract-item, #tab2 .item-row');
+                let foundItem = null;
+                
+                // Search through various possible selectors
+                itemElements.forEach(element => {
+                    const elementText = element.textContent || element.innerHTML || '';
+                    if (elementText.includes(tagId)) {
+                        foundItem = element;
+                    }
+                });
+                
+                if (foundItem) {
+                    // Scroll to the item and highlight it
+                    foundItem.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    foundItem.style.backgroundColor = '#fff3cd';
+                    foundItem.style.border = '2px solid #ffc107';
+                    
+                    // Remove highlighting after 3 seconds
+                    setTimeout(() => {
+                        foundItem.style.backgroundColor = '';
+                        foundItem.style.border = '';
+                    }, 3000);
+                } else {
+                    // If not found, show search hint
+                    alert(`Switched to Open Contracts tab. Please search for item: ${tagId}`);
+                }
+            }, 500);
+        } else {
+            console.error('Could not find Tab 2 link');
+            alert('Could not navigate to Open Contracts tab');
+        }
+    } catch (error) {
+        console.error('Error navigating to item:', error);
+        alert(`Error navigating to item ${tagId}`);
+    }
+}
 </script>
 {% endblock %}
