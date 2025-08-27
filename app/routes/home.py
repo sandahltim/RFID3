@@ -11,6 +11,7 @@ import os
 import json
 from config import LOG_FILE
 from ..services.logger import get_logger
+from ..utils.exceptions import DatabaseException, handle_api_error, log_and_handle_exception
 
 # Configure logging with process ID
 logger = get_logger(f'home_{os.getpid()}', level=logging.INFO, log_file=LOG_FILE)
@@ -19,6 +20,7 @@ home_bp = Blueprint('home', __name__)
 
 @home_bp.route('/', endpoint='home')
 @home_bp.route('/home', endpoint='home_page')
+@handle_api_error
 def home():
     cache_key = 'home_page_cache'
     cached_data = cache.get(cache_key)
@@ -30,12 +32,17 @@ def home():
         logger.info("Starting new session for home")
 
         # Aggregate all counts in a single query for better performance
-        counts = db.session.query(
-            func.count(ItemMaster.tag_id).label("total"),
-            func.sum(case((ItemMaster.status.in_(['On Rent', 'Delivered']), 1), else_=0)).label("on_rent"),
-            func.sum(case((ItemMaster.status == 'Ready to Rent', 1), else_=0)).label("available"),
-            func.sum(case((ItemMaster.status.notin_(['Ready to Rent', 'On Rent', 'Delivered']), 1), else_=0)).label("in_service")
-        ).one()
+        try:
+            counts = db.session.query(
+                func.count(ItemMaster.tag_id).label("total"),
+                func.sum(case((ItemMaster.status.in_(['On Rent', 'Delivered']), 1), else_=0)).label("on_rent"),
+                func.sum(case((ItemMaster.status == 'Ready to Rent', 1), else_=0)).label("available"),
+                func.sum(case((ItemMaster.status.notin_(['Ready to Rent', 'On Rent', 'Delivered']), 1), else_=0)).label("in_service")
+            ).one()
+        except Exception as e:
+            raise DatabaseException(f"Failed to fetch inventory counts: {str(e)}",
+                                  error_code="INVENTORY_COUNT_FAILED",
+                                  details={'query': 'inventory_aggregation'})
         
         # Extract aggregated values (convert to int for JSON serialization)
         total_items = int(counts.total or 0)
@@ -119,6 +126,7 @@ def get_refresh_status():
     return jsonify(refresh_status)
 
 @home_bp.route('/api/recent_scans')
+@handle_api_error
 def get_recent_scans():
     """Get recent scans with optional timestamp filtering for real-time updates."""
     from flask import request, jsonify
@@ -182,6 +190,7 @@ def get_recent_scans():
         return jsonify({'error': str(e)}), 500
 
 @home_bp.route('/api/summary_stats')
+@handle_api_error
 def get_summary_stats():
     """Get summary statistics with caching for better performance."""
     from flask import jsonify
