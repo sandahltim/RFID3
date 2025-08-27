@@ -10,13 +10,46 @@ from sqlalchemy import func, desc, and_, or_, text
 from sqlalchemy.exc import SQLAlchemyError
 from datetime import datetime, timedelta
 import json
+from decimal import Decimal
 
 logger = get_logger(__name__)
 
 inventory_analytics_bp = Blueprint('inventory_analytics', __name__)
 
 # Version marker
-logger.info("Deployed inventory_analytics.py version: 2025-08-25-v1 at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+logger.info("Deployed inventory_analytics.py version: 2025-08-27-POS-v1 at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+
+def build_global_filters(store_filter='all', type_filter='all'):
+    """Build SQLAlchemy filters for store and inventory type selection."""
+    filters = []
+    
+    if store_filter and store_filter != 'all':
+        # Filter by either home_store or current_store
+        filters.append(
+            or_(ItemMaster.home_store == store_filter,
+                ItemMaster.current_store == store_filter)
+        )
+        logger.debug(f"Applied store filter: {store_filter}")
+    
+    if type_filter and type_filter != 'all':
+        filters.append(ItemMaster.identifier_type == type_filter)
+        logger.debug(f"Applied inventory type filter: {type_filter}")
+    
+    return filters
+
+def apply_global_filters(query, request_args=None):
+    """Apply store and inventory type filters to any ItemMaster query."""
+    if request_args is None:
+        request_args = request.args
+    
+    store_filter = request_args.get('store', 'all')
+    type_filter = request_args.get('type', 'all')
+    
+    filters = build_global_filters(store_filter, type_filter)
+    for filter_condition in filters:
+        query = query.filter(filter_condition)
+    
+    return query
 
 @inventory_analytics_bp.route('/tab/6')
 def inventory_analytics_view():
@@ -27,17 +60,25 @@ def inventory_analytics_view():
 @inventory_analytics_bp.route('/api/inventory/dashboard_summary', methods=['GET'])
 @handle_api_error
 def get_dashboard_summary():
-    """Get high-level dashboard metrics for the analytics overview."""
+    """Get high-level dashboard metrics with store and inventory type filtering."""
     session = None
     try:
         session = db.session()
-        logger.info("Fetching inventory dashboard summary")
         
-        # Get basic inventory counts
-        total_items = session.query(ItemMaster).count()
-        items_on_rent = session.query(ItemMaster).filter(ItemMaster.status.in_(['On Rent', 'Delivered'])).count()
-        items_available = session.query(ItemMaster).filter(ItemMaster.status == 'Ready to Rent').count()
-        items_in_service = session.query(ItemMaster).filter(ItemMaster.status.in_(['Repair', 'Needs to be Inspected'])).count()
+        # Get filter parameters
+        store_filter = request.args.get('store', 'all')
+        type_filter = request.args.get('type', 'all')
+        logger.info(f"Fetching dashboard summary with filters: store={store_filter}, type={type_filter}")
+        
+        # Build base query with global filters
+        base_query = session.query(ItemMaster)
+        base_query = apply_global_filters(base_query)
+        
+        # Get basic inventory counts with filters applied
+        total_items = base_query.count()
+        items_on_rent = base_query.filter(ItemMaster.status.in_(['On Rent', 'Delivered'])).count()
+        items_available = base_query.filter(ItemMaster.status == 'Ready to Rent').count()
+        items_in_service = base_query.filter(ItemMaster.status.in_(['Repair', 'Needs to be Inspected'])).count()
         
         # Calculate utilization rate
         utilization_rate = round((items_on_rent / max(total_items, 1)) * 100, 2)
@@ -94,6 +135,144 @@ def get_dashboard_summary():
         
     except Exception as e:
         logger.error(f"Error fetching dashboard summary: {str(e)}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+    finally:
+        if session:
+            session.close()
+
+@inventory_analytics_bp.route('/api/inventory/business_intelligence', methods=['GET'])
+@handle_api_error
+def get_business_intelligence():
+    """Get POS business intelligence metrics with real data."""
+    session = None
+    try:
+        session = db.session()
+        
+        # Get filter parameters
+        store_filter = request.args.get('store', 'all')
+        type_filter = request.args.get('type', 'all')
+        logger.info(f"Fetching business intelligence with filters: store={store_filter}, type={type_filter}")
+        
+        # Build base query with filters
+        base_query = session.query(ItemMaster)
+        base_query = apply_global_filters(base_query)
+        
+        # Store Distribution Analysis
+        store_distribution = session.query(
+            ItemMaster.current_store,
+            func.count(ItemMaster.tag_id).label('item_count'),
+            func.avg(ItemMaster.sell_price).label('avg_sell_price'),
+            func.sum(ItemMaster.turnover_ytd).label('total_turnover')
+        ).filter(*build_global_filters(store_filter, type_filter)).group_by(ItemMaster.current_store).all()
+        
+        # Inventory Type Distribution
+        type_distribution = base_query.with_entities(
+            ItemMaster.identifier_type,
+            func.count(ItemMaster.tag_id).label('count'),
+            func.avg(ItemMaster.sell_price).label('avg_price')
+        ).group_by(ItemMaster.identifier_type).all()
+        
+        # Financial Analytics (Real POS Data)
+        financial_data = base_query.filter(
+            or_(ItemMaster.sell_price.isnot(None), 
+                ItemMaster.turnover_ytd.isnot(None),
+                ItemMaster.repair_cost_ltd.isnot(None))
+        ).with_entities(
+            func.count(ItemMaster.tag_id).label('items_with_financial_data'),
+            func.sum(ItemMaster.sell_price).label('total_inventory_value'),
+            func.avg(ItemMaster.sell_price).label('avg_sell_price'),
+            func.sum(ItemMaster.turnover_ytd).label('total_turnover_ytd'),
+            func.avg(ItemMaster.turnover_ytd).label('avg_turnover_ytd'),
+            func.sum(ItemMaster.repair_cost_ltd).label('total_repair_costs'),
+            func.avg(ItemMaster.repair_cost_ltd).label('avg_repair_cost')
+        ).first()
+        
+        # Top Manufacturers by Item Count
+        top_manufacturers = base_query.filter(
+            ItemMaster.manufacturer.isnot(None),
+            ItemMaster.manufacturer != ''
+        ).with_entities(
+            ItemMaster.manufacturer,
+            func.count(ItemMaster.tag_id).label('item_count'),
+            func.avg(ItemMaster.sell_price).label('avg_price')
+        ).group_by(ItemMaster.manufacturer).order_by(desc('item_count')).limit(10).all()
+        
+        # High Value Items (top 10% by sell_price) - MariaDB compatible approach
+        price_threshold_query = base_query.filter(ItemMaster.sell_price.isnot(None))
+        if price_threshold_query.count() > 0:
+            # Get all prices and calculate 90th percentile manually (MariaDB compatible)
+            all_prices = [item.sell_price for item in price_threshold_query.all() if item.sell_price]
+            if all_prices:
+                all_prices.sort()
+                percentile_index = int(0.9 * len(all_prices))
+                price_percentile = float(all_prices[min(percentile_index, len(all_prices) - 1)])
+                
+                high_value_items = base_query.filter(
+                    ItemMaster.sell_price >= price_percentile
+                ).count()
+            else:
+                high_value_items = 0
+                price_percentile = 0
+        else:
+            high_value_items = 0
+            price_percentile = 0
+        
+        # Convert Decimal objects to float for JSON serialization
+        def decimal_to_float(value):
+            if isinstance(value, Decimal):
+                return float(value)
+            return value
+        
+        # Build response
+        business_intel = {
+            'store_analysis': {
+                'distribution': [{
+                    'store_code': store.current_store or 'Unassigned',
+                    'item_count': store.item_count,
+                    'avg_sell_price': decimal_to_float(store.avg_sell_price) if store.avg_sell_price else 0,
+                    'total_turnover': decimal_to_float(store.total_turnover) if store.total_turnover else 0
+                } for store in store_distribution],
+                'total_stores': len([s for s in store_distribution if s.current_store])
+            },
+            'inventory_type_analysis': {
+                'distribution': [{
+                    'type': type_dist.identifier_type or 'Untyped',
+                    'count': type_dist.count,
+                    'avg_price': decimal_to_float(type_dist.avg_price) if type_dist.avg_price else 0
+                } for type_dist in type_distribution],
+                'total_types': len(type_distribution)
+            },
+            'financial_insights': {
+                'items_with_data': financial_data.items_with_financial_data or 0,
+                'total_inventory_value': decimal_to_float(financial_data.total_inventory_value) if financial_data.total_inventory_value else 0,
+                'avg_sell_price': decimal_to_float(financial_data.avg_sell_price) if financial_data.avg_sell_price else 0,
+                'total_turnover_ytd': decimal_to_float(financial_data.total_turnover_ytd) if financial_data.total_turnover_ytd else 0,
+                'avg_turnover_ytd': decimal_to_float(financial_data.avg_turnover_ytd) if financial_data.avg_turnover_ytd else 0,
+                'total_repair_costs': decimal_to_float(financial_data.total_repair_costs) if financial_data.total_repair_costs else 0,
+                'avg_repair_cost': decimal_to_float(financial_data.avg_repair_cost) if financial_data.avg_repair_cost else 0,
+                'high_value_items': high_value_items,
+                'high_value_threshold': decimal_to_float(price_percentile) if price_percentile else 0
+            },
+            'manufacturer_insights': {
+                'top_manufacturers': [{
+                    'manufacturer': mfr.manufacturer,
+                    'item_count': mfr.item_count,
+                    'avg_price': decimal_to_float(mfr.avg_price) if mfr.avg_price else 0
+                } for mfr in top_manufacturers]
+            },
+            'filter_context': {
+                'store_filter': store_filter,
+                'type_filter': type_filter,
+                'total_items_in_view': base_query.count()
+            },
+            'timestamp': datetime.now().isoformat()
+        }
+        
+        logger.info(f"Business intelligence calculated for {business_intel['filter_context']['total_items_in_view']} items")
+        return jsonify(business_intel)
+        
+    except Exception as e:
+        logger.error(f"Error fetching business intelligence: {str(e)}", exc_info=True)
         return jsonify({'error': str(e)}), 500
     finally:
         if session:

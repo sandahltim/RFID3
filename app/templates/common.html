@@ -2,7 +2,7 @@
 
 {% block content %}
     <div class="container mt-4">
-        <h2>
+        <!-- Global Store & Inventory Type Filters -->\n        {% include 'global_filters.html' %}\n        \n        <h2>
             {% if tab_num == 1 %}Rental Inventory
             {% elif tab_num == 2 %}Open Contracts
             {% elif tab_num == 3 %}Service

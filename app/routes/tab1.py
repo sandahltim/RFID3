@@ -149,6 +149,10 @@ def tab1_view():
         sort = request.args.get('sort', '')
         status_filter = request.args.get('statusFilter', '').lower()
         bin_filter = request.args.get('binFilter', '').lower()
+        
+        # Global filters for store-aware functionality
+        store_filter = request.args.get('store', 'all')
+        type_filter = request.args.get('type', 'all')
         logger.debug(f"Tab 1 parameters: filter_query={filter_query}, sort={sort}, status_filter={status_filter}, bin_filter={bin_filter}")
 
         category_data = get_category_data(session, filter_query, sort, status_filter, bin_filter)
