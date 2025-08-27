@@ -29,6 +29,16 @@ class ItemMaster(db.Model):
     date_last_scanned = db.Column(db.DateTime)
     date_created = db.Column(db.DateTime)
     date_updated = db.Column(db.DateTime)
+    home_store = db.Column(db.String(10))
+    current_store = db.Column(db.String(10))
+    identifier_type = db.Column(db.String(10))
+    item_num = db.Column(db.Integer, unique=True)
+    turnover_ytd = db.Column(db.DECIMAL(10, 2))
+    turnover_ltd = db.Column(db.DECIMAL(10, 2))
+    repair_cost_ltd = db.Column(db.DECIMAL(10, 2))
+    sell_price = db.Column(db.DECIMAL(10, 2))
+    retail_price = db.Column(db.DECIMAL(10, 2))
+    manufacturer = db.Column(db.String(100))
 
     def to_dict(self):
         return {
@@ -369,4 +379,123 @@ class InventoryConfig(db.Model):
             'category': self.category,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
+        }
+
+# Executive Dashboard Models - Added 2025-08-27
+class PayrollTrends(db.Model):
+    """Store historical payroll and revenue data by store and week."""
+    __tablename__ = 'executive_payroll_trends'
+    __table_args__ = (
+        db.Index('ix_payroll_trends_week_ending', 'week_ending'),
+        db.Index('ix_payroll_trends_store_id', 'store_id'),
+        db.Index('ix_payroll_trends_week_store', 'week_ending', 'store_id'),
+    )
+    
+    id = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
+    week_ending = db.Column(db.Date, nullable=False)
+    store_id = db.Column(db.String(10), nullable=False)  # 6800, 3607, 8101, 728
+    rental_revenue = db.Column(db.DECIMAL(12, 2))
+    total_revenue = db.Column(db.DECIMAL(12, 2))
+    payroll_cost = db.Column(db.DECIMAL(12, 2))
+    wage_hours = db.Column(db.DECIMAL(10, 2))
+    labor_efficiency_ratio = db.Column(db.DECIMAL(5, 2))  # Calculated: payroll_cost / total_revenue * 100
+    revenue_per_hour = db.Column(db.DECIMAL(10, 2))  # Calculated: total_revenue / wage_hours
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'week_ending': self.week_ending.isoformat() if self.week_ending else None,
+            'store_id': self.store_id,
+            'rental_revenue': float(self.rental_revenue) if self.rental_revenue else None,
+            'total_revenue': float(self.total_revenue) if self.total_revenue else None,
+            'payroll_cost': float(self.payroll_cost) if self.payroll_cost else None,
+            'wage_hours': float(self.wage_hours) if self.wage_hours else None,
+            'labor_efficiency_ratio': float(self.labor_efficiency_ratio) if self.labor_efficiency_ratio else None,
+            'revenue_per_hour': float(self.revenue_per_hour) if self.revenue_per_hour else None
+        }
+
+class ScorecardTrends(db.Model):
+    """Store weekly business scorecard metrics."""
+    __tablename__ = 'executive_scorecard_trends'
+    __table_args__ = (
+        db.Index('ix_scorecard_trends_week_ending', 'week_ending'),
+        db.Index('ix_scorecard_trends_store_id', 'store_id'),
+    )
+    
+    id = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
+    week_ending = db.Column(db.Date, nullable=False)
+    store_id = db.Column(db.String(10))  # NULL for company-wide metrics
+    
+    # Revenue Metrics
+    total_weekly_revenue = db.Column(db.DECIMAL(12, 2))
+    
+    # Contract Metrics
+    new_contracts_count = db.Column(db.Integer)
+    open_quotes_count = db.Column(db.Integer)
+    
+    # Operational Metrics
+    deliveries_scheduled_next_7_days = db.Column(db.Integer)
+    
+    # Reservation Pipeline
+    reservation_value_next_14_days = db.Column(db.DECIMAL(12, 2))
+    total_reservation_value = db.Column(db.DECIMAL(12, 2))
+    
+    # Financial Health
+    ar_over_45_days_percent = db.Column(db.DECIMAL(5, 2))
+    total_ar_cash_customers = db.Column(db.DECIMAL(12, 2))
+    total_discount_amount = db.Column(db.DECIMAL(12, 2))
+    
+    # Metadata
+    week_number = db.Column(db.Integer)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'week_ending': self.week_ending.isoformat() if self.week_ending else None,
+            'store_id': self.store_id,
+            'total_weekly_revenue': float(self.total_weekly_revenue) if self.total_weekly_revenue else None,
+            'new_contracts_count': self.new_contracts_count,
+            'open_quotes_count': self.open_quotes_count,
+            'deliveries_scheduled': self.deliveries_scheduled_next_7_days,
+            'reservation_14_days': float(self.reservation_value_next_14_days) if self.reservation_value_next_14_days else None,
+            'total_reservation': float(self.total_reservation_value) if self.total_reservation_value else None,
+            'ar_aging_percent': float(self.ar_over_45_days_percent) if self.ar_over_45_days_percent else None,
+            'ar_cash_customers': float(self.total_ar_cash_customers) if self.total_ar_cash_customers else None,
+            'discount_amount': float(self.total_discount_amount) if self.total_discount_amount else None,
+            'week_number': self.week_number
+        }
+
+class ExecutiveKPI(db.Model):
+    """Store calculated executive KPIs and targets."""
+    __tablename__ = 'executive_kpi'
+    
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    kpi_name = db.Column(db.String(100), nullable=False, unique=True, index=True)
+    kpi_category = db.Column(db.String(50))  # 'financial', 'operational', 'efficiency', 'growth'
+    current_value = db.Column(db.DECIMAL(15, 2))
+    target_value = db.Column(db.DECIMAL(15, 2))
+    variance_percent = db.Column(db.DECIMAL(5, 2))
+    trend_direction = db.Column(db.String(10))  # 'up', 'down', 'stable'
+    period = db.Column(db.String(20))  # 'weekly', 'monthly', 'quarterly', 'yearly'
+    store_id = db.Column(db.String(10))  # NULL for company-wide
+    last_calculated = db.Column(db.DateTime)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'kpi_name': self.kpi_name,
+            'kpi_category': self.kpi_category,
+            'current_value': float(self.current_value) if self.current_value else None,
+            'target_value': float(self.target_value) if self.target_value else None,
+            'variance_percent': float(self.variance_percent) if self.variance_percent else None,
+            'trend_direction': self.trend_direction,
+            'period': self.period,
+            'store_id': self.store_id,
+            'last_calculated': self.last_calculated.isoformat() if self.last_calculated else None
         }

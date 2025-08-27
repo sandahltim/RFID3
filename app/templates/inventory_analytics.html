@@ -1,6 +1,8 @@
 {% extends "base.html" %}
 {% block title %}Inventory & Analytics{% endblock %}
 {% block extra_head %}
+<!-- Include Chart.js for enhanced analytics -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
     .dashboard-card {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -55,7 +57,13 @@
     .alert-critical { background-color: #dc3545; color: white; }
     .alert-high { background-color: #fd7e14; color: white; }
     .alert-medium { background-color: #ffc107; color: black; }
-    .alert-low { background-color: #28a745; color: white; }
+    
+    /* Accessibility: Icons for color-independent status identification */
+    .status-icon {
+        margin-right: 0.25rem;
+        font-size: 0.875em;
+    }
+    .alert-low { background-color: #28a745; color: white; }\n    \n    /* Accessibility: Enhanced focus indicators for keyboard navigation */\n    .nav-link:focus {\n        box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.5) !important;\n        outline: 2px solid transparent;\n        outline-offset: 2px;\n    }\n    \n    button:focus, .btn:focus {\n        box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.5) !important;\n        outline: 2px solid transparent;\n    }
     
     .stale-item {
         padding: 10px;
@@ -75,7 +83,7 @@
         animation: spin 1s linear infinite;
     }
     
-    @keyframes spin {
+    /* Phase 1B: Standardized Progress Loading */\n    .progress-loader {\n        text-align: center;\n        padding: 20px;\n        background: #f8f9fa;\n        border-radius: 8px;\n        border-left: 4px solid #007bff;\n        margin: 15px 0;\n    }\n    \n    .progress-loader .spinner-border {\n        width: 1.5rem;\n        height: 1.5rem;\n        margin-right: 0.5rem;\n    }\n    \n    .progress-step {\n        font-weight: 500;\n        color: #495057;\n        margin-bottom: 0.25rem;\n    }\n    \n    .progress-time {\n        font-size: 0.875rem;\n        color: #6c757d;\n        font-style: italic;\n    }\n    \n    @keyframes spin {
         0% { transform: rotate(0deg); }
         100% { transform: rotate(360deg); }
     }
@@ -146,40 +154,163 @@
         </div>
     </div>
     
+    <!-- Global Store and Inventory Type Filters -->
+    {% include 'global_filters.html' %}
+    
     <!-- Tabs for Different Views -->
     <div class="row">
         <div class="col-12">
             <ul class="nav nav-tabs" id="analyticsTab" role="tablist">
                 <li class="nav-item" role="presentation">
-                    <button class="nav-link active" id="alerts-tab" data-mdb-toggle="tab" data-mdb-target="#alerts" type="button" role="tab" aria-controls="alerts" aria-selected="true">
+                    <button class="nav-link active" id="business-intelligence-tab" data-bs-toggle="tab" data-bs-target="#business-intelligence" type="button" role="tab" aria-controls="business-intelligence" aria-selected="true" aria-label="View business intelligence and financial metrics">
+                        <i class="fas fa-chart-line"></i> Business Intelligence
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="alerts-tab" data-bs-toggle="tab" data-bs-target="#alerts" type="button" role="tab" aria-controls="alerts" aria-selected="false" aria-label="View and manage inventory health alerts">
                         <i class="fas fa-exclamation-triangle"></i> Health Alerts
                     </button>
                 </li>
                 <li class="nav-item" role="presentation">
-                    <button class="nav-link" id="stale-items-tab" data-mdb-toggle="tab" data-mdb-target="#stale-items" type="button" role="tab" aria-controls="stale-items" aria-selected="false">
+                    <button class="nav-link" id="stale-items-tab" data-bs-toggle="tab" data-bs-target="#stale-items" type="button" role="tab" aria-controls="stale-items" aria-selected="false" aria-label="View items with limited recent activity">
                         <i class="fas fa-clock"></i> Stale Items
                     </button>
                 </li>
                 <li class="nav-item" role="presentation">
-                    <button class="nav-link" id="usage-analysis-tab" data-mdb-toggle="tab" data-mdb-target="#usage-analysis" type="button" role="tab" aria-controls="usage-analysis" aria-selected="false">
+                    <button class="nav-link" id="usage-analysis-tab" data-bs-toggle="tab" data-bs-target="#usage-analysis" type="button" role="tab" aria-controls="usage-analysis" aria-selected="false" aria-label="Analyze usage patterns and data quality">
                         <i class="fas fa-chart-bar"></i> Usage Analysis
                     </button>
                 </li>
                 <li class="nav-item" role="presentation">
-                    <button class="nav-link" id="resale-tracking-tab" data-mdb-toggle="tab" data-mdb-target="#resale-tracking" type="button" role="tab" aria-controls="resale-tracking" aria-selected="false">
+                    <button class="nav-link" id="resale-tracking-tab" data-bs-toggle="tab" data-bs-target="#resale-tracking" type="button" role="tab" aria-controls="resale-tracking" aria-selected="false" aria-label="Track equipment resale and lifecycle management">
                         <i class="fas fa-shopping-cart"></i> Resale Tracking
                     </button>
                 </li>
                 <li class="nav-item" role="presentation">
-                    <button class="nav-link" id="configuration-tab" data-mdb-toggle="tab" data-mdb-target="#configuration" type="button" role="tab" aria-controls="configuration" aria-selected="false">
+                    <button class="nav-link" id="configuration-tab" data-bs-toggle="tab" data-bs-target="#configuration" type="button" role="tab" aria-controls="configuration" aria-selected="false" aria-label="Configure analytics settings and preferences">
                         <i class="fas fa-cog"></i> Configuration
                     </button>
                 </li>
             </ul>
             
             <div class="tab-content" id="analyticsTabContent">
+                <!-- Business Intelligence Tab -->
+                <div class="tab-pane fade show active" id="business-intelligence" role="tabpanel" aria-labelledby="business-intelligence-tab">
+                    <div class="row">
+                        <!-- Store Performance -->
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5><i class="fas fa-store"></i> Store Performance</h5>
+                                </div>
+                                <div class="card-body">
+                                    <canvas id="store-distribution-chart" height="200"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Inventory Type Distribution -->
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5><i class="fas fa-tags"></i> Inventory Type Distribution</h5>
+                                </div>
+                                <div class="card-body">
+                                    <canvas id="type-distribution-chart" height="200"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mt-3">
+                        <!-- Financial Insights -->
+                        <div class="col-md-8">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5><i class="fas fa-dollar-sign"></i> Financial Insights (Real POS Data)</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row">
+                                        <div class="col-md-3">
+                                            <div class="metric-card text-center">
+                                                <div class="metric-value text-success" id="total-inventory-value">$--</div>
+                                                <div class="metric-label">Total Inventory Value</div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="metric-card text-center">
+                                                <div class="metric-value text-info" id="avg-sell-price">$--</div>
+                                                <div class="metric-label">Average Sell Price</div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="metric-card text-center">
+                                                <div class="metric-value text-warning" id="total-turnover">$--</div>
+                                                <div class="metric-label">Total Turnover YTD</div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="metric-card text-center">
+                                                <div class="metric-value text-danger" id="total-repair-costs">$--</div>
+                                                <div class="metric-label">Total Repair Costs</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="row mt-3">
+                                        <div class="col-md-6">
+                                            <div class="d-flex align-items-center">
+                                                <i class="fas fa-gem text-warning me-2"></i>
+                                                <span>High Value Items (>90th percentile):</span>
+                                                <strong class="ms-2" id="high-value-count">--</strong>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="d-flex align-items-center">
+                                                <i class="fas fa-chart-area text-info me-2"></i>
+                                                <span>Items with Financial Data:</span>
+                                                <strong class="ms-2" id="items-with-data">--</strong>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Top Manufacturers -->
+                        <div class="col-md-4">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5><i class="fas fa-industry"></i> Top Manufacturers</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div id="manufacturers-list">Loading...</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mt-3">
+                        <div class="col-12">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5><i class="fas fa-info-circle"></i> Business Intelligence Summary</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="alert alert-info">
+                                        <strong><i class="fas fa-lightbulb"></i> Insights:</strong>
+                                        <ul id="business-insights" class="mb-0">
+                                            <li>Loading business intelligence insights...</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
                 <!-- Health Alerts Tab -->
-                <div class="tab-pane fade show active" id="alerts" role="tabpanel" aria-labelledby="alerts-tab">
+                <div class="tab-pane fade" id="alerts" role="tabpanel" aria-labelledby="alerts-tab">
                     <div class="row">
                         <div class="col-md-8">
                             <div class="card">
@@ -241,13 +372,19 @@
                                 </div>
                                 <div class="card-body">
                                     <div class="mb-2">
-                                        <span class="alert-badge alert-critical" id="critical-count">0</span> Critical
+                                        <span class="alert-badge alert-critical" id="critical-count" aria-label="Critical alerts count">
+                                            <i class="fas fa-exclamation-triangle status-icon" aria-hidden="true"></i>0
+                                        </span> Critical
                                     </div>
                                     <div class="mb-2">
-                                        <span class="alert-badge alert-high" id="high-count">0</span> High
+                                        <span class="alert-badge alert-high" id="high-count" aria-label="High priority alerts count">
+                                            <i class="fas fa-exclamation-circle status-icon" aria-hidden="true"></i>0
+                                        </span> High
                                     </div>
                                     <div class="mb-2">
-                                        <span class="alert-badge alert-medium" id="medium-count">0</span> Medium
+                                        <span class="alert-badge alert-medium" id="medium-count" aria-label="Medium priority alerts count">
+                                            <i class="fas fa-info-circle status-icon" aria-hidden="true"></i>0
+                                        </span> Medium
                                     </div>
                                     <div class="mb-2">
                                         <span class="alert-badge alert-low" id="low-count">0</span> Low
@@ -742,7 +879,7 @@ class InventoryAnalytics {
         }, 5 * 60 * 1000);
     }
     
-    showError(message, containerId = null) {
+    // Phase 1B: Standardized Progress Loading Utility\n    showProgressLoader(containerId, steps, currentStep = 1, expectedTime = \"<1 sec\") {\n        const container = document.getElementById(containerId);\n        if (!container) return;\n        \n        const stepDescriptions = {\n            'business-insights': {\n                1: \"Loading store data...\",\n                2: \"Processing financial metrics...\",\n                3: \"Generating charts...\"\n            },\n            'alerts-list': {\n                1: \"Loading health alerts...\",\n                2: \"Applying filters...\",\n                3: \"Organizing results...\"\n            },\n            'stale-items-list': {\n                1: \"Analyzing scan history...\",\n                2: \"Identifying stale items...\",\n                3: \"Generating report...\"\n            }\n        };\n        \n        const descriptions = stepDescriptions[containerId] || {\n            1: \"Loading data...\",\n            2: \"Processing...\",\n            3: \"Finalizing...\"\n        };\n        \n        const stepDescription = descriptions[currentStep] || \"Loading...\";\n        \n        container.innerHTML = `\n            <div class=\"progress-loader\">\n                <div class=\"spinner-border text-primary\" role=\"status\" aria-hidden=\"true\"></div>\n                <div class=\"progress-step\">${stepDescription} (${currentStep} of ${steps})</div>\n                <div class=\"progress-time\">Expected: ${expectedTime}</div>\n            </div>\n        `;\n    }\n    \n    hideProgressLoader(containerId) {\n        const container = document.getElementById(containerId);\n        if (container && container.querySelector('.progress-loader')) {\n            container.innerHTML = '';\n        }\n    }\n    \n    showError(message, containerId = null) {
         const errorHtml = `<div class="alert alert-danger"><i class="fas fa-exclamation-triangle"></i> ${message}</div>`;
         
         if (containerId) {
@@ -1391,7 +1528,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Initialize tabs with fallback for MDB
     function initializeTabs() {
-        const triggerTabList = [].slice.call(document.querySelectorAll('#analyticsTab button[data-mdb-toggle="tab"]'));
+        const triggerTabList = [].slice.call(document.querySelectorAll('#analyticsTab button[data-bs-toggle="tab"]'));
         
         triggerTabList.forEach(function (triggerEl) {
             triggerEl.addEventListener('click', function (event) {
@@ -1407,7 +1544,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 triggerEl.classList.add('active');
                 
                 // Show corresponding content
-                const targetId = triggerEl.getAttribute('data-mdb-target');
+                const targetId = triggerEl.getAttribute('data-bs-target');
                 if (targetId) {
                     const targetPane = document.querySelector(targetId);
                     if (targetPane) {
@@ -1488,5 +1625,294 @@ function navigateToItem(tagId) {
         alert(`Error navigating to item ${tagId}`);
     }
 }
+
+// ===== BUSINESS INTELLIGENCE FUNCTIONALITY =====
+
+let storeChart = null;
+let typeChart = null;
+
+// Refresh analytics data based on current filters
+function refreshAnalyticsData() {
+    console.log('Refreshing Analytics Tab 6 data with filters:', GlobalFilters.getApiParams());
+    
+    // Update dashboard summary with filters
+    fetchDashboardSummary();
+    
+    // Update business intelligence with filters
+    fetchBusinessIntelligence();
+}
+
+// Fetch business intelligence data with real POS data
+function fetchBusinessIntelligence() {\n    // Phase 1B: Progressive loading implementation
+    const params = GlobalFilters.getUrlParams();
+    const url = `/api/inventory/business_intelligence${params ? '?' + params : ''}`;
+    
+    console.log('Fetching business intelligence from:', url);\n    \n    // Phase 1B: Start progress loading sequence\n    if (window.inventoryAnalytics) {\n        window.inventoryAnalytics.showProgressLoader('business-insights', 3, 1, '<1 sec');\n        // Simulate progressive steps for better UX\n        setTimeout(() => window.inventoryAnalytics.showProgressLoader('business-insights', 3, 2, '<1 sec'), 200);\n        setTimeout(() => window.inventoryAnalytics.showProgressLoader('business-insights', 3, 3, '<1 sec'), 400);\n    }
+    
+    fetch(url)
+        .then(response => response.json())
+        .then(data => {
+            console.log('Business intelligence data received:', data);
+            // Phase 1B: Hide progress loader before displaying results\n            if (window.inventoryAnalytics) {\n                window.inventoryAnalytics.hideProgressLoader('business-insights');\n            }\n            updateBusinessIntelligenceDisplay(data);
+        })
+        .catch(error => {
+            console.error('Error fetching business intelligence:', error);
+            // Phase 1B: Hide progress loader on error\n            if (window.inventoryAnalytics) {\n                window.inventoryAnalytics.hideProgressLoader('business-insights');\n            }\n            showBusinessIntelligenceError('Failed to load business intelligence data');
+        });
+}
+
+// Update business intelligence display with real data
+function updateBusinessIntelligenceDisplay(data) {
+    // Update financial metrics
+    const financialInsights = data.financial_insights || {};
+    document.getElementById('total-inventory-value').textContent = formatCurrency(financialInsights.total_inventory_value || 0);
+    document.getElementById('avg-sell-price').textContent = formatCurrency(financialInsights.avg_sell_price || 0);
+    document.getElementById('total-turnover').textContent = formatCurrency(financialInsights.total_turnover_ytd || 0);
+    document.getElementById('total-repair-costs').textContent = formatCurrency(financialInsights.total_repair_costs || 0);
+    document.getElementById('high-value-count').textContent = formatNumber(financialInsights.high_value_items || 0);
+    document.getElementById('items-with-data').textContent = formatNumber(financialInsights.items_with_data || 0);
+    
+    // Update store distribution chart
+    updateStoreDistributionChart(data.store_analysis?.distribution || []);
+    
+    // Update inventory type distribution chart
+    updateTypeDistributionChart(data.inventory_type_analysis?.distribution || []);
+    
+    // Update manufacturers list
+    updateManufacturersList(data.manufacturer_insights?.top_manufacturers || []);
+    
+    // Generate business insights
+    generateBusinessInsights(data);
+}
+
+// Update store distribution chart
+function updateStoreDistributionChart(storeData) {
+    const ctx = document.getElementById('store-distribution-chart').getContext('2d');
+    
+    // Destroy existing chart
+    if (storeChart) {
+        storeChart.destroy();
+    }
+    
+    // Map store codes to readable names
+    const storeNames = {
+        '6800': 'Brooklyn Park',
+        '3607': 'Wayzata', 
+        '8101': 'Fridley',
+        '728': 'Elk River',
+        '000': 'Legacy/Unassigned',
+        'Unassigned': 'Unassigned'
+    };
+    
+    const labels = storeData.map(store => storeNames[store.store_code] || store.store_code);
+    const itemCounts = storeData.map(store => store.item_count);
+    const backgroundColors = [
+        '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40'
+    ];
+    
+    storeChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: labels,
+            datasets: [{
+                data: itemCounts,
+                backgroundColor: backgroundColors.slice(0, labels.length),
+                borderWidth: 2,
+                borderColor: '#ffffff'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        usePointStyle: true,
+                        padding: 20
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const label = context.label || '';
+                            const value = formatNumber(context.raw);
+                            const percentage = ((context.raw / itemCounts.reduce((a, b) => a + b, 0)) * 100).toFixed(1);
+                            return `${label}: ${value} items (${percentage}%)`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Update inventory type distribution chart
+function updateTypeDistributionChart(typeData) {
+    const ctx = document.getElementById('type-distribution-chart').getContext('2d');
+    
+    // Destroy existing chart
+    if (typeChart) {
+        typeChart.destroy();
+    }
+    
+    const labels = typeData.map(type => type.type);
+    const counts = typeData.map(type => type.count);
+    const backgroundColors = ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF'];
+    
+    typeChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Item Count',
+                data: counts,
+                backgroundColor: backgroundColors.slice(0, labels.length),
+                borderColor: backgroundColors.slice(0, labels.length),
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return `${context.label}: ${formatNumber(context.raw)} items`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            return formatNumber(value);
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Update manufacturers list
+function updateManufacturersList(manufacturers) {
+    const container = document.getElementById('manufacturers-list');
+    
+    if (manufacturers.length === 0) {
+        container.innerHTML = '<p class="text-muted"><em>No manufacturer data available</em></p>';
+        return;
+    }
+    
+    const html = manufacturers.slice(0, 8).map((mfr, index) => `
+        <div class="d-flex justify-content-between align-items-center py-1 ${index !== manufacturers.length - 1 ? 'border-bottom' : ''}">
+            <div>
+                <strong>${mfr.manufacturer}</strong>
+                <br>
+                <small class="text-muted">${formatNumber(mfr.item_count)} items</small>
+            </div>
+            <div class="text-end">
+                <span class="badge bg-primary">${formatCurrency(mfr.avg_price)}</span>
+                <br>
+                <small class="text-muted">avg price</small>
+            </div>
+        </div>
+    `).join('');
+    
+    container.innerHTML = html;
+}
+
+// Generate business insights from the data
+function generateBusinessInsights(data) {
+    const insights = [];
+    const financial = data.financial_insights || {};
+    const stores = data.store_analysis?.distribution || [];
+    const types = data.inventory_type_analysis?.distribution || [];
+    
+    // Financial insights
+    if (financial.total_inventory_value > 1000000) {
+        insights.push(`High-value inventory portfolio worth <strong>${formatCurrency(financial.total_inventory_value)}</strong>`);
+    }
+    
+    if (financial.high_value_items > 0) {
+        insights.push(`<strong>${formatNumber(financial.high_value_items)}</strong> premium items above $${formatNumber(financial.high_value_threshold)} (90th percentile)`);
+    }
+    
+    // Store insights
+    const topStore = stores.reduce((max, store) => store.item_count > max.item_count ? store : max, stores[0] || {});
+    if (topStore.store_code) {
+        const storeName = topStore.store_code === '6800' ? 'Brooklyn Park' : 
+                         topStore.store_code === '3607' ? 'Wayzata' : 
+                         topStore.store_code === '8101' ? 'Fridley' : 
+                         topStore.store_code === '728' ? 'Elk River' : topStore.store_code;
+        insights.push(`<strong>${storeName}</strong> leads with ${formatNumber(topStore.item_count)} items`);
+    }
+    
+    // Type insights  
+    const topType = types.reduce((max, type) => type.count > max.count ? type : max, types[0] || {});
+    if (topType.type) {
+        insights.push(`<strong>${topType.type}</strong> inventory type dominates with ${formatNumber(topType.count)} items`);
+    }
+    
+    // Repair cost insights
+    if (financial.total_repair_costs > 0) {
+        const repairPercentage = ((financial.total_repair_costs / financial.total_inventory_value) * 100).toFixed(1);
+        insights.push(`Repair costs represent <strong>${repairPercentage}%</strong> of total inventory value`);
+    }
+    
+    // Data coverage insight
+    const totalItems = data.filter_context?.total_items_in_view || 0;
+    if (financial.items_with_data > 0 && totalItems > 0) {
+        const dataPercentage = ((financial.items_with_data / totalItems) * 100).toFixed(1);
+        insights.push(`<strong>${dataPercentage}%</strong> of items have complete financial data from POS system`);
+    }
+    
+    // Default insight if no data
+    if (insights.length === 0) {
+        insights.push('Limited business intelligence available for current filter selection');
+    }
+    
+    document.getElementById('business-insights').innerHTML = insights.map(insight => `<li>${insight}</li>`).join('');
+}
+
+// Show error message for business intelligence
+function showBusinessIntelligenceError(message) {
+    document.getElementById('business-insights').innerHTML = `<li class="text-danger"><i class="fas fa-exclamation-triangle"></i> ${message}</li>`;
+}
+
+// Utility function to format currency
+function formatCurrency(amount) {
+    if (amount === 0) return '$0';
+    if (amount < 1000) return `$${amount.toFixed(2)}`;
+    if (amount < 1000000) return `$${(amount / 1000).toFixed(1)}K`;
+    return `$${(amount / 1000000).toFixed(1)}M`;
+}
+
+// Utility function to format numbers
+function formatNumber(num) {
+    if (num === 0) return '0';
+    if (num < 1000) return num.toString();
+    if (num < 1000000) return `${(num / 1000).toFixed(1)}K`;
+    return `${(num / 1000000).toFixed(1)}M`;
+}
+
+// Initialize business intelligence when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    // Load business intelligence data on page load
+    setTimeout(() => {
+        fetchBusinessIntelligence();
+    }, 1000);
+    
+    // Refresh data when tab becomes active
+    document.getElementById('business-intelligence-tab').addEventListener('shown.bs.tab', function() {
+        fetchBusinessIntelligence();
+    });
+});
 </script>
 {% endblock %}

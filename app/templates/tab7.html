@@ -1,0 +1,597 @@
+{% extends 'base.html' %}
+
+{% block title %}Executive Dashboard - RFID System{% endblock %}
+
+{% block extra_head %}
+<style>
+    /* Executive Dashboard Styles */
+    .executive-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 15px;
+        padding: 25px;
+        margin-bottom: 20px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+    }
+    
+    .metric-card {
+        background: white;
+        border-radius: 10px;
+        padding: 20px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+        transition: transform 0.3s ease;
+    }
+    
+    .metric-card:hover {
+        transform: translateY(-5px);
+    }
+    
+    .metric-value {
+        font-size: 2.5em;
+        font-weight: bold;
+        color: #2c3e50;
+    }
+    
+    .metric-label {
+        color: #7f8c8d;
+        font-size: 0.9em;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+    
+    .trend-up {
+        color: #27ae60;
+    }
+    
+    .trend-down {
+        color: #e74c3c;
+    }
+    
+    .kpi-gauge {
+        position: relative;
+        height: 150px;
+    }
+    
+    .store-comparison-table {
+        background: white;
+        border-radius: 10px;
+        overflow: hidden;
+    }
+    
+    .store-comparison-table th {
+        background: #34495e;
+        color: white;
+        padding: 12px;
+    }
+    
+    .chart-container {
+        background: white;
+        border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 20px;
+    }
+    
+    .filter-section {
+        background: #f8f9fa;
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 25px;
+    }
+    
+    .executive-header {
+        background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+        color: white;
+        padding: 30px;
+        border-radius: 10px;
+        margin-bottom: 30px;
+    }
+    
+    .efficiency-indicator {
+        display: inline-block;
+        padding: 5px 10px;
+        border-radius: 20px;
+        font-size: 0.85em;
+        font-weight: bold;
+    }
+    
+    .efficiency-good {
+        background: #d4edda;
+        color: #155724;
+    }
+    
+    .efficiency-warning {
+        background: #fff3cd;
+        color: #856404;
+    }
+    
+    .efficiency-poor {
+        background: #f8d7da;
+        color: #721c24;
+    }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Executive Header -->
+    <div class="executive-header">
+        <div class="row align-items-center">
+            <div class="col-md-8">
+                <h1 class="mb-2">Executive Dashboard</h1>
+                <p class="mb-0">Real-time business intelligence and financial analytics</p>
+            </div>
+            <div class="col-md-4 text-end">
+                <div class="text-white-50">Last Updated</div>
+                <div id="last-updated" class="h5">--:--:--</div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Filter Section -->
+    <div class="filter-section">
+        <div class="row">
+            <div class="col-md-3">
+                <label class="form-label">Store Location</label>
+                <select id="store-filter" class="form-select">
+                    <option value="all">All Stores</option>
+                    <option value="6800">Brooklyn Park</option>
+                    <option value="3607">Wayzata</option>
+                    <option value="8101">Anoka</option>
+                    <option value="728">St. Paul</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Time Period</label>
+                <select id="period-filter" class="form-select">
+                    <option value="4weeks">Last 4 Weeks</option>
+                    <option value="12weeks">Last 12 Weeks</option>
+                    <option value="52weeks">Last 52 Weeks</option>
+                    <option value="ytd">Year to Date</option>
+                </select>
+            </div>
+            <div class="col-md-6 d-flex align-items-end">
+                <button id="refresh-data" class="btn btn-primary me-2">
+                    <i class="fas fa-sync-alt"></i> Refresh Data
+                </button>
+                <button id="export-data" class="btn btn-outline-primary">
+                    <i class="fas fa-download"></i> Export Report
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Key Metrics Row -->
+    <div class="row mb-4">
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="metric-card">
+                <div class="metric-label">Total Revenue</div>
+                <div class="metric-value" id="total-revenue">--</div>
+                <div class="text-muted">
+                    <span id="revenue-trend" class="me-2"></span>
+                    <span id="yoy-growth">--% YoY</span>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="metric-card">
+                <div class="metric-label">Labor Efficiency</div>
+                <div class="metric-value" id="labor-efficiency">--%</div>
+                <div id="efficiency-status"></div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="metric-card">
+                <div class="metric-label">Profit Margin</div>
+                <div class="metric-value" id="profit-margin">--%</div>
+                <div class="text-muted">Revenue - Payroll</div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="metric-card">
+                <div class="metric-label">New Contracts</div>
+                <div class="metric-value" id="new-contracts">--</div>
+                <div class="text-muted">Avg <span id="avg-weekly-contracts">--</span>/week</div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Charts Row -->
+    <div class="row mb-4">
+        <div class="col-lg-8">
+            <div class="chart-container">
+                <h5>Revenue & Payroll Trends</h5>
+                <canvas id="revenue-chart" height="100"></canvas>
+            </div>
+        </div>
+        <div class="col-lg-4">
+            <div class="chart-container">
+                <h5>Store Performance</h5>
+                <canvas id="store-pie-chart" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Store Comparison Table -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="store-comparison-table">
+                <h5 class="p-3 mb-0">Store Comparison Analysis</h5>
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>Store</th>
+                                <th>Revenue</th>
+                                <th>Payroll</th>
+                                <th>Profit</th>
+                                <th>Margin %</th>
+                                <th>Labor Ratio</th>
+                                <th>$/Hour</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="store-comparison-tbody">
+                            <tr>
+                                <td colspan="8" class="text-center">Loading store data...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- KPI Dashboard -->
+    <div class="row">
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="metric-card">
+                <h6>Financial KPIs</h6>
+                <div id="financial-kpis" class="mt-3">
+                    <!-- Dynamic KPIs loaded here -->
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="metric-card">
+                <h6>Operational KPIs</h6>
+                <div id="operational-kpis" class="mt-3">
+                    <!-- Dynamic KPIs loaded here -->
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="metric-card">
+                <h6>Efficiency KPIs</h6>
+                <div id="efficiency-kpis" class="mt-3">
+                    <!-- Dynamic KPIs loaded here -->
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="metric-card">
+                <h6>Growth KPIs</h6>
+                <div id="growth-kpis" class="mt-3">
+                    <!-- Dynamic KPIs loaded here -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Loading Overlay -->
+<div id="loading-overlay" class="d-none">
+    <div class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">Loading...</span>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+// Executive Dashboard JavaScript
+document.addEventListener('DOMContentLoaded', function() {
+    let revenueChart = null;
+    let storePieChart = null;
+    
+    // Initialize dashboard
+    loadExecutiveDashboard();
+    
+    // Event listeners
+    document.getElementById('refresh-data').addEventListener('click', loadExecutiveDashboard);
+    document.getElementById('store-filter').addEventListener('change', loadExecutiveDashboard);
+    document.getElementById('period-filter').addEventListener('change', loadExecutiveDashboard);
+    
+    async function loadExecutiveDashboard() {
+        showLoading(true);
+        
+        const store = document.getElementById('store-filter').value;
+        const period = document.getElementById('period-filter').value;
+        
+        try {
+            // Load summary data
+            const summaryResponse = await fetch(`/api/executive/dashboard_summary?store=${store}&period=${period}`);
+            const summaryData = await summaryResponse.json();
+            updateSummaryMetrics(summaryData);
+            
+            // Load trends for chart
+            const trendsResponse = await fetch(`/api/executive/payroll_trends?store=${store}&weeks=52`);
+            const trendsData = await trendsResponse.json();
+            updateRevenueChart(trendsData.trends);
+            
+            // Load store comparison
+            const comparisonResponse = await fetch(`/api/executive/store_comparison?weeks=4`);
+            const comparisonData = await comparisonResponse.json();
+            updateStoreComparison(comparisonData.stores);
+            updateStorePieChart(comparisonData.stores);
+            
+            // Load KPIs
+            const kpiResponse = await fetch(`/api/executive/kpi_dashboard?store=${store}`);
+            const kpiData = await kpiResponse.json();
+            updateKPIDashboard(kpiData);
+            
+            // Update timestamp
+            document.getElementById('last-updated').textContent = new Date().toLocaleTimeString();
+            
+        } catch (error) {
+            console.error('Error loading dashboard:', error);
+            alert('Error loading executive dashboard data');
+        } finally {
+            showLoading(false);
+        }
+    }
+    
+    function updateSummaryMetrics(data) {
+        // Financial metrics
+        document.getElementById('total-revenue').textContent = formatCurrency(data.financial_metrics.total_revenue);
+        document.getElementById('labor-efficiency').textContent = data.financial_metrics.labor_efficiency.toFixed(1) + '%';
+        document.getElementById('profit-margin').textContent = data.health_indicators.profit_margin.toFixed(1) + '%';
+        
+        // YoY Growth indicator
+        const yoyGrowth = data.financial_metrics.yoy_growth;
+        const growthElement = document.getElementById('yoy-growth');
+        growthElement.textContent = (yoyGrowth >= 0 ? '+' : '') + yoyGrowth.toFixed(1) + '% YoY';
+        growthElement.className = yoyGrowth >= 0 ? 'trend-up' : 'trend-down';
+        
+        // Revenue trend icon
+        const trendIcon = document.getElementById('revenue-trend');
+        trendIcon.innerHTML = yoyGrowth >= 0 ? 
+            '<i class="fas fa-arrow-up trend-up"></i>' : 
+            '<i class="fas fa-arrow-down trend-down"></i>';
+        
+        // Labor efficiency status
+        const efficiency = data.financial_metrics.labor_efficiency;
+        const statusElement = document.getElementById('efficiency-status');
+        if (efficiency < 25) {
+            statusElement.innerHTML = '<span class="efficiency-good efficiency-indicator">Excellent</span>';
+        } else if (efficiency < 35) {
+            statusElement.innerHTML = '<span class="efficiency-warning efficiency-indicator">Acceptable</span>';
+        } else {
+            statusElement.innerHTML = '<span class="efficiency-poor efficiency-indicator">Needs Attention</span>';
+        }
+        
+        // Operational metrics
+        document.getElementById('new-contracts').textContent = data.operational_metrics.new_contracts;
+        document.getElementById('avg-weekly-contracts').textContent = 
+            data.operational_metrics.avg_weekly_contracts.toFixed(1);
+    }
+    
+    function updateRevenueChart(trends) {
+        const ctx = document.getElementById('revenue-chart').getContext('2d');
+        
+        // Group by week for cleaner visualization
+        const weeklyData = {};
+        trends.forEach(item => {
+            if (!weeklyData[item.week]) {
+                weeklyData[item.week] = {revenue: 0, payroll: 0};
+            }
+            weeklyData[item.week].revenue += item.revenue;
+            weeklyData[item.week].payroll += item.payroll;
+        });
+        
+        const labels = Object.keys(weeklyData).sort().slice(-12); // Last 12 weeks
+        const revenueData = labels.map(week => weeklyData[week].revenue);
+        const payrollData = labels.map(week => weeklyData[week].payroll);
+        
+        if (revenueChart) {
+            revenueChart.destroy();
+        }
+        
+        revenueChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels.map(date => new Date(date).toLocaleDateString('en-US', {month: 'short', day: 'numeric'})),
+                datasets: [{
+                    label: 'Revenue',
+                    data: revenueData,
+                    borderColor: '#27ae60',
+                    backgroundColor: 'rgba(39, 174, 96, 0.1)',
+                    tension: 0.3
+                }, {
+                    label: 'Payroll',
+                    data: payrollData,
+                    borderColor: '#e74c3c',
+                    backgroundColor: 'rgba(231, 76, 60, 0.1)',
+                    tension: 0.3
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'top'
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: function(value) {
+                                return '$' + (value / 1000).toFixed(0) + 'K';
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+    
+    function updateStorePieChart(stores) {
+        const ctx = document.getElementById('store-pie-chart').getContext('2d');
+        
+        const labels = stores.map(s => s.store_name);
+        const data = stores.map(s => s.revenue);
+        
+        if (storePieChart) {
+            storePieChart.destroy();
+        }
+        
+        storePieChart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: data,
+                    backgroundColor: [
+                        '#3498db',
+                        '#9b59b6',
+                        '#e74c3c',
+                        '#f39c12'
+                    ]
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const label = context.label || '';
+                                const value = formatCurrency(context.raw);
+                                const percentage = ((context.raw / data.reduce((a,b) => a+b, 0)) * 100).toFixed(1);
+                                return `${label}: ${value} (${percentage}%)`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+    
+    function updateStoreComparison(stores) {
+        const tbody = document.getElementById('store-comparison-tbody');
+        
+        if (!stores || stores.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="8" class="text-center">No store data available</td></tr>';
+            return;
+        }
+        
+        tbody.innerHTML = stores.map(store => {
+            const marginClass = store.profit_margin > 70 ? 'text-success' : 
+                               store.profit_margin > 60 ? 'text-warning' : 'text-danger';
+            const efficiencyClass = store.efficiency < 25 ? 'efficiency-good' :
+                                   store.efficiency < 35 ? 'efficiency-warning' : 'efficiency-poor';
+            
+            return `
+                <tr>
+                    <td><strong>${store.store_name}</strong></td>
+                    <td>${formatCurrency(store.revenue)}</td>
+                    <td>${formatCurrency(store.payroll)}</td>
+                    <td>${formatCurrency(store.profit)}</td>
+                    <td class="${marginClass}">${store.profit_margin.toFixed(1)}%</td>
+                    <td>${store.efficiency.toFixed(1)}%</td>
+                    <td>$${store.revenue_per_hour.toFixed(2)}</td>
+                    <td><span class="${efficiencyClass} efficiency-indicator">
+                        ${store.efficiency < 25 ? 'Optimal' : store.efficiency < 35 ? 'Monitor' : 'Review'}
+                    </span></td>
+                </tr>
+            `;
+        }).join('');
+    }
+    
+    function updateKPIDashboard(kpiData) {
+        // Update each KPI category
+        ['financial', 'operational', 'efficiency', 'growth'].forEach(category => {
+            const container = document.getElementById(`${category}-kpis`);
+            const kpis = kpiData[category] || [];
+            
+            if (kpis.length === 0) {
+                container.innerHTML = '<div class="text-muted small">No KPIs configured</div>';
+            } else {
+                container.innerHTML = kpis.slice(0, 3).map(kpi => {
+                    const variance = kpi.variance || 0;
+                    const varianceClass = variance >= 0 ? 'text-success' : 'text-danger';
+                    const trendIcon = kpi.trend === 'up' ? 'fa-arrow-up' : 
+                                    kpi.trend === 'down' ? 'fa-arrow-down' : 'fa-minus';
+                    
+                    return `
+                        <div class="mb-2">
+                            <div class="d-flex justify-content-between">
+                                <small class="text-muted">${kpi.name}</small>
+                                <small class="${varianceClass}">
+                                    <i class="fas ${trendIcon}"></i> ${Math.abs(variance).toFixed(1)}%
+                                </small>
+                            </div>
+                            <div class="fw-bold">${formatKpiValue(kpi.current)}</div>
+                        </div>
+                    `;
+                }).join('');
+            }
+        });
+    }
+    
+    function formatCurrency(value) {
+        if (!value) return '$0';
+        return new Intl.NumberFormat('en-US', {
+            style: 'currency',
+            currency: 'USD',
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 0
+        }).format(value);
+    }
+    
+    function formatKpiValue(value) {
+        if (!value) return '0';
+        if (value >= 1000000) {
+            return '$' + (value / 1000000).toFixed(1) + 'M';
+        } else if (value >= 1000) {
+            return '$' + (value / 1000).toFixed(1) + 'K';
+        }
+        return '$' + value.toFixed(0);
+    }
+    
+    function showLoading(show) {
+        const overlay = document.getElementById('loading-overlay');
+        if (show) {
+            overlay.classList.remove('d-none');
+        } else {
+            overlay.classList.add('d-none');
+        }
+    }
+    
+    // Auto-refresh every 5 minutes
+    setInterval(loadExecutiveDashboard, 300000);
+});
+</script>
+
+<style>
+#loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.9);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+}
+</style>
+{% endblock %}

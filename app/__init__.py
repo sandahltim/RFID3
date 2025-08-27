@@ -95,6 +95,7 @@ def create_app():
         from app.routes.tab3 import tab3_bp
         from app.routes.tab4 import tab4_bp
         from app.routes.tab5 import tab5_bp
+        from app.routes.tab7 import tab7_bp
         from app.routes.categories import categories_bp
         from app.routes.health import health_bp
         from app.routes.tabs import tabs_bp
@@ -108,6 +109,7 @@ def create_app():
         app.register_blueprint(tab3_bp)
         app.register_blueprint(tab4_bp)
         app.register_blueprint(tab5_bp)
+        app.register_blueprint(tab7_bp)
         app.register_blueprint(categories_bp)
         app.register_blueprint(inventory_analytics_bp)
         app.register_blueprint(health_bp)

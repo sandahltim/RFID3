@@ -9,7 +9,10 @@ from config import (
     LOG_FILE,
 )
 from .. import db, cache
-from .refresh import full_refresh, incremental_refresh
+# Lazy import refresh functions to avoid startup issues
+def get_refresh_functions():
+    from .refresh import full_refresh, incremental_refresh
+    return full_refresh, incremental_refresh
 import logging
 import os
 import time
@@ -71,6 +74,7 @@ def init_scheduler(app):
             try:
                 with acquire_lock(redis_client, lock_key, lock_timeout):
                     logger.info("Triggering full refresh on startup")
+                    full_refresh, _ = get_refresh_functions()
                     full_refresh()
                     logger.info("Full refresh on startup completed successfully")
             except LockError:
@@ -86,6 +90,7 @@ def init_scheduler(app):
                 try:
                     with acquire_lock(redis_client, lock_key, lock_timeout):
                         logger.info("Triggering full refresh on startup (after wait)")
+                        full_refresh, _ = get_refresh_functions()
                         full_refresh()
                         logger.info("Full refresh on startup completed successfully")
                 except LockError:
@@ -103,6 +108,7 @@ def init_scheduler(app):
                 try:
                     with acquire_lock(redis_client, incremental_lock_key, lock_timeout):
                         logger.debug("Starting scheduled incremental refresh (item master + transactions)")
+                        _, incremental_refresh = get_refresh_functions()
                         incremental_refresh()
                         logger.info("Scheduled incremental refresh completed successfully")
                 except LockError:
@@ -121,6 +127,7 @@ def init_scheduler(app):
                 try:
                     with acquire_lock(redis_client, lock_key, lock_timeout):
                         logger.debug("Starting scheduled full refresh (item master, transactions, seed data)")
+                        full_refresh, _ = get_refresh_functions()
                         full_refresh()
                         logger.info("Scheduled full refresh completed successfully")
                 except LockError:

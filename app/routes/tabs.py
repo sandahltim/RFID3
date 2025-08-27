@@ -29,6 +29,9 @@ def tab_view(tab_num):
     elif tab_num == 5:
         logger.debug("Redirecting to tab5.tab5_view at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
         return redirect(url_for('tab5.tab5_view'))
+    elif tab_num == 7:
+        logger.debug("Redirecting to tab7.tab7_view at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+        return redirect(url_for('tab7.tab7_view'))
     else:
         logger.warning(f"Tab {tab_num} not implemented at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
         return render_template('common.html', tab_num=tab_num)
