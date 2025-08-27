@@ -244,6 +244,9 @@ def update_user_mappings(session, csv_file_path=None):
 def update_item_master(session, items):
     """Update id_item_master with provided items.
     
+    IMPORTANT: Preserves POS data fields during API refresh.
+    Only updates RFID API-owned fields, preserves POS integration data.
+    
     Args:
         session: SQLAlchemy session
         items: List of item dictionaries
@@ -264,7 +267,19 @@ def update_item_master(session, items):
                     logger.warning(f"Skipping item with missing tag_id: {item}")
                     skipped += 1
                     continue
-                db_item = ItemMaster(tag_id=tag_id)
+                # Check if item exists to preserve POS data
+                existing_item = session.query(ItemMaster).filter_by(tag_id=tag_id).first()
+                
+                if existing_item:
+                    # Update existing item - preserve POS fields
+                    db_item = existing_item
+                    logger.debug(f"Updating existing item {tag_id}, preserving POS data")
+                else:
+                    # Create new item
+                    db_item = ItemMaster(tag_id=tag_id)
+                    logger.debug(f"Creating new item {tag_id}")
+                
+                # Update ONLY RFID API-owned fields (preserve POS fields)
                 db_item.serial_number = item.get('serial_number')
                 db_item.rental_class_num = item.get('rental_class_num')
                 db_item.client_name = item.get('client_name')
@@ -284,7 +299,15 @@ def update_item_master(session, items):
                 db_item.date_last_scanned = validate_date(item.get('date_last_scanned'), 'date_last_scanned', tag_id)
                 db_item.date_created = validate_date(item.get('date_created'), 'date_created', tag_id)
                 db_item.date_updated = validate_date(item.get('date_updated'), 'date_updated', tag_id)
-                session.merge(db_item)
+                
+                # DO NOT overwrite POS fields:
+                # item_num, identifier_type, department, manufacturer,
+                # turnover_ytd, repair_cost_ltd, sell_price, retail_price,
+                # home_store, current_store, rental_rates, vendor_ids, tag_history
+                
+                if not existing_item:
+                    session.add(db_item)
+                # existing items are already tracked by session
             session.commit()
             logger.debug(f"Committed item batch {i//batch_size + 1}")
         except Exception as e:
@@ -400,11 +423,15 @@ def update_seed_data(session, seed_data):
     logger.info(f"Updated {len(seed_data) - skipped - failed} seed items, skipped {skipped}, failed {failed}")
 
 def full_refresh():
-    """Perform a full refresh of the database.
+    """Perform a POS-safe full refresh of the database.
 
+    IMPORTANT: Modified for POS data integration compatibility.
+    - Preserves id_item_master POS data fields during refresh
+    - Only updates RFID API-owned fields in existing items
+    - Replaces transactions and seed data (no POS fields)
+    
     Retrieves *all* available fields from the Item Master, Transactions,
-    and Seed Rental Class APIs and replaces the corresponding tables in the
-    local database.
+    and Seed Rental Class APIs and safely merges with existing data.
     """
     logger.info("Starting full refresh of item master, transactions, and seed data")
     
@@ -416,12 +443,13 @@ def full_refresh():
     max_retries = 3
     for attempt in range(max_retries):
         try:
-            logger.debug("Clearing existing data")
-            deleted_items = session.query(ItemMaster).delete()
+            logger.debug("Preparing for POS-safe full refresh - preserving POS data in id_item_master")
+            # CRITICAL CHANGE: Do NOT delete id_item_master data (preserves POS integration)
+            # Only clear transaction and seed data which don't have POS fields
             deleted_transactions = session.query(Transaction).delete()
             deleted_seed = session.query(SeedRentalClass).delete()
             session.commit()
-            logger.info(f"Deleted {deleted_items} items from id_item_master")
+            logger.info("POS-SAFE REFRESH: Preserved id_item_master data with POS fields")
             logger.info(f"Deleted {deleted_transactions} transactions from id_transactions")
             logger.info(f"Deleted {deleted_seed} items from seed_rental_classes")
 
@@ -558,8 +586,8 @@ def incremental_refresh():
 
 @refresh_bp.route('/refresh/full', methods=['POST'])
 def full_refresh_endpoint():
-    """Endpoint for full refresh."""
-    logger.info("Received request for full refresh via endpoint")
+    """Endpoint for POS-safe full refresh."""
+    logger.info("Received request for POS-safe full refresh via endpoint")
     try:
         full_refresh()
         logger.info("Full refresh completed successfully")
@@ -588,8 +616,8 @@ def incremental_refresh_endpoint():
 
 @refresh_bp.route('/clear_api_data', methods=['POST'])
 def clear_api_data():
-    """Endpoint to clear API data and perform full refresh."""
-    logger.info("Received request for clear API data and refresh")
+    """Endpoint to refresh API data while preserving POS data."""
+    logger.info("Received request for POS-safe API data refresh")
     try:
         full_refresh()
         logger.info("Clear API data and refresh completed successfully")
