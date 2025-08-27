@@ -95,8 +95,8 @@ def get_executive_summary():
             PayrollTrends.week_ending.between(last_year_start, last_year_end)
         ).scalar() or 0
         
-        current_revenue = payroll_metrics.total_revenue or 0
-        yoy_growth = ((current_revenue - last_year_revenue) / last_year_revenue * 100) if last_year_revenue else 0
+        current_revenue = float(payroll_metrics.total_revenue or 0)
+        yoy_growth = ((current_revenue - float(last_year_revenue)) / float(last_year_revenue) * 100) if last_year_revenue else 0
         
         # Get current inventory value (from existing ItemMaster)
         inventory_query = session.query(
@@ -131,7 +131,7 @@ def get_executive_summary():
             'health_indicators': {
                 'ar_aging_percent': float(scorecard_metrics.avg_ar_aging or 0),
                 'total_discounts': float(scorecard_metrics.total_discounts or 0),
-                'profit_margin': round((current_revenue - float(payroll_metrics.total_payroll or 0)) / current_revenue * 100, 2) if current_revenue else 0
+                'profit_margin': round((float(current_revenue) - float(payroll_metrics.total_payroll or 0)) / float(current_revenue) * 100, 2) if current_revenue else 0
             },
             'metadata': {
                 'store': store_filter,

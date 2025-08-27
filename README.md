@@ -1,278 +1,348 @@
-# RFID Dashboard Application
+# RFID Inventory Management System 🏪
 
-**Last Updated:** August 26, 2025  
-**Current Version:** Phase 2 Complete - Advanced Inventory Analytics with Configuration Management
+[![Python](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://python.org)
+[![Flask](https://img.shields.io/badge/Flask-3.0+-green.svg)](https://flask.palletsprojects.com/)
+[![MariaDB](https://img.shields.io/badge/MariaDB-11.0+-orange.svg)](https://mariadb.org/)
+[![Redis](https://img.shields.io/badge/Redis-7.0+-red.svg)](https://redis.io/)
 
-This Flask-based RFID dashboard application manages inventory, tracks contracts, and provides comprehensive analytics for Broadway Tent and Event. It integrates with an external API for data synchronization and uses MariaDB and Redis for persistence and caching.
+A comprehensive RFID-based inventory management system with advanced business intelligence, multi-store analytics, and executive dashboards for retail rental operations.
 
-## 🆕 Latest Features - Phase 2 Complete
+## 🚀 **NEW: Executive Dashboard (Tab 7)**
 
-### Tab 6: Inventory & Analytics
-- **Health Alerts Dashboard** - Real-time inventory health monitoring with severity-based alerting
-- **Stale Items Analysis** - Category-specific thresholds for identifying items not scanned recently
-- **Configuration Management** - Full UI for managing alert thresholds and business rules
-- **Usage Patterns Analysis** - Utilization tracking and data discrepancy identification
-- **Advanced Filtering & Pagination** - Category/subcategory filters with responsive pagination
-- **Transaction Integration** - Cross-references item master with transaction history for comprehensive insights
+**Revolutionary business intelligence system with 328+ weeks of historical financial data:**
+- **Multi-store payroll trends** with labor efficiency analysis
+- **Interactive financial charts** showing revenue vs payroll patterns  
+- **Store performance comparison** with profitability rankings
+- **Executive KPI dashboard** with targets and variance tracking
+- **Real-time analytics** with auto-refresh and store filtering
 
-## Project Structure
+![Executive Dashboard Preview](docs/images/executive-dashboard-preview.png)
 
-```
-RFID3/
-├── app/
-│   ├── __init__.py
-│   ├── routes/
-│   │   ├── home.py
-│   │   ├── common.py
-│   │   ├── tabs.py
-│   │   ├── tab1.py              # Rental Inventory
-│   │   ├── tab2.py              # Open Contracts
-│   │   ├── tab3.py              # Items in Service
-│   │   ├── tab4.py              # Laundry Contracts
-│   │   ├── tab5.py              # Resale/Rental Packs
-│   │   ├── categories.py        # Manage Categories
-│   │   ├── health.py            # System Health
-│   │   └── inventory_analytics.py  # 🆕 Tab 6: Inventory Analytics
-│   ├── services/
-│   │   ├── api_client.py
-│   │   ├── refresh.py
-│   │   ├── scheduler.py
-│   ├── models/
-│   │   └── db_models.py         # Includes new analytics models
-│   ├── templates/
-│   │   ├── base.html
-│   │   ├── home.html
-│   │   ├── tab1.html - tab5.html
-│   │   ├── categories.html
-│   │   ├── inventory_analytics.html  # 🆕 Tab 6 Interface
-│   │   ├── _category_rows.html
-│   │   └── _hand_counted_item.html
-├── static/
-│   ├── css/
-│   │   ├── common.css
-│   │   ├── tab1.css - tab5.css
-│   │   └── tab2_4.css
-│   ├── js/
-│   │   ├── common.js
-│   │   ├── home.js
-│   │   ├── tab1.js - tab5.js
-│   │   └── categories.js
-├── scripts/
-│   ├── migrate_db.sql
-│   ├── create_inventory_analytics_tables.sql  # 🆕 Analytics schema
-│   ├── setup_mariadb.sh
-│   ├── easy_install.sh
-│   ├── update_rental_class_mappings.py
-│   └── migrate_hand_counted_items.sql
-├── logs/
-│   ├── gunicorn_error.log
-│   ├── gunicorn_access.log
-│   ├── rfid_dashboard.log
-│   └── app.log
-├── run.py
-├── config.py
-├── README.md
-├── INSTALL_PI.md
-├── ROADMAP.md                    # 🆕 Phase upgrade plan
-└── rfid_dash_dev.service
-```
+## 📊 **System Overview**
 
-## Features
+This system provides comprehensive inventory management across 4 store locations with advanced analytics, health monitoring, and executive reporting capabilities.
 
-### Application Tabs
-- **Tab 1:** Rental Inventory - View and manage rental inventory items
-- **Tab 2:** Open Contracts - Track active rental contracts
-- **Tab 3:** Items in Service - Monitor items requiring maintenance
-- **Tab 4:** Laundry Contracts - Handle laundry processing with hand-counted items
-- **Tab 5:** Resale/Rental Packs - Bulk manage resale and pack items
-- **Tab 6:** 🆕 **Inventory & Analytics** - Advanced inventory health monitoring and analytics
-- **Categories:** Manage rental class mappings and category assignments
+### **Core Modules**
 
-### Tab 6: Inventory & Analytics Features
-- **Health Alerts Dashboard**
-  - Real-time inventory health scoring (0-100 scale)
-  - Severity-based alerts (Critical, High, Medium, Low)
-  - Category and alert type filtering
-  - Automated alert generation from stale items
-  
-- **Stale Items Analysis**
-  - Category-specific scan thresholds (Resale: 7 days, Pack: 14 days, Default: 30 days)
-  - Transaction count integration
-  - Advanced filtering by category, subcategory, and days threshold
-  - Responsive pagination (10/25/50/100 items per page)
+| Tab | Module | Description | Key Features |
+|-----|--------|-------------|--------------|
+| 1 | **Rental Inventory** | Main inventory tracking | Item status, bin locations, availability |
+| 2 | **Open Contracts** | Active rental contracts | Contract management, customer tracking |
+| 3 | **Service** | Repair & maintenance | Service workflows, repair tracking |
+| 4 | **Laundry Contracts** | Specialized laundry items | Laundry-specific contract management |
+| 5 | **Resale** | Retail sales items | Resale inventory and pricing |
+| 6 | **Inventory & Analytics** | 📈 Business intelligence | Activity tracking, health alerts, location analytics |
+| 7 | **Executive Dashboard** | 🎯 **NEW** Financial BI | Payroll trends, store comparison, executive KPIs |
 
-- **Configuration Management**
-  - Visual threshold configuration interface
-  - Real-time saving and validation
-  - Reset to defaults capability
-  - Business rule management
+### **Advanced Features**
 
-- **Usage Analysis**
-  - Utilization pattern tracking
-  - Data discrepancy analysis between ItemMaster and Transactions
-  - Database health metrics
-  - Orphaned record identification
+- **🏪 Multi-Store Operations**: 4 locations (Brooklyn Park, Wayzata, Anoka, St. Paul)
+- **📊 Real-Time Analytics**: Live inventory health monitoring and business intelligence
+- **🔍 Global Filtering**: Store-aware data filtering across all modules
+- **📱 Mobile Ready**: Responsive design for mobile and tablet access
+- **🚨 Health Alerts**: Automated inventory health monitoring with severity levels
+- **📈 Predictive Analytics**: Trend analysis and forecasting capabilities
 
-### Core Functionality
-- **Expandable Sections:** Detailed views for common names, items, and contracts
-- **Hand-Counted Items:** Track manually counted items for laundry contracts
-- **Bulk Operations:** CSV exports and bulk updates for resale/rental packs
-- **Print Functionality:** Generate printouts for contracts, categories, and items
-- **Real-Time Sync:** Scheduled full and incremental data refreshes from external API
-- **Advanced Search:** Category-based filtering with subcategory drill-down
-- **Responsive Design:** Mobile-friendly interface using MDB UI Kit
+## 💼 **Business Intelligence Features**
 
-## Database Schema
+### **Executive Dashboard (Tab 7)**
+- **Financial Performance**: Revenue trends, payroll analysis, profit margins
+- **Store Analytics**: Multi-location performance comparison and ranking
+- **Labor Efficiency**: Productivity metrics and labor cost optimization
+- **KPI Tracking**: Configurable key performance indicators with targets
+- **Historical Analysis**: 328+ weeks of financial data for trend analysis
 
-### Core Tables
-- **id_item_master** - Master inventory dataset (primary item records)
-- **id_transactions** - Complete transaction history
-- **id_rfidtag** - RFID tag metadata
-- **seed_rental_classes** - Rental class definitions
-- **user_rental_class_mappings** - User-defined category mappings
+### **Inventory Analytics (Tab 6)**  
+- **Activity Tracking**: Touch scans, movement patterns, utilization analysis
+- **Health Monitoring**: Stale item detection, repair cycle tracking
+- **Location Intelligence**: Bin location optimization and movement analytics
+- **Alert System**: Automated notifications for inventory issues
 
-### 🆕 Analytics Tables (Phase 1-2)
-- **inventory_health_alerts** - Health monitoring and alerting system
-- **item_usage_history** - Comprehensive item lifecycle tracking
-- **inventory_config** - Configuration management for thresholds and business rules
-- **inventory_metrics_daily** - Aggregated daily metrics for performance optimization
+## 🛠 **Technical Architecture**
 
-### Table Relationships
-- `id_item_master.tag_id` ↔ `id_transactions.tag_id` (one-to-many)
-- `id_item_master.rental_class_num` ↔ `seed_rental_classes.rental_class_id` (many-to-one)
-- `inventory_health_alerts.tag_id` ↔ `id_item_master.tag_id` (many-to-one)
-- `item_usage_history.tag_id` ↔ `id_item_master.tag_id` (many-to-one)
+### **Backend Stack**
+- **Framework**: Flask 3.0+ with Blueprint architecture
+- **Database**: MariaDB 11.0+ with optimized indexing
+- **Caching**: Redis 7.0+ for performance optimization
+- **ORM**: SQLAlchemy with session management
+- **Background Tasks**: APScheduler for automated refreshes
 
-## Prerequisites
+### **Frontend Stack**
+- **UI Framework**: Bootstrap 5 + MDB UI Kit
+- **Charts**: Chart.js for interactive visualizations
+- **JavaScript**: Modern ES6+ with modular architecture
+- **Styling**: CSS3 with responsive design patterns
 
-- Raspberry Pi with Raspberry Pi OS (Bookworm) or compatible Linux system
+### **Data Sources**
+- **Primary**: ItemMaster table with 30+ fields per item
+- **Transactions**: Historical transaction data with scan patterns
+- **Financial**: Payroll trends and executive KPI data
+- **External APIs**: Integration with POS systems and external data sources
+
+## 🚀 **Quick Start**
+
+### **Prerequisites**
 - Python 3.11+
-- MariaDB 10.5+
-- Redis 6.0+
-- Git
-- Nginx (optional, for production)
+- MariaDB 11.0+
+- Redis 7.0+
+- Node.js (for frontend dependencies)
 
-## Quick Installation
+### **Installation**
 
-### Using Easy Install Script
+1. **Clone Repository**
+   ```bash
+   git clone https://github.com/sandahltim/RFID3.git
+   cd RFID3
+   ```
+
+2. **Setup Virtual Environment**
+   ```bash
+   python3 -m venv venv
+   source venv/bin/activate  # Linux/Mac
+   # or venv\Scripts\activate  # Windows
+   ```
+
+3. **Install Dependencies**
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+4. **Database Setup**
+   ```bash
+   # Create database
+   mysql -u root -p -e "CREATE DATABASE rfid_inventory;"
+   
+   # Run migrations (tables auto-created on first run)
+   python app.py
+   ```
+
+5. **Executive Dashboard Setup**
+   ```bash
+   # Create executive tables
+   mysql -u rfid_user -p rfid_inventory < create_executive_tables.sql
+   
+   # Load sample data (optional)
+   python load_executive_data.py
+   ```
+
+6. **Start Application**
+   ```bash
+   # For development (port 5000)
+   flask run --host=0.0.0.0 --port=5000
+   
+   # For production (ports 8101/8102 with nginx)
+   gunicorn --workers 1 --threads 4 --bind 0.0.0.0:8102 run:app
+   ```
+
+Visit `http://localhost:8101` to access the dashboard (production) or `http://localhost:5000` (development).
+
+## 🔧 **Configuration**
+
+### **Environment Variables**
 ```bash
-# Clone repository
-git clone https://github.com/sandahltim/_rfidpi.git /home/tim/RFID3
-cd /home/tim/RFID3
-git checkout RFID3dev  # Use RFID3dev for latest features
+# Database Configuration
+DB_HOST=localhost
+DB_USER=rfid_user  
+DB_PASSWORD=your_secure_password
+DB_DATABASE=rfid_inventory
 
-# Run easy installation
-chmod +x scripts/easy_install.sh
-sudo scripts/easy_install.sh
+# API Configuration  
+API_USERNAME=your_api_user
+API_PASSWORD=your_api_password
+
+# Application Settings
+APP_IP=192.168.1.100
+REDIS_URL=redis://localhost:6379/0
 ```
 
-### Manual Installation
-See [INSTALL_PI.md](INSTALL_PI.md) for detailed manual installation instructions.
-
-## Configuration
-
-### Database
-- **Host:** localhost
-- **Database:** rfid_inventory  
-- **User:** rfid_user
-- **Password:** rfid_user_password
-
-### API Endpoints
-Configured in `config.py`:
-- **Item Master:** `cs.iot.ptshome.com/api/v1/data/14223767938169344381`
-- **Transactions:** `cs.iot.ptshome.com/api/v1/data/14223767938169346196`
-- **Seed Data:** `cs.iot.ptshome.com/api/v1/data/14223767938169215907`
-
-### Service Configuration
-- **Application Port:** 8102 (Gunicorn)
-- **Web Interface:** 8101 (Nginx proxy)
-- **Service Name:** rfid_dash_dev.service
-- **Auto-Restart:** Enabled via systemd
-
-## Usage
-
-1. **Access Application:** Navigate to `http://your-pi-ip:8101`
-2. **Data Refresh:** Use "Full Refresh" button on home page for initial data sync
-3. **Category Management:** Assign categories via "Manage Categories" tab
-4. **Analytics:** Access comprehensive analytics via Tab 6
-5. **Configuration:** Adjust alert thresholds via Tab 6 → Configuration
-
-## Deployment
-
-### Development (RFID3dev branch)
-```bash
-git add .
-git commit -m "Your changes"
-git push origin RFID3dev
-# Changes auto-deployed via GitHub Actions
+### **Config File Structure**
+```
+config.py                 # Main configuration
+├── Database settings      # MariaDB connection
+├── Redis configuration    # Caching settings  
+├── API endpoints         # External integrations
+├── Refresh intervals     # Data sync timing
+└── Logging setup         # Application logging
 ```
 
-### Production (main branch)
-```bash
-git checkout main
-git merge RFID3dev
-git push origin main
-# Production systems pull from main branch
+## 📈 **Analytics & Reporting**
+
+### **Executive Metrics**
+- **Revenue Analysis**: Historical trends with YoY growth tracking
+- **Labor Efficiency**: Cost per hour and productivity metrics  
+- **Store Performance**: Comparative analysis across locations
+- **Profit Margins**: Revenue minus payroll calculations
+- **KPI Dashboard**: Customizable key performance indicators
+
+### **Inventory Intelligence**
+- **Health Alerts**: Automated detection of inventory issues
+- **Activity Patterns**: Touch scan analysis and movement tracking
+- **Location Optimization**: Bin assignment and retrieval efficiency
+- **Utilization Metrics**: Asset performance and turnover analysis
+
+### **Data Export Options**
+- **CSV Export**: All data tables with filtering options
+- **API Access**: REST endpoints for external integrations
+- **Report Generation**: Scheduled reports via email/alerts
+- **Dashboard Widgets**: Embeddable analytics components
+
+## 🔐 **Security Features**
+
+- **SQL Injection Protection**: Parameterized queries throughout
+- **XSS Prevention**: Input sanitization and output encoding
+- **Session Management**: Secure session handling with timeouts
+- **Access Control**: Role-based permissions and store-level filtering
+- **Audit Logging**: Comprehensive activity tracking and monitoring
+
+## 📱 **Mobile & API Support**
+
+### **Responsive Design**
+- Mobile-first approach with responsive breakpoints
+- Touch-friendly interfaces for mobile scanning
+- Progressive Web App (PWA) capabilities
+
+### **API Endpoints**
+```
+# Core Inventory APIs
+GET  /api/tab/{tab_id}/data      # Tab data with filtering
+POST /api/tab/{tab_id}/update    # Update inventory items
+
+# Executive Dashboard APIs  
+GET  /api/executive/dashboard_summary     # High-level metrics
+GET  /api/executive/payroll_trends       # Financial trend data
+GET  /api/executive/store_comparison     # Multi-store analytics
+GET  /api/executive/kpi_dashboard        # KPI metrics
+
+# Analytics APIs
+GET  /api/analytics/health_alerts        # Inventory health status
+GET  /api/analytics/activity_data        # Item activity patterns
+GET  /api/analytics/location_data        # Location-based analytics
 ```
 
-## Monitoring & Logs
+## 🧪 **Testing**
 
-### Log Files
+### **Test Suite Structure**
 ```bash
-# Application logs
-tail -f /home/tim/RFID3/logs/rfid_dashboard.log
-tail -f /home/tim/RFID3/logs/gunicorn_error.log
-tail -f /home/tim/RFID3/logs/app.log
-
-# System status
-sudo systemctl status rfid_dash_dev.service
+tests/
+├── unit/                 # Unit tests for individual functions
+├── integration/          # API endpoint integration tests  
+├── security/            # Security vulnerability tests
+└── performance/         # Performance and load tests
 ```
 
-### Health Monitoring
-- Built-in system health dashboard accessible via main navigation
-- Database connection monitoring
-- API endpoint status tracking
-- Automatic error recovery and logging
+### **Running Tests**
+```bash
+# Run full test suite
+python -m pytest tests/ -v --cov=app
 
-## Upgrade Roadmap
+# Run security tests
+python -m pytest tests/security/ -v
 
-See [ROADMAP.md](ROADMAP.md) for detailed phase-by-phase upgrade plan including:
-- **Phase 1-2:** ✅ Complete (Advanced Analytics Infrastructure)
-- **Phase 3:** Resale & Pack Management + Predictive Analytics  
-- **Phase 4:** Revenue Optimization + Workflow Automation
-- **Phase 5:** Advanced Reporting & External Integration
+# Run performance tests  
+python -m pytest tests/performance/ -v
+```
 
-## Troubleshooting
+## 📊 **Database Schema**
 
-### Common Issues
+### **Core Tables**
+- **id_item_master**: Primary inventory data (40+ fields)
+- **id_transactions**: Historical transaction records
+- **id_categories**: Item categorization and hierarchy
 
-**500 Errors:**
-- Check `rfid_dashboard.log` and `gunicorn_error.log`
-- Verify database connectivity: `mysql -u rfid_user -prfid_user_password rfid_inventory`
+### **Analytics Tables**
+- **executive_payroll_trends**: Financial performance data (328+ records)
+- **executive_scorecard_trends**: Business metrics and KPIs
+- **executive_kpi**: Key performance indicators with targets
 
-**Tab 6 Not Loading:**
-- Ensure analytics tables created: `mysql -u rfid_user -prfid_user_password rfid_inventory < scripts/create_inventory_analytics_tables.sql`
-- Check browser console for JavaScript errors
-- Verify MDB UI Kit loading properly
+### **Health & Monitoring**
+- **health_alerts**: Automated inventory health notifications
+- **item_usage_history**: Activity tracking and analytics
+- **location_analytics**: Bin location and movement data
 
-**Data Sync Issues:**
-- Verify API credentials in `config.py`
-- Check network connectivity to external APIs
-- Review sync logs in `logs/sync.log`
+## 🚀 **Deployment**
 
-**Performance Issues:**
-- Monitor database performance and connection pool
-- Check Redis cache status
-- Review memory usage with long-running processes
+### **Production Deployment**
+```bash
+# Production configuration
+export FLASK_ENV=production
+export DB_PASSWORD=secure_production_password
 
-### Support
+# Deploy with gunicorn
+gunicorn --workers 4 --bind 0.0.0.0:5000 app:app
 
-- **Issues:** Report bugs at https://github.com/sandahltim/_rfidpi/issues
-- **Documentation:** See `INSTALL_PI.md` for installation details
-- **Logs:** All logs stored in `/home/tim/RFID3/logs/` directory
+# Or deploy with Docker
+docker build -t rfid-system .
+docker run -p 5000:5000 rfid-system
+```
+
+### **Performance Optimization**
+- **Database**: Optimized indexes on frequently queried fields
+- **Caching**: Redis caching for expensive queries  
+- **CDN**: Static asset delivery via CDN
+- **Load Balancing**: Multi-instance deployment support
+
+## 📋 **Roadmap**
+
+### **Phase 1: Security & Performance (Next 30 days)**
+- [ ] Fix SQL injection vulnerabilities  
+- [ ] Implement proper input validation
+- [ ] Add database query optimization
+- [ ] Mobile responsiveness improvements
+
+### **Phase 2: Advanced Analytics (Next 60 days)**  
+- [ ] Predictive inventory analytics
+- [ ] Revenue optimization algorithms
+- [ ] Customer behavior analysis
+- [ ] Automated reorder point calculations
+
+### **Phase 3: Integration & Automation (Next 90 days)**
+- [ ] Mobile app API development
+- [ ] External POS system integration  
+- [ ] Automated workflow optimization
+- [ ] Machine learning-based forecasting
+
+### **Phase 4: Enterprise Features (Next 120 days)**
+- [ ] Multi-tenant architecture
+- [ ] Advanced reporting suite
+- [ ] Audit trail and compliance
+- [ ] Enterprise SSO integration
+
+## 🤝 **Contributing**
+
+We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
+
+### **Development Setup**
+1. Fork the repository
+2. Create feature branch (`git checkout -b feature/amazing-feature`)  
+3. Make changes and add tests
+4. Run test suite (`pytest tests/ -v`)
+5. Submit pull request
+
+### **Code Standards**
+- Python: PEP 8 compliance with type hints
+- JavaScript: ES6+ with consistent formatting
+- SQL: Parameterized queries only
+- CSS: BEM methodology for naming
+
+## 📞 **Support**
+
+- **Documentation**: [Wiki Pages](https://github.com/sandahltim/RFID3/wiki)
+- **Issues**: [GitHub Issues](https://github.com/sandahltim/RFID3/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/sandahltim/RFID3/discussions)
+
+## 📄 **License**
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🏆 **Acknowledgments**
+
+- **Chart.js** for excellent data visualization capabilities
+- **Bootstrap** and **MDB UI Kit** for responsive design components
+- **Flask** community for robust web framework
+- **MariaDB** for reliable database performance
 
 ---
 
-**Note:** This application manages real-time inventory for Broadway Tent and Event. Not all items will have categories assigned until mapped via the "Manage Categories" interface. Hand-counted items are specific to laundry contracts and stored locally.
+**Built with ❤️ for inventory management excellence**
 
-**Last Updated:** August 26, 2025 - Phase 2 Complete
+*Last updated: 2025-08-27 | Version: 2025-08-27-v1 | Executive Dashboard Release*
