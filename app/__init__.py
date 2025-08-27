@@ -99,6 +99,7 @@ def create_app():
         from app.routes.health import health_bp
         from app.routes.tabs import tabs_bp
         from app.routes.inventory_analytics import inventory_analytics_bp
+        from app.routes.performance import performance_bp
         from app.services.refresh import refresh_bp
 
         app.register_blueprint(home_bp)
@@ -111,8 +112,15 @@ def create_app():
         app.register_blueprint(inventory_analytics_bp)
         app.register_blueprint(health_bp)
         app.register_blueprint(tabs_bp)
+        app.register_blueprint(performance_bp)
         app.register_blueprint(refresh_bp)
         app.logger.info("Blueprints registered successfully")
+        
+        # Set up performance monitoring middleware
+        from app.routes.performance import track_request_performance
+        before_request, after_request = track_request_performance()
+        app.before_request(before_request)
+        app.after_request(after_request)
     except (ImportError, AttributeError) as e:
         app.logger.error(f"Failed to register blueprints: {str(e)}", exc_info=True)
         raise

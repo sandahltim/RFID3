@@ -19,6 +19,7 @@ from urllib.parse import quote
 from contextlib import nullcontext
 from .. import cache
 from .logger import get_logger
+from ..utils.exceptions import APIException, log_and_handle_exception
 
 # Configure logging
 logger = get_logger('api_client', level=logging.INFO, log_file=LOG_FILE)
@@ -75,11 +76,22 @@ class APIClient:
                     if attempt < 4:
                         time.sleep(3)
             except requests.RequestException as e:
-                logger.error(f"Token attempt {attempt + 1} failed: {str(e)}")
+                error_details = {
+                    'attempt': attempt + 1,
+                    'url': LOGIN_URL,
+                    'error_type': type(e).__name__
+                }
+                logger.error(f"Token attempt {attempt + 1} failed: {str(e)}", extra=error_details)
                 if attempt < 4:
                     time.sleep(3)
+                else:
+                    raise APIException(f"Authentication request failed: {str(e)}",
+                                     error_code="AUTH_REQUEST_FAILED",
+                                     details=error_details)
         logger.error("Failed to fetch access token after 5 attempts")
-        raise Exception("Failed to fetch access token after 5 attempts")
+        raise APIException("Failed to fetch access token after 5 attempts", 
+                          error_code="AUTH_FAILURE",
+                          details={'attempts': 5, 'endpoint': LOGIN_URL})
 
     def _make_request(self, endpoint_id, params=None, method='GET', data=None, timeout=20, user_operation=False, headers=None):
         """Make a request to the RFID API, capping the limit at the API's maximum of 200."""

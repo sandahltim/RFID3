@@ -5,6 +5,7 @@ from ..models.db_models import (
     InventoryConfig, UserRentalClassMapping, RentalClassMapping
 )
 from ..services.logger import get_logger
+from ..utils.exceptions import DatabaseException, ValidationException, handle_api_error, log_and_handle_exception
 from sqlalchemy import func, desc, and_, or_, text
 from sqlalchemy.exc import SQLAlchemyError
 from datetime import datetime, timedelta
@@ -24,6 +25,7 @@ def inventory_analytics_view():
     return render_template('inventory_analytics.html')
 
 @inventory_analytics_bp.route('/api/inventory/dashboard_summary', methods=['GET'])
+@handle_api_error
 def get_dashboard_summary():
     """Get high-level dashboard metrics for the analytics overview."""
     session = None
@@ -98,6 +100,7 @@ def get_dashboard_summary():
             session.close()
 
 @inventory_analytics_bp.route('/api/inventory/alerts', methods=['GET'])
+@handle_api_error
 def get_inventory_alerts():
     """Get inventory health alerts with filtering and pagination."""
     session = None
