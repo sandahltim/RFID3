@@ -402,6 +402,14 @@ def update_transactions(session, transactions):
     skipped = 0
     failed = 0
     batch_size = 500
+    
+    # Log detailed information about the first few transactions for debugging
+    if transactions:
+        logger.info(f"Sample transaction data structure (first record):")
+        sample = transactions[0]
+        for key, value in sample.items():
+            logger.info(f"  {key}: {value} (type: {type(value).__name__})")
+    
     for i in range(0, len(transactions), batch_size):
         batch = transactions[i : i + batch_size]
         try:
