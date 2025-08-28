@@ -1,71 +1,100 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    {% block head %}
+  {% block head %}
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}RFID DASHBOARD{% endblock %}</title>
+    
+    <!-- External CSS -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/mdb-ui-kit/7.1.0/mdb.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    
+    <!-- Application CSS -->
     <link rel="stylesheet" href="/static/css/common.css">
     {% if request.path == '/tab/1' %}
-        <link rel="stylesheet" href="/static/css/tab1.css">
+      <link rel="stylesheet" href="/static/css/tab1.css">
     {% elif request.path == '/tab/2' or request.path == '/tab/4' %}
-        <link rel="stylesheet" href="/static/css/tab2_4.css">
+      <link rel="stylesheet" href="/static/css/tab2_4.css">
     {% elif request.path == '/tab/3' %}
-        <link rel="stylesheet" href="/static/css/tab3.css">
+      <link rel="stylesheet" href="/static/css/tab3.css">
     {% elif request.path == '/tab/5' %}
-        <link rel="stylesheet" href="/static/css/tab5.css">
+      <link rel="stylesheet" href="/static/css/tab5.css">
     {% endif %}
+    
     <link rel="icon" href="/static/favicon.ico">
-    {% endblock %}
-    {% block extra_head %}{% endblock %}
+  {% endblock %}
+  {% block extra_head %}{% endblock %}
 </head>
 <body>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
-        <div class="container-fluid">
-            <a class="navbar-brand" href="/">RFID DASHBOARD</a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav ms-auto">
-                    <li class="nav-item"><a class="nav-link {% if request.path == '/' or request.path == '/home' %}active{% endif %}" href="/home">Home</a></li>
-                    <li class="nav-item"><a class="nav-link {% if request.path == '/tab/1' %}active{% endif %}" href="/tab/1">Rental Inventory</a></li>
-                    <li class="nav-item"><a class="nav-link {% if request.path == '/tab/2' %}active{% endif %}" href="/tab/2">Open Contracts</a></li>
-                    <li class="nav-item"><a class="nav-link {% if request.path == '/tab/3' %}active{% endif %}" href="/tab/3">Service</a></li>
-                    <li class="nav-item"><a class="nav-link {% if request.path == '/tab/4' %}active{% endif %}" href="/tab/4">Laundry Contracts</a></li>
-                    <li class="nav-item"><a class="nav-link {% if request.path == '/tab/5' %}active{% endif %}" href="/tab/5">Resale</a></li>
-                    <li class="nav-item"><a class="nav-link {% if request.path == '/tab/6' %}active{% endif %}" href="/tab/6">Inventory & Analytics</a></li>
-                    <li class="nav-item"><a class="nav-link {% if request.path == '/tab/7' %}active{% endif %}" href="/tab/7">Executive Dashboard</a></li>
-                    <li class="nav-item"><a class="nav-link {% if request.path == '/categories' %}active{% endif %}" href="/categories">Manage Categories</a></li>
-                </ul>
-            </div>
-        </div>
-    </nav>
-    <div class="container mt-3">
-        {% block content %}{% endblock %}
+  <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+    <div class="container-fluid">
+      <a class="navbar-brand" href="/">RFID DASHBOARD</a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="navbarNav">
+        <ul class="navbar-nav ms-auto">
+          <li class="nav-item">
+            <a class="nav-link {% if request.path == '/' or request.path == '/home' %}active{% endif %}" href="/home">Home</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link {% if request.path == '/tab/1' %}active{% endif %}" href="/tab/1">Rental Inventory</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link {% if request.path == '/tab/2' %}active{% endif %}" href="/tab/2">Open Contracts</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link {% if request.path == '/tab/3' %}active{% endif %}" href="/tab/3">Service</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link {% if request.path == '/tab/4' %}active{% endif %}" href="/tab/4">Laundry Contracts</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link {% if request.path == '/tab/5' %}active{% endif %}" href="/tab/5">Resale</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link {% if request.path == '/tab/6' %}active{% endif %}" href="/tab/6">Inventory & Analytics</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link {% if request.path == '/tab/7' %}active{% endif %}" href="/tab/7">Executive Dashboard</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link {% if request.path == '/categories' %}active{% endif %}" href="/categories">Manage Categories</a>
+          </li>
+        </ul>
+      </div>
     </div>
+  </nav>
+  <div class="container mt-3">
+    {% block content %}{% endblock %}
+  </div>
+  
+  {% include 'refresh_status.html' %}
+  
+  {% block scripts %}
+    <!-- Common Scripts -->
+    <script type="module" src="/static/js/common.js?cb={{ cache_bust }}"></script>
+    <script type="module" src="/static/js/tab.js?cb={{ cache_bust }}"></script>
     
-    {% include 'refresh_status.html' %}
-    {% block scripts %}
-        <script type="module" src="/static/js/common.js?cb={{ cache_bust }}"></script>
-        <script type="module" src="/static/js/tab.js?cb={{ cache_bust }}"></script>
-        {% if request.path == '/tab/1' %}
-            <script type="module" src="/static/js/tab1.js?cb={{ cache_bust }}"></script>
-        {% elif request.path == '/tab/2' %}
-            <script type="module" src="/static/js/tab2.js?cb={{ cache_bust }}"></script>
-        {% elif request.path == '/tab/3' %}
-            <script type="module" src="/static/js/tab3.js?cb={{ cache_bust }}"></script>
-        {% elif request.path == '/tab/4' %}
-            <script type="module" src="/static/js/tab4.js?cb={{ cache_bust }}"></script>
-        {% elif request.path == '/tab/5' %}
-            <script type="module" src="/static/js/tab5.js?cb={{ cache_bust }}"></script>
-        {% elif request.path == '/categories' %}
-            <script type="module" src="/static/js/categories.js?cb={{ cache_bust }}"></script>
-        {% elif request.path == '/' or request.path == '/home' %}
-            <script type="module" src="/static/js/tab1.js?cb={{ cache_bust }}"></script>
-        {% endif %}
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/mdb-ui-kit/7.1.0/mdb.min.js"></script>
-    {% endblock %}
+    <!-- Page-specific Scripts -->
+    {% if request.path == '/tab/1' %}
+      <script type="module" src="/static/js/tab1.js?cb={{ cache_bust }}"></script>
+    {% elif request.path == '/tab/2' %}
+      <script type="module" src="/static/js/tab2.js?cb={{ cache_bust }}"></script>
+    {% elif request.path == '/tab/3' %}
+      <script type="module" src="/static/js/tab3.js?cb={{ cache_bust }}"></script>
+    {% elif request.path == '/tab/4' %}
+      <script type="module" src="/static/js/tab4.js?cb={{ cache_bust }}"></script>
+    {% elif request.path == '/tab/5' %}
+      <script type="module" src="/static/js/tab5.js?cb={{ cache_bust }}"></script>
+    {% elif request.path == '/categories' %}
+      <script type="module" src="/static/js/categories.js?cb={{ cache_bust }}"></script>
+    {% elif request.path == '/' or request.path == '/home' %}
+      <script type="module" src="/static/js/tab1.js?cb={{ cache_bust }}"></script>
+    {% endif %}
+    
+    <!-- External Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mdb-ui-kit/7.1.0/mdb.min.js"></script>
+  {% endblock %}
 </body>
 </html>
