@@ -38,7 +38,7 @@ def health_check():
 
     # Check Redis
     try:
-        cache.set("health_check", "ok", timeout=1)
+        cache.set("health_check", "ok", ex=1)
         if cache.get("health_check") == b"ok":
             status["redis"] = "healthy"
             logger.info("Redis health check passed")
