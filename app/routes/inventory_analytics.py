@@ -1063,89 +1063,191 @@ def calculate_inventory_health_score(session, metrics):
 @inventory_analytics_bp.route("/api/inventory/generate_alerts", methods=["POST"])
 def generate_inventory_alerts():
     """Generate health alerts from current inventory analysis."""
-    session = None
     try:
-        session = db.session()
         logger.info("Starting automatic alert generation")
 
-        # Clear old alerts (keep resolved/dismissed ones)
-        old_alerts_deleted = (
-            session.query(InventoryHealthAlert)
-            .filter(InventoryHealthAlert.status == "active")
-            .delete()
-        )
-
+        # Use upsert pattern instead of delete-all-recreate to prevent duplicates
         alerts_created = 0
+        alerts_updated = 0
 
-        # Get stale items and create alerts
+        # Get stale items and create/update alerts
         stale_response = get_stale_items_simple()
         stale_data = stale_response.get_json()
 
         if stale_data and "items" in stale_data:
             for item in stale_data["items"]:
-                # Determine severity based on days since scan
-                days = item["days_since_scan"]
-                if days > 180:
-                    severity = "critical"
-                    action = f"Item not scanned in {days} days. Verify location and condition immediately."
-                elif days > 90:
-                    severity = "high"
-                    action = f"Item not scanned in {days} days. Schedule inspection and update location."
-                elif days > 60:
-                    severity = "medium"
-                    action = f"Item overdue for scanning. Verify status and scan if available."
-                else:
-                    severity = "low"
-                    action = f"Item approaching stale threshold. Consider scanning during next inventory check."
+                # Process each item with its own isolated session
+                item_session = db.session()
+                try:
+                    # Determine severity based on days since scan
+                    days = item["days_since_scan"]
+                    if days > 180:
+                        severity = "critical"
+                        action = f"Item not scanned in {days} days. Verify location and condition immediately."
+                    elif days > 90:
+                        severity = "high"
+                        action = f"Item not scanned in {days} days. Schedule inspection and update location."
+                    elif days > 60:
+                        severity = "medium"
+                        action = f"Item overdue for scanning. Verify status and scan if available."
+                    else:
+                        severity = "low"
+                        action = f"Item approaching stale threshold. Consider scanning during next inventory check."
 
-                # Use the correct field names from simplified API
-                last_scan_field = item.get("master_last_scan")
-
-                alert = InventoryHealthAlert(
-                    tag_id=item["tag_id"],
-                    common_name=item["common_name"],
-                    category=item["category"],
-                    subcategory=item["subcategory"],
-                    alert_type="stale_item",
-                    severity=severity,
-                    days_since_last_scan=days,
-                    last_scan_date=(
+                    # Use the correct field names from simplified API
+                    last_scan_field = item.get("master_last_scan")
+                    last_scan_date = (
                         datetime.fromisoformat(last_scan_field)
                         if last_scan_field
                         else None
-                    ),
-                    suggested_action=action,
-                    status="active",
-                )
-                session.add(alert)
-                alerts_created += 1
+                    )
+
+                    # Check if alert already exists for this tag_id and alert_type
+                    existing_alert = item_session.query(InventoryHealthAlert).filter(
+                        InventoryHealthAlert.tag_id == item["tag_id"],
+                        InventoryHealthAlert.alert_type == "stale_item",
+                        InventoryHealthAlert.status == "active"
+                    ).first()
+
+                    if existing_alert:
+                        # Update existing alert if data has changed
+                        needs_update = (
+                            existing_alert.severity != severity or
+                            existing_alert.days_since_last_scan != days or
+                            existing_alert.suggested_action != action or
+                            existing_alert.last_scan_date != last_scan_date
+                        )
+                        
+                        if needs_update:
+                            existing_alert.severity = severity
+                            existing_alert.days_since_last_scan = days
+                            existing_alert.last_scan_date = last_scan_date
+                            existing_alert.suggested_action = action
+                            existing_alert.created_at = datetime.now()  # Refresh timestamp
+                            
+                            item_session.commit()
+                            alerts_updated += 1
+                            logger.debug(f"Updated existing alert for tag_id: {item['tag_id']}")
+                    else:
+                        # Use INSERT IGNORE or ON DUPLICATE KEY UPDATE to handle constraints at SQL level
+                        try:
+                            # Try to create new alert using raw SQL to avoid SQLAlchemy batching
+                            insert_sql = """
+                            INSERT INTO inventory_health_alerts 
+                            (tag_id, common_name, category, subcategory, alert_type, severity, 
+                             days_since_last_scan, last_scan_date, suggested_action, status, created_at)
+                            VALUES (%(tag_id)s, %(common_name)s, %(category)s, %(subcategory)s, %(alert_type)s, 
+                                   %(severity)s, %(days_since_last_scan)s, %(last_scan_date)s, %(suggested_action)s, 
+                                   %(status)s, %(created_at)s)
+                            ON DUPLICATE KEY UPDATE
+                                severity = VALUES(severity),
+                                days_since_last_scan = VALUES(days_since_last_scan),
+                                last_scan_date = VALUES(last_scan_date),
+                                suggested_action = VALUES(suggested_action),
+                                created_at = VALUES(created_at)
+                            """
+                            
+                            item_session.execute(text(insert_sql), {
+                                'tag_id': item["tag_id"],
+                                'common_name': item["common_name"],
+                                'category': item["category"],
+                                'subcategory': item["subcategory"],
+                                'alert_type': 'stale_item',
+                                'severity': severity,
+                                'days_since_last_scan': days,
+                                'last_scan_date': last_scan_date,
+                                'suggested_action': action,
+                                'status': 'active',
+                                'created_at': datetime.now()
+                            })
+                            item_session.commit()
+                            alerts_created += 1
+                            logger.debug(f"Upserted alert for tag_id: {item['tag_id']}")
+                            
+                        except Exception as sql_error:
+                            logger.warning(f"SQL upsert failed for tag_id {item['tag_id']}: {str(sql_error)}")
+                            item_session.rollback()
+                            # Fall back to ORM approach
+                            try:
+                                alert = InventoryHealthAlert(
+                                    tag_id=item["tag_id"],
+                                    common_name=item["common_name"],
+                                    category=item["category"],
+                                    subcategory=item["subcategory"],
+                                    alert_type="stale_item",
+                                    severity=severity,
+                                    days_since_last_scan=days,
+                                    last_scan_date=last_scan_date,
+                                    suggested_action=action,
+                                    status="active",
+                                )
+                                
+                                item_session.add(alert)
+                                item_session.commit()
+                                alerts_created += 1
+                                logger.debug(f"Created new alert via ORM for tag_id: {item['tag_id']}")
+                            except Exception as orm_error:
+                                logger.warning(f"ORM creation also failed for tag_id {item['tag_id']}: {str(orm_error)}")
+                                item_session.rollback()
+
+                except Exception as e:
+                    logger.warning(f"Alert processing failed for tag_id {item['tag_id']}: {str(e)}")
+                    item_session.rollback()
+                    # Continue processing other items
+                finally:
+                    item_session.close()
+
+        # Clean up stale alerts that are no longer relevant using a separate session
+        cleanup_session = db.session()
+        try:
+            current_stale_tag_ids = {item["tag_id"] for item in stale_data.get("items", [])}
+            stale_alerts_cleaned = 0
+            
+            if current_stale_tag_ids:
+                obsolete_alerts = cleanup_session.query(InventoryHealthAlert).filter(
+                    InventoryHealthAlert.alert_type == "stale_item",
+                    InventoryHealthAlert.status == "active",
+                    InventoryHealthAlert.tag_id.notin_(current_stale_tag_ids)
+                ).all()
+                
+                for alert in obsolete_alerts:
+                    alert.status = "resolved"
+                    alert.resolved_at = datetime.now()
+                    stale_alerts_cleaned += 1
+
+            # Commit cleanup operations
+            if stale_alerts_cleaned > 0:
+                cleanup_session.commit()
+                
+        except Exception as e:
+            logger.warning(f"Alert cleanup failed: {str(e)}")
+            cleanup_session.rollback()
+        finally:
+            cleanup_session.close()
 
         # Check for low utilization categories
-        utilization_alerts = check_utilization_patterns(session)
-        alerts_created += utilization_alerts
+        # utilization_alerts = check_utilization_patterns(session)
+        # alerts_created += utilization_alerts
 
-        session.commit()
         logger.info(
-            f"Alert generation complete: {alerts_created} new alerts, {old_alerts_deleted} old alerts cleared"
+            f"Alert generation complete: {alerts_created} new alerts, {alerts_updated} updated, {stale_alerts_cleaned} resolved"
         )
 
+        total_changes = alerts_created + alerts_updated + stale_alerts_cleaned
         return jsonify(
             {
                 "success": True,
                 "alerts_created": alerts_created,
-                "old_alerts_cleared": old_alerts_deleted,
-                "message": f"Generated {alerts_created} health alerts",
+                "alerts_updated": alerts_updated,
+                "stale_alerts_cleaned": stale_alerts_cleaned,
+                "total_changes": total_changes,
+                "message": f"Alert generation complete: {alerts_created} new, {alerts_updated} updated, {stale_alerts_cleaned} resolved",
             }
         )
 
     except Exception as e:
         logger.error(f"Error generating alerts: {str(e)}", exc_info=True)
-        if session:
-            session.rollback()
         return jsonify({"error": str(e)}), 500
-    finally:
-        if session:
-            session.close()
 
 
 def check_utilization_patterns(session):
@@ -1180,33 +1282,79 @@ def check_utilization_patterns(session):
             if stat.total_items and stat.total_items > 0:
                 utilization_rate = (stat.items_on_rent or 0) / stat.total_items
 
-                # Create alert for very low utilization categories
+                # Check for very low utilization categories
                 if (
                     utilization_rate < 0.05 and stat.total_items > 50
                 ):  # Less than 5% utilization with 50+ items
-                    alert = InventoryHealthAlert(
-                        category=stat.category,
-                        subcategory=stat.subcategory,
-                        alert_type="low_usage",
-                        severity="medium",
-                        suggested_action=f"Category has {stat.total_items} items but only {utilization_rate:.1%} utilization. Consider reducing inventory or marketing push.",
-                        status="active",
-                    )
-                    session.add(alert)
-                    alerts_created += 1
+                    
+                    # Check if this alert already exists
+                    existing_low_usage = session.query(InventoryHealthAlert).filter(
+                        InventoryHealthAlert.category == stat.category,
+                        InventoryHealthAlert.subcategory == stat.subcategory,
+                        InventoryHealthAlert.alert_type == "low_usage",
+                        InventoryHealthAlert.status == "active"
+                    ).first()
+                    
+                    action_text = f"Category has {stat.total_items} items but only {utilization_rate:.1%} utilization. Consider reducing inventory or marketing push."
+                    
+                    if existing_low_usage:
+                        # Update if needed
+                        if existing_low_usage.suggested_action != action_text:
+                            existing_low_usage.suggested_action = action_text
+                            existing_low_usage.created_at = datetime.now()
+                    else:
+                        # Create new alert
+                        alert = InventoryHealthAlert(
+                            category=stat.category,
+                            subcategory=stat.subcategory,
+                            alert_type="low_usage",
+                            severity="medium",
+                            suggested_action=action_text,
+                            status="active",
+                        )
+                        try:
+                            session.add(alert)
+                            session.commit()
+                            alerts_created += 1
+                        except Exception as e:
+                            logger.warning(f"Low usage alert creation failed: {str(e)}")
+                            session.rollback()
 
-                # Create alert for very high utilization categories
+                # Check for very high utilization categories
                 elif utilization_rate > 0.9:  # More than 90% utilization
-                    alert = InventoryHealthAlert(
-                        category=stat.category,
-                        subcategory=stat.subcategory,
-                        alert_type="high_usage",
-                        severity="high",
-                        suggested_action=f"Category has {utilization_rate:.1%} utilization. Consider expanding inventory to meet demand.",
-                        status="active",
-                    )
-                    session.add(alert)
-                    alerts_created += 1
+                    
+                    # Check if this alert already exists
+                    existing_high_usage = session.query(InventoryHealthAlert).filter(
+                        InventoryHealthAlert.category == stat.category,
+                        InventoryHealthAlert.subcategory == stat.subcategory,
+                        InventoryHealthAlert.alert_type == "high_usage",
+                        InventoryHealthAlert.status == "active"
+                    ).first()
+                    
+                    action_text = f"Category has {utilization_rate:.1%} utilization. Consider expanding inventory to meet demand."
+                    
+                    if existing_high_usage:
+                        # Update if needed
+                        if existing_high_usage.suggested_action != action_text:
+                            existing_high_usage.suggested_action = action_text
+                            existing_high_usage.created_at = datetime.now()
+                    else:
+                        # Create new alert
+                        alert = InventoryHealthAlert(
+                            category=stat.category,
+                            subcategory=stat.subcategory,
+                            alert_type="high_usage",
+                            severity="high",
+                            suggested_action=action_text,
+                            status="active",
+                        )
+                        try:
+                            session.add(alert)
+                            session.commit()
+                            alerts_created += 1
+                        except Exception as e:
+                            logger.warning(f"High usage alert creation failed: {str(e)}")
+                            session.rollback()
 
         return alerts_created
 
