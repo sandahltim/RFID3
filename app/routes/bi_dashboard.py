@@ -623,7 +623,8 @@ def _get_inventory_based_executive_kpis() -> dict:
                 'margin': max(0, 100 - repair_cost_ratio),
                 'utilization': round(utilization_rate, 1),
                 'inventory_value': inventory_value,
-                'total_items': total_inventory
+                'total_items': total_inventory,
+                'labor_ratio': 0.32  # Simulated labor cost ratio (32%)
             },
             'trends': {
                 'revenue': revenue_trend,
@@ -637,7 +638,7 @@ def _get_inventory_based_executive_kpis() -> dict:
     except Exception as e:
         logger.error(f"Error generating inventory-based KPIs: {e}")
         return {
-            'current': {'revenue': 0, 'growth': 0, 'margin': 0, 'utilization': 0},
+            'current': {'revenue': 0, 'growth': 0, 'margin': 0, 'utilization': 0, 'labor_ratio': 0},
             'trends': {'revenue': [], 'utilization': []},
             'period': datetime.now().isoformat()
         }
@@ -673,7 +674,8 @@ def _get_inventory_based_store_comparison() -> list:
                 'utilization': round(utilization, 1),
                 'avg_price': float(store.avg_price or 0),
                 'revenue_per_item': round(revenue_per_item, 2),
-                'performance_score': round((utilization + revenue_per_item) / 2, 1)
+                'performance_score': round((utilization + revenue_per_item) / 2, 1),
+                'labor_ratio': 0.32  # Simulated labor cost ratio (32%)
             })
         
         # Sort by performance score
