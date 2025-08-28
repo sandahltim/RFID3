@@ -163,10 +163,12 @@ def get_payroll_trends():
             PayrollTrends.total_revenue,
             PayrollTrends.payroll_cost,
             PayrollTrends.labor_efficiency_ratio
-        ).order_by(desc(PayrollTrends.week_ending)).limit(weeks * 4)  # 4 stores
+        )
         
         if store_filter != 'all':
             query = query.filter(PayrollTrends.store_id == store_filter)
+        
+        query = query.order_by(desc(PayrollTrends.week_ending)).limit(weeks * 4)  # 4 stores
         
         results = query.all()
         
