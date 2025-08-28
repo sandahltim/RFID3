@@ -2293,17 +2293,25 @@ function formatNumber(num) {
     return `${(num / 1000000).toFixed(1)}M`;
 }
 
+// Global store name mapping for consistent use across all functions
+const storeNames = {
+    '6800': 'Brooklyn Park',
+    '3607': 'Wayzata', 
+    '8101': 'Fridley',
+    '728': 'Elk River',
+    '000': 'Legacy/Unassigned',
+    'Unassigned': 'Unassigned'
+};
+
 // Initialize business intelligence when page loads
 document.addEventListener('DOMContentLoaded', function() {
     // Initialize main dashboard first
     console.log('DOMContentLoaded: Initializing analytics dashboard');
     window.inventoryAnalytics = new InventoryAnalytics();
     
-    // Load business intelligence data on page load  
-    setTimeout(() => {
-        console.log('Loading business intelligence data');
-        fetchBusinessIntelligence();
-    }, 1000);
+    // Load business intelligence data immediately on page load
+    console.log('Loading business intelligence data immediately');
+    fetchBusinessIntelligence();
     
     // Refresh data when tab becomes active
     document.getElementById('business-intelligence-tab').addEventListener('shown.bs.tab', function() {

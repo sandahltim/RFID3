@@ -715,10 +715,8 @@ document.addEventListener('DOMContentLoaded', function() {
             statusElement.innerHTML = '<span class="efficiency-poor efficiency-indicator">Needs Attention</span>';
         }
         
-        // Operational metrics
-        document.getElementById('new-contracts').textContent = data.operational_metrics.new_contracts;
-        document.getElementById('avg-weekly-contracts').textContent = 
-            data.operational_metrics.avg_weekly_contracts.toFixed(1);
+        // Growth Velocity (will be updated from growth analysis)
+        // Placeholder until growth data is loaded
     }
     
     function updateRevenueChart(trends) {
