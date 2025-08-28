@@ -112,7 +112,7 @@ def get_dashboard_summary():
         # Get basic inventory counts with filters applied
         total_items = base_query.count()
         items_on_rent = base_query.filter(
-            ItemMaster.status.in_(["On Rent", "Delivered"])
+            ItemMaster.status.in_(["On Rent", "Delivered", "Out to Customer"])
         ).count()
         items_available = base_query.filter(
             ItemMaster.status == "Ready to Rent"
