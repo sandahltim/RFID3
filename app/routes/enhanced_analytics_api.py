@@ -9,6 +9,7 @@ from sqlalchemy import func, text, and_, or_
 from datetime import datetime, timedelta
 from .. import db
 from ..models.db_models import ItemMaster, Transaction
+# Note: StorePerformance table may not exist - using inventory data instead
 from ..services.logger import get_logger
 from decimal import Decimal
 import json
