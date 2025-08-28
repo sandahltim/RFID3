@@ -36,7 +36,7 @@ This system provides comprehensive inventory management across 4 store locations
 
 ### **Advanced Features**
 
-- **🏪 Multi-Store Operations**: 4 locations (Brooklyn Park, Wayzata, Anoka, St. Paul)
+- **🏪 Multi-Store Operations**: 4 locations (Brooklyn Park, Wayzata, Fridley, Elk River)
 - **📊 Real-Time Analytics**: Live inventory health monitoring and business intelligence
 - **🔍 Global Filtering**: Store-aware data filtering across all modules
 - **📱 Mobile Ready**: Responsive design for mobile and tablet access
