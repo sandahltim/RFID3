@@ -6,7 +6,7 @@ Handles data import, processing, and KPI calculations
 import csv
 import json
 from datetime import datetime, timedelta, date
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 from typing import Dict, List, Optional, Tuple
 import pandas as pd
 import numpy as np
@@ -81,12 +81,24 @@ class BIAnalyticsService:
 
                         if total_revenue and total_revenue > 0:
                             if payroll_cost:
-                                labor_cost_ratio = float(payroll_cost / total_revenue)
+                                labor_cost_ratio = (
+                                    (Decimal(payroll_cost) / Decimal(total_revenue)).quantize(
+                                        Decimal("0.01"), rounding=ROUND_HALF_UP
+                                    )
+                                )
                             if wage_hours and wage_hours > 0:
-                                revenue_per_hour = float(total_revenue / wage_hours)
+                                revenue_per_hour = (
+                                    (Decimal(total_revenue) / Decimal(wage_hours)).quantize(
+                                        Decimal("0.01"), rounding=ROUND_HALF_UP
+                                    )
+                                )
 
                         if wage_hours and wage_hours > 0 and payroll_cost:
-                            avg_wage_rate = float(payroll_cost / wage_hours)
+                            avg_wage_rate = (
+                                (Decimal(payroll_cost) / Decimal(wage_hours)).quantize(
+                                    Decimal("0.01"), rounding=ROUND_HALF_UP
+                                )
+                            )
 
                         # Insert or update record
                         self._upsert_store_performance(
@@ -230,7 +242,7 @@ class BIAnalyticsService:
             if result and result.total_revenue:
                 # Calculate growth metrics
                 revenue_growth = self._calculate_growth(
-                    period_ending, "total_revenue", result.total_revenue
+                    period_ending, "total_revenue", Decimal(result.total_revenue)
                 )
 
                 # Calculate margins (simplified - would need cost data)
@@ -437,30 +449,32 @@ class BIAnalyticsService:
         if isinstance(value, str):
             value = value.replace("$", "").replace(",", "").strip()
         try:
-            return Decimal(str(value))
-        except:
+            return Decimal(str(value)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        except Exception:
             return None
 
-    def _parse_number(self, value) -> Optional[float]:
-        """Parse number string to float"""
+    def _parse_number(self, value) -> Optional[Decimal]:
+        """Parse number string to Decimal"""
         if pd.isna(value) or value == "":
             return None
         if isinstance(value, str):
             value = value.replace(",", "").strip()
         try:
-            return float(value)
-        except:
+            return Decimal(str(value)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        except Exception:
             return None
 
-    def _parse_percentage(self, value) -> Optional[float]:
-        """Parse percentage string to float"""
+    def _parse_percentage(self, value) -> Optional[Decimal]:
+        """Parse percentage string to Decimal"""
         if pd.isna(value) or value == "":
             return None
         if isinstance(value, str):
             value = value.replace("%", "").strip()
         try:
-            return float(value) / 100
-        except:
+            return (
+                Decimal(str(value)) / Decimal("100")
+            ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        except Exception:
             return None
 
     def _upsert_store_performance(self, **kwargs):
@@ -606,8 +620,8 @@ class BIAnalyticsService:
         db.session.commit()
 
     def _calculate_growth(
-        self, current_date: date, metric: str, current_value: float
-    ) -> Optional[float]:
+        self, current_date: date, metric: str, current_value: Decimal
+    ) -> Optional[Decimal]:
         """Calculate period-over-period growth"""
         try:
             # Get previous period value (2 weeks ago for biweekly)
@@ -622,9 +636,13 @@ class BIAnalyticsService:
             ).fetchone()
 
             if result and result[0]:
-                prev_value = float(result[0])
+                prev_value = Decimal(str(result[0]))
                 if prev_value > 0:
-                    return ((current_value - prev_value) / prev_value) * 100
+                    return (
+                        (Decimal(current_value) - prev_value)
+                        / prev_value
+                        * Decimal("100")
+                    ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
         except Exception as e:
             self.logger.error(f"Error calculating growth: {e}")
 
@@ -653,9 +671,21 @@ class BIAnalyticsService:
                 {
                     "rank": i,
                     "store": row.store_code,
-                    "revenue": float(row.total_revenue) if row.total_revenue else 0,
+                    "revenue": float(
+                        Decimal(row.total_revenue).quantize(
+                            Decimal("0.01"), rounding=ROUND_HALF_UP
+                        )
+                    )
+                    if row.total_revenue
+                    else 0,
                     "efficiency": (
-                        float(row.revenue_per_hour) if row.revenue_per_hour else 0
+                        float(
+                            Decimal(row.revenue_per_hour).quantize(
+                                Decimal("0.01"), rounding=ROUND_HALF_UP
+                            )
+                        )
+                        if row.revenue_per_hour
+                        else 0
                     ),
                 }
             )
@@ -700,7 +730,7 @@ class BIAnalyticsService:
 
     def _get_current_metric_value(
         self, metric_name: str, store_code: Optional[str]
-    ) -> Optional[float]:
+    ) -> Optional[Decimal]:
         """Get current value for a metric"""
         # Map metric to appropriate table and column
         metric_queries = {
@@ -740,7 +770,13 @@ class BIAnalyticsService:
         params = {"store_code": store_code} if store_code else {}
         result = db.session.execute(text(query), params).fetchone()
 
-        return float(result[0]) if result and result[0] else None
+        return (
+            Decimal(str(result[0])).quantize(
+                Decimal("0.01"), rounding=ROUND_HALF_UP
+            )
+            if result and result[0]
+            else None
+        )
 
     def _update_alert_status(self, rule_id: int, status: str):
         """Update alert rule status"""

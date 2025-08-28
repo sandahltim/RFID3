@@ -20,7 +20,7 @@ from sqlalchemy import func, desc, and_, or_, text
 from sqlalchemy.exc import SQLAlchemyError
 from datetime import datetime, timedelta
 import json
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 
 logger = get_logger(__name__)
 
@@ -285,9 +285,9 @@ def get_business_intelligence():
             if all_prices:
                 all_prices.sort()
                 percentile_index = int(0.9 * len(all_prices))
-                price_percentile = float(
-                    all_prices[min(percentile_index, len(all_prices) - 1)]
-                )
+                price_percentile = Decimal(
+                    str(all_prices[min(percentile_index, len(all_prices) - 1)])
+                ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
                 high_value_items = base_query.filter(
                     ItemMaster.sell_price >= price_percentile
@@ -302,7 +302,7 @@ def get_business_intelligence():
         # Convert Decimal objects to float for JSON serialization
         def decimal_to_float(value):
             if isinstance(value, Decimal):
-                return float(value)
+                return float(value.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
             return value
 
         # Build response
