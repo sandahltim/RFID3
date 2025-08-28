@@ -3,9 +3,15 @@ import os
 from logging.handlers import RotatingFileHandler
 from config import LOG_FILE, LOG_DIR
 
-_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+_formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 
-def get_logger(name: str = None, level: int = logging.INFO, log_file: str = None, add_handlers: bool = True) -> logging.Logger:
+
+def get_logger(
+    name: str = None,
+    level: int = logging.INFO,
+    log_file: str = None,
+    add_handlers: bool = True,
+) -> logging.Logger:
     """Return a configured logger with rotating file and console handlers.
 
     Parameters:
@@ -18,12 +24,12 @@ def get_logger(name: str = None, level: int = logging.INFO, log_file: str = None
     # Use default log file if not specified
     if log_file is None:
         log_file = LOG_FILE
-        
+
     # Use the provided name or default to main logger
     logger_name = name if name is not None else __name__
     logger = logging.getLogger(logger_name)
     logger.setLevel(level)
-    
+
     if add_handlers and not logger.handlers:
         # Ensure log directory exists
         os.makedirs(LOG_DIR, exist_ok=True)
@@ -44,17 +50,17 @@ def get_logger(name: str = None, level: int = logging.INFO, log_file: str = None
 def setup_app_logging(app):
     """
     Configure Flask application logging using centralized logger.
-    
+
     Args:
         app: Flask application instance
     """
     # Clear existing handlers to avoid duplicates
-    logging.getLogger('').handlers.clear()
+    logging.getLogger("").handlers.clear()
     app.logger.handlers.clear()
-    
+
     # Setup centralized logging
-    logger = get_logger('rfid_app', logging.DEBUG)
-    
+    logger = get_logger("rfid_app", logging.DEBUG)
+
     # Configure Flask app logger
     app.logger.handlers = logger.handlers
     app.logger.setLevel(logging.DEBUG)
