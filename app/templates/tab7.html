@@ -451,6 +451,9 @@
     }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/moment@2.29.4/moment.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.min.js"></script>
+<link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.css" />
 {% endblock %}
 
 {% block content %}
@@ -489,15 +492,58 @@
                     <option value="12weeks">Last 12 Weeks</option>
                     <option value="52weeks">Last 52 Weeks</option>
                     <option value="ytd">Year to Date</option>
+                    <option value="custom">Custom Date Range</option>
                 </select>
+            </div>
+            <div class="col-md-3" id="custom-date-range" style="display: none;">
+                <label class="form-label">Custom Date Range</label>
+                <input type="text" id="daterange-picker" class="form-control" placeholder="Select date range">
             </div>
             <div class="col-md-6 d-flex align-items-end">
                 <button id="refresh-data" class="btn btn-primary me-2">
                     <i class="fas fa-sync-alt"></i> Refresh Data
                 </button>
-                <button id="export-data" class="btn btn-outline-primary">
+                <button id="export-data" class="btn btn-outline-primary me-2">
                     <i class="fas fa-download"></i> Export Report
                 </button>
+                <button id="compare-periods" class="btn btn-outline-success">
+                    <i class="fas fa-chart-bar"></i> Compare Periods
+                </button>
+            </div>
+        </div>
+        
+        <!-- Period Comparison Section -->
+        <div id="comparison-section" class="row mt-3" style="display: none;">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h6><i class="fas fa-analytics"></i> Period Comparison Analysis</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-3">
+                                <label class="form-label">Comparison Type</label>
+                                <select id="comparison-type" class="form-select">
+                                    <option value="wow">Week over Week</option>
+                                    <option value="mom">Month over Month</option>
+                                    <option value="yoy">Year over Year</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Current Period</label>
+                                <input type="text" id="comparison-daterange" class="form-control" placeholder="Select comparison period">
+                            </div>
+                            <div class="col-md-3 d-flex align-items-end">
+                                <button id="run-comparison" class="btn btn-success">
+                                    <i class="fas fa-play"></i> Run Comparison
+                                </button>
+                            </div>
+                        </div>
+                        <div id="comparison-results" class="mt-4" style="display: none;">
+                            <!-- Comparison results will be displayed here -->
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -639,6 +685,9 @@ document.addEventListener('DOMContentLoaded', function() {
     let revenueChart = null;
     let storePieChart = null;
     
+    // Initialize date range pickers
+    initializeDateRangePickers();
+    
     // Initialize dashboard
     loadExecutiveDashboard();
     
@@ -653,21 +702,38 @@ document.addEventListener('DOMContentLoaded', function() {
         const store = document.getElementById('store-filter').value;
         const period = document.getElementById('period-filter').value;
         
-        try {
-            // Load summary data
-            const summaryResponse = await fetch(`/api/executive/dashboard_summary?store=${store}&period=${period}`);
-            const summaryData = await summaryResponse.json();
-            updateSummaryMetrics(summaryData);
-            
-            // Load trends for chart - convert period to weeks
-            let weeks = 52;
+        // Handle custom date range
+        let apiParams = `store=${store}&period=${period}`;
+        let weeks = 52;
+        
+        if (period === 'custom') {
+            const dateRangePicker = $('#daterange-picker').data('daterangepicker');
+            if (dateRangePicker) {
+                const startDate = dateRangePicker.startDate.format('YYYY-MM-DD');
+                const endDate = dateRangePicker.endDate.format('YYYY-MM-DD');
+                apiParams = `store=${store}&start_date=${startDate}&end_date=${endDate}`;
+                
+                // Calculate approximate weeks for trends chart
+                const daysDiff = dateRangePicker.endDate.diff(dateRangePicker.startDate, 'days');
+                weeks = Math.max(Math.ceil(daysDiff / 7), 4);
+            }
+        } else {
+            // Convert period to weeks
             switch(period) {
                 case '4weeks': weeks = 4; break;
                 case '12weeks': weeks = 12; break;
                 case '52weeks': weeks = 52; break;
                 case 'ytd': weeks = 26; break; // Approximate 6 months
             }
+        }
+        
+        try {
+            // Load summary data
+            const summaryResponse = await fetch(`/api/executive/dashboard_summary?${apiParams}`);
+            const summaryData = await summaryResponse.json();
+            updateSummaryMetrics(summaryData);
             
+            // Load trends for chart
             const trendsResponse = await fetch(`/api/executive/payroll_trends?store=${store}&weeks=${weeks}`);
             const trendsData = await trendsResponse.json();
             updateRevenueChart(trendsData.trends);
@@ -1181,6 +1247,155 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
+    // Initialize date range pickers and comparison functionality
+    function initializeDateRangePickers() {
+        // Period filter change handler
+        document.getElementById('period-filter').addEventListener('change', function() {
+            const customDateRange = document.getElementById('custom-date-range');
+            if (this.value === 'custom') {
+                customDateRange.style.display = 'block';
+            } else {
+                customDateRange.style.display = 'none';
+                loadExecutiveDashboard();
+            }
+        });
+        
+        // Initialize main date range picker
+        $('#daterange-picker').daterangepicker({
+            startDate: moment().subtract(29, 'days'),
+            endDate: moment(),
+            ranges: {
+                'Today': [moment(), moment()],
+                'Yesterday': [moment().subtract(1, 'days'), moment().subtract(1, 'days')],
+                'Last 7 Days': [moment().subtract(6, 'days'), moment()],
+                'Last 30 Days': [moment().subtract(29, 'days'), moment()],
+                'This Month': [moment().startOf('month'), moment().endOf('month')],
+                'Last Month': [moment().subtract(1, 'month').startOf('month'), moment().subtract(1, 'month').endOf('month')],
+                'This Quarter': [moment().startOf('quarter'), moment().endOf('quarter')],
+                'Last Quarter': [moment().subtract(1, 'quarter').startOf('quarter'), moment().subtract(1, 'quarter').endOf('quarter')]
+            }
+        }, function(start, end, label) {
+            console.log('Date range selected: ' + start.format('YYYY-MM-DD') + ' to ' + end.format('YYYY-MM-DD'));
+            loadExecutiveDashboard();
+        });
+        
+        // Initialize comparison date range picker  
+        $('#comparison-daterange').daterangepicker({
+            startDate: moment().subtract(29, 'days'),
+            endDate: moment(),
+            ranges: {
+                'Last 7 Days': [moment().subtract(6, 'days'), moment()],
+                'Last 30 Days': [moment().subtract(29, 'days'), moment()],
+                'This Month': [moment().startOf('month'), moment().endOf('month')],
+                'Last Month': [moment().subtract(1, 'month').startOf('month'), moment().subtract(1, 'month').endOf('month')],
+                'This Quarter': [moment().startOf('quarter'), moment().endOf('quarter')],
+                'This Year': [moment().startOf('year'), moment().endOf('year')]
+            }
+        });
+        
+        // Compare periods button
+        document.getElementById('compare-periods').addEventListener('click', function() {
+            const comparisonSection = document.getElementById('comparison-section');
+            if (comparisonSection.style.display === 'none') {
+                comparisonSection.style.display = 'block';
+            } else {
+                comparisonSection.style.display = 'none';
+            }
+        });
+        
+        // Run comparison button
+        document.getElementById('run-comparison').addEventListener('click', runPeriodComparison);
+    }
+    
+    function runPeriodComparison() {
+        const comparisonType = document.getElementById('comparison-type').value;
+        const dateRange = $('#comparison-daterange').data('daterangepicker');
+        const store = document.getElementById('store-filter').value;
+        
+        const startDate = dateRange.startDate.format('YYYY-MM-DD');
+        const endDate = dateRange.endDate.format('YYYY-MM-DD');
+        
+        console.log(`Running ${comparisonType.toUpperCase()} comparison for ${startDate} to ${endDate}`);
+        
+        fetch(`/api/executive/period_comparison?type=${comparisonType}&current_start=${startDate}&current_end=${endDate}&store=${store}`)
+            .then(response => response.json())
+            .then(data => {
+                displayComparisonResults(data);
+            })
+            .catch(error => {
+                console.error('Error running period comparison:', error);
+                document.getElementById('comparison-results').innerHTML = 
+                    '<div class="alert alert-danger">Error running comparison analysis</div>';
+            });
+    }
+    
+    function displayComparisonResults(data) {
+        const resultsDiv = document.getElementById('comparison-results');
+        resultsDiv.style.display = 'block';
+        
+        const formatCurrency = (amount) => new Intl.NumberFormat('en-US', { 
+            style: 'currency', 
+            currency: 'USD',
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 0
+        }).format(amount);
+        
+        const formatPercent = (value) => {
+            const color = value >= 0 ? 'text-success' : 'text-danger';
+            const icon = value >= 0 ? 'fa-arrow-up' : 'fa-arrow-down';
+            return `<span class="${color}"><i class="fas ${icon}"></i> ${Math.abs(value).toFixed(1)}%</span>`;
+        };
+        
+        resultsDiv.innerHTML = `
+            <div class="row">
+                <div class="col-12">
+                    <h6>${data.comparison_type} Analysis</h6>
+                    <p class="text-muted">Comparing ${data.current_period.start_date} to ${data.current_period.end_date} vs ${data.compare_period.start_date} to ${data.compare_period.end_date}</p>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-md-3">
+                    <div class="metric-card text-center">
+                        <div class="metric-value">${formatCurrency(data.current_period.metrics.revenue)}</div>
+                        <div class="metric-label">Current Revenue</div>
+                        <div class="mt-2">${formatPercent(data.changes.revenue)}</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="metric-card text-center">
+                        <div class="metric-value">${formatCurrency(data.current_period.metrics.profit)}</div>
+                        <div class="metric-label">Current Profit</div>
+                        <div class="mt-2">${formatPercent(data.changes.profit)}</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="metric-card text-center">
+                        <div class="metric-value">${data.current_period.metrics.profit_margin.toFixed(1)}%</div>
+                        <div class="metric-label">Profit Margin</div>
+                        <div class="mt-2">${formatPercent(data.changes.profit_margin)}</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="metric-card text-center">
+                        <div class="metric-value">$${data.current_period.metrics.revenue_per_hour.toFixed(2)}</div>
+                        <div class="metric-label">Revenue/Hour</div>
+                        <div class="mt-2">${formatPercent(data.changes.revenue_per_hour)}</div>
+                    </div>
+                </div>
+            </div>
+            <div class="row mt-3">
+                <div class="col-12">
+                    <div class="alert alert-info">
+                        <strong>Summary:</strong> 
+                        Revenue ${data.changes.revenue >= 0 ? 'increased' : 'decreased'} by ${formatCurrency(Math.abs(data.summary.total_revenue_change))} 
+                        and profit ${data.changes.profit >= 0 ? 'increased' : 'decreased'} by ${formatCurrency(Math.abs(data.summary.total_profit_change))} 
+                        compared to the previous ${data.comparison_type.toLowerCase().replace('o', ' over ')}.
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
     // Auto-refresh every 5 minutes
     setInterval(loadExecutiveDashboard, 300000);
 });
