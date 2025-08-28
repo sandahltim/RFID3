@@ -72,6 +72,11 @@ class ItemMaster(db.Model):
 
 class Transaction(db.Model):
     __tablename__ = "id_transactions"
+    __table_args__ = (
+        db.Index("ix_transactions_tag_id", "tag_id"),
+        db.Index("ix_transactions_scan_date", "scan_date"),
+        db.Index("ix_transactions_status", "status"),
+    )
 
     id = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
     contract_number = db.Column(db.String(255))
