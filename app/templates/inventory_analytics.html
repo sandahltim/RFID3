@@ -1697,7 +1697,7 @@ function updateStoreDistributionChart(storeData) {
     // Map store codes to readable names
     const storeNames = {
         '6800': 'Brooklyn Park',
-        '3607': 'Wayzata', 
+        '3607': 'Wayzata',
         '8101': 'Fridley',
         '728': 'Elk River',
         '000': 'Legacy/Unassigned',
@@ -1847,10 +1847,7 @@ function generateBusinessInsights(data) {
     // Store insights
     const topStore = stores.reduce((max, store) => store.item_count > max.item_count ? store : max, stores[0] || {});
     if (topStore.store_code) {
-        const storeName = topStore.store_code === '6800' ? 'Brooklyn Park' : 
-                         topStore.store_code === '3607' ? 'Wayzata' : 
-                         topStore.store_code === '8101' ? 'Fridley' : 
-                         topStore.store_code === '728' ? 'Elk River' : topStore.store_code;
+        const storeName = storeNames[topStore.store_code] || topStore.store_code;
         insights.push(`<strong>${storeName}</strong> leads with ${formatNumber(topStore.item_count)} items`);
     }
     

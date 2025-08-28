@@ -20,13 +20,8 @@ tab7_bp = Blueprint('tab7', __name__)
 logger.info("Deployed tab7.py (Executive Dashboard) version: 2025-08-27-v1 at %s", 
             datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
 
-# Store mappings for display
-STORE_MAPPING = {
-    '6800': 'Brooklyn Park',
-    '3607': 'Wayzata', 
-    '8101': 'Anoka',
-    '728': 'St. Paul'
-}
+# Import centralized store configuration
+from ..config.stores import STORE_MAPPING, get_store_name
 
 @tab7_bp.route('/tab/7')
 def tab7_view():

@@ -1,16 +1,16 @@
 # TABLE: employees
 employee_id,name,initials,score,role,active,last_decay_date
 E001,Tim Sandahl,ts,50,master,1,
-E002,David House,dh,49,supervisor,1,2025-08-27 00:36:54
+E002,David House,dh,53,supervisor,1,2025-08-27 00:36:54
 E003,Reggie Robinson,rr,38,supervisor,1,2025-08-27 00:36:54
 E004,Tom Wells,tw,45,supervisor,1,2025-08-27 00:36:54
-E005,Ali Al-Arahawi Crew #1,aa,52,driver,1,2025-08-27 00:36:54
+E005,Ali Al-Arahawi Crew #1,aa,56,driver,1,2025-08-27 00:36:54
 E006,Dominique Terry Crew # 2,dt,57,driver,1,2025-08-27 00:36:54
-E007,Saul Sanchez,ss,57,laborer,1,2025-08-27 00:36:54
-E008,ZaQuan Clemons,zc,28,laborer,1,2025-08-27 00:36:54
-E009,Javaris Taylor,jt,47,laborer,1,2025-08-27 00:36:54
+E007,Saul Sanchez,ss,61,laborer,1,2025-08-27 00:36:54
+E008,ZaQuan Clemons,zc,32,laborer,1,2025-08-27 00:36:54
+E009,Javaris Taylor,jt,51,laborer,1,2025-08-27 00:36:54
 E010,Javonz Northington,jn,46,laborer,1,2025-08-27 00:36:54
-E012,Jeremiah Wells,jw,45,laborer,1,2025-08-27 00:36:54
+E012,Jeremiah Wells,jw,52,laborer,1,2025-08-27 00:36:54
 E013,Chelisa Williams,cw,49,laborer,1,2025-08-27 00:36:54
 E014,AJ Nelson,an,54,laborer,0,2025-08-08 00:54:12
 
@@ -535,13 +535,24 @@ vote_id,voter_initials,recipient_id,vote_value,vote_date
 548,rr,E004,1,2025-08-27 08:14:23
 549,rr,E003,0,2025-08-27 08:14:23
 550,rr,E008,1,2025-08-27 08:14:23
+551,dh,E006,0,2025-08-27 11:31:18
+552,dh,E007,1,2025-08-27 11:31:18
+553,dh,E005,0,2025-08-27 11:31:18
+554,dh,E013,-1,2025-08-27 11:31:18
+555,dh,E002,0,2025-08-27 11:31:18
+556,dh,E009,0,2025-08-27 11:31:18
+557,dh,E010,-1,2025-08-27 11:31:18
+558,dh,E012,1,2025-08-27 11:31:18
+559,dh,E004,0,2025-08-27 11:31:18
+560,dh,E003,0,2025-08-27 11:31:18
+561,dh,E008,0,2025-08-27 11:31:18
 
 # TABLE: voting_sessions
 session_id,vote_code,admin_id,start_time,end_time
 5,active,admin2,2025-08-06 07:55:24,2025-08-06 08:53:12
 6,active,admin2,2025-08-13 06:57:48,2025-08-14 08:38:30
 7,active,admin2,2025-08-21 07:55:57,2025-08-21 08:31:51
-8,active,admin2,2025-08-27 07:46:32,
+8,active,admin2,2025-08-27 07:46:32,2025-08-27 11:31:18
 
 # TABLE: score_history
 history_id,employee_id,changed_by,points,reason,notes,date,month_year
@@ -864,6 +875,17 @@ history_id,employee_id,changed_by,points,reason,notes,date,month_year
 328,E002,system,-1,Daily point decay for Supervisor,,2025-08-27 00:36:54,2025-08
 329,E003,system,-1,Daily point decay for Supervisor,,2025-08-27 00:36:54,2025-08
 330,E004,system,-1,Daily point decay for Supervisor,,2025-08-27 00:36:54,2025-08
+331,E006,0,0,Voting result,,2025-08-27 11:31:18,2025-08
+332,E007,0,4,Voting result,,2025-08-27 11:31:18,2025-08
+333,E005,0,4,Voting result,,2025-08-27 11:31:18,2025-08
+334,E013,0,0,Voting result,,2025-08-27 11:31:18,2025-08
+335,E002,0,4,Voting result,,2025-08-27 11:31:18,2025-08
+336,E009,0,4,Voting result,,2025-08-27 11:31:18,2025-08
+337,E010,0,0,Voting result,,2025-08-27 11:31:18,2025-08
+338,E012,0,7,Voting result,,2025-08-27 11:31:18,2025-08
+339,E004,0,0,Voting result,,2025-08-27 11:31:18,2025-08
+340,E003,0,0,Voting result,,2025-08-27 11:31:18,2025-08
+341,E008,0,4,Voting result,,2025-08-27 11:31:18,2025-08
 
 # TABLE: incentive_rules
 rule_id,description,points,details,display_order
