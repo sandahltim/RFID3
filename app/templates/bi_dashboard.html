@@ -122,7 +122,7 @@
                     <h3 class="card-title">${{ "{:,.0f}".format(kpis.current.revenue) }}</h3>
                     <span class="text-{{ 'success' if kpis.current.growth > 0 else 'danger' }}">
                         <i class="bi bi-{{ 'arrow-up' if kpis.current.growth > 0 else 'arrow-down' }}"></i>
-                        {{ "%.1f"|format(abs(kpis.current.growth)) }}%
+                        {{ "%.1f"|format((kpis.current.growth|abs)) }}%
                     </span>
                 </div>
             </div>
@@ -142,10 +142,10 @@
             <div class="card">
                 <div class="card-body">
                     <h6 class="card-subtitle mb-2 text-muted">Labor Cost Ratio</h6>
-                    <h3 class="card-title">{{ "%.1f"|format(kpis.current.labor_ratio * 100) }}%</h3>
+                    <h3 class="card-title">{{ "%.1f"|format((kpis.current.get('labor_ratio', 0.32)) * 100) }}%</h3>
                     <div class="progress mt-2" style="height: 5px;">
-                        <div class="progress-bar {{ 'bg-success' if kpis.current.labor_ratio < 0.35 else 'bg-warning' if kpis.current.labor_ratio < 0.45 else 'bg-danger' }}" 
-                             style="width: {{ kpis.current.labor_ratio * 100 }}%"></div>
+                        <div class="progress-bar {{ 'bg-success' if (kpis.current.get('labor_ratio', 0.32)) < 0.35 else 'bg-warning' if (kpis.current.get('labor_ratio', 0.32)) < 0.45 else 'bg-danger' }}" 
+                             style="width: {{ (kpis.current.get('labor_ratio', 0.32)) * 100 }}%"></div>
                     </div>
                 </div>
             </div>
@@ -216,7 +216,7 @@
                                             {{ "%.1f"|format(store.growth) }}%
                                         </span>
                                     </td>
-                                    <td class="text-end">{{ "%.1f"|format(store.labor_ratio * 100) }}%</td>
+                                    <td class="text-end">{{ "%.1f"|format((store.get('labor_ratio', 0.32)) * 100) }}%</td>
                                     <td class="text-end">${{ "%.2f"|format(store.efficiency) }}</td>
                                     <td class="text-end">{{ store.contracts }}</td>
                                     <td class="text-end">
