@@ -2,23 +2,44 @@
 
 {% block title %}Executive Dashboard - Business Intelligence{% endblock %}
 
+{% block extra_head %}
+<!-- Executive Dashboard Enhanced Styles and Scripts -->
+<link href="{{ url_for('static', filename='css/executive-dashboard.css') }}" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.min.js"></script>
+<script src="{{ url_for('static', filename='js/chart-utilities.js') }}"></script>
+{% endblock %}
+
 {% block content %}
-<div class="container-fluid mt-4">
-    <!-- Header Section -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <h1 class="h2 mb-3">Executive Business Intelligence Dashboard</h1>
-            <div class="d-flex justify-content-between align-items-center">
-                <div>
-                    <span class="text-muted">Period Ending: {{ kpis.period }}</span>
-                </div>
-                <div>
-                    <button class="btn btn-primary" onclick="refreshDashboard()">
-                        <i class="bi bi-arrow-clockwise"></i> Refresh
-                    </button>
-                    <button class="btn btn-outline-secondary" onclick="exportReport()">
-                        <i class="bi bi-download"></i> Export Report
-                    </button>
+<div class="container-fluid executive-dashboard mt-4">
+    <!-- Enhanced Executive Header -->
+    <div class="dashboard-header">
+        <div class="container-fluid">
+            <div class="row">
+                <div class="col-12">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h1 class="display-6 mb-2">
+                                <i class="fas fa-chart-line me-3"></i>
+                                Executive Business Intelligence
+                            </h1>
+                            <p class="mb-0 opacity-90">
+                                <i class="fas fa-calendar-alt me-2"></i>
+                                Period Ending: <strong>{{ kpis.period or 'Current Week' }}</strong>
+                                <span class="mx-3">|</span>
+                                <span class="data-refresh-indicator live" id="refreshStatus">
+                                    <i class="fas fa-circle"></i> Live Data
+                                </span>
+                            </p>
+                        </div>
+                        <div>
+                            <button class="btn btn-light btn-executive me-2" onclick="refreshDashboard()">
+                                <i class="fas fa-sync-alt"></i> Refresh
+                            </button>
+                            <button class="btn btn-outline-light" onclick="exportReport()">
+                                <i class="fas fa-download"></i> Export
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -45,9 +66,56 @@
     </div>
     {% endif %}
 
-    <!-- Key Performance Indicators -->
+    <!-- Executive KPI Scorecard -->
+    <div id="executive-kpis" class="mb-4">
+        <!-- KPIs will be populated by JavaScript -->
+    </div>
+
+    <!-- Quick Actions Panel -->
     <div class="row mb-4">
-        <div class="col-md-2">
+        <div class="col-12">
+            <div class="filter-controls">
+                <div class="row align-items-end">
+                    <div class="col-md-3">
+                        <label class="form-label fw-semibold">Time Period</label>
+                        <select class="form-control" id="periodFilter" onchange="updateDashboardPeriod()">
+                            <option value="4">Last 4 Weeks</option>
+                            <option value="12" selected>Last 12 Weeks</option>
+                            <option value="26">Last 26 Weeks</option>
+                            <option value="52">Last Year</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label fw-semibold">Store Filter</label>
+                        <select class="form-control" id="storeFilter" onchange="updateDashboardFilters()">
+                            <option value="all">All Stores</option>
+                            <option value="6800">Brooklyn Park</option>
+                            <option value="3607">Wayzata</option>
+                            <option value="8101">Fridley</option>
+                            <option value="728">Elk River</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label fw-semibold">Auto Refresh</label>
+                        <div class="form-check form-switch mt-2">
+                            <input class="form-check-input" type="checkbox" id="autoRefreshToggle" checked onchange="toggleAutoRefresh()">
+                            <label class="form-check-label" for="autoRefreshToggle">
+                                Every 5 minutes
+                            </label>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label fw-semibold">&nbsp;</label>
+                        <div>
+                            <button class="btn btn-executive" onclick="refreshDashboard()">
+                                <i class="fas fa-sync-alt"></i> Refresh Now
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
             <div class="card">
                 <div class="card-body">
                     <h6 class="card-subtitle mb-2 text-muted">Total Revenue</h6>
@@ -174,49 +242,96 @@
         </div>
     </div>
 
-    <!-- Charts Row -->
+    <!-- Executive Analytics Charts -->
     <div class="row mb-4">
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="mb-0">Revenue Trend (12 Weeks)</h5>
+        <div class="col-lg-8">
+            <div class="chart-container">
+                <div class="chart-header">
+                    <h5>
+                        <i class="fas fa-chart-line"></i>
+                        Revenue Performance Trend
+                    </h5>
+                    <div class="data-refresh-indicator" id="revenueChartStatus">
+                        <i class="fas fa-circle"></i> Live
+                    </div>
                 </div>
-                <div class="card-body">
-                    <canvas id="revenueTrendChart" height="100"></canvas>
+                <div class="chart-body">
+                    <canvas id="revenueTrendChart"></canvas>
                 </div>
             </div>
         </div>
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="mb-0">Labor Efficiency by Store</h5>
+        <div class="col-lg-4">
+            <div class="chart-container">
+                <div class="chart-header">
+                    <h5>
+                        <i class="fas fa-tachometer-alt"></i>
+                        Overall Utilization
+                    </h5>
                 </div>
-                <div class="card-body">
-                    <canvas id="laborEfficiencyChart" height="100"></canvas>
+                <div class="chart-body">
+                    <canvas id="utilizationGauge"></canvas>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Predictive Analytics -->
     <div class="row mb-4">
         <div class="col-md-6">
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="mb-0">Revenue Forecast (Next 4 Weeks)</h5>
+            <div class="chart-container">
+                <div class="chart-header">
+                    <h5>
+                        <i class="fas fa-store"></i>
+                        Store Performance Comparison
+                    </h5>
                 </div>
-                <div class="card-body">
-                    <canvas id="forecastChart" height="100"></canvas>
+                <div class="chart-body">
+                    <canvas id="storePerformanceChart"></canvas>
                 </div>
             </div>
         </div>
         <div class="col-md-6">
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="mb-0">Top Inventory Classes by ROI</h5>
+            <div class="chart-container">
+                <div class="chart-header">
+                    <h5>
+                        <i class="fas fa-boxes"></i>
+                        Inventory Distribution
+                    </h5>
                 </div>
-                <div class="card-body">
-                    <div id="inventoryROI"></div>
+                <div class="chart-body">
+                    <canvas id="inventoryDistributionChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Predictive Analytics and Business Intelligence -->
+    <div class="row mb-4">
+        <div class="col-lg-8">
+            <div class="chart-container">
+                <div class="chart-header">
+                    <h5>
+                        <i class="fas fa-crystal-ball"></i>
+                        Revenue Forecast & Predictive Analytics
+                    </h5>
+                    <div class="data-refresh-indicator info" id="forecastChartStatus">
+                        <i class="fas fa-brain"></i> AI Powered
+                    </div>
+                </div>
+                <div class="chart-body">
+                    <canvas id="forecastChart"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-4">
+            <div class="chart-container">
+                <div class="chart-header">
+                    <h5>
+                        <i class="fas fa-trophy"></i>
+                        Top Performing Categories
+                    </h5>
+                </div>
+                <div class="chart-body">
+                    <div id="topCategoriesDisplay"></div>
                 </div>
             </div>
         </div>
@@ -407,7 +522,16 @@ fetch('/bi/api/inventory-analytics')
                 </div>
             </div>
         `).join('');
-        document.getElementById('inventoryROI').innerHTML = roiHtml;
-    });
+</script>
+
+<!-- Enhanced Page Cleanup -->
+<script>
+// Cleanup resources when page unloads
+window.addEventListener('beforeunload', function() {
+    if (window.chartManager) {
+        window.chartManager.destroyAllCharts();
+        window.chartManager.disableAutoRefresh();
+    }
+});
 </script>
 {% endblock %}
