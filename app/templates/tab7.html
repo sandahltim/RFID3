@@ -659,8 +659,16 @@ document.addEventListener('DOMContentLoaded', function() {
             const summaryData = await summaryResponse.json();
             updateSummaryMetrics(summaryData);
             
-            // Load trends for chart
-            const trendsResponse = await fetch(`/api/executive/payroll_trends?store=${store}&weeks=52`);
+            // Load trends for chart - convert period to weeks
+            let weeks = 52;
+            switch(period) {
+                case '4weeks': weeks = 4; break;
+                case '12weeks': weeks = 12; break;
+                case '52weeks': weeks = 52; break;
+                case 'ytd': weeks = 26; break; // Approximate 6 months
+            }
+            
+            const trendsResponse = await fetch(`/api/executive/payroll_trends?store=${store}&weeks=${weeks}`);
             const trendsData = await trendsResponse.json();
             updateRevenueChart(trendsData.trends);
             

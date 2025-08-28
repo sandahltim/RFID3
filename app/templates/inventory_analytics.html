@@ -1842,8 +1842,18 @@ function refreshAnalyticsData() {
 }
 
 // Fetch business intelligence data with real POS data
-function fetchBusinessIntelligence() {\n    // Phase 1B: Progressive loading implementation
-    const params = GlobalFilters.getUrlParams();
+function fetchBusinessIntelligence() {
+    // Phase 1B: Progressive loading implementation
+    let params = '';
+    try {
+        if (window.GlobalFilters && typeof GlobalFilters.getUrlParams === 'function') {
+            params = GlobalFilters.getUrlParams();
+        }
+    } catch (error) {
+        console.warn('GlobalFilters not available, using default parameters:', error);
+        params = '';
+    }
+    
     const url = `/api/inventory/business_intelligence${params ? '?' + params : ''}`;
     
     console.log('Fetching business intelligence from:', url);\n    \n    // Phase 1B: Start progress loading sequence\n    if (window.inventoryAnalytics) {\n        window.inventoryAnalytics.showProgressLoader('business-insights', 3, 1, '<1 sec');\n        // Simulate progressive steps for better UX\n        setTimeout(() => window.inventoryAnalytics.showProgressLoader('business-insights', 3, 2, '<1 sec'), 200);\n        setTimeout(() => window.inventoryAnalytics.showProgressLoader('business-insights', 3, 3, '<1 sec'), 400);\n    }
