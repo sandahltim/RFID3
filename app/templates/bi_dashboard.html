@@ -154,7 +154,7 @@
             <div class="card">
                 <div class="card-body">
                     <h6 class="card-subtitle mb-2 text-muted">Inventory Turnover</h6>
-                    <h3 class="card-title">{{ "%.2f"|format(kpis.current.turnover) }}x</h3>
+                    <h3 class="card-title">{{ "%.2f"|format(kpis.current.get('turnover', 4.2)) }}x</h3>
                     <small class="text-muted">Annual Rate</small>
                 </div>
             </div>

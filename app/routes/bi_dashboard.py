@@ -26,8 +26,16 @@ def executive_dashboard():
         weeks = int(request.args.get('weeks', 12))
         
         # Use inventory-based executive metrics instead of missing BI tables
+        logger.info("🔍 DEBUG: Fetching executive KPIs...")
         kpis = _get_inventory_based_executive_kpis()
+        logger.info(f"🔍 DEBUG: KPIs fetched: {type(kpis)} - keys: {kpis.keys() if isinstance(kpis, dict) else 'not dict'}")
+        
+        logger.info("🔍 DEBUG: Fetching store comparison...")
         store_comparison = _get_inventory_based_store_comparison()
+        logger.info(f"🔍 DEBUG: Store comparison fetched: {len(store_comparison)} stores")
+        if store_comparison:
+            logger.info(f"🔍 DEBUG: First store keys: {store_comparison[0].keys() if store_comparison else 'empty'}")
+        
         alerts = _get_inventory_based_alerts()  # Use our own alerts instead of bi_service
         predictions = _get_inventory_based_predictions()
         
@@ -624,7 +632,8 @@ def _get_inventory_based_executive_kpis() -> dict:
                 'utilization': round(utilization_rate, 1),
                 'inventory_value': inventory_value,
                 'total_items': total_inventory,
-                'labor_ratio': 0.32  # Simulated labor cost ratio (32%)
+                'labor_ratio': 0.32,  # Simulated labor cost ratio (32%)
+                'turnover': 4.2  # Simulated inventory turnover rate (4.2x annually)
             },
             'trends': {
                 'revenue': revenue_trend,
