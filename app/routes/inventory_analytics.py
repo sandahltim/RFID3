@@ -61,6 +61,16 @@ def inventory_analytics_view():
 @handle_api_error
 def get_dashboard_summary():
     """Get high-level dashboard metrics with store and inventory type filtering."""
+    
+    # Check if we should use backup data during refresh
+    try:
+        from ..services.backup_fallback import backup_service
+        if backup_service.should_use_backup():
+            logger.info("API refresh in progress, using backup data")
+            return jsonify(backup_service.load_backup_data())
+    except Exception as e:
+        logger.warning(f"Backup fallback failed, proceeding with live data: {e}")
+    
     session = None
     try:
         session = db.session()
