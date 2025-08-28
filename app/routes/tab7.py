@@ -79,8 +79,16 @@ def get_executive_summary():
         
         logger.info(f"Fetching executive summary: store={store_filter}, period={period}")
         
-        # Calculate date range based on period
-        end_date = datetime.now().date()
+        # Calculate date range based on period - use actual latest data date instead of today
+        latest_data_date = session.query(func.max(PayrollTrends.week_ending)).filter(
+            PayrollTrends.total_revenue > 0
+        ).scalar()
+        
+        if not latest_data_date:
+            # Fallback to today if no data found
+            latest_data_date = datetime.now().date()
+            
+        end_date = latest_data_date
         if period == '4weeks':
             start_date = end_date - timedelta(weeks=4)
         elif period == '12weeks':
@@ -305,7 +313,15 @@ def get_store_comparison():
         session = db.session()
         period_weeks = int(request.args.get('weeks', 4))
         
-        end_date = datetime.now().date()
+        # Use actual latest data date instead of today
+        latest_data_date = session.query(func.max(PayrollTrends.week_ending)).filter(
+            PayrollTrends.total_revenue > 0
+        ).scalar()
+        
+        if not latest_data_date:
+            latest_data_date = datetime.now().date()
+            
+        end_date = latest_data_date
         start_date = end_date - timedelta(weeks=period_weeks)
         
         # Get aggregated metrics by store
@@ -413,19 +429,38 @@ def get_growth_analysis():
         
         logger.info(f"Calculating growth analysis for store: {store_filter}")
         
-        # Get current date boundaries
-        end_date = datetime.now().date()
+        # Get current date boundaries - use latest data date instead of today
+        latest_data_date = session.query(func.max(PayrollTrends.week_ending)).filter(
+            PayrollTrends.total_revenue > 0
+        ).scalar()
+        
+        if not latest_data_date:
+            latest_data_date = datetime.now().date()
+        
+        end_date = latest_data_date
         current_week_start = end_date - timedelta(days=7)
         current_month_start = end_date.replace(day=1)
         current_year_start = end_date.replace(month=1, day=1)
         
-        # Previous periods
-        prev_week_start = current_week_start - timedelta(days=7)
-        prev_week_end = current_week_start - timedelta(days=1)
+        # Previous periods - FIXED: WoW compares same week last year (not last week)
+        try:
+            prev_week_start = current_week_start.replace(year=current_week_start.year - 1)
+            prev_week_end = end_date.replace(year=end_date.year - 1)
+        except ValueError:
+            # Handle leap year edge case
+            prev_week_start = current_week_start - timedelta(days=365)
+            prev_week_end = end_date - timedelta(days=365)
+            
         prev_month_start = (current_month_start - timedelta(days=1)).replace(day=1)
         prev_month_end = current_month_start - timedelta(days=1)
-        prev_year_start = current_year_start.replace(year=current_year_start.year - 1)
-        prev_year_end = end_date.replace(year=end_date.year - 1)
+        
+        try:
+            prev_year_start = current_year_start.replace(year=current_year_start.year - 1)
+            prev_year_end = end_date.replace(year=end_date.year - 1)
+        except ValueError:
+            # Handle leap year edge case
+            prev_year_start = current_year_start - timedelta(days=365)
+            prev_year_end = end_date - timedelta(days=365)
         
         def get_period_metrics(start_date, end_date):
             query = session.query(
@@ -1080,15 +1115,31 @@ def get_period_comparison():
         # Calculate comparison period based on type
         period_days = (current_end_date - current_start_date).days
         
-        if comparison_type == 'wow':  # Week over Week
-            compare_start = current_start_date - timedelta(days=7)
-            compare_end = current_end_date - timedelta(days=7)
+        if comparison_type == 'wow':  # Week over Week - FIXED: Compare same week last year vs this year
+            try:
+                compare_start = current_start_date.replace(year=current_start_date.year - 1)
+                compare_end = current_end_date.replace(year=current_end_date.year - 1)
+            except ValueError:
+                # Handle leap year edge case (Feb 29)
+                compare_start = current_start_date - timedelta(days=365)
+                compare_end = current_end_date - timedelta(days=365)
         elif comparison_type == 'mom':  # Month over Month
-            compare_start = current_start_date - timedelta(days=30)
-            compare_end = current_end_date - timedelta(days=30)
+            try:
+                # Compare same month last year
+                compare_start = current_start_date.replace(year=current_start_date.year - 1)
+                compare_end = current_end_date.replace(year=current_end_date.year - 1)
+            except ValueError:
+                # Handle leap year edge case
+                compare_start = current_start_date - timedelta(days=365)
+                compare_end = current_end_date - timedelta(days=365)
         else:  # Year over Year (default)
-            compare_start = current_start_date - timedelta(days=365)
-            compare_end = current_end_date - timedelta(days=365)
+            try:
+                compare_start = current_start_date.replace(year=current_start_date.year - 1)
+                compare_end = current_end_date.replace(year=current_end_date.year - 1)
+            except ValueError:
+                # Handle leap year edge case (Feb 29)
+                compare_start = current_start_date - timedelta(days=365)
+                compare_end = current_end_date - timedelta(days=365)
         
         logger.info(f"Period comparison {comparison_type}: Current {current_start} to {current_end}, Compare {compare_start} to {compare_end}")
         
