@@ -205,7 +205,22 @@ def get_payroll_trends():
         
         logger.info(f"Fetching {weeks} weeks of payroll trends for store: {store_filter}")
         
-        # Get weekly data with comprehensive metrics
+        # Get the latest available data date - CRITICAL FIX for date range calculation
+        latest_data_date = session.query(func.max(PayrollTrends.week_ending)).filter(
+            PayrollTrends.total_revenue > 0
+        ).scalar()
+        
+        if not latest_data_date:
+            # Fallback to today if no data found
+            latest_data_date = datetime.now().date()
+            
+        # Calculate the date range based on the most recent data, not today's date
+        end_date = latest_data_date
+        start_date = end_date - timedelta(weeks=weeks)
+        
+        logger.info(f"Date range for payroll trends: {start_date} to {end_date} (latest data: {latest_data_date})")
+        
+        # Get weekly data with comprehensive metrics - FIXED: Add date filtering
         query = session.query(
             PayrollTrends.week_ending,
             PayrollTrends.store_id,
@@ -215,13 +230,16 @@ def get_payroll_trends():
             PayrollTrends.labor_efficiency_ratio,
             PayrollTrends.revenue_per_hour,
             PayrollTrends.wage_hours
+        ).filter(
+            PayrollTrends.week_ending.between(start_date, end_date),
+            PayrollTrends.total_revenue > 0  # Only include actual data records
         )
         
         if store_filter != 'all':
             query = query.filter(PayrollTrends.store_id == store_filter)
         
         # Order by date ascending for proper time series
-        query = query.order_by(PayrollTrends.week_ending).limit(weeks * 4 if store_filter == 'all' else weeks)
+        query = query.order_by(PayrollTrends.week_ending)
         
         results = query.all()
         
@@ -313,7 +331,7 @@ def get_store_comparison():
         session = db.session()
         period_weeks = int(request.args.get('weeks', 4))
         
-        # Use actual latest data date instead of today
+        # Use actual latest data date instead of today - CONSISTENT FIX
         latest_data_date = session.query(func.max(PayrollTrends.week_ending)).filter(
             PayrollTrends.total_revenue > 0
         ).scalar()
@@ -323,6 +341,8 @@ def get_store_comparison():
             
         end_date = latest_data_date
         start_date = end_date - timedelta(weeks=period_weeks)
+        
+        logger.info(f"Store comparison date range: {start_date} to {end_date} (latest data: {latest_data_date})")
         
         # Get aggregated metrics by store
         store_metrics = session.query(
@@ -644,10 +664,18 @@ def get_store_benchmarking():
         session = db.session()
         period_weeks = int(request.args.get('weeks', 52))  # Full year by default
         
-        end_date = datetime.now().date()
+        # Use actual latest data date instead of today - CONSISTENT FIX
+        latest_data_date = session.query(func.max(PayrollTrends.week_ending)).filter(
+            PayrollTrends.total_revenue > 0
+        ).scalar()
+        
+        if not latest_data_date:
+            latest_data_date = datetime.now().date()
+            
+        end_date = latest_data_date
         start_date = end_date - timedelta(weeks=period_weeks)
         
-        logger.info(f"Generating store benchmarking for {period_weeks} weeks")
+        logger.info(f"Generating store benchmarking for {period_weeks} weeks: {start_date} to {end_date}")
         
         # Get comprehensive store metrics
         store_metrics = session.query(
@@ -768,7 +796,7 @@ def load_historical_data():
 from sqlalchemy import extract
 import calendar
 
-def get_date_range_from_params(request):
+def get_date_range_from_params(request, session=None):
     """Extract and validate date range from request parameters."""
     # Check for custom date range
     start_date_str = request.args.get('start_date')
@@ -782,9 +810,17 @@ def get_date_range_from_params(request):
         except ValueError:
             logger.error(f"Invalid date format: start={start_date_str}, end={end_date_str}")
     
-    # Fall back to period-based selection
+    # Fall back to period-based selection - FIXED: Use latest data date instead of today
     period = request.args.get('period', '4weeks')
-    end_date = datetime.now().date()
+    
+    if session:
+        # Get latest available data date
+        latest_data_date = session.query(func.max(PayrollTrends.week_ending)).filter(
+            PayrollTrends.total_revenue > 0
+        ).scalar()
+        end_date = latest_data_date if latest_data_date else datetime.now().date()
+    else:
+        end_date = datetime.now().date()
     
     if period == '4weeks':
         start_date = end_date - timedelta(weeks=4)
@@ -887,7 +923,7 @@ def get_period_comparison_legacy():
         comparison_type = request.args.get('comparison_type', 'wow')  # wow, mom, yoy, custom
         
         # Get base period dates
-        base_start, base_end = get_date_range_from_params(request)
+        base_start, base_end = get_date_range_from_params(request, session)
         
         if not base_start or not base_end:
             return jsonify({'error': 'Invalid date range specified'}), 400
@@ -1016,7 +1052,7 @@ def get_trending_analysis():
             metrics = ['revenue', 'payroll', 'profit', 'efficiency']
         
         # Get date range
-        start_date, end_date = get_date_range_from_params(request)
+        start_date, end_date = get_date_range_from_params(request, session)
         
         if not start_date or not end_date:
             return jsonify({'error': 'Invalid date range'}), 400
