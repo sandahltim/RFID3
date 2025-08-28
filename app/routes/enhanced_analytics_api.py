@@ -8,7 +8,7 @@ from flask import Blueprint, jsonify, request
 from sqlalchemy import func, text, and_, or_
 from datetime import datetime, timedelta
 from .. import db
-from ..models.db_models import ItemMaster, Transaction, StorePerformance
+from ..models.db_models import ItemMaster, Transaction
 from ..services.logger import get_logger
 from decimal import Decimal
 import json
