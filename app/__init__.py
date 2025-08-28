@@ -100,6 +100,7 @@ def create_app():
         from app.routes.health import health_bp
         from app.routes.tabs import tabs_bp
         from app.routes.inventory_analytics import inventory_analytics_bp
+        from app.routes.enhanced_analytics_api import enhanced_analytics_bp
         from app.routes.performance import performance_bp
         from app.services.refresh import refresh_bp
 
@@ -112,6 +113,7 @@ def create_app():
         app.register_blueprint(tab7_bp)
         app.register_blueprint(categories_bp)
         app.register_blueprint(inventory_analytics_bp)
+        app.register_blueprint(enhanced_analytics_bp)
         app.register_blueprint(health_bp)
         app.register_blueprint(tabs_bp)
         app.register_blueprint(performance_bp)
