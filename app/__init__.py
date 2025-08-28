@@ -119,6 +119,8 @@ def create_app():
         from app.routes.bi_dashboard import bi_bp
         from app.routes.performance import performance_bp
         from app.services.refresh import refresh_bp
+        from app.routes.correlation_routes import correlation_bp
+        from app.routes.pos_routes import pos_bp
 
         app.register_blueprint(home_bp)
         app.register_blueprint(tab1_bp)
@@ -135,6 +137,8 @@ def create_app():
         app.register_blueprint(tabs_bp)
         app.register_blueprint(performance_bp)
         app.register_blueprint(refresh_bp)
+        app.register_blueprint(correlation_bp)
+        app.register_blueprint(pos_bp)
         app.logger.info("Blueprints registered successfully")
 
         # Set up performance monitoring middleware

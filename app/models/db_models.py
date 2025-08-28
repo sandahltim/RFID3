@@ -377,6 +377,27 @@ class ItemUsageHistory(db.Model):
 
 class InventoryHealthAlert(db.Model):
     __tablename__ = "inventory_health_alerts"
+    __table_args__ = (
+        # Unique constraint to prevent duplicate alerts for same item and alert type
+        db.UniqueConstraint(
+            "tag_id", 
+            "alert_type", 
+            "status",
+            name="uq_health_alert_tag_type_status"
+        ),
+        # Unique constraint for category-based alerts (no specific tag_id)
+        db.UniqueConstraint(
+            "category", 
+            "subcategory", 
+            "alert_type", 
+            "status",
+            name="uq_health_alert_category_type_status"
+        ),
+        # Indexes for performance
+        db.Index("ix_health_alert_tag_id_type", "tag_id", "alert_type"),
+        db.Index("ix_health_alert_category_type", "category", "alert_type"),
+        db.Index("ix_health_alert_status_created", "status", "created_at"),
+    )
 
     id = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
     tag_id = db.Column(db.String(255), nullable=True, index=True)
