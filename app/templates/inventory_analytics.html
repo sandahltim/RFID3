@@ -1721,11 +1721,7 @@ function updatePagination(containerId, currentPage, totalPages, onPageChange) {
     });
 }
 
-// Initialize when page loads
-document.addEventListener('DOMContentLoaded', function() {
-    window.inventoryAnalytics = new InventoryAnalytics();
-    
-    // Initialize tabs with fallback for MDB
+// REMOVED: Duplicate initialization moved to single DOMContentLoaded handler below
     function initializeTabs() {
         const triggerTabList = [].slice.call(document.querySelectorAll('#analyticsTab button[data-bs-toggle="tab"]'));
         
@@ -2295,14 +2291,45 @@ function formatNumber(num) {
 
 // Initialize business intelligence when page loads
 document.addEventListener('DOMContentLoaded', function() {
-    // Load business intelligence data on page load
+    // Initialize main dashboard first
+    console.log('DOMContentLoaded: Initializing analytics dashboard');
+    window.inventoryAnalytics = new InventoryAnalytics();
+    
+    // Load business intelligence data on page load  
     setTimeout(() => {
+        console.log('Loading business intelligence data');
         fetchBusinessIntelligence();
     }, 1000);
     
     // Refresh data when tab becomes active
     document.getElementById('business-intelligence-tab').addEventListener('shown.bs.tab', function() {
+        console.log('Business intelligence tab activated, fetching data');
         fetchBusinessIntelligence();
+    });
+    
+    // Initialize tab-specific data loading on tab activation
+    document.addEventListener('shown.bs.tab', function(event) {
+        const targetTab = event.target.getAttribute('data-bs-target') || event.target.getAttribute('href');
+        console.log('Tab activated:', targetTab);
+        
+        switch(targetTab) {
+            case '#health-alerts':
+                console.log('Loading health alerts for tab activation');
+                loadAllHealthAlerts();
+                break;
+            case '#stale-items':
+                console.log('Loading stale items for tab activation');
+                loadAllStaleItems();
+                break;
+            case '#usage-patterns':
+                console.log('Loading usage patterns for tab activation');
+                loadUsagePatterns();
+                break;
+            case '#data-discrepancies':
+                console.log('Loading data discrepancies for tab activation');
+                loadDataDiscrepancies();
+                break;
+        }
     });
 });
 </script>
