@@ -8,8 +8,7 @@ from flask import Blueprint, jsonify, request
 from sqlalchemy import func, text, and_, or_
 from datetime import datetime, timedelta
 from .. import db
-from ..models.db_models import ItemMaster, Transaction
-# Note: StorePerformance table may not exist - using inventory data instead
+from ..models.db_models import ItemMaster, Transaction, PayrollTrends, UserRentalClassMapping
 from ..services.logger import get_logger
 from decimal import Decimal
 import json
@@ -53,17 +52,17 @@ def get_enhanced_kpis():
         if total_items > 0:
             utilization_rate = round((items_on_rent / total_items) * 100, 2)
         
-        # Get revenue data from store performance
+        # Get revenue data from payroll trends
         revenue_query = db.session.query(
-            func.sum(StorePerformance.total_revenue).label('total_revenue'),
-            func.avg(StorePerformance.revenue_per_hour).label('avg_efficiency')
+            func.sum(PayrollTrends.total_revenue).label('total_revenue'),
+            func.avg(PayrollTrends.revenue_per_hour).label('avg_efficiency')
         )
         
         if store_filter != 'all':
-            revenue_query = revenue_query.filter(StorePerformance.store_code == store_filter)
+            revenue_query = revenue_query.filter(PayrollTrends.store_id == store_filter)
         
         revenue_data = revenue_query.filter(
-            StorePerformance.period_ending >= start_date.date()
+            PayrollTrends.week_ending >= start_date.date()
         ).first()
         
         total_revenue = float(revenue_data.total_revenue or 0)
@@ -76,11 +75,11 @@ def get_enhanced_kpis():
             week_end = end_date - timedelta(weeks=i)
             
             week_revenue = db.session.query(
-                func.sum(StorePerformance.total_revenue)
+                func.sum(PayrollTrends.total_revenue)
             ).filter(
                 and_(
-                    StorePerformance.period_ending >= week_start.date(),
-                    StorePerformance.period_ending < week_end.date()
+                    PayrollTrends.week_ending >= week_start.date(),
+                    PayrollTrends.week_ending < week_end.date()
                 )
             ).scalar() or 0
             
@@ -97,14 +96,15 @@ def get_enhanced_kpis():
             if previous_revenue > 0:
                 revenue_growth = ((current_revenue - previous_revenue) / previous_revenue) * 100
         
-        # Get active alerts count
-        active_alerts = db.session.query(
-            func.count()
-        ).select_from(
-            text("inventory_health_alerts")
-        ).filter(
-            text("status = 'active'")
-        ).scalar() or 0
+        # Get active alerts count using raw SQL for safety
+        try:
+            active_alerts_result = db.session.execute(
+                text("SELECT COUNT(*) FROM inventory_health_alerts WHERE status = 'active'")
+            ).scalar()
+            active_alerts = active_alerts_result or 0
+        except Exception:
+            # Table might not exist, fallback to 0
+            active_alerts = 0
         
         return jsonify({
             'success': True,
@@ -163,22 +163,22 @@ def get_store_performance():
         
         # Get store performance data
         store_performance = db.session.query(
-            StorePerformance.store_code,
-            func.avg(StorePerformance.total_revenue).label('avg_revenue'),
-            func.avg(StorePerformance.revenue_per_hour).label('avg_efficiency'),
-            func.avg(StorePerformance.labor_cost_ratio).label('avg_labor_ratio')
+            PayrollTrends.store_id,
+            func.avg(PayrollTrends.total_revenue).label('avg_revenue'),
+            func.avg(PayrollTrends.revenue_per_hour).label('avg_efficiency'),
+            func.avg(PayrollTrends.labor_efficiency_ratio).label('avg_labor_ratio')
         ).filter(
-            StorePerformance.period_ending >= start_date.date()
+            PayrollTrends.week_ending >= start_date.date()
         ).group_by(
-            StorePerformance.store_code
+            PayrollTrends.store_id
         ).all()
         
         # Format store performance data
         stores_data = []
         for store in store_performance:
             stores_data.append({
-                'store_code': store.store_code,
-                'store_name': get_store_name(store.store_code),
+                'store_code': store.store_id,
+                'store_name': get_store_name(store.store_id),
                 'avg_revenue': float(store.avg_revenue or 0),
                 'efficiency': float(store.avg_efficiency or 0),
                 'labor_ratio': float(store.avg_labor_ratio or 0)
@@ -218,7 +218,7 @@ def get_inventory_distribution():
         # Get distribution by status
         status_distribution = base_query.with_entities(
             ItemMaster.status,
-            func.count(ItemMaster.id).label('count')
+            func.count(ItemMaster.tag_id).label('count')
         ).group_by(ItemMaster.status).all()
         
         # Format status distribution
@@ -236,7 +236,7 @@ def get_inventory_distribution():
         if store_filter == 'all':
             store_distribution = base_query.with_entities(
                 ItemMaster.current_store,
-                func.count(ItemMaster.id).label('count')
+                func.count(ItemMaster.tag_id).label('count')
             ).group_by(ItemMaster.current_store).all()
             
             for store_code, count in store_distribution:
@@ -249,7 +249,7 @@ def get_inventory_distribution():
         # Get type distribution
         type_distribution = base_query.with_entities(
             ItemMaster.identifier_type,
-            func.count(ItemMaster.id).label('count')
+            func.count(ItemMaster.tag_id).label('count')
         ).group_by(ItemMaster.identifier_type).all()
         
         type_labels = []
@@ -307,20 +307,23 @@ def get_financial_metrics():
                     ItemMaster.current_store == store_filter)
             )
         
-        # Get financial metrics from POS data
-        financial_metrics = base_query.with_entities(
-            func.sum(ItemMaster.sell_price).label('total_inventory_value'),
-            func.avg(ItemMaster.sell_price).label('avg_sell_price'),
-            func.count(ItemMaster.sell_price).label('items_with_price'),
-            func.sum(
-                func.case(
-                    [(ItemMaster.sell_price >= 1000, ItemMaster.sell_price)],
-                    else_=0
-                )
-            ).label('high_value_inventory')
-        ).filter(
-            ItemMaster.sell_price.isnot(None)
-        ).first()
+        # Get financial metrics from POS data using raw SQL for reliability
+        store_filter_sql = ""
+        if store_filter != 'all':
+            store_filter_sql = f"AND (home_store = '{store_filter}' OR current_store = '{store_filter}')"
+        
+        financial_sql = text(f"""
+            SELECT 
+                SUM(sell_price) as total_inventory_value,
+                AVG(sell_price) as avg_sell_price,
+                COUNT(sell_price) as items_with_price,
+                SUM(CASE WHEN sell_price >= 1000 THEN sell_price ELSE 0 END) as high_value_inventory
+            FROM id_item_master 
+            WHERE sell_price IS NOT NULL {store_filter_sql}
+        """)
+        
+        financial_result = db.session.execute(financial_sql).fetchone()
+        financial_metrics = financial_result if financial_result else (0, 0, 0, 0)
         
         # Calculate repair costs
         repair_cost_query = base_query.filter(
@@ -330,10 +333,10 @@ def get_financial_metrics():
         ).first()
         
         # Format financial data
-        total_inventory_value = float(financial_metrics.total_inventory_value or 0)
-        avg_sell_price = float(financial_metrics.avg_sell_price or 0)
-        items_with_price = int(financial_metrics.items_with_price or 0)
-        high_value_inventory = float(financial_metrics.high_value_inventory or 0)
+        total_inventory_value = float(financial_metrics[0] or 0)
+        avg_sell_price = float(financial_metrics[1] or 0)
+        items_with_price = int(financial_metrics[2] or 0)
+        high_value_inventory = float(financial_metrics[3] or 0)
         repair_inventory_value = float(repair_cost_query.repair_inventory_value or 0)
         
         # Calculate derived metrics
@@ -344,14 +347,14 @@ def get_financial_metrics():
         # Get manufacturer insights
         manufacturer_data = base_query.with_entities(
             ItemMaster.manufacturer,
-            func.count(ItemMaster.id).label('item_count'),
+            func.count(ItemMaster.tag_id).label('item_count'),
             func.sum(ItemMaster.sell_price).label('total_value')
         ).filter(
             ItemMaster.manufacturer.isnot(None)
         ).group_by(
             ItemMaster.manufacturer
         ).order_by(
-            func.count(ItemMaster.id).desc()
+            func.count(ItemMaster.tag_id).desc()
         ).limit(10).all()
         
         top_manufacturers = []
@@ -420,18 +423,24 @@ def get_utilization_analysis():
                     ItemMaster.current_store == store_filter)
             )
         
-        # Calculate utilization by category
-        utilization_by_category = base_query.with_entities(
-            ItemMaster.category,
-            func.count(
-                func.case(
-                    [(ItemMaster.status.in_(['On Rent', 'Delivered']), ItemMaster.id)]
-                )
-            ).label('on_rent_count'),
-            func.count(ItemMaster.id).label('total_count')
-        ).group_by(
-            ItemMaster.category
-        ).all()
+        # Calculate utilization by category using raw SQL for reliability
+        store_filter_sql = ""
+        if store_filter != 'all':
+            store_filter_sql = f"AND (m.home_store = '{store_filter}' OR m.current_store = '{store_filter}')"
+        
+        category_sql = text(f"""
+            SELECT 
+                u.category,
+                COUNT(CASE WHEN m.status IN ('On Rent', 'Delivered') THEN m.tag_id END) as on_rent_count,
+                COUNT(m.tag_id) as total_count
+            FROM user_rental_class_mappings u
+            JOIN id_item_master m ON u.rental_class_id = m.rental_class_num
+            WHERE m.tag_id IS NOT NULL {store_filter_sql}
+            GROUP BY u.category
+            HAVING COUNT(m.tag_id) > 0
+        """)
+        
+        utilization_by_category = db.session.execute(category_sql).fetchall()
         
         category_utilization = []
         for category in utilization_by_category:

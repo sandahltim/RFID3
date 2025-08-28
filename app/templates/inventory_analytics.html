@@ -1,93 +1,95 @@
 {% extends "base.html" %}
+
 {% block title %}Inventory & Analytics{% endblock %}
+
 {% block extra_head %}
-<!-- Include Chart.js for enhanced analytics -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Include Chart.js for enhanced analytics -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-<!-- Load Executive Dashboard CSS for Fortune 500 styling -->
-<link rel="stylesheet" href="/static/css/executive-dashboard.css">
+  <!-- Load Executive Dashboard CSS for Fortune 500 styling -->
+  <link rel="stylesheet" href="/static/css/executive-dashboard.css">
 
-<style>
+  <style>
     /* Fortune 500 Analytics Dashboard Styles */
     :root {
-        --primary-gradient: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
-        --analytics-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        --success-gradient: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
-        --warning-gradient: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-        --info-gradient: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-        --executive-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
-        --card-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
-        --hover-shadow: 0 15px 45px rgba(0, 0, 0, 0.2);
+      --primary-gradient: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+      --analytics-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      --success-gradient: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+      --warning-gradient: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+      --info-gradient: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+      --executive-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+      --card-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+      --hover-shadow: 0 15px 45px rgba(0, 0, 0, 0.2);
     }
     
     body {
-        background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-        min-height: 100vh;
-        font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+      min-height: 100vh;
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
     }
     
     .dashboard-card {
-        background: var(--primary-gradient);
-        border-radius: 20px;
-        color: white;
-        padding: 40px;
-        margin-bottom: 30px;
-        box-shadow: var(--executive-shadow);
-        position: relative;
-        overflow: hidden;
+      background: var(--primary-gradient);
+      border-radius: 20px;
+      color: white;
+      padding: 40px;
+      margin-bottom: 30px;
+      box-shadow: var(--executive-shadow);
+      position: relative;
+      overflow: hidden;
     }
     
     .dashboard-card::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        height: 4px;
-        background: linear-gradient(90deg, #00d4aa, #00a8ff, #8c7ae6, #ff9ff3);
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+      background: linear-gradient(90deg, #00d4aa, #00a8ff, #8c7ae6, #ff9ff3);
     }
     
     .dashboard-card::after {
-        content: '';
-        position: absolute;
-        top: -50%;
-        right: -20%;
-        width: 300px;
-        height: 300px;
-        background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
-        border-radius: 50%;
+      content: '';
+      position: absolute;
+      top: -50%;
+      right: -20%;
+      width: 300px;
+      height: 300px;
+      background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+      border-radius: 50%;
     }
     
     .dashboard-card h1 {
-        font-size: 2.6em;
-        font-weight: 700;
-        margin-bottom: 16px;
-        position: relative;
-        z-index: 2;
+      font-size: 2.6em;
+      font-weight: 700;
+      margin-bottom: 16px;
+      position: relative;
+      z-index: 2;
     }
     
     .metric-card {
-        background: white;
-        border-radius: 16px;
-        padding: 28px;
-        margin-bottom: 20px;
-        box-shadow: var(--card-shadow);
-        transition: all 0.4s cubic-bezier(0.23, 1, 0.320, 1);
-        border: 1px solid rgba(255, 255, 255, 0.8);
-        position: relative;
-        overflow: hidden;
+      background: white;
+      border-radius: 16px;
+      padding: 28px;
+      margin-bottom: 20px;
+      box-shadow: var(--card-shadow);
+      transition: all 0.4s cubic-bezier(0.23, 1, 0.320, 1);
+      border: 1px solid rgba(255, 255, 255, 0.8);
+      position: relative;
+      overflow: hidden;
     }
     
     .metric-card::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        height: 3px;
-        background: var(--analytics-gradient);
-        transform: scaleX(0);
-        transition: transform 0.3s ease;
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: var(--analytics-gradient);
+      transform: scaleX(0);
+      transition: transform 0.3s ease;
     }
     
     .metric-card:hover {
@@ -300,61 +302,61 @@
     .text-warning { color: #ed8936 !important; font-weight: 600; }
     .text-info { color: #4fd1c7 !important; font-weight: 600; }
     .text-muted { color: #718096 !important; font-weight: 500; }
-</style>
+  </style>
 {% endblock %}
 
 {% block content %}
-<div class="container-fluid mt-3">
+  <div class="container-fluid mt-3">
     <!-- Dashboard Header -->
     <div class="row mb-4">
-        <div class="col-12">
-            <div class="dashboard-card text-center">
-                <h1><i class="fas fa-chart-line"></i> Inventory & Analytics Dashboard</h1>
-                <p class="mb-0">Real-time inventory health monitoring and usage analysis</p>
-                <div class="row mt-3">
-                    <div class="col-md-4">
-                        <div class="health-score" id="health-score">--</div>
-                        <div>Overall Health Score</div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="health-score" id="total-items">--</div>
-                        <div>Total Items</div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="health-score" id="active-alerts">--</div>
-                        <div>Active Alerts</div>
-                    </div>
-                </div>
+      <div class="col-12">
+        <div class="dashboard-card text-center">
+          <h1><i class="fas fa-chart-line" aria-hidden="true"></i> Inventory & Analytics Dashboard</h1>
+          <p class="mb-0">Real-time inventory health monitoring and usage analysis</p>
+          <div class="row mt-3">
+            <div class="col-md-4">
+              <div class="health-score" id="health-score">--</div>
+              <div>Overall Health Score</div>
             </div>
+            <div class="col-md-4">
+              <div class="health-score" id="total-items">--</div>
+              <div>Total Items</div>
+            </div>
+            <div class="col-md-4">
+              <div class="health-score" id="active-alerts">--</div>
+              <div>Active Alerts</div>
+            </div>
+          </div>
         </div>
+      </div>
     </div>
     
     <!-- Key Metrics Row -->
     <div class="row mb-4">
-        <div class="col-md-3">
-            <div class="metric-card text-center">
-                <div class="metric-value text-success" id="items-on-rent">--</div>
-                <div class="metric-label">On Rent</div>
-            </div>
+      <div class="col-md-3">
+        <div class="metric-card text-center">
+          <div class="metric-value text-success" id="items-on-rent">--</div>
+          <div class="metric-label">On Rent</div>
         </div>
-        <div class="col-md-3">
-            <div class="metric-card text-center">
-                <div class="metric-value text-primary" id="items-available">--</div>
-                <div class="metric-label">Available</div>
-            </div>
+      </div>
+      <div class="col-md-3">
+        <div class="metric-card text-center">
+          <div class="metric-value text-primary" id="items-available">--</div>
+          <div class="metric-label">Available</div>
         </div>
-        <div class="col-md-3">
-            <div class="metric-card text-center">
-                <div class="metric-value text-warning" id="items-in-service">--</div>
-                <div class="metric-label">In Service</div>
-            </div>
+      </div>
+      <div class="col-md-3">
+        <div class="metric-card text-center">
+          <div class="metric-value text-warning" id="items-in-service">--</div>
+          <div class="metric-label">In Service</div>
         </div>
-        <div class="col-md-3">
-            <div class="metric-card text-center">
-                <div class="metric-value text-info" id="utilization-rate">--%</div>
-                <div class="metric-label">Utilization Rate</div>
-            </div>
+      </div>
+      <div class="col-md-3">
+        <div class="metric-card text-center">
+          <div class="metric-value text-info" id="utilization-rate">--%</div>
+          <div class="metric-label">Utilization Rate</div>
         </div>
+      </div>
     </div>
     
     <!-- Global Store and Inventory Type Filters -->
@@ -362,7 +364,7 @@
     
     <!-- Tabs for Different Views -->
     <div class="row">
-        <div class="col-12">
+      <div class="col-12">
             <ul class="nav nav-tabs" id="analyticsTab" role="tablist">
                 <li class="nav-item" role="presentation">
                     <button class="nav-link active" id="business-intelligence-tab" data-bs-toggle="tab" data-bs-target="#business-intelligence" type="button" role="tab" aria-controls="business-intelligence" aria-selected="true" aria-label="View business intelligence and financial metrics">
@@ -825,9 +827,9 @@
                     </div>
                 </div>
             </div>
-        </div>
+      </div>
     </div>
-</div>
+  </div>
 {% endblock %}
 
 {% block scripts %}
@@ -1634,7 +1636,7 @@ function filterStaleItems() {
         const subcategorySelect = document.getElementById('stale-subcategory-filter');
         subcategorySelect.innerHTML = '<option value="">All Subcategories</option>';
         subcategories.forEach(sub => {
-            subcategorySelect.innerHTML += `<option value="${sub}"${subcategory === subcategoryFilter ? ' selected' : ''}>${sub}</option>`;
+            subcategorySelect.innerHTML += `<option value="${sub}"${sub === subcategoryFilter ? ' selected' : ''}>${sub}</option>`;
         });
     }
     
@@ -1821,7 +1823,6 @@ function updatePagination(containerId, currentPage, totalPages, onPageChange) {
         loadUsagePatterns();
         loadDataDiscrepancies();
     });
-});
 
 // Navigate to specific item on Tab 1 (Rental Inventory)
 function navigateToItem(tagId) {
@@ -2577,6 +2578,6 @@ function updateBusinessIntelligenceCharts(data) {
     }
     
     console.log('✅ Business intelligence charts updated successfully');
-}
+  }
 </script>
 {% endblock %}
