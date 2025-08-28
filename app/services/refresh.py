@@ -330,19 +330,37 @@ def update_transactions(session, transactions):
     skipped = 0
     failed = 0
     batch_size = 500
+    
+    # Log detailed information about the first few transactions for debugging
+    if transactions:
+        logger.info(f"Sample transaction data structure (first record):")
+        sample = transactions[0]
+        for key, value in sample.items():
+            logger.info(f"  {key}: {value} (type: {type(value).__name__})")
+    
     for i in range(0, len(transactions), batch_size):
         batch = transactions[i:i + batch_size]
         try:
             for transaction in batch:
                 tag_id = transaction.get('tag_id')
                 scan_date = transaction.get('scan_date')
+                
+                # Enhanced logging for corrupted data
                 if not tag_id or not scan_date:
                     logger.warning(f"Skipping transaction with missing tag_id or scan_date: {transaction}")
                     skipped += 1
                     continue
+                
+                # Check for obvious data corruption (scan_date same as tag_id)
+                if scan_date == tag_id:
+                    logger.error(f"CORRUPTED DATA: scan_date equals tag_id for {tag_id}. Full record: {transaction}")
+                    skipped += 1
+                    continue
+                    
                 scan_date_dt = validate_date(scan_date, 'scan_date', tag_id)
                 if not scan_date_dt:
                     logger.warning(f"Skipping transaction with invalid scan_date for tag_id {tag_id}: {scan_date}")
+                    logger.info(f"Full transaction record: {transaction}")
                     skipped += 1
                     continue
                 db_transaction = Transaction(tag_id=tag_id, scan_date=scan_date_dt)
