@@ -6,7 +6,15 @@ from logging.handlers import RotatingFileHandler
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_redis import FlaskRedis
-from config import DB_CONFIG, REDIS_URL, LOG_FILE, APP_IP, BASE_DIR, STATIC_DIR, validate_config
+from config import (
+    DB_CONFIG,
+    REDIS_URL,
+    LOG_FILE,
+    APP_IP,
+    BASE_DIR,
+    STATIC_DIR,
+    validate_config,
+)
 from datetime import datetime
 import re
 
@@ -14,12 +22,14 @@ import re
 db = SQLAlchemy()
 cache = FlaskRedis()
 
+
 def create_app():
     """Create and configure the Flask application."""
     app = Flask(__name__, static_folder=str(STATIC_DIR))
 
     # Configure logging using centralized system
     from app.services.logger import setup_app_logging
+
     setup_app_logging(app)
     app.logger.info("Application starting up - logging initialized")
     app.logger.debug(f"Static folder path: {app.static_folder}")
@@ -34,22 +44,24 @@ def create_app():
 
     # Database configuration
     try:
-        app.config['SQLALCHEMY_DATABASE_URI'] = (
+        app.config["SQLALCHEMY_DATABASE_URI"] = (
             f"mysql+mysqlconnector://{DB_CONFIG['user']}:{DB_CONFIG['password']}@"
             f"{DB_CONFIG['host']}/{DB_CONFIG['database']}?charset={DB_CONFIG['charset']}&collation={DB_CONFIG['collation']}"
         )
-        app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-        app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-            'pool_size': 10,
-            'max_overflow': 20,
-            'pool_timeout': 30,
-            'pool_recycle': 1800,
+        app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+        app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+            "pool_size": 10,
+            "max_overflow": 20,
+            "pool_timeout": 30,
+            "pool_recycle": 1800,
         }
-        app.config['REDIS_URL'] = REDIS_URL
-        app.config['APP_IP'] = APP_IP
+        app.config["REDIS_URL"] = REDIS_URL
+        app.config["APP_IP"] = APP_IP
         app.logger.info("Database and Redis configuration set successfully")
     except (KeyError, TypeError) as e:
-        app.logger.error(f"Failed to set database/Redis configuration: {str(e)}", exc_info=True)
+        app.logger.error(
+            f"Failed to set database/Redis configuration: {str(e)}", exc_info=True
+        )
         raise
 
     # Initialize extensions
@@ -64,25 +76,28 @@ def create_app():
     # Add custom Jinja2 filters
     def timestamp_filter(value):
         return int(datetime.now().timestamp())
-    app.jinja_env.filters['timestamp'] = timestamp_filter
+
+    app.jinja_env.filters["timestamp"] = timestamp_filter
 
     def datetimeformat(value):
         if value is None:
-            return 'N/A'
+            return "N/A"
         if isinstance(value, str):
             try:
-                value = datetime.fromisoformat(value.replace('Z', '+00:00'))
+                value = datetime.fromisoformat(value.replace("Z", "+00:00"))
             except ValueError:
                 return value
-        return value.strftime('%Y-%m-%d %H:%M:%S')
-    app.jinja_env.filters['datetimeformat'] = datetimeformat
+        return value.strftime("%Y-%m-%d %H:%M:%S")
+
+    app.jinja_env.filters["datetimeformat"] = datetimeformat
 
     def regex_replace(value, pattern, replace):
         """Replace characters matching pattern with replace string."""
         if not value:
             return value
         return re.sub(pattern, replace, str(value))
-    app.jinja_env.filters['regex_replace'] = regex_replace
+
+    app.jinja_env.filters["regex_replace"] = regex_replace
 
     # Note: Database table creation should be handled explicitly via migration scripts
     # or administrative commands, not automatically on every application startup
@@ -121,9 +136,10 @@ def create_app():
         app.register_blueprint(performance_bp)
         app.register_blueprint(refresh_bp)
         app.logger.info("Blueprints registered successfully")
-        
+
         # Set up performance monitoring middleware
         from app.routes.performance import track_request_performance
+
         before_request, after_request = track_request_performance()
         app.before_request(before_request)
         app.after_request(after_request)
@@ -134,6 +150,7 @@ def create_app():
     # Initialize scheduler
     try:
         from app.services.scheduler import init_scheduler
+
         init_scheduler(app)
         app.logger.info("Scheduler initialized successfully")
     except (ImportError, RuntimeError) as e:
