@@ -19,31 +19,44 @@ from ..services.mappings_cache import get_cached_mappings
 
 logger = get_logger(__name__)
 
-tab5_bp = Blueprint('tab5', __name__)
+tab5_bp = Blueprint("tab5", __name__)
 
 # Version marker
-logger.info("Deployed tab5.py version: 2025-06-23-v44 at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+logger.info(
+    "Deployed tab5.py version: 2025-06-23-v44 at %s",
+    datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+)
 
 
 def get_mappings(session, category=None, subcategory=None):
     """Return cached mappings optionally filtered by category/subcategory."""
     mappings = get_cached_mappings(session)
     if category:
-        mappings = {rc_id: data for rc_id, data in mappings.items()
-                    if data.get('category') and data['category'].lower() == category.lower()}
+        mappings = {
+            rc_id: data
+            for rc_id, data in mappings.items()
+            if data.get("category") and data["category"].lower() == category.lower()
+        }
     if subcategory:
-        mappings = {rc_id: data for rc_id, data in mappings.items()
-                    if data.get('subcategory') and data['subcategory'].lower() == subcategory.lower()}
+        mappings = {
+            rc_id: data
+            for rc_id, data in mappings.items()
+            if data.get("subcategory")
+            and data["subcategory"].lower() == subcategory.lower()
+        }
     return mappings
 
 
 def resale_pack_condition(column):
     """SQL expression matching bin locations that start with 'resale' or 'pack'."""
-    col = func.lower(func.trim(func.coalesce(column, '')))
-    return or_(col.like('resale%'), col.like('pack%'))
+    col = func.lower(func.trim(func.coalesce(column, "")))
+    return or_(col.like("resale%"), col.like("pack%"))
 
-def get_category_data(session, filter_query='', sort='', status_filter='', bin_filter=''):
-    cache_key = f'tab5_view_data_{filter_query}_{sort}_{status_filter}_{bin_filter}'
+
+def get_category_data(
+    session, filter_query="", sort="", status_filter="", bin_filter=""
+):
+    cache_key = f"tab5_view_data_{filter_query}_{sort}_{status_filter}_{bin_filter}"
     cached_data = None
     try:
         cached_data = cache.get(cache_key)
@@ -52,12 +65,12 @@ def get_category_data(session, filter_query='', sort='', status_filter='', bin_f
             "Cache get failed for key %s: %s at %s",
             cache_key,
             str(e),
-            datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         )
     if cached_data is not None:
         logger.info(
             "Serving Tab 5 data from cache at %s",
-            datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         )
         return json.loads(cached_data)
 
@@ -70,8 +83,8 @@ def get_category_data(session, filter_query='', sort='', status_filter='', bin_f
 
     latest_txn_subq = (
         session.query(
-            Transaction.tag_id.label('tag_id'),
-            func.max(Transaction.scan_date).label('max_date'),
+            Transaction.tag_id.label("tag_id"),
+            func.max(Transaction.scan_date).label("max_date"),
         )
         .group_by(Transaction.tag_id)
         .subquery()
@@ -88,52 +101,56 @@ def get_category_data(session, filter_query='', sort='', status_filter='', bin_f
         .subquery()
     )
 
-    base_query = (
-        session.query(
-            func.trim(
-                func.cast(func.replace(ItemMaster.rental_class_num, '\x00', ''), db.String)
-            ).label('rc_id'),
-            func.count(ItemMaster.tag_id).label('total_items'),
-            func.sum(
-                case((ItemMaster.status.in_(['On Rent', 'Delivered']), 1), else_=0)
-            ).label('items_on_contracts'),
-            func.sum(
-                case(
-                    (
-                        or_(
-                            ItemMaster.status.notin_(['Ready to Rent', 'On Rent', 'Delivered']),
-                            ItemMaster.tag_id.in_(select(service_required_subq.c.tag_id)),
+    base_query = session.query(
+        func.trim(
+            func.cast(func.replace(ItemMaster.rental_class_num, "\x00", ""), db.String)
+        ).label("rc_id"),
+        func.count(ItemMaster.tag_id).label("total_items"),
+        func.sum(
+            case((ItemMaster.status.in_(["On Rent", "Delivered"]), 1), else_=0)
+        ).label("items_on_contracts"),
+        func.sum(
+            case(
+                (
+                    or_(
+                        ItemMaster.status.notin_(
+                            ["Ready to Rent", "On Rent", "Delivered"]
                         ),
-                        1,
+                        ItemMaster.tag_id.in_(select(service_required_subq.c.tag_id)),
                     ),
-                    else_=0,
-                )
-            ).label('items_in_service'),
-            func.sum(case((ItemMaster.status == 'Ready to Rent', 1), else_=0)).label('items_available'),
-        )
-        .filter(
-            func.trim(
-                func.cast(func.replace(ItemMaster.rental_class_num, '\x00', ''), db.String)
-            ).in_(rc_ids),
-            resale_pack_condition(ItemMaster.bin_location),
-        )
+                    1,
+                ),
+                else_=0,
+            )
+        ).label("items_in_service"),
+        func.sum(case((ItemMaster.status == "Ready to Rent", 1), else_=0)).label(
+            "items_available"
+        ),
+    ).filter(
+        func.trim(
+            func.cast(func.replace(ItemMaster.rental_class_num, "\x00", ""), db.String)
+        ).in_(rc_ids),
+        resale_pack_condition(ItemMaster.bin_location),
     )
 
     if status_filter:
-        base_query = base_query.filter(func.lower(ItemMaster.status) == status_filter.lower())
+        base_query = base_query.filter(
+            func.lower(ItemMaster.status) == status_filter.lower()
+        )
     if bin_filter:
         base_query = base_query.filter(
-            func.lower(func.trim(func.coalesce(ItemMaster.bin_location, ''))) == bin_filter.lower()
+            func.lower(func.trim(func.coalesce(ItemMaster.bin_location, "")))
+            == bin_filter.lower()
         )
 
-    base_query = base_query.group_by('rc_id')
+    base_query = base_query.group_by("rc_id")
     try:
         results = base_query.all()
     except SQLAlchemyError as e:
         logger.error(
             "Database error fetching category data: %s at %s",
             str(e),
-            datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             exc_info=True,
         )
         results = []
@@ -143,90 +160,112 @@ def get_category_data(session, filter_query='', sort='', status_filter='', bin_f
     for row in results:
         rc_id = row.rc_id
         mapping = mappings_dict.get(rc_id, {})
-        cat = mapping.get('category', 'Unmapped')
+        cat = mapping.get("category", "Unmapped")
         if filter_query and filter_query not in cat.lower():
             continue
         entry = category_totals.setdefault(
             cat,
             {
-                'category': cat,
-                'cat_id': cat.lower().replace(' ', '_').replace('/', '_'),
-                'total_items': 0,
-                'items_on_contracts': 0,
-                'items_in_service': 0,
-                'items_available': 0,
+                "category": cat,
+                "cat_id": cat.lower().replace(" ", "_").replace("/", "_"),
+                "total_items": 0,
+                "items_on_contracts": 0,
+                "items_in_service": 0,
+                "items_available": 0,
             },
         )
-        entry['total_items'] += row.total_items or 0
-        entry['items_on_contracts'] += row.items_on_contracts or 0
-        entry['items_in_service'] += row.items_in_service or 0
-        entry['items_available'] += row.items_available or 0
+        entry["total_items"] += row.total_items or 0
+        entry["items_on_contracts"] += row.items_on_contracts or 0
+        entry["items_in_service"] += row.items_in_service or 0
+        entry["items_available"] += row.items_available or 0
 
-    category_data = [entry for entry in category_totals.values() if entry['total_items'] > 0]
+    category_data = [
+        entry for entry in category_totals.values() if entry["total_items"] > 0
+    ]
 
-    if sort == 'category_asc':
-        category_data.sort(key=lambda x: x['category'].lower())
-    elif sort == 'category_desc':
-        category_data.sort(key=lambda x: x['category'].lower(), reverse=True)
-    elif sort == 'total_items_asc':
-        category_data.sort(key=lambda x: x['total_items'])
-    elif sort == 'total_items_desc':
-        category_data.sort(key=lambda x: x['total_items'], reverse=True)
+    if sort == "category_asc":
+        category_data.sort(key=lambda x: x["category"].lower())
+    elif sort == "category_desc":
+        category_data.sort(key=lambda x: x["category"].lower(), reverse=True)
+    elif sort == "total_items_asc":
+        category_data.sort(key=lambda x: x["total_items"])
+    elif sort == "total_items_desc":
+        category_data.sort(key=lambda x: x["total_items"], reverse=True)
 
     try:
         cache.set(cache_key, json.dumps(category_data), ex=60)
         logger.info(
             f"Cached Tab 5 data with {len(category_data)} categories at %s",
-            datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         )
     except Exception as e:
         logger.warning(
             "Cache set failed for key %s: %s at %s",
             cache_key,
             str(e),
-            datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         )
     return category_data
 
-@tab5_bp.route('/tab/5')
+
+@tab5_bp.route("/tab/5")
 def tab5_view():
-    logger.info("Tab 5 route accessed at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+    logger.info(
+        "Tab 5 route accessed at %s", datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    )
     session = None
     try:
         session = db.session()
-        filter_query = request.args.get('filter', '').lower()
-        sort = request.args.get('sort', '')
-        status_filter = request.args.get('statusFilter', '').lower()
-        bin_filter = request.args.get('binFilter', '').lower()
+        filter_query = request.args.get("filter", "").lower()
+        sort = request.args.get("sort", "")
+        status_filter = request.args.get("statusFilter", "").lower()
+        bin_filter = request.args.get("binFilter", "").lower()
 
-        category_data = get_category_data(session, filter_query, sort, status_filter, bin_filter)
-        logger.info(f"Fetched {len(category_data)} categories for tab5 at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+        category_data = get_category_data(
+            session, filter_query, sort, status_filter, bin_filter
+        )
+        logger.info(
+            f"Fetched {len(category_data)} categories for tab5 at %s",
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        )
 
-        return render_template('tab5.html', categories=category_data, cache_bust=int(time.time()))
+        return render_template(
+            "tab5.html", categories=category_data, cache_bust=int(time.time())
+        )
     except Exception as e:
-        logger.error(f"Error rendering Tab 5: {str(e)} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'), exc_info=True)
-        return render_template('tab5.html', categories=[], cache_bust=int(time.time()))
+        logger.error(
+            f"Error rendering Tab 5: {str(e)} at %s",
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            exc_info=True,
+        )
+        return render_template("tab5.html", categories=[], cache_bust=int(time.time()))
     finally:
         if session:
             session.close()
 
-@tab5_bp.route('/tab/5/filter', methods=['POST'])
+
+@tab5_bp.route("/tab/5/filter", methods=["POST"])
 def tab5_filter():
-    logger.info("Tab 5 filter route accessed at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+    logger.info(
+        "Tab 5 filter route accessed at %s",
+        datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+    )
     session = None
     try:
         session = db.session()
-        filter_query = request.form.get('category-filter', '').lower()
-        sort = request.form.get('category-sort', '')
-        status_filter = request.form.get('statusFilter', '').lower()
-        bin_filter = request.form.get('binFilter', '').lower()
+        filter_query = request.form.get("category-filter", "").lower()
+        sort = request.form.get("category-sort", "")
+        status_filter = request.form.get("statusFilter", "").lower()
+        bin_filter = request.form.get("binFilter", "").lower()
 
-        category_data = get_category_data(session, filter_query, sort, status_filter, bin_filter)
+        category_data = get_category_data(
+            session, filter_query, sort, status_filter, bin_filter
+        )
         return jsonify(category_data)
     except Exception as e:
         logger.error(
             f"Error filtering Tab 5: {str(e)} at %s",
-            datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             exc_info=True,
         )
         # Return an empty list rather than a server error so the UI can recover
@@ -235,39 +274,51 @@ def tab5_filter():
         if session:
             session.close()
 
-@tab5_bp.route('/tab/5/subcat_data')
+
+@tab5_bp.route("/tab/5/subcat_data")
 def tab5_subcat_data():
-    category = unquote(request.args.get('category'))
-    page = int(request.args.get('page', 1))
+    category = unquote(request.args.get("category"))
+    page = int(request.args.get("page", 1))
     per_page = 10
-    filter_query = request.args.get('filter', '').lower()
-    status_filter = request.args.get('statusFilter', '').lower()
-    bin_filter = request.args.get('binFilter', '').lower()
-    sort = request.args.get('sort', '')
+    filter_query = request.args.get("filter", "").lower()
+    status_filter = request.args.get("statusFilter", "").lower()
+    bin_filter = request.args.get("binFilter", "").lower()
+    sort = request.args.get("sort", "")
 
     if not category:
-        logger.error("Category parameter is missing in subcat_data request at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-        return jsonify({'error': 'Category is required'}), 400
+        logger.error(
+            "Category parameter is missing in subcat_data request at %s",
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        )
+        return jsonify({"error": "Category is required"}), 400
 
-    logger.info(f"Fetching subcategories for category: {category} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+    logger.info(
+        f"Fetching subcategories for category: {category} at %s",
+        datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+    )
     session = None
     try:
         session = db.session()
 
         mappings_dict = get_mappings(session, category=category)
         if not mappings_dict:
-            logger.warning(f"No mappings found for category {category} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-            return jsonify({
-                'subcategories': [],
-                'total_subcats': 0,
-                'page': page,
-                'per_page': per_page,
-                'message': f"No mappings found for category '{category}'. Please add mappings in the Categories tab."
-            })
+            logger.warning(
+                f"No mappings found for category {category} at %s",
+                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            )
+            return jsonify(
+                {
+                    "subcategories": [],
+                    "total_subcats": 0,
+                    "page": page,
+                    "per_page": per_page,
+                    "message": f"No mappings found for category '{category}'. Please add mappings in the Categories tab.",
+                }
+            )
 
         subcategories = {}
         for rental_class_id, data in mappings_dict.items():
-            subcategory = data['subcategory']
+            subcategory = data["subcategory"]
             if not subcategory:
                 continue
             if subcategory not in subcategories:
@@ -278,177 +329,252 @@ def tab5_subcat_data():
         for subcat, rental_class_ids in subcategories.items():
 
             total_items_query = session.query(func.count(ItemMaster.tag_id)).filter(
-                func.trim(func.cast(func.replace(ItemMaster.rental_class_num, '\x00', ''), db.String)).in_(rental_class_ids),
-                resale_pack_condition(ItemMaster.bin_location)
+                func.trim(
+                    func.cast(
+                        func.replace(ItemMaster.rental_class_num, "\x00", ""), db.String
+                    )
+                ).in_(rental_class_ids),
+                resale_pack_condition(ItemMaster.bin_location),
             )
             if status_filter:
-                total_items_query = total_items_query.filter(func.lower(ItemMaster.status) == status_filter.lower())
+                total_items_query = total_items_query.filter(
+                    func.lower(ItemMaster.status) == status_filter.lower()
+                )
             if bin_filter:
                 total_items_query = total_items_query.filter(
-                    func.lower(func.trim(func.coalesce(ItemMaster.bin_location, ''))) == bin_filter.lower()
+                    func.lower(func.trim(func.coalesce(ItemMaster.bin_location, "")))
+                    == bin_filter.lower()
                 )
             total_items = total_items_query.scalar() or 0
-            logger.debug(f"Subcategory {subcat}: total_items={total_items} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+            logger.debug(
+                f"Subcategory {subcat}: total_items={total_items} at %s",
+                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            )
 
-            items_on_contracts_query = session.query(func.count(ItemMaster.tag_id)).filter(
-                func.trim(func.cast(func.replace(ItemMaster.rental_class_num, '\x00', ''), db.String)).in_(rental_class_ids),
-                ItemMaster.status.in_(['On Rent', 'Delivered']),
-                resale_pack_condition(ItemMaster.bin_location)
+            items_on_contracts_query = session.query(
+                func.count(ItemMaster.tag_id)
+            ).filter(
+                func.trim(
+                    func.cast(
+                        func.replace(ItemMaster.rental_class_num, "\x00", ""), db.String
+                    )
+                ).in_(rental_class_ids),
+                ItemMaster.status.in_(["On Rent", "Delivered"]),
+                resale_pack_condition(ItemMaster.bin_location),
             )
             if status_filter:
-                items_on_contracts_query = items_on_contracts_query.filter(func.lower(ItemMaster.status) == status_filter.lower())
+                items_on_contracts_query = items_on_contracts_query.filter(
+                    func.lower(ItemMaster.status) == status_filter.lower()
+                )
             if bin_filter:
                 items_on_contracts_query = items_on_contracts_query.filter(
-                    func.lower(func.trim(func.coalesce(ItemMaster.bin_location, ''))) == bin_filter.lower()
+                    func.lower(func.trim(func.coalesce(ItemMaster.bin_location, "")))
+                    == bin_filter.lower()
                 )
             items_on_contracts = items_on_contracts_query.scalar() or 0
 
-            subquery = session.query(
-                Transaction.tag_id,
-                Transaction.scan_date,
-                Transaction.service_required
-            ).filter(
-                Transaction.tag_id == ItemMaster.tag_id
-            ).order_by(
-                Transaction.scan_date.desc()
-            ).subquery()
+            subquery = (
+                session.query(
+                    Transaction.tag_id,
+                    Transaction.scan_date,
+                    Transaction.service_required,
+                )
+                .filter(Transaction.tag_id == ItemMaster.tag_id)
+                .order_by(Transaction.scan_date.desc())
+                .subquery()
+            )
 
-            items_in_service_query = session.query(func.count(ItemMaster.tag_id)).filter(
-                func.trim(func.cast(func.replace(ItemMaster.rental_class_num, '\x00', ''), db.String)).in_(rental_class_ids),
+            items_in_service_query = session.query(
+                func.count(ItemMaster.tag_id)
+            ).filter(
+                func.trim(
+                    func.cast(
+                        func.replace(ItemMaster.rental_class_num, "\x00", ""), db.String
+                    )
+                ).in_(rental_class_ids),
                 resale_pack_condition(ItemMaster.bin_location),
                 or_(
-                    ItemMaster.status.notin_(['Ready to Rent', 'On Rent', 'Delivered']),
+                    ItemMaster.status.notin_(["Ready to Rent", "On Rent", "Delivered"]),
                     ItemMaster.tag_id.in_(
                         session.query(subquery.c.tag_id).filter(
-                            subquery.c.scan_date == session.query(func.max(Transaction.scan_date)).filter(Transaction.tag_id == subquery.c.tag_id).correlate(subquery).scalar_subquery(),
-                            subquery.c.service_required == True
+                            subquery.c.scan_date
+                            == session.query(func.max(Transaction.scan_date))
+                            .filter(Transaction.tag_id == subquery.c.tag_id)
+                            .correlate(subquery)
+                            .scalar_subquery(),
+                            subquery.c.service_required == True,
                         )
-                    )
-                )
+                    ),
+                ),
             )
             if status_filter:
-                items_in_service_query = items_in_service_query.filter(func.lower(ItemMaster.status) == status_filter.lower())
+                items_in_service_query = items_in_service_query.filter(
+                    func.lower(ItemMaster.status) == status_filter.lower()
+                )
             if bin_filter:
                 items_in_service_query = items_in_service_query.filter(
-                    func.lower(func.trim(func.coalesce(ItemMaster.bin_location, ''))) == bin_filter.lower()
+                    func.lower(func.trim(func.coalesce(ItemMaster.bin_location, "")))
+                    == bin_filter.lower()
                 )
             items_in_service = items_in_service_query.scalar() or 0
 
             items_available_query = session.query(func.count(ItemMaster.tag_id)).filter(
-                func.trim(func.cast(func.replace(ItemMaster.rental_class_num, '\x00', ''), db.String)).in_(rental_class_ids),
-                ItemMaster.status == 'Ready to Rent',
-                resale_pack_condition(ItemMaster.bin_location)
+                func.trim(
+                    func.cast(
+                        func.replace(ItemMaster.rental_class_num, "\x00", ""), db.String
+                    )
+                ).in_(rental_class_ids),
+                ItemMaster.status == "Ready to Rent",
+                resale_pack_condition(ItemMaster.bin_location),
             )
             if status_filter:
-                items_available_query = items_available_query.filter(func.lower(ItemMaster.status) == status_filter.lower())
+                items_available_query = items_available_query.filter(
+                    func.lower(ItemMaster.status) == status_filter.lower()
+                )
             if bin_filter:
                 items_available_query = items_available_query.filter(
-                    func.lower(func.trim(func.coalesce(ItemMaster.bin_location, ''))) == bin_filter.lower()
+                    func.lower(func.trim(func.coalesce(ItemMaster.bin_location, "")))
+                    == bin_filter.lower()
                 )
             items_available = items_available_query.scalar() or 0
 
             if total_items > 0:
-                subcategory_data.append({
-                    'subcategory': subcat,
-                    'total_items': total_items,
-                    'items_on_contracts': items_on_contracts,
-                    'items_in_service': items_in_service,
-                    'items_available': items_available
-                })
+                subcategory_data.append(
+                    {
+                        "subcategory": subcat,
+                        "total_items": total_items,
+                        "items_on_contracts": items_on_contracts,
+                        "items_in_service": items_in_service,
+                        "items_available": items_available,
+                    }
+                )
 
         if filter_query:
-            subcategory_data = [s for s in subcategory_data if filter_query in s['subcategory'].lower()]
-        if sort == 'subcategory_asc':
-            subcategory_data.sort(key=lambda x: x['subcategory'].lower())
-        elif sort == 'subcategory_desc':
-            subcategory_data.sort(key=lambda x: x['subcategory'].lower(), reverse=True)
-        elif sort == 'total_items_asc':
-            subcategory_data.sort(key=lambda x: x['total_items'])
-        elif sort == 'total_items_desc':
-            subcategory_data.sort(key=lambda x: x['total_items'], reverse=True)
+            subcategory_data = [
+                s for s in subcategory_data if filter_query in s["subcategory"].lower()
+            ]
+        if sort == "subcategory_asc":
+            subcategory_data.sort(key=lambda x: x["subcategory"].lower())
+        elif sort == "subcategory_desc":
+            subcategory_data.sort(key=lambda x: x["subcategory"].lower(), reverse=True)
+        elif sort == "total_items_asc":
+            subcategory_data.sort(key=lambda x: x["total_items"])
+        elif sort == "total_items_desc":
+            subcategory_data.sort(key=lambda x: x["total_items"], reverse=True)
 
         total_subcats = len(subcategory_data)
         start = (page - 1) * per_page
         end = start + per_page
         paginated_subcats = subcategory_data[start:end]
 
-        logger.info(f"Returning {len(paginated_subcats)} subcategories for category {category} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-        return jsonify({
-            'subcategories': paginated_subcats,
-            'total_subcats': total_subcats,
-            'page': page,
-            'per_page': per_page
-        })
+        logger.info(
+            f"Returning {len(paginated_subcats)} subcategories for category {category} at %s",
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        )
+        return jsonify(
+            {
+                "subcategories": paginated_subcats,
+                "total_subcats": total_subcats,
+                "page": page,
+                "per_page": per_page,
+            }
+        )
     except Exception as e:
-        logger.error(f"Error fetching subcategory data for category {category}: {str(e)} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'), exc_info=True)
-        return jsonify({'error': 'Failed to fetch subcategory data', 'details': str(e)}), 500
+        logger.error(
+            f"Error fetching subcategory data for category {category}: {str(e)} at %s",
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            exc_info=True,
+        )
+        return (
+            jsonify({"error": "Failed to fetch subcategory data", "details": str(e)}),
+            500,
+        )
     finally:
         if session:
             session.close()
 
-@tab5_bp.route('/tab/5/common_names')
+
+@tab5_bp.route("/tab/5/common_names")
 def tab5_common_names():
-    category = unquote(request.args.get('category'))
-    subcategory = unquote(request.args.get('subcategory'))
-    page = int(request.args.get('page', 1))
+    category = unquote(request.args.get("category"))
+    subcategory = unquote(request.args.get("subcategory"))
+    page = int(request.args.get("page", 1))
     per_page = 10
-    filter_query = request.args.get('filter', '').lower()
-    status_filter = request.args.get('statusFilter', '').lower()
-    bin_filter = request.args.get('binFilter', '').lower()
-    sort = request.args.get('sort', '')
+    filter_query = request.args.get("filter", "").lower()
+    status_filter = request.args.get("statusFilter", "").lower()
+    bin_filter = request.args.get("binFilter", "").lower()
+    sort = request.args.get("sort", "")
 
     if not category or not subcategory:
-        logger.error("Category and subcategory are required in common_names request at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-        return jsonify({'error': 'Category and subcategory are required'}), 400
+        logger.error(
+            "Category and subcategory are required in common_names request at %s",
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        )
+        return jsonify({"error": "Category and subcategory are required"}), 400
 
-    logger.info(f"Fetching common names for category {category}, subcategory {subcategory} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+    logger.info(
+        f"Fetching common names for category {category}, subcategory {subcategory} at %s",
+        datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+    )
     session = None
     try:
         session = db.session()
 
-        mappings_dict = get_mappings(session, category=category, subcategory=subcategory)
+        mappings_dict = get_mappings(
+            session, category=category, subcategory=subcategory
+        )
         rental_class_ids = list(mappings_dict.keys())
         if not rental_class_ids:
             logger.warning(
                 f"No mappings found for category {category}, subcategory {subcategory} at %s",
-                datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             )
             return jsonify(
                 {
-                    'common_names': [],
-                    'total_common_names': 0,
-                    'page': page,
-                    'per_page': per_page,
+                    "common_names": [],
+                    "total_common_names": 0,
+                    "page": page,
+                    "per_page": per_page,
                 }
             )
 
         common_names_query = session.query(
-            ItemMaster.common_name,
-            func.count(ItemMaster.tag_id).label('total_items')
+            ItemMaster.common_name, func.count(ItemMaster.tag_id).label("total_items")
         ).filter(
-            func.trim(func.cast(func.replace(ItemMaster.rental_class_num, '\x00', ''), db.String)).in_(rental_class_ids),
-            resale_pack_condition(ItemMaster.bin_location)
+            func.trim(
+                func.cast(
+                    func.replace(ItemMaster.rental_class_num, "\x00", ""), db.String
+                )
+            ).in_(rental_class_ids),
+            resale_pack_condition(ItemMaster.bin_location),
         )
         if filter_query:
             common_names_query = common_names_query.filter(
-                func.lower(ItemMaster.common_name).like(f'%{filter_query}%')
+                func.lower(ItemMaster.common_name).like(f"%{filter_query}%")
             )
         if status_filter:
-            common_names_query = common_names_query.filter(func.lower(ItemMaster.status) == status_filter.lower())
+            common_names_query = common_names_query.filter(
+                func.lower(ItemMaster.status) == status_filter.lower()
+            )
         if bin_filter:
             common_names_query = common_names_query.filter(
-                func.lower(func.trim(func.coalesce(ItemMaster.bin_location, ''))) == bin_filter.lower()
+                func.lower(func.trim(func.coalesce(ItemMaster.bin_location, "")))
+                == bin_filter.lower()
             )
         common_names_query = common_names_query.group_by(ItemMaster.common_name)
 
-        if sort == 'name_asc':
-            common_names_query = common_names_query.order_by(asc(func.lower(ItemMaster.common_name)))
-        elif sort == 'name_desc':
-            common_names_query = common_names_query.order_by(desc(func.lower(ItemMaster.common_name)))
-        elif sort == 'total_items_asc':
-            common_names_query = common_names_query.order_by(asc('total_items'))
-        elif sort == 'total_items_desc':
-            common_names_query = common_names_query.order_by(desc('total_items'))
+        if sort == "name_asc":
+            common_names_query = common_names_query.order_by(
+                asc(func.lower(ItemMaster.common_name))
+            )
+        elif sort == "name_desc":
+            common_names_query = common_names_query.order_by(
+                desc(func.lower(ItemMaster.common_name))
+            )
+        elif sort == "total_items_asc":
+            common_names_query = common_names_query.order_by(asc("total_items"))
+        elif sort == "total_items_desc":
+            common_names_query = common_names_query.order_by(desc("total_items"))
 
         common_names_all = common_names_query.all()
         common_names = []
@@ -456,141 +582,197 @@ def tab5_common_names():
             if not name:
                 continue
 
-            items_on_contracts_query = session.query(func.count(ItemMaster.tag_id)).filter(
-                func.trim(func.cast(func.replace(ItemMaster.rental_class_num, '\x00', ''), db.String)).in_(rental_class_ids),
+            items_on_contracts_query = session.query(
+                func.count(ItemMaster.tag_id)
+            ).filter(
+                func.trim(
+                    func.cast(
+                        func.replace(ItemMaster.rental_class_num, "\x00", ""), db.String
+                    )
+                ).in_(rental_class_ids),
                 ItemMaster.common_name == name,
-                ItemMaster.status.in_(['On Rent', 'Delivered']),
-                resale_pack_condition(ItemMaster.bin_location)
+                ItemMaster.status.in_(["On Rent", "Delivered"]),
+                resale_pack_condition(ItemMaster.bin_location),
             )
             if filter_query:
                 items_on_contracts_query = items_on_contracts_query.filter(
-                    func.lower(ItemMaster.common_name).like(f'%{filter_query}%')
+                    func.lower(ItemMaster.common_name).like(f"%{filter_query}%")
                 )
             if status_filter:
-                items_on_contracts_query = items_on_contracts_query.filter(func.lower(ItemMaster.status) == status_filter.lower())
+                items_on_contracts_query = items_on_contracts_query.filter(
+                    func.lower(ItemMaster.status) == status_filter.lower()
+                )
             if bin_filter:
                 items_on_contracts_query = items_on_contracts_query.filter(
-                    func.lower(func.trim(func.coalesce(ItemMaster.bin_location, ''))) == bin_filter.lower()
+                    func.lower(func.trim(func.coalesce(ItemMaster.bin_location, "")))
+                    == bin_filter.lower()
                 )
             items_on_contracts = items_on_contracts_query.scalar() or 0
 
-            subquery = session.query(
-                Transaction.tag_id,
-                Transaction.scan_date,
-                Transaction.service_required
-            ).filter(
-                Transaction.tag_id == ItemMaster.tag_id
-            ).order_by(
-                Transaction.scan_date.desc()
-            ).subquery()
+            subquery = (
+                session.query(
+                    Transaction.tag_id,
+                    Transaction.scan_date,
+                    Transaction.service_required,
+                )
+                .filter(Transaction.tag_id == ItemMaster.tag_id)
+                .order_by(Transaction.scan_date.desc())
+                .subquery()
+            )
 
-            items_in_service_query = session.query(func.count(ItemMaster.tag_id)).filter(
-                func.trim(func.cast(func.replace(ItemMaster.rental_class_num, '\x00', ''), db.String)).in_(rental_class_ids),
+            items_in_service_query = session.query(
+                func.count(ItemMaster.tag_id)
+            ).filter(
+                func.trim(
+                    func.cast(
+                        func.replace(ItemMaster.rental_class_num, "\x00", ""), db.String
+                    )
+                ).in_(rental_class_ids),
                 ItemMaster.common_name == name,
                 resale_pack_condition(ItemMaster.bin_location),
                 or_(
-                    ItemMaster.status.notin_(['Ready to Rent', 'On Rent', 'Delivered']),
+                    ItemMaster.status.notin_(["Ready to Rent", "On Rent", "Delivered"]),
                     ItemMaster.tag_id.in_(
                         session.query(subquery.c.tag_id).filter(
-                            subquery.c.scan_date == session.query(func.max(Transaction.scan_date)).filter(Transaction.tag_id == subquery.c.tag_id).correlate(subquery).scalar_subquery(),
-                            subquery.c.service_required == True
+                            subquery.c.scan_date
+                            == session.query(func.max(Transaction.scan_date))
+                            .filter(Transaction.tag_id == subquery.c.tag_id)
+                            .correlate(subquery)
+                            .scalar_subquery(),
+                            subquery.c.service_required == True,
                         )
-                    )
-                )
+                    ),
+                ),
             )
             if filter_query:
                 items_in_service_query = items_in_service_query.filter(
-                    func.lower(ItemMaster.common_name).like(f'%{filter_query}%')
+                    func.lower(ItemMaster.common_name).like(f"%{filter_query}%")
                 )
             if status_filter:
-                items_in_service_query = items_in_service_query.filter(func.lower(ItemMaster.status) == status_filter.lower())
+                items_in_service_query = items_in_service_query.filter(
+                    func.lower(ItemMaster.status) == status_filter.lower()
+                )
             if bin_filter:
                 items_in_service_query = items_in_service_query.filter(
-                    func.lower(func.trim(func.coalesce(ItemMaster.bin_location, ''))) == bin_filter.lower()
+                    func.lower(func.trim(func.coalesce(ItemMaster.bin_location, "")))
+                    == bin_filter.lower()
                 )
             items_in_service = items_in_service_query.scalar() or 0
 
             items_available_query = session.query(func.count(ItemMaster.tag_id)).filter(
-                func.trim(func.cast(func.replace(ItemMaster.rental_class_num, '\x00', ''), db.String)).in_(rental_class_ids),
+                func.trim(
+                    func.cast(
+                        func.replace(ItemMaster.rental_class_num, "\x00", ""), db.String
+                    )
+                ).in_(rental_class_ids),
                 ItemMaster.common_name == name,
-                ItemMaster.status == 'Ready to Rent',
-                resale_pack_condition(ItemMaster.bin_location)
+                ItemMaster.status == "Ready to Rent",
+                resale_pack_condition(ItemMaster.bin_location),
             )
             if filter_query:
                 items_available_query = items_available_query.filter(
-                    func.lower(ItemMaster.common_name).like(f'%{filter_query}%')
+                    func.lower(ItemMaster.common_name).like(f"%{filter_query}%")
                 )
             if status_filter:
-                items_available_query = items_available_query.filter(func.lower(ItemMaster.status) == status_filter.lower())
+                items_available_query = items_available_query.filter(
+                    func.lower(ItemMaster.status) == status_filter.lower()
+                )
             if bin_filter:
                 items_available_query = items_available_query.filter(
-                    func.lower(func.trim(func.coalesce(ItemMaster.bin_location, ''))) == bin_filter.lower()
+                    func.lower(func.trim(func.coalesce(ItemMaster.bin_location, "")))
+                    == bin_filter.lower()
                 )
             items_available = items_available_query.scalar() or 0
 
-            common_names.append({
-                'name': name,
-                'total_items': total,
-                'items_on_contracts': items_on_contracts,
-                'items_in_service': items_in_service,
-                'items_available': items_available
-            })
+            common_names.append(
+                {
+                    "name": name,
+                    "total_items": total,
+                    "items_on_contracts": items_on_contracts,
+                    "items_in_service": items_in_service,
+                    "items_available": items_available,
+                }
+            )
 
         total_common_names = len(common_names)
         start = (page - 1) * per_page
         end = start + per_page
         paginated_common_names = common_names[start:end]
 
-        logger.info(f"Returning {len(paginated_common_names)} common names for category {category}, subcategory {subcategory} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-        return jsonify({
-            'common_names': paginated_common_names,
-            'total_common_names': total_common_names,
-            'page': page,
-            'per_page': per_page
-        })
+        logger.info(
+            f"Returning {len(paginated_common_names)} common names for category {category}, subcategory {subcategory} at %s",
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        )
+        return jsonify(
+            {
+                "common_names": paginated_common_names,
+                "total_common_names": total_common_names,
+                "page": page,
+                "per_page": per_page,
+            }
+        )
     except Exception as e:
-        logger.error(f"Error fetching common names for category {category}, subcategory {subcategory}: {str(e)} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-        return jsonify({'error': 'Failed to fetch common names'}), 500
+        logger.error(
+            f"Error fetching common names for category {category}, subcategory {subcategory}: {str(e)} at %s",
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        )
+        return jsonify({"error": "Failed to fetch common names"}), 500
     finally:
         if session:
             session.close()
 
-@tab5_bp.route('/tab/5/data')
+
+@tab5_bp.route("/tab/5/data")
 def tab5_data():
-    category = unquote(request.args.get('category'))
-    subcategory = unquote(request.args.get('subcategory'))
-    common_name = unquote(request.args.get('common_name'))
-    page = int(request.args.get('page', 1))
+    category = unquote(request.args.get("category"))
+    subcategory = unquote(request.args.get("subcategory"))
+    common_name = unquote(request.args.get("common_name"))
+    page = int(request.args.get("page", 1))
     per_page = 10
-    sort = request.args.get('sort', '')  # Keep for compatibility, but ignore for now
+    sort = request.args.get("sort", "")  # Keep for compatibility, but ignore for now
 
     if not category or not subcategory or not common_name:
-        logger.error("Category, subcategory, and common name are required in data request at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-        return jsonify({'error': 'Category, subcategory, and common name are required'}), 400
+        logger.error(
+            "Category, subcategory, and common name are required in data request at %s",
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        )
+        return (
+            jsonify({"error": "Category, subcategory, and common name are required"}),
+            400,
+        )
 
-    logger.info(f"Fetching items for category {category}, subcategory {subcategory}, common_name {common_name} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+    logger.info(
+        f"Fetching items for category {category}, subcategory {subcategory}, common_name {common_name} at %s",
+        datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+    )
     session = None
     try:
         session = db.session()
 
-        mappings_dict = get_mappings(session, category=category, subcategory=subcategory)
+        mappings_dict = get_mappings(
+            session, category=category, subcategory=subcategory
+        )
         if not mappings_dict:
-            logger.warning(f"No mappings found for category {category}, subcategory {subcategory} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-            return jsonify({
-                'items': [],
-                'total_items': 0,
-                'page': page,
-                'per_page': per_page
-            })
+            logger.warning(
+                f"No mappings found for category {category}, subcategory {subcategory} at %s",
+                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            )
+            return jsonify(
+                {"items": [], "total_items": 0, "page": page, "per_page": per_page}
+            )
 
         rental_class_ids = list(mappings_dict.keys())
 
         rental_class_ids = list(mappings_dict.keys())
 
         items_query = session.query(ItemMaster).filter(
-            func.trim(func.cast(func.replace(ItemMaster.rental_class_num, '\x00', ''), db.String)).in_(rental_class_ids),
+            func.trim(
+                func.cast(
+                    func.replace(ItemMaster.rental_class_num, "\x00", ""), db.String
+                )
+            ).in_(rental_class_ids),
             ItemMaster.common_name == common_name,
-            resale_pack_condition(ItemMaster.bin_location)
+            resale_pack_condition(ItemMaster.bin_location),
         )
 
         total_items = items_query.count()
@@ -598,64 +780,89 @@ def tab5_data():
 
         items_data = []
         for item in items:
-            last_scanned_date = item.date_last_scanned.isoformat() if item.date_last_scanned else 'N/A'
-            
-            # Get customer name from latest transaction for this item
-            customer_name = 'N/A'
-            if item.last_contract_num and item.last_contract_num != 'N/A':
-                latest_transaction = session.query(Transaction.client_name).filter(
-                    Transaction.tag_id == item.tag_id,
-                    Transaction.contract_number == item.last_contract_num
-                ).order_by(desc(Transaction.scan_date)).first()
-                customer_name = latest_transaction.client_name if latest_transaction and latest_transaction.client_name else 'N/A'
-            
-            items_data.append({
-                'tag_id': item.tag_id,
-                'common_name': item.common_name,
-                'rental_class_num': item.rental_class_num or 'N/A',
-                'bin_location': item.bin_location or 'N/A',
-                'status': item.status or 'N/A',
-                'last_contract_num': item.last_contract_num or 'N/A',
-                'customer_name': customer_name,
-                'last_scanned_date': last_scanned_date,
-                'quality': item.quality or 'N/A',
-                'notes': item.notes or 'N/A'
-            })
+            last_scanned_date = (
+                item.date_last_scanned.isoformat() if item.date_last_scanned else "N/A"
+            )
 
-        logger.info(f"Returning {len(items_data)} items for category {category}, subcategory {subcategory}, common_name {common_name} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-        return jsonify({
-            'items': items_data,
-            'total_items': total_items,
-            'page': page,
-            'per_page': per_page
-        })
+            # Get customer name from latest transaction for this item
+            customer_name = "N/A"
+            if item.last_contract_num and item.last_contract_num != "N/A":
+                latest_transaction = (
+                    session.query(Transaction.client_name)
+                    .filter(
+                        Transaction.tag_id == item.tag_id,
+                        Transaction.contract_number == item.last_contract_num,
+                    )
+                    .order_by(desc(Transaction.scan_date))
+                    .first()
+                )
+                customer_name = (
+                    latest_transaction.client_name
+                    if latest_transaction and latest_transaction.client_name
+                    else "N/A"
+                )
+
+            items_data.append(
+                {
+                    "tag_id": item.tag_id,
+                    "common_name": item.common_name,
+                    "rental_class_num": item.rental_class_num or "N/A",
+                    "bin_location": item.bin_location or "N/A",
+                    "status": item.status or "N/A",
+                    "last_contract_num": item.last_contract_num or "N/A",
+                    "customer_name": customer_name,
+                    "last_scanned_date": last_scanned_date,
+                    "quality": item.quality or "N/A",
+                    "notes": item.notes or "N/A",
+                }
+            )
+
+        logger.info(
+            f"Returning {len(items_data)} items for category {category}, subcategory {subcategory}, common_name {common_name} at %s",
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        )
+        return jsonify(
+            {
+                "items": items_data,
+                "total_items": total_items,
+                "page": page,
+                "per_page": per_page,
+            }
+        )
     except Exception as e:
-        logger.error(f"Error fetching items for category {category}, subcategory {subcategory}, common_name {common_name}: {str(e)} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'), exc_info=True)
-        return jsonify({'error': 'Failed to fetch items'}), 500
+        logger.error(
+            f"Error fetching items for category {category}, subcategory {subcategory}, common_name {common_name}: {str(e)} at %s",
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            exc_info=True,
+        )
+        return jsonify({"error": "Failed to fetch items"}), 500
     finally:
         if session:
             session.close()
 
-@tab5_bp.route('/tab/5/update_bin_location', methods=['POST'])
+
+@tab5_bp.route("/tab/5/update_bin_location", methods=["POST"])
 def update_bin_location():
     session = None
     try:
-        logger.info("Updating bin location at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+        logger.info(
+            "Updating bin location at %s", datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        )
         data = request.get_json()
-        tag_id = data.get('tag_id')
-        new_bin_location = data.get('bin_location')
+        tag_id = data.get("tag_id")
+        new_bin_location = data.get("bin_location")
 
         if not tag_id or not new_bin_location:
-            return jsonify({'error': 'Tag ID and bin location are required'}), 400
+            return jsonify({"error": "Tag ID and bin location are required"}), 400
 
         new_bin_location_lower = new_bin_location.lower()
-        if new_bin_location_lower not in ['resale', 'sold', 'pack', 'burst']:
-            return jsonify({'error': 'Invalid bin location'}), 400
+        if new_bin_location_lower not in ["resale", "sold", "pack", "burst"]:
+            return jsonify({"error": "Invalid bin location"}), 400
 
         session = db.session()
         item = session.query(ItemMaster).filter_by(tag_id=tag_id).first()
         if not item:
-            return jsonify({'error': 'Item not found'}), 404
+            return jsonify({"error": "Item not found"}), 404
 
         current_time = datetime.now()
         item.bin_location = new_bin_location
@@ -665,39 +872,64 @@ def update_bin_location():
         api_client = APIClient()
         api_client.update_bin_location(tag_id, new_bin_location)
 
-        logger.info(f"Updated bin_location for tag_id {tag_id} to {new_bin_location} and date_last_scanned to {current_time} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-        return jsonify({'message': 'Bin location updated successfully'})
+        logger.info(
+            f"Updated bin_location for tag_id {tag_id} to {new_bin_location} and date_last_scanned to {current_time} at %s",
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        )
+        return jsonify({"message": "Bin location updated successfully"})
     except Exception as e:
         if session:
             session.rollback()
-        logger.error(f"Error updating bin location for tag {tag_id}: {str(e)} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-        return jsonify({'error': str(e)}), 500
+        logger.error(
+            f"Error updating bin location for tag {tag_id}: {str(e)} at %s",
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        )
+        return jsonify({"error": str(e)}), 500
     finally:
         if session:
             session.close()
 
-@tab5_bp.route('/tab/5/update_status', methods=['POST'])
+
+@tab5_bp.route("/tab/5/update_status", methods=["POST"])
 def update_status():
     session = None
     try:
-        logger.info("Updating status at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+        logger.info(
+            "Updating status at %s", datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        )
         data = request.get_json()
-        tag_id = data.get('tag_id')
-        new_status = data.get('status')
+        tag_id = data.get("tag_id")
+        new_status = data.get("status")
 
         if not tag_id or not new_status:
-            return jsonify({'error': 'Tag ID and status are required'}), 400
+            return jsonify({"error": "Tag ID and status are required"}), 400
 
-        if new_status not in ['Ready to Rent', 'Sold']:
-            return jsonify({'error': 'Status can only be updated to "Ready to Rent" or "Sold"'}), 400
+        if new_status not in ["Ready to Rent", "Sold"]:
+            return (
+                jsonify(
+                    {"error": 'Status can only be updated to "Ready to Rent" or "Sold"'}
+                ),
+                400,
+            )
 
         session = db.session()
         item = session.query(ItemMaster).filter_by(tag_id=tag_id).first()
         if not item:
-            return jsonify({'error': 'Item not found'}), 404
+            return jsonify({"error": "Item not found"}), 404
 
-        if new_status == 'Ready to Rent' and item.status not in ['On Rent', 'Delivered', 'Sold']:
-            return jsonify({'error': 'Status can only be updated to "Ready to Rent" from "On Rent", "Delivered", or "Sold"'}), 400
+        if new_status == "Ready to Rent" and item.status not in [
+            "On Rent",
+            "Delivered",
+            "Sold",
+        ]:
+            return (
+                jsonify(
+                    {
+                        "error": 'Status can only be updated to "Ready to Rent" from "On Rent", "Delivered", or "Sold"'
+                    }
+                ),
+                400,
+            )
 
         current_time = datetime.now()
         item.status = new_status
@@ -707,19 +939,29 @@ def update_status():
         api_client = APIClient()
         api_client.update_status(tag_id, new_status)
 
-        logger.info(f"Updated status for tag_id {tag_id} to {new_status} and date_last_scanned to {current_time} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-        return jsonify({'message': 'Status updated successfully'})
+        logger.info(
+            f"Updated status for tag_id {tag_id} to {new_status} and date_last_scanned to {current_time} at %s",
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        )
+        return jsonify({"message": "Status updated successfully"})
     except Exception as e:
         if session:
             session.rollback()
-        logger.error(f"Error updating status for tag {tag_id}: {str(e)} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-        return jsonify({'error': str(e)}), 500
+        logger.error(
+            f"Error updating status for tag {tag_id}: {str(e)} at %s",
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        )
+        return jsonify({"error": str(e)}), 500
     finally:
         if session:
             session.close()
 
+
 def update_items_async(app, tag_ids_to_update, current_time, scheduler):
-    logger.info(f"Starting background update task for {len(tag_ids_to_update)} items at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+    logger.info(
+        f"Starting background update task for {len(tag_ids_to_update)} items at %s",
+        datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+    )
     api_client = APIClient()
     updated_items = 0
     failed_items = []
@@ -729,81 +971,145 @@ def update_items_async(app, tag_ids_to_update, current_time, scheduler):
         session_factory = sessionmaker(bind=db.engine)
         session = scoped_session(session_factory)
         session.autoflush = False
-        logger.debug("Created new SQLAlchemy session for background thread at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+        logger.debug(
+            "Created new SQLAlchemy session for background thread at %s",
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        )
 
         try:
             # Authenticate API client with retries
             max_auth_retries = 3
             for auth_attempt in range(max_auth_retries):
                 try:
-                    logger.debug(f"Attempting API authentication, attempt {auth_attempt + 1} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+                    logger.debug(
+                        f"Attempting API authentication, attempt {auth_attempt + 1} at %s",
+                        datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    )
                     api_client.authenticate()
-                    logger.info("API authentication successful at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+                    logger.info(
+                        "API authentication successful at %s",
+                        datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    )
                     break
                 except Exception as e:
-                    logger.error(f"API authentication failed on attempt {auth_attempt + 1}: {str(e)} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+                    logger.error(
+                        f"API authentication failed on attempt {auth_attempt + 1}: {str(e)} at %s",
+                        datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    )
                     if auth_attempt == max_auth_retries - 1:
-                        logger.error("Failed to authenticate API after 3 attempts at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+                        logger.error(
+                            "Failed to authenticate API after 3 attempts at %s",
+                            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                        )
                         raise
                     time.sleep(5)
 
             # Process items in batches
             for i in range(0, len(tag_ids_to_update), batch_size):
-                batch_ids = tag_ids_to_update[i:i + batch_size]
-                logger.debug(f"Processing batch {i // batch_size + 1} with {len(batch_ids)} items at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+                batch_ids = tag_ids_to_update[i : i + batch_size]
+                logger.debug(
+                    f"Processing batch {i // batch_size + 1} with {len(batch_ids)} items at %s",
+                    datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                )
 
                 for tag_id in batch_ids:
                     max_retries = 3
                     for attempt in range(max_retries):
                         try:
-                            logger.debug(f"Updating tag_id {tag_id}, attempt {attempt + 1} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-                            item = session.query(ItemMaster).filter_by(tag_id=tag_id).first()
+                            logger.debug(
+                                f"Updating tag_id {tag_id}, attempt {attempt + 1} at %s",
+                                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                            )
+                            item = (
+                                session.query(ItemMaster)
+                                .filter_by(tag_id=tag_id)
+                                .first()
+                            )
                             if not item:
-                                logger.warning(f"Item with tag_id {tag_id} not found, skipping at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+                                logger.warning(
+                                    f"Item with tag_id {tag_id} not found, skipping at %s",
+                                    datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                                )
                                 break
 
                             try:
-                                api_client.update_status(tag_id, 'Sold')
-                                logger.debug(f"API update successful for tag_id {tag_id} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+                                api_client.update_status(tag_id, "Sold")
+                                logger.debug(
+                                    f"API update successful for tag_id {tag_id} at %s",
+                                    datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                                )
                             except Exception as api_e:
-                                logger.error(f"API update failed for tag_id {tag_id}: {str(api_e)} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+                                logger.error(
+                                    f"API update failed for tag_id {tag_id}: {str(api_e)} at %s",
+                                    datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                                )
                                 raise
 
-                            item.status = 'Sold'
+                            item.status = "Sold"
                             item.date_last_scanned = current_time
                             session.commit()
                             updated_items += 1
-                            logger.debug(f"Successfully updated tag_id {tag_id} to status 'Sold' at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+                            logger.debug(
+                                f"Successfully updated tag_id {tag_id} to status 'Sold' at %s",
+                                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                            )
                             break
                         except Exception as e:
                             session.rollback()
-                            logger.error(f"Failed to update tag_id {tag_id} on attempt {attempt + 1}: {str(e)} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'), exc_info=True)
+                            logger.error(
+                                f"Failed to update tag_id {tag_id} on attempt {attempt + 1}: {str(e)} at %s",
+                                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                                exc_info=True,
+                            )
                             if attempt == max_retries - 1:
                                 failed_items.append((tag_id, str(e)))
                             else:
-                                logger.info(f"Retrying update for tag_id {tag_id} after 5 seconds at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+                                logger.info(
+                                    f"Retrying update for tag_id {tag_id} after 5 seconds at %s",
+                                    datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                                )
                                 time.sleep(5)
                             continue
 
-            logger.info(f"Background task completed: updated {updated_items} items, failed {len(failed_items)} items at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+            logger.info(
+                f"Background task completed: updated {updated_items} items, failed {len(failed_items)} items at %s",
+                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            )
             if failed_items:
-                logger.warning(f"Failed items: {failed_items} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+                logger.warning(
+                    f"Failed items: {failed_items} at %s",
+                    datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                )
 
         except Exception as e:
             session.rollback()
-            logger.error(f"Critical error in background update task: {str(e)} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'), exc_info=True)
+            logger.error(
+                f"Critical error in background update task: {str(e)} at %s",
+                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                exc_info=True,
+            )
         finally:
             session.remove()
-            logger.debug("Closed background session at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+            logger.debug(
+                "Closed background session at %s",
+                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            )
             if scheduler and scheduler.running:
                 scheduler.resume()
-                logger.info("Scheduler resumed at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+                logger.info(
+                    "Scheduler resumed at %s",
+                    datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                )
 
-@tab5_bp.route('/tab/5/update_resale_pack_to_sold', methods=['POST'])
+
+@tab5_bp.route("/tab/5/update_resale_pack_to_sold", methods=["POST"])
 def update_resale_pack_to_sold():
     session = None
     try:
-        logger.info("Starting update_resale_pack_to_sold process at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+        logger.info(
+            "Starting update_resale_pack_to_sold process at %s",
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        )
         session = db.session()
         current_time = datetime.now()
         four_days_ago = current_time - timedelta(days=4)
@@ -811,183 +1117,277 @@ def update_resale_pack_to_sold():
         offset = 0
         tag_ids_to_update = []
 
-        logger.debug("Querying items for update in batches at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+        logger.debug(
+            "Querying items for update in batches at %s",
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        )
         while True:
-            items_batch = session.query(ItemMaster.tag_id).filter(
-                resale_pack_condition(ItemMaster.bin_location),
-                ItemMaster.status.in_(['On Rent', 'Delivered']),
-                ItemMaster.date_last_scanned.isnot(None),
-                ItemMaster.date_last_scanned < four_days_ago
-            ).offset(offset).limit(batch_size).all()
+            items_batch = (
+                session.query(ItemMaster.tag_id)
+                .filter(
+                    resale_pack_condition(ItemMaster.bin_location),
+                    ItemMaster.status.in_(["On Rent", "Delivered"]),
+                    ItemMaster.date_last_scanned.isnot(None),
+                    ItemMaster.date_last_scanned < four_days_ago,
+                )
+                .offset(offset)
+                .limit(batch_size)
+                .all()
+            )
 
             if not items_batch:
                 break
 
             tag_ids_to_update.extend([item.tag_id for item in items_batch])
             offset += batch_size
-            logger.debug(f"Fetched batch of {len(items_batch)} items, total so far: {len(tag_ids_to_update)} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+            logger.debug(
+                f"Fetched batch of {len(items_batch)} items, total so far: {len(tag_ids_to_update)} at %s",
+                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            )
 
-        logger.info(f"Found {len(tag_ids_to_update)} items to update at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+        logger.info(
+            f"Found {len(tag_ids_to_update)} items to update at %s",
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        )
 
         if not tag_ids_to_update:
-            logger.info("No items found to update at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-            return jsonify({'status': 'success', 'message': 'No items found to update'})
+            logger.info(
+                "No items found to update at %s",
+                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            )
+            return jsonify({"status": "success", "message": "No items found to update"})
 
         scheduler = get_scheduler()
         if scheduler and scheduler.running:
             scheduler.pause()
-            logger.info("Paused scheduler for update at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+            logger.info(
+                "Paused scheduler for update at %s",
+                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            )
 
         threading.Thread(
             target=update_items_async,
-            args=(current_app._get_current_object(), tag_ids_to_update, current_time, scheduler),
-            daemon=False
+            args=(
+                current_app._get_current_object(),
+                tag_ids_to_update,
+                current_time,
+                scheduler,
+            ),
+            daemon=False,
         ).start()
 
-        logger.info(f"Started background task to update {len(tag_ids_to_update)} items at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-        return jsonify({
-            'status': 'success',
-            'message': f'Started update for {len(tag_ids_to_update)} items. Updates are processing in the background.'
-        })
+        logger.info(
+            f"Started background task to update {len(tag_ids_to_update)} items at %s",
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        )
+        return jsonify(
+            {
+                "status": "success",
+                "message": f"Started update for {len(tag_ids_to_update)} items. Updates are processing in the background.",
+            }
+        )
 
     except Exception as e:
         if session:
             session.rollback()
-        logger.error(f"Error initiating update_resale_pack_to_sold: {str(e)} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'), exc_info=True)
-        return jsonify({'status': 'error', 'message': str(e)}), 500
+        logger.error(
+            f"Error initiating update_resale_pack_to_sold: {str(e)} at %s",
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            exc_info=True,
+        )
+        return jsonify({"status": "error", "message": str(e)}), 500
     finally:
         if session:
             session.close()
 
-@tab5_bp.route('/tab/5/export_sold_items_csv')
+
+@tab5_bp.route("/tab/5/export_sold_items_csv")
 def export_sold_items_csv():
     session = None
     try:
-        logger.info("Exporting sold items to CSV at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+        logger.info(
+            "Exporting sold items to CSV at %s",
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        )
         session = db.session()
 
         mappings_dict = get_mappings(session)
 
-        items = session.query(ItemMaster).filter(
-            func.lower(func.trim(func.coalesce(ItemMaster.bin_location, ''))).in_(['resale', 'sold', 'pack', 'burst']),
-            ItemMaster.status == 'Sold'
-        ).all()
+        items = (
+            session.query(ItemMaster)
+            .filter(
+                func.lower(func.trim(func.coalesce(ItemMaster.bin_location, ""))).in_(
+                    ["resale", "sold", "pack", "burst"]
+                ),
+                ItemMaster.status == "Sold",
+            )
+            .all()
+        )
 
         output = StringIO()
         writer = csv.writer(output)
 
-        headers = ['Tag ID', 'Common Name', 'Subcategory', 'Short Common Name']
+        headers = ["Tag ID", "Common Name", "Subcategory", "Short Common Name"]
         writer.writerow(headers)
 
         for item in items:
-            rental_class_num = str(item.rental_class_num).strip() if item.rental_class_num else ''
+            rental_class_num = (
+                str(item.rental_class_num).strip() if item.rental_class_num else ""
+            )
             mapping = mappings_dict.get(rental_class_num, {})
-            subcategory = mapping.get('subcategory', 'N/A')
-            short_common_name = mapping.get('short_common_name', '')
-            writer.writerow([
-                item.tag_id,
-                item.common_name,
-                subcategory,
-                short_common_name
-            ])
+            subcategory = mapping.get("subcategory", "N/A")
+            short_common_name = mapping.get("short_common_name", "")
+            writer.writerow(
+                [item.tag_id, item.common_name, subcategory, short_common_name]
+            )
 
         output.seek(0)
         return Response(
             output.getvalue(),
-            mimetype='text/csv',
-            headers={'Content-Disposition': 'attachment; filename=sold_items.csv'}
+            mimetype="text/csv",
+            headers={"Content-Disposition": "attachment; filename=sold_items.csv"},
         )
     except Exception as e:
-        logger.error(f"Error exporting sold items to CSV: {str(e)} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-        return jsonify({'error': 'Failed to export CSV'}), 500
+        logger.error(
+            f"Error exporting sold items to CSV: {str(e)} at %s",
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        )
+        return jsonify({"error": "Failed to export CSV"}), 500
     finally:
         if session:
             session.close()
 
-@tab5_bp.route('/tab/5/full_items_by_rental_class')
+
+@tab5_bp.route("/tab/5/full_items_by_rental_class")
 def full_items_by_rental_class():
-    category = unquote(request.args.get('category'))
-    subcategory = unquote(request.args.get('subcategory'))
-    common_name = unquote(request.args.get('common_name'))
+    category = unquote(request.args.get("category"))
+    subcategory = unquote(request.args.get("subcategory"))
+    common_name = unquote(request.args.get("common_name"))
 
     if not category or not subcategory or not common_name:
-        logger.error("Category, subcategory, and common name are required in full_items_by_rental_class request at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-        return jsonify({'error': 'Category, subcategory, and common name are required'}), 400
+        logger.error(
+            "Category, subcategory, and common name are required in full_items_by_rental_class request at %s",
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        )
+        return (
+            jsonify({"error": "Category, subcategory, and common name are required"}),
+            400,
+        )
 
-    logger.info(f"Fetching full items for category {category}, subcategory {subcategory}, common_name {common_name} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+    logger.info(
+        f"Fetching full items for category {category}, subcategory {subcategory}, common_name {common_name} at %s",
+        datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+    )
     session = None
     try:
         session = db.session()
 
-        mappings_dict = get_mappings(session, category=category, subcategory=subcategory)
+        mappings_dict = get_mappings(
+            session, category=category, subcategory=subcategory
+        )
         rental_class_ids = list(mappings_dict.keys())
 
-        items_query = session.query(ItemMaster).filter(
-            func.trim(func.cast(func.replace(ItemMaster.rental_class_num, '\x00', ''), db.String)).in_(rental_class_ids),
-            ItemMaster.common_name == common_name,
-            resale_pack_condition(ItemMaster.bin_location)
-        ).order_by(ItemMaster.tag_id)
+        items_query = (
+            session.query(ItemMaster)
+            .filter(
+                func.trim(
+                    func.cast(
+                        func.replace(ItemMaster.rental_class_num, "\x00", ""), db.String
+                    )
+                ).in_(rental_class_ids),
+                ItemMaster.common_name == common_name,
+                resale_pack_condition(ItemMaster.bin_location),
+            )
+            .order_by(ItemMaster.tag_id)
+        )
 
         items = items_query.all()
         items_data = []
         for item in items:
-            last_scanned_date = item.date_last_scanned.isoformat() if item.date_last_scanned else 'N/A'
-            items_data.append({
-                'tag_id': item.tag_id,
-                'common_name': item.common_name,
-                'rental_class_num': item.rental_class_num,
-                'bin_location': item.bin_location,
-                'status': item.status,
-                'last_contract_num': item.last_contract_num,
-                'last_scanned_date': last_scanned_date,
-                'quality': item.quality,
-                'notes': item.notes
-            })
+            last_scanned_date = (
+                item.date_last_scanned.isoformat() if item.date_last_scanned else "N/A"
+            )
+            items_data.append(
+                {
+                    "tag_id": item.tag_id,
+                    "common_name": item.common_name,
+                    "rental_class_num": item.rental_class_num,
+                    "bin_location": item.bin_location,
+                    "status": item.status,
+                    "last_contract_num": item.last_contract_num,
+                    "last_scanned_date": last_scanned_date,
+                    "quality": item.quality,
+                    "notes": item.notes,
+                }
+            )
 
-        logger.info(f"Returning {len(items_data)} items for category {category}, subcategory {subcategory}, common_name {common_name} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-        return jsonify({
-            'items': items_data,
-            'total_items': len(items_data)
-        })
+        logger.info(
+            f"Returning {len(items_data)} items for category {category}, subcategory {subcategory}, common_name {common_name} at %s",
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        )
+        return jsonify({"items": items_data, "total_items": len(items_data)})
     except Exception as e:
-        logger.error(f"Error fetching full items for category {category}, subcategory {subcategory}, common_name {common_name}: {str(e)} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-        return jsonify({'error': 'Failed to fetch full items'}), 500
+        logger.error(
+            f"Error fetching full items for category {category}, subcategory {subcategory}, common_name {common_name}: {str(e)} at %s",
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        )
+        return jsonify({"error": "Failed to fetch full items"}), 500
     finally:
         if session:
             session.close()
 
-@tab5_bp.route('/tab/5/bulk_update_common_name', methods=['POST'])
+
+@tab5_bp.route("/tab/5/bulk_update_common_name", methods=["POST"])
 def bulk_update_common_name():
     session = None
     try:
-        logger.info("Bulk updating common name at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+        logger.info(
+            "Bulk updating common name at %s",
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        )
         data = request.get_json()
-        category = data.get('category')
-        subcategory = data.get('subcategory')
-        common_name = data.get('common_name')
-        new_bin_location = data.get('bin_location')
-        new_status = data.get('status')
+        category = data.get("category")
+        subcategory = data.get("subcategory")
+        common_name = data.get("common_name")
+        new_bin_location = data.get("bin_location")
+        new_status = data.get("status")
 
         if not category or not subcategory or not common_name:
-            return jsonify({'error': 'Category, subcategory, and common name are required'}), 400
+            return (
+                jsonify(
+                    {"error": "Category, subcategory, and common name are required"}
+                ),
+                400,
+            )
 
         if not new_bin_location and not new_status:
-            return jsonify({'error': 'At least one of bin_location or status must be provided'}), 400
+            return (
+                jsonify(
+                    {"error": "At least one of bin_location or status must be provided"}
+                ),
+                400,
+            )
 
         session = db.session()
 
-        mappings_dict = get_mappings(session, category=category, subcategory=subcategory)
+        mappings_dict = get_mappings(
+            session, category=category, subcategory=subcategory
+        )
         rental_class_ids = list(mappings_dict.keys())
 
         query = session.query(ItemMaster).filter(
-            func.trim(func.cast(func.replace(ItemMaster.rental_class_num, '\x00', ''), db.String)).in_(rental_class_ids),
+            func.trim(
+                func.cast(
+                    func.replace(ItemMaster.rental_class_num, "\x00", ""), db.String
+                )
+            ).in_(rental_class_ids),
             ItemMaster.common_name == common_name,
-            resale_pack_condition(ItemMaster.bin_location)
+            resale_pack_condition(ItemMaster.bin_location),
         )
 
         items = query.all()
         if not items:
-            return jsonify({'error': 'No items found for the given criteria'}), 404
+            return jsonify({"error": "No items found for the given criteria"}), 404
 
         api_client = APIClient()
         updated_items = 0
@@ -996,17 +1396,28 @@ def bulk_update_common_name():
         for item in items:
             if new_bin_location:
                 new_bin_location_lower = new_bin_location.lower()
-                if new_bin_location_lower not in ['resale', 'sold', 'pack', 'burst']:
-                    return jsonify({'error': 'Invalid bin location'}), 400
+                if new_bin_location_lower not in ["resale", "sold", "pack", "burst"]:
+                    return jsonify({"error": "Invalid bin location"}), 400
                 item.bin_location = new_bin_location
                 item.date_last_scanned = current_time
                 api_client.update_bin_location(item.tag_id, new_bin_location)
                 updated_items += 1
 
             if new_status:
-                if new_status not in ['Ready to Rent', 'Sold']:
-                    return jsonify({'error': 'Status can only be updated to "Ready to Rent" or "Sold"'}), 400
-                if new_status == 'Ready to Rent' and item.status not in ['On Rent', 'Delivered', 'Sold']:
+                if new_status not in ["Ready to Rent", "Sold"]:
+                    return (
+                        jsonify(
+                            {
+                                "error": 'Status can only be updated to "Ready to Rent" or "Sold"'
+                            }
+                        ),
+                        400,
+                    )
+                if new_status == "Ready to Rent" and item.status not in [
+                    "On Rent",
+                    "Delivered",
+                    "Sold",
+                ]:
                     continue
                 item.status = new_status
                 item.date_last_scanned = current_time
@@ -1015,38 +1426,54 @@ def bulk_update_common_name():
 
         session.commit()
 
-        logger.info(f"Bulk updated {updated_items} items for category {category}, subcategory {subcategory}, common_name {common_name} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-        return jsonify({'message': f'Bulk update successful, updated {updated_items} items'})
+        logger.info(
+            f"Bulk updated {updated_items} items for category {category}, subcategory {subcategory}, common_name {common_name} at %s",
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        )
+        return jsonify(
+            {"message": f"Bulk update successful, updated {updated_items} items"}
+        )
     except Exception as e:
         if session:
             session.rollback()
-        logger.error(f"Error in bulk update for common name {common_name}: {str(e)} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-        return jsonify({'error': str(e)}), 500
+        logger.error(
+            f"Error in bulk update for common name {common_name}: {str(e)} at %s",
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        )
+        return jsonify({"error": str(e)}), 500
     finally:
         if session:
             session.close()
 
-@tab5_bp.route('/tab/5/bulk_update_items', methods=['POST'])
+
+@tab5_bp.route("/tab/5/bulk_update_items", methods=["POST"])
 def bulk_update_items():
     session = None
     try:
-        logger.info("Bulk updating items at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+        logger.info(
+            "Bulk updating items at %s", datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        )
         data = request.get_json()
-        tag_ids = data.get('tag_ids', [])
-        new_bin_location = data.get('bin_location')
-        new_status = data.get('status')
+        tag_ids = data.get("tag_ids", [])
+        new_bin_location = data.get("bin_location")
+        new_status = data.get("status")
 
         if not tag_ids:
-            return jsonify({'error': 'Tag IDs are required'}), 400
+            return jsonify({"error": "Tag IDs are required"}), 400
 
         if not new_bin_location and not new_status:
-            return jsonify({'error': 'At least one of bin_location or status must be provided'}), 400
+            return (
+                jsonify(
+                    {"error": "At least one of bin_location or status must be provided"}
+                ),
+                400,
+            )
 
         session = db.session()
         items = session.query(ItemMaster).filter(ItemMaster.tag_id.in_(tag_ids)).all()
 
         if not items:
-            return jsonify({'error': 'No items found for the given tag IDs'}), 404
+            return jsonify({"error": "No items found for the given tag IDs"}), 404
 
         api_client = APIClient()
         updated_items = 0
@@ -1055,17 +1482,28 @@ def bulk_update_items():
         for item in items:
             if new_bin_location:
                 new_bin_location_lower = new_bin_location.lower()
-                if new_bin_location_lower not in ['resale', 'sold', 'pack', 'burst']:
-                    return jsonify({'error': 'Invalid bin location'}), 400
+                if new_bin_location_lower not in ["resale", "sold", "pack", "burst"]:
+                    return jsonify({"error": "Invalid bin location"}), 400
                 item.bin_location = new_bin_location
                 item.date_last_scanned = current_time
                 api_client.update_bin_location(item.tag_id, new_bin_location)
                 updated_items += 1
 
             if new_status:
-                if new_status not in ['Ready to Rent', 'Sold']:
-                    return jsonify({'error': 'Status can only be updated to "Ready to Rent" or "Sold"'}), 400
-                if new_status == 'Ready to Rent' and item.status not in ['On Rent', 'Delivered', 'Sold']:
+                if new_status not in ["Ready to Rent", "Sold"]:
+                    return (
+                        jsonify(
+                            {
+                                "error": 'Status can only be updated to "Ready to Rent" or "Sold"'
+                            }
+                        ),
+                        400,
+                    )
+                if new_status == "Ready to Rent" and item.status not in [
+                    "On Rent",
+                    "Delivered",
+                    "Sold",
+                ]:
                     continue
                 item.status = new_status
                 item.date_last_scanned = current_time
@@ -1074,13 +1512,21 @@ def bulk_update_items():
 
         session.commit()
 
-        logger.info(f"Bulk updated {updated_items} items for {len(tag_ids)} tag_ids at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-        return jsonify({'message': f'Bulk update successful, updated {updated_items} items'})
+        logger.info(
+            f"Bulk updated {updated_items} items for {len(tag_ids)} tag_ids at %s",
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        )
+        return jsonify(
+            {"message": f"Bulk update successful, updated {updated_items} items"}
+        )
     except Exception as e:
         if session:
             session.rollback()
-        logger.error(f"Error in bulk update for tag_ids {tag_ids}: {str(e)} at %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-        return jsonify({'error': str(e)}), 500
+        logger.error(
+            f"Error in bulk update for tag_ids {tag_ids}: {str(e)} at %s",
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        )
+        return jsonify({"error": str(e)}), 500
     finally:
         if session:
             session.close()
