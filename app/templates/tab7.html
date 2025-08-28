@@ -542,13 +542,13 @@
         <div class="col-lg-8">
             <div class="chart-container">
                 <h5>Revenue & Payroll Trends</h5>
-                <canvas id="revenue-chart" height="100"></canvas>
+                <canvas id="revenue-chart"></canvas>
             </div>
         </div>
         <div class="col-lg-4">
             <div class="chart-container">
                 <h5>Store Performance</h5>
-                <canvas id="store-pie-chart" height="200"></canvas>
+                <canvas id="store-pie-chart"></canvas>
             </div>
         </div>
     </div>
@@ -792,7 +792,7 @@ document.addEventListener('DOMContentLoaded', function() {
             },
             options: {
                 responsive: true,
-                maintainAspectRatio: false,
+                maintainAspectRatio: true,
                 interaction: {
                     intersect: false,
                     mode: 'index'
@@ -934,7 +934,7 @@ document.addEventListener('DOMContentLoaded', function() {
             },
             options: {
                 responsive: true,
-                maintainAspectRatio: false,
+                maintainAspectRatio: true,
                 cutout: '65%',
                 plugins: {
                     legend: {
