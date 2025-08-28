@@ -48,7 +48,7 @@ def get_enhanced_kpis():
         # Calculate accurate inventory metrics
         total_items = base_query.count()
         items_on_rent = base_query.filter(
-            ItemMaster.status.in_(["On Rent", "Delivered"])
+            ItemMaster.status.in_(["On Rent", "Delivered", "Out to Customer"])
         ).count()
         items_available = base_query.filter(
             ItemMaster.status == "Ready to Rent"
@@ -510,7 +510,7 @@ def get_utilization_analysis():
             f"""
             SELECT 
                 u.category,
-                COUNT(CASE WHEN m.status IN ('On Rent', 'Delivered') THEN m.tag_id END) as on_rent_count,
+                COUNT(CASE WHEN m.status IN ('On Rent', 'Delivered', 'Out to Customer') THEN m.tag_id END) as on_rent_count,
                 COUNT(m.tag_id) as total_count
             FROM user_rental_class_mappings u
             JOIN id_item_master m ON u.rental_class_id = m.rental_class_num
@@ -541,7 +541,7 @@ def get_utilization_analysis():
         # Calculate overall utilization
         total_items = base_query.count()
         items_on_rent = base_query.filter(
-            ItemMaster.status.in_(["On Rent", "Delivered"])
+            ItemMaster.status.in_(["On Rent", "Delivered", "Out to Customer"])
         ).count()
 
         overall_utilization = 0
