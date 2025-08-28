@@ -11,9 +11,9 @@ import csv
 from sqlalchemy import text
 from app import db
 from app.services.bi_analytics import BIAnalyticsService
-from app.services.logger import setup_logger
+from app.services.logger import get_logger
 
-logger = setup_logger(__name__)
+logger = get_logger(__name__)
 bi_bp = Blueprint('bi', __name__, url_prefix='/bi')
 bi_service = BIAnalyticsService()
 

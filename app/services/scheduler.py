@@ -67,37 +67,37 @@ def init_scheduler(app):
         logger.error("Failed to establish database connection after retries")
         return False
 
-    # Run full refresh on startup
-    with app.app_context():
-        if retry_database_connection():
-            logger.debug("Checking for full refresh lock")
-            try:
-                with acquire_lock(redis_client, lock_key, lock_timeout):
-                    logger.info("Triggering full refresh on startup")
-                    full_refresh, _ = get_refresh_functions()
-                    full_refresh()
-                    logger.info("Full refresh on startup completed successfully")
-            except LockError:
-                logger.info("Full refresh lock exists, waiting for release")
-                max_wait = 120
-                waited = 0
-                while redis_client.exists(lock_key) and waited < max_wait:
-                    time.sleep(1)
-                    waited += 1
-                    logger.debug(f"Waiting for lock release, elapsed: {waited}s")
-                
-                # Try again after waiting
-                try:
-                    with acquire_lock(redis_client, lock_key, lock_timeout):
-                        logger.info("Triggering full refresh on startup (after wait)")
-                        full_refresh, _ = get_refresh_functions()
-                        full_refresh()
-                        logger.info("Full refresh on startup completed successfully")
-                except LockError:
-                    logger.warning("Full refresh lock still exists after waiting, forcing release and skipping startup refresh")
-                    redis_client.delete(lock_key)
-        else:
-            logger.warning("Skipping full refresh due to database connection failure")
+    # TEMPORARILY DISABLED: Run full refresh on startup (causes blocking)
+    # with app.app_context():
+    #     if retry_database_connection():
+    #         logger.debug("Checking for full refresh lock")
+    #         try:
+    #             with acquire_lock(redis_client, lock_key, lock_timeout):
+    #                 logger.info("Triggering full refresh on startup")
+    #                 full_refresh, _ = get_refresh_functions()
+    #                 full_refresh()
+    #                 logger.info("Full refresh on startup completed successfully")
+            # except LockError:
+            #     logger.info("Full refresh lock exists, waiting for release")
+            #     max_wait = 120
+            #     waited = 0
+            #     while redis_client.exists(lock_key) and waited < max_wait:
+            #         time.sleep(1)
+            #         waited += 1
+            #         logger.debug(f"Waiting for lock release, elapsed: {waited}s")
+            #     
+            #     # Try again after waiting
+            #     try:
+            #         with acquire_lock(redis_client, lock_key, lock_timeout):
+            #             logger.info("Triggering full refresh on startup (after wait)")
+            #             full_refresh, _ = get_refresh_functions()
+            #             full_refresh()
+            #             logger.info("Full refresh on startup completed successfully")
+            #     except LockError:
+            #         logger.warning("Full refresh lock still exists after waiting, forcing release and skipping startup refresh")
+            #         redis_client.delete(lock_key)
+        # else:
+        #     logger.warning("Skipping full refresh due to database connection failure")
 
     def run_with_context():
         with app.app_context():
