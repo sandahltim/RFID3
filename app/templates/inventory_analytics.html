@@ -1082,7 +1082,54 @@ class InventoryAnalytics {
         }, 5 * 60 * 1000);
     }
     
-    // Phase 1B: Standardized Progress Loading Utility\n    showProgressLoader(containerId, steps, currentStep = 1, expectedTime = \"<1 sec\") {\n        const container = document.getElementById(containerId);\n        if (!container) return;\n        \n        const stepDescriptions = {\n            'business-insights': {\n                1: \"Loading store data...\",\n                2: \"Processing financial metrics...\",\n                3: \"Generating charts...\"\n            },\n            'alerts-list': {\n                1: \"Loading health alerts...\",\n                2: \"Applying filters...\",\n                3: \"Organizing results...\"\n            },\n            'stale-items-list': {\n                1: \"Analyzing scan history...\",\n                2: \"Identifying stale items...\",\n                3: \"Generating report...\"\n            }\n        };\n        \n        const descriptions = stepDescriptions[containerId] || {\n            1: \"Loading data...\",\n            2: \"Processing...\",\n            3: \"Finalizing...\"\n        };\n        \n        const stepDescription = descriptions[currentStep] || \"Loading...\";\n        \n        container.innerHTML = `\n            <div class=\"progress-loader\">\n                <div class=\"spinner-border text-primary\" role=\"status\" aria-hidden=\"true\"></div>\n                <div class=\"progress-step\">${stepDescription} (${currentStep} of ${steps})</div>\n                <div class=\"progress-time\">Expected: ${expectedTime}</div>\n            </div>\n        `;\n    }\n    \n    hideProgressLoader(containerId) {\n        const container = document.getElementById(containerId);\n        if (container && container.querySelector('.progress-loader')) {\n            container.innerHTML = '';\n        }\n    }\n    \n    showError(message, containerId = null) {
+    // Phase 1B: Standardized Progress Loading Utility
+    showProgressLoader(containerId, steps, currentStep = 1, expectedTime = "<1 sec") {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        
+        const stepDescriptions = {
+            'business-insights': {
+                1: "Loading store data...",
+                2: "Processing financial metrics...",
+                3: "Generating charts..."
+            },
+            'alerts-list': {
+                1: "Loading health alerts...",
+                2: "Applying filters...",
+                3: "Organizing results..."
+            },
+            'stale-items-list': {
+                1: "Analyzing scan history...",
+                2: "Identifying stale items...",
+                3: "Generating report..."
+            }
+        };
+        
+        const descriptions = stepDescriptions[containerId] || {
+            1: "Loading data...",
+            2: "Processing...",
+            3: "Finalizing..."
+        };
+        
+        const stepDescription = descriptions[currentStep] || "Loading...";
+        
+        container.innerHTML = `
+            <div class="progress-loader">
+                <div class="spinner-border text-primary" role="status" aria-hidden="true"></div>
+                <div class="progress-step">${stepDescription} (${currentStep} of ${steps})</div>
+                <div class="progress-time">Expected: ${expectedTime}</div>
+            </div>
+        `;
+    }
+    
+    hideProgressLoader(containerId) {
+        const container = document.getElementById(containerId);
+        if (container && container.querySelector('.progress-loader')) {
+            container.innerHTML = '';
+        }
+    }
+    
+    showError(message, containerId = null) {
         const errorHtml = `<div class="alert alert-danger"><i class="fas fa-exclamation-triangle"></i> ${message}</div>`;
         
         if (containerId) {
@@ -1856,17 +1903,33 @@ function fetchBusinessIntelligence() {
     
     const url = `/api/inventory/business_intelligence${params ? '?' + params : ''}`;
     
-    console.log('Fetching business intelligence from:', url);\n    \n    // Phase 1B: Start progress loading sequence\n    if (window.inventoryAnalytics) {\n        window.inventoryAnalytics.showProgressLoader('business-insights', 3, 1, '<1 sec');\n        // Simulate progressive steps for better UX\n        setTimeout(() => window.inventoryAnalytics.showProgressLoader('business-insights', 3, 2, '<1 sec'), 200);\n        setTimeout(() => window.inventoryAnalytics.showProgressLoader('business-insights', 3, 3, '<1 sec'), 400);\n    }
+    console.log('Fetching business intelligence from:', url);
+    
+    // Phase 1B: Start progress loading sequence
+    if (window.inventoryAnalytics) {
+        window.inventoryAnalytics.showProgressLoader('business-insights', 3, 1, '<1 sec');
+        // Simulate progressive steps for better UX
+        setTimeout(() => window.inventoryAnalytics.showProgressLoader('business-insights', 3, 2, '<1 sec'), 200);
+        setTimeout(() => window.inventoryAnalytics.showProgressLoader('business-insights', 3, 3, '<1 sec'), 400);
+    }
     
     fetch(url)
         .then(response => response.json())
         .then(data => {
             console.log('Business intelligence data received:', data);
-            // Phase 1B: Hide progress loader before displaying results\n            if (window.inventoryAnalytics) {\n                window.inventoryAnalytics.hideProgressLoader('business-insights');\n            }\n            updateBusinessIntelligenceDisplay(data);
+            // Phase 1B: Hide progress loader before displaying results
+            if (window.inventoryAnalytics) {
+                window.inventoryAnalytics.hideProgressLoader('business-insights');
+            }
+            updateBusinessIntelligenceDisplay(data);
         })
         .catch(error => {
             console.error('Error fetching business intelligence:', error);
-            // Phase 1B: Hide progress loader on error\n            if (window.inventoryAnalytics) {\n                window.inventoryAnalytics.hideProgressLoader('business-insights');\n            }\n            showBusinessIntelligenceError('Failed to load business intelligence data');
+            // Phase 1B: Hide progress loader on error
+            if (window.inventoryAnalytics) {
+                window.inventoryAnalytics.hideProgressLoader('business-insights');
+            }
+            showBusinessIntelligenceError('Failed to load business intelligence data');
         });
 }
 
