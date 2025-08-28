@@ -3,6 +3,10 @@
 {% block extra_head %}
 <!-- Include Chart.js for enhanced analytics -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<!-- Load Executive Dashboard CSS for Fortune 500 styling -->
+<link rel="stylesheet" href="/static/css/executive-dashboard.css">
+
 <style>
     /* Fortune 500 Analytics Dashboard Styles */
     :root {
@@ -2332,5 +2336,166 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 });
+</script>
+
+<!-- Load Chart Utilities and Dashboard Integration -->
+<script src="/static/js/chart-utilities.js"></script>
+<script src="/static/js/dashboard-integration.js"></script>
+
+<!-- Initialize advanced chart functionality -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('🚀 ADVANCED INTEGRATION: Initializing chart utilities and dashboard integration...');
+    
+    // Initialize chart defaults for professional presentation
+    if (window.chartManager) {
+        window.chartManager.initializeChartDefaults();
+        console.log('✅ Chart utilities initialized with Fortune 500 styling');
+    }
+    
+    // Initialize dashboard integration for seamless data flow
+    if (window.dashboardIntegration) {
+        window.dashboardIntegration.init().then(() => {
+            console.log('✅ Dashboard integration manager initialized');
+            console.log('🎯 Ready for enterprise-level data visualization');
+        });
+    }
+    
+    // Enhanced data binding for inventory analytics
+    enhanceInventoryAnalytics();
+});
+
+function enhanceInventoryAnalytics() {
+    console.log('🔥 ENHANCEMENT: Upgrading inventory analytics with advanced features...');
+    
+    // Create enhanced utilization gauge for the dashboard
+    const utilizationContainer = document.querySelector('#utilization-rate');
+    if (utilizationContainer && window.chartManager) {
+        // Get current utilization rate
+        const currentRate = parseFloat(utilizationContainer.textContent.replace('%', '')) || 0;
+        
+        // Create a canvas for the gauge
+        const gaugeCanvas = document.createElement('canvas');
+        gaugeCanvas.id = 'utilizationGaugeChart';
+        gaugeCanvas.width = 200;
+        gaugeCanvas.height = 200;
+        gaugeCanvas.style.maxWidth = '150px';
+        gaugeCanvas.style.maxHeight = '150px';
+        gaugeCanvas.style.margin = '10px auto';
+        gaugeCanvas.style.display = 'block';
+        
+        // Insert the gauge after the text
+        utilizationContainer.parentNode.appendChild(gaugeCanvas);
+        
+        // Create the utilization gauge
+        window.chartManager.createUtilizationGauge('utilizationGaugeChart', currentRate, 75);
+        console.log(`📊 Created utilization gauge showing ${currentRate}% utilization`);
+    }
+    
+    // Enhance business intelligence display with charts
+    enhanceBusinessIntelligenceCharts();
+    
+    console.log('✨ Inventory analytics enhancement complete!');
+}
+
+function enhanceBusinessIntelligenceCharts() {
+    console.log('📈 CHART ENHANCEMENT: Adding business intelligence visualizations...');
+    
+    // Add chart containers to business intelligence sections
+    const biSection = document.getElementById('business-intelligence');
+    if (biSection && window.chartManager) {
+        // Add store distribution chart container
+        const storeChartContainer = document.createElement('div');
+        storeChartContainer.innerHTML = `
+            <div class="chart-container mt-4">
+                <div class="chart-header">
+                    <h5><i class="fas fa-store"></i> Store Distribution</h5>
+                    <div class="data-refresh-indicator live">
+                        <i class="fas fa-circle"></i> Live
+                    </div>
+                </div>
+                <div class="chart-body">
+                    <canvas id="storeDistributionChart" style="max-height: 300px;"></canvas>
+                </div>
+            </div>
+        `;
+        
+        // Add inventory type chart container  
+        const typeChartContainer = document.createElement('div');
+        typeChartContainer.innerHTML = `
+            <div class="chart-container mt-4">
+                <div class="chart-header">
+                    <h5><i class="fas fa-chart-pie"></i> Inventory Type Distribution</h5>
+                    <div class="data-refresh-indicator live">
+                        <i class="fas fa-circle"></i> Live
+                    </div>
+                </div>
+                <div class="chart-body">
+                    <canvas id="inventoryTypeChart" style="max-height: 300px;"></canvas>
+                </div>
+            </div>
+        `;
+        
+        // Insert at the end of business intelligence section
+        biSection.appendChild(storeChartContainer);
+        biSection.appendChild(typeChartContainer);
+        
+        console.log('📊 Added chart containers for business intelligence');
+    }
+}
+
+// Override the original business intelligence update function to include charts
+const originalUpdateBI = window.updateBusinessIntelligenceDisplay;
+window.updateBusinessIntelligenceDisplay = function(data) {
+    // Call original function first
+    if (originalUpdateBI) {
+        originalUpdateBI(data);
+    }
+    
+    // Add enhanced chart visualizations
+    updateBusinessIntelligenceCharts(data);
+};
+
+function updateBusinessIntelligenceCharts(data) {
+    if (!window.chartManager || !data) return;
+    
+    console.log('🎨 VISUALIZATION: Updating business intelligence charts with live data...');
+    
+    // Update store distribution chart
+    if (data.store_analysis && data.store_analysis.distribution) {
+        const storeData = {
+            labels: data.store_analysis.distribution.map(store => 
+                store.store_code === 'Unassigned' ? 'Unassigned' : `Store ${store.store_code}`
+            ),
+            values: data.store_analysis.distribution.map(store => store.item_count)
+        };
+        
+        window.chartManager.createStorePerformanceChart('storeDistributionChart', {
+            stores: data.store_analysis.distribution.map(store => ({ code: store.store_code })),
+            values: data.store_analysis.distribution.map(store => store.avg_sell_price || 0)
+        });
+        
+        console.log(`📈 Updated store distribution chart with ${storeData.labels.length} stores`);
+    }
+    
+    // Update inventory type chart
+    if (data.inventory_type_analysis && data.inventory_type_analysis.distribution) {
+        const typeData = {
+            labels: data.inventory_type_analysis.distribution.map(type => 
+                type.type === 'None' ? 'Untyped' : type.type
+            ),
+            values: data.inventory_type_analysis.distribution.map(type => type.count)
+        };
+        
+        window.chartManager.createInventoryDistributionChart('inventoryTypeChart', typeData, {
+            text: `${typeData.values.reduce((a, b) => a + b, 0).toLocaleString()}`,
+            subtext: 'Total Items'
+        });
+        
+        console.log(`🥧 Updated inventory type chart with ${typeData.labels.length} types`);
+    }
+    
+    console.log('✅ Business intelligence charts updated successfully');
+}
 </script>
 {% endblock %}
