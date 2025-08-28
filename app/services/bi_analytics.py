@@ -12,9 +12,9 @@ import pandas as pd
 import numpy as np
 from sqlalchemy import text
 from app import db
-from app.services.logger import setup_logger
+from app.services.logger import get_logger
 
-logger = setup_logger(__name__)
+logger = get_logger(__name__)
 
 class BIAnalyticsService:
     """Service for managing business intelligence data and analytics"""
