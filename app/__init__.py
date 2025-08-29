@@ -123,7 +123,7 @@ def create_app():
         from app.routes.pos_routes import pos_bp
         from app.routes.predictive_analytics_api import predictive_bp
         from app.routes.predictive_analytics_routes import predictive_routes_bp
-        from app.routes.configuration_routes import config_bp
+        from app.routes.configuration_routes import config_bp, config_redirect_bp
         from app.routes.feedback_api import feedback_bp
         from app.routes.feedback_dashboard_route import feedback_dashboard_bp
         from app.routes.manual_import_routes import manual_import_bp
@@ -148,6 +148,7 @@ def create_app():
         app.register_blueprint(predictive_bp)
         app.register_blueprint(predictive_routes_bp)
         app.register_blueprint(config_bp)
+        app.register_blueprint(config_redirect_bp)
         app.register_blueprint(feedback_bp)
         app.register_blueprint(feedback_dashboard_bp)
         app.register_blueprint(manual_import_bp)
