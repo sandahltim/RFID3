@@ -19,6 +19,14 @@
   .configuration-container {
     background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
     min-height: 100vh;
+    margin-top: -80px;  /* Offset base template margin */
+    padding-top: 80px;  /* Add back necessary top spacing */
+  }
+  
+  /* Override dashboard header for configuration page */
+  .configuration-container .dashboard-header {
+    padding: 20px 0;       /* Reduced from 40px */
+    margin-bottom: 20px;   /* Reduced from 30px */
   }
   
   .config-section {
