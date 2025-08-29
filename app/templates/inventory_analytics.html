@@ -850,7 +850,7 @@ class InventoryAnalytics {
     async loadDashboardData() {
         try {
             console.log('Loading dashboard summary data');
-            const response = await fetch('/api/inventory/dashboard_summary');
+            const response = await fetch(withGlobalFilters('/api/inventory/dashboard_summary'));
             const data = await response.json();
             
             if (response.ok) {
@@ -904,7 +904,7 @@ class InventoryAnalytics {
             document.getElementById('alerts-loading').style.display = 'block';
             document.getElementById('alerts-content').style.display = 'none';
             
-            const response = await fetch('/api/inventory/alerts');
+            const response = await fetch(withGlobalFilters('/api/inventory/alerts'));
             const data = await response.json();
             
             if (response.ok) {
@@ -1041,7 +1041,7 @@ class InventoryAnalytics {
             button.innerHTML = '<div class="loading-spinner"></div> Generating...';
             button.disabled = true;
             
-            const response = await fetch('/api/inventory/generate_alerts', {
+            const response = await fetch(withGlobalFilters('/api/inventory/generate_alerts'), {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'}
             });
@@ -1174,7 +1174,7 @@ function generateAlerts() {
 // Configuration management functions
 async function loadConfiguration() {
     try {
-        const response = await fetch('/api/inventory/configuration');
+        const response = await fetch(withGlobalFilters('/api/inventory/configuration'));
         if (response.ok) {
             const config = await response.json();
             
@@ -1212,7 +1212,7 @@ async function saveConfiguration() {
             }
         };
         
-        const response = await fetch('/api/inventory/configuration', {
+        const response = await fetch(withGlobalFilters('/api/inventory/configuration'), {
             method: 'PUT',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify(config)
@@ -1258,7 +1258,7 @@ async function loadUsagePatterns() {
         document.getElementById('usage-patterns-loading').style.display = 'block';
         document.getElementById('usage-patterns-content').style.display = 'none';
         
-        const response = await fetch('/api/inventory/usage_patterns');
+        const response = await fetch(withGlobalFilters('/api/inventory/usage_patterns'));
         const data = await response.json();
         
         if (response.ok) {
@@ -1306,7 +1306,7 @@ async function loadDataDiscrepancies() {
         document.getElementById('discrepancies-loading').style.display = 'block';
         document.getElementById('discrepancies-content').style.display = 'none';
         
-        const response = await fetch('/api/inventory/data_discrepancies');
+        const response = await fetch(withGlobalFilters('/api/inventory/data_discrepancies'));
         const data = await response.json();
         
         if (response.ok) {
@@ -1386,7 +1386,7 @@ async function loadAllHealthAlerts() {
         let hasMore = true;
         
         while (hasMore) {
-            const response = await fetch(`/api/inventory/alerts?limit=${limit}&offset=${offset}`);
+            const response = await fetch(withGlobalFilters(`/api/inventory/alerts?limit=${limit}&offset=${offset}`));
             const data = await response.json();
             
             if (response.ok && data.alerts) {
@@ -1439,7 +1439,7 @@ async function loadAllStaleItems() {
         let hasMore = true;
         
         while (hasMore && allItems.length < maxItems) {
-            const response = await fetch(`/api/inventory/stale_items_simple?limit=${limit}&offset=${offset}`);
+            const response = await fetch(withGlobalFilters(`/api/inventory/stale_items_simple?limit=${limit}&offset=${offset}`));
             const data = await response.json();
             
             if (response.ok && data.items) {
@@ -1878,16 +1878,29 @@ function navigateToItem(tagId) {
 let storeChart = null;
 let typeChart = null;
 
+// Helper to append global filter parameters to API requests
+function withGlobalFilters(url) {
+    try {
+        const params = window.GlobalFilters?.getUrlParams?.();
+        if (!params) return url;
+        return url.includes('?') ? `${url}&${params}` : `${url}?${params}`;
+    } catch (err) {
+        console.warn('GlobalFilters unavailable:', err);
+        return url;
+    }
+}
+
 // Refresh analytics data based on current filters
 function refreshAnalyticsData() {
     console.log('Refreshing Analytics Tab 6 data with filters:', GlobalFilters.getApiParams());
-    
+
     // Update dashboard summary with filters
     fetchDashboardSummary();
-    
+
     // Update business intelligence with filters
     fetchBusinessIntelligence();
 }
+window.refreshAnalyticsData = refreshAnalyticsData;
 
 // Fetch business intelligence data with real POS data
 function fetchBusinessIntelligence() {
