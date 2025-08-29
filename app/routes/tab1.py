@@ -35,24 +35,7 @@ VALID_QUALITIES = ["A+", "A", "A-", "B+", "B", "B-", "C+", "C", "C-", ""]
 logger.info("Deployed tab1.py version: 2025-07-10-v24")
 
 from ..services.mappings_cache import get_cached_mappings
-
-
-def build_global_filters(store_filter="all", type_filter="all"):
-    """Build SQLAlchemy filters for store and inventory type selection."""
-    filters = []
-
-    if store_filter and store_filter != "all":
-        filters.append(
-            or_(
-                ItemMaster.home_store == store_filter,
-                ItemMaster.current_store == store_filter,
-            )
-        )
-
-    if type_filter and type_filter != "all":
-        filters.append(ItemMaster.identifier_type == type_filter)
-
-    return filters
+from ..utils.filters import build_global_filters
 
 
 def get_category_data(

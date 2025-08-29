@@ -4,6 +4,7 @@ from ..models.db_models import Transaction, ItemMaster
 from ..services.api_client import APIClient
 from ..services.logger import get_logger
 from sqlalchemy import func, desc, asc, text
+from ..utils.filters import apply_global_filters
 from time import time
 from datetime import datetime, timedelta, timezone
 
@@ -42,11 +43,15 @@ def tab2_view():
         )
         logger.debug(f"Status counts in ItemMaster: {status_counts}")
 
+        store_filter = request.args.get("store", "all")
+        type_filter = request.args.get("type", "all")
+
         # Step 1: Base query without filters
         base_query = session.query(
             ItemMaster.last_contract_num,
             func.count(ItemMaster.tag_id).label("total_items"),
         ).group_by(ItemMaster.last_contract_num)
+        base_query = apply_global_filters(base_query, store_filter, type_filter)
         logger.debug(f"Base query SQL: {str(base_query)}")
         base_results = base_query.all()
         logger.debug(
@@ -105,20 +110,22 @@ def tab2_view():
                 f"Contract {contract_number} - Client: {client_name}, Scan Date: {scan_date}, Stale: {is_stale}"
             )
 
-            items_on_contract = (
-                session.query(func.count(ItemMaster.tag_id))
-                .filter(
-                    ItemMaster.last_contract_num == contract_number,
-                    func.lower(ItemMaster.status).in_(["on rent", "delivered"]),
-                )
-                .scalar()
+            items_on_contract_query = session.query(func.count(ItemMaster.tag_id)).filter(
+                ItemMaster.last_contract_num == contract_number,
+                func.lower(ItemMaster.status).in_(["on rent", "delivered"]),
             )
+            items_on_contract_query = apply_global_filters(
+                items_on_contract_query, store_filter, type_filter
+            )
+            items_on_contract = items_on_contract_query.scalar()
 
-            total_items_inventory = (
-                session.query(func.count(ItemMaster.tag_id))
-                .filter(ItemMaster.last_contract_num == contract_number)
-                .scalar()
+            total_items_inventory_query = session.query(
+                func.count(ItemMaster.tag_id)
+            ).filter(ItemMaster.last_contract_num == contract_number)
+            total_items_inventory_query = apply_global_filters(
+                total_items_inventory_query, store_filter, type_filter
             )
+            total_items_inventory = total_items_inventory_query.scalar()
 
             contracts.append(
                 {
@@ -191,11 +198,15 @@ def sort_contracts():
             sort_column, sort_direction = sort_parts[0], sort_parts[1]
         sort_direction = asc if sort_direction == "asc" else desc
 
+        store_filter = request.args.get("store", "all")
+        type_filter = request.args.get("type", "all")
+
         # Step 1: Base query
         base_query = session.query(
             ItemMaster.last_contract_num,
             func.count(ItemMaster.tag_id).label("total_items"),
         ).group_by(ItemMaster.last_contract_num)
+        base_query = apply_global_filters(base_query, store_filter, type_filter)
 
         # Apply filters
         contracts_query = (
@@ -268,20 +279,22 @@ def sort_contracts():
                 f"Contract {contract_number} - Client: {client_name}, Scan Date: {scan_date}, Stale: {is_stale}"
             )
 
-            items_on_contract = (
-                session.query(func.count(ItemMaster.tag_id))
-                .filter(
-                    ItemMaster.last_contract_num == contract_number,
-                    func.lower(ItemMaster.status).in_(["on rent", "delivered"]),
-                )
-                .scalar()
+            items_on_contract_query = session.query(func.count(ItemMaster.tag_id)).filter(
+                ItemMaster.last_contract_num == contract_number,
+                func.lower(ItemMaster.status).in_(["on rent", "delivered"]),
             )
+            items_on_contract_query = apply_global_filters(
+                items_on_contract_query, store_filter, type_filter
+            )
+            items_on_contract = items_on_contract_query.scalar()
 
-            total_items_inventory = (
-                session.query(func.count(ItemMaster.tag_id))
-                .filter(ItemMaster.last_contract_num == contract_number)
-                .scalar()
+            total_items_inventory_query = session.query(
+                func.count(ItemMaster.tag_id)
+            ).filter(ItemMaster.last_contract_num == contract_number)
+            total_items_inventory_query = apply_global_filters(
+                total_items_inventory_query, store_filter, type_filter
             )
+            total_items_inventory = total_items_inventory_query.scalar()
 
             contracts.append(
                 {
@@ -601,6 +614,8 @@ def tab2_data():
     page = int(request.args.get("page", 1))
     per_page = 10
     sort = request.args.get("sort", "")
+    store_filter = request.args.get("store", "all")
+    type_filter = request.args.get("type", "all")
 
     logger.info(
         f"Fetching items for contract_number={contract_number}, common_name={common_name}, page={page}, sort={sort}"
@@ -628,6 +643,7 @@ def tab2_data():
             ItemMaster.common_name == common_name,
             func.lower(ItemMaster.status).in_(["on rent", "delivered"]),
         )
+        query = apply_global_filters(query, store_filter, type_filter)
 
         # Apply sorting (unchanged for nested layers)
         if sort == "tag_id_asc":
@@ -717,6 +733,8 @@ def tab2_data():
 def full_items_by_rental_class():
     contract_number = request.args.get("category")
     common_name = request.args.get("common_name")
+    store_filter = request.args.get("store", "all")
+    type_filter = request.args.get("type", "all")
 
     if not contract_number or not common_name:
         logger.error("Category (contract_number) and common name are required")
@@ -735,14 +753,12 @@ def full_items_by_rental_class():
         session = db.session()
         logger.info("Successfully created session for full_items_by_rental_class")
 
-        items_query = (
-            session.query(ItemMaster)
-            .filter(
-                ItemMaster.last_contract_num == contract_number,
-                ItemMaster.common_name == common_name,
-            )
-            .order_by(ItemMaster.tag_id)
+        items_query = session.query(ItemMaster).filter(
+            ItemMaster.last_contract_num == contract_number,
+            ItemMaster.common_name == common_name,
         )
+        items_query = apply_global_filters(items_query, store_filter, type_filter)
+        items_query = items_query.order_by(ItemMaster.tag_id)
 
         items = items_query.all()
         items_data = []
