@@ -1327,3 +1327,31 @@ window.printFullItemList = async function printFullItemList(category, subcategor
     printWindow.document.write(printContent);
     printWindow.document.close();
 }
+// CRITICAL FIX: Force fixed navbar positioning
+function forceNavbarFixed() {
+    const navbar = document.querySelector('.navbar');
+    if (navbar) {
+        // Force fixed positioning
+        navbar.style.position = 'fixed';
+        navbar.style.top = '0';
+        navbar.style.left = '0';
+        navbar.style.right = '0';
+        navbar.style.width = '100%';
+        navbar.style.zIndex = '1030';
+        console.log('Navbar fixed positioning enforced via JavaScript');
+    }
+}
+
+// Auto-run the navbar fix when this script loads
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function() {
+        forceNavbarFixed();
+        setTimeout(forceNavbarFixed, 100);
+        setTimeout(forceNavbarFixed, 500);
+    });
+} else {
+    // Document already loaded
+    forceNavbarFixed();
+    setTimeout(forceNavbarFixed, 100);
+    setTimeout(forceNavbarFixed, 500);
+}

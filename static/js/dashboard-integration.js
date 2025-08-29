@@ -305,6 +305,13 @@ class DashboardIntegrationManager {
             });
             
             const response = await fetch(`/api/enhanced/dashboard/kpis?${params}`);
+            
+            // Handle 404 gracefully - endpoint doesn't exist yet
+            if (response.status === 404) {
+                console.warn('Enhanced dashboard KPIs endpoint not implemented yet');
+                return { mock: true, message: 'Enhanced KPIs endpoint not available' };
+            }
+            
             const data = await response.json();
             
             if (data.success) {
@@ -352,10 +359,12 @@ class DashboardIntegrationManager {
             
             const [distribution, financial, utilization] = await Promise.all(promises);
             
+            // Handle mock responses from unimplemented endpoints
             const inventoryData = {
-                distribution: distribution.data,
-                financial: financial.data,
-                utilization: utilization.data
+                distribution: distribution.mock ? null : distribution.data,
+                financial: financial.mock ? null : financial.data,
+                utilization: utilization.mock ? null : utilization.data,
+                hasMockData: distribution.mock || financial.mock || utilization.mock
             };
             
             // Cache the result
@@ -424,6 +433,17 @@ class DashboardIntegrationManager {
         
         const url = params.toString() ? `${endpoint}?${params}` : endpoint;
         const response = await fetch(url);
+        
+        // Handle 404s gracefully for unimplemented enhanced endpoints
+        if (response.status === 404 && endpoint.includes('/api/enhanced/')) {
+            console.warn(`Enhanced endpoint not implemented: ${endpoint}`);
+            return { 
+                success: false, 
+                data: null, 
+                message: `Endpoint ${endpoint} not implemented yet`,
+                mock: true 
+            };
+        }
         
         if (!response.ok) {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);

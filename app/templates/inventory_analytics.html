@@ -152,7 +152,19 @@
         margin-right: 0.25rem;
         font-size: 0.875em;
     }
-    .alert-low { background-color: #28a745; color: white; }\n    \n    /* Accessibility: Enhanced focus indicators for keyboard navigation */\n    .nav-link:focus {\n        box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.5) !important;\n        outline: 2px solid transparent;\n        outline-offset: 2px;\n    }\n    \n    button:focus, .btn:focus {\n        box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.5) !important;\n        outline: 2px solid transparent;\n    }
+    .alert-low { background-color: #28a745; color: white; }
+    
+    /* Accessibility: Enhanced focus indicators for keyboard navigation */
+    .nav-link:focus {
+        box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.5) !important;
+        outline: 2px solid transparent;
+        outline-offset: 2px;
+    }
+    
+    button:focus, .btn:focus {
+        box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.5) !important;
+        outline: 2px solid transparent;
+    }
     
     .stale-item {
         padding: 10px;
@@ -172,7 +184,35 @@
         animation: spin 1s linear infinite;
     }
     
-    /* Phase 1B: Standardized Progress Loading */\n    .progress-loader {\n        text-align: center;\n        padding: 20px;\n        background: #f8f9fa;\n        border-radius: 8px;\n        border-left: 4px solid #007bff;\n        margin: 15px 0;\n    }\n    \n    .progress-loader .spinner-border {\n        width: 1.5rem;\n        height: 1.5rem;\n        margin-right: 0.5rem;\n    }\n    \n    .progress-step {\n        font-weight: 500;\n        color: #495057;\n        margin-bottom: 0.25rem;\n    }\n    \n    .progress-time {\n        font-size: 0.875rem;\n        color: #6c757d;\n        font-style: italic;\n    }\n    \n    @keyframes spin {
+    /* Phase 1B: Standardized Progress Loading */
+    .progress-loader {
+        text-align: center;
+        padding: 20px;
+        background: #f8f9fa;
+        border-radius: 8px;
+        border-left: 4px solid #007bff;
+        margin: 15px 0;
+    }
+    
+    .progress-loader .spinner-border {
+        width: 1.5rem;
+        height: 1.5rem;
+        margin-right: 0.5rem;
+    }
+    
+    .progress-step {
+        font-weight: 500;
+        color: #495057;
+        margin-bottom: 0.25rem;
+    }
+    
+    .progress-time {
+        font-size: 0.875rem;
+        color: #6c757d;
+        font-style: italic;
+    }
+    
+    @keyframes spin {
         0% { transform: rotate(0deg); }
         100% { transform: rotate(360deg); }
     }
@@ -1497,39 +1537,9 @@ function displayHealthAlerts(alerts) {
         alerts = [];
     }
     
-    // Group alerts by tag_id to eliminate duplicates
-    const groupedAlerts = {};
-    alerts.forEach(alert => {
-        const key = alert.tag_id || `${alert.category}_${alert.subcategory}_${Math.random()}`;
-        if (!groupedAlerts[key]) {
-            groupedAlerts[key] = {
-                ...alert,
-                alertCount: 1,
-                severities: [alert.severity],
-                alertTypes: [alert.alert_type],
-                suggestions: [alert.suggested_action]
-            };
-        } else {
-            // Merge duplicate alerts
-            groupedAlerts[key].alertCount++;
-            if (!groupedAlerts[key].severities.includes(alert.severity)) {
-                groupedAlerts[key].severities.push(alert.severity);
-            }
-            if (!groupedAlerts[key].alertTypes.includes(alert.alert_type)) {
-                groupedAlerts[key].alertTypes.push(alert.alert_type);
-            }
-            if (!groupedAlerts[key].suggestions.includes(alert.suggested_action)) {
-                groupedAlerts[key].suggestions.push(alert.suggested_action);
-            }
-            // Use highest priority severity
-            const severityPriority = { 'critical': 4, 'high': 3, 'medium': 2, 'low': 1 };
-            if (severityPriority[alert.severity] > severityPriority[groupedAlerts[key].severity]) {
-                groupedAlerts[key].severity = alert.severity;
-            }
-        }
-    });
-    
-    const uniqueAlerts = Object.values(groupedAlerts);
+    // Backend now prevents duplicates with proper unique constraints and upsert logic
+    // No need for frontend deduplication - each alert should be unique
+    const uniqueAlerts = alerts;
     
     const perPage = parseInt(document.getElementById('alerts-per-page').value) || 25;
     const totalPages = Math.ceil(uniqueAlerts.length / perPage);
@@ -1539,7 +1549,7 @@ function displayHealthAlerts(alerts) {
     
     // Update count
     document.getElementById('alerts-count').textContent = 
-        `Showing ${startIndex + 1}-${Math.min(endIndex, uniqueAlerts.length)} of ${uniqueAlerts.length} unique items (${alerts.length} total alerts)`;
+        `Showing ${startIndex + 1}-${Math.min(endIndex, uniqueAlerts.length)} of ${uniqueAlerts.length} health alerts`;
     
     // Display alerts
     let html = '';
@@ -1552,37 +1562,32 @@ function displayHealthAlerts(alerts) {
                 'low': 'secondary'
             }[alert.severity] || 'secondary';
             
-            // Create badges for all severities
-            const severityBadges = alert.severities.map(sev => {
-                const color = {'critical': 'danger', 'high': 'warning', 'medium': 'info', 'low': 'secondary'}[sev] || 'secondary';
-                return `<span class="badge bg-${color} me-1">${sev.toUpperCase()}</span>`;
-            }).join('');
+            // Single severity badge since duplicates are prevented at backend
+            const severityBadge = `<span class="badge bg-${severityColor} me-1">${alert.severity.toUpperCase()}</span>`;
             
-            // Create combined suggestions
-            const suggestions = alert.suggestions.filter(s => s && s.trim()).join(' • ');
+            // Single suggestion since no duplicates
+            const suggestions = alert.suggested_action || 'No action suggested';
             
             html += `
                 <div class="alert alert-${severityColor} d-flex justify-content-between align-items-start">
                     <div class="flex-grow-1">
                         <div class="d-flex align-items-center mb-1">
                             <strong class="me-2">${alert.common_name || alert.category || 'Unknown Item'}</strong>
-                            ${alert.alertCount > 1 ? `<span class="badge bg-info">${alert.alertCount} alerts</span>` : ''}
                         </div>
                         ${alert.tag_id ? `<div class="small text-muted mb-1">Tag ID: ${alert.tag_id}</div>` : ''}
                         <div class="small text-muted mb-1">${alert.category || 'No Category'} > ${alert.subcategory || 'No Subcategory'}</div>
                         <div class="mt-1">
-                            <small>${suggestions || 'No action suggested'}</small>
+                            <small>${suggestions}</small>
                         </div>
                         <div class="mt-1">
                             <small class="text-muted">
                                 Created: ${new Date(alert.created_at).toLocaleDateString()}
-                                ${alert.alertCount > 1 ? ` (Latest of ${alert.alertCount} similar alerts)` : ''}
                             </small>
                         </div>
                     </div>
                     <div class="d-flex flex-column align-items-end">
                         <div class="mb-2">
-                            ${severityBadges}
+                            ${severityBadge}
                         </div>
                         ${alert.tag_id ? `
                             <button class="btn btn-outline-primary btn-sm" onclick="navigateToItem('${alert.tag_id}')" 

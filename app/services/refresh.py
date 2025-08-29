@@ -31,7 +31,19 @@ refresh_bp = Blueprint("refresh", __name__)
 # Global refresh status tracking
 refresh_status = {"refreshing": False, "start_time": None}
 
-api_client = APIClient()
+# Initialize APIClient lazily to prevent startup failures
+api_client = None
+
+def get_api_client():
+    """Get APIClient instance, initialize if needed"""
+    global api_client
+    if api_client is None:
+        try:
+            api_client = APIClient()
+        except Exception as e:
+            logger.warning(f"APIClient initialization failed: {e}. Refresh functions may be limited.")
+            api_client = None
+    return api_client
 
 
 def validate_date(date_str, field_name, tag_id):
@@ -570,11 +582,14 @@ def full_refresh():
             logger.info(f"Deleted {deleted_seed} items from seed_rental_classes")
 
             logger.debug("Fetching data from API")
-            items = api_client.get_item_master(since_date=None, full_refresh=True)
-            transactions = api_client.get_transactions(
+            client = get_api_client()
+            if not client:
+                raise Exception("API client not available - check authentication settings")
+            items = client.get_item_master(since_date=None, full_refresh=True)
+            transactions = client.get_transactions(
                 since_date=None, full_refresh=True
             )
-            seed_data = api_client.get_seed_data()
+            seed_data = client.get_seed_data()
 
             logger.info(f"Fetched {len(items)} item master records")
             logger.info(f"Fetched {len(transactions)} transaction records")
@@ -654,14 +669,17 @@ def incremental_refresh():
                     f"Checking for item master and transaction updates since: {since_date.strftime('%Y-%m-%d %H:%M:%S')}"
                 )
 
-                items = api_client.get_item_master(
+                client = get_api_client()
+                if not client:
+                    raise Exception("API client not available - check authentication settings")
+                items = client.get_item_master(
                     since_date=since_date, full_refresh=False
                 )
                 logger.info(f"Fetched {len(items)} item master records")
                 if not items:
                     logger.info("No new items fetched from item master API")
 
-                transactions = api_client.get_transactions(
+                transactions = client.get_transactions(
                     since_date=since_date, full_refresh=False
                 )
                 logger.info(f"Fetched {len(transactions)} transaction records")

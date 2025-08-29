@@ -22,7 +22,7 @@ sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 from app.models.db_models import (
     ItemMaster, Transaction, InventoryHealthAlert, 
-    InventoryConfig, UserRentalClassMapping, StorePerformance
+    InventoryConfig, UserRentalClassMapping, PayrollTrends
 )
 
 

@@ -1,0 +1,182 @@
+{
+  "timestamp": "2025-08-29T09:32:31.876678",
+  "integrity_checks": {
+    "orphaned_transactions": {
+      "count": 974,
+      "status": "FAIL"
+    },
+    "duplicate_tags": {
+      "count": 0,
+      "status": "PASS",
+      "details": []
+    },
+    "pnl_consistency": {
+      "error": "(mysql.connector.errors.ProgrammingError) 1054 (42S22): Unknown column 'store_id' in 'SELECT'\n[SQL: \n        SELECT \n            store_id,\n            COUNT(DISTINCT year) as years,\n            COUNT(DISTINCT month) as months,\n            COUNT(*) as total_records,\n            MIN(year) as min_year,\n            MAX(year) as max_year\n        FROM pos_pnl\n        GROUP BY store_id\n        ]\n(Background on this error at: https://sqlalche.me/e/20/f405)",
+      "status": "ERROR"
+    },
+    "fk_transactions_to_items": {
+      "error": "(mysql.connector.errors.ProgrammingError) 1054 (42S22): Unknown column 'pti.transaction_id' in 'WHERE'\n[SQL: \n                    SELECT COUNT(*) as missing_items\n                    FROM pos_transactions pt\n                    LEFT JOIN pos_transaction_items pti ON pt.transaction_id = pti.transaction_id\n                    WHERE pti.transaction_id IS NULL AND pt.total_items > 0\n                ]\n(Background on this error at: https://sqlalche.me/e/20/f405)",
+      "status": "ERROR"
+    },
+    "fk_equipment_to_customers": {
+      "error": "(mysql.connector.errors.ProgrammingError) 1054 (42S22): Unknown column 'pc.customer_id' in 'WHERE'\n[SQL: \n                    SELECT COUNT(*) as orphaned_equipment\n                    FROM pos_equipment pe\n                    LEFT JOIN pos_customers pc ON pe.customer_id = pc.customer_id\n                    WHERE pc.customer_id IS NULL\n                ]\n(Background on this error at: https://sqlalche.me/e/20/f405)",
+      "status": "ERROR"
+    },
+    "data_types": {
+      "error": "(mysql.connector.errors.ProgrammingError) 1054 (42S22): Unknown column 'date_in' in 'SELECT'\n[SQL: \n        SELECT \n            'id_item_master' as table_name,\n            COUNT(*) as total,\n            SUM(CASE WHEN date_in IS NOT NULL AND date_in != '' THEN 1 ELSE 0 END) as valid_dates,\n            SUM(CASE WHEN turnover_ytd IS NOT NULL THEN 1 ELSE 0 END) as valid_turnover\n        FROM id_item_master\n        ]\n(Background on this error at: https://sqlalche.me/e/20/f405)",
+      "status": "ERROR"
+    }
+  },
+  "performance_metrics": {
+    "store_performance": {
+      "execution_time_ms": 171.47,
+      "row_count": 6,
+      "status": "PASS",
+      "optimization_needed": false
+    },
+    "pnl_variance": {
+      "error": "(mysql.connector.errors.ProgrammingError) 1054 (42S22): Unknown column 'p.store_id' in 'SELECT'\n[SQL: \n                    SELECT \n                        p.store_id,\n                        p.year,\n                        p.month,\n                        p.revenue,\n                        p.cogs,\n                        p.gross_profit,\n                        e.gdp_growth,\n                        e.unemployment_rate\n                    FROM pos_pnl p\n                    LEFT JOIN external_factors e \n                        ON DATE(p.year || '-' || printf('%%02d', p.month) || '-01') = DATE(e.date)\n                    WHERE p.year >= 2023\n                ]\n(Background on this error at: https://sqlalche.me/e/20/f405)",
+      "status": "ERROR"
+    },
+    "correlation_analysis": {
+      "error": "(mysql.connector.errors.ProgrammingError) 1054 (42S22): Unknown column 'factor_name' in 'SELECT'\n[SQL: \n                    SELECT \n                        factor_name,\n                        correlation_value,\n                        p_value,\n                        lag_days\n                    FROM pos_rfid_correlations\n                    WHERE ABS(correlation_value) > 0.5\n                        AND p_value < 0.05\n                    ORDER BY ABS(correlation_value) DESC\n                ]\n(Background on this error at: https://sqlalche.me/e/20/f405)",
+      "status": "ERROR"
+    },
+    "inventory_health": {
+      "error": "(mysql.connector.errors.ProgrammingError) 1054 (42S22): Unknown column 't.transaction_id' in 'SELECT'\n[SQL: \n                    SELECT \n                        im.current_store,\n                        COUNT(DISTINCT im.tag_id) as unique_items,\n                        COUNT(t.transaction_id) as total_transactions,\n                        AVG(JULIANDAY('now') - JULIANDAY(t.scan_date)) as avg_days_since_scan\n                    FROM id_item_master im\n                    LEFT JOIN id_transactions t ON im.tag_id = t.tag_id\n                    GROUP BY im.current_store\n                ]\n(Background on this error at: https://sqlalche.me/e/20/f405)",
+      "status": "ERROR"
+    },
+    "indexes": {
+      "error": "(mysql.connector.errors.ProgrammingError) 1064 (42000): You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near 'FROM sqlite_master\n        WHERE type = 'index'\n            AND sql IS NOT NULL' at line 5\n[SQL: \n        SELECT \n            name,\n            tbl_name,\n            sql\n        FROM sqlite_master\n        WHERE type = 'index'\n            AND sql IS NOT NULL\n        ]\n(Background on this error at: https://sqlalche.me/e/20/f405)"
+    },
+    "table_statistics": {
+      "error": "(mysql.connector.errors.ProgrammingError) 1064 (42000): You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near '(name)) as column_count\n        FROM sqlite_master\n        WHERE type = 'tabl...' at line 3\n[SQL: \n        SELECT \n            name,\n            (SELECT COUNT(*) FROM pragma_table_info(name)) as column_count\n        FROM sqlite_master\n        WHERE type = 'table'\n            AND name NOT LIKE 'sqlite_%%'\n        ORDER BY name\n        ]\n(Background on this error at: https://sqlalche.me/e/20/f405)"
+    },
+    "concurrent_queries": {
+      "queries_executed": 4,
+      "total_time_ms": 44.73,
+      "avg_time_ms": 11.18,
+      "status": "PASS"
+    },
+    "large_dataset": {
+      "error": "(mysql.connector.errors.ProgrammingError) 1054 (42S22): Unknown column 't.transaction_id' in 'SELECT'\n[SQL: \n        SELECT \n            im.current_store,\n            COUNT(DISTINCT im.tag_id) as items,\n            COUNT(t.transaction_id) as transactions,\n            AVG(im.turnover_ytd) as avg_turnover,\n            SUM(im.turnover_ytd) as total_turnover\n        FROM id_item_master im\n        LEFT JOIN id_transactions t ON im.tag_id = t.tag_id\n        GROUP BY im.current_store\n        ]\n(Background on this error at: https://sqlalche.me/e/20/f405)",
+      "status": "ERROR"
+    },
+    "pnl_analytics": {
+      "error": "(mysql.connector.errors.ProgrammingError) 1054 (42S22): Unknown column 'store_id' in 'SELECT'\n[SQL: \n        SELECT \n            store_id,\n            year,\n            AVG(revenue) as avg_revenue,\n            AVG(gross_profit) as avg_profit,\n            AVG(gross_margin) as avg_margin\n        FROM pos_pnl\n        WHERE year BETWEEN 2021 AND 2025\n        GROUP BY store_id, year\n        ]\n(Background on this error at: https://sqlalche.me/e/20/f405)",
+      "status": "ERROR"
+    },
+    "memory_usage": {
+      "estimated_mb": 36.56,
+      "tables": {
+        "id_item_master": 32198.24,
+        "id_transactions": 5190.23,
+        "pos_pnl": 52.73
+      },
+      "status": "PASS"
+    }
+  },
+  "data_quality": {
+    "missing_data": {
+      "id_item_master": {
+        "total_records": 65942,
+        "missing_counts": {
+          "tag_id": "0",
+          "current_store": "13608",
+          "turnover_ytd": "62287"
+        },
+        "completeness_percentage": "5.54"
+      },
+      "pos_pnl": {
+        "error": "(mysql.connector.errors.ProgrammingError) 1054 (42S22): Unknown column 'store_id' in 'SELECT'\n[SQL: \n                    SELECT \n                        COUNT(*) as total,\n                        SUM(CASE WHEN store_id IS NULL THEN 1 ELSE 0 END) as missing_store,\n                        SUM(CASE WHEN revenue IS NULL THEN 1 ELSE 0 END) as missing_revenue,\n                        SUM(CASE WHEN gross_profit IS NULL THEN 1 ELSE 0 END) as missing_profit\n                    FROM pos_pnl\n                ]\n(Background on this error at: https://sqlalche.me/e/20/f405)"
+      }
+    },
+    "outliers": {
+      "total_items": 3655,
+      "outlier_count": "487",
+      "outlier_percentage": "13.32",
+      "statistics": {
+        "min": "1.00",
+        "max": "14262.00",
+        "avg": "43.12",
+        "q1": "1.00",
+        "q3": "11.00"
+      }
+    },
+    "pnl_consistency": {
+      "error": "(mysql.connector.errors.ProgrammingError) 1054 (42S22): Unknown column 'store_id' in 'SELECT'\n[SQL: \n        SELECT \n            store_id,\n            year,\n            month,\n            revenue,\n            cogs,\n            gross_profit,\n            CASE \n                WHEN ABS(gross_profit - (revenue - cogs)) > 0.01 \n                THEN 'INCONSISTENT' \n                ELSE 'CONSISTENT' \n            END as consistency_check\n        FROM pos_pnl\n        WHERE revenue IS NOT NULL AND cogs IS NOT NULL AND gross_profit IS NOT NULL\n        ]\n(Background on this error at: https://sqlalche.me/e/20/f405)"
+    },
+    "date_quality": {
+      "error": "(mysql.connector.errors.ProgrammingError) 1054 (42S22): Unknown column 'date_in' in 'SELECT'\n[SQL: \n        SELECT \n            COUNT(*) as total,\n            SUM(CASE \n                WHEN date_in IS NOT NULL \n                AND date_in != '' \n                AND date(date_in) IS NOT NULL \n                THEN 1 ELSE 0 \n            END) as valid_dates,\n            MIN(date_in) as earliest_date,\n            MAX(date_in) as latest_date\n        FROM id_item_master\n        ]\n(Background on this error at: https://sqlalche.me/e/20/f405)"
+    }
+  },
+  "algorithm_validation": {
+    "pearson_correlation": {
+      "test_correlation": 0.9655,
+      "test_p_value": 0.0,
+      "status": "PASS",
+      "threshold_check": {
+        "correlation_threshold": 0.5,
+        "p_value_threshold": 0.05,
+        "meets_criteria": "True"
+      }
+    },
+    "granger_causality": {
+      "error": "No module named 'statsmodels'",
+      "status": "ERROR"
+    },
+    "arima_validation": {
+      "error": "No module named 'pmdarima'",
+      "status": "ERROR"
+    },
+    "interpolation": {
+      "methods_tested": [
+        "linear",
+        "polynomial",
+        "forward_fill",
+        "backward_fill"
+      ],
+      "gaps_filled": {
+        "linear": "3",
+        "polynomial": "2",
+        "forward_fill": "3",
+        "backward_fill": "2"
+      },
+      "status": "PASS"
+    },
+    "correlation_thresholds": {
+      "error": "(mysql.connector.errors.ProgrammingError) 1054 (42S22): Unknown column 'correlation_value' in 'SELECT'\n[SQL: \n            SELECT \n                COUNT(*) as total_correlations,\n                SUM(CASE WHEN ABS(correlation_value) > 0.5 THEN 1 ELSE 0 END) as significant_correlations,\n                SUM(CASE WHEN p_value < 0.05 THEN 1 ELSE 0 END) as statistically_significant,\n                AVG(ABS(correlation_value)) as avg_correlation\n            FROM pos_rfid_correlations\n            ]\n(Background on this error at: https://sqlalche.me/e/20/f405)",
+      "status": "ERROR"
+    }
+  },
+  "recommendations": [
+    {
+      "priority": "HIGH",
+      "category": "Data Integrity",
+      "issue": "Found 974 orphaned transactions",
+      "recommendation": "Add foreign key constraint or clean orphaned records",
+      "sql": "\n                DELETE FROM id_transactions \n                WHERE tag_id NOT IN (SELECT tag_id FROM id_item_master)\n                "
+    },
+    {
+      "priority": "MEDIUM",
+      "category": "Data Quality",
+      "issue": "Table id_item_master has only 5.54% data completeness",
+      "recommendation": "Implement data validation and interpolation strategies",
+      "action": "Review ETL processes and add NOT NULL constraints where appropriate"
+    },
+    {
+      "priority": "LOW",
+      "category": "Data Quality",
+      "issue": "13.32% of records are outliers",
+      "recommendation": "Review outlier detection thresholds and data validation rules",
+      "action": "Implement data cleaning pipeline with configurable outlier handling"
+    },
+    {
+      "priority": "HIGH",
+      "category": "Performance",
+      "issue": "Insufficient indexes detected",
+      "recommendation": "Create indexes on frequently queried columns",
+      "sql": "\n                -- Core indexes for performance\n                CREATE INDEX IF NOT EXISTS idx_item_master_store ON id_item_master(current_store);\n                CREATE INDEX IF NOT EXISTS idx_item_master_tag ON id_item_master(tag_id);\n                CREATE INDEX IF NOT EXISTS idx_transactions_tag ON id_transactions(tag_id);\n                CREATE INDEX IF NOT EXISTS idx_transactions_date ON id_transactions(scan_date);\n                CREATE INDEX IF NOT EXISTS idx_pnl_store_date ON pos_pnl(store_id, year, month);\n                CREATE INDEX IF NOT EXISTS idx_correlations_value ON pos_rfid_correlations(correlation_value);\n                "
+    }
+  ]
+}

@@ -82,7 +82,14 @@
                         <td>{{ contract.items_on_contract }}</td>
                         <td>{{ contract.total_items_inventory }}</td>
                         <td>{{ contract.hand_counted_items }}</td>
-                        <td>{{ contract.scan_date }}</td>
+                        <td>
+                            {% if contract.scan_date and contract.scan_date != 'N/A' %}
+                                {{ contract.scan_date[:10] }}
+                                <br><small class="text-muted">{{ contract.scan_date[11:16] }}</small>
+                            {% else %}
+                                {{ contract.scan_date or 'N/A' }}
+                            {% endif %}
+                        </td>
                         <td class="action-buttons">
                             <!-- Core actions always available -->
                             <button class="btn btn-sm btn-secondary expand-btn" data-target-id="common-{{ contract.contract_number|replace(' ', '_') }}" data-contract-number="{{ contract.contract_number }}">Expand</button>

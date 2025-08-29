@@ -51,8 +51,8 @@ def home():
                 func.sum(
                     case(
                         (
-                            ItemMaster.status.notin_(
-                                ["Ready to Rent", "On Rent", "Delivered"]
+                            ItemMaster.status.in_(
+                                ["Needs to be Inspected", "Wet", "Repair", "Missing"]
                             ),
                             1,
                         ),
@@ -284,8 +284,8 @@ def get_summary_stats():
             func.sum(
                 case(
                     (
-                        ItemMaster.status.notin_(
-                            ["Ready to Rent", "On Rent", "Delivered"]
+                        ItemMaster.status.in_(
+                            ["Needs to be Inspected", "Wet", "Repair", "Missing"]
                         ),
                         1,
                     ),
@@ -328,3 +328,9 @@ def get_summary_stats():
     except Exception as e:
         logger.error(f"Error fetching summary stats: {str(e)}", exc_info=True)
         return jsonify({"error": str(e)}), 500
+
+
+@home_bp.route("/sticky_test")
+def sticky_test():
+    """Simple test page to verify sticky positioning works"""
+    return render_template("sticky_test.html")

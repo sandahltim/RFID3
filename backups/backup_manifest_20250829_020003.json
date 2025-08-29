@@ -1,0 +1,10 @@
+{
+  "backup_date": "2025-08-29T02:00:03.112492",
+  "database_name": "rfid_inventory",
+  "backup_file": "rfid_inventory_backup_20250829_020001.sql.gz",
+  "backup_size_bytes": 2362702,
+  "database_size_gb": 0.08,
+  "backup_type": "nightly_full",
+  "retention_days": 30,
+  "status": "success"
+}
