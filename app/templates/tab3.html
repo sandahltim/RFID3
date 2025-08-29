@@ -5,6 +5,8 @@
 {% block content %}
     <h2>Service</h2>
 
+    {% include 'global_filters.html' %}
+
     <!-- Filter Section -->
     <div class="card mb-4">
         <div class="card-header">Filters</div>
@@ -45,7 +47,7 @@
     </div>
 
     <!-- Summary Table -->
-    <h2>Items in Service</h2>
+    <h3>Items in Service</h3>
     {% if crew_groups.get('Tent Crew') or crew_groups.get('Linen Crew') or crew_groups.get('Service Dept') %}
         {% for crew in ['Tent Crew', 'Linen Crew', 'Service Dept'] %}
             {% if crew_groups.get(crew) %}
@@ -144,7 +146,7 @@
     {% endif %}
 
     <!-- Print RFID Tags Section -->
-    <h2 class="mt-4">Print RFID Tags</h2>
+    <h3 class="mt-4">Print RFID Tags</h3>
     <div class="card mb-4">
         <div class="card-body">
             <div class="row">
