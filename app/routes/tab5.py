@@ -311,6 +311,8 @@ def tab5_subcat_data():
     status_filter = request.args.get("statusFilter", "").lower()
     bin_filter = request.args.get("binFilter", "").lower()
     sort = request.args.get("sort", "")
+    store_filter = request.args.get("store", "all")
+    type_filter = request.args.get("type", "all")
 
     if not category:
         logger.error(
