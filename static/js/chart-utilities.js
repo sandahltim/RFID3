@@ -25,6 +25,10 @@ class RFID3ChartManager {
      * Initialize Chart.js with global defaults for executive presentation
      */
     initializeChartDefaults() {
+        if (typeof Chart === 'undefined') {
+            console.warn('Chart.js is not loaded yet, skipping chart defaults initialization');
+            return;
+        }
         Chart.defaults.font.family = "'Segoe UI', system-ui, -apple-system, sans-serif";
         Chart.defaults.font.size = 12;
         Chart.defaults.color = '#4a5568';
@@ -750,9 +754,18 @@ class RFID3ChartManager {
 // Initialize global chart manager
 window.chartManager = new RFID3ChartManager();
 
-// Auto-initialize Chart.js defaults when script loads
+// Auto-initialize Chart.js defaults when script loads (with Chart.js availability check)
 document.addEventListener('DOMContentLoaded', () => {
-    window.chartManager.initializeChartDefaults();
+    // Wait for Chart.js to be available
+    const initCharts = () => {
+        if (typeof Chart !== 'undefined') {
+            window.chartManager.initializeChartDefaults();
+        } else {
+            // Retry after a short delay if Chart.js is not yet loaded
+            setTimeout(initCharts, 100);
+        }
+    };
+    initCharts();
 });
 
 // Export for module systems
