@@ -20,6 +20,9 @@ logger = logging.getLogger(__name__)
 # Create blueprint
 config_bp = Blueprint('configuration', __name__, url_prefix='/config')
 
+# Also create a redirect blueprint for common URL variations
+config_redirect_bp = Blueprint('config_redirect', __name__)
+
 # Default user ID (in a real application, this would come from authentication)
 DEFAULT_USER_ID = 'default_user'
 
@@ -762,3 +765,18 @@ def reset_configuration(config_type):
         db.session.rollback()
         logger.error(f"Error resetting {config_type} configuration: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# Redirect routes for common URL variations
+@config_redirect_bp.route('/configuration')
+@config_redirect_bp.route('/configuration/')
+def redirect_to_config():
+    """Redirect common configuration URLs to the correct path."""
+    return redirect(url_for('configuration.configuration_dashboard'))
+
+
+@config_redirect_bp.route('/settings')
+@config_redirect_bp.route('/settings/')
+def redirect_settings_to_config():
+    """Redirect settings URLs to configuration dashboard."""
+    return redirect(url_for('configuration.configuration_dashboard'))
