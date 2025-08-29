@@ -1,0 +1,126 @@
+{
+  "database_connection": "PASS",
+  "table_counts": {
+    "pos_equipment": {
+      "actual": 25000,
+      "expected": 25000,
+      "status": "\u2705 PASS"
+    },
+    "pos_customers": {
+      "actual": 0,
+      "expected": 0,
+      "status": "\u2705 PASS"
+    },
+    "pos_transactions": {
+      "actual": 0,
+      "expected": 0,
+      "status": "\u2705 PASS"
+    },
+    "pos_transaction_items": {
+      "actual": 0,
+      "expected": 0,
+      "status": "\u2705 PASS"
+    },
+    "pos_pnl": {
+      "actual": 180,
+      "expected": 180,
+      "status": "\u2705 PASS"
+    },
+    "id_item_master": {
+      "actual": 65942,
+      "expected": 65942,
+      "status": "\u2705 PASS"
+    },
+    "id_transactions": {
+      "actual": 26574,
+      "expected": 26574,
+      "status": "\u2705 PASS"
+    },
+    "executive_kpi": {
+      "actual": 6,
+      "expected": 6,
+      "status": "\u2705 PASS"
+    },
+    "executive_payroll_trends": {
+      "actual": 328,
+      "expected": 328,
+      "status": "\u2705 PASS"
+    },
+    "executive_scorecard_trends": {
+      "actual": 0,
+      "expected": 0,
+      "status": "\u2705 PASS"
+    },
+    "resale_analytics": {
+      "actual": 1000,
+      "expected": 1000,
+      "status": "\u2705 PASS"
+    }
+  },
+  "csv_import": {
+    "customer8.26.25.csv": {
+      "exists": true,
+      "size": 41830119
+    },
+    "transactions8.26.25.csv": {
+      "exists": true,
+      "size": 48634841
+    },
+    "equip8.26.25.csv": {
+      "exists": true,
+      "size": 13431531
+    },
+    "PL8.28.25.csv": {
+      "exists": true,
+      "size": 23107
+    },
+    "Payroll Trends.csv": {
+      "exists": true,
+      "size": 12923
+    },
+    "Scorecard Trends.csv": {
+      "exists": true,
+      "size": 17357170
+    },
+    "script_test": "FAILED - Command '['python3', '/home/tim/RFID3/limited_data_import.py']' timed out after 30 seconds"
+  },
+  "api_endpoints": {
+    "/api/inventory/dashboard_summary": {
+      "status": "PASS",
+      "type": "JSON"
+    },
+    "/api/inventory/business_intelligence": {
+      "status": "PASS",
+      "type": "JSON"
+    },
+    "/api/inventory/alerts": {
+      "status": "PASS",
+      "type": "JSON"
+    },
+    "/": {
+      "status": "PASS",
+      "type": "HTML"
+    },
+    "/tab7": {
+      "status": "NOT_FOUND"
+    },
+    "/bi/dashboard": {
+      "status": "PASS",
+      "type": "HTML"
+    }
+  },
+  "business_analytics": {
+    "equipment_utilization": "PASS",
+    "pnl_analytics": "PASS",
+    "roi_calculation": "PASS"
+  },
+  "schema_integrity": {
+    "indexes": "PASS",
+    "foreign_keys": "PASS",
+    "data_consistency": {
+      "equipment_with_store": 21000,
+      "pnl_stores": 4,
+      "equipment_stores": 6
+    }
+  }
+}
