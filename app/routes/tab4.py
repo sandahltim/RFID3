@@ -16,6 +16,7 @@ from ..models.db_models import (
 )
 from ..services.logger import get_logger
 from sqlalchemy import func, desc, or_
+from ..utils.filters import apply_global_filters
 from sqlalchemy.exc import ProgrammingError
 from datetime import datetime
 import time  # Ensure the time module is imported
@@ -50,7 +51,10 @@ def tab4_view():
             "Fetching items from id_item_master with status 'On Rent' or 'Delivered' and contract starting with 'L' at %s",
             datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         )
-        item_master_contracts = (
+        store_filter = request.args.get("store", "all")
+        type_filter = request.args.get("type", "all")
+
+        item_master_contracts_query = (
             session.query(
                 ItemMaster.last_contract_num.label("contract_number"),
                 func.count(ItemMaster.tag_id).label("items_on_contract"),
@@ -63,8 +67,11 @@ def tab4_view():
             )
             .group_by(ItemMaster.last_contract_num)
             .having(func.count(ItemMaster.tag_id) > 0)
-            .all()
         )
+        item_master_contracts_query = apply_global_filters(
+            item_master_contracts_query, store_filter, type_filter
+        )
+        item_master_contracts = item_master_contracts_query.all()
 
         logger.info(
             f"Contracts from ItemMaster: {[(c.contract_number, c.items_on_contract) for c in item_master_contracts]} at %s",
@@ -80,8 +87,11 @@ def tab4_view():
             )
             .filter(ItemMaster.last_contract_num.in_(contract_numbers_from_items))
             .group_by(ItemMaster.last_contract_num)
-            .all()
         )
+        total_items_inventory_query = apply_global_filters(
+            total_items_inventory_query, store_filter, type_filter
+        )
+        total_items_inventory_query = total_items_inventory_query.all()
 
         total_items_inventory_dict = {
             item.contract_number: item.total_items_inventory
