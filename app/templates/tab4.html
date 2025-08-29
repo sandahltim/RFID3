@@ -7,6 +7,8 @@
 {% block content %}
     <h2>Laundry Contracts</h2>
 
+    {% include 'global_filters.html' %}
+
     {% if error %}
         <div class="alert alert-danger" role="alert">
             Error loading contracts: {{ error }}
