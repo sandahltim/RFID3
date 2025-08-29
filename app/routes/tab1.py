@@ -37,12 +37,42 @@ logger.info("Deployed tab1.py version: 2025-07-10-v24")
 from ..services.mappings_cache import get_cached_mappings
 
 
+def build_global_filters(store_filter="all", type_filter="all"):
+    """Build SQLAlchemy filters for store and inventory type selection."""
+    filters = []
+
+    if store_filter and store_filter != "all":
+        filters.append(
+            or_(
+                ItemMaster.home_store == store_filter,
+                ItemMaster.current_store == store_filter,
+            )
+        )
+
+    if type_filter and type_filter != "all":
+        filters.append(ItemMaster.identifier_type == type_filter)
+
+    return filters
+
+
 def get_category_data(
-    session, filter_query="", sort="", status_filter="", bin_filter=""
+    session,
+    filter_query="",
+    sort="",
+    status_filter="",
+    bin_filter="",
+    store_filter="all",
+    type_filter="all",
 ):
     """Return aggregated category counts using a single grouped query."""
     logger.debug(
-        f"get_category_data: filter_query={filter_query}, sort={sort}, status_filter={status_filter}, bin_filter={bin_filter}"
+        "get_category_data: filter_query=%s, sort=%s, status_filter=%s, bin_filter=%s, store_filter=%s, type_filter=%s",
+        filter_query,
+        sort,
+        status_filter,
+        bin_filter,
+        store_filter,
+        type_filter,
     )
 
     mappings_dict = get_cached_mappings(session)
@@ -96,6 +126,9 @@ def get_category_data(
             "items_available"
         ),
     ).filter(func.trim(func.cast(ItemMaster.rental_class_num, db.String)).in_(rc_ids))
+
+    for condition in build_global_filters(store_filter, type_filter):
+        base_query = base_query.filter(condition)
 
     if status_filter:
         base_query = base_query.filter(
@@ -166,11 +199,17 @@ def tab1_view():
         store_filter = request.args.get("store", "all")
         type_filter = request.args.get("type", "all")
         logger.debug(
-            f"Tab 1 parameters: filter_query={filter_query}, sort={sort}, status_filter={status_filter}, bin_filter={bin_filter}"
+            f"Tab 1 parameters: filter_query={filter_query}, sort={sort}, status_filter={status_filter}, bin_filter={bin_filter}, store_filter={store_filter}, type_filter={type_filter}"
         )
 
         category_data = get_category_data(
-            session, filter_query, sort, status_filter, bin_filter
+            session,
+            filter_query,
+            sort,
+            status_filter,
+            bin_filter,
+            store_filter,
+            type_filter,
         )
         logger.info(f"Fetched {len(category_data)} categories for tab1")
 
@@ -198,12 +237,20 @@ def tab1_filter():
         sort = request.form.get("category-sort", "")
         status_filter = request.form.get("statusFilter", "").lower()
         bin_filter = request.form.get("binFilter", "").lower()
+        store_filter = request.form.get("store", "all")
+        type_filter = request.form.get("type", "all")
         logger.debug(
-            f"Filter parameters: filter_query={filter_query}, sort={sort}, status_filter={status_filter}, bin_filter={bin_filter}"
+            f"Filter parameters: filter_query={filter_query}, sort={sort}, status_filter={status_filter}, bin_filter={bin_filter}, store_filter={store_filter}, type_filter={type_filter}"
         )
 
         category_data = get_category_data(
-            session, filter_query, sort, status_filter, bin_filter
+            session,
+            filter_query,
+            sort,
+            status_filter,
+            bin_filter,
+            store_filter,
+            type_filter,
         )
 
         return render_template("_category_rows.html", categories=category_data)
@@ -224,8 +271,10 @@ def tab1_subcat_data():
     sort = request.args.get("sort", "")
     status_filter = request.args.get("statusFilter", "").lower()
     bin_filter = request.args.get("binFilter", "").lower()
+    store_filter = request.args.get("store", "all")
+    type_filter = request.args.get("type", "all")
     logger.debug(
-        f"subcat_data: category={category}, page={page}, per_page={per_page}, filter_query={filter_query}, sort={sort}, status_filter={status_filter}, bin_filter={bin_filter}"
+        f"subcat_data: category={category}, page={page}, per_page={per_page}, filter_query={filter_query}, sort={sort}, status_filter={status_filter}, bin_filter={bin_filter}, store_filter={store_filter}, type_filter={type_filter}"
     )
 
     if not category:
@@ -278,6 +327,8 @@ def tab1_subcat_data():
             f"Total subcategories: {total_subcats}, paginated: {paginated_subcats}"
         )
 
+        global_filters = build_global_filters(store_filter, type_filter)
+
         subcategory_data = []
         for subcat in paginated_subcats:
             rental_class_ids = subcategories[subcat]
@@ -290,6 +341,8 @@ def tab1_subcat_data():
                     rental_class_ids
                 )
             )
+            for condition in global_filters:
+                total_items_query = total_items_query.filter(condition)
             if status_filter:
                 total_items_query = total_items_query.filter(
                     func.lower(ItemMaster.status) == status_filter.lower()
@@ -309,6 +362,8 @@ def tab1_subcat_data():
                 ),
                 ItemMaster.status.in_(["On Rent", "Delivered"]),
             )
+            for condition in global_filters:
+                items_on_contracts_query = items_on_contracts_query.filter(condition)
             if status_filter:
                 items_on_contracts_query = items_on_contracts_query.filter(
                     func.lower(ItemMaster.status) == status_filter.lower()
@@ -351,6 +406,8 @@ def tab1_subcat_data():
                     ),
                 ),
             )
+            for condition in global_filters:
+                items_in_service_query = items_in_service_query.filter(condition)
             if status_filter:
                 items_in_service_query = items_in_service_query.filter(
                     func.lower(ItemMaster.status) == status_filter.lower()
@@ -368,6 +425,8 @@ def tab1_subcat_data():
                 ),
                 ItemMaster.status == "Ready to Rent",
             )
+            for condition in global_filters:
+                items_available_query = items_available_query.filter(condition)
             if status_filter:
                 items_available_query = items_available_query.filter(
                     func.lower(ItemMaster.status) == status_filter.lower()
