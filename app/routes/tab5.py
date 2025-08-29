@@ -4,6 +4,7 @@ from ..models.db_models import ItemMaster, Transaction
 from ..services.api_client import APIClient
 from ..services.logger import get_logger
 from sqlalchemy import func, desc, or_, asc, text, case, select
+from ..utils.filters import apply_global_filters
 from sqlalchemy.exc import SQLAlchemyError
 import time
 from datetime import datetime, timedelta
@@ -54,9 +55,18 @@ def resale_pack_condition(column):
 
 
 def get_category_data(
-    session, filter_query="", sort="", status_filter="", bin_filter=""
+    session,
+    filter_query="",
+    sort="",
+    status_filter="",
+    bin_filter="",
+    store_filter="all",
+    type_filter="all",
 ):
-    cache_key = f"tab5_view_data_{filter_query}_{sort}_{status_filter}_{bin_filter}"
+    cache_key = (
+        f"tab5_view_data_{filter_query}_{sort}_{status_filter}_{bin_filter}_"
+        f"{store_filter}_{type_filter}"
+    )
     cached_data = None
     try:
         cached_data = cache.get(cache_key)
@@ -132,6 +142,7 @@ def get_category_data(
         ).in_(rc_ids),
         resale_pack_condition(ItemMaster.bin_location),
     )
+    base_query = apply_global_filters(base_query, store_filter, type_filter)
 
     if status_filter:
         base_query = base_query.filter(
@@ -220,9 +231,17 @@ def tab5_view():
         sort = request.args.get("sort", "")
         status_filter = request.args.get("statusFilter", "").lower()
         bin_filter = request.args.get("binFilter", "").lower()
+        store_filter = request.args.get("store", "all")
+        type_filter = request.args.get("type", "all")
 
         category_data = get_category_data(
-            session, filter_query, sort, status_filter, bin_filter
+            session,
+            filter_query,
+            sort,
+            status_filter,
+            bin_filter,
+            store_filter,
+            type_filter,
         )
         logger.info(
             f"Fetched {len(category_data)} categories for tab5 at %s",
@@ -257,9 +276,17 @@ def tab5_filter():
         sort = request.form.get("category-sort", "")
         status_filter = request.form.get("statusFilter", "").lower()
         bin_filter = request.form.get("binFilter", "").lower()
+        store_filter = request.form.get("store", "all")
+        type_filter = request.form.get("type", "all")
 
         category_data = get_category_data(
-            session, filter_query, sort, status_filter, bin_filter
+            session,
+            filter_query,
+            sort,
+            status_filter,
+            bin_filter,
+            store_filter,
+            type_filter,
         )
         return jsonify(category_data)
     except Exception as e:
@@ -336,6 +363,9 @@ def tab5_subcat_data():
                 ).in_(rental_class_ids),
                 resale_pack_condition(ItemMaster.bin_location),
             )
+            total_items_query = apply_global_filters(
+                total_items_query, store_filter, type_filter
+            )
             if status_filter:
                 total_items_query = total_items_query.filter(
                     func.lower(ItemMaster.status) == status_filter.lower()
@@ -361,6 +391,9 @@ def tab5_subcat_data():
                 ).in_(rental_class_ids),
                 ItemMaster.status.in_(["On Rent", "Delivered"]),
                 resale_pack_condition(ItemMaster.bin_location),
+            )
+            items_on_contracts_query = apply_global_filters(
+                items_on_contracts_query, store_filter, type_filter
             )
             if status_filter:
                 items_on_contracts_query = items_on_contracts_query.filter(
@@ -407,6 +440,9 @@ def tab5_subcat_data():
                     ),
                 ),
             )
+            items_in_service_query = apply_global_filters(
+                items_in_service_query, store_filter, type_filter
+            )
             if status_filter:
                 items_in_service_query = items_in_service_query.filter(
                     func.lower(ItemMaster.status) == status_filter.lower()
@@ -426,6 +462,9 @@ def tab5_subcat_data():
                 ).in_(rental_class_ids),
                 ItemMaster.status == "Ready to Rent",
                 resale_pack_condition(ItemMaster.bin_location),
+            )
+            items_available_query = apply_global_filters(
+                items_available_query, store_filter, type_filter
             )
             if status_filter:
                 items_available_query = items_available_query.filter(
@@ -730,6 +769,8 @@ def tab5_data():
     page = int(request.args.get("page", 1))
     per_page = 10
     sort = request.args.get("sort", "")  # Keep for compatibility, but ignore for now
+    store_filter = request.args.get("store", "all")
+    type_filter = request.args.get("type", "all")
 
     if not category or not subcategory or not common_name:
         logger.error(
@@ -774,6 +815,7 @@ def tab5_data():
             ItemMaster.common_name == common_name,
             resale_pack_condition(ItemMaster.bin_location),
         )
+        items_query = apply_global_filters(items_query, store_filter, type_filter)
 
         total_items = items_query.count()
         items = items_query.offset((page - 1) * per_page).limit(per_page).all()
