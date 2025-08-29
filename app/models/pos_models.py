@@ -163,6 +163,115 @@ class POSTransactionItem(db.Model):
         }
 
 
+class POSEquipment(db.Model):
+    """Store POS equipment/inventory data imported from external accounting system."""
+    __tablename__ = "pos_equipment"
+    __table_args__ = (
+        db.Index("ix_pos_equip_item_num", "item_num"),
+        db.Index("ix_pos_equip_current_store", "current_store"),
+        db.Index("ix_pos_equip_category", "category"),
+        db.Index("ix_pos_equip_department", "department"),
+        db.Index("ix_pos_equip_inactive", "inactive"),
+        UniqueConstraint("item_num", name="uq_item_num"),
+    )
+
+    id = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
+    item_num = db.Column(db.String(50), nullable=False, unique=True)
+    key = db.Column(db.String(50))
+    name = db.Column(db.String(255))
+    location = db.Column(db.String(100))
+    category = db.Column(db.String(100))
+    department = db.Column(db.String(100))
+    type_desc = db.Column(db.String(100))
+    quantity = db.Column(db.Integer, default=0)
+    home_store = db.Column(db.String(10))
+    current_store = db.Column(db.String(10))
+    group_name = db.Column(db.String(100))
+    manufacturer = db.Column(db.String(100))
+    model_no = db.Column(db.String(100))
+    serial_no = db.Column(db.String(100))
+    part_no = db.Column(db.String(100))
+    license_no = db.Column(db.String(50))
+    model_year = db.Column(db.String(10))
+    
+    # Financial Fields
+    turnover_mtd = db.Column(db.DECIMAL(12, 2), default=0)
+    turnover_ytd = db.Column(db.DECIMAL(12, 2), default=0)
+    turnover_ltd = db.Column(db.DECIMAL(12, 2), default=0)
+    repair_cost_mtd = db.Column(db.DECIMAL(12, 2), default=0)
+    repair_cost_ltd = db.Column(db.DECIMAL(12, 2), default=0)
+    sell_price = db.Column(db.DECIMAL(12, 2), default=0)
+    retail_price = db.Column(db.DECIMAL(12, 2), default=0)
+    deposit = db.Column(db.DECIMAL(12, 2), default=0)
+    damage_waiver_pct = db.Column(db.DECIMAL(5, 2), default=0)
+    
+    # Rental Rates (10 periods)
+    period_1 = db.Column(db.String(20))
+    period_2 = db.Column(db.String(20))
+    period_3 = db.Column(db.String(20))
+    period_4 = db.Column(db.String(20))
+    period_5 = db.Column(db.String(20))
+    rate_1 = db.Column(db.DECIMAL(12, 2))
+    rate_2 = db.Column(db.DECIMAL(12, 2))
+    rate_3 = db.Column(db.DECIMAL(12, 2))
+    rate_4 = db.Column(db.DECIMAL(12, 2))
+    rate_5 = db.Column(db.DECIMAL(12, 2))
+    
+    # Inventory Management
+    reorder_min = db.Column(db.Integer, default=0)
+    reorder_max = db.Column(db.Integer, default=0)
+    user_defined_1 = db.Column(db.String(100))
+    user_defined_2 = db.Column(db.String(100))
+    meter_out = db.Column(db.DECIMAL(12, 2))
+    meter_in = db.Column(db.DECIMAL(12, 2))
+    
+    # Purchase/Vendor Info
+    last_purchase_date = db.Column(db.DateTime)
+    last_purchase_price = db.Column(db.DECIMAL(12, 2))
+    vendor_no_1 = db.Column(db.String(50))
+    vendor_no_2 = db.Column(db.String(50))
+    vendor_no_3 = db.Column(db.String(50))
+    order_no_1 = db.Column(db.String(50))
+    order_no_2 = db.Column(db.String(50))
+    order_no_3 = db.Column(db.String(50))
+    qty_on_order = db.Column(db.Integer, default=0)
+    
+    # Other Fields
+    sort_order = db.Column(db.Integer)
+    expiration_date = db.Column(db.DateTime)
+    warranty_date = db.Column(db.DateTime)
+    weight = db.Column(db.DECIMAL(10, 2))
+    setup_time = db.Column(db.DECIMAL(10, 2))
+    income = db.Column(db.DECIMAL(12, 2))
+    depr_method = db.Column(db.String(50))
+    depr = db.Column(db.DECIMAL(12, 2))
+    non_taxable = db.Column(db.Boolean, default=False)
+    header_no = db.Column(db.String(50))
+    inactive = db.Column(db.Boolean, default=False)
+    
+    # Import metadata
+    import_date = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    import_batch = db.Column(db.String(50))
+    last_updated = db.Column(db.DateTime, onupdate=lambda: datetime.now(timezone.utc))
+    
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "item_num": self.item_num,
+            "name": self.name,
+            "category": self.category,
+            "department": self.department,
+            "current_store": self.current_store,
+            "quantity": self.quantity,
+            "turnover_ytd": float(self.turnover_ytd) if self.turnover_ytd else 0,
+            "turnover_ltd": float(self.turnover_ltd) if self.turnover_ltd else 0,
+            "repair_cost_ltd": float(self.repair_cost_ltd) if self.repair_cost_ltd else 0,
+            "sell_price": float(self.sell_price) if self.sell_price else 0,
+            "inactive": self.inactive,
+            "import_date": self.import_date.isoformat() if self.import_date else None,
+        }
+
+
 class POSCustomer(db.Model):
     """Store POS customer data for correlation."""
     __tablename__ = "pos_customers"

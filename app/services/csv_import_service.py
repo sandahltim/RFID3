@@ -216,6 +216,44 @@ class CSVImportService:
             logger.error(f"Transaction import failed: {str(e)}", exc_info=True)
             return {"success": False, "error": str(e)}
 
+    def import_transaction_items_data(self, file_path: str = None) -> Dict:
+        """Import transaction items data from transitems8.26.25.csv"""
+        if not file_path:
+            pattern = os.path.join(self.CSV_BASE_PATH, "transitems*.csv")
+            files = glob.glob(pattern)
+            if not files:
+                raise FileNotFoundError(f"No transaction items CSV files found in {self.CSV_BASE_PATH}")
+            file_path = max(files, key=os.path.getctime)
+            
+        logger.info(f"Starting transaction items import from: {file_path}")
+        
+        try:
+            # Read CSV with chunk processing for large file (53MB, ~597K records)
+            chunk_size = 3000
+            imported_count = 0
+            total_records = 0
+            
+            for chunk in pd.read_csv(file_path, encoding='utf-8', chunksize=chunk_size, low_memory=False):
+                chunk = self._clean_transaction_items_data(chunk)
+                imported_count += self._import_transaction_items_batch(chunk)
+                total_records += len(chunk)
+                
+                if total_records % 15000 == 0:
+                    logger.info(f"Processed {total_records} transaction item records...")
+            
+            logger.info(f"Transaction items import completed: {imported_count}/{total_records} records imported")
+            
+            return {
+                "success": True,
+                "file_path": file_path,
+                "total_records": total_records,
+                "imported_records": imported_count
+            }
+            
+        except Exception as e:
+            logger.error(f"Transaction items import failed: {str(e)}", exc_info=True)
+            return {"success": False, "error": str(e)}
+
     def import_customer_data(self, csv_file_path: str, limit: int = None) -> Dict[str, Any]:
         """Import customer data from CSV file"""
         logger.info(f"Starting customer import from {csv_file_path}")
@@ -249,6 +287,14 @@ class CSVImportService:
                     
                     for record in records:
                         try:
+                            # Clean record - convert pandas NaT to None for MySQL compatibility  
+                            clean_record = {}
+                            for key, value in record.items():
+                                if pd.isna(value):
+                                    clean_record[key] = None
+                                else:
+                                    clean_record[key] = value
+                            
                             # Insert using raw SQL to handle duplicates - using actual schema columns
                             insert_sql = text("""
                                 INSERT INTO pos_customers 
@@ -267,7 +313,7 @@ class CSVImportService:
                                 import_date = NOW()
                             """)
                             
-                            session.execute(insert_sql, record)
+                            session.execute(insert_sql, clean_record)
                             imported_count += 1
                             
                         except Exception as e:
@@ -374,9 +420,7 @@ class CSVImportService:
             'ltd_payments': 0.0,
             'current_balance': 0.0,
             'credit_limit': 0.0,
-            'no_of_contracts': 0,
-            'open_date': pd.NaT,
-            'last_active_date': pd.NaT
+            'no_of_contracts': 0
         }
         
         for col, default_val in defaults.items():
@@ -384,6 +428,13 @@ class CSVImportService:
                 df[col] = default_val
             else:
                 df[col] = df[col].fillna(default_val)
+        
+        # Handle datetime columns separately - convert NaT to None for MySQL
+        date_columns = ['open_date', 'last_active_date']
+        for col in date_columns:
+            if col in df.columns:
+                # Replace NaT with None (NULL in database)
+                df[col] = df[col].where(pd.notna(df[col]), None)
         
         return df
 
@@ -451,7 +502,15 @@ class CSVImportService:
                         'total_owed': float(row.get('Total Owed', 0) or 0)
                     }
                     
-                    session.execute(insert_sql, record)
+                    # Clean record - convert pandas NaT to None for MySQL compatibility  
+                    clean_record = {}
+                    for key, value in record.items():
+                        if pd.isna(value):
+                            clean_record[key] = None
+                        else:
+                            clean_record[key] = value
+                    
+                    session.execute(insert_sql, clean_record)
                     imported_count += 1
                     
                 except Exception as e:
@@ -464,6 +523,119 @@ class CSVImportService:
         except Exception as e:
             session.rollback()
             logger.error(f"Transaction batch import failed: {e}")
+        finally:
+            session.close()
+        
+        return imported_count
+
+    def _clean_transaction_items_data(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Clean and normalize transaction items data"""
+        
+        # Clean contract and item numbers
+        df['Contract No'] = df['Contract No'].astype(str).str.strip()
+        df['ItemNum'] = df['ItemNum'].fillna('').astype(str).str.strip()
+        
+        # Convert date/time columns
+        date_cols = ['Due Date', 'ConfirmedDate']
+        for col in date_cols:
+            if col in df.columns:
+                df[col] = pd.to_datetime(df[col], errors='coerce')
+        
+        # Convert numeric columns
+        numeric_cols = ['Qty', 'Hours', 'Price', 'ItemPercentage', 'DiscountPercent', 
+                       'Discount Amt', 'Daily Amt', 'Weekly Amt', 'Monthly Amt', 
+                       'Minimum Amt', 'Meter Out', 'Meter In', 'Downtime Hrs', 'RetailPrice']
+        for col in numeric_cols:
+            if col in df.columns:
+                df[col] = pd.to_numeric(df[col].astype(str).str.replace(',', '').str.replace('$', ''), 
+                                      errors='coerce').fillna(0)
+        
+        # Filter valid records
+        df = df[df['Contract No'].str.len() > 0]
+        df = df[df['Contract No'] != 'nan']
+        df = df[df['ItemNum'].str.len() > 0]
+        df = df[df['ItemNum'] != 'nan']
+        
+        return df
+
+    def _import_transaction_items_batch(self, batch_df: pd.DataFrame) -> int:
+        """Import a batch of transaction item records"""
+        imported_count = 0
+        session = self.Session()
+        
+        try:
+            for _, row in batch_df.iterrows():
+                try:
+                    # Insert using raw SQL to handle database schema
+                    insert_sql = text("""
+                        INSERT INTO pos_transaction_items 
+                        (contract_no, item_num, qty, hours, due_date, due_time, line_status, 
+                         price, `desc`, dmg_wvr, item_percentage, discount_percent, 
+                         nontaxable, nondiscount, discount_amt, daily_amt, weekly_amt, 
+                         monthly_amt, minimum_amt, meter_out, meter_in, downtime_hrs, 
+                         retail_price, kit_field, confirmed_date, line_number)
+                        VALUES 
+                        (:contract_no, :item_num, :qty, :hours, :due_date, :due_time, :line_status,
+                         :price, :description, :dmg_wvr, :item_percentage, :discount_percent,
+                         :nontaxable, :nondiscount, :discount_amt, :daily_amt, :weekly_amt,
+                         :monthly_amt, :minimum_amt, :meter_out, :meter_in, :downtime_hrs,
+                         :retail_price, :kit_field, :confirmed_date, :line_number)
+                        ON DUPLICATE KEY UPDATE
+                        qty = VALUES(qty),
+                        price = VALUES(price),
+                        import_date = NOW()
+                    """)
+                    
+                    record = {
+                        'contract_no': str(row.get('Contract No', ''))[:50],
+                        'item_num': str(row.get('ItemNum', ''))[:50],
+                        'qty': float(row.get('Qty', 0) or 0),
+                        'hours': float(row.get('Hours', 0) or 0),
+                        'due_date': row.get('Due Date'),
+                        'due_time': str(row.get('Due Time', ''))[:20],
+                        'line_status': str(row.get('Line Status', ''))[:50],
+                        'price': float(row.get('Price', 0) or 0),
+                        'description': str(row.get('Desc', ''))[:500],
+                        'dmg_wvr': float(row.get('DmgWvr', 0) or 0),
+                        'item_percentage': float(row.get('ItemPercentage', 0) or 0),
+                        'discount_percent': float(row.get('DiscountPercent', 0) or 0),
+                        'nontaxable': 1 if str(row.get('Nontaxable', 'False')).lower() == 'true' else 0,
+                        'nondiscount': 1 if str(row.get('Nondiscount', 'False')).lower() == 'true' else 0,
+                        'discount_amt': float(row.get('Discount Amt', 0) or 0),
+                        'daily_amt': float(row.get('Daily Amt', 0) or 0),
+                        'weekly_amt': float(row.get('Weekly Amt', 0) or 0),
+                        'monthly_amt': float(row.get('Monthly Amt', 0) or 0),
+                        'minimum_amt': float(row.get('Minimum Amt', 0) or 0),
+                        'meter_out': float(row.get('Meter Out', 0) or 0),
+                        'meter_in': float(row.get('Meter In', 0) or 0),
+                        'downtime_hrs': float(row.get('Downtime Hrs', 0) or 0),
+                        'retail_price': float(row.get('RetailPrice', 0) or 0),
+                        'kit_field': str(row.get('KitField', ''))[:50],
+                        'confirmed_date': row.get('ConfirmedDate'),
+                        'line_number': str(row.get('LineNumber', ''))[:20]
+                    }
+                    
+                    # Clean record - convert pandas NaT to None for MySQL compatibility  
+                    clean_record = {}
+                    for key, value in record.items():
+                        if pd.isna(value):
+                            clean_record[key] = None
+                        else:
+                            clean_record[key] = value
+                    
+                    session.execute(insert_sql, clean_record)
+                    imported_count += 1
+                    
+                except Exception as e:
+                    logger.warning(f"Error importing transaction item record: {e}")
+                    continue
+            
+            # Commit the batch
+            session.commit()
+        
+        except Exception as e:
+            session.rollback()
+            logger.error(f"Transaction items batch import failed: {e}")
         finally:
             session.close()
         

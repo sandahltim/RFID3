@@ -15,6 +15,7 @@ from ..models.db_models import (
     UserRentalClassMapping,
 )
 from ..services.logger import get_logger
+from ..services.business_analytics_service import BusinessAnalyticsService
 from decimal import Decimal
 import json
 
@@ -602,11 +603,79 @@ def get_utilization_analysis():
         )
 
 
+@enhanced_analytics_bp.route("/business-analytics/utilization")
+def get_business_utilization_analytics():
+    """Get comprehensive equipment utilization analytics from CSV business data"""
+    try:
+        analytics_service = BusinessAnalyticsService()
+        result = analytics_service.calculate_equipment_utilization_analytics()
+        
+        if "error" in result:
+            return jsonify({"success": False, "error": result["error"]}), 500
+        
+        return jsonify({
+            "success": True,
+            "data": result,
+            "timestamp": datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        logger.error(f"Error fetching business utilization analytics: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@enhanced_analytics_bp.route("/business-analytics/executive-metrics")
+def get_executive_business_metrics():
+    """Get executive-level business metrics combining RFID and CSV data"""
+    try:
+        analytics_service = BusinessAnalyticsService()
+        result = analytics_service.generate_executive_dashboard_metrics()
+        
+        if "error" in result:
+            return jsonify({"success": False, "error": result["error"]}), 500
+        
+        return jsonify({
+            "success": True,
+            "data": result,
+            "timestamp": datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        logger.error(f"Error fetching executive business metrics: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@enhanced_analytics_bp.route("/business-analytics/resale-opportunities")
+def get_resale_opportunities():
+    """Get resale opportunities and recommendations"""
+    try:
+        analytics_service = BusinessAnalyticsService()
+        utilization_data = analytics_service.calculate_equipment_utilization_analytics()
+        
+        if "error" in utilization_data:
+            return jsonify({"success": False, "error": utilization_data["error"]}), 500
+        
+        resale_data = utilization_data.get("resale_recommendations", {})
+        return jsonify({
+            "success": True,
+            "data": {
+                "resale_opportunities": resale_data,
+                "underperformers": utilization_data.get("underperformers", {}),
+                "category_insights": utilization_data.get("category_analysis", {})
+            },
+            "timestamp": datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        logger.error(f"Error fetching resale opportunities: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
 def get_store_name(store_code):
     """Helper function to get readable store names"""
     store_names = {
         "6800": "Brooklyn Park",
-        "3607": "Wayzata",
+        "3607": "Wayzata", 
         "8101": "Fridley",
         "728": "Elk River",
         "000": "Legacy/Unassigned",
