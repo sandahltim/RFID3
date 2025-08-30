@@ -1539,3 +1539,144 @@ def update_configuration():
     finally:
         if session:
             session.close()
+
+
+@inventory_analytics_bp.route("/api/inventory/resale_tracking", methods=["GET"])
+@handle_api_error
+def get_resale_tracking():
+    """Get comprehensive resale item tracking and performance metrics."""
+    session = None
+    try:
+        session = db.session()
+        days_back = int(request.args.get("days", 90))
+        cutoff_date = datetime.now() - timedelta(days=days_back)
+        
+        logger.info(f"Fetching resale tracking data for last {days_back} days")
+
+        # Get resale items with their performance metrics
+        resale_query = (
+            session.query(
+                ItemMaster.tag_id,
+                ItemMaster.common_name,
+                ItemMaster.status,
+                ItemMaster.quality,
+                ItemMaster.date_created,
+                ItemMaster.date_last_scanned,
+                UserRentalClassMapping.category,
+                UserRentalClassMapping.subcategory,
+                func.count(Transaction.id).label("transaction_count"),
+                func.max(Transaction.scan_date).label("last_transaction"),
+                func.min(Transaction.scan_date).label("first_transaction")
+            )
+            .join(
+                UserRentalClassMapping,
+                ItemMaster.rental_class_num == UserRentalClassMapping.rental_class_id
+            )
+            .outerjoin(
+                Transaction,
+                and_(
+                    ItemMaster.tag_id == Transaction.tag_id,
+                    Transaction.scan_date >= cutoff_date
+                )
+            )
+            .filter(UserRentalClassMapping.category == "Resale")
+            .group_by(
+                ItemMaster.tag_id,
+                ItemMaster.common_name,
+                ItemMaster.status,
+                ItemMaster.quality,
+                ItemMaster.date_created,
+                ItemMaster.date_last_scanned,
+                UserRentalClassMapping.category,
+                UserRentalClassMapping.subcategory
+            )
+            .order_by(func.count(Transaction.id).desc())
+            .limit(100)  # Top 100 most active resale items
+        )
+        
+        resale_items = resale_query.all()
+
+        # Calculate age in days for each item
+        current_date = datetime.now()
+        resale_data = []
+        
+        for item in resale_items:
+            age_days = (current_date - item.date_created).days if item.date_created else None
+            days_since_scan = (current_date - item.date_last_scanned).days if item.date_last_scanned else None
+            
+            resale_data.append({
+                "tag_id": item.tag_id,
+                "common_name": item.common_name,
+                "subcategory": item.subcategory,
+                "status": item.status,
+                "quality": item.quality,
+                "age_days": age_days,
+                "days_since_last_scan": days_since_scan,
+                "transaction_count": item.transaction_count,
+                "activity_score": round(item.transaction_count / max(age_days or 1, 1) * 365, 2),  # Transactions per year
+                "last_transaction": item.last_transaction.isoformat() if item.last_transaction else None,
+                "first_transaction": item.first_transaction.isoformat() if item.first_transaction else None,
+                "created_date": item.date_created.isoformat() if item.date_created else None,
+            })
+
+        # Get resale summary statistics - simplified approach
+        resale_summary = (
+            session.query(
+                UserRentalClassMapping.subcategory,
+                func.count(ItemMaster.tag_id).label("total_items"),
+                func.avg(
+                    func.datediff(func.now(), ItemMaster.date_created)
+                ).label("avg_age_days")
+            )
+            .join(
+                ItemMaster,
+                UserRentalClassMapping.rental_class_id == ItemMaster.rental_class_num
+            )
+            .filter(UserRentalClassMapping.category == "Resale")
+            .group_by(UserRentalClassMapping.subcategory)
+            .order_by(func.count(ItemMaster.tag_id).desc())
+        ).all()
+
+        summary_data = []
+        for summary in resale_summary:
+            # Count sold items separately to avoid SQLAlchemy CASE syntax issues
+            sold_count = (
+                session.query(func.count(ItemMaster.tag_id))
+                .join(UserRentalClassMapping, ItemMaster.rental_class_num == UserRentalClassMapping.rental_class_id)
+                .filter(
+                    UserRentalClassMapping.category == "Resale",
+                    UserRentalClassMapping.subcategory == summary.subcategory,
+                    ItemMaster.status == "Sold"
+                )
+                .scalar() or 0
+            )
+            
+            summary_data.append({
+                "subcategory": summary.subcategory,
+                "total_items": summary.total_items,
+                "available_items": summary.total_items - sold_count,
+                "sold_items": sold_count,
+                "sell_rate": round(sold_count / max(summary.total_items, 1) * 100, 2),
+                "avg_age_days": round(float(summary.avg_age_days) if summary.avg_age_days else 0, 1)
+            })
+
+        result = {
+            "resale_tracking": {
+                "items": resale_data,
+                "summary_by_category": summary_data,
+                "analysis_period_days": days_back,
+                "total_resale_items_analyzed": len(resale_data)
+            },
+            "generated_at": datetime.now().isoformat(),
+            "success": True
+        }
+
+        logger.info(f"Generated resale tracking report with {len(resale_data)} items and {len(summary_data)} categories")
+        return jsonify(result)
+
+    except Exception as e:
+        logger.error(f"Error fetching resale tracking data: {str(e)}", exc_info=True)
+        return jsonify({"error": f"Failed to fetch resale tracking data: {str(e)}"}), 500
+    finally:
+        if session:
+            session.close()
