@@ -129,6 +129,29 @@ Each prediction includes a confidence rating:
 
 ---
 
+## Data Sources and Processing
+
+The dashboard ingests historical data from CSV exports stored in `shared/POR/`. The `load_executive_data.py` script reads files such as `Payroll Trends.csv` and `Scorecard Trends.csv`, cleans currency fields, and derives metrics like labor efficiency (`payroll_cost / total_revenue * 100`) and revenue per hour (`total_revenue / wage_hours`) before inserting records into the database【F:load_executive_data.py†L62-L63】【F:load_executive_data.py†L99-L107】【F:load_executive_data.py†L131-L133】.
+
+Imported values populate three core tables:
+
+| Table | Purpose | Model |
+|-------|---------|-------|
+| `executive_payroll_trends` | Weekly payroll, revenue, and efficiency metrics | `PayrollTrends`【F:app/models/db_models.py†L501-L520】 |
+| `executive_scorecard_trends` | Store scorecard values including contracts and reservations | `ScorecardTrends`【F:app/models/db_models.py†L548-L580】 |
+| `executive_kpi` | Calculated key performance indicators and targets | `ExecutiveKPI`【F:app/models/db_models.py†L627-L646】 |
+
+Route logic in `app/routes/tab7.py` aggregates these tables for API responses. The summary endpoint derives year‑over‑year growth and profit margin using payroll trend data (`(current - last_year) / last_year * 100` and `(revenue - payroll) / revenue * 100`)【F:app/routes/tab7.py†L155-L175】【F:app/routes/tab7.py†L212-L219】.
+
+Derived KPIs include:
+
+- **Labor Efficiency** – payroll cost divided by revenue.
+- **Revenue per Hour** – revenue divided by labor hours.
+- **Profit Margin** – profit divided by revenue.
+- **YoY Growth** – current revenue compared to the same period last year.
+
+---
+
 ## Navigation and Filters
 
 ### Date Range Selection
