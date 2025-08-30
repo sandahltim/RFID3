@@ -1512,6 +1512,154 @@ def update_configuration():
             session.close()
 
 
+@inventory_analytics_bp.route("/api/inventory/usage_analysis", methods=["GET"])
+@handle_api_error
+def get_usage_analysis():
+    """Get comprehensive usage analysis with turnover and utilization metrics."""
+    session = None
+    try:
+        session = db.session()
+        days_back = int(request.args.get("days", 30))
+        cutoff_date = datetime.now() - timedelta(days=days_back)
+        
+        logger.info(f"Fetching usage analysis for last {days_back} days")
+        
+        # Since ItemUsageHistory is empty, generate usage data from transactions
+        # Calculate category-level usage patterns
+        usage_query = (
+            session.query(
+                UserRentalClassMapping.category,
+                UserRentalClassMapping.subcategory,
+                func.count(distinct(ItemMaster.tag_id)).label("total_items"),
+                func.count(distinct(Transaction.tag_id)).label("active_items"),
+                func.count(Transaction.id).label("transaction_count"),
+                func.avg(
+                    func.datediff(func.now(), ItemMaster.date_created)
+                ).label("avg_item_age")
+            )
+            .join(
+                ItemMaster,
+                UserRentalClassMapping.rental_class_id == ItemMaster.rental_class_num
+            )
+            .outerjoin(
+                Transaction,
+                and_(
+                    ItemMaster.tag_id == Transaction.tag_id,
+                    Transaction.scan_date >= cutoff_date
+                )
+            )
+            .group_by(
+                UserRentalClassMapping.category,
+                UserRentalClassMapping.subcategory
+            )
+            .having(func.count(distinct(ItemMaster.tag_id)) > 0)
+            .order_by(func.count(Transaction.id).desc())
+            .limit(20)
+        )
+        
+        usage_patterns = usage_query.all()
+        
+        # Calculate turnover metrics
+        turnover_data = []
+        for pattern in usage_patterns:
+            utilization_rate = (
+                (pattern.active_items / max(pattern.total_items, 1)) * 100
+                if pattern.total_items > 0 else 0
+            )
+            
+            # Calculate turnover rate (transactions per item per period)
+            turnover_rate = (
+                pattern.transaction_count / max(pattern.active_items, 1) / max(days_back, 1) * 365
+                if pattern.active_items > 0 else 0
+            )
+            
+            turnover_data.append({
+                "category": pattern.category,
+                "subcategory": pattern.subcategory,
+                "total_items": pattern.total_items,
+                "active_items": pattern.active_items,
+                "transaction_count": pattern.transaction_count,
+                "utilization_rate": round(utilization_rate, 2),
+                "turnover_rate": round(turnover_rate, 2),
+                "avg_item_age_days": round(float(pattern.avg_item_age) if pattern.avg_item_age else 0, 1),
+                "activity_score": round(utilization_rate * 0.6 + min(turnover_rate, 100) * 0.4, 2)
+            })
+        
+        # Get top performing items
+        top_items_query = (
+            session.query(
+                ItemMaster.tag_id,
+                ItemMaster.common_name,
+                ItemMaster.status,
+                func.count(Transaction.id).label("usage_count"),
+                func.max(Transaction.scan_date).label("last_used")
+            )
+            .join(
+                Transaction,
+                and_(
+                    ItemMaster.tag_id == Transaction.tag_id,
+                    Transaction.scan_date >= cutoff_date
+                )
+            )
+            .group_by(
+                ItemMaster.tag_id,
+                ItemMaster.common_name,
+                ItemMaster.status
+            )
+            .order_by(func.count(Transaction.id).desc())
+            .limit(10)
+        )
+        
+        top_items = top_items_query.all()
+        top_items_data = []
+        for item in top_items:
+            top_items_data.append({
+                "tag_id": item.tag_id,
+                "common_name": item.common_name,
+                "status": item.status,
+                "usage_count": item.usage_count,
+                "last_used": item.last_used.isoformat() if item.last_used else None,
+                "daily_usage_rate": round(item.usage_count / max(days_back, 1), 2)
+            })
+        
+        # Calculate summary metrics
+        total_items = session.query(func.count(ItemMaster.tag_id)).scalar() or 0
+        active_items = session.query(func.count(distinct(Transaction.tag_id))).filter(
+            Transaction.scan_date >= cutoff_date
+        ).scalar() or 0
+        total_transactions = session.query(func.count(Transaction.id)).filter(
+            Transaction.scan_date >= cutoff_date
+        ).scalar() or 0
+        
+        overall_utilization = round((active_items / max(total_items, 1)) * 100, 2)
+        
+        result = {
+            "usage_analysis": {
+                "summary": {
+                    "total_items": total_items,
+                    "active_items": active_items,
+                    "total_transactions": total_transactions,
+                    "overall_utilization": overall_utilization,
+                    "analysis_period_days": days_back
+                },
+                "category_patterns": turnover_data,
+                "top_performing_items": top_items_data
+            },
+            "generated_at": datetime.now().isoformat(),
+            "success": True
+        }
+        
+        logger.info(f"Generated usage analysis with {len(turnover_data)} categories and {len(top_items_data)} top items")
+        return jsonify(result)
+        
+    except Exception as e:
+        logger.error(f"Error fetching usage analysis: {str(e)}", exc_info=True)
+        return jsonify({"error": f"Failed to fetch usage analysis: {str(e)}"}), 500
+    finally:
+        if session:
+            session.close()
+
+
 @inventory_analytics_bp.route("/api/inventory/resale_tracking", methods=["GET"])
 @handle_api_error
 def get_resale_tracking():
@@ -1651,3 +1799,91 @@ def get_resale_tracking():
     finally:
         if session:
             session.close()
+
+
+@inventory_analytics_bp.route("/api/inventory/usage_analysis", methods=["GET"])
+@handle_api_error
+def get_usage_analysis():
+    """Get usage analysis data for the Usage Analysis tab."""
+    try:
+        days_back = int(request.args.get("days", 30))
+        cutoff_date = datetime.now() - timedelta(days=days_back)
+        
+        logger.info(f"Generating usage analysis for the last {days_back} days")
+
+        # Get usage history data if available, otherwise use transaction data
+        usage_query = (
+            db.session.query(
+                ItemMaster.rental_class_num,
+                ItemMaster.common_name,
+                func.count(Transaction.id).label('transaction_count'),
+                func.count(func.distinct(ItemMaster.tag_id)).label('unique_items'),
+                func.avg(func.datediff(func.now(), ItemMaster.date_created)).label('avg_age_days')
+            )
+            .join(Transaction, ItemMaster.tag_id == Transaction.tag_id)
+            .filter(
+                Transaction.scan_date >= cutoff_date,
+                ItemMaster.rental_class_num.isnot(None)
+            )
+            .group_by(ItemMaster.rental_class_num, ItemMaster.common_name)
+            .order_by(func.count(Transaction.id).desc())
+            .limit(50)
+        ).all()
+
+        usage_data = []
+        for usage in usage_query:
+            # Calculate utilization metrics
+            utilization_rate = min(usage.transaction_count / max(usage.unique_items, 1) * 10, 100)
+            
+            usage_data.append({
+                "rental_class_num": usage.rental_class_num,
+                "common_name": usage.common_name,
+                "transaction_count": usage.transaction_count,
+                "unique_items": usage.unique_items,
+                "utilization_rate": round(utilization_rate, 2),
+                "avg_age_days": round(float(usage.avg_age_days) if usage.avg_age_days else 0, 1),
+                "usage_intensity": "High" if utilization_rate > 50 else "Medium" if utilization_rate > 20 else "Low"
+            })
+
+        # Get top categories by usage
+        category_query = (
+            db.session.query(
+                UserRentalClassMapping.category,
+                func.count(Transaction.id).label('total_transactions'),
+                func.count(func.distinct(ItemMaster.tag_id)).label('active_items')
+            )
+            .join(ItemMaster, UserRentalClassMapping.rental_class_id == ItemMaster.rental_class_num)
+            .join(Transaction, ItemMaster.tag_id == Transaction.tag_id)
+            .filter(Transaction.scan_date >= cutoff_date)
+            .group_by(UserRentalClassMapping.category)
+            .order_by(func.count(Transaction.id).desc())
+        ).all()
+
+        category_summary = []
+        for category in category_query:
+            usage_rate = category.total_transactions / max(category.active_items, 1)
+            category_summary.append({
+                "category": category.category,
+                "total_transactions": category.total_transactions,
+                "active_items": category.active_items,
+                "usage_rate": round(usage_rate, 2)
+            })
+
+        result = {
+            "usage_analysis": {
+                "items": usage_data,
+                "category_summary": category_summary,
+                "analysis_period_days": days_back,
+                "total_items_analyzed": len(usage_data),
+                "total_transactions": sum(item["transaction_count"] for item in usage_data)
+            },
+            "generated_at": datetime.now().isoformat(),
+            "success": True
+        }
+
+        logger.info(f"Generated usage analysis with {len(usage_data)} items and {len(category_summary)} categories")
+        return jsonify(result)
+
+    except Exception as e:
+        logger.error(f"Error fetching usage analysis data: {str(e)}", exc_info=True)
+        return jsonify({"error": f"Failed to fetch usage analysis data: {str(e)}"}), 500
