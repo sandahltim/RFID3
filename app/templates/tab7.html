@@ -603,9 +603,15 @@
     <!-- Store Comparison Table -->
     <div class="row mb-4">
         <div class="col-12">
+            <div class="d-flex justify-content-end mb-2">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="weekly-toggle">
+                    <label class="form-check-label" for="weekly-toggle">Weekly Snapshot</label>
+                </div>
+            </div>
             <div class="store-comparison-table">
                 <h5 class="p-3 mb-0">Store Comparison Analysis</h5>
-                <div class="table-responsive">
+                <div id="aggregate-comparison" class="table-responsive">
                     <table class="table table-hover table-executive mb-0">
                         <thead>
                             <tr>
@@ -624,6 +630,27 @@
                                 <td colspan="8" class="text-center" style="padding: 40px;">
                                     <div class="loading-shimmer" style="height: 20px; border-radius: 10px;"></div>
                                     <div style="margin-top: 10px; color: #718096;">Loading executive metrics...</div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div id="weekly-comparison" class="table-responsive" style="display:none;">
+                    <table class="table table-hover table-executive mb-0">
+                        <thead>
+                            <tr>
+                                <th>Store</th>
+                                <th>Metric</th>
+                                <th>Current Week</th>
+                                <th>Previous Week</th>
+                                <th>Change</th>
+                            </tr>
+                        </thead>
+                        <tbody id="weekly-comparison-tbody">
+                            <tr>
+                                <td colspan="5" class="text-center" style="padding: 40px;">
+                                    <div class="loading-shimmer" style="height: 20px; border-radius: 10px;"></div>
+                                    <div style="margin-top: 10px; color: #718096;">Loading weekly metrics...</div>
                                 </td>
                             </tr>
                         </tbody>
@@ -690,12 +717,19 @@ document.addEventListener('DOMContentLoaded', function() {
     initializeDateRangePickers();
     
     // Initialize dashboard
+    let comparisonMode = 'aggregate';
     loadExecutiveDashboard();
-    
+
     // Event listeners
     document.getElementById('refresh-data').addEventListener('click', loadExecutiveDashboard);
     document.getElementById('store-filter').addEventListener('change', loadExecutiveDashboard);
     document.getElementById('period-filter').addEventListener('change', loadExecutiveDashboard);
+    document.getElementById('weekly-toggle').addEventListener('change', () => {
+        comparisonMode = document.getElementById('weekly-toggle').checked ? 'weekly' : 'aggregate';
+        document.getElementById('aggregate-comparison').style.display = comparisonMode === 'aggregate' ? '' : 'none';
+        document.getElementById('weekly-comparison').style.display = comparisonMode === 'weekly' ? '' : 'none';
+        loadStoreComparison();
+    });
     
     async function loadExecutiveDashboard() {
         showLoading(true);
@@ -740,10 +774,7 @@ document.addEventListener('DOMContentLoaded', function() {
             updateRevenueChart(trendsData.trends);
             
             // Load store comparison
-            const comparisonResponse = await fetch(`/api/executive/store_comparison?weeks=4`);
-            const comparisonData = await comparisonResponse.json();
-            updateStoreComparison(comparisonData.stores);
-            updateStorePieChart(comparisonData.stores);
+            await loadStoreComparison();
             
             // Load KPIs
             const kpiResponse = await fetch(`/api/executive/kpi_dashboard?store=${store}`);
@@ -1113,22 +1144,44 @@ document.addEventListener('DOMContentLoaded', function() {
             Chart.register(centerText);
         }
     }
+
+    async function loadStoreComparison() {
+        try {
+            const response = await fetch(`/api/executive/store_comparison?weeks=4&mode=${comparisonMode}`);
+            const data = await response.json();
+            updateStoreComparison(data);
+            const pieStores = comparisonMode === 'weekly'
+                ? data.stores.map(s => ({store_name: s.store_name, revenue: s.revenue.current}))
+                : data.stores;
+            updateStorePieChart(pieStores);
+        } catch (error) {
+            console.error('Error loading store comparison:', error);
+        }
+    }
     
-    function updateStoreComparison(stores) {
+    function updateStoreComparison(data) {
+        if (data.mode === 'weekly') {
+            updateWeeklyComparison(data.stores);
+        } else {
+            updateAggregateComparison(data.stores);
+        }
+    }
+
+    function updateAggregateComparison(stores) {
         const tbody = document.getElementById('store-comparison-tbody');
-        
+
         if (!stores || stores.length === 0) {
             tbody.innerHTML = '<tr><td colspan="8" class="text-center">No store data available</td></tr>';
             return;
         }
-        
+
         tbody.innerHTML = stores.map(store => {
-            const marginClass = store.profit_margin > 70 ? 'text-success' : 
+            const marginClass = store.profit_margin > 70 ? 'text-success' :
                                store.profit_margin > 60 ? 'text-warning' : 'text-danger';
-            const statusClass = store.efficiency < 25 ? 'status-excellent' : 
-                               store.efficiency < 35 ? 'status-good' : 
+            const statusClass = store.efficiency < 25 ? 'status-excellent' :
+                               store.efficiency < 35 ? 'status-good' :
                                store.efficiency < 45 ? 'status-warning' : 'status-poor';
-            
+
             return `
                 <tr class="table-row-executive">
                     <td><strong style="color: #2d3748;">${store.store_name}</strong></td>
@@ -1143,6 +1196,37 @@ document.addEventListener('DOMContentLoaded', function() {
                     </span></td>
                 </tr>
             `;
+        }).join('');
+    }
+
+    function updateWeeklyComparison(stores) {
+        const tbody = document.getElementById('weekly-comparison-tbody');
+
+        if (!stores || stores.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center">No store data available</td></tr>';
+            return;
+        }
+
+        const metricLabels = { revenue: 'Revenue', payroll: 'Payroll', profit: 'Profit', efficiency: 'Labor Ratio' };
+
+        tbody.innerHTML = stores.map(store => {
+            return ['revenue','payroll','profit','efficiency'].map((metric, idx) => {
+                const m = store[metric];
+                const isPositive = metric === 'payroll' || metric === 'efficiency' ? m.change <= 0 : m.change >= 0;
+                const changeClass = isPositive ? 'text-success' : 'text-danger';
+                const formatter = metric === 'efficiency' ? v => v.toFixed(1) + '%' : v => formatExecutiveNumber(v, 'currency');
+                const changeValue = metric === 'efficiency' ? m.change.toFixed(1) + '%' : formatExecutiveNumber(m.change, 'currency');
+                const pct = m.pct_change !== null && m.pct_change !== undefined ? m.pct_change.toFixed(1) + '%' : 'N/A';
+                return `
+                    <tr>
+                        ${idx === 0 ? `<td rowspan="4"><strong>${store.store_name}</strong></td>` : ''}
+                        <td>${metricLabels[metric]}</td>
+                        <td>${formatter(m.current)}</td>
+                        <td>${formatter(m.previous)}</td>
+                        <td class="${changeClass}">${m.change >= 0 ? '+' : ''}${changeValue} (${pct})</td>
+                    </tr>
+                `;
+            }).join('');
         }).join('');
     }
     
