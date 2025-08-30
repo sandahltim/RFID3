@@ -1300,7 +1300,7 @@ async function loadUsagePatterns() {
         const data = await response.json();
         
         if (response.ok && data.success && data.usage_analysis) {
-            displayUsagePatterns(data.usage_analysis.items || []);
+            displayUsagePatterns(data.usage_analysis.category_patterns || []);
         } else {
             document.getElementById('usage-patterns-list').innerHTML = 
                 `<div class="alert alert-danger">Error loading patterns: ${data.error || 'No usage data available'}</div>`;
@@ -1323,15 +1323,15 @@ function displayUsagePatterns(patterns) {
             html += `
                 <div class="border-bottom pb-2 mb-2">
                     <div class="d-flex justify-content-between">
-                        <strong>${pattern.common_name || 'Unknown Item'}</strong>
+                        <strong>${pattern.category || 'Unknown Category'}</strong>
                         <span class="badge bg-${percentage > 70 ? 'success' : percentage > 40 ? 'warning' : 'secondary'}">${percentage}%</span>
                     </div>
-                    <small class="text-muted">Class: ${pattern.rental_class_num || 'N/A'} • ${pattern.usage_intensity || 'Unknown'} usage</small>
+                    <small class="text-muted">${pattern.subcategory || ''} • Turnover: ${(pattern.turnover_rate || 0).toFixed(1)}</small>
                     <div class="mt-1">
-                        <small>${pattern.unique_items || 0} items • ${pattern.transaction_count || 0} transactions</small>
+                        <small>${pattern.total_items || 0} items • ${pattern.transaction_count || 0} transactions</small>
                     </div>
                     <div class="mt-1">
-                        <small class="text-info">Age: ${pattern.avg_age_days || 0} days</small>
+                        <small class="text-info">Activity Score: ${(pattern.activity_score || 0).toFixed(1)}</small>
                     </div>
                 </div>
             `;
