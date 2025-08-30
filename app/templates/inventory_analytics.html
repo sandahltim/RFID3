@@ -774,26 +774,24 @@
                             <h5><i class="fas fa-shopping-cart"></i> Resale & Pack Status Tracking</h5>
                         </div>
                         <div class="card-body">
-                            <p class="text-muted">Specialized tracking for resale items and pack status management coming in Phase 2...</p>
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <h6>Resale Item Features:</h6>
-                                    <ul>
-                                        <li>Automatic restock alerts (7-day threshold)</li>
-                                        <li>Consumption rate tracking</li>
-                                        <li>Low inventory warnings</li>
-                                        <li>Supplier order suggestions</li>
-                                    </ul>
+                            <div id="resale-tracking-loading" class="text-center">
+                                <div class="loading-spinner"></div> Loading resale tracking data...
+                            </div>
+                            <div id="resale-tracking-content" style="display: none;">
+                                <div class="row mb-4">
+                                    <div class="col-md-12">
+                                        <div id="resale-summary-stats"></div>
+                                    </div>
                                 </div>
-                                <div class="col-md-6">
-                                    <h6>Pack Status Management:</h6>
-                                    <ul>
-                                        <li>Pack/unpack recommendations based on demand</li>
-                                        <li>Storage optimization alerts</li>
-                                        <li>Bulk item tracking</li>
-                                        <li>Space utilization analysis</li>
-                                    </ul>
+                                <div class="row">
+                                    <div class="col-md-12">
+                                        <h6>Resale Items</h6>
+                                        <div id="resale-items-table"></div>
+                                    </div>
                                 </div>
+                            </div>
+                            <div id="resale-tracking-error" style="display: none;" class="alert alert-warning">
+                                <i class="fas fa-exclamation-triangle"></i> Unable to load resale tracking data. Please try refreshing the page.
                             </div>
                         </div>
                     </div>
@@ -1298,14 +1296,14 @@ async function loadUsagePatterns() {
         document.getElementById('usage-patterns-loading').style.display = 'block';
         document.getElementById('usage-patterns-content').style.display = 'none';
         
-        const response = await fetch(withGlobalFilters('/api/inventory/usage_patterns'));
+        const response = await fetch(withGlobalFilters('/api/inventory/usage_analysis?days=30'));
         const data = await response.json();
         
-        if (response.ok) {
-            displayUsagePatterns(data.patterns);
+        if (response.ok && data.success && data.usage_analysis) {
+            displayUsagePatterns(data.usage_analysis.items || []);
         } else {
             document.getElementById('usage-patterns-list').innerHTML = 
-                `<div class="alert alert-danger">Error loading patterns: ${data.error}</div>`;
+                `<div class="alert alert-danger">Error loading patterns: ${data.error || 'No usage data available'}</div>`;
         }
     } catch (error) {
         console.error('Error loading usage patterns:', error);
@@ -1321,22 +1319,25 @@ function displayUsagePatterns(patterns) {
     let html = '';
     if (patterns && patterns.length > 0) {
         patterns.slice(0, 10).forEach(pattern => {
-            const percentage = ((pattern.usage_rate || 0) * 100).toFixed(1);
+            const percentage = (pattern.utilization_rate || 0).toFixed(1);
             html += `
                 <div class="border-bottom pb-2 mb-2">
                     <div class="d-flex justify-content-between">
-                        <strong>${pattern.category || 'Unknown'}</strong>
+                        <strong>${pattern.common_name || 'Unknown Item'}</strong>
                         <span class="badge bg-${percentage > 70 ? 'success' : percentage > 40 ? 'warning' : 'secondary'}">${percentage}%</span>
                     </div>
-                    <small class="text-muted">${pattern.subcategory || ''}</small>
+                    <small class="text-muted">Class: ${pattern.rental_class_num || 'N/A'} • ${pattern.usage_intensity || 'Unknown'} usage</small>
                     <div class="mt-1">
-                        <small>${pattern.total_items || 0} items • ${pattern.rental_count || 0} rentals</small>
+                        <small>${pattern.unique_items || 0} items • ${pattern.transaction_count || 0} transactions</small>
+                    </div>
+                    <div class="mt-1">
+                        <small class="text-info">Age: ${pattern.avg_age_days || 0} days</small>
                     </div>
                 </div>
             `;
         });
     } else {
-        html = '<p class="text-muted">No usage patterns found.</p>';
+        html = '<p class="text-muted">No usage patterns found. This may indicate limited transaction data or missing rental class assignments.</p>';
     }
     document.getElementById('usage-patterns-list').innerHTML = html;
 }
@@ -1406,6 +1407,109 @@ function displayDataDiscrepancies(data) {
 function refreshAnalysisData() {
     loadUsagePatterns();
     loadDataDiscrepancies();
+}
+
+// Load resale tracking data
+async function loadResaleTrackingData() {
+    try {
+        document.getElementById('resale-tracking-loading').style.display = 'block';
+        document.getElementById('resale-tracking-content').style.display = 'none';
+        document.getElementById('resale-tracking-error').style.display = 'none';
+
+        const response = await fetch('/api/inventory/resale_tracking?days=30');
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        if (data.success && data.resale_tracking) {
+            displayResaleTrackingData(data.resale_tracking);
+        } else {
+            throw new Error('Invalid resale tracking data received');
+        }
+    } catch (error) {
+        console.error('Error loading resale tracking data:', error);
+        document.getElementById('resale-tracking-loading').style.display = 'none';
+        document.getElementById('resale-tracking-error').style.display = 'block';
+    }
+}
+
+function displayResaleTrackingData(resaleData) {
+    document.getElementById('resale-tracking-loading').style.display = 'none';
+    document.getElementById('resale-tracking-content').style.display = 'block';
+    
+    // Display summary stats
+    const summaryHtml = `
+        <div class="row">
+            <div class="col-md-3">
+                <div class="metric-card">
+                    <h4>${resaleData.items ? resaleData.items.length : 0}</h4>
+                    <p>Total Resale Items</p>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="metric-card">
+                    <h4>${resaleData.summary_by_category ? resaleData.summary_by_category.length : 0}</h4>
+                    <p>Categories</p>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="metric-card">
+                    <h4>${resaleData.analysis_period_days || 30}</h4>
+                    <p>Days Analyzed</p>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="metric-card">
+                    <h4>${resaleData.total_resale_items_analyzed || 0}</h4>
+                    <p>Items Analyzed</p>
+                </div>
+            </div>
+        </div>
+    `;
+    document.getElementById('resale-summary-stats').innerHTML = summaryHtml;
+    
+    // Display resale items table
+    if (resaleData.items && resaleData.items.length > 0) {
+        let tableHtml = `
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Item Name</th>
+                            <th>Category</th>
+                            <th>Status</th>
+                            <th>Age (Days)</th>
+                            <th>Sell Price</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+        
+        resaleData.items.forEach(item => {
+            tableHtml += `
+                <tr>
+                    <td>${item.common_name || 'N/A'}</td>
+                    <td>${item.subcategory || 'General'}</td>
+                    <td><span class="badge ${item.status === 'Available' ? 'bg-success' : 'bg-secondary'}">${item.status || 'Unknown'}</span></td>
+                    <td>${item.age_days || 0}</td>
+                    <td>$${(item.sell_price || 0).toFixed(2)}</td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-primary" onclick="navigateToItem('${item.tag_id}')">
+                            <i class="fas fa-eye"></i> View
+                        </button>
+                    </td>
+                </tr>
+            `;
+        });
+        
+        tableHtml += '</tbody></table></div>';
+        document.getElementById('resale-items-table').innerHTML = tableHtml;
+    } else {
+        document.getElementById('resale-items-table').innerHTML = '<p class="text-muted">No resale items found.</p>';
+    }
 }
 
 // Global data storage and pagination state
@@ -1827,6 +1931,11 @@ function updatePagination(containerId, currentPage, totalPages, onPageChange) {
     document.getElementById('usage-analysis-tab').addEventListener('click', function() {
         loadUsagePatterns();
         loadDataDiscrepancies();
+    });
+    
+    // Load resale tracking when resale tracking tab is clicked
+    document.getElementById('resale-tracking-tab').addEventListener('click', function() {
+        loadResaleTrackingData();
     });
 
 // Navigate to specific item on Tab 1 (Rental Inventory)
@@ -2600,4 +2709,7 @@ function updateBusinessIntelligenceCharts(data) {
     console.log('✅ Business intelligence charts updated successfully');
   }
 </script>
+<!-- Tab 6 Fixes - Usage Analysis and Resale Tracking -->
+<script src="/static/js/tab6_fixes.js"></script>
+
 {% endblock %}
