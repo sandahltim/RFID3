@@ -127,6 +127,7 @@ def create_app():
         from app.routes.feedback_api import feedback_bp
         from app.routes.feedback_dashboard_route import feedback_dashboard_bp
         from app.routes.manual_import_routes import manual_import_bp
+        from app.routes.database_viewer import database_viewer_bp
 
         app.register_blueprint(home_bp)
         app.register_blueprint(tab1_bp)
@@ -152,6 +153,7 @@ def create_app():
         app.register_blueprint(feedback_bp)
         app.register_blueprint(feedback_dashboard_bp)
         app.register_blueprint(manual_import_bp)
+        app.register_blueprint(database_viewer_bp)
         app.logger.info("Blueprints registered successfully")
 
         # Set up performance monitoring middleware

@@ -1655,8 +1655,435 @@ def get_period_comparison():
             session.close()
 
 
+@tab7_bp.route("/api/executive/multi_period_analysis", methods=["GET"])
+def get_multi_period_analysis():
+    """Get comprehensive multi-period analysis with trailing/leading averages and YoY/Yo2Y comparisons."""
+    session = None
+    try:
+        session = db.session()
+        store_filter = request.args.get("store", "all")
+        
+        # Get latest data date
+        latest_data_date = (
+            session.query(func.max(PayrollTrends.week_ending))
+            .filter(PayrollTrends.total_revenue > 0)
+            .scalar()
+        )
+        if not latest_data_date:
+            latest_data_date = datetime.now().date()
+        
+        logger.info(f"Multi-period analysis for store: {store_filter}, latest data: {latest_data_date}")
+        
+        # Calculate date ranges for comprehensive analysis
+        # Current period (last 12 weeks for stable analysis)
+        current_end = latest_data_date
+        current_start = current_end - timedelta(weeks=12)
+        
+        # Extended range for 3-month averages (need at least 6 months)
+        extended_start = current_end - timedelta(weeks=26)
+        
+        # Historical periods for YoY and Yo2Y comparisons
+        yoy_end = current_end - timedelta(weeks=52)
+        yoy_start = yoy_end - timedelta(weeks=12)
+        
+        yo2y_end = current_end - timedelta(weeks=104)  # 2 years ago
+        yo2y_start = yo2y_end - timedelta(weeks=12)
+        
+        # Get comprehensive dataset
+        base_query = session.query(
+            PayrollTrends.week_ending,
+            PayrollTrends.store_id,
+            PayrollTrends.total_revenue,
+            PayrollTrends.rental_revenue,
+            PayrollTrends.payroll_cost,
+            PayrollTrends.labor_efficiency_ratio,
+            PayrollTrends.revenue_per_hour,
+            PayrollTrends.wage_hours,
+        ).filter(
+            PayrollTrends.total_revenue > 0,
+            PayrollTrends.week_ending >= extended_start  # Get 6 months of data
+        )
+        
+        if store_filter != "all":
+            base_query = base_query.filter(PayrollTrends.store_id == store_filter)
+        
+        all_data = base_query.order_by(PayrollTrends.week_ending).all()
+        
+        # Process data into periods
+        current_data = [r for r in all_data if current_start <= r.week_ending <= current_end]
+        extended_data = [r for r in all_data if extended_start <= r.week_ending <= current_end]
+        yoy_data = [r for r in all_data if yoy_start <= r.week_ending <= yoy_end]
+        yo2y_data = [r for r in all_data if yo2y_start <= r.week_ending <= yo2y_end]
+        
+        def calculate_period_metrics(data):
+            """Calculate aggregate metrics for a period."""
+            if not data:
+                return {
+                    "revenue": 0, "payroll": 0, "profit": 0, "profit_margin": 0,
+                    "efficiency": 0, "revenue_per_hour": 0, "hours": 0, "weeks": 0
+                }
+            
+            total_revenue = sum(float(r.total_revenue or 0) for r in data)
+            total_payroll = sum(float(r.payroll_cost or 0) for r in data)
+            total_hours = sum(float(r.wage_hours or 0) for r in data)
+            avg_efficiency = sum(float(r.labor_efficiency_ratio or 0) for r in data) / len(data)
+            
+            profit = total_revenue - total_payroll
+            profit_margin = (profit / total_revenue * 100) if total_revenue else 0
+            revenue_per_hour = (total_revenue / total_hours) if total_hours else 0
+            
+            return {
+                "revenue": round(total_revenue, 2),
+                "payroll": round(total_payroll, 2),
+                "profit": round(profit, 2),
+                "profit_margin": round(profit_margin, 2),
+                "efficiency": round(avg_efficiency, 2),
+                "revenue_per_hour": round(revenue_per_hour, 2),
+                "hours": round(total_hours, 2),
+                "weeks": len(data)
+            }
+        
+        def calculate_trailing_leading_averages(data):
+            """Calculate 3-month trailing and leading averages."""
+            if len(data) < 12:  # Need at least 12 weeks for stable averages
+                return {"trailing_3m": None, "leading_3m": None}
+            
+            # Group data by month for 3-month calculations
+            monthly_data = {}
+            for row in data:
+                month_key = row.week_ending.replace(day=1)
+                if month_key not in monthly_data:
+                    monthly_data[month_key] = []
+                monthly_data[month_key].append(row)
+            
+            # Calculate monthly aggregates
+            monthly_metrics = {}
+            for month, month_data in monthly_data.items():
+                monthly_metrics[month] = calculate_period_metrics(month_data)
+            
+            # Sort months
+            sorted_months = sorted(monthly_metrics.keys())
+            
+            if len(sorted_months) < 6:  # Need at least 6 months
+                return {"trailing_3m": None, "leading_3m": None}
+            
+            # Calculate trailing 3-month average (last 3 months)
+            recent_months = sorted_months[-3:]
+            trailing_metrics = []
+            for month in recent_months:
+                trailing_metrics.append(monthly_metrics[month])
+            
+            trailing_3m = {
+                "revenue": sum(m["revenue"] for m in trailing_metrics) / 3,
+                "payroll": sum(m["payroll"] for m in trailing_metrics) / 3,
+                "profit": sum(m["profit"] for m in trailing_metrics) / 3,
+                "profit_margin": sum(m["profit_margin"] for m in trailing_metrics) / 3,
+                "efficiency": sum(m["efficiency"] for m in trailing_metrics) / 3,
+                "revenue_per_hour": sum(m["revenue_per_hour"] for m in trailing_metrics) / 3,
+            }
+            
+            # For leading average, we'll use projected data based on trends
+            # Since we don't have future data, we'll calculate trend-based projections
+            if len(sorted_months) >= 6:
+                # Use last 6 months to project next 3 months
+                projection_base = sorted_months[-6:]
+                projection_metrics = [monthly_metrics[m] for m in projection_base]
+                
+                # Simple linear trend projection
+                leading_3m = {
+                    "revenue": sum(m["revenue"] for m in projection_metrics[-3:]) / 3,
+                    "payroll": sum(m["payroll"] for m in projection_metrics[-3:]) / 3,
+                    "profit": sum(m["profit"] for m in projection_metrics[-3:]) / 3,
+                    "profit_margin": sum(m["profit_margin"] for m in projection_metrics[-3:]) / 3,
+                    "efficiency": sum(m["efficiency"] for m in projection_metrics[-3:]) / 3,
+                    "revenue_per_hour": sum(m["revenue_per_hour"] for m in projection_metrics[-3:]) / 3,
+                }
+            else:
+                leading_3m = None
+            
+            return {
+                "trailing_3m": {k: round(v, 2) for k, v in trailing_3m.items()},
+                "leading_3m": {k: round(v, 2) for k, v in leading_3m.items()} if leading_3m else None
+            }
+        
+        # Calculate metrics for each period
+        current_metrics = calculate_period_metrics(current_data)
+        yoy_metrics = calculate_period_metrics(yoy_data)
+        yo2y_metrics = calculate_period_metrics(yo2y_data)
+        
+        # Calculate trailing/leading averages
+        averages = calculate_trailing_leading_averages(extended_data)
+        
+        # Calculate comparisons
+        def calculate_comparison(current, historical, period_name):
+            """Calculate comparison metrics."""
+            if not historical or historical == 0:
+                return {"absolute": 0, "percentage": 0, "trend": "neutral"}
+            
+            absolute = current - historical
+            percentage = (absolute / historical) * 100
+            
+            trend = "up" if absolute > 0 else "down" if absolute < 0 else "neutral"
+            
+            return {
+                "absolute": round(absolute, 2),
+                "percentage": round(percentage, 2),
+                "trend": trend,
+                "period": period_name
+            }
+        
+        # Build comprehensive analysis result
+        analysis_result = {
+            "analysis_date": latest_data_date.isoformat(),
+            "store_filter": store_filter,
+            "store_name": STORE_MAPPING.get(store_filter, store_filter) if store_filter != "all" else "All Stores",
+            
+            "current_period": {
+                "start_date": current_start.isoformat(),
+                "end_date": current_end.isoformat(),
+                "metrics": current_metrics
+            },
+            
+            "moving_averages": {
+                "trailing_3month": averages["trailing_3m"],
+                "leading_3month": averages["leading_3m"],
+                "calculation_period": f"{extended_start.isoformat()} to {current_end.isoformat()}"
+            },
+            
+            "historical_comparisons": {
+                "year_over_year": {
+                    "period": f"{yoy_start.isoformat()} to {yoy_end.isoformat()}",
+                    "metrics": yoy_metrics,
+                    "comparisons": {
+                        "revenue": calculate_comparison(current_metrics["revenue"], yoy_metrics["revenue"], "YoY"),
+                        "profit": calculate_comparison(current_metrics["profit"], yoy_metrics["profit"], "YoY"),
+                        "profit_margin": calculate_comparison(current_metrics["profit_margin"], yoy_metrics["profit_margin"], "YoY"),
+                        "efficiency": calculate_comparison(current_metrics["efficiency"], yoy_metrics["efficiency"], "YoY"),
+                        "revenue_per_hour": calculate_comparison(current_metrics["revenue_per_hour"], yoy_metrics["revenue_per_hour"], "YoY")
+                    }
+                },
+                "two_years_over_two_years": {
+                    "period": f"{yo2y_start.isoformat()} to {yo2y_end.isoformat()}",
+                    "metrics": yo2y_metrics,
+                    "comparisons": {
+                        "revenue": calculate_comparison(current_metrics["revenue"], yo2y_metrics["revenue"], "Yo2Y"),
+                        "profit": calculate_comparison(current_metrics["profit"], yo2y_metrics["profit"], "Yo2Y"),
+                        "profit_margin": calculate_comparison(current_metrics["profit_margin"], yo2y_metrics["profit_margin"], "Yo2Y"),
+                        "efficiency": calculate_comparison(current_metrics["efficiency"], yo2y_metrics["efficiency"], "Yo2Y"),
+                        "revenue_per_hour": calculate_comparison(current_metrics["revenue_per_hour"], yo2y_metrics["revenue_per_hour"], "Yo2Y")
+                    }
+                }
+            },
+            
+            "trend_analysis": {
+                "data_availability": {
+                    "current_weeks": len(current_data),
+                    "extended_weeks": len(extended_data),
+                    "yoy_weeks": len(yoy_data),
+                    "yo2y_weeks": len(yo2y_data)
+                },
+                "confidence_level": "high" if len(extended_data) >= 20 else "medium" if len(extended_data) >= 12 else "low"
+            }
+        }
+        
+        return jsonify(analysis_result)
+        
+    except Exception as e:
+        logger.error(f"Error in multi-period analysis: {str(e)}", exc_info=True)
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if session:
+            session.close()
+
+
+@tab7_bp.route("/api/executive/enhanced_trends", methods=["GET"])
+def get_enhanced_trends():
+    """Get enhanced trend data with 3-month averages and historical comparisons."""
+    session = None
+    try:
+        session = db.session()
+        store_filter = request.args.get("store", "all")
+        months_back = int(request.args.get("months", 12))  # Default 12 months
+        
+        # Get latest data date
+        latest_data_date = (
+            session.query(func.max(PayrollTrends.week_ending))
+            .filter(PayrollTrends.total_revenue > 0)
+            .scalar()
+        )
+        if not latest_data_date:
+            latest_data_date = datetime.now().date()
+        
+        # Calculate extended date range (need extra data for averages)
+        end_date = latest_data_date
+        start_date = end_date - timedelta(weeks=months_back * 4 + 12)  # Extra weeks for calculations
+        
+        logger.info(f"Enhanced trends for {months_back} months: {start_date} to {end_date}")
+        
+        # Get comprehensive dataset
+        query = session.query(
+            PayrollTrends.week_ending,
+            PayrollTrends.store_id,
+            PayrollTrends.total_revenue,
+            PayrollTrends.rental_revenue,
+            PayrollTrends.payroll_cost,
+            PayrollTrends.labor_efficiency_ratio,
+            PayrollTrends.revenue_per_hour,
+            PayrollTrends.wage_hours,
+        ).filter(
+            PayrollTrends.week_ending.between(start_date, end_date),
+            PayrollTrends.total_revenue > 0,
+        )
+        
+        if store_filter != "all":
+            query = query.filter(PayrollTrends.store_id == store_filter)
+        
+        results = query.order_by(PayrollTrends.week_ending).all()
+        
+        # Group data by week and calculate rolling averages
+        weekly_data = {}
+        for row in results:
+            week_key = row.week_ending.isoformat()
+            if week_key not in weekly_data:
+                weekly_data[week_key] = {
+                    "week": week_key,
+                    "week_date": row.week_ending,
+                    "revenue": 0,
+                    "payroll": 0,
+                    "efficiency": [],
+                    "revenue_per_hour": [],
+                    "hours": 0,
+                    "store_count": 0
+                }
+            
+            weekly_data[week_key]["revenue"] += float(row.total_revenue or 0)
+            weekly_data[week_key]["payroll"] += float(row.payroll_cost or 0)
+            weekly_data[week_key]["hours"] += float(row.wage_hours or 0)
+            weekly_data[week_key]["efficiency"].append(float(row.labor_efficiency_ratio or 0))
+            weekly_data[week_key]["revenue_per_hour"].append(float(row.revenue_per_hour or 0))
+            weekly_data[week_key]["store_count"] += 1
+        
+        # Convert to sorted list and calculate averages
+        sorted_weeks = sorted(weekly_data.values(), key=lambda x: x["week_date"])
+        
+        # Calculate 3-month (12-week) rolling averages
+        enhanced_trends = []
+        for i, week_data in enumerate(sorted_weeks):
+            # Base metrics
+            profit = week_data["revenue"] - week_data["payroll"]
+            profit_margin = (profit / week_data["revenue"] * 100) if week_data["revenue"] else 0
+            avg_efficiency = sum(week_data["efficiency"]) / len(week_data["efficiency"]) if week_data["efficiency"] else 0
+            avg_revenue_per_hour = sum(week_data["revenue_per_hour"]) / len(week_data["revenue_per_hour"]) if week_data["revenue_per_hour"] else 0
+            
+            trend_point = {
+                "week": week_data["week"],
+                "revenue": round(week_data["revenue"], 2),
+                "payroll": round(week_data["payroll"], 2),
+                "profit": round(profit, 2),
+                "profit_margin": round(profit_margin, 2),
+                "efficiency": round(avg_efficiency, 2),
+                "revenue_per_hour": round(avg_revenue_per_hour, 2),
+                "hours": round(week_data["hours"], 2),
+                "stores": week_data["store_count"]
+            }
+            
+            # Calculate 3-month trailing average
+            if i >= 11:  # Need at least 12 weeks
+                trailing_weeks = sorted_weeks[max(0, i-11):i+1]
+                
+                trailing_revenue = sum(w["revenue"] for w in trailing_weeks) / len(trailing_weeks)
+                trailing_payroll = sum(w["payroll"] for w in trailing_weeks) / len(trailing_weeks)
+                trailing_profit = trailing_revenue - trailing_payroll
+                trailing_profit_margin = (trailing_profit / trailing_revenue * 100) if trailing_revenue else 0
+                
+                # Average efficiency across weeks
+                all_efficiency = []
+                for w in trailing_weeks:
+                    all_efficiency.extend(w["efficiency"])
+                trailing_efficiency = sum(all_efficiency) / len(all_efficiency) if all_efficiency else 0
+                
+                # Average revenue per hour
+                all_rph = []
+                for w in trailing_weeks:
+                    all_rph.extend(w["revenue_per_hour"])
+                trailing_rph = sum(all_rph) / len(all_rph) if all_rph else 0
+                
+                trend_point["avg_3m_trailing"] = {
+                    "revenue": round(trailing_revenue, 2),
+                    "payroll": round(trailing_payroll, 2),
+                    "profit": round(trailing_profit, 2),
+                    "profit_margin": round(trailing_profit_margin, 2),
+                    "efficiency": round(trailing_efficiency, 2),
+                    "revenue_per_hour": round(trailing_rph, 2)
+                }
+            else:
+                trend_point["avg_3m_trailing"] = None
+            
+            # Calculate 3-month leading average (projection based on trend)
+            if i >= 23 and i < len(sorted_weeks) - 12:  # Need enough data for projection
+                future_weeks = sorted_weeks[i+1:min(len(sorted_weeks), i+13)]
+                if len(future_weeks) >= 12:
+                    leading_revenue = sum(w["revenue"] for w in future_weeks) / len(future_weeks)
+                    leading_payroll = sum(w["payroll"] for w in future_weeks) / len(future_weeks)
+                    leading_profit = leading_revenue - leading_payroll
+                    leading_profit_margin = (leading_profit / leading_revenue * 100) if leading_revenue else 0
+                    
+                    # Average efficiency for leading period
+                    all_efficiency = []
+                    for w in future_weeks:
+                        all_efficiency.extend(w["efficiency"])
+                    leading_efficiency = sum(all_efficiency) / len(all_efficiency) if all_efficiency else 0
+                    
+                    # Average revenue per hour for leading period
+                    all_rph = []
+                    for w in future_weeks:
+                        all_rph.extend(w["revenue_per_hour"])
+                    leading_rph = sum(all_rph) / len(all_rph) if all_rph else 0
+                    
+                    trend_point["avg_3m_leading"] = {
+                        "revenue": round(leading_revenue, 2),
+                        "payroll": round(leading_payroll, 2),
+                        "profit": round(leading_profit, 2),
+                        "profit_margin": round(leading_profit_margin, 2),
+                        "efficiency": round(leading_efficiency, 2),
+                        "revenue_per_hour": round(leading_rph, 2)
+                    }
+                else:
+                    trend_point["avg_3m_leading"] = None
+            else:
+                trend_point["avg_3m_leading"] = None
+            
+            enhanced_trends.append(trend_point)
+        
+        # Filter to requested time range (remove extra weeks used for calculations)
+        final_start = end_date - timedelta(weeks=months_back * 4)
+        filtered_trends = [
+            t for t in enhanced_trends 
+            if datetime.fromisoformat(t["week"]).date() >= final_start
+        ]
+        
+        return jsonify({
+            "trends": filtered_trends,
+            "analysis_period": {
+                "start_date": final_start.isoformat(),
+                "end_date": end_date.isoformat(),
+                "months": months_back,
+                "weeks": len(filtered_trends)
+            },
+            "store_filter": store_filter,
+            "store_name": STORE_MAPPING.get(store_filter, store_filter) if store_filter != "all" else "All Stores"
+        })
+        
+    except Exception as e:
+        logger.error(f"Error in enhanced trends: {str(e)}", exc_info=True)
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if session:
+            session.close()
+
+
 # Update version marker
 logger.info(
-    "Executive Dashboard Enhanced v3 - YoY/MoM/WoW Comparisons - Deployed %s",
+    "Executive Dashboard Enhanced v4 - Multi-Period Analysis with 3-Month Averages and YoY/Yo2Y - Deployed %s",
     datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
 )

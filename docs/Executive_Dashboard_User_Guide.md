@@ -47,7 +47,55 @@ Each metric includes color-coded performance indicators:
 - 🟠 **Warning**: Performance needing attention (Orange gradient)
 - 🔴 **Critical**: Performance requiring immediate action (Red gradient)
 
-### 2. Revenue & Payroll Trends Chart
+### 2. Multi-Period Analysis (New Feature)
+
+The Multi-Period Analysis provides advanced analytical capabilities for comprehensive business performance evaluation:
+
+#### 3-Month Moving Averages
+- **Trailing 3-Month Average**: Mean of the current month and two prior months
+  - Smooths out short-term fluctuations to reveal underlying trends
+  - Provides stable baseline for performance evaluation
+  - Calculated across revenue, profit, efficiency, and revenue per hour metrics
+
+- **Leading 3-Month Projection**: Forward-looking 3-month average based on trend analysis
+  - Uses historical data patterns to project future performance
+  - Helps with strategic planning and resource allocation
+  - Available when sufficient historical data exists (6+ months)
+
+#### Year-over-Year (YoY) Comparisons
+Compare current performance against the same period last year:
+- **Revenue Growth**: Absolute and percentage change in total revenue
+- **Profit Evolution**: Year-over-year profit changes with margin analysis
+- **Efficiency Trends**: Labor efficiency improvements or declines
+- **Performance Indicators**: Color-coded arrows showing positive/negative trends
+
+#### Two-Year-over-Two-Year (Yo2Y) Analysis
+Extended historical comparison spanning two years:
+- **Long-term Trends**: Multi-year performance trajectory analysis
+- **Cyclical Patterns**: Identify seasonal or cyclical business patterns
+- **Growth Trajectory**: Sustained growth vs. temporary fluctuations
+- **Strategic Insights**: Foundation for long-term business planning
+
+#### SQL Algorithm Overview
+The multi-period analysis uses sophisticated queries to:
+1. **Data Collection**: Retrieve 6+ months of PayrollTrends/ScorecardTrends data
+2. **Period Segmentation**: Divide data into current, YoY, and Yo2Y periods
+3. **Monthly Aggregation**: Group weekly data into monthly averages
+4. **Rolling Calculations**: Compute 3-month trailing/leading averages
+5. **Comparison Engine**: Calculate absolute and percentage changes with trend indicators
+
+#### Usage Instructions
+1. Click **"Multi-Period Analysis"** button in the dashboard controls
+2. Use toggle buttons to switch between analysis views:
+   - **Current Period**: Standard dashboard metrics
+   - **3-Month Avg**: Trailing and leading average comparisons
+   - **YoY Comparison**: Year-over-year and two-year comparison tables
+3. View color-coded trend indicators:
+   - 🟢 Green: Positive performance improvement
+   - 🔴 Red: Performance decline requiring attention
+   - ⚪ Gray: Neutral or minimal change
+
+### 3. Revenue & Payroll Trends Chart
 
 **Purpose**: Track financial performance and labor cost optimization over time
 
