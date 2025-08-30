@@ -1,0 +1,50 @@
+================================================================================
+RFID3 DATABASE CORRELATION ANALYSIS REPORT
+================================================================================
+Generated: 2025-08-29T20:21:57.365074
+
+## BASIC STATISTICS
+----------------------------------------
+Total Items: 65,942
+Scan Coverage: 18.81%
+Identifier Types:
+  - RFID: 12,468
+  - QR: 42,224
+  - STICKER: 1,480
+  - BULK: 9,714
+
+## DATA QUALITY ISSUES
+----------------------------------------
+Missing Home Store: 12,477 (18.92%)
+Missing Current Store: 13,608 (20.64%)
+Missing Rental Class: 53,566 (81.23%)
+Never Scanned: 53,539 (81.19%)
+
+## TABLE RELATIONSHIPS
+----------------------------------------
+Items in both tables: 10,388
+Items only in master: 55,554
+Orphaned transactions: 200
+
+## PRIORITY RECOMMENDATIONS
+----------------------------------------
+
+[CRITICAL] Data Quality: Majority of inventory never scanned
+  Recommendation: Initiate comprehensive inventory count campaign
+  Impact: Cannot track or manage unscanned inventory
+  Effort: High
+
+[HIGH] Store Management: Significant missing store location data
+  Recommendation: Implement store assignment based on transaction history
+  Impact: Cannot track inventory location and movement
+  Effort: Medium
+
+[HIGH] Data Integrity: 200 orphaned transactions found
+  Recommendation: Clean up orphaned transactions or create missing item records
+  Impact: Transaction history incomplete
+  Effort: Low
+
+[MEDIUM] Classification: No rental class category mappings exist
+  Recommendation: Populate rental_class_mappings table
+  Impact: Cannot generate category-based reports
+  Effort: Low

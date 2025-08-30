@@ -1,0 +1,186 @@
+{
+  "timestamp": "2025-08-29T20:21:57.365074",
+  "basic_stats": {
+    "item_master": {
+      "total_items": 65942,
+      "unique_rental_classes": 489,
+      "unique_home_stores": 5,
+      "unique_current_stores": 5,
+      "unique_statuses": 7,
+      "identifier_distribution": {
+        "rfid": "12468",
+        "qr": "42224",
+        "sticker": "1480",
+        "bulk": "9714"
+      },
+      "scan_coverage": {
+        "items_scanned": "12403",
+        "scan_percentage": "18.81"
+      },
+      "avg_turnover_ytd": 43.121477
+    },
+    "transactions": {
+      "total_transactions": 26590,
+      "unique_items": 10588,
+      "unique_contracts": 485,
+      "scan_types": 5,
+      "date_range": {
+        "earliest": "2024-12-16T11:59:48",
+        "latest": "2025-08-29T10:18:50"
+      }
+    }
+  },
+  "relationships": {
+    "item_transaction": {
+      "items_in_both": 10388,
+      "items_only_master": 55554,
+      "orphaned_transactions": 200
+    },
+    "rental_classes": {
+      "used_in_items": 489,
+      "seed_definitions": 909,
+      "category_mappings": 0,
+      "unmapped_percentage": 100.0
+    }
+  },
+  "data_quality": {
+    "missing_data": {
+      "missing_home_store": {
+        "count": 12477,
+        "percentage": 18.92
+      },
+      "missing_current_store": {
+        "count": 13608,
+        "percentage": 20.64
+      },
+      "missing_rental_class": {
+        "count": 53566,
+        "percentage": 81.23
+      },
+      "never_scanned": {
+        "count": 53539,
+        "percentage": 81.19
+      }
+    },
+    "data_freshness": {
+      "aging_91_180_days": 1265,
+      "fresh_0_30_days": 5483,
+      "recent_31_90_days": 5599,
+      "stale_181_365_days": 56
+    },
+    "store_consistency": {
+      "mismatched_stores": 69
+    }
+  },
+  "correlations": {
+    "status_identifier": [
+      {
+        "status": "Ready to Rent",
+        "identifier_type": "None",
+        "count": 11330
+      },
+      {
+        "status": "Sold",
+        "identifier_type": "None",
+        "count": 593
+      },
+      {
+        "status": "On Rent",
+        "identifier_type": "None",
+        "count": 452
+      },
+      {
+        "status": "Needs to be Inspected",
+        "identifier_type": "None",
+        "count": 91
+      },
+      {
+        "status": "Wet",
+        "identifier_type": "None",
+        "count": 6
+      },
+      {
+        "status": "Repair",
+        "identifier_type": "None",
+        "count": 4
+      },
+      {
+        "status": "Missing",
+        "identifier_type": "None",
+        "count": 1
+      }
+    ],
+    "store_inventory_patterns": {},
+    "transaction_patterns": {
+      "Rental": {
+        "8": 250,
+        "9": 178,
+        "10": 154,
+        "11": 288,
+        "12": 275,
+        "13": 20,
+        "14": 80,
+        "15": 90,
+        "16": 2,
+        "20": 8,
+        "21": 8
+      },
+      "Return": {
+        "11": 26,
+        "14": 15,
+        "15": 25
+      },
+      "Touch Scan": {
+        "7": 216,
+        "8": 123,
+        "9": 86,
+        "10": 83,
+        "11": 280,
+        "12": 4355,
+        "13": 190,
+        "14": 20,
+        "15": 45,
+        "16": 7,
+        "21": 8
+      }
+    }
+  },
+  "recommendations": [
+    {
+      "priority": "CRITICAL",
+      "category": "Data Quality",
+      "issue": "Majority of inventory never scanned",
+      "recommendation": "Initiate comprehensive inventory count campaign",
+      "impact": "Cannot track or manage unscanned inventory",
+      "effort": "High",
+      "sql_fix": "\n                UPDATE id_item_master \n                SET date_last_scanned = NOW() \n                WHERE tag_id IN (\n                    SELECT DISTINCT tag_id \n                    FROM id_transactions \n                    WHERE scan_date > DATE_SUB(NOW(), INTERVAL 90 DAY)\n                )\n                AND date_last_scanned IS NULL\n                "
+    },
+    {
+      "priority": "HIGH",
+      "category": "Store Management",
+      "issue": "Significant missing store location data",
+      "recommendation": "Implement store assignment based on transaction history",
+      "impact": "Cannot track inventory location and movement",
+      "effort": "Medium",
+      "sql_fix": "\n                UPDATE id_item_master im\n                SET home_store = '6800', current_store = '6800'\n                WHERE (home_store IS NULL OR current_store IS NULL)\n                AND EXISTS (\n                    SELECT 1 FROM id_transactions t \n                    WHERE t.tag_id = im.tag_id \n                    AND t.scan_date > DATE_SUB(NOW(), INTERVAL 180 DAY)\n                )\n                "
+    },
+    {
+      "priority": "HIGH",
+      "category": "Data Integrity",
+      "issue": "200 orphaned transactions found",
+      "recommendation": "Clean up orphaned transactions or create missing item records",
+      "impact": "Transaction history incomplete",
+      "effort": "Low",
+      "sql_fix": "\n                DELETE FROM id_transactions \n                WHERE tag_id NOT IN (SELECT tag_id FROM id_item_master)\n                AND scan_date < DATE_SUB(NOW(), INTERVAL 180 DAY)\n                "
+    },
+    {
+      "priority": "MEDIUM",
+      "category": "Classification",
+      "issue": "No rental class category mappings exist",
+      "recommendation": "Populate rental_class_mappings table",
+      "impact": "Cannot generate category-based reports",
+      "effort": "Low",
+      "sql_fix": "\n                INSERT INTO rental_class_mappings (rental_class_id, category, subcategory)\n                SELECT DISTINCT \n                    rental_class_num,\n                    SUBSTRING_INDEX(common_name, ' ', 1),\n                    common_name\n                FROM id_item_master\n                WHERE rental_class_num IS NOT NULL\n                "
+    }
+  ]
+}
