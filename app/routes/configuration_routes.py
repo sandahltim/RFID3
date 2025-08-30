@@ -768,6 +768,120 @@ def reset_configuration(config_type):
 
 
 
+@config_bp.route('/rfid-correlation-status')
+def get_rfid_correlation_status():
+    """Get RFID data correlation status after fixes"""
+    try:
+        # Get RFID distribution by store
+        query = text("""
+            SELECT 
+                sc.store_name,
+                sc.rfid_store_code,
+                sc.pos_store_code,
+                CASE 
+                    WHEN sc.rfid_store_code = '8101' THEN 'RFID Test Store'
+                    WHEN sc.rfid_store_code = '000' THEN 'Header/System Data'
+                    ELSE 'POS Only'
+                END as store_type,
+                COUNT(DISTINCT im.tag_id) as total_items,
+                SUM(CASE WHEN im.identifier_type = 'RFID' THEN 1 ELSE 0 END) as rfid_items,
+                SUM(CASE WHEN im.rental_class_num IS NOT NULL THEN 1 ELSE 0 END) as has_rental_class
+            FROM store_correlations sc
+            LEFT JOIN id_item_master im ON sc.rfid_store_code = im.current_store
+            WHERE sc.is_active = 1
+            GROUP BY sc.store_name, sc.rfid_store_code, sc.pos_store_code
+            ORDER BY 
+                CASE 
+                    WHEN sc.rfid_store_code = '8101' THEN 1
+                    WHEN sc.rfid_store_code = '000' THEN 99
+                    ELSE 2
+                END
+        """)
+        
+        result = db.session.execute(query)
+        stores = []
+        total_rfid = 0
+        
+        for row in result:
+            stores.append({
+                'store_name': row.store_name,
+                'rfid_code': row.rfid_store_code,
+                'pos_code': row.pos_store_code,
+                'store_type': row.store_type,
+                'total_items': row.total_items or 0,
+                'rfid_items': row.rfid_items or 0,
+                'has_rental_class': row.has_rental_class or 0,
+                'is_rfid_enabled': row.rfid_store_code == '8101'
+            })
+            total_rfid += row.rfid_items or 0
+        
+        # Get identifier type distribution
+        id_query = text("""
+            SELECT 
+                identifier_type,
+                COUNT(*) as count
+            FROM id_item_master
+            GROUP BY identifier_type
+            ORDER BY count DESC
+        """)
+        
+        id_result = db.session.execute(id_query)
+        identifier_types = {}
+        
+        for row in id_result:
+            identifier_types[row.identifier_type or 'None'] = row.count
+        
+        # Get POS equipment patterns
+        pos_query = text("""
+            SELECT 
+                COUNT(*) as total,
+                SUM(CASE WHEN key_field LIKE '%-1' OR key_field LIKE '%-2' 
+                         OR key_field LIKE '%-3' OR key_field LIKE '%-4' THEN 1 ELSE 0 END) as bulk_items,
+                SUM(CASE WHEN key_field LIKE '%#%' THEN 1 ELSE 0 END) as serialized_items
+            FROM pos_equipment
+        """)
+        
+        pos_result = db.session.execute(pos_query).fetchone()
+        
+        # Check correlation health
+        correlation_query = text("""
+            SELECT COUNT(*) as active_correlations
+            FROM pos_rfid_correlations
+            WHERE is_active = 1
+        """)
+        
+        correlation_result = db.session.execute(correlation_query).fetchone()
+        
+        return jsonify({
+            'success': True,
+            'stores': stores,
+            'total_rfid_items': total_rfid,
+            'identifier_distribution': identifier_types,
+            'pos_equipment': {
+                'total': pos_result.total,
+                'bulk_items': pos_result.bulk_items,
+                'serialized_items': pos_result.serialized_items
+            },
+            'correlations': {
+                'active': correlation_result.active_correlations,
+                'status': 'healthy' if correlation_result.active_correlations > 0 else 'needs_setup'
+            },
+            'status': {
+                'rfid_exclusive_to_fridley': total_rfid > 0 and all(
+                    s['rfid_items'] == 0 for s in stores if s['rfid_code'] != '8101'
+                ),
+                'message': 'RFID data correctly assigned to Fridley test store only' if total_rfid > 0 else 'No RFID data found'
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting RFID correlation status: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
 @config_bp.route("/manual-csv-import", methods=["POST"])
 def manual_csv_import():
     """Manual trigger for Tuesday CSV import - for testing and on-demand use"""

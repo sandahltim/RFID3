@@ -2,16 +2,18 @@
 Global Filtering System for RFID3 Inventory Management
 
 This module provides unified filtering capabilities across all inventory views and APIs.
-Enhanced in August 2025 with corrected RFID identification logic and new filter types.
+Enhanced in August 2025 with corrected RFID identification logic and unified store filtering.
 
 Key Enhancements:
 - Fixed RFID detection: 12,500+ items with NULL identifier_type + HEX EPC pattern
 - Added Serialized filter: Combined QR + Sticker items (43,700+ total)  
 - Proper SQLAlchemy NULL vs string handling
 - Support for all inventory type filters: RFID, QR, Sticker, Serialized, Bulk
+- Unified store filtering: Properly handles both RFID codes (000, 3607, 6800, 728, 8101) 
+  and POS codes (0, 1, 2, 3, 4) with automatic correlation
 
 Author: System Development Team
-Last Updated: 2025-08-30 - Post-Refactoring Enhancements
+Last Updated: 2025-08-30 - Unified Store Filtering Implementation
 """
 
 from sqlalchemy import and_, or_
@@ -25,12 +27,14 @@ def build_global_filters(store_filter="all", type_filter="all"):
     
     This function creates the core filtering logic used across all inventory
     endpoints, database views, and analytics APIs. Supports multi-store 
-    operations and accurate inventory type classification.
+    operations with unified RFID/POS store correlation and accurate inventory type classification.
     
     Args:
         store_filter (str): Store code filter or 'all'
-            Valid values: 'all', '6800', '3607', '8101', '728'
-            Maps to both home_store and current_store fields
+            Valid values: 'all' or any valid store code
+            RFID format: '000', '3607', '6800', '728', '8101'  
+            POS format: '0', '1', '2', '3', '4'
+            Both formats are automatically correlated to filter RFID data
             
         type_filter (str): Inventory type filter or 'all'
             Valid values: 'all', 'RFID', 'QR', 'Sticker', 'Serialized', 'Bulk'
@@ -47,26 +51,57 @@ def build_global_filters(store_filter="all", type_filter="all"):
         list: List of SQLAlchemy filter conditions to be applied to queries
         
     Example:
-        >>> filters = build_global_filters(store_filter='6800', type_filter='RFID')
+        >>> # Both RFID and POS codes work automatically
+        >>> filters = build_global_filters(store_filter='6800', type_filter='RFID')  # RFID code
+        >>> filters = build_global_filters(store_filter='2', type_filter='RFID')     # POS code -> same result
         >>> query = session.query(ItemMaster).filter(*filters)
-        >>> rfid_items_6800 = query.all()
+        >>> brooklyn_park_rfid_items = query.all()
         
     Note:
-        The RFID detection logic was corrected in commit b474622 to properly
-        identify items with NULL (not 'None' string) identifier_type and valid
-        hexadecimal EPC tag formats. This fix revealed 12,500+ genuine RFID
-        items vs 47 previously mislabeled items.
+        Store filtering now uses unified correlation between RFID and POS systems.
+        POS codes are automatically converted to RFID codes for filtering RFID data.
+        This ensures consistent results regardless of input store code format.
     """
     filters = []
     
-    # Store filtering - supports multi-store item tracking
+    # Store filtering - unified RFID/POS store correlation
     if store_filter and store_filter != "all":
-        filters.append(
-            or_(
-                ItemMaster.home_store == store_filter,      # Default store assignment
-                ItemMaster.current_store == store_filter,   # Current location
+        # Import here to avoid circular imports
+        try:
+            from ..services.store_correlation_service import get_store_correlation_service
+            correlation_service = get_store_correlation_service()
+            
+            # Detect store type and convert to RFID format for filtering
+            if store_filter in ['0', '1', '2', '3', '4']:
+                # POS code - convert to RFID code
+                rfid_code = correlation_service.correlate_pos_to_rfid(store_filter)
+                if rfid_code:
+                    target_store_code = rfid_code
+                else:
+                    # Fallback to original if correlation fails
+                    target_store_code = store_filter
+            elif store_filter in ['000', '3607', '6800', '728', '8101']:
+                # Already RFID code
+                target_store_code = store_filter
+            else:
+                # Unknown format - try as-is
+                target_store_code = store_filter
+            
+            filters.append(
+                or_(
+                    ItemMaster.home_store == target_store_code,      # Default store assignment
+                    ItemMaster.current_store == target_store_code,   # Current location
+                )
             )
-        )
+            
+        except Exception as e:
+            # Fallback to original behavior if correlation service fails
+            filters.append(
+                or_(
+                    ItemMaster.home_store == store_filter,      
+                    ItemMaster.current_store == store_filter,   
+                )
+            )
     
     # Inventory type filtering - enhanced with corrected RFID logic
     if type_filter and type_filter != "all":
