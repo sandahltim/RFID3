@@ -1444,15 +1444,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    function formatCurrency(value) {
-        if (!value) return '$0';
-        return new Intl.NumberFormat('en-US', {
-            style: 'currency',
-            currency: 'USD',
-            minimumFractionDigits: 0,
-            maximumFractionDigits: 0
-        }).format(value);
-    }
+    // formatCurrency function moved to bottom of file to avoid redeclaration
     
     function formatKpiValue(value) {
         if (!value) return '0';
@@ -1601,12 +1593,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const resultsDiv = document.getElementById('comparison-results');
         resultsDiv.style.display = 'block';
         
-        const formatCurrency = (amount) => new Intl.NumberFormat('en-US', { 
-            style: 'currency', 
-            currency: 'USD',
-            minimumFractionDigits: 0,
-            maximumFractionDigits: 0
-        }).format(amount);
+        // Using global formatCurrency function
         
         const formatPercent = (value) => {
             const color = value >= 0 ? 'text-success' : 'text-danger';
@@ -1838,12 +1825,15 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // Currency formatting function
-    const formatCurrency = (amount) => new Intl.NumberFormat('en-US', { 
-        style: 'currency', 
-        currency: 'USD',
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 0
-    }).format(amount);
+    const formatCurrency = (amount) => {
+        if (!amount) return '$0';
+        return new Intl.NumberFormat('en-US', { 
+            style: 'currency', 
+            currency: 'USD',
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 0
+        }).format(amount);
+    };
     
     // Initialize multi-period analysis when DOM is ready
     document.addEventListener('DOMContentLoaded', function() {
