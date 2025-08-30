@@ -68,19 +68,24 @@ class CSVImportService:
                 if i % 5000 == 0:  # Progress logging every 5k records
                     logger.info(f"Imported {imported_count} equipment records so far...")
             
+            # CRITICAL CORRELATION: Update RFID rental_class_num from POS ItemNum
+            correlation_count = self._correlate_rfid_with_pos_data()
+            
             # Update import stats
             self.import_stats["files_processed"] += 1
             self.import_stats["total_records_processed"] += len(df)
             self.import_stats["total_records_imported"] += imported_count
             
             logger.info(f"Equipment import completed: {imported_count}/{len(df)} records imported")
+            logger.info(f"POS-RFID correlation completed: {correlation_count} RFID items updated with rental_class_num")
             
             return {
                 "success": True,
                 "file_path": file_path,
                 "total_records": len(df),
                 "imported_records": imported_count,
-                "skipped_records": len(df) - imported_count
+                "skipped_records": len(df) - imported_count,
+                "correlation_count": correlation_count
             }
             
         except Exception as e:
@@ -100,6 +105,7 @@ class CSVImportService:
         df['Name'] = df['Name'].fillna('').astype(str).str.strip()
         df['Category'] = df['Category'].fillna('').astype(str).str.strip()
         df['Current Store'] = df['Current Store'].fillna('').astype(str).str.strip()
+        df['SerialNo'] = df['SerialNo'].fillna('').astype(str).str.strip()  # CRITICAL: Import serial numbers
         
         # Convert financial columns
         financial_cols = ['T/O YTD', 'T/O LTD', 'RepairCost MTD', 'RepairCost LTD', 'Sell Price']
@@ -131,6 +137,7 @@ class CSVImportService:
                         'item_num': str(row.get('ItemNum', '')),
                         'name': str(row.get('Name', ''))[:300],  # Truncate to field limit
                         'category': str(row.get('Category', ''))[:100],
+                        'serial_no': str(row.get('SerialNo', ''))[:100],  # CRITICAL: Include serial number for correlation
                         'turnover_ytd': float(row.get('T/O YTD', 0)),
                         'turnover_ltd': float(row.get('T/O LTD', 0)),
                         'repair_cost_ytd': float(row.get('RepairCost MTD', 0)),
@@ -165,8 +172,8 @@ class CSVImportService:
                 try:
                     query = text("""
                         INSERT IGNORE INTO pos_equipment 
-                        (item_num, name, category, turnover_ytd, turnover_ltd, repair_cost_ytd, sell_price, current_store, inactive)
-                        VALUES (:item_num, :name, :category, :turnover_ytd, :turnover_ltd, :repair_cost_ytd, :sell_price, :current_store, :inactive)
+                        (item_num, name, category, serial_no, turnover_ytd, turnover_ltd, repair_cost_ytd, sell_price, current_store, inactive)
+                        VALUES (:item_num, :name, :category, :serial_no, :turnover_ytd, :turnover_ltd, :repair_cost_ytd, :sell_price, :current_store, :inactive)
                     """)
                     db.session.execute(query, record)
                     imported_count += 1
@@ -177,6 +184,51 @@ class CSVImportService:
             db.session.commit()
         
         return imported_count
+    
+    def _correlate_rfid_with_pos_data(self) -> int:
+        """
+        CORRELATION: Update POS equipment with RFID rental_class_num for analytics
+        RFIDpro rental_class_num (from API/seed) is source of truth
+        POS ItemNum should correlate with RFID rental_class_num for cross-system analytics
+        """
+        correlation_count = 0
+        
+        try:
+            logger.info("Starting POS-RFID correlation for analytics...")
+            
+            # Update POS equipment with correlation field pointing to RFID rental_class_num
+            # This preserves RFIDpro as source of truth while enabling POS-RFID analytics
+            correlation_query = text("""
+                UPDATE pos_equipment pos
+                INNER JOIN id_item_master rfid ON TRIM(COALESCE(pos.serial_no, '')) = TRIM(COALESCE(rfid.serial_number, ''))
+                SET pos.rfid_rental_class_num = rfid.rental_class_num
+                WHERE TRIM(COALESCE(pos.serial_no, '')) != ''
+                AND TRIM(COALESCE(rfid.serial_number, '')) != ''
+                AND TRIM(COALESCE(rfid.rental_class_num, '')) != ''
+            """)
+            
+            # First add the correlation column if it doesn't exist
+            try:
+                db.session.execute(text("ALTER TABLE pos_equipment ADD COLUMN rfid_rental_class_num VARCHAR(255)"))
+                db.session.commit()
+                logger.info("Added rfid_rental_class_num column to pos_equipment")
+            except:
+                pass  # Column already exists
+            
+            result = db.session.execute(correlation_query)
+            correlation_count = result.rowcount
+            db.session.commit()
+            
+            if correlation_count > 0:
+                logger.info(f"CORRELATION SUCCESS: Updated {correlation_count} POS items with RFID rental_class_num correlation")
+            else:
+                logger.info("CORRELATION INFO: No matches found - RFIDpro remains source of truth for rental_class_num")
+            
+        except Exception as e:
+            logger.error(f"CORRELATION ERROR: {e}")
+            db.session.rollback()
+            
+        return correlation_count
 
     def import_transactions_data(self, file_path: str = None) -> Dict:
         """Import transaction data from transactions8.26.25.csv"""
