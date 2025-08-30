@@ -416,11 +416,17 @@ def get_payroll_trends():
 
 @tab7_bp.route("/api/executive/store_comparison", methods=["GET"])
 def get_store_comparison():
-    """Get comparative metrics across all stores."""
+    """Get comparative metrics across all stores.
+
+    Supports two modes:
+    - aggregate (default): aggregates metrics over a period of weeks
+    - weekly: returns current vs previous week comparison per store
+    """
     session = None
     try:
         session = db.session()
         period_weeks = int(request.args.get("weeks", 4))
+        mode = request.args.get("mode", "aggregate")
 
         # Use actual latest data date instead of today - CONSISTENT FIX
         latest_data_date = (
@@ -432,6 +438,99 @@ def get_store_comparison():
         if not latest_data_date:
             latest_data_date = datetime.now().date()
 
+        if mode == "weekly":
+            current_week = latest_data_date
+            previous_week = current_week - timedelta(weeks=1)
+
+            # Metrics for current week
+            current_metrics = (
+                session.query(
+                    PayrollTrends.store_id,
+                    func.sum(PayrollTrends.total_revenue).label("revenue"),
+                    func.sum(PayrollTrends.payroll_cost).label("payroll"),
+                    func.avg(PayrollTrends.labor_efficiency_ratio).label("efficiency"),
+                )
+                .filter(PayrollTrends.week_ending == current_week)
+                .group_by(PayrollTrends.store_id)
+                .all()
+            )
+
+            previous_metrics = (
+                session.query(
+                    PayrollTrends.store_id,
+                    func.sum(PayrollTrends.total_revenue).label("revenue"),
+                    func.sum(PayrollTrends.payroll_cost).label("payroll"),
+                    func.avg(PayrollTrends.labor_efficiency_ratio).label("efficiency"),
+                )
+                .filter(PayrollTrends.week_ending == previous_week)
+                .group_by(PayrollTrends.store_id)
+                .all()
+            )
+
+            current_dict = {m.store_id: m for m in current_metrics}
+            previous_dict = {m.store_id: m for m in previous_metrics}
+            all_store_ids = set(current_dict.keys()) | set(previous_dict.keys())
+
+            comparison_data = []
+            for store_id in all_store_ids:
+                current = current_dict.get(store_id)
+                previous = previous_dict.get(store_id)
+
+                curr_revenue = float(current.revenue or 0) if current else 0
+                prev_revenue = float(previous.revenue or 0) if previous else 0
+                curr_payroll = float(current.payroll or 0) if current else 0
+                prev_payroll = float(previous.payroll or 0) if previous else 0
+                curr_eff = float(current.efficiency or 0) if current else 0
+                prev_eff = float(previous.efficiency or 0) if previous else 0
+
+                curr_profit = curr_revenue - curr_payroll
+                prev_profit = prev_revenue - prev_payroll
+
+                def pct_change(curr, prev):
+                    return ((curr - prev) / prev * 100) if prev else None
+
+                store_data = {
+                    "store_id": store_id,
+                    "store_name": STORE_MAPPING.get(store_id, store_id),
+                    "revenue": {
+                        "current": curr_revenue,
+                        "previous": prev_revenue,
+                        "change": curr_revenue - prev_revenue,
+                        "pct_change": pct_change(curr_revenue, prev_revenue),
+                    },
+                    "payroll": {
+                        "current": curr_payroll,
+                        "previous": prev_payroll,
+                        "change": curr_payroll - prev_payroll,
+                        "pct_change": pct_change(curr_payroll, prev_payroll),
+                    },
+                    "profit": {
+                        "current": curr_profit,
+                        "previous": prev_profit,
+                        "change": curr_profit - prev_profit,
+                        "pct_change": pct_change(curr_profit, prev_profit),
+                    },
+                    "efficiency": {
+                        "current": curr_eff,
+                        "previous": prev_eff,
+                        "change": curr_eff - prev_eff,
+                        "pct_change": pct_change(curr_eff, prev_eff),
+                    },
+                }
+                comparison_data.append(store_data)
+
+            # Rankings based on current week values
+            for metric in ["revenue", "payroll", "profit", "efficiency"]:
+                reverse = True
+                sorted_stores = sorted(
+                    comparison_data, key=lambda x: x[metric]["current"], reverse=reverse
+                )
+                for idx, store in enumerate(sorted_stores, 1):
+                    store[metric]["rank"] = idx
+
+            return jsonify({"mode": "weekly", "stores": comparison_data})
+
+        # Default aggregate mode
         end_date = latest_data_date
         start_date = end_date - timedelta(weeks=period_weeks)
 
@@ -439,7 +538,6 @@ def get_store_comparison():
             f"Store comparison date range: {start_date} to {end_date} (latest data: {latest_data_date})"
         )
 
-        # Get aggregated metrics by store
         store_metrics = (
             session.query(
                 PayrollTrends.store_id,
@@ -455,7 +553,6 @@ def get_store_comparison():
 
         comparison_data = []
         for store in store_metrics:
-            # Calculate profitability
             profit = float(store.revenue or 0) - float(store.payroll or 0)
             profit_margin = (
                 (profit / float(store.revenue) * 100) if store.revenue else 0
@@ -477,14 +574,11 @@ def get_store_comparison():
                 }
             )
 
-        # Sort by revenue descending
         comparison_data.sort(key=lambda x: x["revenue"], reverse=True)
-
-        # Add ranking
         for i, store in enumerate(comparison_data, 1):
             store["rank"] = i
 
-        return jsonify({"stores": comparison_data})
+        return jsonify({"mode": "aggregate", "stores": comparison_data})
 
     except Exception as e:
         logger.error(f"Error fetching store comparison: {str(e)}", exc_info=True)
