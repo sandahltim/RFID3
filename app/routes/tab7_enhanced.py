@@ -13,47 +13,12 @@ import json
 from decimal import Decimal
 import calendar
 
+from ..utils.date_ranges import get_date_range_from_params
+
 logger = get_logger(__name__)
 
 # Import centralized store configuration
 from ..config.stores import STORE_MAPPING, get_store_name
-
-
-def get_date_range_from_params(request):
-    """Extract and validate date range from request parameters."""
-    # Check for custom date range
-    start_date_str = request.args.get("start_date")
-    end_date_str = request.args.get("end_date")
-
-    if start_date_str and end_date_str:
-        try:
-            start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date()
-            end_date = datetime.strptime(end_date_str, "%Y-%m-%d").date()
-            return start_date, end_date
-        except ValueError:
-            logger.error(
-                f"Invalid date format: start={start_date_str}, end={end_date_str}"
-            )
-
-    # Fall back to period-based selection
-    period = request.args.get("period", "4weeks")
-    end_date = datetime.now().date()
-
-    if period == "4weeks":
-        start_date = end_date - timedelta(weeks=4)
-    elif period == "12weeks":
-        start_date = end_date - timedelta(weeks=12)
-    elif period == "52weeks":
-        start_date = end_date - timedelta(weeks=52)
-    elif period == "ytd":
-        start_date = date(end_date.year, 1, 1)
-    elif period == "custom":
-        # Custom period should have dates
-        return None, None
-    else:
-        start_date = end_date - timedelta(weeks=4)
-
-    return start_date, end_date
 
 
 def calculate_comparison_metrics(
