@@ -767,6 +767,40 @@ def reset_configuration(config_type):
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+
+@config_bp.route("/manual-csv-import", methods=["POST"])
+def manual_csv_import():
+    """Manual trigger for Tuesday CSV import - for testing and on-demand use"""
+    try:
+        from app.services.csv_import_service import CSVImportService
+        
+        logger.info("🔧 MANUAL TRIGGER: Starting comprehensive CSV import")
+        
+        importer = CSVImportService()
+        result = importer.manual_trigger_tuesday_import()
+        
+        if result.get("successful_imports", 0) > 0:
+            return jsonify({
+                "success": True,
+                "message": f"CSV import completed: {result.get('successful_imports', 0)}/{result.get('total_file_types', 0)} file types successful",
+                "details": result
+            })
+        else:
+            return jsonify({
+                "success": False,
+                "message": "CSV import failed or no files processed",
+                "details": result
+            }), 500
+            
+    except Exception as e:
+        logger.error(f"🔧 MANUAL TRIGGER: CSV import failed - {str(e)}", exc_info=True)
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "message": "Manual CSV import failed"
+        }), 500
+
+
 # Redirect routes for common URL variations
 @config_redirect_bp.route('/configuration')
 @config_redirect_bp.route('/configuration/')

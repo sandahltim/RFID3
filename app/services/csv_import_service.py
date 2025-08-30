@@ -98,7 +98,25 @@ class CSVImportService:
             }
 
     def _clean_equipment_data(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Clean and normalize equipment data"""
+        """Clean and normalize equipment data with contamination filtering"""
+        
+        logger.info(f"Starting equipment data cleaning: {len(df)} raw records")
+        
+        # CRITICAL CONTAMINATION FILTERS - Remove obsolete data
+        contamination_filters = [
+            df['Category'].str.upper() == 'UNUSED',
+            df['Category'].str.upper() == 'NON CURRENT ITEMS', 
+            df['Inactive'].fillna(False).astype(bool) == True
+        ]
+        
+        # Count contaminated records before removal
+        contaminated_mask = contamination_filters[0] | contamination_filters[1] | contamination_filters[2]
+        contaminated_count = contaminated_mask.sum()
+        logger.warning(f"Filtering out {contaminated_count} contaminated records ({contaminated_count/len(df)*100:.1f}%)")
+        
+        # Apply contamination filter
+        df = df[~contaminated_mask].copy()
+        logger.info(f"After contamination filtering: {len(df)} clean records ({len(df)/(len(df)+contaminated_count)*100:.1f}% retained)")
         
         # Handle missing values and data types
         df['ItemNum'] = df['ItemNum'].astype(str).str.strip()
@@ -135,8 +153,10 @@ class CSVImportService:
                 try:
                     record = {
                         'item_num': str(row.get('ItemNum', '')),
+                        'key_field': str(row.get('Key', ''))[:100],  # CRITICAL: Key field for identifier type classification
                         'name': str(row.get('Name', ''))[:300],  # Truncate to field limit
                         'category': str(row.get('Category', ''))[:100],
+                        'qty': int(row.get('Qty', 0)),  # CRITICAL: Quantity for bulk/serialized classification
                         'serial_no': str(row.get('SerialNo', ''))[:100],  # CRITICAL: Include serial number for correlation
                         'turnover_ytd': float(row.get('T/O YTD', 0)),
                         'turnover_ltd': float(row.get('T/O LTD', 0)),
@@ -172,8 +192,8 @@ class CSVImportService:
                 try:
                     query = text("""
                         INSERT IGNORE INTO pos_equipment 
-                        (item_num, name, category, serial_no, turnover_ytd, turnover_ltd, repair_cost_ytd, sell_price, current_store, inactive)
-                        VALUES (:item_num, :name, :category, :serial_no, :turnover_ytd, :turnover_ltd, :repair_cost_ytd, :sell_price, :current_store, :inactive)
+                        (item_num, key_field, qty, name, category, serial_no, turnover_ytd, turnover_ltd, repair_cost_ytd, sell_price, current_store, inactive)
+                        VALUES (:item_num, :key_field, :qty, :name, :category, :serial_no, :turnover_ytd, :turnover_ltd, :repair_cost_ytd, :sell_price, :current_store, :inactive)
                     """)
                     db.session.execute(query, record)
                     imported_count += 1
@@ -711,3 +731,513 @@ class CSVImportService:
             logger.error(f"Failed to clear table {table_name}: {e}")
             db.session.rollback()
             return False
+    def import_all_csv_files(self) -> Dict:
+        """
+        Comprehensive Tuesday 8am CSV Import - All 7 POS CSV Files
+        Imports: customers, equipment, transactions, transaction_items, scorecard, payroll, profit_loss
+        """
+        logger.info("🚀 Starting comprehensive Tuesday CSV import for all POS data")
+        
+        # Reset import stats for this run
+        self.import_stats = {
+            "files_processed": 0,
+            "total_records_processed": 0,
+            "total_records_imported": 0,
+            "errors": []
+        }
+        
+        import_results = {}
+        import_batch_id = datetime.now().strftime("%Y%m%d_%H%M%S")
+        
+        # CSV configurations with all 7 files
+        csv_configs = {
+            'customers': {
+                'file_pattern': r'customer\d+\.\d+\.\d+\.csv',
+                'import_method': 'import_customer_data',
+                'table_name': 'pos_customers'
+            },
+            'equipment': {
+                'file_pattern': r'equip\d+\.\d+\.\d+\.csv',
+                'import_method': 'import_equipment_data',
+                'table_name': 'pos_equipment'
+            },
+            'transactions': {
+                'file_pattern': r'transactions\d+\.\d+\.\d+\.csv',
+                'import_method': 'import_transactions_data',
+                'table_name': 'pos_transactions'
+            },
+            'transaction_items': {
+                'file_pattern': r'transitems\d+\.\d+\.\d+\.csv',
+                'import_method': 'import_transaction_items_data',
+                'table_name': 'pos_transaction_items'
+            },
+            'scorecard': {
+                'file_pattern': r'ScorecardTrends\d+\.\d+\.\d+\.csv',
+                'import_method': 'import_scorecard_trends',
+                'table_name': 'pos_scorecard_trends'
+            },
+            'payroll': {
+                'file_pattern': r'PayrollTrends\d+\.\d+\.\d+\.csv',
+                'import_method': 'import_payroll_trends',
+                'table_name': 'pos_payroll_trends'
+            },
+            'profit_loss': {
+                'file_pattern': r'PL\d+\.\d+\.\d+\.csv',
+                'import_method': 'import_profit_loss',
+                'table_name': 'pos_profit_loss'
+            }
+        }
+        
+        # Process each CSV file type
+        for file_type, config in csv_configs.items():
+            try:
+                logger.info(f"🔄 Processing {file_type.upper()} CSV files...")
+                
+                # Find matching files (excluding RFIDpro files)
+                matching_files = []
+                import re
+                
+                for csv_file in os.listdir(self.CSV_BASE_PATH):
+                    if csv_file.endswith('.csv') and 'RFIDpro' not in csv_file:
+                        if re.match(config['file_pattern'], csv_file):
+                            full_path = os.path.join(self.CSV_BASE_PATH, csv_file)
+                            matching_files.append(full_path)
+                
+                if not matching_files:
+                    logger.warning(f"⚠️  No {file_type} files found matching pattern: {config['file_pattern']}")
+                    import_results[file_type] = {
+                        "success": False,
+                        "error": f"No files found matching pattern: {config['file_pattern']}",
+                        "files_processed": 0
+                    }
+                    continue
+                
+                # Get the most recent file
+                latest_file = max(matching_files, key=os.path.getctime)
+                logger.info(f"📄 Found {file_type} file: {os.path.basename(latest_file)}")
+                
+                # Call the appropriate import method
+                if hasattr(self, config['import_method']):
+                    import_method = getattr(self, config['import_method'])
+                    result = import_method(latest_file)
+                    import_results[file_type] = result
+                    
+                    if result.get("success"):
+                        logger.info(f"✅ {file_type.upper()} import completed: {result.get('imported_records', 0)} records")
+                    else:
+                        logger.error(f"❌ {file_type.upper()} import failed: {result.get('error')}")
+                else:
+                    logger.error(f"❌ Import method {config['import_method']} not found for {file_type}")
+                    import_results[file_type] = {
+                        "success": False,
+                        "error": f"Import method {config['import_method']} not implemented"
+                    }
+                
+            except Exception as e:
+                logger.error(f"❌ Error processing {file_type}: {str(e)}", exc_info=True)
+                import_results[file_type] = {
+                    "success": False,
+                    "error": str(e)
+                }
+                self.import_stats["errors"].append(f"{file_type}: {str(e)}")
+        
+        # Generate summary
+        successful_imports = sum(1 for result in import_results.values() if result.get("success"))
+        total_imports = len(import_results)
+        
+        summary = {
+            "batch_id": import_batch_id,
+            "timestamp": datetime.now().isoformat(),
+            "total_file_types": total_imports,
+            "successful_imports": successful_imports,
+            "failed_imports": total_imports - successful_imports,
+            "import_results": import_results,
+            "overall_stats": self.import_stats
+        }
+        
+        logger.info(f"🏁 Tuesday CSV import completed: {successful_imports}/{total_imports} file types successful")
+        
+        return summary
+
+    def import_scorecard_trends(self, file_path: str) -> Dict:
+        """Import scorecard trends data from ScorecardTrends*.csv"""
+        logger.info(f"Starting scorecard trends import from: {file_path}")
+        
+        try:
+            # Read CSV and handle wide format with many columns
+            df = pd.read_csv(file_path, encoding='utf-8', low_memory=False)
+            
+            # Remove empty/unnamed columns that are common in Excel exports
+            meaningful_cols = []
+            for col in df.columns:
+                if not str(col).startswith('Unnamed:') and pd.notna(col):
+                    if df[col].dropna().nunique() > 0:  # Has actual data
+                        meaningful_cols.append(col)
+            
+            df = df[meaningful_cols[:50]]  # Limit to first 50 meaningful columns
+            logger.info(f"Scorecard CSV processed: {len(df)} records, {len(df.columns)} columns")
+            
+            # Clean the data
+            df = self._clean_scorecard_data(df)
+            
+            # Import in batches
+            imported_count = self._import_scorecard_batch(df)
+            
+            return {
+                "success": True,
+                "file_path": file_path,
+                "total_records": len(df),
+                "imported_records": imported_count
+            }
+            
+        except Exception as e:
+            logger.error(f"Scorecard import failed: {str(e)}", exc_info=True)
+            return {"success": False, "error": str(e)}
+
+    def import_payroll_trends(self, file_path: str) -> Dict:
+        """Import payroll trends data from PayrollTrends*.csv"""
+        logger.info(f"Starting payroll trends import from: {file_path}")
+        
+        try:
+            df = pd.read_csv(file_path, encoding='utf-8', low_memory=False)
+            logger.info(f"Payroll CSV shape: {df.shape}")
+            
+            # Clean the data
+            df = self._clean_payroll_data(df)
+            
+            # Import in batches
+            imported_count = self._import_payroll_batch(df)
+            
+            return {
+                "success": True,
+                "file_path": file_path,
+                "total_records": len(df),
+                "imported_records": imported_count
+            }
+            
+        except Exception as e:
+            logger.error(f"Payroll import failed: {str(e)}", exc_info=True)
+            return {"success": False, "error": str(e)}
+
+    def import_profit_loss(self, file_path: str) -> Dict:
+        """Import profit & loss data from PL*.csv"""
+        logger.info(f"Starting P&L import from: {file_path}")
+        
+        try:
+            df = pd.read_csv(file_path, encoding='utf-8', low_memory=False)
+            logger.info(f"P&L CSV shape: {df.shape}")
+            
+            # Clean the data
+            df = self._clean_profit_loss_data(df)
+            
+            # Import in batches
+            imported_count = self._import_profit_loss_batch(df)
+            
+            return {
+                "success": True,
+                "file_path": file_path,
+                "total_records": len(df),
+                "imported_records": imported_count
+            }
+            
+        except Exception as e:
+            logger.error(f"P&L import failed: {str(e)}", exc_info=True)
+            return {"success": False, "error": str(e)}
+
+    def _clean_scorecard_data(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Clean scorecard trends data"""
+        # Handle date columns
+        for col in df.columns:
+            if 'date' in col.lower() or 'week' in col.lower():
+                df[col] = pd.to_datetime(df[col], errors='coerce')
+        
+        # Convert numeric columns
+        for col in df.columns:
+            if df[col].dtype == 'object':
+                # Try to convert to numeric if it looks numeric
+                try:
+                    numeric_series = pd.to_numeric(df[col].astype(str).str.replace(',', '').str.replace('$', ''), errors='coerce')
+                    if not numeric_series.isna().all():
+                        df[col] = numeric_series.fillna(0)
+                except:
+                    pass
+        
+        return df
+
+    def _import_scorecard_batch(self, df: pd.DataFrame) -> int:
+        """Import scorecard trends batch"""
+        imported_count = 0
+        session = self.Session()
+        
+        try:
+            # Create table if it doesn't exist
+            self._ensure_scorecard_table_exists(session)
+            
+            # Convert DataFrame to records and insert
+            for _, row in df.iterrows():
+                try:
+                    # Create a generic record structure
+                    record_data = {}
+                    for col in df.columns:
+                        clean_col = self._clean_column_name(col)
+                        value = row[col]
+                        if pd.isna(value):
+                            record_data[clean_col] = None
+                        else:
+                            record_data[clean_col] = value
+                    
+                    # Add metadata
+                    record_data['import_date'] = datetime.now()
+                    record_data['import_batch'] = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    
+                    # Insert using dynamic SQL
+                    columns = list(record_data.keys())
+                    placeholders = ', '.join([f":{col}" for col in columns])
+                    
+                    insert_sql = text(f"""
+                        INSERT INTO pos_scorecard_trends ({', '.join(columns)})
+                        VALUES ({placeholders})
+                        ON DUPLICATE KEY UPDATE import_date = VALUES(import_date)
+                    """)
+                    
+                    session.execute(insert_sql, record_data)
+                    imported_count += 1
+                    
+                except Exception as e:
+                    logger.warning(f"Error importing scorecard record: {e}")
+                    continue
+            
+            session.commit()
+            
+        except Exception as e:
+            session.rollback()
+            logger.error(f"Scorecard batch import failed: {e}")
+        finally:
+            session.close()
+        
+        return imported_count
+
+    def _clean_payroll_data(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Clean payroll trends data"""
+        # Similar to scorecard cleaning
+        for col in df.columns:
+            if 'date' in col.lower() or 'week' in col.lower():
+                df[col] = pd.to_datetime(df[col], errors='coerce')
+        
+        for col in df.columns:
+            if df[col].dtype == 'object':
+                try:
+                    numeric_series = pd.to_numeric(df[col].astype(str).str.replace(',', '').str.replace('$', ''), errors='coerce')
+                    if not numeric_series.isna().all():
+                        df[col] = numeric_series.fillna(0)
+                except:
+                    pass
+        
+        return df
+
+    def _import_payroll_batch(self, df: pd.DataFrame) -> int:
+        """Import payroll trends batch"""
+        imported_count = 0
+        session = self.Session()
+        
+        try:
+            self._ensure_payroll_table_exists(session)
+            
+            for _, row in df.iterrows():
+                try:
+                    record_data = {}
+                    for col in df.columns:
+                        clean_col = self._clean_column_name(col)
+                        value = row[col]
+                        if pd.isna(value):
+                            record_data[clean_col] = None
+                        else:
+                            record_data[clean_col] = value
+                    
+                    record_data['import_date'] = datetime.now()
+                    record_data['import_batch'] = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    
+                    columns = list(record_data.keys())
+                    placeholders = ', '.join([f":{col}" for col in columns])
+                    
+                    insert_sql = text(f"""
+                        INSERT INTO pos_payroll_trends ({', '.join(columns)})
+                        VALUES ({placeholders})
+                        ON DUPLICATE KEY UPDATE import_date = VALUES(import_date)
+                    """)
+                    
+                    session.execute(insert_sql, record_data)
+                    imported_count += 1
+                    
+                except Exception as e:
+                    logger.warning(f"Error importing payroll record: {e}")
+                    continue
+            
+            session.commit()
+            
+        except Exception as e:
+            session.rollback()
+            logger.error(f"Payroll batch import failed: {e}")
+        finally:
+            session.close()
+        
+        return imported_count
+
+    def _clean_profit_loss_data(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Clean profit & loss data"""
+        # Financial data cleaning
+        for col in df.columns:
+            if df[col].dtype == 'object':
+                try:
+                    numeric_series = pd.to_numeric(
+                        df[col].astype(str).str.replace(',', '').str.replace('$', '').str.replace('(', '-').str.replace(')', ''),
+                        errors='coerce'
+                    )
+                    if not numeric_series.isna().all():
+                        df[col] = numeric_series.fillna(0)
+                except:
+                    pass
+        
+        return df
+
+    def _import_profit_loss_batch(self, df: pd.DataFrame) -> int:
+        """Import profit & loss batch"""
+        imported_count = 0
+        session = self.Session()
+        
+        try:
+            self._ensure_profit_loss_table_exists(session)
+            
+            for _, row in df.iterrows():
+                try:
+                    record_data = {}
+                    for col in df.columns:
+                        clean_col = self._clean_column_name(col)
+                        value = row[col]
+                        if pd.isna(value):
+                            record_data[clean_col] = None
+                        else:
+                            record_data[clean_col] = value
+                    
+                    record_data['import_date'] = datetime.now()
+                    record_data['import_batch'] = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    
+                    columns = list(record_data.keys())
+                    placeholders = ', '.join([f":{col}" for col in columns])
+                    
+                    insert_sql = text(f"""
+                        INSERT INTO pos_profit_loss ({', '.join(columns)})
+                        VALUES ({placeholders})
+                        ON DUPLICATE KEY UPDATE import_date = VALUES(import_date)
+                    """)
+                    
+                    session.execute(insert_sql, record_data)
+                    imported_count += 1
+                    
+                except Exception as e:
+                    logger.warning(f"Error importing P&L record: {e}")
+                    continue
+            
+            session.commit()
+            
+        except Exception as e:
+            session.rollback()
+            logger.error(f"P&L batch import failed: {e}")
+        finally:
+            session.close()
+        
+        return imported_count
+
+    def _clean_column_name(self, col_name: str) -> str:
+        """Clean column name for database compatibility"""
+        import re
+        # Remove special characters, replace spaces with underscores
+        clean = re.sub(r'[^\w\s]', '', str(col_name))
+        clean = re.sub(r'\s+', '_', clean)
+        clean = clean.lower().strip('_')
+        
+        # Handle reserved words
+        reserved_words = ['key', 'order', 'date', 'time', 'status', 'type', 'desc']
+        if clean in reserved_words:
+            clean = f'{clean}_field'
+            
+        return clean
+
+    def _ensure_scorecard_table_exists(self, session):
+        """Ensure scorecard trends table exists with flexible schema"""
+        try:
+            session.execute(text("""
+                CREATE TABLE IF NOT EXISTS pos_scorecard_trends (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    week_ending DATE,
+                    store_id VARCHAR(10),
+                    revenue DECIMAL(15,2),
+                    profit DECIMAL(15,2),
+                    margin DECIMAL(5,2),
+                    import_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    import_batch VARCHAR(50),
+                    INDEX idx_week_ending (week_ending),
+                    INDEX idx_store_id (store_id)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            """))
+            session.commit()
+        except Exception as e:
+            logger.debug(f"Scorecard table already exists or creation failed: {e}")
+
+    def _ensure_payroll_table_exists(self, session):
+        """Ensure payroll trends table exists with flexible schema"""
+        try:
+            session.execute(text("""
+                CREATE TABLE IF NOT EXISTS pos_payroll_trends (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    week_ending DATE,
+                    store_id VARCHAR(10),
+                    total_hours DECIMAL(10,2),
+                    total_wages DECIMAL(15,2),
+                    avg_hourly_rate DECIMAL(8,2),
+                    import_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    import_batch VARCHAR(50),
+                    INDEX idx_week_ending (week_ending),
+                    INDEX idx_store_id (store_id)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            """))
+            session.commit()
+        except Exception as e:
+            logger.debug(f"Payroll table already exists or creation failed: {e}")
+
+    def _ensure_profit_loss_table_exists(self, session):
+        """Ensure profit & loss table exists with flexible schema"""
+        try:
+            session.execute(text("""
+                CREATE TABLE IF NOT EXISTS pos_profit_loss (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    account_line VARCHAR(100),
+                    account_description VARCHAR(255),
+                    current_month DECIMAL(15,2),
+                    year_to_date DECIMAL(15,2),
+                    prior_year DECIMAL(15,2),
+                    import_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    import_batch VARCHAR(50),
+                    INDEX idx_account_line (account_line)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            """))
+            session.commit()
+        except Exception as e:
+            logger.debug(f"P&L table already exists or creation failed: {e}")
+
+    def manual_trigger_tuesday_import(self) -> Dict:
+        """Manual trigger for Tuesday CSV import - for testing and on-demand use"""
+        logger.info("🔧 MANUAL TRIGGER: Starting comprehensive CSV import")
+        
+        try:
+            result = self.import_all_csv_files()
+            logger.info(f"🔧 MANUAL TRIGGER: Import completed - {result.get('successful_imports', 0)}/{result.get('total_file_types', 0)} successful")
+            return result
+            
+        except Exception as e:
+            logger.error(f"🔧 MANUAL TRIGGER: Import failed - {str(e)}", exc_info=True)
+            return {
+                "success": False,
+                "error": str(e),
+                "timestamp": datetime.now().isoformat()
+            }

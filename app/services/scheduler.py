@@ -58,6 +58,8 @@ def acquire_lock(redis_client, name, timeout):
 def init_scheduler(app):
     logger.info("Initializing background scheduler")
     redis_client = Redis.from_url(REDIS_URL)
+    csv_import_lock_key = "csv_import_lock"
+    csv_import_lock_timeout = 1800  # 30 minutes for CSV import
     lock_key = "full_refresh_lock"
     incremental_lock_key = "incremental_refresh_lock"
     lock_timeout = 300
@@ -187,11 +189,53 @@ def init_scheduler(app):
         coalesce=True,
         max_instances=1,
     )
+
+    # Define Tuesday CSV import function within scheduler scope
+    def run_tuesday_csv_imports():
+        """Run comprehensive CSV imports for all POS data - Tuesdays at 8am"""
+        with app.app_context():
+            # Skip if any existing refresh is running
+            if redis_client.get("full_refresh_lock") or redis_client.get(incremental_lock_key) or redis_client.get(csv_import_lock_key):
+                logger.debug("Other operations in progress, skipping CSV import")
+                return
+            if retry_database_connection():
+                try:
+                    with acquire_lock(redis_client, csv_import_lock_key, csv_import_lock_timeout):
+                        logger.info("🚀 Starting Tuesday 8am CSV imports (all POS files)")
+                        
+                        from .csv_import_service import CSVImportService
+                        importer = CSVImportService()
+                        
+                        import_results = importer.import_all_csv_files()
+                        successful = import_results.get("successful_imports", 0)
+                        total = import_results.get("total_file_types", 0)
+                        logger.info(f"🏁 Tuesday CSV imports completed: {successful}/{total} file types successful")
+                        
+                except LockError:
+                    logger.debug("CSV import lock exists, skipping import")
+                except Exception as e:
+                    logger.error(f"Tuesday CSV import failed: {str(e)}", exc_info=True)
+            else:
+                logger.error("Skipping CSV import due to database connection failure")
+
+    # Schedule Tuesday 8am CSV import
+    logger.info("Adding Tuesday 8am CSV import job to scheduler")
+    scheduler.add_job(
+        func=run_tuesday_csv_imports,
+        trigger="cron",
+        day_of_week="tue",
+        hour=8,
+        minute=0,
+        id="tuesday_csv_import",
+        replace_existing=True,
+        coalesce=True,
+        max_instances=1
+    )
     try:
         logger.debug("Starting scheduler")
         scheduler.start()
         logger.info(
-            f"Background scheduler started for incremental refresh (item master + transactions) every {INCREMENTAL_REFRESH_INTERVAL} seconds and full refresh (item master, transactions, seed data) every {FULL_REFRESH_INTERVAL} seconds"
+            f"Background scheduler started:\n- Incremental refresh (item master + transactions) every {INCREMENTAL_REFRESH_INTERVAL} seconds\n- Full refresh (item master, transactions, seed data) every {FULL_REFRESH_INTERVAL} seconds\n- Tuesday 8am CSV import for all POS data files"
         )
     except Exception as e:
         logger.error(f"Failed to start scheduler: {str(e)}", exc_info=True)
@@ -207,3 +251,4 @@ def init_scheduler(app):
 def get_scheduler():
     logger.debug("Returning scheduler instance")
     return scheduler
+
