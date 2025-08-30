@@ -1,81 +1,11 @@
 # RFID3 System API Documentation
 
-**Version:** 2025-08-30-v2 - Post-Refactoring & RFID Identification Corrections  
+**Version:** 2025-08-28-v1  
 **System:** RFID Inventory Management System  
 **Author:** Technical Documentation Team  
 
 ---
 
-
----
-
-## Recent Critical Updates (2025-08-30)
-
-### RFID Identification Logic Corrections
-
-**MAJOR FIX**: The system now correctly identifies RFID items using proper logic:
-
-- **Previous (Incorrect)**: 47 items mislabeled as RFID
-- **Current (Correct)**: 12,500+ genuine RFID items properly identified
-
-**Corrected RFID Detection Logic:**
-- Items with `identifier_type = NULL` (not string 'None')  
-- Tag IDs matching hexadecimal EPC format (16+ characters: `^[0-9A-Fa-f]{16,}$`)
-- Fixed SQLAlchemy NULL vs string comparison issue in filters
-
-### Updated Inventory Type Distribution
-
-| Type | Count | Description | Filter Logic |
-|------|-------|-------------|--------------|
-| **RFID** | 12,500+ | True RFID EPC tags | `identifier_type=NULL` AND hex pattern |
-| **QR** | 42,200+ | QR code identifiers | `identifier_type='QR'` |
-| **Sticker** | 1,500+ | Barcode stickers | `identifier_type='Sticker'` |
-| **Serialized** | 43,700+ | Combined QR + Sticker | `identifier_type IN ('QR', 'Sticker')` |
-| **Bulk** | 9,900+ | Bulk inventory items | `identifier_type='Bulk'` |
-
-### Global Filters Enhancement
-
-New unified filtering system with accurate counts and improved logic:
-
-```python
-# Enhanced filter implementation (filters.py)
-def build_global_filters(store_filter="all", type_filter="all"):
-    """Build SQLAlchemy filter conditions with corrected RFID logic."""
-    filters = []
-    
-    # Store filtering (unchanged)
-    if store_filter and store_filter != "all":
-        filters.append(or_(
-            ItemMaster.home_store == store_filter,
-            ItemMaster.current_store == store_filter
-        ))
-    
-    # CORRECTED type filtering
-    if type_filter and type_filter != "all":
-        if type_filter == "RFID":
-            # FIXED: Proper RFID detection
-            filters.append(and_(
-                ItemMaster.identifier_type.is_(None),  # NULL, not 'None' string
-                ItemMaster.tag_id.op("REGEXP")("^[0-9A-Fa-f]{16,}$")
-            ))
-        elif type_filter == "Serialized":
-            # NEW: Combined QR + Sticker filter
-            filters.append(ItemMaster.identifier_type.in_(["QR", "Sticker"]))
-        else:
-            filters.append(ItemMaster.identifier_type == type_filter)
-    
-    return filters
-```
-
-### Database Viewer Integration
-
-New comprehensive database exploration with corrected filtering:
-- Fixed 500 errors with store/type filtering
-- Bootstrap modal fallback for cross-browser compatibility  
-- Real-time filtering with accurate item counts
-- Support for all corrected inventory type filters
-
----
 ## Overview
 
 The RFID3 system provides comprehensive REST API endpoints for inventory management, analytics, and business intelligence. This documentation covers all available endpoints, parameters, authentication, and integration examples.
@@ -83,7 +13,7 @@ The RFID3 system provides comprehensive REST API endpoints for inventory managem
 ## Base Configuration
 
 - **Base URL**: `http://localhost:8101` (production) or `http://localhost:5000` (development)
-- **API Version**: v2
+- **API Version**: v1
 - **Authentication**: Session-based authentication (Flask sessions)
 - **Content-Type**: `application/json`
 - **Response Format**: JSON
@@ -116,7 +46,7 @@ Get high-level dashboard metrics with filtering capabilities.
 
 **Parameters:**
 - `store` (string, optional): Store filter ('all', '6800', '3607', '8101', '728')
-- `type (string, optional): Inventory type filter ('all', 'RFID', 'Serialized', 'QR', 'Sticker', 'Bulk')
+- `type` (string, optional): Inventory type filter ('all', 'Bulk', 'Serial')
 
 **Response:**
 ```json
