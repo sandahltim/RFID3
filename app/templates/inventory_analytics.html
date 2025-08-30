@@ -1900,7 +1900,9 @@ function refreshAnalyticsData() {
     console.log('Refreshing Analytics Tab 6 data with filters:', GlobalFilters.getApiParams());
 
     // Update dashboard summary with filters
-    fetchDashboardSummary();
+    if (window.inventoryAnalytics && typeof window.inventoryAnalytics.loadDashboardData === 'function') {
+        window.inventoryAnalytics.loadDashboardData();
+    }
 
     // Update business intelligence with filters
     fetchBusinessIntelligence();
