@@ -1,6 +1,6 @@
 # RFID3 System Architecture Overview
 
-**Version:** 2025-08-28-v1  
+**Version:** 2025-08-30-v2 - Post-Refactoring & Database Enhancements  
 **System:** RFID Inventory Management & Business Intelligence Platform  
 **Architecture:** Modern Web Application with Advanced Analytics  
 
@@ -8,7 +8,7 @@
 
 ## Executive Summary
 
-The RFID3 system is a comprehensive inventory management and business intelligence platform designed for rental operations. Built on modern web technologies with a focus on scalability, performance, and analytics, the system serves 4 store locations with 50,000+ inventory items and processes 10,000+ transactions monthly.
+The RFID3 system is a comprehensive inventory management and business intelligence platform designed for rental operations. Built on modern web technologies with a focus on scalability, performance, and analytics, the system serves 4 store locations with 65,942 inventory items (corrected counts with proper RFID identification) and processes 10,000+ transactions monthly.
 
 ### Key Architectural Achievements
 - **Fortune 500-Level Dashboard**: Professional executive reporting and analytics
@@ -17,6 +17,7 @@ The RFID3 system is a comprehensive inventory management and business intelligen
 - **Real-Time Analytics**: Live inventory health monitoring and business intelligence
 - **Mobile-First Design**: Responsive interface optimized for field operations
 - **Scalable Foundation**: Architecture supporting future growth and AI integration
+- **Database Viewer Integration**: Comprehensive database exploration with advanced filtering and real-time analytics
 
 ---
 
@@ -148,6 +149,7 @@ app/
 │   ├── tab4.py               # Laundry contracts
 │   ├── tab5.py               # Resale inventory
 │   ├── tab7.py               # Executive dashboard
+│   ├── database_viewer.py    # Database exploration and analysis
 │   └── tabs.py               # Tab navigation and routing
 ├── services/                 # Business logic and external integrations
 │   ├── api_client.py         # External API client
@@ -165,6 +167,7 @@ app/
 └── utils/                    # Utility functions
     ├── __init__.py
     └── exceptions.py         # Custom exception handling
+    ├── filters.py             # Global filtering system (enhanced)
 ```
 
 ### Service Layer Architecture
