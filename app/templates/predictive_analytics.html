@@ -3,8 +3,8 @@
 {% block title %}Predictive Analytics - RFID DASHBOARD{% endblock %}
 
 {% block extra_head %}
-<!-- Chart.js for advanced visualizations -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.min.js"></script>
+<!-- Chart.js for advanced visualizations - UMD version to avoid module conflicts -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/date-fns@2.30.0/index.min.js"></script>
 <!-- Font Awesome for icons -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
@@ -452,8 +452,8 @@
 
 {% block scripts %}
 {{ super() }}
-<script type="module" src="/static/js/chart-utilities.js?cb={{ cache_bust }}"></script>
-<script type="module" src="/static/js/predictive-analytics.js?cb={{ cache_bust }}"></script>
+<script src="/static/js/chart-utilities.js?cb={{ cache_bust }}"></script>
+<script src="/static/js/predictive-analytics.js?cb={{ cache_bust }}"></script>
 <script src="/static/js/feedback-system.js?cb={{ cache_bust }}"></script>
 <link rel="stylesheet" href="/static/css/feedback-system.css?cb={{ cache_bust }}">
 <script>
