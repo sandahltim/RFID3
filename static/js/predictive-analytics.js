@@ -6,7 +6,9 @@
 
 class PredictiveAnalyticsDashboard {
     constructor() {
-        this.chartManager = window.chartManager;
+        // Wait for chartManager to be available
+        this.chartManager = null;
+        this.initChartManager();
         this.charts = new Map();
         this.currentConfig = {
             store: 'all',
@@ -27,17 +29,77 @@ class PredictiveAnalyticsDashboard {
     }
 
     /**
+     * Initialize chart manager with retry logic
+     */
+    initChartManager() {
+        let attempts = 0;
+        const maxAttempts = 50; // 5 seconds max wait
+        
+        const tryInit = () => {
+            attempts++;
+            if (typeof Chart !== 'undefined') {
+                this.chartManager = window.chartManager || this.createBasicChartManager();
+                console.log('Chart.js loaded successfully');
+                return true;
+            } else if (attempts < maxAttempts) {
+                console.log('Waiting for Chart.js and chart manager...');
+                setTimeout(tryInit, 100);
+                return false;
+            } else {
+                console.error('Chart.js failed to load after 5 seconds, using fallback');
+                this.chartManager = this.createFallbackChartManager();
+                return true;
+            }
+        };
+        
+        if (!tryInit()) {
+            // Already set timeout in tryInit
+        }
+    }
+    
+    /**
+     * Create basic chart manager if window.chartManager not available
+     */
+    createBasicChartManager() {
+        return {
+            formatCurrency: (value) => `$${(value || 0).toFixed(2)}`,
+            destroy: (chartId) => {
+                const chart = this.charts.get(chartId);
+                if (chart) {
+                    chart.destroy();
+                    this.charts.delete(chartId);
+                }
+            }
+        };
+    }
+    
+    /**
+     * Create fallback when Chart.js fails to load
+     */
+    createFallbackChartManager() {
+        return {
+            formatCurrency: (value) => `$${(value || 0).toFixed(2)}`,
+            destroy: () => console.warn('Chart.js not available - chart operations disabled')
+        };
+    }
+
+    /**
      * Initialize the dashboard
      */
     init() {
         console.log('Initializing Predictive Analytics Dashboard...');
         
-        this.setupEventListeners();
-        this.initializeCharts();
-        this.loadInitialData();
-        this.setupAutoRefresh();
-        
-        console.log('Predictive Analytics Dashboard initialized successfully');
+        try {
+            this.setupEventListeners();
+            this.initializeCharts();
+            this.loadInitialData();
+            this.setupAutoRefresh();
+            
+            console.log('Predictive Analytics Dashboard initialized successfully');
+        } catch (error) {
+            console.error('Failed to initialize dashboard:', error);
+            this.showToast('Failed to initialize dashboard. Please refresh the page.', 'error');
+        }
     }
 
     /**
@@ -84,19 +146,28 @@ class PredictiveAnalyticsDashboard {
      * Initialize chart containers
      */
     initializeCharts() {
-        // Initialize Chart.js defaults
-        this.chartManager.initializeChartDefaults();
+        if (!this.chartManager) {
+            console.error('Chart manager not available');
+            return;
+        }
         
-        // Set up chart containers
-        const chartContainers = ['correlation-chart', 'forecast-chart'];
-        chartContainers.forEach(id => {
-            const canvas = document.getElementById(id);
-            if (canvas) {
-                // Clear any existing canvas content
-                const ctx = canvas.getContext('2d');
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-            }
-        });
+        try {
+            // Initialize Chart.js defaults
+            this.chartManager.initializeChartDefaults();
+            
+            // Set up chart containers
+            const chartContainers = ['correlation-chart', 'forecast-chart'];
+            chartContainers.forEach(id => {
+                const canvas = document.getElementById(id);
+                if (canvas) {
+                    // Clear any existing canvas content
+                    const ctx = canvas.getContext('2d');
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                }
+            });
+        } catch (error) {
+            console.error('Failed to initialize charts:', error);
+        }
     }
 
     /**
@@ -290,9 +361,16 @@ class PredictiveAnalyticsDashboard {
      */
     async loadCorrelationAnalysis() {
         try {
-            this.chartManager.showChartLoading('correlation-chart', 'Running correlation analysis...');
+            if (this.chartManager) {
+                this.chartManager.showChartLoading('correlation-chart', 'Running correlation analysis...');
+            }
             
             const response = await fetch(`${this.apiEndpoints.correlations}/analyze`);
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
             const data = await response.json();
 
             if (data.success) {
@@ -303,7 +381,9 @@ class PredictiveAnalyticsDashboard {
             }
         } catch (error) {
             console.error('Error loading correlation analysis:', error);
-            this.chartManager.showChartError('correlation-chart', error.message);
+            if (this.chartManager) {
+                this.chartManager.showChartError('correlation-chart', error.message);
+            }
             this.renderCorrelationInsights(null, error.message);
         }
     }
@@ -312,28 +392,28 @@ class PredictiveAnalyticsDashboard {
      * Render correlation chart
      */
     renderCorrelationChart(data) {
-        if (!data.insights?.strong_correlations) {
+        if (!data || !data.insights?.strong_correlations) {
+            console.log('No correlation data available, using sample data');
             // Create sample correlation data
             const sampleData = {
                 labels: ['Weather Temp', 'Consumer Confidence', 'Interest Rates', 'Gas Prices', 'Local Events'],
                 datasets: [{
                     label: 'Revenue Correlation',
                     data: [0.65, 0.58, -0.42, -0.38, 0.72],
-                    backgroundColor: (ctx) => {
-                        const value = ctx.parsed.y;
-                        return value > 0.5 ? 'rgba(16, 185, 129, 0.8)' :
-                               value > 0.3 ? 'rgba(251, 191, 36, 0.8)' :
-                               value > 0 ? 'rgba(99, 102, 241, 0.8)' :
-                               value > -0.3 ? 'rgba(239, 68, 68, 0.6)' :
-                               'rgba(239, 68, 68, 0.8)';
-                    },
-                    borderColor: (ctx) => {
-                        const value = ctx.parsed.y;
-                        return value > 0.5 ? 'rgb(16, 185, 129)' :
-                               value > 0.3 ? 'rgb(251, 191, 36)' :
-                               value > 0 ? 'rgb(99, 102, 241)' :
-                               'rgb(239, 68, 68)';
-                    },
+                    backgroundColor: [
+                        'rgba(16, 185, 129, 0.8)',
+                        'rgba(251, 191, 36, 0.8)',
+                        'rgba(239, 68, 68, 0.8)',
+                        'rgba(239, 68, 68, 0.6)',
+                        'rgba(16, 185, 129, 0.8)'
+                    ],
+                    borderColor: [
+                        'rgb(16, 185, 129)',
+                        'rgb(251, 191, 36)',
+                        'rgb(239, 68, 68)',
+                        'rgb(239, 68, 68)',
+                        'rgb(16, 185, 129)'
+                    ],
                     borderWidth: 2
                 }]
             };
@@ -370,11 +450,22 @@ class PredictiveAnalyticsDashboard {
      */
     createCorrelationChart(data) {
         const ctx = document.getElementById('correlation-chart');
-        if (!ctx) return;
+        if (!ctx) {
+            console.error('Correlation chart canvas not found');
+            return;
+        }
 
-        this.chartManager.hideChartLoading('correlation-chart');
+        if (!window.Chart) {
+            console.error('Chart.js not loaded - showing data in table format');
+            return;
+        }
+
+        if (this.chartManager) {
+            this.chartManager.hideChartLoading('correlation-chart');
+        }
         
-        const chart = new Chart(ctx, {
+        try {
+            const chart = new Chart(ctx, {
             type: 'bar',
             data: data,
             options: {
@@ -417,7 +508,13 @@ class PredictiveAnalyticsDashboard {
             }
         });
 
-        this.charts.set('correlation-chart', chart);
+            this.charts.set('correlation-chart', chart);
+        } catch (error) {
+            console.error('Failed to create correlation chart:', error);
+            if (this.chartManager) {
+                this.chartManager.showChartError('correlation-chart', 'Failed to create chart');
+            }
+        }
     }
 
     /**
@@ -501,9 +598,16 @@ class PredictiveAnalyticsDashboard {
      */
     async loadDemandForecast() {
         try {
-            this.chartManager.showChartLoading('forecast-chart', 'Generating demand forecast...');
+            if (this.chartManager) {
+                this.chartManager.showChartLoading('forecast-chart', 'Generating demand forecast...');
+            }
             
             const response = await fetch(`${this.apiEndpoints.forecast}?weeks=${this.currentConfig.forecastWeeks}&store=${this.currentConfig.store}`);
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
             const data = await response.json();
 
             if (data.success) {
@@ -514,7 +618,9 @@ class PredictiveAnalyticsDashboard {
             }
         } catch (error) {
             console.error('Error loading demand forecast:', error);
-            this.chartManager.showChartError('forecast-chart', error.message);
+            if (this.chartManager) {
+                this.chartManager.showChartError('forecast-chart', error.message);
+            }
             this.renderForecastSummary(null, error.message);
         }
     }
@@ -523,9 +629,14 @@ class PredictiveAnalyticsDashboard {
      * Render forecast chart
      */
     renderForecastChart(data) {
-        if (!data.predictions) return;
+        if (!data || !data.predictions) {
+            console.error('No forecast data available');
+            return;
+        }
 
-        this.chartManager.hideChartLoading('forecast-chart');
+        if (this.chartManager) {
+            this.chartManager.hideChartLoading('forecast-chart');
+        }
         
         const labels = data.predictions.map(p => {
             const date = new Date(p.week_starting);
@@ -578,7 +689,18 @@ class PredictiveAnalyticsDashboard {
         };
 
         const ctx = document.getElementById('forecast-chart');
-        const chart = new Chart(ctx, {
+        if (!ctx) {
+            console.error('Forecast chart canvas not found');
+            return;
+        }
+        
+        if (!window.Chart) {
+            console.error('Chart.js not loaded - showing data in table format');
+            return;
+        }
+        
+        try {
+            const chart = new Chart(ctx, {
             type: 'line',
             data: chartData,
             options: {
@@ -600,15 +722,16 @@ class PredictiveAnalyticsDashboard {
                             label: (context) => {
                                 const value = context.parsed.y;
                                 if (context.datasetIndex === 0) {
-                                    return `Predicted: ${this.chartManager.formatCurrency(value)}`;
+                                    return `Predicted: ${this.chartManager?.formatCurrency(value) || '$' + value}`;
                                 }
                                 return null;
                             },
                             afterBody: (tooltipItems) => {
                                 const dataIndex = tooltipItems[0].dataIndex;
                                 const prediction = data.predictions[dataIndex];
+                                if (!prediction) return [];
                                 return [
-                                    `Range: ${this.chartManager.formatCurrency(prediction.confidence_lower)} - ${this.chartManager.formatCurrency(prediction.confidence_upper)}`,
+                                    `Range: ${this.chartManager?.formatCurrency(prediction.confidence_lower) || '$0'} - ${this.chartManager?.formatCurrency(prediction.confidence_upper) || '$0'}`,
                                     `Key factors: ${prediction.key_factors?.seasonal_effect ? 'Seasonal' : 'Standard'}`
                                 ];
                             }
@@ -627,14 +750,20 @@ class PredictiveAnalyticsDashboard {
                             color: 'rgba(0, 0, 0, 0.1)'
                         },
                         ticks: {
-                            callback: (value) => this.chartManager.formatCurrency(value)
+                            callback: (value) => this.chartManager?.formatCurrency(value) || `$${value || 0}`
                         }
                     }
                 }
             }
         });
 
-        this.charts.set('forecast-chart', chart);
+            this.charts.set('forecast-chart', chart);
+        } catch (error) {
+            console.error('Failed to create forecast chart:', error);
+            if (this.chartManager) {
+                this.chartManager.showChartError('forecast-chart', 'Failed to create chart');
+            }
+        }
     }
 
     /**
@@ -656,19 +785,23 @@ class PredictiveAnalyticsDashboard {
 
         if (!data) return;
 
-        const avgPrediction = data.predictions?.reduce((sum, p) => sum + p.predicted_revenue, 0) / (data.predictions?.length || 1);
-        const totalPredicted = data.predictions?.reduce((sum, p) => sum + p.predicted_revenue, 0) || 0;
+        const predictions = data.predictions || [];
+        const validPredictions = predictions.filter(p => p && typeof p.predicted_revenue === 'number');
+        const avgPrediction = validPredictions.length > 0 
+            ? validPredictions.reduce((sum, p) => sum + p.predicted_revenue, 0) / validPredictions.length 
+            : 0;
+        const totalPredicted = validPredictions.reduce((sum, p) => sum + p.predicted_revenue, 0);
 
         container.innerHTML = `
             <div class="forecast-confidence">
                 <h6 class="mb-3"><i class="fas fa-chart-line me-2"></i>Forecast Summary</h6>
                 <div class="mb-3">
                     <strong>Total Predicted:</strong><br>
-                    <span class="h4 text-primary">${this.chartManager.formatCurrency(totalPredicted)}</span>
+                    <span class="h4 text-primary">${this.chartManager?.formatCurrency(totalPredicted) || '$0'}</span>
                 </div>
                 <div class="mb-3">
                     <strong>Avg Weekly:</strong><br>
-                    <span class="h5 text-success">${this.chartManager.formatCurrency(avgPrediction)}</span>
+                    <span class="h5 text-success">${this.chartManager?.formatCurrency(avgPrediction) || '$0'}</span>
                 </div>
                 <div class="mb-3">
                     <strong>Model Accuracy:</strong><br>
@@ -731,7 +864,7 @@ class PredictiveAnalyticsDashboard {
                         <p class="text-muted mb-0">Recommendation: ${cat.recommendation.replace(/_/g, ' ')}</p>
                     </div>
                     <div class="text-end">
-                        <div class="fw-bold text-success">+${this.chartManager.formatCurrency(cat.expected_revenue_impact)}</div>
+                        <div class="fw-bold text-success">+${this.chartManager?.formatCurrency(cat.expected_revenue_impact) || '$0'}</div>
                         <small class="text-muted">Revenue Impact</small>
                     </div>
                 </div>
@@ -747,7 +880,7 @@ class PredictiveAnalyticsDashboard {
                         <p class="text-muted mb-0">Recommendation: ${item.recommendation.replace(/_/g, ' ')}</p>
                     </div>
                     <div class="text-end">
-                        <div class="fw-bold text-info">${this.chartManager.formatCurrency(item.potential_resale_value)}</div>
+                        <div class="fw-bold text-info">${this.chartManager?.formatCurrency(item.potential_resale_value) || '$0'}</div>
                         <small class="text-muted">Resale Value</small>
                     </div>
                 </div>
@@ -786,11 +919,11 @@ class PredictiveAnalyticsDashboard {
                         <div class="section-body">
                             <div class="mb-3">
                                 <strong>Revenue Increase:</strong><br>
-                                <span class="h4 text-success">+${this.chartManager.formatCurrency(financialImpact.potential_revenue_increase || 0)}</span>
+                                <span class="h4 text-success">+${this.chartManager?.formatCurrency(financialImpact.potential_revenue_increase || 0) || '$0'}</span>
                             </div>
                             <div class="mb-3">
                                 <strong>Investment Needed:</strong><br>
-                                <span class="h5 text-primary">${this.chartManager.formatCurrency(financialImpact.inventory_investment_needed || 0)}</span>
+                                <span class="h5 text-primary">${this.chartManager?.formatCurrency(financialImpact.inventory_investment_needed || 0) || '$0'}</span>
                             </div>
                             <div class="mb-3">
                                 <strong>ROI Estimate:</strong><br>
@@ -896,8 +1029,12 @@ class PredictiveAnalyticsDashboard {
 
 // Initialize dashboard when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('Initializing Predictive Analytics Dashboard...');
-    window.predictiveAnalytics = new PredictiveAnalyticsDashboard();
+    console.log('DOM loaded, initializing Predictive Analytics Dashboard...');
+    try {
+        window.predictiveAnalytics = new PredictiveAnalyticsDashboard();
+    } catch (error) {
+        console.error('Failed to initialize Predictive Analytics Dashboard:', error);
+    }
 });
 
 // Cleanup on page unload
