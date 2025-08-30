@@ -349,7 +349,7 @@ def update_item_master(session, items):
 
                 # Update ONLY RFID API-owned fields (preserve POS fields)
                 db_item.serial_number = item.get("serial_number")
-                db_item.rental_class_num = item.get("rental_class_num")
+                db_item.rental_class_num = item.get("rental_class_num")  # RFID system is source of truth
                 db_item.client_name = item.get("client_name")
                 db_item.common_name = item.get("common_name", "Unknown")
                 db_item.quality = item.get("quality")
