@@ -12,7 +12,7 @@ from ..services.store_correlation_service import get_store_correlation_service
 from ..services.rfid_api_compatibility import get_rfid_api_compatibility_layer
 from ..services.enhanced_filtering_service import get_enhanced_filtering_service
 from ..utils.exceptions import APIException
-from .logger import get_logger
+from ..services.logger import get_logger
 
 logger = get_logger("store_correlation_api", level=logging.INFO)
 
