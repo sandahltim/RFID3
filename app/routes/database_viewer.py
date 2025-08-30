@@ -13,7 +13,7 @@ from ..models.db_models import (
     db, ItemMaster, Transaction, RFIDTag, SeedRentalClass, InventoryHealthAlert,
     RentalClassMapping, HandCountedItems, RefreshState, InventoryConfig
 )
-from ..utils.filters import apply_global_filters
+# Removed unused import: from ..utils.filters import apply_global_filters
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -172,8 +172,31 @@ def get_table_data(table_key):
         if hasattr(model, 'current_store') or hasattr(model, 'home_store'):
             store_filter = request.args.get('store', 'all')
             type_filter = request.args.get('type', 'all')
-            if store_filter != 'all' or type_filter != 'all':
-                query = apply_global_filters(query, request.args)
+            
+            # Apply filters manually to avoid request.args conversion issues
+            if store_filter and store_filter != 'all':
+                from sqlalchemy import or_
+                query = query.filter(
+                    or_(
+                        model.home_store == store_filter,
+                        model.current_store == store_filter,
+                    )
+                )
+            if type_filter and type_filter != 'all' and hasattr(model, 'identifier_type'):
+                if type_filter == 'RFID':
+                    # RFID items are those with NULL identifier_type and HEX EPC format
+                    from sqlalchemy import and_
+                    query = query.filter(
+                        and_(
+                            model.identifier_type == 'None',
+                            model.tag_id.op('REGEXP')('^[0-9A-Fa-f]{16,}$')
+                        )
+                    )
+                elif type_filter == 'Serialized':
+                    # Serialized items are QR + Stickers
+                    query = query.filter(model.identifier_type.in_(['QR', 'Sticker']))
+                else:
+                    query = query.filter(model.identifier_type == type_filter)
         
         # Apply search filter
         if search and column_filter:
