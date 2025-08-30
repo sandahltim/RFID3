@@ -119,19 +119,20 @@ const GlobalFilters = {
     
     refreshCurrentData: function() {
         // Trigger refresh of current tab data with new filters
-        const currentTabId = document.querySelector('.nav-link.active').getAttribute('href');
+        const currentPath = window.location.pathname;
+        console.log('Current path for filter refresh:', currentPath);
         
-        // Call tab-specific refresh functions
-        if (currentTabId === '#tab-6' && typeof refreshAnalyticsData === 'function') {
-            console.log('Refreshing Tab 6 Analytics data...');
+        // Call tab-specific refresh functions based on current page
+        if (currentPath.includes('/tab/6') && typeof refreshAnalyticsData === 'function') {
+            console.log('Refreshing Tab 6 Analytics data with filters:', this.getApiParams());
             refreshAnalyticsData();
-        } else if (currentTabId === '#tab-1' && typeof refreshDashboardData === 'function') {
+        } else if (currentPath.includes('/tab/1') && typeof refreshDashboardData === 'function') {
             console.log('Refreshing Tab 1 Dashboard data...');
             refreshDashboardData();
-        } else if (currentTabId === '#tab-2' && typeof refreshSearchData === 'function') {
+        } else if (currentPath.includes('/tab/2') && typeof refreshSearchData === 'function') {
             console.log('Refreshing Tab 2 Search data...');
             refreshSearchData();
-        } else if (currentTabId === '#tab-3' && typeof refreshInventoryData === 'function') {
+        } else if (currentPath.includes('/tab/3') && typeof refreshInventoryData === 'function') {
             console.log('Refreshing Tab 3 Inventory data...');
             refreshInventoryData();
         }
