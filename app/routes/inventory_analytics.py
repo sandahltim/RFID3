@@ -140,27 +140,34 @@ def get_dashboard_summary():
         # Calculate utilization rate
         utilization_rate = round((items_on_rent / max(total_items, 1)) * 100, 2)
 
-        # Get active alerts by severity
-        alert_counts = (
+        # Get active alerts by severity with store/type filters
+        alert_query = (
             session.query(
                 InventoryHealthAlert.severity,
                 func.count(InventoryHealthAlert.id).label("count"),
             )
+            .join(ItemMaster, InventoryHealthAlert.tag_id == ItemMaster.tag_id)
             .filter(InventoryHealthAlert.status == "active")
-            .group_by(InventoryHealthAlert.severity)
-            .all()
         )
+        # Apply store/type filters if provided
+        if (store_filter and store_filter != "all") or (type_filter and type_filter != "all"):
+            alert_query = alert_query.filter(*build_global_filters(store_filter, type_filter))
+
+        alert_counts = alert_query.group_by(InventoryHealthAlert.severity).all()
 
         alerts_by_severity = {alert.severity: alert.count for alert in alert_counts}
 
-        # Get recent activity (last 7 days)
+        # Get recent activity (last 7 days) with filters applied
         recent_activity_date = datetime.now() - timedelta(days=7)
-        recent_scans = (
+        scan_query = (
             session.query(func.count(Transaction.id))
+            .join(ItemMaster, Transaction.tag_id == ItemMaster.tag_id)
             .filter(Transaction.scan_date >= recent_activity_date)
-            .scalar()
-            or 0
         )
+        if (store_filter and store_filter != "all") or (type_filter and type_filter != "all"):
+            scan_query = scan_query.filter(*build_global_filters(store_filter, type_filter))
+
+        recent_scans = scan_query.scalar() or 0
 
         # Calculate inventory health score (0-100)
         health_score = calculate_inventory_health_score(
