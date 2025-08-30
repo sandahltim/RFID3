@@ -135,6 +135,9 @@ const GlobalFilters = {
         } else if (currentPath.includes('/tab/3') && typeof refreshInventoryData === 'function') {
             console.log('Refreshing Tab 3 Inventory data...');
             refreshInventoryData();
+        } else if (currentPath.includes('/database/viewer') && typeof refreshDatabaseData === 'function') {
+            console.log('Refreshing Database Viewer data with filters:', this.getApiParams());
+            refreshDatabaseData();
         }
         
         // Show loading indicator

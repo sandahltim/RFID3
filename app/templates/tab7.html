@@ -48,6 +48,72 @@
         background: white;
         border-radius: 16px;
         padding: 28px;
+    }
+    
+    .small-metric-card {
+        background: #f8f9fa;
+        border-radius: 12px;
+        padding: 16px;
+        margin-bottom: 10px;
+        text-align: center;
+        transition: all 0.3s ease;
+    }
+    
+    .small-metric-card:hover {
+        background: #e9ecef;
+        transform: translateY(-2px);
+    }
+    
+    .small-metric-card .metric-label {
+        font-size: 0.75rem;
+        color: #6c757d;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 4px;
+    }
+    
+    .small-metric-card .metric-value {
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: #495057;
+    }
+    
+    .comparison-table {
+        background: white;
+        border-radius: 12px;
+        padding: 16px;
+    }
+    
+    .comparison-table .table {
+        margin-bottom: 0;
+    }
+    
+    .comparison-table .table th {
+        border-top: none;
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: #495057;
+    }
+    
+    .comparison-table .table td {
+        font-size: 0.9rem;
+        padding: 8px 12px;
+    }
+    
+    .trend-up {
+        color: #28a745;
+        font-weight: 600;
+    }
+    
+    .trend-down {
+        color: #dc3545;
+        font-weight: 600;
+    }
+    
+    .trend-neutral {
+        color: #6c757d;
+        font-weight: 600;
+    }
         box-shadow: var(--card-shadow);
         transition: all 0.4s cubic-bezier(0.23, 1, 0.320, 1);
         border: 1px solid rgba(255, 255, 255, 0.8);
@@ -510,6 +576,123 @@
                 <button id="compare-periods" class="btn btn-outline-success">
                     <i class="fas fa-chart-bar"></i> Compare Periods
                 </button>
+            </div>
+        </div>
+        
+        <!-- Multi-Period Analysis Section -->
+        <div id="multi-period-section" class="row mt-3" style="display: none;">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h6><i class="fas fa-chart-line"></i> Multi-Period Analysis</h6>
+                        <div class="btn-group ms-auto" role="group">
+                            <button type="button" class="btn btn-sm btn-outline-primary active" id="view-current">Current Period</button>
+                            <button type="button" class="btn btn-sm btn-outline-primary" id="view-3m-avg">3-Month Avg</button>
+                            <button type="button" class="btn btn-sm btn-outline-primary" id="view-yoy-comp">YoY Comparison</button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <!-- 3-Month Averages Display -->
+                        <div id="averages-display" class="row mb-4" style="display: none;">
+                            <div class="col-md-6">
+                                <h6><i class="fas fa-arrow-left"></i> Trailing 3-Month Average</h6>
+                                <div class="row">
+                                    <div class="col-6">
+                                        <div class="small-metric-card">
+                                            <div class="metric-label">Revenue</div>
+                                            <div class="metric-value" id="trailing-revenue">--</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="small-metric-card">
+                                            <div class="metric-label">Profit</div>
+                                            <div class="metric-value" id="trailing-profit">--</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="small-metric-card">
+                                            <div class="metric-label">Efficiency</div>
+                                            <div class="metric-value" id="trailing-efficiency">--%</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="small-metric-card">
+                                            <div class="metric-label">Rev/Hour</div>
+                                            <div class="metric-value" id="trailing-rph">--</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <h6><i class="fas fa-arrow-right"></i> Leading 3-Month Projection</h6>
+                                <div class="row">
+                                    <div class="col-6">
+                                        <div class="small-metric-card">
+                                            <div class="metric-label">Revenue</div>
+                                            <div class="metric-value" id="leading-revenue">--</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="small-metric-card">
+                                            <div class="metric-label">Profit</div>
+                                            <div class="metric-value" id="leading-profit">--</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="small-metric-card">
+                                            <div class="metric-label">Efficiency</div>
+                                            <div class="metric-value" id="leading-efficiency">--%</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="small-metric-card">
+                                            <div class="metric-label">Rev/Hour</div>
+                                            <div class="metric-value" id="leading-rph">--</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- YoY and Yo2Y Comparison Display -->
+                        <div id="yoy-comparison-display" class="row" style="display: none;">
+                            <div class="col-md-6">
+                                <h6><i class="fas fa-calendar-alt"></i> Year-over-Year Comparison</h6>
+                                <div class="comparison-table">
+                                    <table class="table table-sm">
+                                        <thead>
+                                            <tr>
+                                                <th>Metric</th>
+                                                <th>Current</th>
+                                                <th>Last Year</th>
+                                                <th>Change</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="yoy-table">
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <h6><i class="fas fa-history"></i> Two Years Comparison</h6>
+                                <div class="comparison-table">
+                                    <table class="table table-sm">
+                                        <thead>
+                                            <tr>
+                                                <th>Metric</th>
+                                                <th>Current</th>
+                                                <th>2 Years Ago</th>
+                                                <th>Change</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="yo2y-table">
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
         
@@ -1480,6 +1663,193 @@ document.addEventListener('DOMContentLoaded', function() {
             </div>
         `;
     }
+    
+    // Multi-Period Analysis Functions
+    function initializeMultiPeriodAnalysis() {
+        // Add multi-period analysis button to the controls
+        const compareButton = document.getElementById('compare-periods');
+        compareButton.insertAdjacentHTML('afterend', `
+            <button id="multi-period-analysis" class="btn btn-outline-info ms-2">
+                <i class="fas fa-chart-line"></i> Multi-Period Analysis
+            </button>
+        `);
+        
+        // Multi-period analysis button event handler
+        document.getElementById('multi-period-analysis').addEventListener('click', function() {
+            const multiPeriodSection = document.getElementById('multi-period-section');
+            if (multiPeriodSection.style.display === 'none') {
+                multiPeriodSection.style.display = 'block';
+                loadMultiPeriodAnalysis();
+            } else {
+                multiPeriodSection.style.display = 'none';
+            }
+        });
+        
+        // View toggle buttons
+        document.getElementById('view-current').addEventListener('click', function() {
+            setActiveView('current');
+            showCurrentPeriodView();
+        });
+        
+        document.getElementById('view-3m-avg').addEventListener('click', function() {
+            setActiveView('3m-avg');
+            show3MonthAveragesView();
+        });
+        
+        document.getElementById('view-yoy-comp').addEventListener('click', function() {
+            setActiveView('yoy-comp');
+            showYoYComparisonView();
+        });
+    }
+    
+    function setActiveView(activeViewId) {
+        // Remove active class from all buttons
+        document.querySelectorAll('#multi-period-section .btn').forEach(btn => {
+            btn.classList.remove('active');
+        });
+        
+        // Add active class to selected button
+        const activeBtn = document.getElementById(`view-${activeViewId}`);
+        if (activeBtn) activeBtn.classList.add('active');
+    }
+    
+    function loadMultiPeriodAnalysis() {
+        const store = document.getElementById('store-filter').value;
+        
+        fetch(`/api/executive/multi_period_analysis?store=${store}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    console.error('Multi-period analysis error:', data.error);
+                    return;
+                }
+                
+                // Store data globally for view switching
+                window.multiPeriodData = data;
+                
+                // Show current period by default
+                showCurrentPeriodView();
+            })
+            .catch(error => {
+                console.error('Error loading multi-period analysis:', error);
+            });
+    }
+    
+    function showCurrentPeriodView() {
+        const data = window.multiPeriodData;
+        if (!data) return;
+        
+        // Hide other views
+        document.getElementById('averages-display').style.display = 'none';
+        document.getElementById('yoy-comparison-display').style.display = 'none';
+        
+        // Show current period metrics in the main dashboard
+        console.log('Current period view - data available in multiPeriodData');
+    }
+    
+    function show3MonthAveragesView() {
+        const data = window.multiPeriodData;
+        if (!data || !data.moving_averages) return;
+        
+        // Hide other views
+        document.getElementById('yoy-comparison-display').style.display = 'none';
+        
+        // Show averages display
+        document.getElementById('averages-display').style.display = 'block';
+        
+        const trailing = data.moving_averages.trailing_3month;
+        const leading = data.moving_averages.leading_3month;
+        
+        // Update trailing averages
+        if (trailing) {
+            document.getElementById('trailing-revenue').textContent = formatCurrency(trailing.revenue);
+            document.getElementById('trailing-profit').textContent = formatCurrency(trailing.profit);
+            document.getElementById('trailing-efficiency').textContent = trailing.efficiency.toFixed(1) + '%';
+            document.getElementById('trailing-rph').textContent = '$' + trailing.revenue_per_hour.toFixed(2);
+        }
+        
+        // Update leading projections
+        if (leading) {
+            document.getElementById('leading-revenue').textContent = formatCurrency(leading.revenue);
+            document.getElementById('leading-profit').textContent = formatCurrency(leading.profit);
+            document.getElementById('leading-efficiency').textContent = leading.efficiency.toFixed(1) + '%';
+            document.getElementById('leading-rph').textContent = '$' + leading.revenue_per_hour.toFixed(2);
+        } else {
+            // Show "Insufficient data" for leading metrics
+            ['leading-revenue', 'leading-profit', 'leading-efficiency', 'leading-rph'].forEach(id => {
+                document.getElementById(id).textContent = 'N/A';
+            });
+        }
+    }
+    
+    function showYoYComparisonView() {
+        const data = window.multiPeriodData;
+        if (!data || !data.historical_comparisons) return;
+        
+        // Hide other views
+        document.getElementById('averages-display').style.display = 'none';
+        
+        // Show YoY comparison display
+        document.getElementById('yoy-comparison-display').style.display = 'block';
+        
+        const yoy = data.historical_comparisons.year_over_year;
+        const yo2y = data.historical_comparisons.two_years_over_two_years;
+        
+        // Build YoY table
+        const yoyTableBody = document.getElementById('yoy-table');
+        yoyTableBody.innerHTML = buildComparisonTable(data.current_period.metrics, yoy);
+        
+        // Build Yo2Y table
+        const yo2yTableBody = document.getElementById('yo2y-table');
+        yo2yTableBody.innerHTML = buildComparisonTable(data.current_period.metrics, yo2y);
+    }
+    
+    function buildComparisonTable(current, historical) {
+        const metrics = [
+            { key: 'revenue', label: 'Revenue', formatter: formatCurrency },
+            { key: 'profit', label: 'Profit', formatter: formatCurrency },
+            { key: 'profit_margin', label: 'Profit Margin', formatter: (v) => v.toFixed(1) + '%' },
+            { key: 'efficiency', label: 'Efficiency', formatter: (v) => v.toFixed(1) + '%' },
+            { key: 'revenue_per_hour', label: 'Rev/Hour', formatter: (v) => '$' + v.toFixed(2) }
+        ];
+        
+        return metrics.map(metric => {
+            const currentVal = current[metric.key];
+            const historicalVal = historical.metrics[metric.key];
+            const comparison = historical.comparisons[metric.key];
+            
+            const trendClass = comparison.trend === 'up' ? 'trend-up' : 
+                              comparison.trend === 'down' ? 'trend-down' : 'trend-neutral';
+            const trendIcon = comparison.trend === 'up' ? 'fa-arrow-up' : 
+                             comparison.trend === 'down' ? 'fa-arrow-down' : 'fa-minus';
+            
+            return `
+                <tr>
+                    <td>${metric.label}</td>
+                    <td>${metric.formatter(currentVal)}</td>
+                    <td>${metric.formatter(historicalVal)}</td>
+                    <td class="${trendClass}">
+                        <i class="fas ${trendIcon}"></i> 
+                        ${Math.abs(comparison.percentage).toFixed(1)}%
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    }
+    
+    // Currency formatting function
+    const formatCurrency = (amount) => new Intl.NumberFormat('en-US', { 
+        style: 'currency', 
+        currency: 'USD',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+    }).format(amount);
+    
+    // Initialize multi-period analysis when DOM is ready
+    document.addEventListener('DOMContentLoaded', function() {
+        // Initialize after a short delay to ensure other elements are ready
+        setTimeout(initializeMultiPeriodAnalysis, 1000);
+    });
 
     // Auto-refresh every 5 minutes
     setInterval(loadExecutiveDashboard, 300000);
