@@ -17,7 +17,7 @@ from ..utils.exceptions import (
     log_and_handle_exception,
 )
 from ..utils.filters import build_global_filters, apply_global_filters
-from sqlalchemy import func, desc, and_, or_, text
+from sqlalchemy import func, desc, and_, or_, text, distinct
 from sqlalchemy.exc import SQLAlchemyError
 from datetime import datetime, timedelta
 import json
@@ -1800,90 +1800,3 @@ def get_resale_tracking():
         if session:
             session.close()
 
-
-@inventory_analytics_bp.route("/api/inventory/usage_analysis", methods=["GET"])
-@handle_api_error
-def get_usage_analysis():
-    """Get usage analysis data for the Usage Analysis tab."""
-    try:
-        days_back = int(request.args.get("days", 30))
-        cutoff_date = datetime.now() - timedelta(days=days_back)
-        
-        logger.info(f"Generating usage analysis for the last {days_back} days")
-
-        # Get usage history data if available, otherwise use transaction data
-        usage_query = (
-            db.session.query(
-                ItemMaster.rental_class_num,
-                ItemMaster.common_name,
-                func.count(Transaction.id).label('transaction_count'),
-                func.count(func.distinct(ItemMaster.tag_id)).label('unique_items'),
-                func.avg(func.datediff(func.now(), ItemMaster.date_created)).label('avg_age_days')
-            )
-            .join(Transaction, ItemMaster.tag_id == Transaction.tag_id)
-            .filter(
-                Transaction.scan_date >= cutoff_date,
-                ItemMaster.rental_class_num.isnot(None)
-            )
-            .group_by(ItemMaster.rental_class_num, ItemMaster.common_name)
-            .order_by(func.count(Transaction.id).desc())
-            .limit(50)
-        ).all()
-
-        usage_data = []
-        for usage in usage_query:
-            # Calculate utilization metrics
-            utilization_rate = min(usage.transaction_count / max(usage.unique_items, 1) * 10, 100)
-            
-            usage_data.append({
-                "rental_class_num": usage.rental_class_num,
-                "common_name": usage.common_name,
-                "transaction_count": usage.transaction_count,
-                "unique_items": usage.unique_items,
-                "utilization_rate": round(utilization_rate, 2),
-                "avg_age_days": round(float(usage.avg_age_days) if usage.avg_age_days else 0, 1),
-                "usage_intensity": "High" if utilization_rate > 50 else "Medium" if utilization_rate > 20 else "Low"
-            })
-
-        # Get top categories by usage
-        category_query = (
-            db.session.query(
-                UserRentalClassMapping.category,
-                func.count(Transaction.id).label('total_transactions'),
-                func.count(func.distinct(ItemMaster.tag_id)).label('active_items')
-            )
-            .join(ItemMaster, UserRentalClassMapping.rental_class_id == ItemMaster.rental_class_num)
-            .join(Transaction, ItemMaster.tag_id == Transaction.tag_id)
-            .filter(Transaction.scan_date >= cutoff_date)
-            .group_by(UserRentalClassMapping.category)
-            .order_by(func.count(Transaction.id).desc())
-        ).all()
-
-        category_summary = []
-        for category in category_query:
-            usage_rate = category.total_transactions / max(category.active_items, 1)
-            category_summary.append({
-                "category": category.category,
-                "total_transactions": category.total_transactions,
-                "active_items": category.active_items,
-                "usage_rate": round(usage_rate, 2)
-            })
-
-        result = {
-            "usage_analysis": {
-                "items": usage_data,
-                "category_summary": category_summary,
-                "analysis_period_days": days_back,
-                "total_items_analyzed": len(usage_data),
-                "total_transactions": sum(item["transaction_count"] for item in usage_data)
-            },
-            "generated_at": datetime.now().isoformat(),
-            "success": True
-        }
-
-        logger.info(f"Generated usage analysis with {len(usage_data)} items and {len(category_summary)} categories")
-        return jsonify(result)
-
-    except Exception as e:
-        logger.error(f"Error fetching usage analysis data: {str(e)}", exc_info=True)
-        return jsonify({"error": f"Failed to fetch usage analysis data: {str(e)}"}), 500
