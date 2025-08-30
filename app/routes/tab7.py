@@ -10,6 +10,8 @@ from datetime import datetime, timedelta, date
 import json
 from decimal import Decimal
 
+from ..utils.date_ranges import get_date_range_from_params
+
 logger = get_logger(__name__)
 
 tab7_bp = Blueprint("tab7", __name__)
@@ -98,26 +100,9 @@ def get_executive_summary():
             f"Fetching executive summary: store={store_filter}, period={period}"
         )
 
-        # Calculate date range based on period - use actual latest data date instead of today
-        latest_data_date = (
-            session.query(func.max(PayrollTrends.week_ending))
-            .filter(PayrollTrends.total_revenue > 0)
-            .scalar()
-        )
-
-        if not latest_data_date:
-            # Fallback to today if no data found
-            latest_data_date = datetime.now().date()
-
-        end_date = latest_data_date
-        if period == "4weeks":
-            start_date = end_date - timedelta(weeks=4)
-        elif period == "12weeks":
-            start_date = end_date - timedelta(weeks=12)
-        elif period == "52weeks":
-            start_date = end_date - timedelta(weeks=52)
-        else:  # YTD
-            start_date = date(end_date.year, 1, 1)
+        start_date, end_date = get_date_range_from_params(request, session)
+        if not start_date or not end_date:
+            return jsonify({"error": "Invalid date range"}), 400
 
         # Build base query for payroll trends
         payroll_query = session.query(
@@ -1120,50 +1105,6 @@ def load_historical_data():
 
 from sqlalchemy import extract
 import calendar
-
-
-def get_date_range_from_params(request, session=None):
-    """Extract and validate date range from request parameters."""
-    # Check for custom date range
-    start_date_str = request.args.get("start_date")
-    end_date_str = request.args.get("end_date")
-
-    if start_date_str and end_date_str:
-        try:
-            start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date()
-            end_date = datetime.strptime(end_date_str, "%Y-%m-%d").date()
-            return start_date, end_date
-        except ValueError:
-            logger.error(
-                f"Invalid date format: start={start_date_str}, end={end_date_str}"
-            )
-
-    # Fall back to period-based selection - FIXED: Use latest data date instead of today
-    period = request.args.get("period", "4weeks")
-
-    if session:
-        # Get latest available data date
-        latest_data_date = (
-            session.query(func.max(PayrollTrends.week_ending))
-            .filter(PayrollTrends.total_revenue > 0)
-            .scalar()
-        )
-        end_date = latest_data_date if latest_data_date else datetime.now().date()
-    else:
-        end_date = datetime.now().date()
-
-    if period == "4weeks":
-        start_date = end_date - timedelta(weeks=4)
-    elif period == "12weeks":
-        start_date = end_date - timedelta(weeks=12)
-    elif period == "52weeks":
-        start_date = end_date - timedelta(weeks=52)
-    elif period == "ytd":
-        start_date = date(end_date.year, 1, 1)
-    else:
-        start_date = end_date - timedelta(weeks=4)
-
-    return start_date, end_date
 
 
 def calculate_comparison_metrics(

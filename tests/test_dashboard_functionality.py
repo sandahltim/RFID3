@@ -13,7 +13,7 @@ import pytest
 import json
 import sys
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from decimal import Decimal
 from unittest.mock import Mock, patch, MagicMock
 
@@ -170,6 +170,19 @@ class TestExecutiveDashboard:
         
         calculated_turnover = round(financial_data['revenue']['ytd_total'] / financial_data['inventory']['total_value'], 3)
         assert calculated_turnover == financial_data['inventory']['turnover_ratio']
+
+    def test_custom_date_range_helper(self):
+        """Ensure get_date_range_from_params handles custom ranges."""
+        from app.utils.date_ranges import get_date_range_from_params
+
+        class Req:
+            def __init__(self, args):
+                self.args = args
+
+        req = Req({"start_date": "2025-01-01", "end_date": "2025-01-31"})
+        start, end = get_date_range_from_params(req)
+        assert start == date(2025, 1, 1)
+        assert end == date(2025, 1, 31)
     
     def test_dashboard_chart_data_accuracy(self):
         """Test accuracy of data feeding dashboard charts."""
