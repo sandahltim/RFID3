@@ -16,7 +16,7 @@ from ..utils.exceptions import (
     handle_api_error,
     log_and_handle_exception,
 )
-from ..utils.filters import apply_global_filters
+from ..utils.filters import build_global_filters
 from sqlalchemy import func, desc, and_, or_, text
 from sqlalchemy.exc import SQLAlchemyError
 from datetime import datetime, timedelta
@@ -109,8 +109,8 @@ def get_dashboard_summary():
         # Build base query with global filters
         base_query = session.query(ItemMaster)
         # Apply filters only if specified (don't filter by default to show all data)
-        if store_filter and store_filter != "all":
-            base_query = apply_global_filters(base_query, store_filter, type_filter)
+        if (store_filter and store_filter != "all") or (type_filter and type_filter != "all"):
+            base_query = apply_global_filters(base_query, request.args)
 
         # Get basic inventory counts with filters applied
         total_items = base_query.count()
