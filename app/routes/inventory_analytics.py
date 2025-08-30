@@ -16,7 +16,7 @@ from ..utils.exceptions import (
     handle_api_error,
     log_and_handle_exception,
 )
-from ..utils.filters import build_global_filters
+from ..utils.filters import build_global_filters, apply_global_filters
 from sqlalchemy import func, desc, and_, or_, text
 from sqlalchemy.exc import SQLAlchemyError
 from datetime import datetime, timedelta
@@ -32,55 +32,6 @@ logger.info(
     "Deployed inventory_analytics.py version: 2025-08-27-POS-v1 at %s",
     datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
 )
-
-
-def build_global_filters(store_filter="all", type_filter="all"):
-    """Build SQLAlchemy filters for store and inventory type selection."""
-    filters = []
-
-    if store_filter and store_filter != "all":
-        # Filter by either home_store or current_store
-        filters.append(
-            or_(
-                ItemMaster.home_store == store_filter,
-                ItemMaster.current_store == store_filter,
-            )
-        )
-        logger.debug(f"Applied store filter: {store_filter}")
-
-    if type_filter and type_filter != "all":
-        if type_filter == "RFID":
-            # RFID items are those with NULL identifier_type and HEX EPC format
-            from sqlalchemy import and_
-            filters.append(
-                and_(
-                    ItemMaster.identifier_type == 'None',
-                    ItemMaster.tag_id.op('REGEXP')('^[0-9A-Fa-f]{16,}$')
-                )
-            )
-        elif type_filter == "Serialized":
-            # Serialized items are QR + Stickers
-            filters.append(ItemMaster.identifier_type.in_(['QR', 'Sticker']))
-        else:
-            filters.append(ItemMaster.identifier_type == type_filter)
-        logger.debug(f"Applied inventory type filter: {type_filter}")
-
-    return filters
-
-
-def apply_global_filters(query, request_args=None):
-    """Apply store and inventory type filters to any ItemMaster query."""
-    if request_args is None:
-        request_args = request.args
-
-    store_filter = request_args.get("store", "all")
-    type_filter = request_args.get("type", "all")
-
-    filters = build_global_filters(store_filter, type_filter)
-    for filter_condition in filters:
-        query = query.filter(filter_condition)
-
-    return query
 
 
 @inventory_analytics_bp.route("/tab/6")
@@ -123,7 +74,7 @@ def get_dashboard_summary():
         base_query = session.query(ItemMaster)
         # Apply filters only if specified (don't filter by default to show all data)
         if (store_filter and store_filter != "all") or (type_filter and type_filter != "all"):
-            base_query = apply_global_filters(base_query, request.args)
+            base_query = apply_global_filters(base_query, store_filter, type_filter)
 
         # Get basic inventory counts with filters applied
         total_items = base_query.count()
@@ -233,7 +184,7 @@ def get_business_intelligence():
 
         # Build base query with filters
         base_query = session.query(ItemMaster)
-        base_query = apply_global_filters(base_query)
+        base_query = apply_global_filters(base_query, store_filter, type_filter)
 
         # Store Distribution Analysis
         store_distribution = (
