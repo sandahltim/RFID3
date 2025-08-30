@@ -49,7 +49,20 @@ def build_global_filters(store_filter="all", type_filter="all"):
         logger.debug(f"Applied store filter: {store_filter}")
 
     if type_filter and type_filter != "all":
-        filters.append(ItemMaster.identifier_type == type_filter)
+        if type_filter == "RFID":
+            # RFID items are those with NULL identifier_type and HEX EPC format
+            from sqlalchemy import and_
+            filters.append(
+                and_(
+                    ItemMaster.identifier_type == 'None',
+                    ItemMaster.tag_id.op('REGEXP')('^[0-9A-Fa-f]{16,}$')
+                )
+            )
+        elif type_filter == "Serialized":
+            # Serialized items are QR + Stickers
+            filters.append(ItemMaster.identifier_type.in_(['QR', 'Sticker']))
+        else:
+            filters.append(ItemMaster.identifier_type == type_filter)
         logger.debug(f"Applied inventory type filter: {type_filter}")
 
     return filters

@@ -456,7 +456,7 @@ class DatabaseViewer {
     async showTableSchema() {
         if (!currentTable) return;
         
-        const modal = new bootstrap.Modal(document.getElementById('schemaModal'));
+        const modalEl = document.getElementById('schemaModal');
         const content = document.getElementById('schema-content');
         
         // Show loading
@@ -469,7 +469,18 @@ class DatabaseViewer {
             </div>
         `;
         
-        modal.show();
+        // Use jQuery Bootstrap modal if available, fallback to manual show
+        if (typeof $ !== 'undefined' && $.fn.modal) {
+            $(modalEl).modal('show');
+        } else if (typeof bootstrap !== 'undefined') {
+            const modal = new bootstrap.Modal(modalEl);
+            modal.show();
+        } else {
+            // Manual modal display as fallback
+            modalEl.style.display = 'block';
+            modalEl.classList.add('show');
+            document.body.classList.add('modal-open');
+        }
         
         try {
             const response = await fetch(`/api/database/table/${currentTable}/schema`);
