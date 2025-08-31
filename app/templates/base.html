@@ -3,11 +3,19 @@
 <head>
   {% block head %}
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- CRITICAL: Optimized viewport for Android Chrome performance -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+    <!-- Prevent zoom on Android input focus -->
+    <meta name="format-detection" content="telephone=no">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <title>{% block title %}RFID DASHBOARD{% endblock %}</title>
     
     <!-- External CSS - Bootstrap for consistent responsive behavior -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- FontAwesome for icons -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     
     <!-- Application CSS - Load all styles for consistency -->
     <link rel="stylesheet" href="/static/css/common.css">
@@ -24,73 +32,138 @@
   {% block extra_head %}{% endblock %}
 </head>
 <body>
-  <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+  <!-- SIMPLE BOOTSTRAP 5 NAVBAR - CLEAN AND FUNCTIONAL -->
+  <nav class="navbar navbar-expand-lg navbar-dark bg-primary fixed-top">
     <div class="container-fluid">
-      <a class="navbar-brand" href="/">RFID DASHBOARD</a>
-      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+      <!-- Brand -->
+      <a class="navbar-brand" href="/">
+        <i class="fas fa-tags me-2"></i>RFID DASHBOARD
+      </a>
+
+      <!-- Mobile hamburger button -->
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" 
+              aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
         <span class="navbar-toggler-icon"></span>
       </button>
+
+      <!-- Collapsible content -->
       <div class="collapse navbar-collapse" id="navbarNav">
-        <ul class="navbar-nav ms-auto">
+        <ul class="navbar-nav me-auto">
           <li class="nav-item">
-            <a class="nav-link {% if request.path == '/' or request.path == '/home' %}active{% endif %}" href="/home">Home</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link {% if request.path == '/tab/1' %}active{% endif %}" href="/tab/1">Rental Inventory</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link {% if request.path == '/tab/2' %}active{% endif %}" href="/tab/2">Open Contracts</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link {% if request.path == '/tab/3' %}active{% endif %}" href="/tab/3">Service</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link {% if request.path == '/tab/4' %}active{% endif %}" href="/tab/4">Laundry Contracts</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link {% if request.path == '/tab/5' %}active{% endif %}" href="/tab/5">Resale</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link {% if request.path == '/tab/6' %}active{% endif %}" href="/tab/6">Inventory & Analytics</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link {% if request.path == '/tab/7' %}active{% endif %}" href="/tab/7">Executive Dashboard</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link {% if request.path == '/predictive/analytics' %}active{% endif %}" href="/predictive/analytics">Predictive Analytics</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link {% if request.path == '/feedback/dashboard' %}active{% endif %}" href="/feedback/dashboard">Feedback Analytics</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link {% if request.path == '/categories' %}active{% endif %}" href="/categories">Manage Categories</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link {% if request.path.startswith('/config') %}active{% endif %}" href="/config/">
-              <i class="fas fa-cogs me-1"></i>Configuration
+            <a class="nav-link {% if request.path == '/' or request.path == '/home' %}active{% endif %}" href="/home">
+              <i class="fas fa-home me-1"></i>Dashboard
             </a>
           </li>
-          <li class="nav-item">
-            <a class="nav-link {% if request.path.startswith('/database/viewer') %}active{% endif %}" href="/database/viewer">
-              <i class="fas fa-database me-1"></i>Database Viewer
+          
+          <!-- Inventory Dropdown -->
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle {% if request.path in ['/tab/1', '/tab/2', '/tab/3', '/tab/4', '/tab/5'] %}active{% endif %}" 
+               href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+              <i class="fas fa-boxes me-1"></i>Inventory
             </a>
+            <ul class="dropdown-menu">
+              <li><a class="dropdown-item {% if request.path == '/tab/1' %}active{% endif %}" href="/tab/1">
+                <i class="fas fa-warehouse me-2"></i>Rental Inventory</a></li>
+              <li><a class="dropdown-item {% if request.path == '/tab/2' %}active{% endif %}" href="/tab/2">
+                <i class="fas fa-file-contract me-2"></i>Open Contracts</a></li>
+              <li><a class="dropdown-item {% if request.path == '/tab/3' %}active{% endif %}" href="/tab/3">
+                <i class="fas fa-tools me-2"></i>Service</a></li>
+              <li><a class="dropdown-item {% if request.path == '/tab/4' %}active{% endif %}" href="/tab/4">
+                <i class="fas fa-tshirt me-2"></i>Laundry Contracts</a></li>
+              <li><a class="dropdown-item {% if request.path == '/tab/5' %}active{% endif %}" href="/tab/5">
+                <i class="fas fa-tag me-2"></i>Resale</a></li>
+            </ul>
           </li>
-          <li class="nav-item">
-            <a class="nav-link {% if request.path.startswith('/api/import/dashboard') %}active{% endif %}" href="/api/import/dashboard">
-              <i class="fas fa-upload me-1"></i>CSV Import
+          
+          <!-- Analytics Dropdown -->
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle {% if request.path in ['/tab/6', '/tab/7', '/predictive/analytics', '/feedback/dashboard'] %}active{% endif %}" 
+               href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+              <i class="fas fa-chart-bar me-1"></i>Analytics
             </a>
+            <ul class="dropdown-menu">
+              <li><a class="dropdown-item {% if request.path == '/tab/6' %}active{% endif %}" href="/tab/6">
+                <i class="fas fa-chart-line me-2"></i>Inventory Analytics</a></li>
+              <li><a class="dropdown-item {% if request.path == '/tab/7' %}active{% endif %}" href="/tab/7">
+                <i class="fas fa-tachometer-alt me-2"></i>Executive Dashboard</a></li>
+              <li><a class="dropdown-item {% if request.path == '/predictive/analytics' %}active{% endif %}" href="/predictive/analytics">
+                <i class="fas fa-brain me-2"></i>Predictive Analytics</a></li>
+              <li><a class="dropdown-item {% if request.path == '/feedback/dashboard' %}active{% endif %}" href="/feedback/dashboard">
+                <i class="fas fa-comments me-2"></i>Feedback Analytics</a></li>
+            </ul>
+          </li>
+        </ul>
+
+        <!-- Right side navigation -->
+        <ul class="navbar-nav">
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle {% if request.path.startswith('/config') or request.path == '/categories' %}active{% endif %}" 
+               href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+              <i class="fas fa-cogs me-1"></i>Tools
+            </a>
+            <ul class="dropdown-menu dropdown-menu-end">
+              <li><a class="dropdown-item {% if request.path == '/categories' %}active{% endif %}" href="/categories">
+                <i class="fas fa-list-ul me-2"></i>Manage Categories</a></li>
+              <li><a class="dropdown-item {% if request.path.startswith('/config') %}active{% endif %}" href="/config/">
+                <i class="fas fa-cogs me-2"></i>Configuration</a></li>
+              <li><a class="dropdown-item {% if request.path.startswith('/database/viewer') %}active{% endif %}" href="/database/viewer">
+                <i class="fas fa-database me-2"></i>Database Viewer</a></li>
+              <li><a class="dropdown-item {% if request.path.startswith('/api/import/dashboard') %}active{% endif %}" href="/api/import/dashboard">
+                <i class="fas fa-upload me-2"></i>CSV Import</a></li>
+            </ul>
           </li>
         </ul>
       </div>
     </div>
   </nav>
-  <div class="container" style="margin-top: 80px;">
-    {% block content %}{% endblock %}
-  </div>
+  <!-- Main Content Container with responsive spacing -->
+  <main class="main-content">
+    <div class="container-fluid">
+      {% block content %}{% endblock %}
+    </div>
+  </main>
   
   {% include 'refresh_status.html' %}
   
   {% block scripts %}
+    <!-- CRITICAL: Performance monitoring for Android Chrome debugging -->
+    <script>
+    if ('serviceWorker' in navigator && /Android.*Chrome/i.test(navigator.userAgent)) {
+        // Enable performance monitoring on Android Chrome
+        window.addEventListener('load', () => {
+            const observer = new PerformanceObserver((list) => {
+                for (const entry of list.getEntries()) {
+                    if (entry.duration > 100) {
+                        console.warn(`Slow performance detected: ${entry.name} took ${entry.duration}ms`);
+                    }
+                }
+            });
+            observer.observe({entryTypes: ['measure', 'navigation', 'paint']});
+        });
+    }
+    </script>
+    
+    <!-- Simple Navbar Close Script -->
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Close mobile navbar when clicking nav links
+        const navLinks = document.querySelectorAll('.navbar-nav .nav-link:not(.dropdown-toggle)');
+        const navbarCollapse = document.getElementById('navbarNav');
+        
+        navLinks.forEach(link => {
+            link.addEventListener('click', () => {
+                // Only close on mobile screens
+                if (window.innerWidth < 992) {
+                    const bsCollapse = bootstrap.Collapse.getInstance(navbarCollapse);
+                    if (bsCollapse) {
+                        bsCollapse.hide();
+                    }
+                }
+            });
+        });
+    });
+    </script>
+    
     <!-- Common Scripts -->
     <script type="module" src="/static/js/common.js?cb={{ cache_bust }}"></script>
     <script type="module" src="/static/js/tab.js?cb={{ cache_bust }}"></script>
@@ -110,12 +183,15 @@
       <script type="module" src="/static/js/categories.js?cb={{ cache_bust }}"></script>
     {% elif request.path == '/' or request.path == '/home' %}
       <script type="module" src="/static/js/tab1.js?cb={{ cache_bust }}"></script>
+      <script type="module" src="/static/js/qr-scanner.js?cb={{ cache_bust }}"></script>
     {% elif request.path == '/predictive/analytics' %}
       <!-- Predictive analytics script loaded in template to prevent double loading -->
     {% endif %}
     
     <!-- External Libraries - Bootstrap for mobile navigation -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- jsQR library for QR code scanning -->
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
   {% endblock %}
 </body>
 </html>
