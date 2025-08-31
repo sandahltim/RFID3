@@ -68,6 +68,10 @@ def create_app():
     try:
         db.init_app(app)
         cache.init_app(app)
+        
+        # Import models to register tables
+        from app.models import db_models, pos_models, financial_models, feedback_models, correlation_models, config_models
+        
         app.logger.info("Extensions initialized successfully")
     except (ImportError, AttributeError, RuntimeError) as e:
         app.logger.error(f"Failed to initialize extensions: {str(e)}", exc_info=True)
