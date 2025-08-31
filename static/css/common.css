@@ -13,85 +13,45 @@
     --bte-accent-green: #28A745;
 }
 
-/* MOBILE-FIRST CONTAINER SYSTEM - Updated for responsive design */
+/* CONTAINER SYSTEM - Clean and simple */
 .container {
     background: linear-gradient(180deg, var(--bte-light-gray) 0%, var(--bte-white) 100%);
     font-family: 'Roboto', sans-serif;
-    min-height: calc(100vh - 60px); /* Responsive navbar height */
     max-width: 1400px;
     margin: 0 auto;
-    padding: 0; /* Removed fixed padding - handled by mobile-fix.css */
 }
 
-/* Main content area responsive spacing */
+/* Main content area - spacing handled by mobile-fix.css */
 .main-content {
     background: linear-gradient(180deg, var(--bte-light-gray) 0%, var(--bte-white) 100%);
     font-family: 'Roboto', sans-serif;
-    min-height: calc(100vh - 56px);
 }
 
-/* Ensure body has no conflicting spacing */
-body {
-    padding-top: 0 !important;
-    margin-top: 0 !important;
-}
-
-/* RESPONSIVE NAVIGATION BAR - Mobile-first approach */
-.navbar {
-    background: linear-gradient(135deg, var(--bte-royal-blue) 0%, #0047AB 50%, #002563 100%) !important;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4), 0 2px 4px rgba(0, 0, 0, 0.2) !important;
-    backdrop-filter: blur(10px) !important;
-    -webkit-backdrop-filter: blur(10px) !important;
-    border-bottom: 2px solid rgba(255, 193, 7, 0.3) !important;
-    /* Position and sizing handled by mobile-fix.css for responsive behavior */
-}
-
-/* RESPONSIVE NAVBAR COMPONENTS - Enhanced for mobile UX */
-.navbar-brand, .navbar-nav .nav-link {
-    color: var(--bte-gold) !important;
-    font-weight: 700;
-    text-decoration: none;
-    transition: color 0.3s ease, transform 0.2s ease, background-color 0.3s ease;
-}
-
+/* SIMPLE NAVBAR STYLING - Bootstrap 5 with BTE colors */
 .navbar-brand {
-    font-size: 1.1rem;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    padding: 8px 0 !important;
+    font-weight: 700;
+    color: var(--bte-gold) !important;
 }
 
 .navbar-nav .nav-link {
-    font-size: 0.95rem;
-    padding: 8px 12px;
-    border-radius: 6px;
-    margin: 2px;
+    color: rgba(255, 255, 255, 0.85) !important;
+    font-weight: 500;
 }
 
-.navbar-brand:hover, 
 .navbar-nav .nav-link:hover,
-.dropdown-item:hover {
-    color: var(--bte-white) !important;
-    background-color: rgba(255, 193, 7, 0.2) !important;
+.navbar-nav .nav-link:focus {
+    color: var(--bte-gold) !important;
 }
 
-.navbar-nav .nav-link.active,
+.navbar-nav .nav-link.active {
+    color: var(--bte-gold) !important;
+    font-weight: 600;
+}
+
 .dropdown-item.active {
-    color: var(--bte-white) !important;
-    background-color: rgba(255, 193, 7, 0.3) !important;
-    font-weight: 900;
+    background-color: var(--bte-royal-blue);
+    color: white;
 }
-
-/* Responsive navbar layout managed by mobile-fix.css */
-.navbar-nav {
-    display: flex;
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    align-items: center;
-}
-
-/* Remove old mobile navigation rules - handled by mobile-fix.css */
 
 /* Headings */
 h2 {
@@ -108,7 +68,8 @@ h2 {
     text-align: center;
     max-width: 95%;
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
-    z-index: 10;
+    position: relative;
+    z-index: 5;
 }
 h2:empty,
 h2 + .table:empty ~ h2 {
@@ -238,7 +199,50 @@ h4 {
     font-size: 0.9rem;
     text-transform: none;
     letter-spacing: normal;
-    height: 40px; /* Explicit height for consistent calculation */
+    height: 40px;
+    position: sticky;
+    top: 56px;
+    z-index: 10;
+    vertical-align: middle;
+    white-space: nowrap;
+}
+
+/* Fix for recent scans table specifically */
+#recent-scans-table thead th {
+    position: sticky;
+    top: 0; /* Reset to 0 for contained table */
+    background: linear-gradient(90deg, var(--bte-royal-blue) 0%, #0047AB 100%) !important;
+    border-bottom: 2px solid var(--bte-gold) !important;
+}
+
+/* Responsive table improvements */
+.table-responsive {
+    position: relative;
+}
+
+.table-responsive .table {
+    margin-bottom: 0;
+}
+
+/* Mobile responsive columns */
+@media (max-width: 767px) {
+    .mobile-hide {
+        display: none !important;
+    }
+    
+    .mobile-only {
+        display: block !important;
+    }
+}
+
+@media (min-width: 768px) {
+    .desktop-only {
+        display: table-cell !important;
+    }
+    
+    .mobile-only {
+        display: none !important;
+    }
 }
 
 /* Notes textarea styling */
