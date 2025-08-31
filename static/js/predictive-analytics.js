@@ -6,6 +6,13 @@
 
 class PredictiveAnalyticsDashboard {
     constructor() {
+        // Singleton pattern to prevent multiple instances
+        if (PredictiveAnalyticsDashboard.instance) {
+            console.warn('PredictiveAnalyticsDashboard instance already exists, returning existing instance');
+            return PredictiveAnalyticsDashboard.instance;
+        }
+        PredictiveAnalyticsDashboard.instance = this;
+        
         // Wait for chartManager to be available
         this.chartManager = null;
         this.initChartManager();
@@ -24,6 +31,10 @@ class PredictiveAnalyticsDashboard {
         };
         this.refreshInterval = null;
         this.isLoading = false;
+        
+        // Initialize chart instances
+        this.correlationChart = null;
+        this.forecastChart = null;
         
         this.init();
     }
@@ -464,8 +475,18 @@ class PredictiveAnalyticsDashboard {
             this.chartManager.hideChartLoading('correlation-chart');
         }
         
+        // Destroy existing chart if it exists
+        const existingChart = this.charts.get('correlation-chart');
+        if (existingChart && typeof existingChart.destroy === 'function') {
+            existingChart.destroy();
+            this.charts.delete('correlation-chart');
+        }
+        if (this.correlationChart && typeof this.correlationChart.destroy === 'function') {
+            this.correlationChart.destroy();
+        }
+        
         try {
-            const chart = new Chart(ctx, {
+            this.correlationChart = new Chart(ctx, {
             type: 'bar',
             data: data,
             options: {
@@ -508,7 +529,8 @@ class PredictiveAnalyticsDashboard {
             }
         });
 
-            this.charts.set('correlation-chart', chart);
+            this.charts.set('correlation-chart', this.correlationChart);
+            console.log('Correlation chart created successfully with ID:', this.correlationChart.id);
         } catch (error) {
             console.error('Failed to create correlation chart:', error);
             if (this.chartManager) {
@@ -699,8 +721,18 @@ class PredictiveAnalyticsDashboard {
             return;
         }
         
+        // Destroy existing chart if it exists
+        const existingChart = this.charts.get('forecast-chart');
+        if (existingChart && typeof existingChart.destroy === 'function') {
+            existingChart.destroy();
+            this.charts.delete('forecast-chart');
+        }
+        if (this.forecastChart && typeof this.forecastChart.destroy === 'function') {
+            this.forecastChart.destroy();
+        }
+        
         try {
-            const chart = new Chart(ctx, {
+            this.forecastChart = new Chart(ctx, {
             type: 'line',
             data: chartData,
             options: {
@@ -757,7 +789,8 @@ class PredictiveAnalyticsDashboard {
             }
         });
 
-            this.charts.set('forecast-chart', chart);
+            this.charts.set('forecast-chart', this.forecastChart);
+            console.log('Forecast chart created successfully with ID:', this.forecastChart.id);
         } catch (error) {
             console.error('Failed to create forecast chart:', error);
             if (this.chartManager) {
@@ -1015,36 +1048,134 @@ class PredictiveAnalyticsDashboard {
     /**
      * Cleanup when leaving the page
      */
+    /**
+     * Completely destroy a chart using all available methods
+     */
+    destroyChartCompletely(canvasId) {
+        try {
+            // Method 1: Destroy from Chart.js registry
+            const registryChart = Chart.getChart(canvasId);
+            if (registryChart) {
+                console.log(`Destroying chart from registry: ${canvasId}`);
+                registryChart.destroy();
+            }
+            
+            // Method 2: Destroy from our tracking Map
+            const trackedChart = this.charts.get(canvasId);
+            if (trackedChart && typeof trackedChart.destroy === 'function') {
+                console.log(`Destroying tracked chart: ${canvasId}`);
+                trackedChart.destroy();
+                this.charts.delete(canvasId);
+            }
+            
+            // Method 3: Destroy from instance variables
+            if (canvasId === 'correlation-chart' && this.correlationChart) {
+                console.log('Destroying correlationChart instance');
+                this.correlationChart.destroy();
+                this.correlationChart = null;
+            }
+            if (canvasId === 'forecast-chart' && this.forecastChart) {
+                console.log('Destroying forecastChart instance');
+                this.forecastChart.destroy();
+                this.forecastChart = null;
+            }
+            
+            // Method 4: Clean canvas element if still problematic
+            const canvas = document.getElementById(canvasId);
+            if (canvas && canvas.getContext) {
+                const ctx = canvas.getContext('2d');
+                if (ctx) {
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                }
+            }
+            
+        } catch (error) {
+            console.warn(`Error during chart destruction for ${canvasId}:`, error);
+            // If all else fails, replace the canvas element
+            this.replaceCanvasElement(canvasId);
+        }
+    }
+    
+    /**
+     * Replace canvas element completely to ensure clean state
+     */
+    replaceCanvasElement(canvasId) {
+        const oldCanvas = document.getElementById(canvasId);
+        if (oldCanvas) {
+            console.log(`Replacing canvas element: ${canvasId}`);
+            const newCanvas = oldCanvas.cloneNode(false);
+            // Ensure the new canvas has the same classes and attributes
+            newCanvas.className = oldCanvas.className;
+            newCanvas.style.cssText = oldCanvas.style.cssText;
+            oldCanvas.parentNode.replaceChild(newCanvas, oldCanvas);
+        }
+    }
+    
     cleanup() {
+        console.log('Cleaning up dashboard...');
+        
         if (this.refreshInterval) {
             clearInterval(this.refreshInterval);
         }
         
+        // Destroy all tracked charts
         this.charts.forEach((chart, id) => {
-            chart.destroy();
+            this.destroyChartCompletely(id);
         });
         this.charts.clear();
+        
+        // Clear singleton instance
+        PredictiveAnalyticsDashboard.instance = null;
     }
 }
 
-// Initialize dashboard when DOM is ready
-document.addEventListener('DOMContentLoaded', () => {
+// Prevent multiple initialization
+let dashboardInitialized = false;
+
+// Initialize dashboard when DOM is ready (only once)
+function initializeDashboard() {
+    if (dashboardInitialized) {
+        console.log('Dashboard already initialized, skipping...');
+        return;
+    }
+    
     console.log('DOM loaded, initializing Predictive Analytics Dashboard...');
     try {
+        // Clean up any existing instance first
+        if (window.predictiveAnalytics) {
+            console.log('Cleaning up existing dashboard instance...');
+            window.predictiveAnalytics.cleanup();
+        }
+        
         window.predictiveAnalytics = new PredictiveAnalyticsDashboard();
+        dashboardInitialized = true;
+        
     } catch (error) {
         console.error('Failed to initialize Predictive Analytics Dashboard:', error);
+        dashboardInitialized = false;
     }
-});
+}
+
+// Initialize when DOM is ready
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeDashboard);
+} else {
+    // DOM is already ready
+    initializeDashboard();
+}
 
 // Cleanup on page unload
 window.addEventListener('beforeunload', () => {
     if (window.predictiveAnalytics) {
         window.predictiveAnalytics.cleanup();
     }
+    dashboardInitialized = false;
 });
 
 // Export for module systems
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = PredictiveAnalyticsDashboard;
 }
+
+// Global access for debugging
+window.PredictiveAnalyticsDashboard = PredictiveAnalyticsDashboard;

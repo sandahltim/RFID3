@@ -111,7 +111,7 @@
     {% elif request.path == '/' or request.path == '/home' %}
       <script type="module" src="/static/js/tab1.js?cb={{ cache_bust }}"></script>
     {% elif request.path == '/predictive/analytics' %}
-      <script type="module" src="/static/js/predictive-analytics.js?cb={{ cache_bust }}"></script>
+      <!-- Predictive analytics script loaded in template to prevent double loading -->
     {% endif %}
     
     <!-- External Libraries - Bootstrap for mobile navigation -->
