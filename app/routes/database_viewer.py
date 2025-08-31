@@ -13,6 +13,8 @@ from ..models.db_models import (
     db, ItemMaster, Transaction, RFIDTag, SeedRentalClass, InventoryHealthAlert,
     RentalClassMapping, HandCountedItems, RefreshState, InventoryConfig
 )
+from ..models.pos_models import POSEquipment, POSTransaction, POSRFIDCorrelation
+from ..models.financial_models import PLData, PayrollTrendsData, ScorecardTrendsData
 # Removed unused import: from ..utils.filters import apply_global_filters
 
 # Configure logging
@@ -75,6 +77,44 @@ AVAILABLE_TABLES = {
         'display_name': 'Inventory Configuration',
         'description': 'System configuration settings for inventory management',
         'key_columns': ['config_key', 'config_value', 'updated_at']
+    },
+    # POS System Tables
+    'pos_equipment': {
+        'model': POSEquipment,
+        'display_name': 'POS Equipment',
+        'description': 'Point-of-sale equipment and inventory data',
+        'key_columns': ['item_num', 'name', 'part_no', 'serial_no', 'current_cost', 'status']
+    },
+    'pos_transactions': {
+        'model': POSTransaction,
+        'display_name': 'POS Transactions',
+        'description': 'Point-of-sale transaction records',
+        'key_columns': ['transaction_num', 'invoice_num', 'customer_id', 'transaction_date', 'total_amount']
+    },
+    'pos_rfid_correlation': {
+        'model': POSRFIDCorrelation,
+        'display_name': 'POS-RFID Correlation',
+        'description': 'Correlation between POS items and RFID tags',
+        'key_columns': ['pos_item_num', 'rfid_tag_id', 'correlation_confidence', 'created_at']
+    },
+    # Financial Data Tables
+    'pl_data': {
+        'model': PLData,
+        'display_name': 'P&L Data',
+        'description': 'Profit & Loss financial data by account and period',
+        'key_columns': ['account_code', 'account_name', 'period_month', 'period_year', 'amount', 'category']
+    },
+    'payroll_trends_data': {
+        'model': PayrollTrendsData,
+        'display_name': 'Payroll Trends',
+        'description': 'Weekly payroll trends by location',
+        'key_columns': ['week_ending', 'location_code', 'rental_revenue', 'payroll_amount', 'wage_hours']
+    },
+    'scorecard_trends_data': {
+        'model': ScorecardTrendsData,
+        'display_name': 'Scorecard Trends',
+        'description': 'Weekly business scorecard metrics and KPIs',
+        'key_columns': ['week_ending', 'total_weekly_revenue', 'revenue_3607', 'revenue_6800', 'revenue_8101', 'total_discount']
     }
 }
 
