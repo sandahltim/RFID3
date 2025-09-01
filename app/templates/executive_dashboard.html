@@ -59,9 +59,17 @@
             margin-bottom: 0.5rem;
         }
 
+        /* High contrast KPI value colors */
+        .kpi-value.text-primary { color: #1e3a8a !important; }
+        .kpi-value.text-success { color: #059669 !important; }
+        .kpi-value.text-warning { color: #d97706 !important; }
+        .kpi-value.text-info { color: #0369a1 !important; }
+        .kpi-value.text-danger { color: #dc2626 !important; }
+
         .kpi-label {
             font-size: 0.875rem;
-            color: var(--executive-gray);
+            color: #374151;  /* Darker gray for better readability */
+            font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.5px;
             margin-bottom: 0.5rem;
@@ -72,9 +80,29 @@
             font-weight: 600;
         }
 
-        .trend-up { color: var(--executive-success); }
-        .trend-down { color: var(--executive-danger); }
-        .trend-neutral { color: var(--executive-gray); }
+        .trend-up { color: #059669 !important; font-weight: 600; }
+        .trend-down { color: #dc2626 !important; font-weight: 600; }
+        .trend-neutral { color: #6b7280 !important; font-weight: 600; }
+
+        /* Improve text contrast for better accessibility */
+        .text-muted { color: #4b5563 !important; }  /* Darker muted text */
+        .small.text-muted { color: #374151 !important; } /* Even darker for small text */
+        
+        /* Section headers */
+        .section-header {
+            color: #1f2937;
+            font-weight: 700;
+            font-size: 1.5rem;
+            margin-bottom: 1.5rem;
+            border-bottom: 2px solid #e5e7eb;
+            padding-bottom: 0.5rem;
+        }
+
+        /* Loading text improvements */
+        .loading-text {
+            color: #4b5563 !important;
+            font-weight: 500;
+        }
 
         .insight-card {
             background: white;
@@ -189,6 +217,161 @@
         .badge-good { background-color: var(--executive-secondary); color: white; }
         .badge-fair { background-color: var(--executive-warning); color: white; }
         .badge-poor { background-color: var(--executive-danger); color: white; }
+
+        /* Location Selector Styles */
+        .location-selector {
+            max-width: 100%;
+        }
+        
+        .location-selector .btn-group {
+            flex-wrap: wrap;
+            gap: 2px;
+        }
+        
+        .location-selector .btn {
+            font-size: 0.75rem;
+            padding: 0.25rem 0.5rem;
+            white-space: nowrap;
+        }
+        
+        .location-selector .btn-check:checked + .btn-outline-light {
+            background-color: rgba(255, 255, 255, 0.2);
+            border-color: white;
+            color: white;
+        }
+        
+        .location-comparison-card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s ease-in-out;
+        }
+        
+        .location-comparison-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+        
+        .location-badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: white;
+            margin-bottom: 0.5rem;
+        }
+        
+        .badge-wayzata { background: linear-gradient(135deg, #1e3a8a, #3b82f6); }
+        .badge-brooklyn { background: linear-gradient(135deg, #059669, #10b981); }
+        .badge-fridley { background: linear-gradient(135deg, #d97706, #f59e0b); }
+        .badge-elkriver { background: linear-gradient(135deg, #7c3aed, #a855f7); }
+        
+        .performance-indicator {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.5rem;
+            background: #f8fafc;
+            border-radius: 8px;
+            margin-bottom: 0.5rem;
+        }
+        
+        .performance-metric {
+            font-weight: 600;
+            color: #374151;
+        }
+        
+        .performance-value {
+            font-weight: 700;
+            font-size: 1.1rem;
+        }
+        
+        /* Enhanced KPI Cards */
+        .kpi-card-enhanced {
+            background: linear-gradient(135deg, white 0%, #f8fafc 100%);
+            border: 1px solid #e5e7eb;
+            border-radius: 16px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            transition: all 0.3s ease;
+            height: 180px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .kpi-card-enhanced::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--executive-primary), var(--executive-secondary));
+        }
+        
+        .kpi-card-enhanced:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 25px -3px rgba(0, 0, 0, 0.15), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        
+        .kpi-icon {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            width: 40px;
+            height: 40px;
+            background: rgba(59, 130, 246, 0.1);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--executive-secondary);
+        }
+        
+        .kpi-change-indicator {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.25rem 0.5rem;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            margin-top: 0.5rem;
+        }
+        
+        .change-positive {
+            background: rgba(16, 185, 129, 0.1);
+            color: #059669;
+        }
+        
+        .change-negative {
+            background: rgba(239, 68, 68, 0.1);
+            color: #dc2626;
+        }
+        
+        .change-neutral {
+            background: rgba(107, 114, 128, 0.1);
+            color: #6b7280;
+        }
+
+        @media (max-width: 1200px) {
+            .location-selector .btn {
+                font-size: 0.7rem;
+                padding: 0.2rem 0.4rem;
+            }
+        }
+        
+        @media (max-width: 992px) {
+            .location-selector .btn-group {
+                flex-direction: column;
+            }
+            
+            .location-selector .btn {
+                font-size: 0.75rem;
+                padding: 0.25rem 0.5rem;
+                width: 100%;
+                margin-bottom: 2px;
+            }
+        }
 
         @media (max-width: 768px) {
             .executive-header {
@@ -317,7 +500,7 @@
                     <div class="card-body" id="storePerformanceSection">
                         <div class="text-center py-4">
                             <div class="loading-spinner mx-auto mb-2"></div>
-                            <small class="text-muted">Loading store data...</small>
+                            <small class="loading-text">Loading store data...</small>
                         </div>
                     </div>
                 </div>
@@ -345,7 +528,7 @@
                     <div class="card-body" id="insightsSection">
                         <div class="text-center py-4">
                             <div class="loading-spinner mx-auto mb-2"></div>
-                            <small class="text-muted">Analyzing business patterns...</small>
+                            <small class="loading-text">Analyzing business patterns...</small>
                         </div>
                     </div>
                 </div>
@@ -558,11 +741,8 @@
             document.getElementById('utilizationKPI').textContent = formatPercentage(utilization);
             document.getElementById('healthKPI').textContent = Math.round(health);
 
-            // Update trend indicators
-            updateTrendIndicator('revenueTrend', data.revenue_metrics?.growth_trend || 0, 'Revenue trend');
-            updateTrendIndicator('growthTrend', growth, 'YoY performance');
-            updateTrendIndicator('utilizationTrend', utilization, 'Equipment efficiency');
-            updateTrendIndicator('healthTrend', health, 'Business health score');
+            // Update change indicators instead of trend indicators
+            updateKPIChangeIndicators(data);
         }
 
         function updateTrendIndicator(elementId, value, label) {
@@ -932,6 +1112,116 @@
         function showErrorMessage(message) {
             // Implementation would show a toast or alert
             console.error('Error:', message);
+        }
+        
+        // Location filtering functions
+        function updateLocationFilterDisplay() {
+            document.getElementById('currentLocationFilter').textContent = storeMapping[currentLocationFilter];
+        }
+        
+        function filterDashboardData() {
+            // Update KPIs based on selected location
+            if (currentLocationFilter === 'all') {
+                // Show aggregate data
+                loadFinancialKPIs();
+            } else {
+                // Show location-specific data
+                loadLocationSpecificKPIs(currentLocationFilter);
+            }
+            
+            // Update charts
+            updateChartsWithLocationFilter();
+        }
+        
+        async function loadLocationSpecificKPIs(storeCode) {
+            try {
+                const response = await fetch(`/executive/api/location-kpis/${storeCode}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    updateKPIDisplays(data);
+                }
+            } catch (error) {
+                console.error('Error loading location-specific KPIs:', error);
+            }
+        }
+        
+        function updateChartsWithLocationFilter() {
+            // Update existing charts based on location filter
+            if (revenueTrendChart && dashboardData.stores?.stores) {
+                const filteredData = currentLocationFilter === 'all' ? 
+                    dashboardData.stores.stores : 
+                    dashboardData.stores.stores.filter(store => store.store_code === currentLocationFilter);
+                
+                // Update chart data...
+                updateChartsWithData();
+            }
+        }
+        
+        function showComparisonMode() {
+            comparisonMode = true;
+            document.getElementById('comparisonSection').style.display = 'block';
+            loadComparisonData();
+        }
+        
+        function hideComparisonMode() {
+            comparisonMode = false;
+            document.getElementById('comparisonSection').style.display = 'none';
+        }
+        
+        async function loadComparisonData() {
+            try {
+                const response = await fetch('/executive/api/location-comparison');
+                const data = await response.json();
+                
+                if (data.success && data.locations) {
+                    updateComparisonDisplay(data.locations);
+                }
+            } catch (error) {
+                console.error('Error loading comparison data:', error);
+            }
+        }
+        
+        function updateComparisonDisplay(locations) {
+            locations.forEach(location => {
+                const storeKey = location.store_code;
+                const storeName = storeMapping[storeKey]?.toLowerCase().replace(' ', '');
+                
+                if (storeName) {
+                    const revenueEl = document.getElementById(`${storeName}Revenue`);
+                    const growthEl = document.getElementById(`${storeName}Growth`);
+                    const utilizationEl = document.getElementById(`${storeName}Utilization`);
+                    
+                    if (revenueEl) revenueEl.textContent = formatCurrency(location.revenue || 0, true);
+                    if (growthEl) growthEl.textContent = formatPercentage(location.growth || 0);
+                    if (utilizationEl) utilizationEl.textContent = formatPercentage(location.utilization || 0);
+                }
+            });
+        }
+        
+        function updateKPIChangeIndicators(data) {
+            // Update change indicators with trend information
+            const revenue_change = data.revenue_metrics?.change_pct || 0;
+            const growth_change = data.growth_metrics?.change_pct || 0;
+            const utilization_change = data.utilization_metrics?.change_pct || 0;
+            const health_change = data.health_metrics?.change_pct || 0;
+            
+            updateChangeIndicator('revenueChange', revenue_change, 'vs last period');
+            updateChangeIndicator('growthChange', growth_change, 'trend');
+            updateChangeIndicator('utilizationChange', utilization_change, 'efficiency');
+            updateChangeIndicator('healthChange', health_change, 'score');
+        }
+        
+        function updateChangeIndicator(elementId, changeValue, label) {
+            const element = document.getElementById(elementId);
+            const isPositive = changeValue > 0;
+            const isNeutral = Math.abs(changeValue) < 0.5;
+            
+            element.className = `kpi-change-indicator ${isNeutral ? 'change-neutral' : isPositive ? 'change-positive' : 'change-negative'}`;
+            
+            const icon = isNeutral ? 'fa-minus' : isPositive ? 'fa-arrow-up' : 'fa-arrow-down';
+            const sign = isPositive ? '+' : '';
+            element.innerHTML = `<i class="fas ${icon} me-1"></i> ${sign}${changeValue.toFixed(1)}% ${label}`;
         }
     </script>
 </body>
