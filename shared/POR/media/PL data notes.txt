@@ -1,0 +1,44 @@
+Rental Revenue-(title)
+3607
+6800
+728
+8101
+Sales Revenue-(title)
+3607
+6800
+728
+8101
+Other Revenue-(title)
+Damage Waiver Fees
+Sale New Equipment
+Sale Used Equipment
+Total Revenue
+COGS-(title showin cost of goods items)
+Merchandise
+Repair Parts
+Shop Supplies
+Vehicle Fuel
+Shop Oil & Gas
+Subrent/Leased Equip
+Employee Uniforms
+Freight
+Outside Repairs
+New Small Equip
+Direct Costs
+Total COGS
+Gross Profit
+Expenses-(title)
+Loan payments
+New Large Equip
+   Total Payroll & Benefits
+   Contract Labor
+   Accounting & Professional
+   Advertising
+   Education & Training
+   Office Expenses
+   Occupancy Expense
+Total Expenses
+Net Income
+TTM-(Term Total)
+% Tot Rev-(ignore column)
+PEG Target-(ignore column)

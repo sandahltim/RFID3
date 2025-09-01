@@ -17,6 +17,7 @@ from ..utils.exceptions import (
     log_and_handle_exception,
 )
 from ..utils.filters import build_global_filters, apply_global_filters
+from ..services.inventory_config_service import inventory_config
 from sqlalchemy import func, desc, and_, or_, text, distinct
 from sqlalchemy.exc import SQLAlchemyError
 from datetime import datetime, timedelta
@@ -1796,6 +1797,162 @@ def get_resale_tracking():
     except Exception as e:
         logger.error(f"Error fetching resale tracking data: {str(e)}", exc_info=True)
         return jsonify({"error": f"Failed to fetch resale tracking data: {str(e)}"}), 500
+    finally:
+        if session:
+            session.close()
+
+
+@inventory_analytics_bp.route("/api/inventory/configuration_status", methods=["GET"])
+@handle_api_error
+def get_configuration_status():
+    """Get inventory configuration utilization status and validation"""
+    try:
+        # Validate configuration
+        validation_results = inventory_config.validate_configuration()
+        
+        # Get current configuration values
+        current_configs = {
+            "alert_thresholds": inventory_config.get_alert_thresholds(),
+            "business_rules": inventory_config.get_business_rules(),
+            "dashboard_settings": inventory_config.get_dashboard_settings()
+        }
+        
+        # Example usage of configurations
+        usage_examples = {
+            "stale_item_check": {
+                "description": "Using database-configured stale item thresholds",
+                "default_days": current_configs["alert_thresholds"]["stale_item_days"]["default"],
+                "resale_days": current_configs["alert_thresholds"]["stale_item_days"]["resale"],
+                "pack_days": current_configs["alert_thresholds"]["stale_item_days"]["pack"]
+            },
+            "usage_thresholds": {
+                "description": "Using database-configured usage thresholds",
+                "high_usage": current_configs["alert_thresholds"]["high_usage_threshold"],
+                "low_usage": current_configs["alert_thresholds"]["low_usage_threshold"]
+            },
+            "status_categorization": {
+                "description": "Using database-configured business rules",
+                "rental_statuses": current_configs["business_rules"]["rental_statuses"],
+                "available_statuses": current_configs["business_rules"]["available_statuses"],
+                "service_statuses": current_configs["business_rules"]["service_statuses"]
+            },
+            "dashboard_defaults": {
+                "description": "Using database-configured dashboard settings",
+                "default_date_range": current_configs["dashboard_settings"]["default_date_range"],
+                "refresh_interval": current_configs["dashboard_settings"]["refresh_interval_minutes"]
+            }
+        }
+        
+        # Check utilization in sample business logic
+        utilization_test = {
+            "stale_item_test": inventory_config.is_stale_item(
+                datetime.now() - timedelta(days=400), "default"
+            ),
+            "high_usage_test": inventory_config.is_high_usage_item(0.9),
+            "low_usage_test": inventory_config.is_low_usage_item(0.1),
+            "rental_status_test": inventory_config.is_rental_status("On Rent"),
+            "service_status_test": inventory_config.is_service_status("Repair")
+        }
+        
+        result = {
+            "configuration_status": {
+                "database_utilization": "ACTIVE",
+                "validation": validation_results,
+                "last_checked": datetime.now().isoformat(),
+                "status": "SUCCESSFULLY_INTEGRATED" if validation_results["valid"] else "CONFIGURATION_ERRORS"
+            },
+            "current_configurations": current_configs,
+            "usage_examples": usage_examples,
+            "utilization_tests": utilization_test,
+            "integration_info": {
+                "service_class": "InventoryConfigService",
+                "cache_enabled": True,
+                "cache_timeout_seconds": 300,
+                "database_table": "inventory_config",
+                "total_config_keys": 3
+            }
+        }
+        
+        logger.info("Configuration status successfully retrieved and validated")
+        return jsonify(result)
+        
+    except Exception as e:
+        logger.error(f"Error getting configuration status: {str(e)}", exc_info=True)
+        return jsonify({"error": f"Failed to get configuration status: {str(e)}"}), 500
+
+
+@inventory_analytics_bp.route("/api/inventory/apply_configuration", methods=["GET"])
+@handle_api_error
+def apply_configuration_analysis():
+    """Demonstrate configuration-driven inventory analysis"""
+    session = None
+    try:
+        session = db.session()
+        
+        # Get date range from configuration
+        default_days = inventory_config.get_default_date_range()
+        cutoff_date = datetime.now() - timedelta(days=default_days)
+        
+        # Apply configuration-driven business logic
+        items_query = session.query(ItemMaster).filter(
+            ItemMaster.date_last_scanned.isnot(None)
+        )
+        
+        # Categorize items using database configurations
+        analysis_results = {
+            "stale_items": {"default": 0, "resale": 0, "pack": 0},
+            "status_categories": {
+                "rental": 0,
+                "available": 0, 
+                "service_needed": 0
+            },
+            "usage_categories": {
+                "high_usage": 0,
+                "low_usage": 0,
+                "normal_usage": 0
+            },
+            "configuration_applied": {
+                "date_range_days": default_days,
+                "cutoff_date": cutoff_date.isoformat(),
+                "thresholds_used": inventory_config.get_alert_thresholds(),
+                "business_rules_used": inventory_config.get_business_rules()
+            }
+        }
+        
+        # Process items with configuration-driven logic
+        for item in items_query.limit(1000):  # Limit for performance
+            # Check stale status using database config
+            if item.date_last_scanned:
+                # Use common_name or rental class to determine category for now
+                category = "resale" if item.common_name and "resale" in item.common_name.lower() else "default"
+                if inventory_config.is_pack_location(item.bin_location or ""):
+                    category = "pack"
+                    
+                if inventory_config.is_stale_item(item.date_last_scanned, category):
+                    analysis_results["stale_items"][category] += 1
+            
+            # Categorize by status using database config
+            if item.status:
+                if inventory_config.is_rental_status(item.status):
+                    analysis_results["status_categories"]["rental"] += 1
+                elif inventory_config.is_available_status(item.status):
+                    analysis_results["status_categories"]["available"] += 1
+                elif inventory_config.is_service_status(item.status):
+                    analysis_results["status_categories"]["service_needed"] += 1
+        
+        result = {
+            "configuration_driven_analysis": analysis_results,
+            "success": True,
+            "message": "Analysis completed using database-stored configuration values",
+            "generated_at": datetime.now().isoformat()
+        }
+        
+        logger.info("Configuration-driven analysis completed successfully")
+        return jsonify(result)
+        
+    except Exception as e:
+        logger.error(f"Error in configuration-driven analysis: {str(e)}", exc_info=True)
+        return jsonify({"error": f"Configuration analysis failed: {str(e)}"}), 500
     finally:
         if session:
             session.close()

@@ -1,0 +1,938 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KVC Companies - Executive Dashboard</title>
+    
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        :root {
+            --executive-primary: #1e3a8a;
+            --executive-secondary: #3b82f6;
+            --executive-success: #10b981;
+            --executive-warning: #f59e0b;
+            --executive-danger: #ef4444;
+            --executive-gray: #6b7280;
+            --executive-light: #f8fafc;
+        }
+
+        body {
+            background-color: var(--executive-light);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        .executive-header {
+            background: linear-gradient(135deg, var(--executive-primary) 0%, var(--executive-secondary) 100%);
+            color: white;
+            padding: 2rem 0;
+            margin-bottom: 2rem;
+        }
+
+        .kpi-card {
+            background: white;
+            border: none;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s ease-in-out;
+            height: 160px;
+        }
+
+        .kpi-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+
+        .kpi-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            line-height: 1;
+            margin-bottom: 0.5rem;
+        }
+
+        .kpi-label {
+            font-size: 0.875rem;
+            color: var(--executive-gray);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 0.5rem;
+        }
+
+        .kpi-trend {
+            font-size: 0.875rem;
+            font-weight: 600;
+        }
+
+        .trend-up { color: var(--executive-success); }
+        .trend-down { color: var(--executive-danger); }
+        .trend-neutral { color: var(--executive-gray); }
+
+        .insight-card {
+            background: white;
+            border-left: 4px solid var(--executive-secondary);
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            margin-bottom: 1rem;
+            transition: all 0.2s ease;
+        }
+
+        .insight-card:hover {
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+        }
+
+        .insight-critical {
+            border-left-color: var(--executive-danger);
+        }
+
+        .insight-warning {
+            border-left-color: var(--executive-warning);
+        }
+
+        .insight-info {
+            border-left-color: var(--executive-secondary);
+        }
+
+        .chart-container {
+            position: relative;
+            height: 300px;
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .store-performance-card {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            margin-bottom: 1rem;
+        }
+
+        .store-rank {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            font-weight: 700;
+            font-size: 0.875rem;
+            color: white;
+        }
+
+        .rank-1 { background-color: var(--executive-success); }
+        .rank-2 { background-color: var(--executive-secondary); }
+        .rank-3 { background-color: var(--executive-warning); }
+        .rank-4 { background-color: var(--executive-gray); }
+
+        .custom-insight-form {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .alert-banner {
+            border: none;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+        }
+
+        .refresh-indicator {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+        }
+
+        .loading-spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid var(--executive-secondary);
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .section-header {
+            border-bottom: 2px solid var(--executive-light);
+            padding-bottom: 0.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .metric-badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .badge-excellent { background-color: var(--executive-success); color: white; }
+        .badge-good { background-color: var(--executive-secondary); color: white; }
+        .badge-fair { background-color: var(--executive-warning); color: white; }
+        .badge-poor { background-color: var(--executive-danger); color: white; }
+
+        @media (max-width: 768px) {
+            .executive-header {
+                padding: 1rem 0;
+            }
+            
+            .kpi-value {
+                font-size: 2rem;
+            }
+            
+            .chart-container {
+                height: 250px;
+                padding: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Refresh Indicator -->
+    <div id="refreshIndicator" class="refresh-indicator" style="display: none;">
+        <div class="alert alert-info d-flex align-items-center">
+            <div class="loading-spinner me-2"></div>
+            Updating dashboard...
+        </div>
+    </div>
+
+    <!-- Executive Header -->
+    <div class="executive-header">
+        <div class="container-fluid">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <h1 class="mb-2">
+                        <i class="fas fa-chart-line me-3"></i>
+                        KVC Companies Executive Dashboard
+                    </h1>
+                    <p class="mb-0 opacity-75">
+                        Real-time insights for A1 Rent It & Broadway Tent & Event
+                    </p>
+                </div>
+                <div class="col-md-4 text-end">
+                    <div class="d-flex justify-content-end align-items-center">
+                        <small class="me-3">
+                            Last Updated: <span id="lastUpdated">--:-- --</span>
+                        </small>
+                        <button class="btn btn-light btn-sm" onclick="refreshDashboard()">
+                            <i class="fas fa-sync-alt"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container-fluid">
+        <!-- Financial Alerts -->
+        <div id="alertsSection" class="row mb-4">
+            <!-- Alerts will be loaded here -->
+        </div>
+
+        <!-- Executive KPIs -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <h3 class="section-header">Key Performance Indicators</h3>
+            </div>
+            <div class="col-lg-3 col-md-6 mb-3">
+                <div class="card kpi-card">
+                    <div class="card-body d-flex flex-column justify-content-center">
+                        <div class="kpi-label">Total Revenue (3-Week Avg)</div>
+                        <div class="kpi-value text-primary" id="revenueKPI">$0</div>
+                        <div class="kpi-trend" id="revenueTrend">
+                            <i class="fas fa-arrow-up"></i> Loading...
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-3 col-md-6 mb-3">
+                <div class="card kpi-card">
+                    <div class="card-body d-flex flex-column justify-content-center">
+                        <div class="kpi-label">YoY Growth</div>
+                        <div class="kpi-value text-success" id="growthKPI">0%</div>
+                        <div class="kpi-trend" id="growthTrend">
+                            <i class="fas fa-chart-line"></i> Loading...
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-3 col-md-6 mb-3">
+                <div class="card kpi-card">
+                    <div class="card-body d-flex flex-column justify-content-center">
+                        <div class="kpi-label">Equipment Utilization</div>
+                        <div class="kpi-value text-warning" id="utilizationKPI">0%</div>
+                        <div class="kpi-trend" id="utilizationTrend">
+                            <i class="fas fa-tools"></i> Loading...
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-3 col-md-6 mb-3">
+                <div class="card kpi-card">
+                    <div class="card-body d-flex flex-column justify-content-center">
+                        <div class="kpi-label">Business Health</div>
+                        <div class="kpi-value text-info" id="healthKPI">0</div>
+                        <div class="kpi-trend" id="healthTrend">
+                            <i class="fas fa-heartbeat"></i> Loading...
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <!-- Revenue Trend Chart -->
+            <div class="col-lg-8 mb-4">
+                <div class="chart-container">
+                    <h5 class="mb-3">Revenue Trend Analysis</h5>
+                    <canvas id="revenueTrendChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Store Performance -->
+            <div class="col-lg-4 mb-4">
+                <div class="card h-100">
+                    <div class="card-header">
+                        <h5 class="mb-0">Store Performance Rankings</h5>
+                    </div>
+                    <div class="card-body" id="storePerformanceSection">
+                        <div class="text-center py-4">
+                            <div class="loading-spinner mx-auto mb-2"></div>
+                            <small class="text-muted">Loading store data...</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <!-- Financial Forecasts -->
+            <div class="col-lg-6 mb-4">
+                <div class="chart-container">
+                    <h5 class="mb-3">12-Week Revenue Forecast</h5>
+                    <canvas id="forecastChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Intelligent Insights -->
+            <div class="col-lg-6 mb-4">
+                <div class="card h-100">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">Intelligent Insights</h5>
+                        <button class="btn btn-outline-primary btn-sm" onclick="showCustomInsightForm()">
+                            <i class="fas fa-plus"></i> Add Insight
+                        </button>
+                    </div>
+                    <div class="card-body" id="insightsSection">
+                        <div class="text-center py-4">
+                            <div class="loading-spinner mx-auto mb-2"></div>
+                            <small class="text-muted">Analyzing business patterns...</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Store Comparison Chart -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="chart-container">
+                    <h5 class="mb-3">Multi-Store Revenue Comparison</h5>
+                    <canvas id="storeComparisonChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Custom Insight Modal -->
+    <div class="modal fade" id="customInsightModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Add Custom Business Insight</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="customInsightForm">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="insightDate" class="form-label">Date</label>
+                                <input type="date" class="form-control" id="insightDate" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="eventType" class="form-label">Event Type</label>
+                                <select class="form-select" id="eventType" required>
+                                    <option value="">Select event type</option>
+                                    <option value="weather">Weather Event</option>
+                                    <option value="local_event">Local Event</option>
+                                    <option value="economic">Economic Factor</option>
+                                    <option value="operational">Operational Change</option>
+                                    <option value="marketing">Marketing Campaign</option>
+                                    <option value="other">Other</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="description" class="form-label">Description</label>
+                            <textarea class="form-control" id="description" rows="3" placeholder="Describe what happened..." required></textarea>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="impactCategory" class="form-label">Impact Category</label>
+                                <select class="form-select" id="impactCategory" required>
+                                    <option value="">Select impact category</option>
+                                    <option value="revenue">Revenue</option>
+                                    <option value="contracts">Contracts</option>
+                                    <option value="utilization">Equipment Utilization</option>
+                                    <option value="profitability">Profitability</option>
+                                    <option value="customer_satisfaction">Customer Satisfaction</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="impactMagnitude" class="form-label">Impact Magnitude (0-1)</label>
+                                <input type="range" class="form-range" id="impactMagnitude" min="0" max="1" step="0.1" value="0.5">
+                                <div class="d-flex justify-content-between">
+                                    <small>Low</small>
+                                    <small>High</small>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="userNotes" class="form-label">Additional Notes (Optional)</label>
+                            <textarea class="form-control" id="userNotes" rows="2" placeholder="Any additional context or observations..."></textarea>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="submitCustomInsight()">Add Insight</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap 5 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        // Global variables
+        let revenueTrendChart, forecastChart, storeComparisonChart;
+        let dashboardData = {};
+
+        // Initialize dashboard
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeDashboard();
+            
+            // Auto-refresh every 5 minutes
+            setInterval(refreshDashboard, 300000);
+        });
+
+        async function initializeDashboard() {
+            showRefreshIndicator(true);
+            
+            try {
+                // Load all dashboard data
+                await Promise.all([
+                    loadFinancialKPIs(),
+                    loadIntelligentInsights(),
+                    loadStorePerformance(),
+                    loadFinancialForecasts(),
+                    loadFinancialAlerts()
+                ]);
+                
+                // Initialize charts
+                initializeCharts();
+                
+            } catch (error) {
+                console.error('Error initializing dashboard:', error);
+                showErrorMessage('Failed to load dashboard data. Please try refreshing the page.');
+            } finally {
+                showRefreshIndicator(false);
+                updateLastUpdatedTime();
+            }
+        }
+
+        async function loadFinancialKPIs() {
+            try {
+                const response = await fetch('/executive/api/financial-kpis');
+                const data = await response.json();
+                
+                if (data.success) {
+                    dashboardData.kpis = data;
+                    updateKPIDisplays(data);
+                }
+            } catch (error) {
+                console.error('Error loading financial KPIs:', error);
+            }
+        }
+
+        async function loadIntelligentInsights() {
+            try {
+                const response = await fetch('/executive/api/intelligent-insights');
+                const data = await response.json();
+                
+                if (data.success) {
+                    dashboardData.insights = data;
+                    updateInsightsDisplay(data);
+                }
+            } catch (error) {
+                console.error('Error loading intelligent insights:', error);
+            }
+        }
+
+        async function loadStorePerformance() {
+            try {
+                const response = await fetch('/executive/api/store-comparison');
+                const data = await response.json();
+                
+                if (data.success) {
+                    dashboardData.stores = data;
+                    updateStorePerformanceDisplay(data);
+                }
+            } catch (error) {
+                console.error('Error loading store performance:', error);
+            }
+        }
+
+        async function loadFinancialForecasts() {
+            try {
+                const response = await fetch('/executive/api/financial-forecasts');
+                const data = await response.json();
+                
+                if (data.success) {
+                    dashboardData.forecasts = data;
+                }
+            } catch (error) {
+                console.error('Error loading financial forecasts:', error);
+            }
+        }
+
+        async function loadFinancialAlerts() {
+            try {
+                // This would load from the alerts API endpoint
+                const alerts = [
+                    {
+                        type: 'warning',
+                        title: 'Revenue Trend Alert',
+                        message: 'Brooklyn Park location showing 3-week declining trend',
+                        action: 'Review operational efficiency metrics'
+                    }
+                ];
+                
+                updateAlertsDisplay(alerts);
+            } catch (error) {
+                console.error('Error loading financial alerts:', error);
+            }
+        }
+
+        function updateKPIDisplays(data) {
+            const revenue = data.revenue_metrics?.current_3wk_avg || 0;
+            const growth = data.revenue_metrics?.yoy_growth || 0;
+            const utilization = data.store_metrics?.utilization_avg || 0;
+            const health = data.operational_health?.health_score || 0;
+
+            document.getElementById('revenueKPI').textContent = formatCurrency(revenue);
+            document.getElementById('growthKPI').textContent = formatPercentage(growth);
+            document.getElementById('utilizationKPI').textContent = formatPercentage(utilization);
+            document.getElementById('healthKPI').textContent = Math.round(health);
+
+            // Update trend indicators
+            updateTrendIndicator('revenueTrend', data.revenue_metrics?.growth_trend || 0, 'Revenue trend');
+            updateTrendIndicator('growthTrend', growth, 'YoY performance');
+            updateTrendIndicator('utilizationTrend', utilization, 'Equipment efficiency');
+            updateTrendIndicator('healthTrend', health, 'Business health score');
+        }
+
+        function updateTrendIndicator(elementId, value, label) {
+            const element = document.getElementById(elementId);
+            const isPositive = value > 0;
+            const isNeutral = Math.abs(value) < 0.5;
+
+            element.className = `kpi-trend ${isNeutral ? 'trend-neutral' : isPositive ? 'trend-up' : 'trend-down'}`;
+            
+            const icon = isNeutral ? 'fa-minus' : isPositive ? 'fa-arrow-up' : 'fa-arrow-down';
+            element.innerHTML = `<i class="fas ${icon}"></i> ${label}`;
+        }
+
+        function updateInsightsDisplay(data) {
+            const insightsSection = document.getElementById('insightsSection');
+            
+            if (!data.actionable_insights?.length) {
+                insightsSection.innerHTML = `
+                    <div class="text-center py-4 text-muted">
+                        <i class="fas fa-lightbulb fa-2x mb-3"></i>
+                        <p>No new insights detected. Business metrics are within normal ranges.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            let insightsHtml = '';
+            data.actionable_insights.forEach(insight => {
+                const severityClass = insight.severity === 'high' ? 'insight-critical' : 
+                                    insight.severity === 'medium' ? 'insight-warning' : 'insight-info';
+                
+                insightsHtml += `
+                    <div class="insight-card ${severityClass} p-3 mb-2">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <h6 class="mb-0">${insight.title || 'Business Insight'}</h6>
+                            <span class="metric-badge badge-${insight.severity === 'high' ? 'poor' : insight.severity === 'medium' ? 'fair' : 'good'}">
+                                ${insight.severity}
+                            </span>
+                        </div>
+                        <p class="mb-1 small">${insight.description}</p>
+                        ${insight.recommendation ? `<small class="text-muted"><strong>Action:</strong> ${insight.recommendation}</small>` : ''}
+                    </div>
+                `;
+            });
+
+            insightsSection.innerHTML = insightsHtml;
+        }
+
+        function updateStorePerformanceDisplay(data) {
+            const storeSection = document.getElementById('storePerformanceSection');
+            
+            if (!data.stores?.length) {
+                storeSection.innerHTML = '<div class="text-center text-muted">No store data available</div>';
+                return;
+            }
+
+            let storeHtml = '';
+            data.stores.forEach((store, index) => {
+                const rank = index + 1;
+                const rankClass = `rank-${Math.min(rank, 4)}`;
+                
+                storeHtml += `
+                    <div class="store-performance-card mb-3">
+                        <div class="d-flex align-items-center mb-2">
+                            <div class="store-rank ${rankClass} me-3">${rank}</div>
+                            <div>
+                                <h6 class="mb-0">${store.name}</h6>
+                                <small class="text-muted">${store.store_code}</small>
+                            </div>
+                        </div>
+                        <div class="row text-center">
+                            <div class="col-4">
+                                <div class="small text-muted">Revenue</div>
+                                <div class="fw-bold">${formatCurrency(store.revenue?.total || 0, true)}</div>
+                            </div>
+                            <div class="col-4">
+                                <div class="small text-muted">Margin</div>
+                                <div class="fw-bold">${formatPercentage(store.profitability?.margin_pct || 0)}</div>
+                            </div>
+                            <div class="col-4">
+                                <div class="small text-muted">Efficiency</div>
+                                <div class="fw-bold">$${Math.round(store.efficiency?.revenue_per_hour || 0)}/hr</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            storeSection.innerHTML = storeHtml;
+        }
+
+        function updateAlertsDisplay(alerts) {
+            const alertsSection = document.getElementById('alertsSection');
+            
+            if (!alerts?.length) {
+                alertsSection.innerHTML = '';
+                return;
+            }
+
+            let alertsHtml = '<div class="col-12">';
+            alerts.forEach(alert => {
+                alertsHtml += `
+                    <div class="alert alert-${alert.type} alert-banner d-flex align-items-center" role="alert">
+                        <i class="fas fa-exclamation-triangle me-3"></i>
+                        <div class="flex-grow-1">
+                            <strong>${alert.title}</strong>
+                            <div>${alert.message}</div>
+                            ${alert.action ? `<small class="d-block mt-1"><strong>Recommended Action:</strong> ${alert.action}</small>` : ''}
+                        </div>
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                `;
+            });
+            alertsHtml += '</div>';
+
+            alertsSection.innerHTML = alertsHtml;
+        }
+
+        function initializeCharts() {
+            // Revenue Trend Chart
+            const revenueTrendCtx = document.getElementById('revenueTrendChart').getContext('2d');
+            revenueTrendChart = new Chart(revenueTrendCtx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Weekly Revenue',
+                        data: [],
+                        borderColor: 'rgb(59, 130, 246)',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            ticks: {
+                                callback: function(value) {
+                                    return formatCurrency(value, true);
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Forecast Chart
+            const forecastCtx = document.getElementById('forecastChart').getContext('2d');
+            forecastChart = new Chart(forecastCtx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [
+                        {
+                            label: 'Forecast',
+                            data: [],
+                            borderColor: 'rgb(16, 185, 129)',
+                            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                            tension: 0.4,
+                            borderDash: [5, 5]
+                        },
+                        {
+                            label: 'Confidence Range',
+                            data: [],
+                            borderColor: 'rgba(16, 185, 129, 0.3)',
+                            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                            fill: '+1'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                        }
+                    },
+                    scales: {
+                        y: {
+                            ticks: {
+                                callback: function(value) {
+                                    return formatCurrency(value, true);
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Store Comparison Chart
+            const storeComparisonCtx = document.getElementById('storeComparisonChart').getContext('2d');
+            storeComparisonChart = new Chart(storeComparisonCtx, {
+                type: 'bar',
+                data: {
+                    labels: ['Wayzata', 'Brooklyn Park', 'Fridley', 'Elk River'],
+                    datasets: [
+                        {
+                            label: 'Revenue',
+                            data: [],
+                            backgroundColor: 'rgba(59, 130, 246, 0.8)'
+                        },
+                        {
+                            label: 'Profit Margin %',
+                            data: [],
+                            backgroundColor: 'rgba(16, 185, 129, 0.8)',
+                            yAxisID: 'y1'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                        }
+                    },
+                    scales: {
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            ticks: {
+                                callback: function(value) {
+                                    return formatCurrency(value, true);
+                                }
+                            }
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            grid: {
+                                drawOnChartArea: false,
+                            },
+                            ticks: {
+                                callback: function(value) {
+                                    return value + '%';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Update charts with data
+            updateChartsWithData();
+        }
+
+        function updateChartsWithData() {
+            // Update charts with available data
+            if (dashboardData.stores?.stores) {
+                const stores = dashboardData.stores.stores;
+                const revenueData = stores.map(s => s.revenue?.total || 0);
+                const marginData = stores.map(s => s.profitability?.margin_pct || 0);
+                
+                storeComparisonChart.data.datasets[0].data = revenueData;
+                storeComparisonChart.data.datasets[1].data = marginData;
+                storeComparisonChart.update();
+            }
+        }
+
+        async function refreshDashboard() {
+            await initializeDashboard();
+        }
+
+        function showCustomInsightForm() {
+            // Set default date to today
+            document.getElementById('insightDate').value = new Date().toISOString().split('T')[0];
+            
+            const modal = new bootstrap.Modal(document.getElementById('customInsightModal'));
+            modal.show();
+        }
+
+        async function submitCustomInsight() {
+            const form = document.getElementById('customInsightForm');
+            
+            if (!form.checkValidity()) {
+                form.reportValidity();
+                return;
+            }
+
+            const formData = {
+                date: document.getElementById('insightDate').value,
+                event_type: document.getElementById('eventType').value,
+                description: document.getElementById('description').value,
+                impact_category: document.getElementById('impactCategory').value,
+                impact_magnitude: document.getElementById('impactMagnitude').value,
+                user_notes: document.getElementById('userNotes').value
+            };
+
+            try {
+                const response = await fetch('/executive/api/custom-insight', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(formData)
+                });
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    // Close modal and refresh insights
+                    bootstrap.Modal.getInstance(document.getElementById('customInsightModal')).hide();
+                    form.reset();
+                    
+                    // Show success message
+                    showSuccessMessage('Custom insight added successfully!');
+                    
+                    // Refresh insights section
+                    await loadIntelligentInsights();
+                } else {
+                    showErrorMessage(result.error || 'Failed to add custom insight');
+                }
+                
+            } catch (error) {
+                console.error('Error submitting custom insight:', error);
+                showErrorMessage('Failed to add custom insight');
+            }
+        }
+
+        // Utility functions
+        function formatCurrency(value, abbreviated = false) {
+            if (!value || isNaN(value)) return '$0';
+            
+            if (abbreviated && value >= 1000000) {
+                return '$' + (value / 1000000).toFixed(1) + 'M';
+            } else if (abbreviated && value >= 1000) {
+                return '$' + (value / 1000).toFixed(1) + 'K';
+            }
+            
+            return new Intl.NumberFormat('en-US', {
+                style: 'currency',
+                currency: 'USD'
+            }).format(value);
+        }
+
+        function formatPercentage(value) {
+            if (!value || isNaN(value)) return '0%';
+            return value.toFixed(1) + '%';
+        }
+
+        function showRefreshIndicator(show) {
+            document.getElementById('refreshIndicator').style.display = show ? 'block' : 'none';
+        }
+
+        function updateLastUpdatedTime() {
+            document.getElementById('lastUpdated').textContent = new Date().toLocaleTimeString();
+        }
+
+        function showSuccessMessage(message) {
+            // Implementation would show a toast or alert
+            console.log('Success:', message);
+        }
+
+        function showErrorMessage(message) {
+            // Implementation would show a toast or alert
+            console.error('Error:', message);
+        }
+    </script>
+</body>
+</html>

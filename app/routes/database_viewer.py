@@ -14,7 +14,8 @@ from ..models.db_models import (
     RentalClassMapping, HandCountedItems, RefreshState, InventoryConfig
 )
 from ..models.pos_models import POSEquipment, POSTransaction, POSRFIDCorrelation
-from ..models.financial_models import PLData, PayrollTrendsData, ScorecardTrendsData
+from ..models.financial_models import PayrollTrendsData, ScorecardTrendsData
+from ..models.db_models import PLData
 # Removed unused import: from ..utils.filters import apply_global_filters
 
 # Configure logging

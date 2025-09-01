@@ -62,7 +62,8 @@ def init_scheduler(app):
     csv_import_lock_timeout = 1800  # 30 minutes for CSV import
     lock_key = "full_refresh_lock"
     incremental_lock_key = "incremental_refresh_lock"
-    lock_timeout = 300
+    lock_timeout = 300  # 5 minutes for incremental refresh
+    full_refresh_lock_timeout = 1800  # 30 minutes for full refresh
 
     def retry_database_connection():
         max_retries = 5
@@ -148,7 +149,7 @@ def init_scheduler(app):
                 return
             if retry_database_connection():
                 try:
-                    with acquire_lock(redis_client, lock_key, lock_timeout):
+                    with acquire_lock(redis_client, lock_key, full_refresh_lock_timeout):
                         logger.debug(
                             "Starting scheduled full refresh (item master, transactions, seed data)"
                         )

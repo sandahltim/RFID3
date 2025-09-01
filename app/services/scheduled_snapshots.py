@@ -38,13 +38,11 @@ class ScheduledSnapshotService:
         }
 
         try:
-            session = db.session()
-
-            # Find all contracts that have had activity in the last week
+            # Use Flask-SQLAlchemy session instead of manual session creation
             cutoff_date = datetime.now(timezone.utc) - timedelta(days=max_days_back)
 
             active_contracts = (
-                session.query(
+                db.session.query(
                     distinct(Transaction.contract_number), Transaction.client_name
                 )
                 .filter(
@@ -130,14 +128,12 @@ class ScheduledSnapshotService:
             return results
 
         except Exception as e:
+            db.session.rollback()
             logger.error(
                 f"Error in weekly snapshot automation: {str(e)}", exc_info=True
             )
             results["errors"].append(f"System error: {str(e)}")
             return results
-        finally:
-            if session:
-                session.close()
 
     @staticmethod
     def cleanup_old_periodic_snapshots(days_to_keep=30):

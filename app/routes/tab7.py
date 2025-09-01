@@ -2,7 +2,7 @@
 # Executive Dashboard - Version: 2025-08-27-v1
 from flask import Blueprint, render_template, request, jsonify, current_app
 from .. import db
-from ..models.db_models import PayrollTrends, ScorecardTrends, ExecutiveKPI, ItemMaster
+from ..models.db_models import PayrollTrends, ScorecardTrends, ExecutiveKPI, ItemMaster, POSScorecardTrends, PLData
 from ..services.logger import get_logger
 from sqlalchemy import func, desc, and_, or_, text, case
 from sqlalchemy.exc import SQLAlchemyError
@@ -24,6 +24,130 @@ logger.info(
 
 # Import centralized store configuration
 from ..config.stores import STORE_MAPPING, get_store_name
+from sqlalchemy import text
+
+
+def get_pl_profit_margin(session, year, month=None, fallback_revenue=None, fallback_payroll=None):
+    """
+    Get profit margin from P&L data if available, otherwise fallback to simple calculation.
+    
+    Args:
+        session: Database session
+        year: Year to get data for
+        month: Month to get data for (optional, if None gets YTD)
+        fallback_revenue: Revenue to use if P&L data not available
+        fallback_payroll: Payroll to use if P&L data not available
+    
+    Returns:
+        float: Profit margin percentage
+    """
+    try:
+        # Try to get profit margin from P&L data first
+        if month:
+            pl_margin = PLData.get_profit_margin(session, year, month)
+        else:
+            # Get YTD margin (all months from Jan to current month)
+            current_month = datetime.now().month
+            pl_margin = PLData.get_profit_margin(session, year)
+            
+        if pl_margin is not None and pl_margin != 0:
+            return pl_margin
+            
+    except Exception as e:
+        logger.warning(f"Could not get P&L profit margin: {e}")
+    
+    # Fallback to simple revenue - payroll calculation
+    if fallback_revenue and fallback_payroll and fallback_revenue > 0:
+        return ((fallback_revenue - fallback_payroll) / fallback_revenue) * 100
+    
+    return 0
+
+
+def excel_weeknum(date_obj, return_type=11):
+    """
+    Python equivalent of Excel's WEEKNUM function with return_type=11
+    (Week starts Monday, numbered 1-53)
+    
+    Args:
+        date_obj: datetime.date or datetime.datetime object
+        return_type: Week numbering system (11 = Monday start, 1-53)
+    
+    Returns:
+        int: Week number (1-53)
+    """
+    if isinstance(date_obj, datetime):
+        date_obj = date_obj.date()
+    
+    year = date_obj.year
+    jan1 = date(year, 1, 1)
+    
+    # Find the Monday of the week containing January 1st
+    jan1_weekday = jan1.weekday()  # 0=Monday, 6=Sunday
+    
+    if return_type == 11:  # Week starts Monday
+        # Calculate days to go back to get the first Monday
+        if jan1_weekday == 0:  # Already Monday
+            week_start_adjustment = 0
+        else:
+            week_start_adjustment = -jan1_weekday
+    
+    first_monday_of_year = jan1 + timedelta(days=week_start_adjustment)
+    
+    # Calculate the number of days between the date and the first Monday
+    days_diff = (date_obj - first_monday_of_year).days
+    
+    # Calculate week number (1-based)
+    week_number = (days_diff // 7) + 1
+    
+    # Handle edge cases for previous/next year spillover
+    if week_number < 1:
+        # Date falls in the last week of the previous year - return as week 1
+        return 1
+    elif week_number > 52:
+        # For weeks beyond 52, check if we should extend to 53 or wrap to 1
+        # Most years have 52 weeks, some have 53
+        dec31 = date(year, 12, 31)
+        jan1_next = date(year + 1, 1, 1)
+        
+        # If Dec 31 is Mon-Wed, it belongs to next year's week 1
+        if dec31.weekday() <= 2:  # Mon=0, Tue=1, Wed=2
+            return 1  # This week belongs to next year
+        else:
+            return 53 if week_number == 53 else 52  # Valid week 53
+    
+    return week_number
+
+
+def get_week_ending_sunday(year, week_number):
+    """
+    Get the week ending Sunday date for a given week number and year
+    using Excel WEEKNUM logic.
+    
+    Args:
+        year: int - The year
+        week_number: int - Week number (1-53)
+    
+    Returns:
+        date: The Sunday ending date for that week
+    """
+    # Find first Monday of the year
+    jan1 = date(year, 1, 1)
+    jan1_weekday = jan1.weekday()
+    
+    if jan1_weekday == 0:  # Already Monday
+        week_start_adjustment = 0
+    else:
+        week_start_adjustment = -jan1_weekday
+    
+    first_monday_of_year = jan1 + timedelta(days=week_start_adjustment)
+    
+    # Calculate the Monday of the specified week
+    week_monday = first_monday_of_year + timedelta(weeks=week_number - 1)
+    
+    # Get the Sunday of that week (6 days later)
+    week_ending_sunday = week_monday + timedelta(days=6)
+    
+    return week_ending_sunday
 
 
 @tab7_bp.route("/tab/7")
@@ -89,20 +213,53 @@ def get_data_availability():
 
 @tab7_bp.route("/api/executive/dashboard_summary", methods=["GET"])
 def get_executive_summary():
-    """Get high-level executive metrics with store filtering."""
+    """Get high-level executive metrics with enhanced store filtering and period options."""
     session = None
     try:
         session = db.session()
         store_filter = request.args.get("store", "all")
-        period = request.args.get("period", "4weeks")  # 4weeks, 12weeks, 52weeks, ytd
+        period = request.args.get("period", "4weeks")  # Enhanced: current_week, previous_week, week_number, 12weeks, 52weeks, ytd
+        rolling_avg = request.args.get("rolling_avg", "none")
+        view_mode = request.args.get("view_mode", "current")
+        week_number = request.args.get("week_number")
 
         logger.info(
-            f"Fetching executive summary: store={store_filter}, period={period}"
+            f"Fetching executive summary: store={store_filter}, period={period}, rolling_avg={rolling_avg}, view_mode={view_mode}"
         )
 
-        start_date, end_date = get_date_range_from_params(request, session)
-        if not start_date or not end_date:
-            return jsonify({"error": "Invalid date range"}), 400
+        # Enhanced date range handling
+        if period == "week_number" and week_number:
+            # Use the enhanced week-based filtering
+            return get_enhanced_dashboard_summary()
+        elif period in ["current_week", "previous_week"]:
+            # Calculate dates using Excel WEEKNUM logic
+            today = datetime.now().date()
+            current_year = today.year
+            current_excel_week = excel_weeknum(today)
+            
+            if period == "current_week":
+                # Current week using Excel logic
+                week_ending_sunday = get_week_ending_sunday(current_year, current_excel_week)
+                start_date = week_ending_sunday - timedelta(days=6)  # Monday
+                end_date = week_ending_sunday  # Sunday
+            else:  # previous_week
+                # Previous week using Excel logic
+                prev_week_num = current_excel_week - 1
+                if prev_week_num < 1:
+                    # Handle year boundary - get last week of previous year
+                    prev_year = current_year - 1
+                    prev_week_num = excel_weeknum(date(prev_year, 12, 31))
+                    week_ending_sunday = get_week_ending_sunday(prev_year, prev_week_num)
+                else:
+                    week_ending_sunday = get_week_ending_sunday(current_year, prev_week_num)
+                
+                start_date = week_ending_sunday - timedelta(days=6)  # Monday
+                end_date = week_ending_sunday  # Sunday
+        else:
+            # Use existing date range logic
+            start_date, end_date = get_date_range_from_params(request, session)
+            if not start_date or not end_date:
+                return jsonify({"error": "Invalid date range"}), 400
 
         # Build base query for payroll trends
         payroll_query = session.query(
@@ -119,36 +276,67 @@ def get_executive_summary():
 
         payroll_metrics = payroll_query.first()
 
-        # Get scorecard metrics
-        scorecard_query = session.query(
-            func.avg(ScorecardTrends.new_contracts_count).label("avg_new_contracts"),
-            func.sum(ScorecardTrends.new_contracts_count).label("total_new_contracts"),
-            func.avg(ScorecardTrends.deliveries_scheduled_next_7_days).label(
-                "avg_deliveries"
-            ),
-            func.avg(ScorecardTrends.ar_over_45_days_percent).label("avg_ar_aging"),
-            func.sum(ScorecardTrends.total_discount_amount).label("total_discounts"),
-        ).filter(ScorecardTrends.week_ending.between(start_date, end_date))
-
+        # Get metrics using standardized store_code columns from pos_transaction_items
         if store_filter != "all":
-            scorecard_query = scorecard_query.filter(
-                ScorecardTrends.store_id == store_filter
-            )
+            store_condition = "AND pti.store_code = :store_filter"
+            store_params = {'start_date': start_date, 'end_date': end_date, 'store_filter': store_filter}
+        else:
+            store_condition = "AND pti.store_code != '000'"
+            store_params = {'start_date': start_date, 'end_date': end_date}
+            
+        pos_scorecard_sql = text(f"""
+            SELECT 
+                COUNT(DISTINCT pti.contract_no) as total_new_contracts,
+                AVG(COUNT(DISTINCT pti.contract_no)) OVER() as avg_new_contracts,
+                SUM(CAST(pti.price * pti.qty AS DECIMAL(12,2))) as total_revenue,
+                COUNT(DISTINCT pti.item_num) as product_diversity,
+                COUNT(DISTINCT pt.customer_no) as unique_customers
+            FROM pos_transaction_items pti
+            JOIN pos_transactions pt ON pti.contract_no = pt.contract_no
+            WHERE pti.import_date BETWEEN :start_date AND :end_date
+                {store_condition}
+        """)
+        
+        pos_scorecard_result = session.execute(pos_scorecard_sql, store_params).first()
 
-        scorecard_metrics = scorecard_query.first()
+        # Store filtering for POS scorecard is done by checking individual store contract columns
+        # No need for store_filter since we're aggregating all stores' contracts
+        
+        # For compatibility, create scorecard_metrics with the expected structure
+        class ScorecardMetricsCompat:
+            def __init__(self, pos_result):
+                self.avg_new_contracts = float(pos_result.avg_new_contracts) if pos_result and pos_result.avg_new_contracts else 0
+                self.total_new_contracts = float(pos_result.total_new_contracts) if pos_result and pos_result.total_new_contracts else 0
+                self.avg_deliveries = float(pos_result.product_diversity) if pos_result and pos_result.product_diversity else 0  # Using product_diversity as proxy
+                self.product_diversity = float(pos_result.product_diversity) if pos_result and pos_result.product_diversity else 0
+                self.unique_customers = float(pos_result.unique_customers) if pos_result and pos_result.unique_customers else 0
+                self.total_revenue = float(pos_result.total_revenue) if pos_result and pos_result.total_revenue else 0
+                self.avg_ar_aging = None  # Calculate from customer data if needed
+                self.total_discounts = None  # Calculate from transaction data if needed
+        
+        scorecard_metrics = ScorecardMetricsCompat(pos_scorecard_result)
 
         # Calculate YoY growth if we have data from last year
         last_year_start = start_date.replace(year=start_date.year - 1)
         last_year_end = end_date.replace(year=end_date.year - 1)
 
-        last_year_revenue = (
-            session.query(func.sum(PayrollTrends.total_revenue))
-            .filter(PayrollTrends.week_ending.between(last_year_start, last_year_end))
-            .scalar()
-            or 0
-        )
-
-        current_revenue = float(payroll_metrics.total_revenue or 0)
+        # Get last year revenue from scorecard trends
+        last_year_scorecard_sql = text("""
+            SELECT SUM(COALESCE(col_3607_revenue, 0) + 
+                      COALESCE(col_6800_revenue, 0) + 
+                      COALESCE(col_728_revenue, 0) + 
+                      COALESCE(col_8101_revenue, 0)) as total_revenue
+            FROM pos_scorecard_trends 
+            WHERE week_ending_sunday BETWEEN :start_date AND :end_date
+        """)
+        
+        last_year_result = session.execute(last_year_scorecard_sql, {
+            'start_date': last_year_start, 
+            'end_date': last_year_end
+        }).first()
+        
+        last_year_revenue = float(last_year_result.total_revenue) if last_year_result and last_year_result.total_revenue else 0
+        current_revenue = float(scorecard_metrics.total_revenue or 0)
         yoy_growth = (
             (
                 (current_revenue - float(last_year_revenue))
@@ -177,7 +365,7 @@ def get_executive_summary():
 
         summary = {
             "financial_metrics": {
-                "total_revenue": float(payroll_metrics.total_revenue or 0),
+                "total_revenue": float(scorecard_metrics.total_revenue or 0),
                 "rental_revenue": float(payroll_metrics.rental_revenue or 0),
                 "total_payroll": float(payroll_metrics.total_payroll or 0),
                 "labor_efficiency": float(payroll_metrics.avg_labor_ratio or 0),
@@ -194,23 +382,22 @@ def get_executive_summary():
             "health_indicators": {
                 "ar_aging_percent": float(scorecard_metrics.avg_ar_aging or 0),
                 "total_discounts": float(scorecard_metrics.total_discounts or 0),
-                "profit_margin": (
-                    round(
-                        (
-                            float(current_revenue)
-                            - float(payroll_metrics.total_payroll or 0)
-                        )
-                        / float(current_revenue)
-                        * 100,
-                        2,
-                    )
-                    if current_revenue
-                    else 0
+                "profit_margin": round(
+                    get_pl_profit_margin(
+                        session, 
+                        datetime.now().year,
+                        fallback_revenue=float(current_revenue),
+                        fallback_payroll=float(payroll_metrics.total_payroll or 0)
+                    ),
+                    2
                 ),
             },
             "metadata": {
                 "store": store_filter,
                 "period": period,
+                "rolling_avg": rolling_avg,
+                "view_mode": view_mode,
+                "week_number": week_number,
                 "start_date": start_date.isoformat(),
                 "end_date": end_date.isoformat(),
                 "timestamp": datetime.now().isoformat(),
@@ -412,48 +599,68 @@ def get_store_comparison():
         session = db.session()
         period_weeks = int(request.args.get("weeks", 4))
         mode = request.args.get("mode", "aggregate")
+        store_filter = request.args.get("store", "all")
 
-        # Use actual latest data date instead of today - CONSISTENT FIX
-        latest_data_date = (
-            session.query(func.max(PayrollTrends.week_ending))
-            .filter(PayrollTrends.total_revenue > 0)
-            .scalar()
-        )
-
-        if not latest_data_date:
+        # Use actual latest data date from pos_transaction_items
+        latest_data_sql = text("""
+            SELECT MAX(DATE(import_date)) 
+            FROM pos_transaction_items 
+            WHERE store_code != '000'
+        """)
+        latest_data_result = session.execute(latest_data_sql).scalar()
+        
+        if latest_data_result:
+            latest_data_date = latest_data_result
+        else:
             latest_data_date = datetime.now().date()
 
         if mode == "weekly":
+            logger.info(f"Using latest data date: {latest_data_date}")
             current_week = latest_data_date
             previous_week = current_week - timedelta(weeks=1)
 
-            # Metrics for current week
-            current_metrics = (
-                session.query(
-                    PayrollTrends.store_id,
-                    func.sum(PayrollTrends.total_revenue).label("revenue"),
-                    func.sum(PayrollTrends.payroll_cost).label("payroll"),
-                    func.avg(PayrollTrends.labor_efficiency_ratio).label("efficiency"),
-                )
-                .filter(PayrollTrends.week_ending == current_week)
-                .group_by(PayrollTrends.store_id)
-                .all()
-            )
+            # Use standardized store_code from pos_transaction_items
+            if store_filter != "all":
+                store_condition = "AND pti.store_code = :store_filter"
+                current_params = {'current_week': current_week, 'store_filter': store_filter}
+                previous_params = {'previous_week': previous_week, 'store_filter': store_filter}
+            else:
+                store_condition = "AND pti.store_code != '000'"
+                current_params = {'current_week': current_week}
+                previous_params = {'previous_week': previous_week}
 
-            previous_metrics = (
-                session.query(
-                    PayrollTrends.store_id,
-                    func.sum(PayrollTrends.total_revenue).label("revenue"),
-                    func.sum(PayrollTrends.payroll_cost).label("payroll"),
-                    func.avg(PayrollTrends.labor_efficiency_ratio).label("efficiency"),
-                )
-                .filter(PayrollTrends.week_ending == previous_week)
-                .group_by(PayrollTrends.store_id)
-                .all()
-            )
+            # Current week metrics using standardized store_code
+            current_sql = text(f"""
+                SELECT 
+                    pti.store_code,
+                    SUM(CAST(pti.price * pti.qty AS DECIMAL(12,2))) as revenue,
+                    COUNT(DISTINCT pti.contract_no) as transaction_count,
+                    COUNT(DISTINCT pti.item_num) as product_diversity,
+                    AVG(CAST(pti.price * pti.qty AS DECIMAL(12,2))) as avg_transaction_value
+                FROM pos_transaction_items pti
+                WHERE DATE(pti.import_date) = :current_week
+                    {store_condition}
+                GROUP BY pti.store_code
+            """)
+            current_metrics = session.execute(current_sql, current_params).fetchall()
 
-            current_dict = {m.store_id: m for m in current_metrics}
-            previous_dict = {m.store_id: m for m in previous_metrics}
+            # Previous week metrics
+            previous_sql = text(f"""
+                SELECT 
+                    pti.store_code,
+                    SUM(CAST(pti.price * pti.qty AS DECIMAL(12,2))) as revenue,
+                    COUNT(DISTINCT pti.contract_no) as transaction_count,
+                    COUNT(DISTINCT pti.item_num) as product_diversity,
+                    AVG(CAST(pti.price * pti.qty AS DECIMAL(12,2))) as avg_transaction_value
+                FROM pos_transaction_items pti
+                WHERE DATE(pti.import_date) = :previous_week
+                    {store_condition}
+                GROUP BY pti.store_code
+            """)
+            previous_metrics = session.execute(previous_sql, previous_params).fetchall()
+
+            current_dict = {m.store_code: m for m in current_metrics}
+            previous_dict = {m.store_code: m for m in previous_metrics}
             all_store_ids = set(current_dict.keys()) | set(previous_dict.keys())
 
             comparison_data = []
@@ -463,13 +670,12 @@ def get_store_comparison():
 
                 curr_revenue = float(current.revenue or 0) if current else 0
                 prev_revenue = float(previous.revenue or 0) if previous else 0
-                curr_payroll = float(current.payroll or 0) if current else 0
-                prev_payroll = float(previous.payroll or 0) if previous else 0
-                curr_eff = float(current.efficiency or 0) if current else 0
-                prev_eff = float(previous.efficiency or 0) if previous else 0
-
-                curr_profit = curr_revenue - curr_payroll
-                prev_profit = prev_revenue - prev_payroll
+                curr_transactions = float(current.transaction_count or 0) if current else 0
+                prev_transactions = float(previous.transaction_count or 0) if previous else 0
+                curr_diversity = float(current.product_diversity or 0) if current else 0
+                prev_diversity = float(previous.product_diversity or 0) if previous else 0
+                curr_avg_value = float(current.avg_transaction_value or 0) if current else 0
+                prev_avg_value = float(previous.avg_transaction_value or 0) if previous else 0
 
                 def pct_change(curr, prev):
                     return ((curr - prev) / prev * 100) if prev else None
@@ -483,35 +689,76 @@ def get_store_comparison():
                         "change": curr_revenue - prev_revenue,
                         "pct_change": pct_change(curr_revenue, prev_revenue),
                     },
-                    "payroll": {
-                        "current": curr_payroll,
-                        "previous": prev_payroll,
-                        "change": curr_payroll - prev_payroll,
-                        "pct_change": pct_change(curr_payroll, prev_payroll),
+                    "transactions": {
+                        "current": curr_transactions,
+                        "previous": prev_transactions,
+                        "change": curr_transactions - prev_transactions,
+                        "pct_change": pct_change(curr_transactions, prev_transactions),
                     },
-                    "profit": {
-                        "current": curr_profit,
-                        "previous": prev_profit,
-                        "change": curr_profit - prev_profit,
-                        "pct_change": pct_change(curr_profit, prev_profit),
+                    "product_diversity": {
+                        "current": curr_diversity,
+                        "previous": prev_diversity,
+                        "change": curr_diversity - prev_diversity,
+                        "pct_change": pct_change(curr_diversity, prev_diversity),
                     },
-                    "efficiency": {
-                        "current": curr_eff,
-                        "previous": prev_eff,
-                        "change": curr_eff - prev_eff,
-                        "pct_change": pct_change(curr_eff, prev_eff),
+                    "avg_transaction_value": {
+                        "current": curr_avg_value,
+                        "previous": prev_avg_value,
+                        "change": curr_avg_value - prev_avg_value,
+                        "pct_change": pct_change(curr_avg_value, prev_avg_value),
                     },
                 }
                 comparison_data.append(store_data)
 
-            # Rankings based on current week values
-            for metric in ["revenue", "payroll", "profit", "efficiency"]:
+            # Rankings based on current week values using revenue + payroll metrics
+            for metric in ["revenue", "transactions", "product_diversity", "avg_transaction_value"]:
                 reverse = True
                 sorted_stores = sorted(
                     comparison_data, key=lambda x: x[metric]["current"], reverse=reverse
                 )
                 for idx, store in enumerate(sorted_stores, 1):
                     store[metric]["rank"] = idx
+                    
+            # Add payroll data from payroll_trends_data if available for each store
+            for store_data in comparison_data:
+                try:
+                    payroll_query = text("""
+                        SELECT SUM(payroll_cost) as payroll, SUM(wage_hours) as hours
+                        FROM executive_payroll_trends 
+                        WHERE store_id = :store_id 
+                        AND week_ending BETWEEN DATE_SUB(:current_week, INTERVAL 6 DAY) AND :current_week
+                    """)
+                    payroll_result = session.execute(payroll_query, {
+                        'store_id': store_data['store_id'], 
+                        'current_week': current_week
+                    }).first()
+                    
+                    if payroll_result and payroll_result.payroll:
+                        curr_payroll = float(payroll_result.payroll)
+                        curr_hours = float(payroll_result.hours or 1)
+                        curr_revenue = store_data['revenue']['current']
+                        
+                        store_data["payroll"] = {
+                            "current": curr_payroll,
+                            "previous": 0,  # Would need previous week query
+                            "change": curr_payroll,
+                            "pct_change": None
+                        }
+                        store_data["profit"] = {
+                            "current": curr_revenue - curr_payroll,
+                            "previous": 0,
+                            "change": curr_revenue - curr_payroll,
+                            "pct_change": None
+                        }
+                        store_data["efficiency"] = {
+                            "current": curr_revenue / curr_hours if curr_hours else 0,
+                            "previous": 0,
+                            "change": curr_revenue / curr_hours if curr_hours else 0,
+                            "pct_change": None
+                        }
+                except:
+                    # If payroll data not available, use placeholder values
+                    pass
 
             return jsonify({"mode": "weekly", "stores": comparison_data})
 
@@ -523,39 +770,49 @@ def get_store_comparison():
             f"Store comparison date range: {start_date} to {end_date} (latest data: {latest_data_date})"
         )
 
-        store_metrics = (
-            session.query(
-                PayrollTrends.store_id,
-                func.sum(PayrollTrends.total_revenue).label("revenue"),
-                func.sum(PayrollTrends.payroll_cost).label("payroll"),
-                func.avg(PayrollTrends.labor_efficiency_ratio).label("efficiency"),
-                func.sum(PayrollTrends.wage_hours).label("hours"),
-            )
-            .filter(PayrollTrends.week_ending.between(start_date, end_date))
-            .group_by(PayrollTrends.store_id)
-            .all()
-        )
+        # Use standardized store_code from pos_transaction_items for aggregate mode
+        if store_filter != "all":
+            store_condition = "AND pti.store_code = :store_filter"
+            store_params = {'start_date': start_date, 'end_date': end_date, 'store_filter': store_filter}
+        else:
+            store_condition = "AND pti.store_code != '000'"
+            store_params = {'start_date': start_date, 'end_date': end_date}
+
+        store_sql = text(f"""
+            SELECT 
+                pti.store_code,
+                SUM(CAST(pti.price * pti.qty AS DECIMAL(12,2))) as revenue,
+                COUNT(DISTINCT pti.contract_no) as total_transactions,
+                COUNT(DISTINCT pti.item_num) as product_diversity,
+                AVG(CAST(pti.price * pti.qty AS DECIMAL(12,2))) as avg_transaction_value,
+                COUNT(DISTINCT pt.customer_no) as unique_customers
+            FROM pos_transaction_items pti
+            JOIN pos_transactions pt ON pti.contract_no = pt.contract_no
+            WHERE pti.import_date BETWEEN :start_date AND :end_date
+                {store_condition}
+            GROUP BY pti.store_code
+        """)
+        store_metrics = session.execute(store_sql, store_params).fetchall()
 
         comparison_data = []
         for store in store_metrics:
-            profit = float(store.revenue or 0) - float(store.payroll or 0)
-            profit_margin = (
-                (profit / float(store.revenue) * 100) if store.revenue else 0
-            )
+            revenue = float(store.revenue or 0)
+            transactions = float(store.total_transactions or 0)
+            diversity = float(store.product_diversity or 0)
+            avg_value = float(store.avg_transaction_value or 0)
+            customers = float(store.unique_customers or 0)
 
             comparison_data.append(
                 {
-                    "store_id": store.store_id,
-                    "store_name": STORE_MAPPING.get(store.store_id, store.store_id),
-                    "revenue": float(store.revenue or 0),
-                    "payroll": float(store.payroll or 0),
-                    "profit": profit,
-                    "profit_margin": round(profit_margin, 2),
-                    "efficiency": float(store.efficiency or 0),
-                    "total_hours": float(store.hours or 0),
-                    "revenue_per_hour": (
-                        float(store.revenue / store.hours) if store.hours else 0
-                    ),
+                    "store_id": store.store_code,
+                    "store_name": STORE_MAPPING.get(store.store_code, store.store_code),
+                    "revenue": revenue,
+                    "total_transactions": transactions,
+                    "product_diversity": diversity,
+                    "avg_transaction_value": avg_value,
+                    "unique_customers": customers,
+                    "revenue_per_transaction": revenue / transactions if transactions else 0,
+                    "revenue_per_customer": revenue / customers if customers else 0,
                 }
             )
 
@@ -763,6 +1020,347 @@ def get_growth_analysis():
 
     except Exception as e:
         logger.error(f"Error calculating growth analysis: {str(e)}", exc_info=True)
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if session:
+            session.close()
+
+
+@tab7_bp.route("/api/executive/store_performance_metrics", methods=["GET"])
+def get_store_performance_metrics():
+    """Get store performance metrics using standardized store_code columns.
+    
+    Returns revenue comparison, transaction volume, and product diversity by store.
+    """
+    session = None
+    try:
+        session = db.session()
+        store_filter = request.args.get("store", "all")
+        period_weeks = int(request.args.get("weeks", 4))
+        
+        end_date = datetime.now().date()
+        start_date = end_date - timedelta(weeks=period_weeks)
+        
+        # Store Revenue Comparison from correlation analysis
+        if store_filter != "all":
+            store_condition = "AND pti.store_code = :store_filter"
+            params = {'start_date': start_date, 'end_date': end_date, 'store_filter': store_filter}
+        else:
+            store_condition = "AND pti.store_code != '000'"
+            params = {'start_date': start_date, 'end_date': end_date}
+            
+        performance_sql = text(f"""
+            SELECT 
+                pti.store_code,
+                COUNT(DISTINCT pti.contract_no) as transactions,
+                SUM(CAST(pti.price * pti.qty AS DECIMAL(12,2))) as total_revenue,
+                AVG(CAST(pti.price * pti.qty AS DECIMAL(12,2))) as avg_transaction_value,
+                COUNT(DISTINCT pti.item_num) as product_diversity,
+                COUNT(DISTINCT pt.customer_no) as unique_customers
+            FROM pos_transaction_items pti
+            JOIN pos_transactions pt ON pti.contract_no = pt.contract_no
+            WHERE pti.import_date BETWEEN :start_date AND :end_date
+                {store_condition}
+            GROUP BY pti.store_code
+            ORDER BY total_revenue DESC
+        """)
+        
+        results = session.execute(performance_sql, params).fetchall()
+        
+        metrics = []
+        for row in results:
+            metrics.append({
+                "store_code": row.store_code,
+                "store_name": STORE_MAPPING.get(row.store_code, row.store_code),
+                "transactions": int(row.transactions),
+                "total_revenue": float(row.total_revenue),
+                "avg_transaction_value": float(row.avg_transaction_value),
+                "product_diversity": int(row.product_diversity),
+                "unique_customers": int(row.unique_customers),
+                "revenue_per_customer": float(row.total_revenue) / float(row.unique_customers) if row.unique_customers else 0,
+            })
+        
+        return jsonify({
+            "period": f"{period_weeks} weeks",
+            "date_range": {
+                "start": start_date.isoformat(),
+                "end": end_date.isoformat()
+            },
+            "metrics": metrics
+        })
+        
+    except Exception as e:
+        logger.error(f"Error fetching store performance metrics: {str(e)}", exc_info=True)
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if session:
+            session.close()
+
+
+@tab7_bp.route("/api/executive/manager_scorecard", methods=["GET"])
+def get_manager_scorecard():
+    """Get manager performance scorecard using standardized store_code columns.
+    
+    Returns performance metrics by manager/store from correlation analysis.
+    """
+    session = None
+    try:
+        session = db.session()
+        store_filter = request.args.get("store", "all")
+        period_weeks = int(request.args.get("weeks", 4))
+        
+        end_date = datetime.now().date()
+        start_date = end_date - timedelta(weeks=period_weeks)
+        
+        # Manager Performance by Store from correlation analysis
+        if store_filter != "all":
+            store_condition = "AND pti.store_code = :store_filter"
+            params = {'start_date': start_date, 'end_date': end_date, 'store_filter': store_filter}
+        else:
+            store_condition = "AND pti.store_code != '000'"
+            params = {'start_date': start_date, 'end_date': end_date}
+            
+        manager_sql = text(f"""
+            SELECT 
+                pti.store_code,
+                CASE pti.store_code
+                    WHEN '3607' THEN 'TYLER'
+                    WHEN '6800' THEN 'ZACK'
+                    WHEN '728' THEN 'BRUCE'
+                    WHEN '8101' THEN 'TIM'
+                    ELSE 'CORPORATE'
+                END as manager,
+                COUNT(DISTINCT pt.customer_no) as unique_customers,
+                COUNT(DISTINCT pti.contract_no) as total_contracts,
+                SUM(CAST(pti.price * pti.qty AS DECIMAL(12,2))) as revenue,
+                COUNT(DISTINCT pti.item_num) as product_types_sold
+            FROM pos_transaction_items pti
+            JOIN pos_transactions pt ON pti.contract_no = pt.contract_no
+            WHERE pti.import_date BETWEEN :start_date AND :end_date
+                {store_condition}
+            GROUP BY pti.store_code
+            ORDER BY revenue DESC
+        """)
+        
+        results = session.execute(manager_sql, params).fetchall()
+        
+        scorecards = []
+        for row in results:
+            revenue = float(row.revenue)
+            customers = int(row.unique_customers)
+            contracts = int(row.total_contracts)
+            
+            scorecards.append({
+                "store_code": row.store_code,
+                "store_name": STORE_MAPPING.get(row.store_code, row.store_code),
+                "manager": row.manager,
+                "unique_customers": customers,
+                "total_contracts": contracts,
+                "revenue": revenue,
+                "product_types_sold": int(row.product_types_sold),
+                "revenue_per_customer": revenue / customers if customers else 0,
+                "revenue_per_contract": revenue / contracts if contracts else 0,
+                "contracts_per_customer": contracts / customers if customers else 0,
+            })
+        
+        return jsonify({
+            "period": f"{period_weeks} weeks",
+            "date_range": {
+                "start": start_date.isoformat(),
+                "end": end_date.isoformat()
+            },
+            "scorecards": scorecards
+        })
+        
+    except Exception as e:
+        logger.error(f"Error fetching manager scorecard: {str(e)}", exc_info=True)
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if session:
+            session.close()
+
+
+@tab7_bp.route("/api/executive/equipment_utilization", methods=["GET"])
+def get_equipment_utilization():
+    """Get equipment utilization analysis using standardized store_code columns.
+    
+    Returns equipment distribution and utilization metrics by store.
+    """
+    session = None
+    try:
+        session = db.session()
+        store_filter = request.args.get("store", "all")
+        
+        # Equipment Distribution by Store from correlation analysis
+        if store_filter != "all":
+            store_condition = "AND home_store = :store_filter"
+            params = {'store_filter': store_filter}
+        else:
+            store_condition = "AND home_store IN ('3607','6800','728','8101')"
+            params = {}
+            
+        equipment_sql = text(f"""
+            SELECT 
+                home_store as store_code,
+                COUNT(DISTINCT item_num) as equipment_types,
+                SUM(qty) as total_inventory,
+                SUM(CASE WHEN qty = 0 THEN 1 ELSE 0 END) as out_of_stock_items,
+                AVG(sell_price) as avg_equipment_value,
+                SUM(qty * sell_price) as total_inventory_value
+            FROM pos_equipment
+            WHERE sell_price > 0 
+                AND sell_price < 5000  -- Filter out unrealistic test values
+                AND qty < 10000        -- Filter out unrealistic test quantities
+                {store_condition}
+            GROUP BY home_store
+            ORDER BY total_inventory_value DESC
+        """)
+        
+        results = session.execute(equipment_sql, params).fetchall()
+        
+        utilization = []
+        for row in results:
+            total_items = int(row.equipment_types)
+            out_of_stock = int(row.out_of_stock_items)
+            in_stock_items = total_items - out_of_stock
+            
+            utilization.append({
+                "store_code": row.store_code,
+                "store_name": STORE_MAPPING.get(row.store_code, row.store_code),
+                "equipment_types": total_items,
+                "total_inventory": int(row.total_inventory),
+                "out_of_stock_items": out_of_stock,
+                "in_stock_items": in_stock_items,
+                "stock_rate_pct": (in_stock_items / total_items * 100) if total_items else 0,
+                "avg_equipment_value": float(row.avg_equipment_value),
+                "total_inventory_value": float(row.total_inventory_value)
+            })
+        
+        return jsonify({
+            "utilization": utilization
+        })
+        
+    except Exception as e:
+        logger.error(f"Error fetching equipment utilization: {str(e)}", exc_info=True)
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if session:
+            session.close()
+
+
+@tab7_bp.route("/api/executive/payroll_analytics", methods=["GET"])
+def get_payroll_analytics():
+    """Get comprehensive payroll analytics and cost control metrics.
+    
+    Returns payroll costs, efficiency ratios, and profit margins by store.
+    This is critical for controllable expense management.
+    """
+    session = None
+    try:
+        session = db.session()
+        store_filter = request.args.get("store", "all")
+        period_weeks = int(request.args.get("weeks", 8))
+        
+        end_date = datetime.now().date()
+        start_date = end_date - timedelta(weeks=period_weeks)
+        
+        # Get payroll data from payroll_trends_data table
+        if store_filter != "all":
+            store_condition = "AND store_id = :store_filter"
+            params = {'start_date': start_date, 'end_date': end_date, 'store_filter': store_filter}
+        else:
+            store_condition = ""
+            params = {'start_date': start_date, 'end_date': end_date}
+            
+        payroll_sql = text(f"""
+            SELECT 
+                store_id,
+                SUM(total_revenue) as total_revenue,
+                SUM(payroll_cost) as total_payroll,
+                AVG(labor_efficiency_ratio) as avg_efficiency,
+                SUM(wage_hours) as total_hours,
+                COUNT(DISTINCT week_ending) as weeks_of_data
+            FROM executive_payroll_trends
+            WHERE week_ending BETWEEN :start_date AND :end_date
+                {store_condition}
+            GROUP BY store_id
+            ORDER BY total_revenue DESC
+        """)
+        
+        results = session.execute(payroll_sql, params).fetchall()
+        
+        payroll_metrics = []
+        for row in results:
+            total_revenue = float(row.total_revenue or 0)
+            total_payroll = float(row.total_payroll or 0)
+            total_hours = float(row.total_hours or 0)
+            
+            # Calculate key cost control metrics
+            payroll_percent = (total_payroll / total_revenue * 100) if total_revenue else 0
+            profit = total_revenue - total_payroll
+            profit_margin = (profit / total_revenue * 100) if total_revenue else 0
+            revenue_per_hour = total_revenue / total_hours if total_hours else 0
+            cost_per_hour = total_payroll / total_hours if total_hours else 0
+            
+            payroll_metrics.append({
+                "store_id": row.store_id,
+                "store_name": STORE_MAPPING.get(row.store_id, row.store_id),
+                "total_revenue": total_revenue,
+                "total_payroll": total_payroll,
+                "gross_profit": profit,
+                "payroll_percentage": round(payroll_percent, 2),
+                "profit_margin": round(profit_margin, 2),
+                "total_hours": total_hours,
+                "revenue_per_hour": round(revenue_per_hour, 2),
+                "cost_per_hour": round(cost_per_hour, 2),
+                "avg_efficiency": float(row.avg_efficiency or 0),
+                "weeks_of_data": int(row.weeks_of_data),
+                "weekly_avg_revenue": total_revenue / max(int(row.weeks_of_data), 1),
+                "weekly_avg_payroll": total_payroll / max(int(row.weeks_of_data), 1)
+            })
+        
+        # Add company-wide summary if viewing all stores
+        if store_filter == "all" and payroll_metrics:
+            company_totals = {
+                "store_id": "COMPANY",
+                "store_name": "Company Total",
+                "total_revenue": sum(m["total_revenue"] for m in payroll_metrics),
+                "total_payroll": sum(m["total_payroll"] for m in payroll_metrics),
+                "total_hours": sum(m["total_hours"] for m in payroll_metrics)
+            }
+            
+            company_totals["gross_profit"] = company_totals["total_revenue"] - company_totals["total_payroll"]
+            company_totals["payroll_percentage"] = round(
+                (company_totals["total_payroll"] / company_totals["total_revenue"] * 100) if company_totals["total_revenue"] else 0, 2
+            )
+            company_totals["profit_margin"] = round(
+                (company_totals["gross_profit"] / company_totals["total_revenue"] * 100) if company_totals["total_revenue"] else 0, 2
+            )
+            company_totals["revenue_per_hour"] = round(
+                company_totals["total_revenue"] / company_totals["total_hours"] if company_totals["total_hours"] else 0, 2
+            )
+            company_totals["cost_per_hour"] = round(
+                company_totals["total_payroll"] / company_totals["total_hours"] if company_totals["total_hours"] else 0, 2
+            )
+            
+            payroll_metrics.append(company_totals)
+        
+        return jsonify({
+            "period": f"{period_weeks} weeks",
+            "date_range": {
+                "start": start_date.isoformat(),
+                "end": end_date.isoformat()
+            },
+            "payroll_metrics": payroll_metrics,
+            "cost_control_notes": {
+                "target_payroll_percentage": "15-25% of revenue",
+                "target_profit_margin": "40-60% gross margin",
+                "efficiency_benchmark": "Revenue per hour should exceed $50"
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Error fetching payroll analytics: {str(e)}", exc_info=True)
         return jsonify({"error": str(e)}), 500
     finally:
         if session:
@@ -1130,18 +1728,26 @@ def calculate_comparison_metrics(
 
         result = query.first()
 
-        # Get scorecard metrics
-        scorecard_query = session.query(
-            func.sum(ScorecardTrends.new_contracts_count).label("contracts"),
-            func.avg(ScorecardTrends.ar_over_45_days_percent).label("ar_aging"),
-        ).filter(ScorecardTrends.week_ending.between(start_date, end_date))
+        # Get scorecard metrics from pos_scorecard_trends table
+        pos_scorecard_query = session.query(
+            func.sum(
+                (POSScorecardTrends.new_open_contracts_3607 or 0) +
+                (POSScorecardTrends.new_open_contracts_6800 or 0) +
+                (POSScorecardTrends.new_open_contracts_8101 or 0) +
+                (POSScorecardTrends.new_open_contracts_728 or 0)
+            ).label("contracts"),
+        ).filter(POSScorecardTrends.week_ending_sunday.between(start_date, end_date))
 
-        if store_filter != "all":
-            scorecard_query = scorecard_query.filter(
-                ScorecardTrends.store_id == store_filter
-            )
-
-        scorecard = scorecard_query.first()
+        # No store filtering needed as we aggregate across all stores
+        pos_scorecard = pos_scorecard_query.first()
+        
+        # Create compatibility object
+        class ScorecardCompat:
+            def __init__(self, pos_metrics):
+                self.contracts = pos_metrics.contracts if pos_metrics else 0
+                self.ar_aging = None  # Not available in pos_scorecard_trends
+        
+        scorecard = ScorecardCompat(pos_scorecard)
 
         return {
             "revenue": float(result.revenue or 0),
@@ -2082,8 +2688,319 @@ def get_enhanced_trends():
             session.close()
 
 
+@tab7_bp.route("/api/executive/rolling_analysis", methods=["GET"])
+def get_rolling_analysis():
+    """Get rolling average analysis with 12-week and 12-month options."""
+    session = None
+    try:
+        session = db.session()
+        store_filter = request.args.get("store", "all")
+        period = request.args.get("period", "12week")  # 12week, 12month, combined
+        
+        # Get latest data date
+        latest_data_date = (
+            session.query(func.max(PayrollTrends.week_ending))
+            .filter(PayrollTrends.total_revenue > 0)
+            .scalar()
+        )
+        if not latest_data_date:
+            latest_data_date = datetime.now().date()
+        
+        # Calculate periods based on analysis type
+        if period == "12month":
+            weeks_back = 52  # 12 months
+            rolling_window = 12  # 12-week rolling window
+        else:  # 12week or combined
+            weeks_back = 24  # Need extra data for rolling calculation
+            rolling_window = 12  # 12-week rolling window
+            
+        end_date = latest_data_date
+        start_date = end_date - timedelta(weeks=weeks_back)
+        
+        logger.info(f"Rolling analysis for {period}: {start_date} to {end_date}, rolling window: {rolling_window}")
+        
+        # Get comprehensive dataset
+        query = session.query(
+            PayrollTrends.week_ending,
+            PayrollTrends.store_id,
+            PayrollTrends.total_revenue,
+            PayrollTrends.payroll_cost,
+            PayrollTrends.labor_efficiency_ratio,
+            PayrollTrends.revenue_per_hour,
+            PayrollTrends.wage_hours,
+        ).filter(
+            PayrollTrends.week_ending.between(start_date, end_date),
+            PayrollTrends.total_revenue > 0,
+        )
+        
+        if store_filter != "all":
+            query = query.filter(PayrollTrends.store_id == store_filter)
+        
+        results = query.order_by(PayrollTrends.week_ending).all()
+        
+        # Group by week and calculate rolling averages
+        weekly_data = {}
+        for row in results:
+            week_key = row.week_ending.isoformat()
+            if week_key not in weekly_data:
+                weekly_data[week_key] = {
+                    "week": week_key,
+                    "week_date": row.week_ending,
+                    "revenue": 0,
+                    "payroll": 0,
+                    "hours": 0,
+                    "stores": []
+                }
+            
+            weekly_data[week_key]["revenue"] += float(row.total_revenue or 0)
+            weekly_data[week_key]["payroll"] += float(row.payroll_cost or 0)
+            weekly_data[week_key]["hours"] += float(row.wage_hours or 0)
+            weekly_data[week_key]["stores"].append({
+                "store_id": row.store_id,
+                "revenue": float(row.total_revenue or 0),
+                "efficiency": float(row.labor_efficiency_ratio or 0),
+                "revenue_per_hour": float(row.revenue_per_hour or 0),
+            })
+        
+        # Convert to sorted list and calculate rolling averages
+        sorted_weeks = sorted(weekly_data.values(), key=lambda x: x["week_date"])
+        
+        # Calculate rolling averages
+        trends = []
+        for i, week_data in enumerate(sorted_weeks):
+            if i >= rolling_window - 1:  # Ensure we have enough data for rolling average
+                # Calculate rolling average for the past 'rolling_window' weeks
+                rolling_weeks = sorted_weeks[i - rolling_window + 1:i + 1]
+                
+                avg_revenue = sum(w["revenue"] for w in rolling_weeks) / len(rolling_weeks)
+                avg_payroll = sum(w["payroll"] for w in rolling_weeks) / len(rolling_weeks)
+                avg_profit = avg_revenue - avg_payroll
+                
+                trends.append({
+                    "week": week_data["week"],
+                    "revenue": week_data["revenue"],
+                    "payroll": week_data["payroll"],
+                    "profit": week_data["revenue"] - week_data["payroll"],
+                    "rolling_avg": round(avg_revenue, 2),
+                    "rolling_avg_payroll": round(avg_payroll, 2),
+                    "rolling_avg_profit": round(avg_profit, 2),
+                    "variance_from_avg": round(week_data["revenue"] - avg_revenue, 2),
+                })
+        
+        # Calculate overall metrics
+        if trends:
+            latest_trend = trends[-1]
+            metrics = {
+                "avg_12week_revenue": latest_trend["rolling_avg"],
+                "avg_12week_profit": latest_trend["rolling_avg_profit"],
+                "current_vs_avg": latest_trend["variance_from_avg"],
+                "trend_direction": "increasing" if len(trends) >= 2 and trends[-1]["rolling_avg"] > trends[-2]["rolling_avg"] else "decreasing"
+            }
+        else:
+            metrics = {
+                "avg_12week_revenue": 0,
+                "avg_12week_profit": 0,
+                "current_vs_avg": 0,
+                "trend_direction": "stable"
+            }
+        
+        # Store performance analysis
+        store_performance = []
+        if store_filter == "all":
+            # Get performance for all stores from latest week
+            latest_week = sorted_weeks[-1] if sorted_weeks else None
+            if latest_week:
+                for store_data in latest_week["stores"]:
+                    store_performance.append({
+                        "store_id": store_data["store_id"],
+                        "store_name": STORE_MAPPING.get(store_data["store_id"], store_data["store_id"]),
+                        "total_revenue": store_data["revenue"],
+                        "efficiency": store_data["efficiency"],
+                        "revenue_per_hour": store_data["revenue_per_hour"],
+                    })
+        
+        return jsonify({
+            "trends": trends,
+            "metrics": metrics,
+            "store_performance": store_performance,
+            "period": period,
+            "rolling_window": rolling_window,
+            "analysis_period": {
+                "start_date": start_date.isoformat(),
+                "end_date": end_date.isoformat(),
+                "weeks_analyzed": len(trends)
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Error in rolling analysis: {str(e)}", exc_info=True)
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if session:
+            session.close()
+
+
+@tab7_bp.route("/api/executive/week_based_filter", methods=["GET"])
+def get_week_based_filter():
+    """Get data for specific week number filtering."""
+    session = None
+    try:
+        session = db.session()
+        store_filter = request.args.get("store", "all")
+        week_number = request.args.get("week_number")
+        year = int(request.args.get("year", datetime.now().year))
+        
+        if not week_number:
+            return jsonify({"error": "Week number is required"}), 400
+            
+        week_number = int(week_number)
+        logger.info(f"Week-based filter: Week {week_number} of {year} for store {store_filter}")
+        
+        # Calculate date range using Excel WEEKNUM(date,11) logic
+        # Week starts Monday, numbered 1-53
+        week_ending_sunday = get_week_ending_sunday(year, week_number)
+        target_week_start = week_ending_sunday - timedelta(days=6)  # Monday
+        target_week_end = week_ending_sunday  # Sunday
+        
+        logger.info(f"Target week range: {target_week_start} to {target_week_end}")
+        
+        # Get data for the specific week
+        query = session.query(
+            PayrollTrends.store_id,
+            PayrollTrends.week_ending,
+            PayrollTrends.total_revenue,
+            PayrollTrends.payroll_cost,
+            PayrollTrends.labor_efficiency_ratio,
+            PayrollTrends.revenue_per_hour,
+            PayrollTrends.wage_hours,
+        ).filter(
+            PayrollTrends.week_ending.between(target_week_start, target_week_end),
+            PayrollTrends.total_revenue > 0,
+        )
+        
+        if store_filter != "all":
+            query = query.filter(PayrollTrends.store_id == store_filter)
+        
+        results = query.all()
+        
+        # Process results
+        week_data = {
+            "week_number": week_number,
+            "year": year,
+            "week_start": target_week_start.isoformat(),
+            "week_end": target_week_end.isoformat(),
+            "stores": []
+        }
+        
+        total_revenue = 0
+        total_payroll = 0
+        total_hours = 0
+        
+        for row in results:
+            store_revenue = float(row.total_revenue or 0)
+            store_payroll = float(row.payroll_cost or 0)
+            store_hours = float(row.wage_hours or 0)
+            
+            week_data["stores"].append({
+                "store_id": row.store_id,
+                "store_name": STORE_MAPPING.get(row.store_id, row.store_id),
+                "revenue": store_revenue,
+                "payroll": store_payroll,
+                "profit": store_revenue - store_payroll,
+                "efficiency": float(row.labor_efficiency_ratio or 0),
+                "revenue_per_hour": float(row.revenue_per_hour or 0),
+                "hours": store_hours,
+            })
+            
+            total_revenue += store_revenue
+            total_payroll += store_payroll
+            total_hours += store_hours
+        
+        # Add aggregated totals
+        week_data["totals"] = {
+            "revenue": total_revenue,
+            "payroll": total_payroll,
+            "profit": total_revenue - total_payroll,
+            "hours": total_hours,
+            "profit_margin": (total_revenue - total_payroll) / total_revenue * 100 if total_revenue else 0,
+            "revenue_per_hour": total_revenue / total_hours if total_hours else 0,
+        }
+        
+        return jsonify(week_data)
+        
+    except Exception as e:
+        logger.error(f"Error in week-based filter: {str(e)}", exc_info=True)
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if session:
+            session.close()
+
+
+@tab7_bp.route("/api/executive/enhanced_dashboard_summary", methods=["GET"])
+def get_enhanced_dashboard_summary():
+    """Enhanced dashboard summary with support for new filtering options."""
+    session = None
+    try:
+        session = db.session()
+        store_filter = request.args.get("store", "all")
+        period = request.args.get("period", "current_week")
+        rolling_avg = request.args.get("rolling_avg", "none")
+        view_mode = request.args.get("view_mode", "current")
+        week_number = request.args.get("week_number")
+        
+        logger.info(f"Enhanced dashboard summary: store={store_filter}, period={period}, rolling_avg={rolling_avg}, view_mode={view_mode}")
+        
+        # Handle different period types
+        if period == "week_number" and week_number:
+            # Use week-based filtering
+            week_response = get_week_based_filter()
+            if week_response.status_code == 200:
+                week_data = week_response.get_json()
+                return jsonify({
+                    "financial_metrics": {
+                        "total_revenue": week_data["totals"]["revenue"],
+                        "total_payroll": week_data["totals"]["payroll"],
+                        "labor_efficiency": week_data["totals"]["profit_margin"],
+                        "revenue_per_hour": week_data["totals"]["revenue_per_hour"],
+                        "yoy_growth": 0,  # Will be calculated separately
+                    },
+                    "operational_metrics": {
+                        "new_contracts": 0,  # Not available at week level
+                        "avg_weekly_contracts": 0,
+                        "avg_deliveries": 0,
+                        "inventory_value": 0,  # Will be calculated separately
+                        "total_items": 0,
+                    },
+                    "health_indicators": {
+                        "ar_aging_percent": 0,
+                        "total_discounts": 0,
+                        "profit_margin": week_data["totals"]["profit_margin"],
+                    },
+                    "metadata": {
+                        "store": store_filter,
+                        "period": period,
+                        "week_number": week_number,
+                        "view_mode": view_mode,
+                        "timestamp": datetime.now().isoformat(),
+                    },
+                    "week_data": week_data,
+                })
+            else:
+                return week_response
+        else:
+            # Use existing dashboard summary logic
+            return get_executive_summary()
+            
+    except Exception as e:
+        logger.error(f"Error in enhanced dashboard summary: {str(e)}", exc_info=True)
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if session:
+            session.close()
+
+
 # Update version marker
 logger.info(
-    "Executive Dashboard Enhanced v4 - Multi-Period Analysis with 3-Month Averages and YoY/Yo2Y - Deployed %s",
+    "Executive Dashboard Enhanced v5 - Week-Based Filtering & Rolling Averages with Store Color Coding - Deployed %s",
     datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
 )

@@ -1,0 +1,241 @@
+version: '3.8'
+
+services:
+  # Main AI Agent Application
+  ai-agent-core:
+    build:
+      context: .
+      dockerfile: Dockerfile.ai-agent
+      target: production
+    container_name: ai-agent-core
+    restart: unless-stopped
+    environment:
+      - PYTHONPATH=/app
+      - ENVIRONMENT=production
+      - DB_HOST=${DB_HOST:-192.168.3.110}
+      - DB_USER=${DB_USER:-rfid_user}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_DATABASE=${DB_DATABASE:-rfid_inventory}
+      - REDIS_URL=redis://ai-agent-redis:6379/0
+      - OLLAMA_HOST=http://ai-agent-llm:11434
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - API_SECRET_KEY=${API_SECRET_KEY}
+      - PI5_WEBHOOK_URL=${PI5_WEBHOOK_URL}
+    ports:
+      - "8000:8000"  # FastAPI application
+    depends_on:
+      - ai-agent-redis
+      - ai-agent-llm
+    volumes:
+      - ./logs:/app/logs
+      - ./cache:/app/cache
+      - ./models:/app/models
+    networks:
+      - ai-agent-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # Ollama LLM Server with GPU support
+  ai-agent-llm:
+    image: ollama/ollama:latest
+    container_name: ai-agent-llm
+    restart: unless-stopped
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+      - OLLAMA_MODELS=/root/.ollama/models
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+    networks:
+      - ai-agent-network
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+
+  # Celery Workers for Background Tasks
+  ai-agent-workers:
+    build:
+      context: .
+      dockerfile: Dockerfile.ai-agent
+      target: production
+    container_name: ai-agent-workers
+    restart: unless-stopped
+    environment:
+      - PYTHONPATH=/app
+      - ENVIRONMENT=production
+      - DB_HOST=${DB_HOST:-192.168.3.110}
+      - DB_USER=${DB_USER:-rfid_user}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_DATABASE=${DB_DATABASE:-rfid_inventory}
+      - REDIS_URL=redis://ai-agent-redis:6379/0
+      - OLLAMA_HOST=http://ai-agent-llm:11434
+      - CELERY_BROKER_URL=redis://ai-agent-redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://ai-agent-redis:6379/1
+    command: celery -A app.tasks.celery_app worker --loglevel=info --concurrency=4
+    depends_on:
+      - ai-agent-redis
+      - ai-agent-llm
+    volumes:
+      - ./logs:/app/logs
+      - ./cache:/app/cache
+    networks:
+      - ai-agent-network
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          memory: 4G
+        reservations:
+          memory: 2G
+
+  # Celery Beat Scheduler
+  ai-agent-scheduler:
+    build:
+      context: .
+      dockerfile: Dockerfile.ai-agent
+      target: production
+    container_name: ai-agent-scheduler
+    restart: unless-stopped
+    environment:
+      - PYTHONPATH=/app
+      - ENVIRONMENT=production
+      - REDIS_URL=redis://ai-agent-redis:6379/0
+      - CELERY_BROKER_URL=redis://ai-agent-redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://ai-agent-redis:6379/1
+    command: celery -A app.tasks.celery_app beat --loglevel=info
+    depends_on:
+      - ai-agent-redis
+    volumes:
+      - ./logs:/app/logs
+      - celerybeat-schedule:/app/celerybeat-schedule
+    networks:
+      - ai-agent-network
+
+  # Redis for Caching and Task Queue
+  ai-agent-redis:
+    image: redis:7-alpine
+    container_name: ai-agent-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 2gb --maxmemory-policy allkeys-lru
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - ai-agent-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Nginx Reverse Proxy
+  ai-agent-proxy:
+    image: nginx:alpine
+    container_name: ai-agent-proxy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - ./logs/nginx:/var/log/nginx
+    depends_on:
+      - ai-agent-core
+    networks:
+      - ai-agent-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Prometheus Monitoring
+  ai-agent-prometheus:
+    image: prom/prometheus:latest
+    container_name: ai-agent-prometheus
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.enable-lifecycle'
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    networks:
+      - ai-agent-network
+
+  # Grafana Dashboard
+  ai-agent-grafana:
+    image: grafana/grafana:latest
+    container_name: ai-agent-grafana
+    restart: unless-stopped
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin123}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_INSTALL_PLUGINS=redis-datasource
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+    depends_on:
+      - ai-agent-prometheus
+    networks:
+      - ai-agent-network
+
+  # Log Aggregation with Fluentd
+  ai-agent-fluentd:
+    build:
+      context: ./monitoring/fluentd
+    container_name: ai-agent-fluentd
+    restart: unless-stopped
+    ports:
+      - "24224:24224"
+      - "24224:24224/udp"
+    volumes:
+      - ./logs:/var/log/apps
+      - ./monitoring/fluentd/fluent.conf:/fluentd/etc/fluent.conf:ro
+    networks:
+      - ai-agent-network
+
+volumes:
+  ollama-data:
+    driver: local
+  redis-data:
+    driver: local
+  prometheus-data:
+    driver: local
+  grafana-data:
+    driver: local
+  celerybeat-schedule:
+    driver: local
+
+networks:
+  ai-agent-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

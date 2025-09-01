@@ -70,7 +70,7 @@ def create_app():
         cache.init_app(app)
         
         # Import models to register tables
-        from app.models import db_models, pos_models, financial_models, feedback_models, correlation_models, config_models
+        from app.models import db_models, pos_models, financial_models, feedback_models, correlation_models, config_models, suggestion_models
         
         app.logger.info("Extensions initialized successfully")
     except (ImportError, AttributeError, RuntimeError) as e:
@@ -134,6 +134,11 @@ def create_app():
         from app.routes.database_viewer import database_viewer_bp
         from app.routes.store_correlation_api import store_correlation_bp
         from app.routes.unified_store_api import unified_store_bp
+        from app.routes.financial_analytics_routes import financial_bp
+        from app.routes.user_suggestions_api import suggestions_api_bp
+        from app.routes.user_suggestions_routes import suggestions_routes_bp
+        from app.routes.system_health import system_health_bp
+        from app.routes.executive_dashboard import executive_bp
 
         app.register_blueprint(home_bp)
         app.register_blueprint(tab1_bp)
@@ -162,6 +167,11 @@ def create_app():
         app.register_blueprint(database_viewer_bp)
         app.register_blueprint(store_correlation_bp)
         app.register_blueprint(unified_store_bp)
+        app.register_blueprint(financial_bp)
+        app.register_blueprint(suggestions_api_bp)
+        app.register_blueprint(suggestions_routes_bp)
+        app.register_blueprint(system_health_bp)
+        app.register_blueprint(executive_bp)
         app.logger.info("Blueprints registered successfully")
 
         # Set up performance monitoring middleware

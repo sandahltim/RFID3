@@ -191,26 +191,26 @@ h4 {
 }
 
 .table thead th {
-    background: linear-gradient(90deg, var(--bte-royal-blue) 0%, #0047AB 100%);
-    color: var(--bte-white);
-    border-bottom: 2px solid var(--bte-gold);
+    background: linear-gradient(90deg, var(--bte-royal-blue) 0%, #0047AB 100%) !important;
+    color: var(--bte-white) !important;
+    border-bottom: 2px solid var(--bte-gold) !important;
     text-align: center;
     font-weight: 600;
     font-size: 0.9rem;
     text-transform: none;
     letter-spacing: normal;
     height: 40px;
-    position: sticky;
-    top: 56px;
-    z-index: 10;
+    position: static !important; /* Remove sticky positioning */
+    top: auto !important;
+    z-index: 1 !important;
     vertical-align: middle;
     white-space: nowrap;
 }
 
-/* Fix for recent scans table specifically */
+/* Fix for recent scans table specifically - also remove sticky */
 #recent-scans-table thead th {
-    position: sticky;
-    top: 0; /* Reset to 0 for contained table */
+    position: static !important; /* Remove sticky positioning */
+    top: auto !important;
     background: linear-gradient(90deg, var(--bte-royal-blue) 0%, #0047AB 100%) !important;
     border-bottom: 2px solid var(--bte-gold) !important;
 }

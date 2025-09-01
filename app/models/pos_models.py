@@ -177,57 +177,67 @@ class POSEquipment(db.Model):
 
     id = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
     item_num = db.Column(db.String(50), nullable=False, unique=True)
-    key = db.Column(db.String(50))
+    key_field = db.Column('key_field', db.String(50))  # Maps to key_field column
     name = db.Column(db.String(255))
-    location = db.Column(db.String(100))
+    loc = db.Column('loc', db.String(100))  # Maps to loc column
     category = db.Column(db.String(100))
     department = db.Column(db.String(100))
     type_desc = db.Column(db.String(100))
-    quantity = db.Column(db.Integer, default=0)
+    qty = db.Column('qty', db.Integer, default=0)  # Maps to qty column
     home_store = db.Column(db.String(10))
     current_store = db.Column(db.String(10))
-    group_name = db.Column(db.String(100))
-    manufacturer = db.Column(db.String(100))
+    group_field = db.Column('group_field', db.String(100))  # Maps to group_field column
+    manf = db.Column('manf', db.String(100))  # Maps to manf column
     model_no = db.Column(db.String(100))
     serial_no = db.Column(db.String(100))
     part_no = db.Column(db.String(100))
     license_no = db.Column(db.String(50))
     model_year = db.Column(db.String(10))
     
-    # Financial Fields
-    turnover_mtd = db.Column(db.DECIMAL(12, 2), default=0)
-    turnover_ytd = db.Column(db.DECIMAL(12, 2), default=0)
-    turnover_ltd = db.Column(db.DECIMAL(12, 2), default=0)
-    repair_cost_mtd = db.Column(db.DECIMAL(12, 2), default=0)
-    repair_cost_ltd = db.Column(db.DECIMAL(12, 2), default=0)
-    sell_price = db.Column(db.DECIMAL(12, 2), default=0)
-    retail_price = db.Column(db.DECIMAL(12, 2), default=0)
-    deposit = db.Column(db.DECIMAL(12, 2), default=0)
-    damage_waiver_pct = db.Column(db.DECIMAL(5, 2), default=0)
+    # Financial Fields - match database column names
+    to_mtd = db.Column('to_mtd', db.DECIMAL(12, 2), default=0)  # Maps to to_mtd
+    to_ytd = db.Column('to_ytd', db.DECIMAL(12, 2), default=0)  # Maps to to_ytd
+    to_ltd = db.Column('to_ltd', db.DECIMAL(12, 2), default=0)  # Maps to to_ltd
+    repair_cost_mtd = db.Column(db.DECIMAL(10, 2), default=0)
+    repair_cost_ltd = db.Column(db.DECIMAL(10, 2), default=0)
+    sell_price = db.Column(db.DECIMAL(10, 2), default=0)
+    retail_price = db.Column(db.DECIMAL(10, 2), default=0)
+    deposit = db.Column(db.DECIMAL(10, 2), default=0)
+    damage_waiver_percent = db.Column('damage_waiver_percent', db.DECIMAL(5, 2), default=0)  # Maps to damage_waiver_percent
     
-    # Rental Rates (10 periods)
-    period_1 = db.Column(db.String(20))
-    period_2 = db.Column(db.String(20))
-    period_3 = db.Column(db.String(20))
-    period_4 = db.Column(db.String(20))
-    period_5 = db.Column(db.String(20))
-    rate_1 = db.Column(db.DECIMAL(12, 2))
-    rate_2 = db.Column(db.DECIMAL(12, 2))
-    rate_3 = db.Column(db.DECIMAL(12, 2))
-    rate_4 = db.Column(db.DECIMAL(12, 2))
-    rate_5 = db.Column(db.DECIMAL(12, 2))
+    # Rental Rates (10 periods) - match database schema
+    period_1 = db.Column(db.DECIMAL(10, 2))
+    period_2 = db.Column(db.DECIMAL(10, 2))
+    period_3 = db.Column(db.DECIMAL(10, 2))
+    period_4 = db.Column(db.DECIMAL(10, 2))
+    period_5 = db.Column(db.DECIMAL(10, 2))
+    period_6 = db.Column(db.DECIMAL(10, 2))
+    period_7 = db.Column(db.DECIMAL(10, 2))
+    period_8 = db.Column(db.DECIMAL(10, 2))
+    period_9 = db.Column(db.DECIMAL(10, 2))
+    period_10 = db.Column(db.DECIMAL(10, 2))
+    rate_1 = db.Column(db.DECIMAL(10, 2))
+    rate_2 = db.Column(db.DECIMAL(10, 2))
+    rate_3 = db.Column(db.DECIMAL(10, 2))
+    rate_4 = db.Column(db.DECIMAL(10, 2))
+    rate_5 = db.Column(db.DECIMAL(10, 2))
+    rate_6 = db.Column(db.DECIMAL(10, 2))
+    rate_7 = db.Column(db.DECIMAL(10, 2))
+    rate_8 = db.Column(db.DECIMAL(10, 2))
+    rate_9 = db.Column(db.DECIMAL(10, 2))
+    rate_10 = db.Column(db.DECIMAL(10, 2))
     
     # Inventory Management
     reorder_min = db.Column(db.Integer, default=0)
     reorder_max = db.Column(db.Integer, default=0)
     user_defined_1 = db.Column(db.String(100))
     user_defined_2 = db.Column(db.String(100))
-    meter_out = db.Column(db.DECIMAL(12, 2))
-    meter_in = db.Column(db.DECIMAL(12, 2))
+    meter_out = db.Column(db.DECIMAL(10, 2))  # Match database precision
+    meter_in = db.Column(db.DECIMAL(10, 2))  # Match database precision
     
     # Purchase/Vendor Info
-    last_purchase_date = db.Column(db.DateTime)
-    last_purchase_price = db.Column(db.DECIMAL(12, 2))
+    last_purchase_date = db.Column(db.Date)  # Date not DateTime
+    last_purchase_price = db.Column(db.DECIMAL(10, 2))  # 10,2 to match database
     vendor_no_1 = db.Column(db.String(50))
     vendor_no_2 = db.Column(db.String(50))
     vendor_no_3 = db.Column(db.String(50))
@@ -237,38 +247,45 @@ class POSEquipment(db.Model):
     qty_on_order = db.Column(db.Integer, default=0)
     
     # Other Fields
-    sort_order = db.Column(db.Integer)
-    expiration_date = db.Column(db.DateTime)
-    warranty_date = db.Column(db.DateTime)
-    weight = db.Column(db.DECIMAL(10, 2))
+    sort_field = db.Column('sort_field', db.String(100))  # Maps to sort_field column (not sort_order)
+    expiration_date = db.Column(db.Date)  # Date not DateTime
+    warranty_date = db.Column(db.Date)  # Date not DateTime
+    weight = db.Column(db.DECIMAL(10, 3))  # Note: 3 decimal places in DB
     setup_time = db.Column(db.DECIMAL(10, 2))
     income = db.Column(db.DECIMAL(12, 2))
     depr_method = db.Column(db.String(50))
-    depr = db.Column(db.DECIMAL(12, 2))
+    depr = db.Column(db.DECIMAL(10, 2))  # 10,2 not 12,2
     non_taxable = db.Column(db.Boolean, default=False)
     header_no = db.Column(db.String(50))
     inactive = db.Column(db.Boolean, default=False)
     
-    # Import metadata
-    import_date = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
-    import_batch = db.Column(db.String(50))
-    last_updated = db.Column(db.DateTime, onupdate=lambda: datetime.now(timezone.utc))
+    # RFID-specific fields missing from model
+    pos_store_code = db.Column(db.String(10))
+    rfid_rental_class_num = db.Column(db.String(255))
+    created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    identifier_type = db.Column(db.Enum('RFID', 'Sticker', 'QR', 'Barcode', 'Bulk', 'None', name='identifier_type_enum'), default='None')
+    
+    # Note: import_date, import_batch, last_updated columns do not exist in database schema
     
     def to_dict(self):
         return {
             "id": self.id,
             "item_num": self.item_num,
+            "key_field": self.key_field,
             "name": self.name,
+            "loc": self.loc,
             "category": self.category,
             "department": self.department,
+            "qty": self.qty,
             "current_store": self.current_store,
-            "quantity": self.quantity,
-            "turnover_ytd": float(self.turnover_ytd) if self.turnover_ytd else 0,
-            "turnover_ltd": float(self.turnover_ltd) if self.turnover_ltd else 0,
+            "group_field": self.group_field,
+            "manf": self.manf,
+            "to_ytd": float(self.to_ytd) if self.to_ytd else 0,
+            "to_ltd": float(self.to_ltd) if self.to_ltd else 0,
             "repair_cost_ltd": float(self.repair_cost_ltd) if self.repair_cost_ltd else 0,
             "sell_price": float(self.sell_price) if self.sell_price else 0,
             "inactive": self.inactive,
-            "import_date": self.import_date.isoformat() if self.import_date else None,
         }
 
 

@@ -117,21 +117,24 @@ def get_database_metrics():
         except Exception as e:
             metrics["database_version"] = f"Error: {str(e)}"
 
-        # Table sizes and row counts
+        # Table sizes and row counts - using safe table mapping
         try:
-            tables = ["id_item_master", "id_transactions", "inventory_health_alerts"]
+            # Safe table mapping to prevent SQL injection
+            table_queries = {
+                "id_item_master": "SELECT COUNT(*) FROM id_item_master",
+                "id_transactions": "SELECT COUNT(*) FROM id_transactions", 
+                "inventory_health_alerts": "SELECT COUNT(*) FROM inventory_health_alerts"
+            }
             table_stats = {}
 
-            for table in tables:
+            for table_name, query in table_queries.items():
                 try:
-                    # Get row count
-                    count_result = db.session.execute(
-                        text(f"SELECT COUNT(*) FROM {table}")
-                    )
+                    # Get row count using predefined safe queries
+                    count_result = db.session.execute(text(query))
                     row_count = count_result.scalar()
-                    table_stats[table] = {"row_count": row_count}
+                    table_stats[table_name] = {"row_count": row_count}
                 except Exception as e:
-                    table_stats[table] = {"error": str(e)}
+                    table_stats[table_name] = {"error": str(e)}
 
             metrics["table_stats"] = table_stats
         except Exception as e:

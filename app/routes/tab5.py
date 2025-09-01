@@ -3,7 +3,7 @@ from .. import db, cache
 from ..models.db_models import ItemMaster, Transaction
 from ..services.api_client import APIClient
 from ..services.logger import get_logger
-from sqlalchemy import func, desc, or_, asc, text, case, select
+from sqlalchemy import func, desc, or_, asc, text, case, select, and_
 from ..utils.filters import apply_global_filters
 from sqlalchemy.exc import SQLAlchemyError
 import time
@@ -820,31 +820,38 @@ def tab5_data():
         items_query = apply_global_filters(items_query, store_filter, type_filter)
 
         total_items = items_query.count()
-        items = items_query.offset((page - 1) * per_page).limit(per_page).all()
+        
+        # Optimize: Join with Transaction to get customer names in one query
+        items_with_customer = session.query(
+            ItemMaster,
+            Transaction.client_name.label('customer_name')
+        ).outerjoin(
+            Transaction,
+            and_(
+                Transaction.tag_id == ItemMaster.tag_id,
+                Transaction.contract_number == ItemMaster.last_contract_num
+            )
+        ).filter(
+            func.trim(
+                func.cast(
+                    func.replace(ItemMaster.rental_class_num, "\x00", ""), db.String
+                )
+            ).in_(rental_class_ids),
+            ItemMaster.common_name == common_name,
+            resale_pack_condition(ItemMaster.bin_location),
+        )
+        
+        items_with_customer = apply_global_filters(items_with_customer, store_filter, type_filter)
+        items_result = items_with_customer.offset((page - 1) * per_page).limit(per_page).all()
 
         items_data = []
-        for item in items:
+        for item, customer_name in items_result:
             last_scanned_date = (
                 item.date_last_scanned.isoformat() if item.date_last_scanned else "N/A"
             )
 
-            # Get customer name from latest transaction for this item
-            customer_name = "N/A"
-            if item.last_contract_num and item.last_contract_num != "N/A":
-                latest_transaction = (
-                    session.query(Transaction.client_name)
-                    .filter(
-                        Transaction.tag_id == item.tag_id,
-                        Transaction.contract_number == item.last_contract_num,
-                    )
-                    .order_by(desc(Transaction.scan_date))
-                    .first()
-                )
-                customer_name = (
-                    latest_transaction.client_name
-                    if latest_transaction and latest_transaction.client_name
-                    else "N/A"
-                )
+            # Customer name is now retrieved from the join
+            customer_name = customer_name if customer_name else "N/A"
 
             items_data.append(
                 {

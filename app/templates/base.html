@@ -90,6 +90,9 @@
                 <i class="fas fa-brain me-2"></i>Predictive Analytics</a></li>
               <li><a class="dropdown-item {% if request.path == '/feedback/dashboard' %}active{% endif %}" href="/feedback/dashboard">
                 <i class="fas fa-comments me-2"></i>Feedback Analytics</a></li>
+              <li><hr class="dropdown-divider"></li>
+              <li><a class="dropdown-item {% if request.path.startswith('/suggestions') %}active{% endif %}" href="/suggestions">
+                <i class="fas fa-lightbulb me-2"></i>Analytics Suggestions</a></li>
             </ul>
           </li>
         </ul>
@@ -168,6 +171,10 @@
     <script type="module" src="/static/js/common.js?cb={{ cache_bust }}"></script>
     <script type="module" src="/static/js/tab.js?cb={{ cache_bust }}"></script>
     
+    <!-- Mobile Enhancements - Load early for better UX -->
+    <script src="/static/js/mobile-enhancements.js?cb={{ cache_bust }}"></script>
+    <script src="/static/js/android-chrome-performance.js?cb={{ cache_bust }}"></script>
+    
     <!-- Page-specific Scripts -->
     {% if request.path == '/tab/1' %}
       <script type="module" src="/static/js/tab1.js?cb={{ cache_bust }}"></script>
@@ -192,6 +199,69 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <!-- jsQR library for QR code scanning -->
     <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+    
+    <!-- Mobile navbar close functionality -->
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Auto-close mobile navbar when clicking nav links
+        const navbarToggler = document.querySelector('.navbar-toggler');
+        const navbarCollapse = document.querySelector('.navbar-collapse');
+        const navLinks = document.querySelectorAll('.nav-link, .dropdown-item');
+        
+        let isClosing = false;
+        
+        navLinks.forEach(function(link) {
+            link.addEventListener('click', function(event) {
+                // Don't close if this is a dropdown toggle
+                if (link.classList.contains('dropdown-toggle')) {
+                    return; // Let Bootstrap handle dropdown toggle
+                }
+                
+                // Only close on mobile screens and if navbar is open
+                if (window.innerWidth < 992 && navbarCollapse.classList.contains('show')) {
+                    event.stopPropagation(); // Prevent event bubbling
+                    isClosing = true;
+                    
+                    const bsCollapse = new bootstrap.Collapse(navbarCollapse, {
+                        toggle: false
+                    });
+                    bsCollapse.hide();
+                    
+                    // Reset flag after animation completes
+                    setTimeout(() => {
+                        isClosing = false;
+                    }, 350);
+                }
+            });
+        });
+        
+        // Prevent toggler from reopening during close animation
+        navbarToggler.addEventListener('click', function(event) {
+            if (isClosing) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+        });
+        
+        // Also close when clicking outside the navbar
+        document.addEventListener('click', function(event) {
+            if (window.innerWidth < 992 && 
+                navbarCollapse.classList.contains('show') && 
+                !event.target.closest('.navbar') &&
+                !isClosing) {
+                isClosing = true;
+                const bsCollapse = new bootstrap.Collapse(navbarCollapse, {
+                    toggle: false
+                });
+                bsCollapse.hide();
+                
+                setTimeout(() => {
+                    isClosing = false;
+                }, 350);
+            }
+        });
+    });
+    </script>
   {% endblock %}
 </body>
 </html>

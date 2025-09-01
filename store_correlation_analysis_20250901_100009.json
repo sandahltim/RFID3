@@ -1,0 +1,87 @@
+{
+  "schema": {},
+  "store_distribution": {},
+  "correlations": {},
+  "executive_kpis": {},
+  "dashboard_queries": {
+    "store_comparison": "\n        -- Store Performance Comparison Dashboard\n        WITH store_summary AS (\n            SELECT \n                pti.store_code,\n                COUNT(DISTINCT pti.transaction_number) as transactions,\n                COUNT(DISTINCT pti.customer_account) as customers,\n                SUM(CAST(pti.extended_price AS FLOAT)) as revenue,\n                AVG(CAST(pti.extended_price AS FLOAT)) as avg_ticket,\n                COUNT(DISTINCT pti.item_code) as product_mix,\n                COUNT(DISTINCT DATE(pti.created_at)) as operating_days\n            FROM pos_transaction_items pti\n            WHERE pti.created_at >= :start_date\n                AND pti.created_at <= :end_date\n                AND pti.store_code != '000'\n            GROUP BY pti.store_code\n        ),\n        pl_summary AS (\n            SELECT \n                store_code,\n                AVG(CAST(gross_profit AS FLOAT)) as avg_gross_profit,\n                AVG(CAST(net_income AS FLOAT)) as avg_net_income\n            FROM pl_data\n            WHERE period_date >= :start_date\n                AND period_date <= :end_date\n            GROUP BY store_code\n        )\n        SELECT \n            ss.*,\n            ps.avg_gross_profit,\n            ps.avg_net_income,\n            (ss.revenue / NULLIF(ss.operating_days, 0)) as daily_revenue,\n            (ss.transactions / NULLIF(ss.operating_days, 0.0)) as daily_transactions,\n            (ps.avg_gross_profit / NULLIF(ss.revenue, 0) * 100) as gross_margin_pct\n        FROM store_summary ss\n        LEFT JOIN pl_summary ps ON ss.store_code = ps.store_code\n        ORDER BY ss.revenue DESC\n        ",
+    "manager_scorecard": "\n        -- Manager Performance Scorecard\n        WITH manager_metrics AS (\n            SELECT \n                pti.store_code,\n                CASE pti.store_code\n                    WHEN '3607' THEN 'TYLER'\n                    WHEN '6800' THEN 'ZACK'\n                    WHEN '728' THEN 'BRUCE'\n                    WHEN '8101' THEN 'TIM'\n                    ELSE 'CORPORATE'\n                END as manager,\n                COUNT(DISTINCT pti.transaction_number) as total_transactions,\n                COUNT(DISTINCT pti.customer_account) as unique_customers,\n                SUM(CAST(pti.extended_price AS FLOAT)) as total_revenue,\n                AVG(CAST(pti.extended_price AS FLOAT)) as avg_transaction_value,\n                COUNT(DISTINCT pti.item_code) as product_diversity\n            FROM pos_transaction_items pti\n            WHERE pti.created_at >= :start_date\n                AND pti.created_at <= :end_date\n                AND pti.store_code != '000'\n            GROUP BY pti.store_code\n        ),\n        feedback_metrics AS (\n            SELECT \n                store_code,\n                AVG(CAST(rating AS FLOAT)) as avg_rating,\n                COUNT(*) as feedback_count\n            FROM feedback\n            WHERE created_at >= :start_date\n                AND created_at <= :end_date\n            GROUP BY store_code\n        )\n        SELECT \n            mm.*,\n            fm.avg_rating,\n            fm.feedback_count,\n            (mm.unique_customers * 100.0 / NULLIF(mm.total_transactions, 0)) as customer_retention_rate\n        FROM manager_metrics mm\n        LEFT JOIN feedback_metrics fm ON mm.store_code = fm.store_code\n        ORDER BY mm.total_revenue DESC\n        ",
+    "transfer_analysis": "\n        -- Cross-Store Transfer and Movement Analysis\n        WITH transfer_patterns AS (\n            SELECT \n                source.store_code as source_store,\n                dest.store_code as dest_store,\n                source.item_code,\n                source.item_description,\n                COUNT(*) as transfer_frequency,\n                SUM(ABS(CAST(source.quantity AS FLOAT))) as total_quantity\n            FROM pos_transaction_items source\n            JOIN pos_transaction_items dest \n                ON source.item_code = dest.item_code\n                AND source.store_code != dest.store_code\n                AND DATE(dest.created_at) > DATE(source.created_at)\n                AND DATE(dest.created_at) <= DATE(source.created_at, '+7 days')\n            WHERE source.store_code != '000' \n                AND dest.store_code != '000'\n                AND CAST(source.quantity AS FLOAT) < 0  -- Outgoing\n                AND CAST(dest.quantity AS FLOAT) > 0    -- Incoming\n            GROUP BY source.store_code, dest.store_code, source.item_code\n        )\n        SELECT \n            source_store,\n            dest_store,\n            COUNT(DISTINCT item_code) as items_transferred,\n            SUM(transfer_frequency) as total_transfers,\n            SUM(total_quantity) as total_units_moved\n        FROM transfer_patterns\n        GROUP BY source_store, dest_store\n        ORDER BY total_transfers DESC\n        ",
+    "predictive_metrics": "\n        -- Predictive Analytics Base Query\n        WITH historical_trends AS (\n            SELECT \n                store_code,\n                DATE(created_at) as transaction_date,\n                strftime('%w', created_at) as day_of_week,\n                strftime('%m', created_at) as month,\n                COUNT(DISTINCT transaction_number) as daily_transactions,\n                SUM(CAST(extended_price AS FLOAT)) as daily_revenue,\n                COUNT(DISTINCT customer_account) as daily_customers,\n                AVG(CAST(extended_price AS FLOAT)) as avg_ticket\n            FROM pos_transaction_items\n            WHERE store_code != '000'\n                AND created_at >= date('now', '-90 days')\n            GROUP BY store_code, DATE(created_at)\n        ),\n        moving_averages AS (\n            SELECT \n                *,\n                AVG(daily_revenue) OVER (\n                    PARTITION BY store_code \n                    ORDER BY transaction_date \n                    ROWS BETWEEN 6 PRECEDING AND CURRENT ROW\n                ) as revenue_7day_ma,\n                AVG(daily_transactions) OVER (\n                    PARTITION BY store_code \n                    ORDER BY transaction_date \n                    ROWS BETWEEN 29 PRECEDING AND CURRENT ROW\n                ) as transactions_30day_ma\n            FROM historical_trends\n        )\n        SELECT \n            store_code,\n            transaction_date,\n            daily_revenue,\n            revenue_7day_ma,\n            daily_transactions,\n            transactions_30day_ma,\n            (daily_revenue - revenue_7day_ma) as revenue_variance,\n            (daily_transactions - transactions_30day_ma) as transaction_variance\n        FROM moving_averages\n        WHERE transaction_date >= date('now', '-30 days')\n        ORDER BY store_code, transaction_date\n        "
+  },
+  "data_quality_issues": [],
+  "ai_readiness": {
+    "features_available": [
+      {
+        "name": "Transaction History",
+        "table": "pos_transaction_items",
+        "quality": "HIGH"
+      },
+      {
+        "name": "Customer Patterns",
+        "table": "pos_transaction_items",
+        "quality": "HIGH"
+      },
+      {
+        "name": "Product Performance",
+        "table": "pos_transaction_items",
+        "quality": "HIGH"
+      },
+      {
+        "name": "Inventory Levels",
+        "table": "pos_equipment",
+        "quality": "MEDIUM"
+      },
+      {
+        "name": "Financial Metrics",
+        "table": "pl_data",
+        "quality": "MEDIUM"
+      },
+      {
+        "name": "Weather Data",
+        "table": "minnesota_weather_data",
+        "quality": "HIGH"
+      },
+      {
+        "name": "Customer Feedback",
+        "table": "feedback",
+        "quality": "MEDIUM"
+      }
+    ],
+    "target_variables": [
+      "Daily Revenue (pos_transaction_items)",
+      "Customer Retention (pos_transaction_items)",
+      "Inventory Demand (pos_equipment)",
+      "Gross Margin (pl_data)",
+      "Customer Satisfaction (feedback)"
+    ],
+    "data_volume": {},
+    "recommendations": [
+      "1. Start with time-series forecasting for daily revenue prediction",
+      "2. Implement customer segmentation using transaction patterns",
+      "3. Build inventory optimization model using POS and equipment data",
+      "4. Create churn prediction model using customer transaction frequency",
+      "5. Develop price optimization model using P&L and transaction data"
+    ]
+  },
+  "integration_roadmap": {
+    "immediate": [
+      "Create composite indexes on (store_code, created_at) for all transaction tables",
+      "Implement data validation triggers for store_code consistency",
+      "Build materialized views for store-specific KPIs",
+      "Set up automated data quality monitoring"
+    ],
+    "short_term": [
+      "Implement real-time dashboard with store filtering",
+      "Create automated manager performance reports",
+      "Build customer journey mapping system",
+      "Deploy predictive analytics for inventory management"
+    ],
+    "long_term": [
+      "Implement ML-based demand forecasting",
+      "Build automated pricing optimization system",
+      "Create cross-store inventory balancing algorithm",
+      "Deploy customer lifetime value prediction model"
+    ]
+  }
+}

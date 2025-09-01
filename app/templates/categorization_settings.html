@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Equipment Categorization Settings</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- Chart.js for visualization -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Custom CSS -->
+    <style>
+        .settings-card {
+            border-radius: 12px;
+            border: none;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            transition: transform 0.2s ease;
+        }
+        
+        .settings-card:hover {
+            transform: translateY(-2px);
+        }
+        
+        .category-badge {
+            display: inline-block;
+            padding: 0.375rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .category-party { background: #e8f4fd; color: #0984e3; }
+        .category-construction { background: #fff0e6; color: #e17055; }
+        .category-landscaping { background: #e8f5e8; color: #00b894; }
+        .category-mixed { background: #f3e8ff; color: #6c5ce7; }
+        .category-uncategorized { background: #f8f9fa; color: #636e72; }
+        
+        .confidence-bar {
+            height: 8px;
+            border-radius: 4px;
+            background: #e9ecef;
+            overflow: hidden;
+        }
+        
+        .confidence-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.3s ease;
+        }
+        
+        .confidence-high { background: #00b894; }
+        .confidence-medium { background: #fdcb6e; }
+        .confidence-low { background: #e17055; }
+        
+        .threshold-slider {
+            margin: 1rem 0;
+        }
+        
+        .keyword-tag {
+            display: inline-block;
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 15px;
+            padding: 0.25rem 0.75rem;
+            margin: 0.25rem;
+            font-size: 0.85rem;
+            color: #495057;
+        }
+        
+        .keyword-tag:hover {
+            background: #e9ecef;
+            cursor: pointer;
+        }
+        
+        .stats-metric {
+            text-align: center;
+            padding: 1rem;
+            border-radius: 8px;
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            margin-bottom: 1rem;
+        }
+        
+        .stats-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #2d3436;
+        }
+        
+        .stats-label {
+            font-size: 0.85rem;
+            color: #636e72;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .progress-ring {
+            transform: rotate(-90deg);
+        }
+        
+        .progress-ring-circle {
+            transition: stroke-dashoffset 0.35s;
+            transform-origin: 50% 50%;
+        }
+        
+        .action-button {
+            border-radius: 25px;
+            padding: 0.75rem 2rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            transition: all 0.2s ease;
+        }
+        
+        .action-button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+        
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            display: none;
+        }
+        
+        .loading-spinner {
+            border: 4px solid rgba(116, 185, 255, 0.3);
+            border-radius: 50%;
+            border-top: 4px solid #74b9ff;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .alert-custom {
+            border-radius: 10px;
+            border: none;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        
+        .nav-pills .nav-link {
+            border-radius: 25px;
+            padding: 0.75rem 1.5rem;
+            margin-right: 0.5rem;
+            font-weight: 600;
+            transition: all 0.2s ease;
+        }
+        
+        .nav-pills .nav-link.active {
+            background: linear-gradient(135deg, #74b9ff 0%, #0984e3 100%);
+        }
+    </style>
+</head>
+<body class="bg-light">
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="loading-overlay">
+        <div class="text-center text-white">
+            <div class="loading-spinner"></div>
+            <p class="mt-3">Processing equipment categorization...</p>
+        </div>
+    </div>
+
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark" style="background: linear-gradient(135deg, #2d3436 0%, #636e72 100%);">
+        <div class="container">
+            <a class="navbar-brand fw-bold" href="#">
+                <i class="bi bi-gear"></i> Equipment Categorization Settings
+            </a>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="/api/minnesota-weather/dashboard">
+                    <i class="bi bi-arrow-left"></i> Back to Weather Dashboard
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <!-- Alert Messages -->
+        <div id="alert-container"></div>
+
+        <!-- Overview Statistics -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="stats-metric">
+                    <div class="stats-value" id="total-items">--</div>
+                    <div class="stats-label">Total Items</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stats-metric">
+                    <div class="stats-value" id="categorized-items">--</div>
+                    <div class="stats-label">Categorized Items</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stats-metric">
+                    <div class="stats-value" id="avg-confidence">--%</div>
+                    <div class="stats-label">Avg Confidence</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stats-metric">
+                    <div class="stats-value" id="needs-review">--</div>
+                    <div class="stats-label">Needs Review</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Navigation Tabs -->
+        <ul class="nav nav-pills mb-4" id="settings-tabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="thresholds-tab" data-bs-toggle="pill" data-bs-target="#thresholds">
+                    Confidence Thresholds
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="ratios-tab" data-bs-toggle="pill" data-bs-target="#ratios">
+                    Industry Ratios
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="keywords-tab" data-bs-toggle="pill" data-bs-target="#keywords">
+                    Keywords & Rules
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="results-tab" data-bs-toggle="pill" data-bs-target="#results">
+                    Categorization Results
+                </button>
+            </li>
+        </ul>
+
+        <!-- Tab Content -->
+        <div class="tab-content" id="settings-content">
+            <!-- Confidence Thresholds Tab -->
+            <div class="tab-pane fade show active" id="thresholds" role="tabpanel">
+                <div class="row">
+                    <div class="col-md-8">
+                        <div class="card settings-card">
+                            <div class="card-header">
+                                <h5 class="card-title mb-0">Confidence Score Thresholds</h5>
+                                <small class="text-muted">Adjust confidence thresholds for automatic categorization</small>
+                            </div>
+                            <div class="card-body">
+                                <div class="threshold-slider">
+                                    <label for="high-confidence-threshold" class="form-label">
+                                        High Confidence Threshold: <span id="high-confidence-value">0.8</span>
+                                    </label>
+                                    <input type="range" class="form-range" id="high-confidence-threshold" 
+                                           min="0.5" max="1.0" step="0.05" value="0.8">
+                                    <small class="form-text text-muted">
+                                        Items above this threshold are automatically categorized
+                                    </small>
+                                </div>
+                                
+                                <div class="threshold-slider">
+                                    <label for="medium-confidence-threshold" class="form-label">
+                                        Medium Confidence Threshold: <span id="medium-confidence-value">0.6</span>
+                                    </label>
+                                    <input type="range" class="form-range" id="medium-confidence-threshold" 
+                                           min="0.3" max="0.8" step="0.05" value="0.6">
+                                    <small class="form-text text-muted">
+                                        Items in this range require supervisor approval
+                                    </small>
+                                </div>
+                                
+                                <div class="threshold-slider">
+                                    <label for="review-threshold" class="form-label">
+                                        Review Required Threshold: <span id="review-threshold-value">0.4</span>
+                                    </label>
+                                    <input type="range" class="form-range" id="review-threshold" 
+                                           min="0.1" max="0.6" step="0.05" value="0.4">
+                                    <small class="form-text text-muted">
+                                        Items below this threshold require manual review
+                                    </small>
+                                </div>
+                                
+                                <div class="mt-4">
+                                    <button class="btn btn-primary action-button" id="save-thresholds">
+                                        Save Thresholds
+                                    </button>
+                                    <button class="btn btn-outline-secondary action-button ms-2" id="reset-thresholds">
+                                        Reset to Defaults
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-4">
+                        <div class="card settings-card h-100">
+                            <div class="card-header">
+                                <h5 class="card-title mb-0">Impact Preview</h5>
+                            </div>
+                            <div class="card-body">
+                                <canvas id="threshold-impact-chart"></canvas>
+                                <div class="mt-3">
+                                    <div class="d-flex justify-content-between">
+                                        <span class="text-success">Auto-categorized:</span>
+                                        <strong id="auto-count">--</strong>
+                                    </div>
+                                    <div class="d-flex justify-content-between">
+                                        <span class="text-warning">Needs approval:</span>
+                                        <strong id="approval-count">--</strong>
+                                    </div>
+                                    <div class="d-flex justify-content-between">
+                                        <span class="text-danger">Needs review:</span>
+                                        <strong id="review-count">--</strong>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Industry Ratios Tab -->
+            <div class="tab-pane fade" id="ratios" role="tabpanel">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="card settings-card">
+                            <div class="card-header">
+                                <h5 class="card-title mb-0">Target Industry Ratios</h5>
+                                <small class="text-muted">Set target distribution for equipment categories</small>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-4">
+                                    <label class="form-label">
+                                        <span class="category-badge category-party">Party/Event Equipment</span>
+                                        Target: <span id="party-target-value">30%</span>
+                                    </label>
+                                    <input type="range" class="form-range" id="party-ratio-target" 
+                                           min="10" max="60" step="5" value="30">
+                                    <div class="mt-2">
+                                        <small class="text-success">Current: <span id="party-current">--</span></small>
+                                    </div>
+                                </div>
+                                
+                                <div class="mb-4">
+                                    <label class="form-label">
+                                        <span class="category-badge category-construction">Construction/DIY</span>
+                                        Target: <span id="construction-target-value">50%</span>
+                                    </label>
+                                    <input type="range" class="form-range" id="construction-ratio-target" 
+                                           min="30" max="70" step="5" value="50">
+                                    <div class="mt-2">
+                                        <small class="text-success">Current: <span id="construction-current">--</span></small>
+                                    </div>
+                                </div>
+                                
+                                <div class="mb-4">
+                                    <label class="form-label">
+                                        <span class="category-badge category-landscaping">Landscaping</span>
+                                        Target: <span id="landscaping-target-value">15%</span>
+                                    </label>
+                                    <input type="range" class="form-range" id="landscaping-ratio-target" 
+                                           min="5" max="30" step="5" value="15">
+                                    <div class="mt-2">
+                                        <small class="text-success">Current: <span id="landscaping-current">--</span></small>
+                                    </div>
+                                </div>
+                                
+                                <div class="mb-4">
+                                    <label class="form-label">
+                                        <span class="category-badge category-mixed">Mixed/Other</span>
+                                        Target: <span id="mixed-target-value">5%</span>
+                                    </label>
+                                    <input type="range" class="form-range" id="mixed-ratio-target" 
+                                           min="0" max="20" step="5" value="5">
+                                    <div class="mt-2">
+                                        <small class="text-success">Current: <span id="mixed-current">--</span></small>
+                                    </div>
+                                </div>
+                                
+                                <div class="mt-4">
+                                    <button class="btn btn-primary action-button" id="save-ratios">
+                                        Save Target Ratios
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <div class="card settings-card h-100">
+                            <div class="card-header">
+                                <h5 class="card-title mb-0">Current vs Target Distribution</h5>
+                            </div>
+                            <div class="card-body">
+                                <canvas id="ratio-comparison-chart"></canvas>
+                                
+                                <div class="mt-3">
+                                    <div class="alert alert-info alert-custom" id="ratio-recommendations">
+                                        <strong>Recommendations:</strong>
+                                        <ul id="ratio-rec-list" class="mb-0 mt-2">
+                                            <li>Loading recommendations...</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Keywords & Rules Tab -->
+            <div class="tab-pane fade" id="keywords" role="tabpanel">
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="card settings-card">
+                            <div class="card-header">
+                                <h5 class="card-title mb-0">Party/Event Keywords</h5>
+                            </div>
+                            <div class="card-body">
+                                <div id="party-keywords" class="mb-3">
+                                    <!-- Keywords will be loaded here -->
+                                </div>
+                                <div class="input-group">
+                                    <input type="text" class="form-control" id="new-party-keyword" 
+                                           placeholder="Add keyword...">
+                                    <button class="btn btn-primary" id="add-party-keyword">Add</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-4">
+                        <div class="card settings-card">
+                            <div class="card-header">
+                                <h5 class="card-title mb-0">Construction/DIY Keywords</h5>
+                            </div>
+                            <div class="card-body">
+                                <div id="construction-keywords" class="mb-3">
+                                    <!-- Keywords will be loaded here -->
+                                </div>
+                                <div class="input-group">
+                                    <input type="text" class="form-control" id="new-construction-keyword" 
+                                           placeholder="Add keyword...">
+                                    <button class="btn btn-primary" id="add-construction-keyword">Add</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-4">
+                        <div class="card settings-card">
+                            <div class="card-header">
+                                <h5 class="card-title mb-0">Landscaping Keywords</h5>
+                            </div>
+                            <div class="card-body">
+                                <div id="landscaping-keywords" class="mb-3">
+                                    <!-- Keywords will be loaded here -->
+                                </div>
+                                <div class="input-group">
+                                    <input type="text" class="form-control" id="new-landscaping-keyword" 
+                                           placeholder="Add keyword...">
+                                    <button class="btn btn-primary" id="add-landscaping-keyword">Add</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row mt-4">
+                    <div class="col-12">
+                        <div class="card settings-card">
+                            <div class="card-header">
+                                <h5 class="card-title mb-0">Classification Methods</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-3">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="keyword-match" checked>
+                                            <label class="form-check-label" for="keyword-match">
+                                                <strong>Keyword Matching</strong>
+                                                <br><small class="text-muted">Match item names/descriptions to keywords</small>
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="ml-classification">
+                                            <label class="form-check-label" for="ml-classification">
+                                                <strong>ML Classification</strong>
+                                                <br><small class="text-muted">Use machine learning models</small>
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="manual-override" checked>
+                                            <label class="form-check-label" for="manual-override">
+                                                <strong>Manual Override</strong>
+                                                <br><small class="text-muted">Allow manual categorization</small>
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="rule-based" checked>
+                                            <label class="form-check-label" for="rule-based">
+                                                <strong>Rule-based Logic</strong>
+                                                <br><small class="text-muted">Apply business rules</small>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="mt-4">
+                                    <button class="btn btn-primary action-button" id="save-methods">
+                                        Save Classification Methods
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Categorization Results Tab -->
+            <div class="tab-pane fade" id="results" role="tabpanel">
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <div class="card settings-card">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h5 class="card-title mb-0">Run Categorization</h5>
+                                <div>
+                                    <button class="btn btn-success action-button" id="run-categorization">
+                                        <i class="bi bi-play-fill"></i> Run Full Categorization
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <label for="batch-size" class="form-label">Batch Size</label>
+                                    <select class="form-select" id="batch-size">
+                                        <option value="100">100 items</option>
+                                        <option value="500">500 items</option>
+                                        <option value="1000" selected>1000 items</option>
+                                        <option value="2000">2000 items</option>
+                                    </select>
+                                    <div class="form-text">Process items in batches to manage performance</div>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="overwrite-existing">
+                                        <label class="form-check-label" for="overwrite-existing">
+                                            Overwrite existing categorizations
+                                        </label>
+                                    </div>
+                                </div>
+                                
+                                <div id="categorization-progress" class="d-none">
+                                    <div class="progress mb-2">
+                                        <div class="progress-bar" role="progressbar" style="width: 0%"></div>
+                                    </div>
+                                    <small class="text-muted">Processing items...</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <div class="card settings-card">
+                            <div class="card-header">
+                                <h5 class="card-title mb-0">Last Categorization Results</h5>
+                            </div>
+                            <div class="card-body">
+                                <div id="categorization-results">
+                                    <div class="text-center text-muted">
+                                        No categorization results available
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-12">
+                        <div class="card settings-card">
+                            <div class="card-header">
+                                <h5 class="card-title mb-0">Categorization Statistics</h5>
+                            </div>
+                            <div class="card-body">
+                                <canvas id="categorization-stats-chart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css">
+    
+    <!-- Custom JavaScript -->
+    <script src="{{ url_for('static', filename='js/categorization-settings.js') }}"></script>
+</body>
+</html>

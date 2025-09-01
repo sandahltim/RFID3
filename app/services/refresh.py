@@ -434,6 +434,14 @@ def update_transactions(session, transactions):
                     )
                     skipped += 1
                     continue
+                
+                # Filter out problematic records where scan_date equals tag_id (API data error)
+                if scan_date == tag_id:
+                    logger.info(
+                        f"Skipping transaction with scan_date=tag_id (known API error): tag_id={tag_id}"
+                    )
+                    skipped += 1
+                    continue
                 scan_date_dt = validate_date(scan_date, "scan_date", tag_id)
                 if not scan_date_dt:
                     logger.warning(
