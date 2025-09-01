@@ -114,7 +114,7 @@ def create_app():
         from app.routes.tab3 import tab3_bp
         from app.routes.tab4 import tab4_bp
         from app.routes.tab5 import tab5_bp
-        from app.routes.tab7 import tab7_bp
+        from app.routes.tab7 import tab7_bp, executive_api_bp
         from app.routes.categories import categories_bp
         from app.routes.health import health_bp
         from app.routes.tabs import tabs_bp
@@ -139,6 +139,7 @@ def create_app():
         from app.routes.user_suggestions_routes import suggestions_routes_bp
         from app.routes.system_health import system_health_bp
         from app.routes.executive_dashboard import executive_bp
+        from app.routes.scorecard_correlation_api import scorecard_correlation_bp
 
         app.register_blueprint(home_bp)
         app.register_blueprint(tab1_bp)
@@ -147,6 +148,7 @@ def create_app():
         app.register_blueprint(tab4_bp)
         app.register_blueprint(tab5_bp)
         app.register_blueprint(tab7_bp)
+        app.register_blueprint(executive_api_bp)
         app.register_blueprint(categories_bp)
         app.register_blueprint(inventory_analytics_bp)
         app.register_blueprint(enhanced_analytics_bp)
@@ -172,6 +174,7 @@ def create_app():
         app.register_blueprint(suggestions_routes_bp)
         app.register_blueprint(system_health_bp)
         app.register_blueprint(executive_bp)
+        app.register_blueprint(scorecard_correlation_bp)
         app.logger.info("Blueprints registered successfully")
 
         # Set up performance monitoring middleware
