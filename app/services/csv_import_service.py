@@ -962,8 +962,13 @@ class CSVImportService:
                     # Extract base data that applies to all records
                     base_data = self._extract_base_scorecard_data(row, df.columns)
                     
+                    # Skip rows with invalid dates
                     if not base_data.get('week_ending_sunday'):
-                        logger.warning(f"Skipping row with invalid date: {row.to_dict()}")
+                        continue
+                    
+                    # Skip rows with only future dates and no actual business data
+                    # Future rows only have week numbers but no revenue/operational data
+                    if not self._has_any_business_data(row, df.columns):
                         continue
                     
                     # COMPANY-WIDE RECORD (store_code = "000")
@@ -1145,6 +1150,27 @@ class CSVImportService:
                     break
         
         return metrics
+
+    def _has_any_business_data(self, row, columns) -> bool:
+        """Check if row has any actual business data (not just date and week number)"""
+        # Key indicators of actual business data
+        business_indicators = [
+            'total weekly revenue',
+            '3607 revenue', '6800 revenue', '728 revenue', '8101 revenue',
+            '# new open contracts',
+            '$ on reservation',
+            'total discount',
+            '# open quotes'
+        ]
+        
+        for col in columns:
+            col_lower = col.lower().strip()
+            if any(indicator in col_lower for indicator in business_indicators):
+                value = row[col]
+                if pd.notna(value) and value != 0 and str(value).strip() not in ['', '0', '$0']:
+                    return True
+        
+        return False
 
     def _has_meaningful_store_data(self, store_record: Dict) -> bool:
         """Check if store record has any meaningful data beyond base fields"""
