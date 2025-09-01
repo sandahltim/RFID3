@@ -14,6 +14,7 @@ class QRScanner {
         this.cameras = [];
         this.currentCameraIndex = 0;
         this.facingMode = 'environment'; // Start with back camera
+        this.cameraSupported = true;
         
         // Performance tracking
         this.scanCount = 0;
@@ -75,54 +76,48 @@ class QRScanner {
     }
     
     setupEventListeners() {
-        // Toggle scanner button
-        this.elements.toggleBtn?.addEventListener('click', () => {
-            if (this.scanning) {
-                this.stopScanning();
-            } else {
+        // Store bound functions for cleanup
+        this.boundHandlers = {
+            toggleScanner: () => {
+                if (this.scanning) {
+                    this.stopScanning();
+                } else {
+                    this.startScanning();
+                }
+            },
+            toggleManual: () => this.toggleManualEntry(),
+            switchCamera: () => this.switchCamera(),
+            manualLookup: () => this.performManualLookup(),
+            keypress: (e) => {
+                if (e.key === 'Enter') {
+                    this.performManualLookup();
+                }
+            },
+            clearResults: () => this.clearResults(),
+            scanAgain: () => {
+                this.clearResults();
                 this.startScanning();
             }
-        });
+        };
         
-        // Manual entry button
-        this.elements.manualBtn?.addEventListener('click', () => {
-            this.toggleManualEntry();
-        });
-        
-        // Switch camera button
-        this.elements.switchCameraBtn?.addEventListener('click', () => {
-            this.switchCamera();
-        });
-        
-        // Manual lookup
-        this.elements.manualLookupBtn?.addEventListener('click', () => {
-            this.performManualLookup();
-        });
-        
-        this.elements.manualInput?.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                this.performManualLookup();
-            }
-        });
-        
-        // Result actions
-        this.elements.clearResultsBtn?.addEventListener('click', () => {
-            this.clearResults();
-        });
-        
-        this.elements.scanAgainBtn?.addEventListener('click', () => {
-            this.clearResults();
-            this.startScanning();
-        });
-        
-        // Video events
+        // Add event listeners
+        this.elements.toggleBtn?.addEventListener('click', this.boundHandlers.toggleScanner);
+        this.elements.manualBtn?.addEventListener('click', this.boundHandlers.toggleManual);
+        this.elements.switchCameraBtn?.addEventListener('click', this.boundHandlers.switchCamera);
+        this.elements.manualLookupBtn?.addEventListener('click', this.boundHandlers.manualLookup);
+        this.elements.manualInput?.addEventListener('keypress', this.boundHandlers.keypress);
+        this.elements.clearResultsBtn?.addEventListener('click', this.boundHandlers.clearResults);
+        this.elements.scanAgainBtn?.addEventListener('click', this.boundHandlers.scanAgain);
         this.video?.addEventListener('play', this.onVideoPlay);
     }
     
     async checkCameraSupport() {
-        // Check HTTPS requirement first
+        // Check HTTPS requirement first - but don't throw error, just disable camera
         if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
-            throw new Error('Camera access requires HTTPS. Please use https:// or access via localhost for testing.');
+            console.warn('Camera access requires HTTPS. Camera disabled - using manual entry only.');
+            this.cameraSupported = false;
+            this.highlightManualEntry('Camera requires HTTPS - Use manual entry below');
+            return;
         }
         
         // Check for modern mediaDevices API
@@ -172,6 +167,13 @@ class QRScanner {
     }
     
     async startScanning() {
+        // Check if camera is supported (HTTPS, etc.)
+        if (!this.cameraSupported) {
+            this.showError('Camera not available. Please use Manual Entry below.');
+            this.highlightManualEntry('Camera not available - Use manual entry');
+            return;
+        }
+        
         try {
             this.showLoading();
             this.elements.toggleBtn.disabled = true;
@@ -325,7 +327,7 @@ class QRScanner {
                 
             case 'NotSupportedError':
                 return 'Camera access not supported. Please:\n' +
-                       '1. Ensure you\\'re using HTTPS (required for camera access)\n' +
+                       '1. Ensure you\'re using HTTPS (required for camera access)\n' +
                        '2. Update your browser to the latest version\n' +
                        '3. Check browser camera permissions\n' +
                        'Or use Manual Entry below as an alternative.';
@@ -616,6 +618,33 @@ class QRScanner {
         this.elements.manualInput.value = '';
     }
     
+    cleanup() {
+        // Stop any ongoing scanning
+        this.stopScanning();
+        
+        // Remove event listeners to prevent memory leaks
+        if (this.boundHandlers) {
+            this.elements.toggleBtn?.removeEventListener('click', this.boundHandlers.toggleScanner);
+            this.elements.manualBtn?.removeEventListener('click', this.boundHandlers.toggleManual);
+            this.elements.switchCameraBtn?.removeEventListener('click', this.boundHandlers.switchCamera);
+            this.elements.manualLookupBtn?.removeEventListener('click', this.boundHandlers.manualLookup);
+            this.elements.manualInput?.removeEventListener('keypress', this.boundHandlers.keypress);
+            this.elements.clearResultsBtn?.removeEventListener('click', this.boundHandlers.clearResults);
+            this.elements.scanAgainBtn?.removeEventListener('click', this.boundHandlers.scanAgain);
+        }
+        
+        this.video?.removeEventListener('play', this.onVideoPlay);
+        
+        // Clear references
+        this.boundHandlers = null;
+        this.elements = {};
+        this.video = null;
+        this.canvas = null;
+        this.context = null;
+        this.stream = null;
+        this.cameras = [];
+    }
+    
     updatePerformanceStats() {
         this.frameCount++;
         const now = Date.now();
@@ -774,31 +803,7 @@ class BrowserCompatibility {
     }
 }
 
-// Initialize QR Scanner when DOM is loaded
-document.addEventListener('DOMContentLoaded', () => {
-    // Only initialize on home page
-    if (window.location.pathname === '/' || window.location.pathname === '/home') {
-        // Check browser compatibility first
-        const compatibility = BrowserCompatibility.checkCameraSupport();
-        
-        // Log compatibility info for debugging
-        console.log('QR Scanner Initialization:', compatibility);
-        
-        // Show compatibility notice if there are issues
-        if (!compatibility.supportsCamera) {
-            BrowserCompatibility.showCompatibilityNotice(compatibility);
-        }
-        
-        // Initialize scanner
-        try {
-            window.qrScanner = new QRScanner();
-        } catch (error) {
-            console.error('QR Scanner initialization failed:', error);
-            // Show fallback message
-            BrowserCompatibility.showInitializationError(error);
-        }
-    }
-});
+// Removed duplicate initialization block - using the one at end of file
 
 // Browser compatibility helper methods
 BrowserCompatibility.showCompatibilityNotice = function(compatibility) {
@@ -838,9 +843,37 @@ BrowserCompatibility.showInitializationError = function(error) {
 // Cleanup on page unload
 window.addEventListener('beforeunload', () => {
     if (window.qrScanner) {
-        window.qrScanner.stopScanning();
+        window.qrScanner.cleanup();
     }
 });
 
 // Export for debugging
 window.BrowserCompatibility = BrowserCompatibility;
+
+// Initialize QR scanner when DOM is loaded
+document.addEventListener('DOMContentLoaded', function() {
+    // Only initialize on home page (where QR scanner exists)
+    const scannerContainer = document.querySelector('#scanner-container');
+    if (scannerContainer) {
+        console.log('Initializing QR Scanner...');
+        try {
+            window.qrScanner = new QRScanner();
+            console.log('QR Scanner initialized successfully');
+        } catch (error) {
+            console.error('Failed to initialize QR Scanner:', error);
+            // Show error message to user
+            const errorContainer = document.querySelector('#scanner-error');
+            if (errorContainer) {
+                const errorElement = errorContainer.querySelector('.alert') || errorContainer;
+                errorElement.innerHTML = `
+                    <strong>QR Scanner Initialization Failed</strong><br>
+                    ${error.message}<br><br>
+                    <em>Please use Manual Entry below to input codes.</em>
+                `;
+                errorContainer.style.display = 'block';
+            }
+        }
+    } else {
+        console.log('QR Scanner not initialized - not on home page');
+    }
+});

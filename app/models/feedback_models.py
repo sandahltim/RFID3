@@ -203,7 +203,7 @@ class CorrelationSuggestions(db.Model):
     # Voting and community feedback
     upvotes = db.Column(db.Integer, default=0)
     downvotes = db.Column(db.Integer, default=0)
-    community_comments = db.relationship("SuggestionComments", back_populates="suggestion", lazy="dynamic")
+    community_comments = db.relationship("CorrelationSuggestionComments", back_populates="suggestion", lazy="dynamic")
     
     # Processing
     submitted_date = db.Column(db.DateTime, default=datetime.utcnow)
@@ -240,9 +240,9 @@ class CorrelationSuggestions(db.Model):
             'implementation_date': self.implementation_date.isoformat() if self.implementation_date else None
         }
 
-class SuggestionComments(db.Model):
+class CorrelationSuggestionComments(db.Model):
     """Comments on correlation suggestions"""
-    __tablename__ = "suggestion_comments"
+    __tablename__ = "correlation_suggestion_comments"
     __table_args__ = (
         db.Index("idx_comment_suggestion", "suggestion_id"),
         db.Index("idx_comment_date", "comment_date"),

@@ -8,6 +8,7 @@ import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple, Any
+from app.models.db_models import PLData
 import glob
 from sqlalchemy import text, create_engine
 from sqlalchemy.orm import sessionmaker
@@ -232,7 +233,9 @@ class CSVImportService:
                 db.session.execute(text("ALTER TABLE pos_equipment ADD COLUMN rfid_rental_class_num VARCHAR(255)"))
                 db.session.commit()
                 logger.info("Added rfid_rental_class_num column to pos_equipment")
-            except:
+            except SQLAlchemyError as e:
+                db.session.rollback()
+                logger.debug(f"Column already exists or other SQL error: {str(e)}")
                 pass  # Column already exists
             
             result = db.session.execute(correlation_query)
@@ -747,7 +750,7 @@ class CSVImportService:
         }
         
         import_results = {}
-        import_batch_id = datetime.now().strftime("%Y%m%d_%H%M%S")
+        import_batch_id_id = datetime.now().strftime("%Y%m%d_%H%M%S")
         
         # CSV configurations with all 7 files
         csv_configs = {
@@ -846,7 +849,7 @@ class CSVImportService:
         total_imports = len(import_results)
         
         summary = {
-            "batch_id": import_batch_id,
+            "batch_id": import_batch_id_id,
             "timestamp": datetime.now().isoformat(),
             "total_file_types": total_imports,
             "successful_imports": successful_imports,
@@ -860,28 +863,20 @@ class CSVImportService:
         return summary
 
     def import_scorecard_trends(self, file_path: str) -> Dict:
-        """Import scorecard trends data from ScorecardTrends*.csv"""
-        logger.info(f"Starting scorecard trends import from: {file_path}")
+        """Import scorecard trends data from ScorecardTrends*.csv with proper store marker support"""
+        logger.info(f"Starting FIXED scorecard trends import from: {file_path}")
         
         try:
-            # Read CSV and handle wide format with many columns
+            # Read CSV with all columns preserved
             df = pd.read_csv(file_path, encoding='utf-8', low_memory=False)
+            logger.info(f"Original CSV shape: {df.shape}")
+            logger.info(f"CSV columns: {list(df.columns)}")
             
-            # Remove empty/unnamed columns that are common in Excel exports
-            meaningful_cols = []
-            for col in df.columns:
-                if not str(col).startswith('Unnamed:') and pd.notna(col):
-                    if df[col].dropna().nunique() > 0:  # Has actual data
-                        meaningful_cols.append(col)
+            # Clean the data first
+            df = self._clean_scorecard_data_fixed(df)
             
-            df = df[meaningful_cols[:50]]  # Limit to first 50 meaningful columns
-            logger.info(f"Scorecard CSV processed: {len(df)} records, {len(df.columns)} columns")
-            
-            # Clean the data
-            df = self._clean_scorecard_data(df)
-            
-            # Import in batches
-            imported_count = self._import_scorecard_batch(df)
+            # Import using new normalized approach with store markers
+            imported_count = self._import_scorecard_batch_fixed(df)
             
             return {
                 "success": True,
@@ -894,128 +889,318 @@ class CSVImportService:
             logger.error(f"Scorecard import failed: {str(e)}", exc_info=True)
             return {"success": False, "error": str(e)}
 
-    def import_payroll_trends(self, file_path: str) -> Dict:
-        """Import payroll trends data from PayrollTrends*.csv"""
-        logger.info(f"Starting payroll trends import from: {file_path}")
-        
-        try:
-            df = pd.read_csv(file_path, encoding='utf-8', low_memory=False)
-            logger.info(f"Payroll CSV shape: {df.shape}")
-            
-            # Clean the data
-            df = self._clean_payroll_data(df)
-            
-            # Import in batches
-            imported_count = self._import_payroll_batch(df)
-            
-            return {
-                "success": True,
-                "file_path": file_path,
-                "total_records": len(df),
-                "imported_records": imported_count
-            }
-            
-        except Exception as e:
-            logger.error(f"Payroll import failed: {str(e)}", exc_info=True)
-            return {"success": False, "error": str(e)}
 
-    def import_profit_loss(self, file_path: str) -> Dict:
-        """Import profit & loss data from PL*.csv"""
-        logger.info(f"Starting P&L import from: {file_path}")
-        
-        try:
-            df = pd.read_csv(file_path, encoding='utf-8', low_memory=False)
-            logger.info(f"P&L CSV shape: {df.shape}")
-            
-            # Clean the data
-            df = self._clean_profit_loss_data(df)
-            
-            # Import in batches
-            imported_count = self._import_profit_loss_batch(df)
-            
-            return {
-                "success": True,
-                "file_path": file_path,
-                "total_records": len(df),
-                "imported_records": imported_count
-            }
-            
-        except Exception as e:
-            logger.error(f"P&L import failed: {str(e)}", exc_info=True)
-            return {"success": False, "error": str(e)}
-
+    # Legacy function aliases for backward compatibility
     def _clean_scorecard_data(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Clean scorecard trends data"""
-        # Handle date columns
-        for col in df.columns:
-            if 'date' in col.lower() or 'week' in col.lower():
-                df[col] = pd.to_datetime(df[col], errors='coerce')
-        
-        # Convert numeric columns
-        for col in df.columns:
-            if df[col].dtype == 'object':
-                # Try to convert to numeric if it looks numeric
-                try:
-                    numeric_series = pd.to_numeric(df[col].astype(str).str.replace(',', '').str.replace('$', ''), errors='coerce')
-                    if not numeric_series.isna().all():
-                        df[col] = numeric_series.fillna(0)
-                except:
-                    pass
-        
-        return df
+        """Legacy alias for _clean_scorecard_data_fixed"""
+        return self._clean_scorecard_data_fixed(df)
 
     def _import_scorecard_batch(self, df: pd.DataFrame) -> int:
-        """Import scorecard trends batch"""
+        """Legacy alias for _import_scorecard_batch_fixed"""
+        return self._import_scorecard_batch_fixed(df)
+    def _clean_scorecard_data_fixed(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Clean scorecard data with proper column handling for actual CSV structure"""
+        logger.info(f"Cleaning scorecard data: {len(df)} records")
+        
+        # Handle the Week ending Sunday column (date parsing)
+        date_columns = [col for col in df.columns if 'week' in col.lower() and 'ending' in col.lower()]
+        for col in date_columns:
+            df[col] = pd.to_datetime(df[col], errors='coerce')
+            logger.info(f"Processed date column: {col}")
+        
+        # Convert financial/numeric columns (handle $, comma formatting)
+        financial_patterns = ['revenue', 'reservation', 'discount', 'ar', 'cash']
+        for col in df.columns:
+            if any(pattern in col.lower() for pattern in financial_patterns):
+                if df[col].dtype == 'object':
+                    # Clean financial data: remove $, commas, handle empty strings
+                    df[col] = df[col].astype(str).str.replace(r'[$,]', '', regex=True)
+                    df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+                    logger.debug(f"Processed financial column: {col}")
+        
+        # Convert integer columns (contracts, quotes, deliveries)
+        integer_patterns = ['contracts', 'quotes', 'deliveries', 'week number']
+        for col in df.columns:
+            if any(pattern in col.lower() for pattern in integer_patterns):
+                if col.lower() != 'week ending sunday':  # Don't convert date column
+                    df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0).astype(int)
+                    logger.debug(f"Processed integer column: {col}")
+        
+        # Handle percentage columns (AR aging)
+        percentage_patterns = ['%', 'percent']
+        for col in df.columns:
+            if any(pattern in col.lower() for pattern in percentage_patterns):
+                if df[col].dtype == 'object':
+                    # Remove % sign and convert to decimal
+                    df[col] = df[col].astype(str).str.replace('%', '').str.strip()
+                    df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+                    logger.debug(f"Processed percentage column: {col}")
+        
+        logger.info(f"Data cleaning completed: {len(df)} clean records")
+        return df
+
+    def _import_scorecard_batch_fixed(self, df: pd.DataFrame) -> int:
+        """Import scorecard data with proper store marker support and column mapping"""
         imported_count = 0
         session = self.Session()
         
         try:
-            # Create table if it doesn't exist
-            self._ensure_scorecard_table_exists(session)
+            # Store mapping configuration
+            STORE_MAPPING = {
+                '3607': 'Wayzata',
+                '6800': 'Brooklyn Park', 
+                '728': 'Elk River',
+                '8101': 'Fridley'
+            }
             
-            # Convert DataFrame to records and insert
+            # Build column mapping based on actual CSV structure vs database columns
+            column_mapping = self._build_scorecard_column_mapping(df.columns)
+            logger.info(f"Built column mapping for {len(column_mapping)} columns")
+            
             for _, row in df.iterrows():
                 try:
-                    # Create a generic record structure
-                    record_data = {}
-                    for col in df.columns:
-                        clean_col = self._clean_column_name(col)
-                        value = row[col]
-                        if pd.isna(value):
-                            record_data[clean_col] = None
-                        else:
-                            record_data[clean_col] = value
+                    # Extract base data that applies to all records
+                    base_data = self._extract_base_scorecard_data(row, df.columns)
                     
-                    # Add metadata
-                    record_data['import_date'] = datetime.now()
-                    record_data['import_batch'] = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    if not base_data.get('week_ending_sunday'):
+                        logger.warning(f"Skipping row with invalid date: {row.to_dict()}")
+                        continue
                     
-                    # Insert using dynamic SQL
-                    columns = list(record_data.keys())
-                    placeholders = ', '.join([f":{col}" for col in columns])
+                    # COMPANY-WIDE RECORD (store_code = "000")
+                    # Contains aggregated data for entire company
+                    company_record = {
+                        **base_data,
+                        'store_code': '000',
+                        'import_batch_id': int(datetime.now().strftime('%m%d%H%M')),
+                        # Skip created_at - it auto-generates
+                    }
                     
-                    insert_sql = text(f"""
-                        INSERT INTO pos_scorecard_trends ({', '.join(columns)})
-                        VALUES ({placeholders})
-                        ON DUPLICATE KEY UPDATE import_date = VALUES(import_date)
-                    """)
+                    # Add company-wide metrics
+                    company_record.update(self._extract_company_wide_metrics(row, df.columns))
                     
-                    session.execute(insert_sql, record_data)
+                    # Insert company-wide record
+                    self._insert_scorecard_record(session, company_record)
                     imported_count += 1
                     
+                    # STORE-SPECIFIC RECORDS (store_code = store codes)
+                    # Create individual records for each store with their specific data
+                    for store_code, store_name in STORE_MAPPING.items():
+                        store_record = {
+                            **base_data,
+                            'store_code': store_code,
+                            'import_batch_id': int(datetime.now().strftime('%m%d%H%M')),
+                        # Skip created_at - it auto-generates
+                        }
+                        
+                        # Add store-specific metrics
+                        store_record.update(self._extract_store_specific_metrics(row, df.columns, store_code))
+                        
+                        # Only insert if store has meaningful data
+                        if self._has_meaningful_store_data(store_record):
+                            self._insert_scorecard_record(session, store_record)
+                            imported_count += 1
+                        else:
+                            logger.debug(f"Skipping store {store_code} record - no meaningful data")
+                    
                 except Exception as e:
-                    logger.warning(f"Error importing scorecard record: {e}")
+                    logger.warning(f"Error processing scorecard row: {e}")
                     continue
             
             session.commit()
+            logger.info(f"Successfully imported {imported_count} scorecard records (company-wide + store-specific)")
             
         except Exception as e:
             session.rollback()
             logger.error(f"Scorecard batch import failed: {e}")
+            raise
         finally:
             session.close()
         
         return imported_count
+
+    def _build_scorecard_column_mapping(self, csv_columns) -> Dict[str, str]:
+        """Build mapping from CSV column names to database column names"""
+        mapping = {}
+        
+        for col in csv_columns:
+            col_clean = col.strip()
+            
+            # Date columns
+            if 'week ending sunday' in col_clean.lower():
+                mapping[col] = 'week_ending_sunday'
+            
+            # Revenue columns - map to new store revenue fields
+            elif '3607 revenue' in col_clean.lower():
+                mapping[col] = 'col_3607_revenue'
+            elif '6800 revenue' in col_clean.lower():
+                mapping[col] = 'col_6800_revenue' 
+            elif '728 revenue' in col_clean.lower():
+                mapping[col] = 'col_728_revenue'
+            elif '8101 revenue' in col_clean.lower():
+                mapping[col] = 'col_8101_revenue'
+            elif 'total weekly revenue' in col_clean.lower():
+                mapping[col] = 'total_weekly_revenue'
+                
+            # Contract columns
+            elif '# new open contracts 3607' in col_clean.lower():
+                mapping[col] = 'new_open_contracts_3607'
+            elif '# new open contracts 6800' in col_clean.lower():
+                mapping[col] = 'new_open_contracts_6800'
+            elif '# new open contracts 728' in col_clean.lower():
+                mapping[col] = 'new_open_contracts_728'
+            elif '# new open contracts 8101' in col_clean.lower():
+                mapping[col] = 'new_open_contracts_8101'
+                
+            # Reservation columns
+            elif 'total $ on reservation 3607' in col_clean.lower():
+                mapping[col] = 'total_on_reservation_3607'
+            elif 'total $ on reservation 6800' in col_clean.lower():
+                mapping[col] = 'total_on_reservation_6800'
+            elif 'total $ on reservation 728' in col_clean.lower():
+                mapping[col] = 'total_on_reservation_728'
+            elif 'total $ on reservation 8101' in col_clean.lower():
+                mapping[col] = 'total_on_reservation_8101'
+                
+            # Other important columns
+            elif 'deliveries scheduled next 7 days' in col_clean.lower():
+                mapping[col] = 'deliveries_scheduled_next_7_days_weds_tues_8101'
+            elif 'week number' in col_clean.lower():
+                mapping[col] = 'week_number'
+        
+        return mapping
+
+    def _extract_base_scorecard_data(self, row, columns) -> Dict:
+        """Extract base data that applies to all scorecard records"""
+        base_data = {}
+        
+        # Find and extract week ending date
+        for col in columns:
+            if 'week ending sunday' in col.lower():
+                date_val = row[col]
+                if pd.notna(date_val):
+                    base_data['week_ending_sunday'] = date_val
+                    break
+        
+        # Extract total weekly revenue 
+        for col in columns:
+            if 'total weekly revenue' in col.lower():
+                revenue_val = row[col]
+                if pd.notna(revenue_val):
+                    base_data['total_weekly_revenue'] = float(revenue_val)
+                    break
+        
+        return base_data
+
+    def _extract_company_wide_metrics(self, row, columns) -> Dict:
+        """Extract company-wide aggregated metrics"""
+        metrics = {}
+        
+        # Company-wide metrics (totals, percentages, etc.)
+        for col in columns:
+            col_lower = col.lower()
+            if 'total discount' in col_lower and 'company wide' in col_lower:
+                if pd.notna(row[col]):
+                    metrics['total_discount_company_wide'] = float(row[col])
+            elif '% -total ar' in col_lower and '45 days' in col_lower:
+                if pd.notna(row[col]):
+                    metrics['ar_over_45_days_percent'] = float(row[col])
+            elif 'total ar (cash customers)' in col_lower:
+                if pd.notna(row[col]):
+                    metrics['total_ar_cash_customers'] = float(row[col])
+                    
+        return metrics
+
+    def _extract_store_specific_metrics(self, row, columns, store_code: str) -> Dict:
+        """Extract store-specific metrics for given store code"""
+        metrics = {}
+        
+        # Store revenue
+        revenue_col = f'{store_code} Revenue'
+        for col in columns:
+            if revenue_col.lower() in col.lower():
+                if pd.notna(row[col]):
+                    metrics[f'revenue_{store_code}'] = float(row[col])
+                break
+        
+        # Store contracts
+        for col in columns:
+            if f'# new open contracts {store_code}' in col.lower():
+                if pd.notna(row[col]):
+                    metrics[f'new_open_contracts_{store_code}'] = int(row[col])
+                break
+        
+        # Store reservations
+        for col in columns:
+            if f'total $ on reservation {store_code}' in col.lower():
+                if pd.notna(row[col]):
+                    metrics[f'total_on_reservation_{store_code}'] = float(row[col])
+                break
+        
+        # Store-specific deliveries (8101 only based on CSV)
+        if store_code == '8101':
+            for col in columns:
+                if '# deliveries scheduled next 7 days' in col.lower() and '8101' in col.lower():
+                    if pd.notna(row[col]):
+                        metrics['deliveries_scheduled_next_7_days_weds_tues_8101'] = int(row[col])
+                    break
+        
+        return metrics
+
+    def _has_meaningful_store_data(self, store_record: Dict) -> bool:
+        """Check if store record has any meaningful data beyond base fields"""
+        # Check if any store-specific fields have non-zero values
+        store_fields = [
+            f'revenue_{store_record["store_code"]}',
+            f'new_open_contracts_{store_record["store_code"]}', 
+            f'total_on_reservation_{store_record["store_code"]}',
+            'deliveries_scheduled_next_7_days_weds_tues_8101'
+        ]
+        
+        return any(
+            store_record.get(field, 0) not in [None, 0, 0.0] 
+            for field in store_fields
+        )
+
+    def _insert_scorecard_record(self, session, record_data: Dict):
+        """Insert scorecard record with proper error handling"""
+        try:
+            # Build column list and values for parameterized query
+            columns = []
+            values = {}
+            
+            for key, value in record_data.items():
+                if key in ['week_ending_sunday', 'total_weekly_revenue', 'store_code', 
+                          'col_3607_revenue', 'col_6800_revenue', 'col_728_revenue', 'col_8101_revenue',
+                          'new_open_contracts_3607', 'new_open_contracts_6800', 
+                          'new_open_contracts_728', 'new_open_contracts_8101',
+                          'total_on_reservation_3607', 'total_on_reservation_6800',
+                          'total_on_reservation_728', 'total_on_reservation_8101',
+                          'deliveries_scheduled_next_7_days_weds_tues_8101', 'import_batch_id']:
+                    columns.append(key)
+                    values[key] = value
+            
+            if not columns:
+                logger.warning("No valid columns found for scorecard record insertion")
+                return
+            
+            # Create INSERT statement
+            column_str = ', '.join(columns)
+            placeholder_str = ', '.join([f":{col}" for col in columns])
+            
+            insert_sql = text(f"""
+                INSERT INTO pos_scorecard_trends ({column_str})
+                VALUES ({placeholder_str})
+                ON DUPLICATE KEY UPDATE
+                total_weekly_revenue = VALUES(total_weekly_revenue),
+                import_batch_id = VALUES(import_batch_id)
+            """)
+            
+            session.execute(insert_sql, values)
+            
+        except Exception as e:
+            logger.error(f"Error inserting scorecard record: {e}")
+            logger.error(f"Record data: {record_data}")
+            raise
 
     def _clean_payroll_data(self, df: pd.DataFrame) -> pd.DataFrame:
         """Clean payroll trends data"""
@@ -1055,7 +1240,7 @@ class CSVImportService:
                             record_data[clean_col] = value
                     
                     record_data['import_date'] = datetime.now()
-                    record_data['import_batch'] = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    record_data['import_batch_id'] = datetime.now().strftime("%Y%m%d_%H%M%S")
                     
                     columns = list(record_data.keys())
                     placeholders = ', '.join([f":{col}" for col in columns])
@@ -1084,8 +1269,35 @@ class CSVImportService:
         return imported_count
 
     def _clean_profit_loss_data(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Clean profit & loss data"""
-        # Financial data cleaning
+        """
+        Clean profit & loss data and automatically transpose matrix format to normalized format
+        Handles both original matrix format (PL8.28.25.csv) and transposed format (transposedPL.csv)
+        """
+        logger.info(f"Processing P&L data - Shape: {df.shape}")
+        
+        # Check if this is the matrix format (original PL8.28.25.csv)
+        # Matrix format has store codes as columns (3607, 6800, 728, 8101) and account names
+        # and the first column contains month names (June, July, August, etc.)
+        is_matrix_format = False
+        
+        # Check if first column contains month names
+        if len(df) > 0:
+            first_col_values = df.iloc[:, 0].astype(str).str.strip().str.lower()
+            month_names = ['june', 'july', 'august', 'september', 'october', 'november', 'december', 'january', 'february', 'march', 'april', 'may']
+            if any(month in first_col_values.values for month in month_names):
+                is_matrix_format = True
+        
+        # Also check for store code columns which indicate matrix format
+        if any(col in ['3607', '6800', '728', '8101'] for col in df.columns):
+            is_matrix_format = True
+            
+        if is_matrix_format:
+            logger.info("Detected matrix format P&L data - converting to normalized format")
+            df = self._transpose_pl_matrix(df)
+        else:
+            logger.info("Processing already normalized P&L data")
+        
+        # Standard financial data cleaning
         for col in df.columns:
             if df[col].dtype == 'object':
                 try:
@@ -1099,46 +1311,208 @@ class CSVImportService:
                     pass
         
         return df
+    
+    def _transpose_pl_matrix(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Convert P&L matrix format to database-normalized format with proper account naming
+        Input: Wide format with periods as rows and accounts/stores as columns
+        Output: Long format for database with meaningful account names
+        
+        Structure understanding:
+        - Columns 2-5: Store codes under "Rental Revenue" (implicit)
+        - Column 6: "Sales Revenue" category header  
+        - Columns 7-10: Store codes under "Sales Revenue"
+        - Column 11+: Company-wide accounts (Other Revenue, COGS, etc.)
+        """
+        logger.info("Converting P&L matrix to normalized format with proper account naming...")
+        
+        try:
+            data_df = df.copy()
+            store_codes = ['3607', '6800', '728', '8101']
+            
+            # Build account mapping with proper context understanding
+            account_columns = []
+            current_category = "Rental Revenue"  # First section is implicitly Rental Revenue
+            
+            for col_idx, col_name in enumerate(df.columns):
+                if col_idx < 2:  # Skip period and year columns
+                    continue
+                    
+                col_name = str(col_name).strip()
+                if not col_name or col_name in ['nan', '', 'Unnamed']:
+                    continue
+                
+                # Handle pandas duplicate column renaming (3607.1, 6800.1, etc.)
+                base_col_name = col_name.split('.')[0]  # Remove .1, .2, etc.
+                
+                # Check if this is a store code (including renamed ones)
+                if col_name in store_codes or base_col_name in store_codes:
+                    # Store-specific account under current category
+                    actual_store = base_col_name if base_col_name in store_codes else col_name
+                    if current_category:
+                        account_name = f"{current_category} - {actual_store}"
+                        store_code = actual_store
+                    else:
+                        # Fallback if no category context
+                        account_name = actual_store
+                        store_code = actual_store
+                elif col_name in ['Sales Revenue', 'Rental Revenue', 'Other Revenue', 'COGS', 'Expenses']:
+                    # Category header - update context and also treat as account
+                    current_category = col_name
+                    account_name = col_name  # Company-wide total
+                    store_code = None
+                else:
+                    # Company-wide account (no store breakdown)
+                    account_name = col_name
+                    store_code = None
+                    # Don't update category for individual accounts
+                
+                account_columns.append({
+                    'index': col_idx,
+                    'name': account_name,
+                    'column': col_name,
+                    'store_code': store_code,
+                    'category': current_category
+                })
+                
+                logger.debug(f"Column {col_idx}: '{col_name}' -> Account: '{account_name}', Store: {store_code}, Category: {current_category}")
+            
+            # Build normalized records
+            normalized_records = []
+            
+            for _, row in data_df.iterrows():
+                period = str(row.iloc[0]).strip() if pd.notna(row.iloc[0]) else ""
+                year_str = str(row.iloc[1]).strip() if pd.notna(row.iloc[1]) else ""
+                
+                # Skip invalid periods
+                if not period or period == 'nan' or period == 'TTM':
+                    continue
+                    
+                # Convert year to integer
+                try:
+                    year = int(float(year_str))
+                except (ValueError, TypeError):
+                    continue
+                
+                # Process each account for this period
+                for account_info in account_columns:
+                    try:
+                        amount_value = row.iloc[account_info['index']]
+                        
+                        # Convert to float
+                        if pd.isna(amount_value) or str(amount_value).strip() == '':
+                            amount = 0.0
+                        else:
+                            amount = float(str(amount_value).replace(',', '').replace('$', ''))
+                        
+                        # Only include non-zero amounts
+                        if amount != 0.0:
+                            normalized_records.append({
+                                'account_name': account_info['name'],
+                                'period_month': period,
+                                'period_year': year,
+                                'amount': amount,
+                                'percentage': 0.0,  # Calculate later if needed
+                                'category': account_info.get('category', 'Unknown'),
+                                'account_code': f"PL{account_info['index']:03d}",
+                                'store_code': account_info.get('store_code')
+                            })
+                    except Exception as e:
+                        logger.warning(f"Error processing account {account_info['name']}: {e}")
+                        continue
+            
+            if normalized_records:
+                result_df = pd.DataFrame(normalized_records)
+                logger.info(f"Converted P&L matrix to {len(normalized_records)} normalized records")
+                return result_df
+            else:
+                logger.warning("No valid P&L data found in matrix")
+                # Return empty DataFrame with correct structure
+                return pd.DataFrame(columns=['account_name', 'period_month', 'period_year', 'amount', 'percentage', 'category', 'account_code'])
+            
+        except Exception as e:
+            logger.error(f"Error converting P&L matrix: {str(e)}", exc_info=True)
+            # Return empty DataFrame with correct structure on error
+            return pd.DataFrame(columns=['account_name', 'period_month', 'period_year', 'amount', 'percentage', 'category', 'account_code'])
+
+    def _categorize_pl_account(self, account_name: str) -> str:
+        """Categorize P&L account based on name"""
+        account_lower = account_name.lower()
+        
+        # Store-specific accounts (3607, 6800, 728, 8101 are store codes)
+        if account_name in ['3607', '6800', '728', '8101', '3607.1', '6800.1', '728.1', '8101.1']:
+            return 'Store Revenue'
+        elif any(word in account_lower for word in ['revenue', 'sales', 'income', 'net income']):
+            return 'Revenue'
+        elif any(word in account_lower for word in ['cogs', 'cost of goods', 'merchandise', 'repair parts', 'shop supplies']):
+            return 'Cost of Goods Sold'
+        elif any(word in account_lower for word in ['payroll', 'wages', 'benefits', 'labor', 'contract labor']):
+            return 'Payroll & Benefits'
+        elif any(word in account_lower for word in ['rent', 'occupancy', 'facility']):
+            return 'Occupancy'
+        elif any(word in account_lower for word in ['advertising', 'marketing']):
+            return 'Marketing'
+        elif any(word in account_lower for word in ['office', 'supplies', 'admin', 'accounting', 'professional']):
+            return 'Administrative'
+        elif any(word in account_lower for word in ['loan', 'interest', 'financing', 'large equip']):
+            return 'Financing'
+        elif any(word in account_lower for word in ['fuel', 'gas', 'oil', 'freight', 'uniforms', 'repairs']):
+            return 'Operating Expenses'
+        else:
+            return 'Other'
 
     def _import_profit_loss_batch(self, df: pd.DataFrame) -> int:
-        """Import profit & loss batch"""
+        """Import profit & loss batch into pl_data table"""
         imported_count = 0
         session = self.Session()
         
         try:
-            self._ensure_profit_loss_table_exists(session)
-            
+            # Import into pl_data table (normalized format)
             for _, row in df.iterrows():
                 try:
-                    record_data = {}
-                    for col in df.columns:
-                        clean_col = self._clean_column_name(col)
-                        value = row[col]
-                        if pd.isna(value):
-                            record_data[clean_col] = None
+                    # Check if this is normalized format (has account_name, period_month, etc.)
+                    if 'account_name' in df.columns and 'period_month' in df.columns:
+                        # Normalized format - import directly into pl_data
+                        pl_record = PLData(
+                            account_code=row.get('account_code', ''),
+                            account_name=row.get('account_name', ''),
+                            period_month=row.get('period_month', ''),
+                            period_year=int(row.get('period_year', 2023)),
+                            amount=float(row.get('amount', 0.0)) if pd.notna(row.get('amount', 0.0)) else 0.0,
+                            percentage=float(row.get('percentage', 0.0)) if pd.notna(row.get('percentage', 0.0)) else 0.0,
+                            category=row.get('category', 'Other'),
+                            created_at=datetime.now()
+                        )
+                        
+                        # Check for existing record
+                        existing = session.query(PLData).filter_by(
+                            account_name=pl_record.account_name,
+                            period_month=pl_record.period_month,
+                            period_year=pl_record.period_year
+                        ).first()
+                        
+                        if existing:
+                            # Update existing record
+                            existing.amount = pl_record.amount
+                            existing.percentage = pl_record.percentage
+                            existing.category = pl_record.category
+                            existing.created_at = datetime.now()
                         else:
-                            record_data[clean_col] = value
-                    
-                    record_data['import_date'] = datetime.now()
-                    record_data['import_batch'] = datetime.now().strftime("%Y%m%d_%H%M%S")
-                    
-                    columns = list(record_data.keys())
-                    placeholders = ', '.join([f":{col}" for col in columns])
-                    
-                    insert_sql = text(f"""
-                        INSERT INTO pos_profit_loss ({', '.join(columns)})
-                        VALUES ({placeholders})
-                        ON DUPLICATE KEY UPDATE import_date = VALUES(import_date)
-                    """)
-                    
-                    session.execute(insert_sql, record_data)
-                    imported_count += 1
+                            # Add new record
+                            session.add(pl_record)
+                        
+                        imported_count += 1
+                    else:
+                        # Old wide format - skip with warning
+                        logger.warning("Skipping old wide format P&L record - should be normalized first")
+                        continue
                     
                 except Exception as e:
-                    logger.warning(f"Error importing P&L record: {e}")
+                    logger.warning(f"Error importing P&L record {row.to_dict()}: {e}")
                     continue
             
             session.commit()
+            logger.info(f"Successfully imported {imported_count} P&L records into pl_data table")
             
         except Exception as e:
             session.rollback()
@@ -1175,7 +1549,7 @@ class CSVImportService:
                     profit DECIMAL(15,2),
                     margin DECIMAL(5,2),
                     import_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    import_batch VARCHAR(50),
+                    import_batch_id VARCHAR(50),
                     INDEX idx_week_ending (week_ending),
                     INDEX idx_store_id (store_id)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
@@ -1196,7 +1570,7 @@ class CSVImportService:
                     total_wages DECIMAL(15,2),
                     avg_hourly_rate DECIMAL(8,2),
                     import_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    import_batch VARCHAR(50),
+                    import_batch_id VARCHAR(50),
                     INDEX idx_week_ending (week_ending),
                     INDEX idx_store_id (store_id)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
@@ -1217,7 +1591,7 @@ class CSVImportService:
                     year_to_date DECIMAL(15,2),
                     prior_year DECIMAL(15,2),
                     import_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    import_batch VARCHAR(50),
+                    import_batch_id VARCHAR(50),
                     INDEX idx_account_line (account_line)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
             """))

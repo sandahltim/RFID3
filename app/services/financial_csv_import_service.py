@@ -41,6 +41,39 @@ class FinancialCSVImportService:
             "warnings": []
         }
 
+    def smart_date_parser(self, date_str: str) -> pd.Timestamp:
+        """Smart date parser that handles various date formats correctly"""
+        if pd.isna(date_str) or date_str == '':
+            return pd.NaT
+        
+        date_str = str(date_str).strip()
+        
+        try:
+            # Try MM/DD/YYYY format first
+            if '/' in date_str and len(date_str.split('/')[2]) == 4:
+                return pd.to_datetime(date_str, format='%m/%d/%Y')
+            
+            # Try MM/DD/YY format - handle 2-digit years properly
+            elif '/' in date_str and len(date_str.split('/')[2]) == 2:
+                # Convert 2-digit year to 4-digit
+                parts = date_str.split('/')
+                year = int(parts[2])
+                # Assume years 00-30 are 2000-2030, 31-99 are 1931-1999
+                if year <= 30:
+                    year += 2000
+                else:
+                    year += 1900
+                date_str = f"{parts[0]}/{parts[1]}/{year}"
+                return pd.to_datetime(date_str, format='%m/%d/%Y')
+            
+            # Try other common formats
+            else:
+                return pd.to_datetime(date_str, errors='coerce')
+                
+        except Exception as e:
+            logger.warning(f"Date parsing failed for '{date_str}': {e}")
+            return pd.NaT
+
     def clean_column_name(self, col_name: str) -> str:
         """Clean column name for database compatibility"""
         # Handle special cases first
@@ -161,7 +194,7 @@ class FinancialCSVImportService:
             
             # Parse dates in first column
             if 'week_ending_sunday' in df.columns:
-                df['week_ending_sunday'] = pd.to_datetime(df['week_ending_sunday'], errors='coerce')
+                df['week_ending_sunday'] = df['week_ending_sunday'].apply(self.smart_date_parser)
             
             # Convert financial columns to numeric
             for col in df.columns:
@@ -227,14 +260,9 @@ class FinancialCSVImportService:
             
             # Parse date column - rename for consistency
             if 'col_2_week_ending_sun' in df.columns:
-                # Handle various date formats
-                df['week_ending'] = pd.to_datetime(df['col_2_week_ending_sun'], format='%m/%d/%Y', errors='coerce')
-                if df['week_ending'].isna().all():
-                    df['week_ending'] = pd.to_datetime(df['col_2_week_ending_sun'], errors='coerce')
+                df['week_ending'] = df['col_2_week_ending_sun'].apply(self.smart_date_parser)
             elif '2_week_ending_sun' in df.columns:
-                df['week_ending'] = pd.to_datetime(df['2_week_ending_sun'], format='%m/%d/%Y', errors='coerce')
-                if df['week_ending'].isna().all():
-                    df['week_ending'] = pd.to_datetime(df['2_week_ending_sun'], errors='coerce')
+                df['week_ending'] = df['2_week_ending_sun'].apply(self.smart_date_parser)
             
             # Convert numeric columns
             for col in df.columns:

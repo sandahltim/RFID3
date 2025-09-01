@@ -1,0 +1,91 @@
+# Multi-stage Dockerfile for AI Agent System
+# Optimized for RTX 4070 deployment with CUDA support
+
+# Stage 1: Base CUDA environment
+FROM nvidia/cuda:12.1-runtime-ubuntu22.04 as base
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    python3.11 \
+    python3.11-dev \
+    python3-pip \
+    python3.11-venv \
+    git \
+    curl \
+    wget \
+    build-essential \
+    pkg-config \
+    libmariadb-dev \
+    libffi-dev \
+    libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create symlinks for python
+RUN ln -sf /usr/bin/python3.11 /usr/bin/python3 && \
+    ln -sf /usr/bin/python3.11 /usr/bin/python
+
+# Stage 2: Python dependencies
+FROM base as deps
+
+WORKDIR /app
+
+# Copy requirements first for better cache utilization
+COPY requirements.ai-agent.txt .
+
+# Create virtual environment and install dependencies
+RUN python3 -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Upgrade pip and install Python packages
+RUN pip install --upgrade pip setuptools wheel && \
+    pip install -r requirements.ai-agent.txt
+
+# Stage 3: Application setup
+FROM deps as development
+
+WORKDIR /app
+
+# Copy application code
+COPY app/ ./app/
+COPY ai_agent_system/ ./ai_agent_system/
+COPY config.py .
+COPY run_ai_agent.py .
+
+# Create necessary directories
+RUN mkdir -p logs cache models data
+
+# Set permissions
+RUN chown -R 1000:1000 /app
+
+# Development server
+EXPOSE 8000
+CMD ["python", "run_ai_agent.py"]
+
+# Stage 4: Production build
+FROM development as production
+
+# Install production-only dependencies
+RUN pip install gunicorn[gevent]
+
+# Remove development files and clean up
+RUN find . -name "*.pyc" -delete && \
+    find . -name "__pycache__" -delete && \
+    rm -rf /root/.cache/pip/*
+
+# Create non-root user
+RUN groupadd -r aiagent && useradd -r -g aiagent -u 1000 aiagent
+RUN chown -R aiagent:aiagent /app /opt/venv
+
+USER aiagent
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+  CMD curl -f http://localhost:8000/health || exit 1
+
+# Production server
+EXPOSE 8000
+CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "4", "--worker-class", "gevent", "--worker-connections", "1000", "--timeout", "120", "--keepalive", "5", "app.main:app"]

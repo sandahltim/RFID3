@@ -72,7 +72,7 @@
     background: linear-gradient(90deg, #00d4aa, #00a8ff, #8c7ae6, #ff9ff3);
 }
 
-/* Executive KPI Cards */
+/* Executive KPI Cards with mobile touch support */
 .kpi-card {
     background: white;
     border-radius: 16px;
@@ -82,6 +82,21 @@
     cursor: pointer;
     position: relative;
     overflow: hidden;
+    /* Better touch target */
+    min-height: 120px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    text-align: center;
+    padding: 20px 15px;
+}
+
+/* Mobile touch feedback */
+@media (hover: none) and (pointer: coarse) {
+    .kpi-card:active {
+        transform: scale(0.98);
+        transition: transform 0.1s ease;
+    }
 }
 
 .kpi-card::before {
@@ -153,17 +168,45 @@
     margin: 0 auto 1rem auto;
 }
 
-/* Chart Container Styling */
+/* Chart Container Styling with mobile optimizations */
 .chart-container {
     background: white;
     border-radius: 16px;
     box-shadow: var(--shadow-card);
     transition: all 0.3s ease;
     border: 1px solid rgba(0, 0, 0, 0.05);
+    position: relative;
+    overflow: hidden;
 }
 
 .chart-container:hover {
     box-shadow: var(--shadow-hover);
+}
+
+/* Mobile chart optimizations */
+@media (max-width: 768px) {
+    .chart-container {
+        margin-bottom: 20px;
+    }
+    
+    /* Ensure charts don't cause horizontal overflow */
+    .chart-body canvas {
+        max-width: 100% !important;
+        height: auto !important;
+    }
+    
+    /* Better legend positioning on mobile */
+    .chart-body .chart-legend {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        margin-top: 15px;
+    }
+    
+    .chart-body .chart-legend-item {
+        margin: 5px 10px;
+        font-size: 0.85rem;
+    }
 }
 
 .chart-header {
@@ -345,7 +388,7 @@
     color: white;
 }
 
-/* Interactive Elements */
+/* Interactive Elements with mobile dropdown fixes */
 .filter-controls {
     background: white;
     border-radius: 16px;
@@ -353,19 +396,81 @@
     margin-bottom: 30px;
     box-shadow: var(--shadow-card);
     border: 1px solid rgba(0, 0, 0, 0.05);
+    position: relative;
+    z-index: 100; /* Ensure filter controls are above other elements */
 }
 
-.filter-controls .form-control {
+/* Prevent dropdown overflow */
+.filter-controls .dropdown-menu {
+    max-height: 250px;
+    overflow-y: auto;
+    z-index: 101;
+}
+
+/* Better mobile form layout */
+@media (max-width: 768px) {
+    .filter-controls .form-group {
+        margin-bottom: 20px;
+    }
+    
+    .filter-controls .form-label {
+        display: block;
+        margin-bottom: 8px;
+        font-weight: 600;
+        color: var(--executive-primary);
+    }
+    
+    .filter-controls .btn-group {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+    
+    .filter-controls .btn-group .btn {
+        flex: 1;
+        min-width: calc(50% - 4px);
+        margin: 0;
+    }
+}
+
+.filter-controls .form-control,
+.filter-controls .form-select {
     border-radius: 12px;
     border: 2px solid rgba(0, 0, 0, 0.1);
     transition: all 0.3s ease;
     padding: 12px 16px;
     font-weight: var(--font-weight-medium);
+    background-color: white;
+    position: relative;
+    z-index: 1;
 }
 
-.filter-controls .form-control:focus {
+.filter-controls .form-control:focus,
+.filter-controls .form-select:focus {
     border-color: var(--executive-primary);
     box-shadow: 0 0 0 3px rgba(30, 64, 175, 0.1);
+    z-index: 10; /* Bring focused element above others */
+}
+
+/* Mobile-specific form control improvements */
+@media (max-width: 767px) {
+    .filter-controls .form-control,
+    .filter-controls .form-select {
+        font-size: 16px; /* Prevent zoom on iOS */
+        min-height: 44px;
+        padding: 12px 14px;
+    }
+    
+    .filter-controls select {
+        -webkit-appearance: none;
+        -moz-appearance: none;
+        appearance: none;
+        background-image: url('data:image/svg+xml;charset=US-ASCII,<svg xmlns="http://www.w3.org/2000/svg" width="4" height="5" viewBox="0 0 4 5"><path fill="%23666" d="M2 0L0 2h4z"/><path fill="%23666" d="M0 3l2 2 2-2z"/></svg>');
+        background-repeat: no-repeat;
+        background-position: right 12px center;
+        background-size: 16px;
+        padding-right: 40px;
+    }
 }
 
 .btn-executive {
@@ -391,7 +496,7 @@
     transform: translateY(0);
 }
 
-/* Mobile Responsive Design */
+/* Mobile Responsive Design with dropdown fixes */
 @media (max-width: 768px) {
     .dashboard-header {
         padding: 20px 0;
@@ -406,11 +511,13 @@
     
     .kpi-card {
         border-radius: 12px;
+        padding: 20px 15px; /* Better mobile padding */
     }
     
     .chart-container {
         border-radius: 12px;
         margin-bottom: 20px;
+        overflow: hidden; /* Prevent content overflow */
     }
     
     .chart-header {
@@ -421,6 +528,7 @@
     .chart-body {
         padding: 20px 15px;
         min-height: 200px;
+        overflow-x: auto; /* Allow horizontal scroll for charts */
     }
     
     .kpi-value {
@@ -430,26 +538,106 @@
     .metric-value {
         font-size: 1.5rem;
     }
+    
+    /* CRITICAL: Fix dropdown positioning in filter controls */
+    .filter-controls {
+        position: relative;
+        z-index: 1000;
+    }
+    
+    .filter-controls .row {
+        flex-direction: column;
+    }
+    
+    .filter-controls .col-md-2,
+    .filter-controls .col-md-3,
+    .filter-controls .col-md-6 {
+        width: 100%;
+        margin-bottom: 15px;
+        position: relative;
+    }
+    
+    /* Fix select dropdown overlaps */
+    .filter-controls select,
+    .filter-controls .form-select {
+        position: relative;
+        z-index: 10;
+        background-color: white;
+        border: 2px solid rgba(0, 0, 0, 0.1);
+    }
+    
+    .filter-controls select:focus,
+    .filter-controls .form-select:focus {
+        z-index: 20;
+        box-shadow: 0 0 0 3px rgba(30, 64, 175, 0.1);
+    }
 }
 
 @media (max-width: 576px) {
     .filter-controls {
         padding: 15px;
         border-radius: 12px;
+        margin-bottom: 15px;
     }
     
     .btn-executive {
         width: 100%;
         margin-bottom: 10px;
+        min-height: 44px; /* Touch-friendly */
+        font-size: 0.9rem;
     }
     
     .kpi-value {
         font-size: 1.8rem;
+        margin-bottom: 8px;
     }
     
     .metric-card {
-        padding: 20px;
+        padding: 15px;
         border-radius: 12px;
+        margin-bottom: 15px;
+    }
+    
+    /* Better button groups on small screens */
+    .btn-group {
+        flex-direction: column;
+        width: 100%;
+    }
+    
+    .btn-group .btn {
+        width: 100%;
+        margin-bottom: 8px;
+        border-radius: 8px !important;
+    }
+    
+    /* Stack form controls vertically */
+    .form-group,
+    .form-row {
+        margin-bottom: 15px;
+    }
+    
+    .form-label {
+        font-size: 0.9rem;
+        font-weight: 600;
+        margin-bottom: 6px;
+    }
+    
+    /* Better chart responsiveness */
+    .chart-body {
+        padding: 15px 10px;
+        min-height: 180px;
+    }
+    
+    /* Improve KPI card layout */
+    .kpi-icon {
+        width: 50px;
+        height: 50px;
+        margin-bottom: 12px;
+    }
+    
+    .kpi-label {
+        font-size: 0.8rem;
+        line-height: 1.3;
     }
 }
 

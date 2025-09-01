@@ -1,5 +1,7 @@
 # app/routes/tab3.py
 # tab3.py version: 2025-07-10-v87
+import pwd
+import grp
 from flask import (
     Blueprint,
     render_template,
@@ -1152,7 +1154,12 @@ def sync_to_pc():
                             )
 
                     # Generate consecutive tag IDs to avoid conflicts
-                    for i in range(remaining_quantity):
+                    max_attempts = remaining_quantity * 10  # Allow for collision retries
+                    attempts = 0
+                    
+                    while len(new_tag_ids) < remaining_quantity and attempts < max_attempts:
+                        attempts += 1
+                        
                         # Validate hex doesn't overflow
                         if (
                             new_num > 0xFFFFFFFFFFFFFFFFFF
@@ -1171,8 +1178,8 @@ def sync_to_pc():
 
                         # Double-check uniqueness
                         if tag_id in existing_tag_ids:
-                            logger.warning(
-                                f"Generated tag_id {tag_id} already exists in existing_tag_ids"
+                            logger.debug(
+                                f"Generated tag_id {tag_id} already exists in existing_tag_ids, trying next"
                             )
                             new_num += 1
                             continue
@@ -1180,6 +1187,13 @@ def sync_to_pc():
                         new_tag_ids.append(tag_id)
                         existing_tag_ids.add(tag_id)
                         new_num += 1
+                        
+                        logger.debug(f"Generated unique tag_id: {tag_id} ({len(new_tag_ids)}/{remaining_quantity})")
+                    
+                    if len(new_tag_ids) < remaining_quantity:
+                        raise ValueError(
+                            f"Could not generate {remaining_quantity} unique tag IDs after {max_attempts} attempts. Generated {len(new_tag_ids)} tags."
+                        )
 
                     session.execute(text("UNLOCK TABLES"))
                     break  # Success, exit retry loop

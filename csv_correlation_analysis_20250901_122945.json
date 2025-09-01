@@ -1,0 +1,40 @@
+{
+  "analysis_timestamp": "2025-09-01T12:29:44.470585",
+  "files_analyzed": [
+    "/home/tim/RFID3/shared/POR/customer8.26.25.csv",
+    "/home/tim/RFID3/shared/POR/equip8.26.25.csv",
+    "/home/tim/RFID3/shared/POR/transactions8.26.25.csv",
+    "/home/tim/RFID3/shared/POR/transitems8.26.25.csv",
+    "/home/tim/RFID3/shared/POR/PayrollTrends8.26.25.csv",
+    "/home/tim/RFID3/shared/POR/PL8.28.25.csv",
+    "/home/tim/RFID3/shared/POR/ScorecardTrends9.1.25.csv",
+    "/home/tim/RFID3/shared/rfid_tags.csv"
+  ],
+  "data_structures": {
+    "pos_customers": {
+      "rows": 10000,
+      "columns": 62,
+      "column_names": [
+        "Key",
+        "CNUM",
+        "Name",
+        "Address",
+        "Address2",
+        "City",
+        "Zip",
+        "Zip4",
+        "DriversLicense",
+        "Birthdate",
+        "Employer",
+        "Auto License",
+        "Auto State",
+        "Phone",
+        "Work Phone",
+        "Mobile Phone",
+        "Fax",
+        "Open Date",
+        "Last Active Date",
+        "Last Contract"
+      ],
+      "dtypes": {
+        

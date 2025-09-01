@@ -6,7 +6,7 @@ Business logic layer for comprehensive feedback system on predictive analytics c
 from app import db
 from app.models.feedback_models import (
     CorrelationFeedback, PredictionValidation, CorrelationSuggestions,
-    SuggestionComments, BusinessContextKnowledge, FeedbackAnalytics,
+    CorrelationSuggestionComments, BusinessContextKnowledge, FeedbackAnalytics,
     UserFeedbackProfile, FeedbackType, FeedbackStatus
 )
 from app.services.logger import get_logger

@@ -6,7 +6,7 @@ import csv
 import os
 import json
 from datetime import datetime, timezone
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from typing import Dict, List, Tuple, Optional
 from sqlalchemy import and_, or_, func
 from app import db
@@ -63,8 +63,8 @@ class POSImportService:
             # Remove any currency symbols and commas
             cleaned = value_str.replace('$', '').replace(',', '').strip()
             return Decimal(cleaned) if cleaned else None
-        except:
-            logger.warning(f"Could not parse decimal: {value_str}")
+        except (ValueError, TypeError, InvalidOperation) as e:
+            logger.warning(f"Could not parse decimal '{value_str}': {str(e)}")
             return None
     
     def parse_bool(self, value_str: str) -> bool:

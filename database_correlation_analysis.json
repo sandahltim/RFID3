@@ -1,0 +1,215 @@
+{
+  "analysis_date": "2025-09-01T02:29:46.765144",
+  "schema_stats": {
+    "id_item_master": {
+      "record_count": 65943,
+      "model": "ItemMaster",
+      "primary_key": "tag_id"
+    },
+    "id_transactions": {
+      "record_count": 26590,
+      "model": "Transaction",
+      "primary_key": "id"
+    },
+    "pos_transactions": {
+      "record_count": 246361,
+      "model": "POSTransaction",
+      "primary_key": "id"
+    },
+    "pos_equipment": {
+      "record_count": 53717,
+      "model": "POSEquipment",
+      "primary_key": "id"
+    },
+    "pl_data": {
+      "record_count": 1818,
+      "model": "PLData",
+      "primary_key": "id"
+    },
+    "payroll_trends": {
+      "record_count": 328,
+      "model": "PayrollTrends",
+      "primary_key": "id"
+    }
+  },
+  "relationships": {
+    "Direct Foreign Keys": [
+      [
+        "id_transactions",
+        "tag_id",
+        "id_item_master",
+        "tag_id"
+      ],
+      [
+        "pos_rfid_correlation",
+        "rfid_tag_id",
+        "id_item_master",
+        "tag_id"
+      ],
+      [
+        "pos_rfid_correlation",
+        "pos_equipment_id",
+        "pos_equipment",
+        "id"
+      ],
+      [
+        "item_usage_history",
+        "tag_id",
+        "id_item_master",
+        "tag_id"
+      ]
+    ],
+    "Implicit Relationships": [
+      [
+        "id_transactions",
+        "contract_number",
+        "pos_transactions",
+        "contract_number"
+      ],
+      [
+        "id_item_master",
+        "rental_class_num",
+        "pos_equipment",
+        "rental_class"
+      ],
+      [
+        "id_item_master",
+        "home_store",
+        "pl_data",
+        "store_code"
+      ],
+      [
+        "payroll_trends",
+        "store_id",
+        "pl_data",
+        "store_code"
+      ]
+    ],
+    "Junction Tables Needed": [
+      {
+        "name": "contract_item_mapping",
+        "purpose": "Link multiple items to contracts",
+        "fields": [
+          "contract_number",
+          "tag_id",
+          "transaction_date",
+          "transaction_type"
+        ]
+      },
+      {
+        "name": "store_equipment_allocation",
+        "purpose": "Track equipment distribution across stores",
+        "fields": [
+          "store_code",
+          "rental_class_num",
+          "quantity",
+          "allocation_date"
+        ]
+      }
+    ],
+    "Data Normalization": []
+  },
+  "quality_issues": {
+    "Inconsistencies": [
+      {
+        "issue": "Multiple store code formats",
+        "tables": [
+          "id_item_master",
+          "pl_data",
+          "payroll_trends"
+        ],
+        "recommendation": "Create store_master table with canonical IDs"
+      }
+    ],
+    "Missing Data": [
+      "No direct link between financial P&L and operational metrics",
+      "Missing customer journey tracking across touchpoints",
+      "No equipment utilization history table",
+      "Absent predictive maintenance indicators"
+    ],
+    "Stale Data": [],
+    "Normalization": []
+  },
+  "kpi_correlations": {
+    "Revenue Metrics": [
+      {
+        "name": "Revenue per Equipment Class",
+        "formula": "SUM(pos_transactions.amount) / COUNT(DISTINCT rental_class)",
+        "correlation": "pos_transactions \u2194 pos_equipment \u2194 rental_class_mapping"
+      },
+      {
+        "name": "Contract Value Trend",
+        "formula": "AVG(contract_total) OVER time_window",
+        "correlation": "id_transactions \u2192 contract_snapshots \u2192 pl_data"
+      },
+      {
+        "name": "Store Revenue Efficiency",
+        "formula": "revenue / (payroll_cost + overhead)",
+        "correlation": "pl_data \u2194 payroll_trends"
+      }
+    ],
+    "Operational Efficiency": [
+      {
+        "name": "Equipment Utilization Rate",
+        "formula": "days_rented / total_days_available",
+        "correlation": "id_transactions \u2192 item_usage_history"
+      },
+      {
+        "name": "Inventory Turnover by Class",
+        "formula": "rental_frequency / avg_inventory_count",
+        "correlation": "id_item_master \u2194 id_transactions"
+      },
+      {
+        "name": "Cross-Store Transfer Efficiency",
+        "formula": "transfer_time / distance_between_stores",
+        "correlation": "id_item_master.current_store \u2194 home_store"
+      }
+    ],
+    "Predictive Analytics": [],
+    "Customer Intelligence": []
+  },
+  "ai_readiness": {
+    "Feature Engineering": [
+      "Seasonal rental patterns by equipment class",
+      "Customer lifetime value indicators",
+      "Equipment maintenance prediction signals",
+      "Demand forecasting variables",
+      "Price elasticity indicators"
+    ],
+    "Training Data": [],
+    "Target Variables": [
+      "Next period revenue (regression)",
+      "Equipment failure probability (classification)",
+      "Customer churn risk (classification)",
+      "Optimal inventory levels (optimization)",
+      "Dynamic pricing recommendations (regression)"
+    ],
+    "Data Gaps": [
+      "Missing: Historical weather correlation data",
+      "Missing: Competitor pricing information",
+      "Missing: Customer satisfaction scores",
+      "Missing: Equipment age and maintenance history",
+      "Missing: Market demand indicators"
+    ]
+  },
+  "recommendations": [
+    {
+      "action": "Create unified store_master table",
+      "impact": "Resolves store code inconsistencies",
+      "effort": "2 hours",
+      "sql": "CREATE TABLE store_master (store_id, store_code, store_name, location)"
+    },
+    {
+      "action": "Add indexes for correlation queries",
+      "impact": "50% query performance improvement",
+      "effort": "1 hour",
+      "sql": "CREATE INDEX idx_trans_contract ON id_transactions(contract_number)"
+    },
+    {
+      "action": "Implement contract_item_mapping junction table",
+      "impact": "Enables accurate revenue attribution",
+      "effort": "3 hours",
+      "sql": "CREATE TABLE contract_item_mapping (...)"
+    }
+  ]
+}

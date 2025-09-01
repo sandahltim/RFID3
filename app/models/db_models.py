@@ -663,3 +663,149 @@ class ExecutiveKPI(db.Model):
                 self.last_calculated.isoformat() if self.last_calculated else None
             ),
         }
+
+
+class POSScorecardTrends(db.Model):
+    """POS Scorecard Trends data with store-specific contract metrics."""
+    
+    __tablename__ = "pos_scorecard_trends"
+    __table_args__ = (
+        db.Index("ix_pos_scorecard_week_ending", "week_ending_sunday"),
+    )
+    
+    id = db.Column(db.Integer, primary_key=True)
+    week_ending_sunday = db.Column(db.Date, nullable=False)
+    total_weekly_revenue = db.Column(db.DECIMAL(15, 2))
+
+    # Store marker for data filtering (000=company-wide, 3607/6800/728/8101=store-specific)
+    store_marker = db.Column(db.String(10), default="000", index=True)
+    
+    # Store-specific revenue metrics (from CSV)
+    revenue_3607 = db.Column(db.DECIMAL(15, 2))
+    revenue_6800 = db.Column(db.DECIMAL(15, 2))
+    revenue_728 = db.Column(db.DECIMAL(15, 2))
+    revenue_8101 = db.Column(db.DECIMAL(15, 2))
+    
+    # Store-specific contract metrics
+    new_open_contracts_3607 = db.Column(db.Integer)
+    new_open_contracts_6800 = db.Column(db.Integer) 
+    new_open_contracts_8101 = db.Column(db.Integer)
+    new_open_contracts_728 = db.Column(db.Integer)
+    
+    # Store-specific reservation metrics
+    total_on_reservation_3607 = db.Column(db.DECIMAL(15, 2))
+    total_on_reservation_6800 = db.Column(db.DECIMAL(15, 2))
+    total_on_reservation_8101 = db.Column(db.DECIMAL(15, 2))
+    total_on_reservation_728 = db.Column(db.DECIMAL(15, 2))
+    
+    # Other metrics
+    deliveries_scheduled_next_7_days = db.Column(db.Integer)
+    import_batch = db.Column(db.String(50))
+    file_source = db.Column(db.String(255))
+    
+    @property
+    def total_new_contracts(self):
+        """Calculate total new contracts across all stores."""
+        return (
+            (self.new_open_contracts_3607 or 0) +
+            (self.new_open_contracts_6800 or 0) + 
+            (self.new_open_contracts_8101 or 0) +
+            (self.new_open_contracts_728 or 0)
+        )
+    
+    @property
+    def total_reservation_value(self):
+        """Calculate total reservation value across all stores."""
+        return (
+            (self.total_on_reservation_3607 or 0) +
+            (self.total_on_reservation_6800 or 0) +
+            (self.total_on_reservation_8101 or 0) +
+            (self.total_on_reservation_728 or 0)
+        )
+    
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "week_ending": self.week_ending_sunday.isoformat() if self.week_ending_sunday else None,
+            "total_weekly_revenue": float(self.total_weekly_revenue) if self.total_weekly_revenue else None,
+            "new_contracts_3607": self.new_open_contracts_3607,
+            "new_contracts_6800": self.new_open_contracts_6800, 
+            "new_contracts_8101": self.new_open_contracts_8101,
+            "new_contracts_728": self.new_open_contracts_728,
+            "total_new_contracts": self.total_new_contracts,
+            "total_reservation_value": float(self.total_reservation_value) if self.total_reservation_value else None,
+            "deliveries_scheduled": self.deliveries_scheduled_next_7_days,
+        }
+
+
+class PLData(db.Model):
+    """P&L data from monthly financial statements - matches actual database structure."""
+    
+    __tablename__ = "pl_data"
+    __table_args__ = (
+        db.Index("ix_pl_data_period", "period_year", "period_month"),
+        db.Index("ix_pl_data_category", "category"),
+    )
+    
+    id = db.Column(db.Integer, primary_key=True)
+    account_code = db.Column(db.String(50))
+    account_name = db.Column(db.String(200))
+    period_month = db.Column(db.String(20))  # VARCHAR not INT in actual table
+    period_year = db.Column(db.Integer)
+    amount = db.Column(db.DECIMAL(15, 2))
+    percentage = db.Column(db.DECIMAL(5, 2))
+    category = db.Column(db.String(100))
+    created_at = db.Column(db.DateTime)
+    
+    @property
+    def period_date(self):
+        """Get date for the period (last day of month)."""
+        from calendar import monthrange
+        last_day = monthrange(self.period_year, self.period_month)[1]
+        return date(self.period_year, self.period_month, last_day)
+    
+    @classmethod
+    def get_profit_margin(cls, session, year, month=None):
+        """Calculate profit margin for a given period."""
+        query = session.query(
+            func.sum(cls.actual_amount).label('total_revenue')
+        ).filter(
+            cls.period_year == year,
+            cls.category == 'Total Revenue'
+        )
+        
+        if month:
+            query = query.filter(cls.period_month == month)
+            
+        total_revenue = query.scalar() or 0
+        
+        # Get total expenses
+        expense_query = session.query(
+            func.sum(cls.actual_amount).label('total_expenses')
+        ).filter(
+            cls.period_year == year,
+            cls.category.in_(['Total COGS', 'Total Expenses'])
+        )
+        
+        if month:
+            expense_query = expense_query.filter(cls.period_month == month)
+            
+        total_expenses = expense_query.scalar() or 0
+        
+        if total_revenue > 0:
+            return ((total_revenue - total_expenses) / total_revenue) * 100
+        return 0
+    
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "period_year": self.period_year,
+            "period_month": self.period_month,
+            "period_date": self.period_date.isoformat() if self.period_date else None,
+            "category": self.category,
+            "subcategory": self.subcategory,
+            "actual_amount": float(self.actual_amount) if self.actual_amount else None,
+            "budget_amount": float(self.budget_amount) if self.budget_amount else None,
+            "variance_amount": float(self.variance_amount) if self.variance_amount else None,
+            "variance_percent": float(self.variance_percent) if self.variance_percent else None,
+        }

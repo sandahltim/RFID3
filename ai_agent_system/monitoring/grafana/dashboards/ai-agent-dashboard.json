@@ -1,0 +1,247 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "AI Agent - Minnesota Equipment Rental",
+    "tags": ["ai-agent", "business-intelligence"],
+    "timezone": "America/Chicago",
+    "refresh": "30s",
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "System Overview",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 24, "x": 0, "y": 0},
+        "targets": [
+          {
+            "expr": "up{job='ai-agent'}",
+            "legendFormat": "AI Agent Status"
+          },
+          {
+            "expr": "up{job='ollama'}",
+            "legendFormat": "LLM Status"
+          },
+          {
+            "expr": "up{job='redis'}",
+            "legendFormat": "Cache Status"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "mappings": [
+              {
+                "options": {"0": {"text": "DOWN"}, "1": {"text": "UP"}},
+                "type": "value"
+              }
+            ],
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": 0},
+                {"color": "green", "value": 1}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 2,
+        "title": "Query Performance",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 4},
+        "targets": [
+          {
+            "expr": "rate(ai_agent_queries_total[5m])",
+            "legendFormat": "Queries/sec"
+          },
+          {
+            "expr": "histogram_quantile(0.95, rate(ai_agent_query_duration_seconds_bucket[5m]))",
+            "legendFormat": "95th percentile response time"
+          },
+          {
+            "expr": "rate(ai_agent_query_errors_total[5m])",
+            "legendFormat": "Error rate"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s"
+          }
+        }
+      },
+      {
+        "id": 3,
+        "title": "LLM Performance",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 4},
+        "targets": [
+          {
+            "expr": "rate(ollama_inference_total[5m])",
+            "legendFormat": "Inferences/sec"
+          },
+          {
+            "expr": "histogram_quantile(0.90, rate(ollama_inference_duration_seconds_bucket[5m]))",
+            "legendFormat": "90th percentile inference time"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s"
+          }
+        }
+      },
+      {
+        "id": 4,
+        "title": "GPU Utilization",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 12},
+        "targets": [
+          {
+            "expr": "DCGM_FI_DEV_GPU_UTIL",
+            "legendFormat": "GPU Utilization %"
+          },
+          {
+            "expr": "DCGM_FI_DEV_MEM_COPY_UTIL",
+            "legendFormat": "GPU Memory %"
+          },
+          {
+            "expr": "DCGM_FI_DEV_GPU_TEMP",
+            "legendFormat": "GPU Temperature °C"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "max": 100,
+            "min": 0
+          }
+        }
+      },
+      {
+        "id": 5,
+        "title": "Cache Performance",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 12},
+        "targets": [
+          {
+            "expr": "rate(redis_keyspace_hits_total[5m]) / (rate(redis_keyspace_hits_total[5m]) + rate(redis_keyspace_misses_total[5m]))",
+            "legendFormat": "Cache Hit Rate"
+          },
+          {
+            "expr": "redis_connected_clients",
+            "legendFormat": "Connected Clients"
+          },
+          {
+            "expr": "redis_memory_used_bytes / 1024 / 1024",
+            "legendFormat": "Memory Used MB"
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "title": "Business Metrics",
+        "type": "stat",
+        "gridPos": {"h": 6, "w": 24, "x": 0, "y": 20},
+        "targets": [
+          {
+            "expr": "increase(ai_agent_queries_total[1h])",
+            "legendFormat": "Queries Last Hour"
+          },
+          {
+            "expr": "ai_agent_active_users",
+            "legendFormat": "Active Users"
+          },
+          {
+            "expr": "ai_agent_insights_generated_total",
+            "legendFormat": "Total Insights Generated"
+          },
+          {
+            "expr": "rate(ai_agent_feedback_positive_total[1h]) / rate(ai_agent_feedback_total[1h])",
+            "legendFormat": "Positive Feedback Rate"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent"
+          }
+        }
+      },
+      {
+        "id": 7,
+        "title": "Tool Usage Distribution",
+        "type": "piechart",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 26},
+        "targets": [
+          {
+            "expr": "increase(ai_agent_tool_usage_total[1h])",
+            "legendFormat": "{{tool_name}}"
+          }
+        ]
+      },
+      {
+        "id": 8,
+        "title": "Query Response Times Heatmap",
+        "type": "heatmap",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 26},
+        "targets": [
+          {
+            "expr": "increase(ai_agent_query_duration_seconds_bucket[5m])",
+            "format": "heatmap",
+            "legendFormat": "{{le}}"
+          }
+        ]
+      },
+      {
+        "id": 9,
+        "title": "Security Alerts",
+        "type": "table",
+        "gridPos": {"h": 6, "w": 24, "x": 0, "y": 34},
+        "targets": [
+          {
+            "expr": "ai_agent_security_alerts_total",
+            "format": "table",
+            "instant": true
+          }
+        ],
+        "transformations": [
+          {
+            "id": "organize",
+            "options": {
+              "excludeByName": {"__name__": true, "job": true, "instance": true},
+              "renameByName": {
+                "type": "Alert Type",
+                "Value": "Count"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "id": 10,
+        "title": "Top User Queries",
+        "type": "table",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 40},
+        "targets": [
+          {
+            "expr": "topk(10, increase(ai_agent_query_count_by_pattern[1h]))",
+            "format": "table",
+            "instant": true
+          }
+        ]
+      },
+      {
+        "id": 11,
+        "title": "Error Breakdown",
+        "type": "piechart",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 40},
+        "targets": [
+          {
+            "expr": "increase(ai_agent_errors_total[1h])",
+            "legendFormat": "{{error_type}}"
+          }
+        ]
+      }
+    ]
+  }
+}
