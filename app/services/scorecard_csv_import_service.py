@@ -36,9 +36,16 @@ class ScorecardCSVImportService:
         old_year_pattern = os.path.join(self.csv_base_path, "scorecard[0-9][0-9][0-9][0-9].csv")
         old_year_files = glob.glob(old_year_pattern)
         
-        # Look for new date-specific files: scorecard01.01.25.csv  
-        new_date_pattern = os.path.join(self.csv_base_path, "scorecard[0-9][0-9].[0-9][0-9].[0-9][0-9].csv")
-        new_date_files = glob.glob(new_date_pattern)
+        # Look for new date-specific files: scorecard01.01.25.csv or scorecard9.2.25.csv
+        # Handle both padded and unpadded date formats
+        new_date_pattern1 = os.path.join(self.csv_base_path, "scorecard[0-9][0-9].[0-9][0-9].[0-9][0-9].csv")
+        new_date_pattern2 = os.path.join(self.csv_base_path, "scorecard[0-9].[0-9].[0-9][0-9].csv") 
+        new_date_pattern3 = os.path.join(self.csv_base_path, "scorecard[0-9][0-9].[0-9].[0-9][0-9].csv")
+        new_date_pattern4 = os.path.join(self.csv_base_path, "scorecard[0-9].[0-9][0-9].[0-9][0-9].csv")
+        new_date_files = (glob.glob(new_date_pattern1) + 
+                         glob.glob(new_date_pattern2) + 
+                         glob.glob(new_date_pattern3) + 
+                         glob.glob(new_date_pattern4))
         
         # Also check general scorecard files (exclude already found files)
         general_pattern = os.path.join(self.csv_base_path, "scorecard*.csv")
@@ -77,8 +84,9 @@ class ScorecardCSVImportService:
             if old_match:
                 return int(old_match.group(1))
             
-            # Try new format: scorecardMM.DD.YY.csv -> 20YY
-            new_match = re.search(r'scorecard\d{2}\.\d{2}\.(\d{2})', filename)
+            # Try new format: scorecardMM.DD.YY.csv or scorecardM.D.YY.csv -> 20YY
+            # Handle both padded (09.02.25) and unpadded (9.2.25) formats
+            new_match = re.search(r'scorecard\d{1,2}\.\d{1,2}\.(\d{2})', filename)
             if new_match:
                 year_suffix = int(new_match.group(1))
                 # Convert 2-digit year to 4-digit (25 -> 2025, 24 -> 2024, etc.)

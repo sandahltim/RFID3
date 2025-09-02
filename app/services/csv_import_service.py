@@ -39,11 +39,18 @@ class CSVImportService:
         }
 
     def import_equipment_data(self, file_path: str = None) -> Dict:
-        """Import equipment/inventory data from equip8.26.25.csv"""
+        """Import equipment/inventory data from equipPOS8.26.25.csv or equip8.26.25.csv"""
         if not file_path:
-            # Find latest equipment file
-            pattern = os.path.join(self.CSV_BASE_PATH, "equip*.csv")
-            files = glob.glob(pattern)
+            # Find latest equipment file - try POS prefix first, then original
+            pos_pattern = os.path.join(self.CSV_BASE_PATH, "equipPOS*.csv")
+            old_pattern = os.path.join(self.CSV_BASE_PATH, "equip*.csv")
+            
+            pos_files = glob.glob(pos_pattern)
+            old_files = glob.glob(old_pattern)
+            
+            # Prefer POS-prefixed files if available
+            files = pos_files if pos_files else old_files
+            
             if not files:
                 raise FileNotFoundError(f"No equipment CSV files found in {self.CSV_BASE_PATH}")
             file_path = max(files, key=os.path.getctime)  # Get newest file

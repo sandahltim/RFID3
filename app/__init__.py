@@ -193,15 +193,18 @@ def create_app():
         app.logger.error(f"Failed to register blueprints: {str(e)}", exc_info=True)
         raise
 
-    # Initialize scheduler
-    try:
-        from app.services.scheduler import init_scheduler
+    # Initialize scheduler (skip if environment variable is set)
+    if not os.getenv('FLASK_SKIP_SCHEDULER'):
+        try:
+            from app.services.scheduler import init_scheduler
 
-        init_scheduler(app)
-        app.logger.info("Scheduler initialized successfully")
-    except (ImportError, RuntimeError) as e:
-        app.logger.error(f"Failed to initialize scheduler: {str(e)}", exc_info=True)
-        raise
+            init_scheduler(app)
+            app.logger.info("Scheduler initialized successfully")
+        except (ImportError, RuntimeError) as e:
+            app.logger.error(f"Failed to initialize scheduler: {str(e)}", exc_info=True)
+            raise
+    else:
+        app.logger.info("Scheduler initialization skipped per environment variable")
 
     app.logger.info("Application startup completed successfully")
     return app
