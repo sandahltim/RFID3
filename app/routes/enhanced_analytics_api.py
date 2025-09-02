@@ -70,7 +70,7 @@ def get_enhanced_kpis():
         )
 
         if store_filter != "all":
-            revenue_query = revenue_query.filter(PayrollTrends.store_id == store_filter)
+            revenue_query = revenue_query.filter(PayrollTrends.store_code == store_filter)
 
         revenue_data = revenue_query.filter(
             PayrollTrends.week_ending >= start_date.date()
@@ -188,13 +188,13 @@ def get_store_performance():
         # Get store performance data
         store_performance = (
             db.session.query(
-                PayrollTrends.store_id,
+                PayrollTrends.store_code,
                 func.avg(PayrollTrends.total_revenue).label("avg_revenue"),
                 func.avg(PayrollTrends.revenue_per_hour).label("avg_efficiency"),
                 func.avg(PayrollTrends.labor_efficiency_ratio).label("avg_labor_ratio"),
             )
             .filter(PayrollTrends.week_ending >= start_date.date())
-            .group_by(PayrollTrends.store_id)
+            .group_by(PayrollTrends.store_code)
             .all()
         )
 
@@ -203,8 +203,8 @@ def get_store_performance():
         for store in store_performance:
             stores_data.append(
                 {
-                    "store_code": store.store_id,
-                    "store_name": get_store_name(store.store_id),
+                    "store_code": store.store_code,
+                    "store_name": get_store_name(store.store_code),
                     "avg_revenue": float(store.avg_revenue or 0),
                     "efficiency": float(store.avg_efficiency or 0),
                     "labor_ratio": float(store.avg_labor_ratio or 0),

@@ -1,7 +1,8 @@
 # app/services/pnl_import_service.py
 """
-P&L (Profit and Loss) CSV Import Service
+P&L (Profit and Loss) CSV Import Service - UPDATED FOR CENTRALIZED STORE CONFIG
 Handles import of financial data with monthly actuals and projections
+Uses centralized store configuration for consistent data correlation
 """
 
 import pandas as pd
@@ -18,6 +19,11 @@ import logging
 from config import DB_CONFIG
 from .logger import get_logger
 
+# Import centralized store configuration
+import sys
+sys.path.append('/home/tim/RFID3/app/config')
+from stores import STORES, get_store_name, get_all_store_codes, get_active_store_codes
+
 logger = get_logger(__name__)
 
 class PnLImportService:
@@ -29,22 +35,23 @@ class PnLImportService:
         self.engine = create_engine(self.database_url, pool_pre_ping=True)
         self.Session = sessionmaker(bind=self.engine)
         
-        # Store mappings for data normalization
-        self.store_mappings = {
-            '3607': 'Wayzata',
-            '6800': 'Brooklyn Park', 
-            '728': 'Elk River',
-            '8101': 'Fridley'
-        }
+        # Use centralized store configuration - NO MORE HARDCODED MAPPINGS
+        self.store_mappings = {store_code: get_store_name(store_code) for store_code in get_all_store_codes()}
+        logger.info(f"Loaded store mappings from centralized config: {self.store_mappings}")
         
-        # P&L metric types supported
+        # P&L metric types supported - enhanced with actual CSV structure analysis
         self.metric_types = [
             'Rental Revenue',
             'Sales Revenue', 
             'COGS',
             'Gross Profit',
             'Operating Expenses',
-            'Net Income'
+            'Net Income',
+            # Additional P&L metrics found in CSV analysis
+            'Other Revenue',
+            'Total Revenue',
+            'Total COGS',
+            'Total Expenses'
         ]
 
     def clean_currency_value(self, value: Any) -> Optional[Decimal]:
@@ -54,7 +61,7 @@ class PnLImportService:
             
         # Convert to string and clean
         str_val = str(value).strip()
-        if not str_val or str_val.lower() in ['nan', 'null', 'none']:
+        if not str_val or str_val.lower() in ['nan', 'null', 'none', '']:
             return None
             
         # Remove currency symbols, commas, parentheses
@@ -67,116 +74,135 @@ class PnLImportService:
         try:
             return Decimal(cleaned)
         except (ValueError, InvalidOperation):
-            logger.warning(f"Could not parse currency value: {value}")
+            logger.debug(f"Could not parse currency value: {value}")
             return None
 
-    def parse_date_from_columns(self, month_col: str, year: int) -> Optional[date]:
-        """Parse date from month column name and year"""
+    def parse_month_year(self, month_str: str, year_str: Optional[str]) -> Optional[date]:
+        """Parse month and year strings into a date object"""
+        if not month_str or month_str.upper() in ['TTM', 'TOTAL', '']:
+            return None
+            
+        # Month mapping
         month_mapping = {
-            'January': 1, 'February': 2, 'March': 3, 'April': 4,
-            'May': 5, 'June': 6, 'July': 7, 'August': 8,
-            'September': 9, 'October': 10, 'November': 11, 'December': 12,
-            'Jan': 1, 'Feb': 2, 'Mar': 3, 'Apr': 4,
-            'Jun': 6, 'Jul': 7, 'Aug': 8, 'Sep': 9, 'Oct': 10, 'Nov': 11, 'Dec': 12
+            'january': 1, 'february': 2, 'march': 3, 'april': 4,
+            'may': 5, 'june': 6, 'july': 7, 'august': 8,
+            'september': 9, 'october': 10, 'november': 11, 'december': 12,
+            'jan': 1, 'feb': 2, 'mar': 3, 'apr': 4,
+            'jun': 6, 'jul': 7, 'aug': 8, 'sep': 9, 'oct': 10, 'nov': 11, 'dec': 12
         }
         
         try:
-            if month_col in month_mapping:
-                return date(year, month_mapping[month_col], 1)
-            # Try direct month name lookup
-            for month_name, month_num in month_mapping.items():
-                if month_name.lower() in month_col.lower():
-                    return date(year, month_num, 1)
-        except ValueError as e:
-            logger.warning(f"Could not parse date from {month_col}, {year}: {e}")
+            # Try to extract year from year_str
+            year = None
+            if year_str and str(year_str).replace('.0', '').isdigit():
+                year = int(float(year_str))
             
-        return None
+            # Try to find month
+            month_clean = month_str.lower().strip()
+            month_num = month_mapping.get(month_clean)
+            
+            if month_num and year and 2020 <= year <= 2030:
+                return date(year, month_num, 1)
+            else:
+                logger.debug(f"Could not parse date: month='{month_str}' year='{year_str}'")
+                return None
+                
+        except (ValueError, TypeError) as e:
+            logger.debug(f"Date parsing error: {e}")
+            return None
 
     def extract_financial_data_from_csv(self, csv_path: str) -> List[Dict]:
-        """Extract and normalize financial data from P&L CSV"""
-        logger.info(f"Starting P&L CSV import from: {csv_path}")
+        """Extract and normalize financial data from P&L CSV with corrected structure parsing"""
+        logger.info(f"Starting corrected P&L CSV import from: {csv_path}")
         
         try:
-            # Read the CSV with specific encoding and handle complex format
+            # Read the full CSV
             df = pd.read_csv(csv_path, encoding='utf-8-sig')
-            logger.info(f"Read CSV with shape: {df.shape}")
+            logger.info(f"Read full CSV with shape: {df.shape}")
             
-            # The CSV has a complex structure - analyze first few rows
             financial_records = []
-            current_metric_type = None
+            
+            # Based on CSV analysis:
+            # Row 1 (index 0): Headers showing store codes and categories
+            # Row 2+ (index 1+): Monthly data with format: Month, Year, Store1_Value, Store2_Value, ...
+            # TTM rows should be skipped
             
             for idx, row in df.iterrows():
-                # Skip first few header rows
-                if idx < 4:
+                # Skip header row (index 0)
+                if idx == 0:
                     continue
-                    
-                # Check if this row defines a metric type
-                first_col = str(row.iloc[0]).strip()
-                if first_col in self.metric_types:
-                    current_metric_type = first_col
-                    logger.debug(f"Found metric type: {current_metric_type}")
+                
+                # Extract month and year from first two columns
+                month_str = str(row.iloc[0]).strip() if not pd.isna(row.iloc[0]) else ""
+                year_str = str(row.iloc[1]).strip() if len(row) > 1 and not pd.isna(row.iloc[1]) else ""
+                
+                # Skip TTM (Trailing Twelve Months) and other summary rows
+                if not month_str or month_str.upper() in ['TTM', 'TOTAL', ''] or not year_str:
                     continue
-                    
-                # Check if this row contains store data
-                if current_metric_type and first_col in self.store_mappings:
-                    store_code = first_col
-                    store_name = self.store_mappings[store_code]
-                    
-                    # Extract data from columns - need to parse the complex date structure
-                    # Looking at the CSV, columns represent months/years in different sections
-                    col_names = df.columns.tolist()
-                    
-                    # Process actual data columns (skip first column which is store code)
-                    for col_idx in range(1, len(row)):
-                        if col_idx >= len(col_names):
-                            break
-                            
-                        value = row.iloc[col_idx]
+                
+                # Parse date
+                parsed_date = self.parse_month_year(month_str, year_str)
+                if not parsed_date:
+                    logger.debug(f"Skipping row {idx}: could not parse date from '{month_str}' '{year_str}'")
+                    continue
+                
+                logger.debug(f"Processing row {idx}: {month_str} {year_str} -> {parsed_date}")
+                
+                # Extract store data from specific columns
+                # Based on header analysis: columns 2-5 contain the main store revenue data
+                store_data_positions = {
+                    2: '3607',  # Wayzata
+                    3: '6800',  # Brooklyn Park
+                    4: '728',   # Elk River  
+                    5: '8101'   # Fridley
+                }
+                
+                for col_pos, store_code in store_data_positions.items():
+                    if col_pos < len(row):
+                        value = row.iloc[col_pos]
                         cleaned_value = self.clean_currency_value(value)
                         
                         if cleaned_value is not None and cleaned_value != 0:
-                            # Try to determine date from column structure
-                            # This is complex due to the CSV format - using position-based logic
-                            
-                            # Based on CSV analysis: columns 1-7 are 2021, 8-21 are 2022, etc.
-                            year = 2021
-                            month = col_idx
-                            
-                            if col_idx >= 8:
-                                year = 2022
-                                month = col_idx - 7
-                            if col_idx >= 21:
-                                year = 2023
-                                month = col_idx - 20
-                            if col_idx >= 34:
-                                year = 2024
-                                month = col_idx - 33
-                            if col_idx >= 47:
-                                year = 2025
-                                month = col_idx - 46
-                                
-                            # Adjust month to be within 1-12
-                            if month > 12:
-                                continue
-                                
-                            try:
-                                month_date = date(year, month, 1)
-                                
-                                record = {
-                                    'store_code': store_code,
-                                    'store_name': store_name,
-                                    'month_year': month_date,
-                                    'metric_type': current_metric_type,
-                                    'actual_amount': cleaned_value,
-                                    'projected_amount': None,  # Will be determined later
-                                    'data_source': 'CSV_IMPORT'
-                                }
-                                financial_records.append(record)
-                                
-                            except ValueError:
-                                continue
+                            record = {
+                                'store_code': store_code,
+                                'store_name': get_store_name(store_code),
+                                'month_year': parsed_date,
+                                'metric_type': 'Rental Revenue',  # Primary revenue metric
+                                'actual_amount': cleaned_value,
+                                'projected_amount': None,
+                                'data_source': 'CSV_IMPORT_PL'
+                            }
+                            financial_records.append(record)
+                            logger.debug(f"Added record: {store_code} {parsed_date} ${cleaned_value}")
+                
+                # Also extract additional revenue categories from other column groups
+                # Columns 7-10 appear to be "Sales Revenue" for each store
+                sales_revenue_positions = {
+                    7: '3607',   # Wayzata Sales Revenue
+                    8: '6800',   # Brooklyn Park Sales Revenue
+                    9: '728',    # Elk River Sales Revenue
+                    10: '8101'   # Fridley Sales Revenue
+                }
+                
+                for col_pos, store_code in sales_revenue_positions.items():
+                    if col_pos < len(row):
+                        value = row.iloc[col_pos]
+                        cleaned_value = self.clean_currency_value(value)
+                        
+                        if cleaned_value is not None and cleaned_value != 0:
+                            record = {
+                                'store_code': store_code,
+                                'store_name': get_store_name(store_code),
+                                'month_year': parsed_date,
+                                'metric_type': 'Sales Revenue',
+                                'actual_amount': cleaned_value,
+                                'projected_amount': None,
+                                'data_source': 'CSV_IMPORT_PL'
+                            }
+                            financial_records.append(record)
+                            logger.debug(f"Added sales record: {store_code} {parsed_date} ${cleaned_value}")
             
-            logger.info(f"Extracted {len(financial_records)} financial records")
+            logger.info(f"Extracted {len(financial_records)} financial records from P&L CSV")
             return financial_records
             
         except Exception as e:
@@ -184,7 +210,7 @@ class PnLImportService:
             raise
 
     def import_pnl_csv_data(self, csv_path: str, limit: int = 25000) -> Dict[str, Any]:
-        """Import P&L data from CSV file"""
+        """Import P&L data from CSV file with enhanced correlation"""
         logger.info(f"Starting P&L import from {csv_path}, limit: {limit}")
         
         try:
@@ -218,7 +244,7 @@ class PnLImportService:
                     
                     for record in chunk:
                         try:
-                            # Insert or update record
+                            # Insert or update record using proper store_code correlation
                             insert_sql = text("""
                                 INSERT INTO pos_pnl 
                                 (store_code, month_year, metric_type, actual_amount, 
@@ -287,22 +313,22 @@ class PnLImportService:
             }
 
     def get_import_summary(self, session) -> Dict[str, Any]:
-        """Generate summary statistics after import"""
+        """Generate summary statistics after import using centralized store config"""
         try:
             # Get counts by store and metric type
             summary_sql = text("""
                 SELECT 
-                    store_code,
-                    metric_type,
+                    pp.store_code,
+                    pp.metric_type,
                     COUNT(*) as record_count,
-                    MIN(month_year) as earliest_date,
-                    MAX(month_year) as latest_date,
-                    SUM(actual_amount) as total_actual,
-                    AVG(actual_amount) as avg_actual
-                FROM pos_pnl 
-                WHERE import_date >= DATE_SUB(NOW(), INTERVAL 1 HOUR)
-                GROUP BY store_code, metric_type
-                ORDER BY store_code, metric_type
+                    MIN(pp.month_year) as earliest_date,
+                    MAX(pp.month_year) as latest_date,
+                    SUM(pp.actual_amount) as total_actual,
+                    AVG(pp.actual_amount) as avg_actual
+                FROM pos_pnl pp 
+                WHERE pp.import_date >= DATE_SUB(NOW(), INTERVAL 1 HOUR)
+                GROUP BY pp.store_code, pp.metric_type
+                ORDER BY pp.store_code, pp.metric_type
             """)
             
             results = session.execute(summary_sql).fetchall()
@@ -317,15 +343,19 @@ class PnLImportService:
                 "by_metric": {}
             }
             
-            # Organize by store and metric
+            # Organize by store and metric using centralized store names
             for row in results:
                 store_code = row.store_code
+                store_name = get_store_name(store_code)  # Use centralized config
                 metric_type = row.metric_type
                 
                 if store_code not in summary["by_store"]:
-                    summary["by_store"][store_code] = {}
+                    summary["by_store"][store_code] = {
+                        "store_name": store_name,
+                        "metrics": {}
+                    }
                 
-                summary["by_store"][store_code][metric_type] = {
+                summary["by_store"][store_code]["metrics"][metric_type] = {
                     "records": row.record_count,
                     "total_actual": float(row.total_actual) if row.total_actual else 0,
                     "avg_actual": float(row.avg_actual) if row.avg_actual else 0
@@ -343,13 +373,13 @@ class PnLImportService:
 
     def get_pnl_analytics(self, store_code: Optional[str] = None, 
                          metric_type: Optional[str] = None) -> Dict[str, Any]:
-        """Get P&L analytics with variance analysis"""
+        """Get P&L analytics with variance analysis using centralized store config"""
         session = self.Session()
         
         try:
+            # Updated query to work with centralized store configuration
             base_query = """
                 SELECT 
-                    psm.store_name,
                     pp.store_code,
                     pp.metric_type,
                     YEAR(pp.month_year) as year,
@@ -365,12 +395,11 @@ class PnLImportService:
                     END as variance_percentage,
                     pp.percentage_total_revenue
                 FROM pos_pnl pp
-                LEFT JOIN pos_store_mapping psm ON pp.store_code = psm.store_code
-                WHERE psm.active = TRUE
+                WHERE 1=1
             """
             
             params = {}
-            if store_code:
+            if store_code and store_code != 'all':
                 base_query += " AND pp.store_code = :store_code"
                 params['store_code'] = store_code
                 
@@ -382,12 +411,12 @@ class PnLImportService:
             
             results = session.execute(text(base_query), params).fetchall()
             
-            # Process results
+            # Process results with centralized store names
             analytics_data = []
             for row in results:
                 analytics_data.append({
-                    'store_name': row.store_name,
                     'store_code': row.store_code,
+                    'store_name': get_store_name(row.store_code),  # Use centralized config
                     'metric_type': row.metric_type,
                     'year': row.year,
                     'month': row.month,
@@ -402,7 +431,8 @@ class PnLImportService:
             return {
                 "success": True,
                 "data": analytics_data,
-                "record_count": len(analytics_data)
+                "record_count": len(analytics_data),
+                "stores": {code: get_store_name(code) for code in get_active_store_codes()}
             }
             
         except Exception as e:
@@ -411,6 +441,44 @@ class PnLImportService:
                 "success": False,
                 "error": str(e),
                 "data": []
+            }
+        finally:
+            session.close()
+
+    def validate_store_correlations(self) -> Dict[str, Any]:
+        """Validate that P&L data correlates properly with centralized store config"""
+        session = self.Session()
+        
+        try:
+            # Check which stores have P&L data vs centralized config
+            pnl_stores_sql = text("SELECT DISTINCT store_code FROM pos_pnl ORDER BY store_code")
+            pnl_stores = [row[0] for row in session.execute(pnl_stores_sql).fetchall()]
+            
+            centralized_stores = get_all_store_codes()
+            active_stores = get_active_store_codes()
+            
+            correlation_report = {
+                "pnl_stores": pnl_stores,
+                "centralized_stores": centralized_stores,
+                "active_stores": active_stores,
+                "missing_in_pnl": [s for s in centralized_stores if s not in pnl_stores],
+                "missing_in_config": [s for s in pnl_stores if s not in centralized_stores],
+                "properly_correlated": [s for s in pnl_stores if s in centralized_stores],
+                "correlation_percentage": len([s for s in pnl_stores if s in centralized_stores]) / max(len(pnl_stores), 1) * 100
+            }
+            
+            logger.info(f"Store correlation validation: {correlation_report['correlation_percentage']:.1f}% properly correlated")
+            
+            return {
+                "success": True,
+                "correlation_report": correlation_report
+            }
+            
+        except Exception as e:
+            logger.error(f"Error validating store correlations: {e}")
+            return {
+                "success": False,
+                "error": str(e)
             }
         finally:
             session.close()

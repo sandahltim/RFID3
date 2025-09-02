@@ -278,9 +278,9 @@ def get_business_context():
     """Get business context knowledge"""
     try:
         context_type = request.args.get('context_type')
-        store_id = request.args.get('store_id')
+        store_code = request.args.get('store_code')
         
-        result = feedback_service.get_business_context(context_type, store_id)
+        result = feedback_service.get_business_context(context_type, store_code)
         
         if result['success']:
             return jsonify(result)

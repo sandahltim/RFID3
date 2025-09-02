@@ -1609,14 +1609,14 @@ class CSVImportService:
                 CREATE TABLE IF NOT EXISTS pos_scorecard_trends (
                     id INT AUTO_INCREMENT PRIMARY KEY,
                     week_ending DATE,
-                    store_id VARCHAR(10),
+                    store_code VARCHAR(10),
                     revenue DECIMAL(15,2),
                     profit DECIMAL(15,2),
                     margin DECIMAL(5,2),
                     import_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     import_batch_id VARCHAR(50),
                     INDEX idx_week_ending (week_ending),
-                    INDEX idx_store_id (store_id)
+                    INDEX idx_store_code (store_code)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
             """))
             session.commit()
@@ -1630,14 +1630,14 @@ class CSVImportService:
                 CREATE TABLE IF NOT EXISTS pos_payroll_trends (
                     id INT AUTO_INCREMENT PRIMARY KEY,
                     week_ending DATE,
-                    store_id VARCHAR(10),
+                    store_code VARCHAR(10),
                     total_hours DECIMAL(10,2),
                     total_wages DECIMAL(15,2),
                     avg_hourly_rate DECIMAL(8,2),
                     import_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     import_batch_id VARCHAR(50),
                     INDEX idx_week_ending (week_ending),
-                    INDEX idx_store_id (store_id)
+                    INDEX idx_store_code (store_code)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
             """))
             session.commit()

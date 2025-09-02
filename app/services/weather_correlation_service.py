@@ -22,6 +22,13 @@ from app.models.pos_models import POSTransaction, POSTransactionItem, POSEquipme
 import json
 from decimal import Decimal
 import warnings
+from app.config.stores import (
+    STORES, STORE_MAPPING, STORE_MANAGERS,
+    STORE_BUSINESS_TYPES, STORE_OPENING_DATES,
+    get_store_name, get_store_manager, get_store_business_type,
+    get_store_opening_date, get_active_store_codes
+)
+
 warnings.filterwarnings('ignore')
 
 # Import ML libraries with fallbacks
@@ -56,6 +63,11 @@ class WeatherCorrelationService:
                                           include_forecasts: bool = False) -> Dict:
         """Comprehensive weather-rental correlation analysis"""
         try:
+            # Validate store code using centralized configuration
+            if store_code and store_code != 'all':
+                if store_code not in STORES:
+                    self.logger.warning(f"Invalid store code {store_code}, using all stores")
+                    store_code = None
             self.logger.info(f"Starting weather-rental correlation analysis for store {store_code}, segment {industry_segment}")
             
             end_date = date.today()

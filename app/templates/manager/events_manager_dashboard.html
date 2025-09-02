@@ -1,0 +1,637 @@
+{% extends "base.html" %}
+{% block title %}{{ store_info.manager }}'s Dashboard - {{ store_info.name }} - RFID DASHBOARD{% endblock %}
+
+{% block extra_head %}
+<style>
+.events-header {
+    background: linear-gradient(135deg, #8e44ad 0%, #9b59b6 100%);
+    color: white;
+    padding: 2rem 0;
+    margin-bottom: 2rem;
+    border-radius: 0 0 15px 15px;
+}
+
+.kpi-card {
+    border: none;
+    border-radius: 12px;
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+    transition: transform 0.3s ease;
+    height: 100%;
+}
+
+.kpi-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.15);
+}
+
+.kpi-value {
+    font-size: 2.5rem;
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+}
+
+.kpi-label {
+    font-size: 0.9rem;
+    color: #6c757d;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.kpi-change {
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-top: 0.5rem;
+}
+
+.kpi-change.positive {
+    color: #28a745;
+}
+
+.kpi-change.negative {
+    color: #dc3545;
+}
+
+.events-icon {
+    font-size: 3rem;
+    color: #8e44ad;
+    margin-bottom: 1rem;
+}
+
+.event-equipment-card {
+    background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+    color: white;
+    border-radius: 15px;
+}
+
+.equipment-metric {
+    text-align: center;
+    padding: 1rem;
+}
+
+.equipment-metric h4 {
+    color: #8e44ad;
+    margin-bottom: 0.5rem;
+}
+
+.alert-events {
+    border-left: 4px solid #8e44ad;
+    background-color: rgba(142, 68, 173, 0.1);
+}
+
+.btn-events {
+    background: linear-gradient(135deg, #8e44ad 0%, #9b59b6 100%);
+    border: none;
+    color: white;
+    font-weight: 600;
+}
+
+.btn-events:hover {
+    background: linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%);
+    color: white;
+}
+
+.seasonal-indicator {
+    padding: 1rem;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+}
+
+.seasonal-high {
+    background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+    color: white;
+}
+
+.seasonal-medium {
+    background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);
+    color: white;
+}
+
+.seasonal-low {
+    background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+    color: white;
+}
+
+.event-category {
+    margin-bottom: 1rem;
+    padding: 1rem;
+    border-radius: 8px;
+    background: #f8f9fa;
+}
+
+.category-name {
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    color: #8e44ad;
+}
+
+.utilization-bar {
+    height: 8px;
+    background-color: #e9ecef;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.utilization-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #8e44ad, #9b59b6);
+    transition: width 0.3s ease;
+}
+
+.chart-container {
+    position: relative;
+    height: 300px;
+    margin-bottom: 2rem;
+}
+
+.broadway-branding {
+    background: linear-gradient(135deg, #8e44ad 0%, #9b59b6 100%);
+    color: white;
+    padding: 1rem;
+    border-radius: 8px;
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+@media (max-width: 768px) {
+    .events-header {
+        padding: 1.5rem 0;
+        margin-bottom: 1.5rem;
+    }
+    
+    .kpi-value {
+        font-size: 2rem;
+    }
+    
+    .chart-container {
+        height: 250px;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="events-header">
+    <div class="container-fluid">
+        <div class="row align-items-center">
+            <div class="col-md-8">
+                <h1 class="display-5 mb-2">
+                    <i class="fas fa-calendar-star me-3"></i>{{ store_info.manager }}'s Events Dashboard
+                </h1>
+                <p class="lead mb-0">{{ store_info.name }} - {{ store_info.location }}</p>
+                <p class="mb-0 mt-1">
+                    <span class="badge bg-light text-dark">{{ store_info.business_type }}</span>
+                    <span class="badge bg-warning ms-2">{{ store_info.approximate_items }} items</span>
+                </p>
+            </div>
+            <div class="col-md-4 text-md-end">
+                <div class="events-icon">
+                    <i class="fas fa-campground"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="container-fluid">
+    <!-- Broadway Tent & Event Branding -->
+    <div class="broadway-branding">
+        <h3 class="mb-2">
+            <i class="fas fa-theater-masks me-2"></i>Broadway Tent & Event
+        </h3>
+        <p class="mb-0">Premier event equipment rental specialist serving the Twin Cities</p>
+    </div>
+
+    <!-- Key Performance Indicators -->
+    <div class="row mb-4">
+        <div class="col-md-3 mb-3">
+            <div class="card kpi-card text-center">
+                <div class="card-body">
+                    <i class="fas fa-calendar-check text-primary mb-2" style="font-size: 2rem;"></i>
+                    <div class="kpi-value text-primary">
+                        {{ dashboard_data.kpis.inventory.total_items if dashboard_data.kpis.inventory else 0 }}
+                    </div>
+                    <div class="kpi-label">Event Items</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3 mb-3">
+            <div class="card kpi-card text-center">
+                <div class="card-body">
+                    <i class="fas fa-users text-success mb-2" style="font-size: 2rem;"></i>
+                    <div class="kpi-value text-success">
+                        {{ dashboard_data.kpis.inventory.utilization_rate if dashboard_data.kpis.inventory else 0 }}%
+                    </div>
+                    <div class="kpi-label">Equipment in Use</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3 mb-3">
+            <div class="card kpi-card text-center">
+                <div class="card-body">
+                    <i class="fas fa-dollar-sign text-warning mb-2" style="font-size: 2rem;"></i>
+                    <div class="kpi-value text-warning">
+                        ${{ "{:,.0f}".format(dashboard_data.financial_summary.current_revenue if dashboard_data.financial_summary else 0) }}
+                    </div>
+                    <div class="kpi-label">Monthly Revenue</div>
+                    {% if dashboard_data.financial_summary and dashboard_data.financial_summary.revenue_change_percent %}
+                    <div class="kpi-change {{ 'positive' if dashboard_data.financial_summary.revenue_change_percent > 0 else 'negative' }}">
+                        {{ "+" if dashboard_data.financial_summary.revenue_change_percent > 0 else "" }}{{ dashboard_data.financial_summary.revenue_change_percent }}% vs last month
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3 mb-3">
+            <div class="card kpi-card text-center">
+                <div class="card-body">
+                    <i class="fas fa-file-contract text-info mb-2" style="font-size: 2rem;"></i>
+                    <div class="kpi-value text-info">
+                        {{ dashboard_data.kpis.contracts.active_contracts if dashboard_data.kpis.contracts else 0 }}
+                    </div>
+                    <div class="kpi-label">Active Events</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Event Equipment Focus Section -->
+    {% if dashboard_data.events_metrics %}
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card event-equipment-card">
+                <div class="card-header bg-transparent">
+                    <h5 class="text-white mb-0">
+                        <i class="fas fa-campground me-2"></i>Event Equipment Performance
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="equipment-metric">
+                                <h4>{{ dashboard_data.events_metrics.event_equipment.total }}</h4>
+                                <p class="mb-0">Total Event Items</p>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="equipment-metric">
+                                <h4>{{ dashboard_data.events_metrics.event_equipment.core_items }}</h4>
+                                <p class="mb-0">Core Event Equipment</p>
+                                <small class="text-muted">(Tents, Tables, Chairs)</small>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="equipment-metric">
+                                <h4>{{ dashboard_data.events_metrics.event_equipment.utilization_rate }}%</h4>
+                                <p class="mb-0">Event Utilization</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="row">
+        <!-- Event Categories & Seasonal Trends -->
+        <div class="col-lg-8 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-chart-bar me-2"></i>Event Equipment Categories
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if dashboard_data.inventory_summary and dashboard_data.inventory_summary.top_categories %}
+                        {% for category in dashboard_data.inventory_summary.top_categories %}
+                        <div class="event-category">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div class="category-name">
+                                    <i class="fas fa-{{ 'campground' if 'tent' in category.category.lower() else 'chair' if 'chair' in category.category.lower() else 'table' if 'table' in category.category.lower() else 'tools' }} me-2"></i>
+                                    {{ category.category }}
+                                </div>
+                                <div>
+                                    <span class="badge bg-secondary">{{ category.total_items }} items</span>
+                                    <span class="badge bg-primary">{{ category.utilization_rate }}% utilized</span>
+                                </div>
+                            </div>
+                            <div class="utilization-bar mt-2">
+                                <div class="utilization-fill" style="width: {{ category.utilization_rate }}%"></div>
+                            </div>
+                            <small class="text-muted">
+                                {{ category.rented }} at events, {{ category.available }} ready, {{ category.maintenance }} in service
+                            </small>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <p class="text-muted">Loading event category data...</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Seasonal Demand Indicator -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-calendar-alt me-2"></i>Seasonal Event Patterns
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="seasonal-indicator seasonal-high">
+                                <h6><i class="fas fa-sun me-2"></i>Summer Peak</h6>
+                                <p class="mb-0">May - September: Wedding season, outdoor events</p>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="seasonal-indicator seasonal-medium">
+                                <h6><i class="fas fa-leaf me-2"></i>Spring/Fall</h6>
+                                <p class="mb-0">March-April, October: Moderate event activity</p>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="seasonal-indicator seasonal-low">
+                                <h6><i class="fas fa-snowflake me-2"></i>Winter Low</h6>
+                                <p class="mb-0">November - February: Indoor events, maintenance</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Alerts and Event Insights -->
+        <div class="col-lg-4 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-bell me-2"></i>Event Alerts
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if dashboard_data.alerts %}
+                        {% for alert in dashboard_data.alerts %}
+                        <div class="alert alert-events mb-3">
+                            <h6 class="alert-heading">{{ alert.title }}</h6>
+                            <p class="mb-1">{{ alert.message }}</p>
+                            {% if alert.action %}
+                            <small class="text-muted">
+                                <i class="fas fa-arrow-right me-1"></i>{{ alert.action }}
+                            </small>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="alert alert-success">
+                            <i class="fas fa-check-circle me-2"></i>All event equipment ready for upcoming bookings!
+                        </div>
+                    {% endif %}
+
+                    <!-- Weather Impact Notice -->
+                    <div class="alert alert-info mt-3">
+                        <h6><i class="fas fa-cloud-sun me-2"></i>Weather Considerations</h6>
+                        <p class="mb-0">Monitor weather patterns for outdoor event planning and tent setup requirements.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Popular Event Items -->
+            {% if dashboard_data.inventory_summary and dashboard_data.inventory_summary.high_value_items %}
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-star me-2"></i>Premium Event Equipment
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% for item in dashboard_data.inventory_summary.high_value_items[:5] %}
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div>
+                            <div class="fw-bold">{{ item.description[:35] }}{{ "..." if item.description|length > 35 }}</div>
+                            <small class="text-muted">
+                                <i class="fas fa-tag me-1"></i>{{ item.category }}
+                            </small>
+                        </div>
+                        <div class="text-end">
+                            <div class="fw-bold">${{ item.rental_rate }}/day</div>
+                            <span class="badge {{ 'bg-success' if item.status == 'rented' else 'bg-warning' if item.status == 'available' else 'bg-danger' }}">
+                                {{ item.status }}
+                            </span>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Event Booking Trends Chart -->
+    <div class="row">
+        <div class="col-12 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-chart-line me-2"></i>Event Booking Trends (Last 30 Days)
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="chart-container">
+                        <canvas id="bookingTrendsChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-bolt me-2"></i>Event Management Actions
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-2 mb-3">
+                            <button class="btn btn-events w-100" onclick="refreshDashboard()">
+                                <i class="fas fa-sync-alt me-2"></i>Refresh
+                            </button>
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <a href="/tab/1?store={{ store_code }}" class="btn btn-outline-secondary w-100">
+                                <i class="fas fa-campground me-2"></i>Tents
+                            </a>
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <a href="/tab/1?store={{ store_code }}&category=table" class="btn btn-outline-secondary w-100">
+                                <i class="fas fa-table me-2"></i>Tables
+                            </a>
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <a href="/tab/1?store={{ store_code }}&category=chair" class="btn btn-outline-secondary w-100">
+                                <i class="fas fa-chair me-2"></i>Chairs
+                            </a>
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <a href="/tab/2?store={{ store_code }}" class="btn btn-outline-secondary w-100">
+                                <i class="fas fa-calendar-check me-2"></i>Events
+                            </a>
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <a href="/manager/executive" class="btn btn-outline-primary w-100">
+                                <i class="fas fa-chart-line me-2"></i>Executive
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize Booking Trends Chart
+    const bookingCtx = document.getElementById('bookingTrendsChart').getContext('2d');
+    const revenueData = {{ dashboard_data.performance_trends.daily_revenue | tojson if dashboard_data.performance_trends else [] }};
+    
+    new Chart(bookingCtx, {
+        type: 'line',
+        data: {
+            labels: revenueData.map(item => {
+                const date = new Date(item.date);
+                return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            }),
+            datasets: [{
+                label: 'Daily Bookings',
+                data: revenueData.map(item => item.value),
+                borderColor: '#8e44ad',
+                backgroundColor: 'rgba(142, 68, 173, 0.1)',
+                borderWidth: 3,
+                fill: true,
+                tension: 0.4,
+                pointBackgroundColor: '#8e44ad',
+                pointBorderColor: '#ffffff',
+                pointBorderWidth: 2,
+                pointRadius: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            return '$' + value.toLocaleString();
+                        }
+                    }
+                },
+                x: {
+                    grid: {
+                        display: false
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    callbacks: {
+                        title: function(context) {
+                            return 'Event Revenue';
+                        },
+                        label: function(context) {
+                            return '$' + context.parsed.y.toLocaleString() + ' in bookings';
+                        }
+                    },
+                    backgroundColor: 'rgba(142, 68, 173, 0.9)',
+                    titleColor: '#ffffff',
+                    bodyColor: '#ffffff',
+                    borderColor: '#8e44ad',
+                    borderWidth: 1
+                }
+            }
+        }
+    });
+    
+    // Seasonal demand animation
+    animateSeasonalIndicators();
+    
+    // Auto-refresh dashboard every 5 minutes
+    setInterval(refreshDashboard, 300000);
+});
+
+function animateSeasonalIndicators() {
+    const indicators = document.querySelectorAll('.seasonal-indicator');
+    indicators.forEach((indicator, index) => {
+        setTimeout(() => {
+            indicator.style.transform = 'scale(1.02)';
+            setTimeout(() => {
+                indicator.style.transform = 'scale(1)';
+            }, 200);
+        }, index * 100);
+    });
+}
+
+function refreshDashboard() {
+    const refreshBtn = document.querySelector('.btn-events');
+    const originalText = refreshBtn.innerHTML;
+    refreshBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Refreshing...';
+    refreshBtn.disabled = true;
+    
+    // Simulate refresh
+    setTimeout(() => {
+        window.location.reload();
+    }, 1000);
+}
+
+// Weather-aware notifications
+function checkWeatherImpact() {
+    // This would integrate with weather API
+    const currentSeason = getCurrentSeason();
+    if (currentSeason === 'summer') {
+        showNotification('Peak wedding season - ensure tent inventory is optimized', 'info');
+    }
+}
+
+function getCurrentSeason() {
+    const month = new Date().getMonth() + 1;
+    if (month >= 6 && month <= 8) return 'summer';
+    if (month >= 3 && month <= 5) return 'spring';
+    if (month >= 9 && month <= 11) return 'fall';
+    return 'winter';
+}
+
+function showNotification(message, type) {
+    // Simple notification system
+    const notification = document.createElement('div');
+    notification.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
+    notification.style.top = '80px';
+    notification.style.right = '20px';
+    notification.style.zIndex = '9999';
+    notification.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+        notification.remove();
+    }, 5000);
+}
+
+// Initialize weather check
+setTimeout(checkWeatherImpact, 2000);
+</script>
+{% endblock %}

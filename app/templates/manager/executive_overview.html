@@ -1,0 +1,643 @@
+{% extends "base.html" %}
+{% block title %}Executive Overview - All Stores - RFID DASHBOARD{% endblock %}
+
+{% block extra_head %}
+<style>
+.executive-header {
+    background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+    color: white;
+    padding: 3rem 0;
+    margin-bottom: 3rem;
+    border-radius: 0 0 20px 20px;
+}
+
+.store-summary-card {
+    border: none;
+    border-radius: 15px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease;
+    height: 100%;
+    position: relative;
+    overflow: hidden;
+}
+
+.store-summary-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+}
+
+.store-header {
+    padding: 1.5rem;
+    color: white;
+    font-weight: 600;
+}
+
+.wayzata-header {
+    background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%);
+}
+
+.brooklyn-park-header {
+    background: linear-gradient(135deg, #e67e22 0%, #d35400 100%);
+}
+
+.fridley-header {
+    background: linear-gradient(135deg, #8e44ad 0%, #9b59b6 100%);
+}
+
+.elk-river-header {
+    background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%);
+}
+
+.store-metrics {
+    padding: 2rem;
+}
+
+.metric-item {
+    display: flex;
+    justify-content: between;
+    margin-bottom: 1rem;
+    padding: 0.75rem;
+    background: #f8f9fa;
+    border-radius: 8px;
+}
+
+.metric-label {
+    font-weight: 500;
+    color: #6c757d;
+    flex-grow: 1;
+}
+
+.metric-value {
+    font-weight: bold;
+    color: #2c3e50;
+}
+
+.comparison-chart-container {
+    height: 400px;
+    position: relative;
+}
+
+.alert-executive {
+    border-radius: 12px;
+    border: none;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.alert-high {
+    background: linear-gradient(135deg, rgba(231, 76, 60, 0.1) 0%, rgba(192, 57, 43, 0.05) 100%);
+    border-left: 4px solid #e74c3c;
+}
+
+.alert-medium {
+    background: linear-gradient(135deg, rgba(243, 156, 18, 0.1) 0%, rgba(230, 126, 34, 0.05) 100%);
+    border-left: 4px solid #f39c12;
+}
+
+.alert-low {
+    background: linear-gradient(135deg, rgba(52, 152, 219, 0.1) 0%, rgba(41, 128, 185, 0.05) 100%);
+    border-left: 4px solid #3498db;
+}
+
+.kpi-summary-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 15px;
+    padding: 2rem;
+    text-align: center;
+    height: 100%;
+}
+
+.kpi-summary-value {
+    font-size: 3rem;
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+}
+
+.kpi-summary-label {
+    font-size: 1.1rem;
+    opacity: 0.9;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.business-type-indicator {
+    position: absolute;
+    top: 10px;
+    right: 15px;
+    padding: 0.25rem 0.75rem;
+    border-radius: 15px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: white;
+    backdrop-filter: blur(10px);
+}
+
+.construction-indicator {
+    background: rgba(230, 126, 34, 0.8);
+}
+
+.events-indicator {
+    background: rgba(142, 68, 173, 0.8);
+}
+
+.diy-indicator {
+    background: rgba(39, 174, 96, 0.8);
+}
+
+.manager-name {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+
+.store-location {
+    font-size: 0.9rem;
+    opacity: 0.8;
+}
+
+.performance-indicator {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    margin-right: 8px;
+}
+
+.performance-excellent {
+    background: #27ae60;
+}
+
+.performance-good {
+    background: #f39c12;
+}
+
+.performance-needs-attention {
+    background: #e74c3c;
+}
+
+@media (max-width: 768px) {
+    .executive-header {
+        padding: 2rem 0;
+        margin-bottom: 2rem;
+    }
+    
+    .store-metrics {
+        padding: 1rem;
+    }
+    
+    .kpi-summary-value {
+        font-size: 2rem;
+    }
+    
+    .comparison-chart-container {
+        height: 300px;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="executive-header">
+    <div class="container-fluid">
+        <div class="row align-items-center">
+            <div class="col-md-8">
+                <h1 class="display-4 mb-3">
+                    <i class="fas fa-chart-line me-3"></i>Executive Overview
+                </h1>
+                <p class="lead mb-2">Comprehensive performance analysis across all store locations</p>
+                <p class="mb-0 opacity-75">Real-time insights into operations, revenue, and management effectiveness</p>
+            </div>
+            <div class="col-md-4 text-md-end">
+                <div style="font-size: 4rem; color: rgba(255,255,255,0.3);">
+                    <i class="fas fa-building"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="container-fluid">
+    <!-- Company-Wide KPI Summary -->
+    <div class="row mb-5">
+        <div class="col-md-3 mb-4">
+            <div class="kpi-summary-card">
+                <div class="kpi-summary-value">
+                    {% set total_items = 0 %}
+                    {% for store_name, kpis in executive_data.store_kpis.items() %}
+                        {% set total_items = total_items + (kpis.inventory.total_items if kpis.inventory else 0) %}
+                    {% endfor %}
+                    {{ "{:,}".format(total_items) }}
+                </div>
+                <div class="kpi-summary-label">Total Inventory Items</div>
+            </div>
+        </div>
+        
+        <div class="col-md-3 mb-4">
+            <div class="kpi-summary-card">
+                <div class="kpi-summary-value">
+                    {% set total_revenue = 0 %}
+                    {% set store_count = 0 %}
+                    {% for store_name, kpis in executive_data.store_kpis.items() %}
+                        {% if kpis.financial %}
+                            {% set total_revenue = total_revenue + (kpis.financial.recent_revenue if kpis.financial.recent_revenue else 0) %}
+                            {% set store_count = store_count + 1 %}
+                        {% endif %}
+                    {% endfor %}
+                    ${{ "{:,.0f}".format(total_revenue) }}
+                </div>
+                <div class="kpi-summary-label">Total Monthly Revenue</div>
+            </div>
+        </div>
+        
+        <div class="col-md-3 mb-4">
+            <div class="kpi-summary-card">
+                <div class="kpi-summary-value">
+                    {% set total_utilization = 0 %}
+                    {% set util_count = 0 %}
+                    {% for store_name, kpis in executive_data.store_kpis.items() %}
+                        {% if kpis.inventory and kpis.inventory.utilization_rate %}
+                            {% set total_utilization = total_utilization + kpis.inventory.utilization_rate %}
+                            {% set util_count = util_count + 1 %}
+                        {% endif %}
+                    {% endfor %}
+                    {{ "{:.1f}".format(total_utilization / util_count if util_count > 0 else 0) }}%
+                </div>
+                <div class="kpi-summary-label">Avg Utilization Rate</div>
+            </div>
+        </div>
+        
+        <div class="col-md-3 mb-4">
+            <div class="kpi-summary-card">
+                <div class="kpi-summary-value">{{ stores|length }}</div>
+                <div class="kpi-summary-label">Active Locations</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Individual Store Performance Cards -->
+    <div class="row mb-5">
+        {% for store_code, store_info in stores.items() %}
+        {% set store_kpis = executive_data.store_kpis.get(store_info.name, {}) %}
+        <div class="col-xl-3 col-lg-4 col-md-6 mb-4">
+            <div class="card store-summary-card">
+                <div class="store-header 
+                    {% if store_info.name == 'Wayzata' %}wayzata-header
+                    {% elif store_info.name == 'Brooklyn Park' %}brooklyn-park-header
+                    {% elif store_info.name == 'Fridley' %}fridley-header
+                    {% elif store_info.name == 'Elk River' %}elk-river-header
+                    {% endif %}">
+                    
+                    <div class="business-type-indicator 
+                        {% if 'Construction' in store_info.business_type %}construction-indicator
+                        {% elif 'Events' in store_info.business_type %}events-indicator
+                        {% else %}diy-indicator
+                        {% endif %}">
+                        {% if 'Construction' in store_info.business_type %}CONSTRUCTION
+                        {% elif 'Events' in store_info.business_type %}EVENTS
+                        {% else %}DIY
+                        {% endif %}
+                    </div>
+                    
+                    <div class="d-flex align-items-center">
+                        <div class="me-3" style="font-size: 2.5rem;">{{ store_info.emoji }}</div>
+                        <div>
+                            <div class="manager-name">{{ store_info.manager }}</div>
+                            <div class="store-location">{{ store_info.name }} - {{ store_info.location }}</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="store-metrics">
+                    <div class="metric-item">
+                        <span class="metric-label">
+                            <span class="performance-indicator 
+                                {% set util_rate = store_kpis.inventory.utilization_rate if store_kpis.inventory else 0 %}
+                                {% if util_rate >= 70 %}performance-excellent
+                                {% elif util_rate >= 50 %}performance-good
+                                {% else %}performance-needs-attention
+                                {% endif %}"></span>
+                            Utilization Rate
+                        </span>
+                        <span class="metric-value">{{ store_kpis.inventory.utilization_rate if store_kpis.inventory else 0 }}%</span>
+                    </div>
+                    
+                    <div class="metric-item">
+                        <span class="metric-label">Total Items</span>
+                        <span class="metric-value">{{ "{:,}".format(store_kpis.inventory.total_items if store_kpis.inventory else 0) }}</span>
+                    </div>
+                    
+                    <div class="metric-item">
+                        <span class="metric-label">Monthly Revenue</span>
+                        <span class="metric-value">${{ "{:,.0f}".format(store_kpis.financial.recent_revenue if store_kpis.financial else 0) }}</span>
+                    </div>
+                    
+                    <div class="metric-item">
+                        <span class="metric-label">Maintenance Queue</span>
+                        <span class="metric-value">{{ store_kpis.inventory.maintenance_items if store_kpis.inventory else 0 }}</span>
+                    </div>
+                    
+                    <div class="mt-3">
+                        <a href="{{ url_for('manager_dashboards.manager_dashboard', store_code=store_code) }}" 
+                           class="btn btn-outline-primary btn-sm w-100">
+                            <i class="fas fa-chart-bar me-2"></i>View {{ store_info.manager }}'s Dashboard
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Performance Comparison Charts -->
+    <div class="row mb-5">
+        <div class="col-lg-6 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-chart-bar me-2"></i>Revenue Comparison by Store
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="comparison-chart-container">
+                        <canvas id="revenueComparisonChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-6 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-percentage me-2"></i>Utilization Rate Comparison
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="comparison-chart-container">
+                        <canvas id="utilizationComparisonChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Executive Alerts Dashboard -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-exclamation-triangle me-2"></i>Executive Alerts & Action Items
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if executive_data.alerts %}
+                    <div class="row">
+                        {% for alert in executive_data.alerts %}
+                        <div class="col-md-6 col-lg-4 mb-3">
+                            <div class="alert alert-executive 
+                                {% if alert.priority == 'high' %}alert-high
+                                {% elif alert.priority == 'medium' %}alert-medium
+                                {% else %}alert-low
+                                {% endif %}">
+                                <h6 class="alert-heading">
+                                    <i class="fas fa-{{ store.emoji if alert.store_code else 'exclamation-triangle' }} me-2"></i>
+                                    {{ alert.store_name if alert.store_name else 'System-Wide' }}
+                                </h6>
+                                <p class="mb-1"><strong>{{ alert.title }}</strong></p>
+                                <p class="mb-2">{{ alert.message }}</p>
+                                {% if alert.action %}
+                                <small class="text-muted">
+                                    <i class="fas fa-arrow-right me-1"></i>{{ alert.action }}
+                                </small>
+                                {% endif %}
+                                {% if alert.manager %}
+                                <div class="mt-2">
+                                    <span class="badge bg-secondary">{{ alert.manager }}</span>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="alert alert-success text-center">
+                        <i class="fas fa-check-circle fa-3x mb-3"></i>
+                        <h4>All Systems Operating Normally</h4>
+                        <p class="mb-0">No critical alerts at this time. All store locations are performing within expected parameters.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Executive Actions -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-bolt me-2"></i>Executive Actions
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-2 mb-3">
+                            <button class="btn btn-primary w-100" onclick="refreshExecutiveDashboard()">
+                                <i class="fas fa-sync-alt me-2"></i>Refresh All Data
+                            </button>
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <a href="/tab/7" class="btn btn-outline-secondary w-100">
+                                <i class="fas fa-tachometer-alt me-2"></i>Executive Dashboard
+                            </a>
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <a href="/predictive/analytics" class="btn btn-outline-secondary w-100">
+                                <i class="fas fa-brain me-2"></i>Predictive Analytics
+                            </a>
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <a href="/feedback/dashboard" class="btn btn-outline-secondary w-100">
+                                <i class="fas fa-comments me-2"></i>Feedback Analysis
+                            </a>
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <a href="/database/viewer" class="btn btn-outline-secondary w-100">
+                                <i class="fas fa-database me-2"></i>Data Explorer
+                            </a>
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <button class="btn btn-outline-info w-100" onclick="exportExecutiveReport()">
+                                <i class="fas fa-download me-2"></i>Export Report
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Revenue Comparison Chart
+    const revenueCtx = document.getElementById('revenueComparisonChart').getContext('2d');
+    
+    const storeData = {{ executive_data.store_kpis | tojson }};
+    const storeNames = Object.keys(storeData);
+    const revenueValues = storeNames.map(name => storeData[name].financial ? (storeData[name].financial.recent_revenue || 0) : 0);
+    
+    const colors = ['#27ae60', '#e67e22', '#8e44ad', '#2ecc71'];
+    
+    new Chart(revenueCtx, {
+        type: 'bar',
+        data: {
+            labels: storeNames,
+            datasets: [{
+                label: 'Monthly Revenue',
+                data: revenueValues,
+                backgroundColor: colors,
+                borderColor: colors.map(color => color + '80'),
+                borderWidth: 2,
+                borderRadius: 8
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return 'Revenue: $' + context.parsed.y.toLocaleString();
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            return '$' + (value / 1000).toFixed(0) + 'K';
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    // Utilization Comparison Chart
+    const utilizationCtx = document.getElementById('utilizationComparisonChart').getContext('2d');
+    const utilizationValues = storeNames.map(name => storeData[name].inventory ? (storeData[name].inventory.utilization_rate || 0) : 0);
+    
+    new Chart(utilizationCtx, {
+        type: 'doughnut',
+        data: {
+            labels: storeNames,
+            datasets: [{
+                data: utilizationValues,
+                backgroundColor: colors,
+                borderColor: '#ffffff',
+                borderWidth: 3
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return context.label + ': ' + context.parsed + '%';
+                        }
+                    }
+                }
+            }
+        }
+    });
+    
+    // Auto-refresh every 10 minutes
+    setInterval(refreshExecutiveDashboard, 600000);
+});
+
+function refreshExecutiveDashboard() {
+    const refreshBtn = document.querySelector('.btn-primary');
+    const originalText = refreshBtn.innerHTML;
+    refreshBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Refreshing...';
+    refreshBtn.disabled = true;
+    
+    // Show loading state on store cards
+    const storeCards = document.querySelectorAll('.store-summary-card');
+    storeCards.forEach(card => {
+        card.style.opacity = '0.7';
+    });
+    
+    setTimeout(() => {
+        window.location.reload();
+    }, 2000);
+}
+
+function exportExecutiveReport() {
+    const exportBtn = document.querySelector('.btn-outline-info');
+    const originalText = exportBtn.innerHTML;
+    exportBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Generating...';
+    exportBtn.disabled = true;
+    
+    // This would typically trigger a server-side report generation
+    setTimeout(() => {
+        exportBtn.innerHTML = originalText;
+        exportBtn.disabled = false;
+        
+        // Show success notification
+        showNotification('Executive report generated successfully!', 'success');
+    }, 3000);
+}
+
+function showNotification(message, type) {
+    const notification = document.createElement('div');
+    notification.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
+    notification.style.top = '80px';
+    notification.style.right = '20px';
+    notification.style.zIndex = '9999';
+    notification.style.maxWidth = '350px';
+    notification.innerHTML = `
+        <i class="fas fa-chart-line me-2"></i>${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+        notification.remove();
+    }, 5000);
+}
+
+// Real-time KPI updates simulation
+function updateKPIs() {
+    // This would typically fetch live data
+    console.log('Updating executive KPIs...');
+}
+
+// Performance monitoring
+function monitorStorePerformance() {
+    const performanceIndicators = document.querySelectorAll('.performance-indicator');
+    performanceIndicators.forEach((indicator, index) => {
+        setTimeout(() => {
+            indicator.style.animation = 'pulse 1s ease-in-out';
+        }, index * 200);
+    });
+}
+
+// Initialize performance monitoring
+setTimeout(monitorStorePerformance, 3000);
+</script>
+{% endblock %}

@@ -281,7 +281,7 @@ def get_executive_summary():
         ).filter(PayrollTrends.week_ending.between(start_date, end_date))
 
         if store_filter != "all":
-            payroll_query = payroll_query.filter(PayrollTrends.store_id == store_filter)
+            payroll_query = payroll_query.filter(PayrollTrends.store_code == store_filter)
 
         payroll_metrics = payroll_query.first()
 
@@ -482,7 +482,7 @@ def get_payroll_trends():
         # Get weekly data with comprehensive metrics - FIXED: Add date filtering
         query = session.query(
             PayrollTrends.week_ending,
-            PayrollTrends.store_id,
+            PayrollTrends.store_code,
             PayrollTrends.total_revenue,
             PayrollTrends.rental_revenue,
             PayrollTrends.payroll_cost,
@@ -495,7 +495,7 @@ def get_payroll_trends():
         )
 
         if store_filter != "all":
-            query = query.filter(PayrollTrends.store_id == store_filter)
+            query = query.filter(PayrollTrends.store_code == store_filter)
 
         # Order by date ascending for proper time series
         query = query.order_by(PayrollTrends.week_ending)
@@ -512,8 +512,8 @@ def get_payroll_trends():
             # Individual store data point
             data_point = {
                 "week": week_key,
-                "store_id": row.store_id,
-                "store_name": STORE_MAPPING.get(row.store_id, row.store_id),
+                "store_code": row.store_code,
+                "store_name": STORE_MAPPING.get(row.store_code, row.store_code),
                 "revenue": float(row.total_revenue) if row.total_revenue else 0,
                 "rental_revenue": (
                     float(row.rental_revenue) if row.rental_revenue else 0
@@ -691,12 +691,12 @@ def get_store_comparison():
 
             current_dict = {m.store_code: m for m in current_metrics}
             previous_dict = {m.store_code: m for m in previous_metrics}
-            all_store_ids = set(current_dict.keys()) | set(previous_dict.keys())
+            all_store_codes = set(current_dict.keys()) | set(previous_dict.keys())
 
             comparison_data = []
-            for store_id in all_store_ids:
-                current = current_dict.get(store_id)
-                previous = previous_dict.get(store_id)
+            for store_code in all_store_codes:
+                current = current_dict.get(store_code)
+                previous = previous_dict.get(store_code)
 
                 curr_revenue = float(current.revenue or 0) if current else 0
                 prev_revenue = float(previous.revenue or 0) if previous else 0
@@ -711,8 +711,8 @@ def get_store_comparison():
                     return ((curr - prev) / prev * 100) if prev else None
 
                 store_data = {
-                    "store_id": store_id,
-                    "store_name": STORE_MAPPING.get(store_id, store_id),
+                    "store_code": store_code,
+                    "store_name": STORE_MAPPING.get(store_code, store_code),
                     "revenue": {
                         "current": curr_revenue,
                         "previous": prev_revenue,
@@ -755,11 +755,11 @@ def get_store_comparison():
                     payroll_query = text("""
                         SELECT SUM(payroll_cost) as payroll, SUM(wage_hours) as hours
                         FROM executive_payroll_trends 
-                        WHERE store_id = :store_id 
+                        WHERE store_code = :store_code 
                         AND week_ending BETWEEN DATE_SUB(:current_week, INTERVAL 6 DAY) AND :current_week
                     """)
                     payroll_result = session.execute(payroll_query, {
-                        'store_id': store_data['store_id'], 
+                        'store_code': store_data['store_code'], 
                         'current_week': current_week
                     }).first()
                     
@@ -834,7 +834,7 @@ def get_store_comparison():
 
             comparison_data.append(
                 {
-                    "store_id": store.store_code,
+                    "store_code": store.store_code,
                     "store_name": STORE_MAPPING.get(store.store_code, store.store_code),
                     "revenue": revenue,
                     "total_transactions": transactions,
@@ -874,12 +874,12 @@ def get_kpi_dashboard():
         if store_filter != "all":
             query = query.filter(
                 or_(
-                    ExecutiveKPI.store_id == store_filter,
-                    ExecutiveKPI.store_id.is_(None),
+                    ExecutiveKPI.store_code == store_filter,
+                    ExecutiveKPI.store_code.is_(None),
                 )  # Include company-wide KPIs
             )
         else:
-            query = query.filter(ExecutiveKPI.store_id.is_(None))  # Only company-wide
+            query = query.filter(ExecutiveKPI.store_code.is_(None))  # Only company-wide
 
         kpis = query.all()
 
@@ -969,7 +969,7 @@ def get_growth_analysis():
             ).filter(PayrollTrends.week_ending.between(start_date, end_date))
 
             if store_filter != "all":
-                query = query.filter(PayrollTrends.store_id == store_filter)
+                query = query.filter(PayrollTrends.store_code == store_filter)
 
             return query.first()
 
@@ -1296,7 +1296,7 @@ def get_payroll_analytics():
         
         # Get payroll data from payroll_trends_data table
         if store_filter != "all":
-            store_condition = "AND store_id = :store_filter"
+            store_condition = "AND store_code = :store_filter"
             params = {'start_date': start_date, 'end_date': end_date, 'store_filter': store_filter}
         else:
             store_condition = ""
@@ -1304,7 +1304,7 @@ def get_payroll_analytics():
             
         payroll_sql = text(f"""
             SELECT 
-                store_id,
+                store_code,
                 SUM(total_revenue) as total_revenue,
                 SUM(payroll_cost) as total_payroll,
                 AVG(labor_efficiency_ratio) as avg_efficiency,
@@ -1313,7 +1313,7 @@ def get_payroll_analytics():
             FROM executive_payroll_trends
             WHERE week_ending BETWEEN :start_date AND :end_date
                 {store_condition}
-            GROUP BY store_id
+            GROUP BY store_code
             ORDER BY total_revenue DESC
         """)
         
@@ -1333,8 +1333,8 @@ def get_payroll_analytics():
             cost_per_hour = total_payroll / total_hours if total_hours else 0
             
             payroll_metrics.append({
-                "store_id": row.store_id,
-                "store_name": STORE_MAPPING.get(row.store_id, row.store_id),
+                "store_code": row.store_code,
+                "store_name": STORE_MAPPING.get(row.store_code, row.store_code),
                 "total_revenue": total_revenue,
                 "total_payroll": total_payroll,
                 "gross_profit": profit,
@@ -1352,7 +1352,7 @@ def get_payroll_analytics():
         # Add company-wide summary if viewing all stores
         if store_filter == "all" and payroll_metrics:
             company_totals = {
-                "store_id": "COMPANY",
+                "store_code": "COMPANY",
                 "store_name": "Company Total",
                 "total_revenue": sum(m["total_revenue"] for m in payroll_metrics),
                 "total_payroll": sum(m["total_payroll"] for m in payroll_metrics),
@@ -1418,7 +1418,7 @@ def get_forecasting():
         )
 
         if store_filter != "all":
-            query = query.filter(PayrollTrends.store_id == store_filter)
+            query = query.filter(PayrollTrends.store_code == store_filter)
 
         query = (
             query.group_by(PayrollTrends.week_ending)
@@ -1565,7 +1565,7 @@ def get_store_benchmarking():
         # Get comprehensive store metrics
         store_metrics = (
             session.query(
-                PayrollTrends.store_id,
+                PayrollTrends.store_code,
                 func.sum(PayrollTrends.total_revenue).label("total_revenue"),
                 func.sum(PayrollTrends.rental_revenue).label("rental_revenue"),
                 func.sum(PayrollTrends.payroll_cost).label("total_payroll"),
@@ -1576,7 +1576,7 @@ def get_store_benchmarking():
                 func.stddev(PayrollTrends.total_revenue).label("revenue_volatility"),
             )
             .filter(PayrollTrends.week_ending.between(start_date, end_date))
-            .group_by(PayrollTrends.store_id)
+            .group_by(PayrollTrends.store_code)
             .all()
         )
 
@@ -1661,8 +1661,8 @@ def get_store_benchmarking():
 
             store_benchmarks.append(
                 {
-                    "store_id": store.store_id,
-                    "store_name": STORE_MAPPING.get(store.store_id, store.store_id),
+                    "store_code": store.store_code,
+                    "store_name": STORE_MAPPING.get(store.store_code, store.store_code),
                     "metrics": {
                         "total_revenue": revenue,
                         "total_payroll": payroll,
@@ -1754,7 +1754,7 @@ def calculate_comparison_metrics(
         )
 
         if store_filter != "all":
-            query = query.filter(PayrollTrends.store_id == store_filter)
+            query = query.filter(PayrollTrends.store_code == store_filter)
 
         result = query.first()
 
@@ -1950,13 +1950,13 @@ def get_data_availability_legacy():
         # Get store-specific availability
         store_data = (
             session.query(
-                PayrollTrends.store_id,
+                PayrollTrends.store_code,
                 func.min(PayrollTrends.week_ending).label("earliest"),
                 func.max(PayrollTrends.week_ending).label("latest"),
                 func.count(func.distinct(PayrollTrends.week_ending)).label("weeks"),
             )
             .filter(PayrollTrends.total_revenue > 0)
-            .group_by(PayrollTrends.store_id)
+            .group_by(PayrollTrends.store_code)
             .all()
         )
 
@@ -1964,8 +1964,8 @@ def get_data_availability_legacy():
         for store in store_data:
             stores_availability.append(
                 {
-                    "store_id": store.store_id,
-                    "store_name": STORE_MAPPING.get(store.store_id, store.store_id),
+                    "store_code": store.store_code,
+                    "store_name": STORE_MAPPING.get(store.store_code, store.store_code),
                     "earliest_date": (
                         store.earliest.isoformat() if store.earliest else None
                     ),
@@ -2038,7 +2038,7 @@ def get_trending_analysis():
         )
 
         if store_filter != "all":
-            query = query.filter(PayrollTrends.store_id == store_filter)
+            query = query.filter(PayrollTrends.store_code == store_filter)
 
         query = query.group_by(PayrollTrends.week_ending).order_by(
             PayrollTrends.week_ending
@@ -2183,7 +2183,7 @@ def get_period_comparison():
         )
 
         if store_filter != "all":
-            base_query = base_query.filter(PayrollTrends.store_id == store_filter)
+            base_query = base_query.filter(PayrollTrends.store_code == store_filter)
 
         # Get current period data
         current_data = base_query.filter(
@@ -2328,7 +2328,7 @@ def get_multi_period_analysis():
         # Get comprehensive dataset
         base_query = session.query(
             PayrollTrends.week_ending,
-            PayrollTrends.store_id,
+            PayrollTrends.store_code,
             PayrollTrends.total_revenue,
             PayrollTrends.rental_revenue,
             PayrollTrends.payroll_cost,
@@ -2341,7 +2341,7 @@ def get_multi_period_analysis():
         )
         
         if store_filter != "all":
-            base_query = base_query.filter(PayrollTrends.store_id == store_filter)
+            base_query = base_query.filter(PayrollTrends.store_code == store_filter)
         
         all_data = base_query.order_by(PayrollTrends.week_ending).all()
         
@@ -2559,7 +2559,7 @@ def get_enhanced_trends():
         # Get comprehensive dataset
         query = session.query(
             PayrollTrends.week_ending,
-            PayrollTrends.store_id,
+            PayrollTrends.store_code,
             PayrollTrends.total_revenue,
             PayrollTrends.rental_revenue,
             PayrollTrends.payroll_cost,
@@ -2572,7 +2572,7 @@ def get_enhanced_trends():
         )
         
         if store_filter != "all":
-            query = query.filter(PayrollTrends.store_id == store_filter)
+            query = query.filter(PayrollTrends.store_code == store_filter)
         
         results = query.order_by(PayrollTrends.week_ending).all()
         
@@ -2752,7 +2752,7 @@ def get_rolling_analysis():
         # Get comprehensive dataset
         query = session.query(
             PayrollTrends.week_ending,
-            PayrollTrends.store_id,
+            PayrollTrends.store_code,
             PayrollTrends.total_revenue,
             PayrollTrends.payroll_cost,
             PayrollTrends.labor_efficiency_ratio,
@@ -2764,7 +2764,7 @@ def get_rolling_analysis():
         )
         
         if store_filter != "all":
-            query = query.filter(PayrollTrends.store_id == store_filter)
+            query = query.filter(PayrollTrends.store_code == store_filter)
         
         results = query.order_by(PayrollTrends.week_ending).all()
         
@@ -2786,7 +2786,7 @@ def get_rolling_analysis():
             weekly_data[week_key]["payroll"] += float(row.payroll_cost or 0)
             weekly_data[week_key]["hours"] += float(row.wage_hours or 0)
             weekly_data[week_key]["stores"].append({
-                "store_id": row.store_id,
+                "store_code": row.store_code,
                 "revenue": float(row.total_revenue or 0),
                 "efficiency": float(row.labor_efficiency_ratio or 0),
                 "revenue_per_hour": float(row.revenue_per_hour or 0),
@@ -2842,8 +2842,8 @@ def get_rolling_analysis():
             if latest_week:
                 for store_data in latest_week["stores"]:
                     store_performance.append({
-                        "store_id": store_data["store_id"],
-                        "store_name": STORE_MAPPING.get(store_data["store_id"], store_data["store_id"]),
+                        "store_code": store_data["store_code"],
+                        "store_name": STORE_MAPPING.get(store_data["store_code"], store_data["store_code"]),
                         "total_revenue": store_data["revenue"],
                         "efficiency": store_data["efficiency"],
                         "revenue_per_hour": store_data["revenue_per_hour"],
@@ -2896,7 +2896,7 @@ def get_week_based_filter():
         
         # Get data for the specific week
         query = session.query(
-            PayrollTrends.store_id,
+            PayrollTrends.store_code,
             PayrollTrends.week_ending,
             PayrollTrends.total_revenue,
             PayrollTrends.payroll_cost,
@@ -2909,7 +2909,7 @@ def get_week_based_filter():
         )
         
         if store_filter != "all":
-            query = query.filter(PayrollTrends.store_id == store_filter)
+            query = query.filter(PayrollTrends.store_code == store_filter)
         
         results = query.all()
         
@@ -2932,8 +2932,8 @@ def get_week_based_filter():
             store_hours = float(row.wage_hours or 0)
             
             week_data["stores"].append({
-                "store_id": row.store_id,
-                "store_name": STORE_MAPPING.get(row.store_id, row.store_id),
+                "store_code": row.store_code,
+                "store_name": STORE_MAPPING.get(row.store_code, row.store_code),
                 "revenue": store_revenue,
                 "payroll": store_payroll,
                 "profit": store_revenue - store_payroll,
@@ -3072,7 +3072,7 @@ def location_specific_kpis(store_code):
         
         # Get recent revenue data for the specific store
         recent_revenue = session.query(PayrollTrends).filter(
-            PayrollTrends.store_id == store_code
+            PayrollTrends.store_code == store_code
         ).order_by(desc(PayrollTrends.week_ending)).limit(3).all()
         
         if recent_revenue:
@@ -3115,7 +3115,7 @@ def location_comparison():
         for store_code, store_info in STORE_LOCATIONS.items():
             # Get recent data for each store
             recent_data = session.query(PayrollTrends).filter(
-                PayrollTrends.store_id == store_code
+                PayrollTrends.store_code == store_code
             ).order_by(desc(PayrollTrends.week_ending)).limit(3).all()
             
             if recent_data:

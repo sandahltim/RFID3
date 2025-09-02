@@ -91,8 +91,13 @@
               <li><a class="dropdown-item {% if request.path == '/feedback/dashboard' %}active{% endif %}" href="/feedback/dashboard">
                 <i class="fas fa-comments me-2"></i>Feedback Analytics</a></li>
               <li><hr class="dropdown-divider"></li>
+              <li><a class="dropdown-item {% if request.path.startswith('/manager') %}active{% endif %}" href="/manager/">
+                <i class="fas fa-users-cog me-2"></i>Manager Dashboards</a></li>
               <li><a class="dropdown-item {% if request.path.startswith('/suggestions') %}active{% endif %}" href="/suggestions">
                 <i class="fas fa-lightbulb me-2"></i>Analytics Suggestions</a></li>
+              <li><hr class="dropdown-divider"></li>
+              <li><a class="dropdown-item {% if request.path.startswith('/config') %}active{% endif %}" href="/config/">
+                <i class="fas fa-cogs me-2"></i>System Configuration</a></li>
             </ul>
           </li>
         </ul>

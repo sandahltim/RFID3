@@ -11,6 +11,13 @@ from app import db
 from app.services.logger import get_logger
 import pandas as pd
 import numpy as np
+from app.config.stores import (
+    STORES, STORE_MAPPING, STORE_MANAGERS,
+    STORE_BUSINESS_TYPES, STORE_OPENING_DATES,
+    get_store_name, get_store_manager, get_store_business_type,
+    get_store_opening_date, get_active_store_codes
+)
+
 
 logger = get_logger(__name__)
 
@@ -23,7 +30,7 @@ class EquipmentCategorizationService:
         # CORRECTED store profiles based on actual business operations
         self.store_profiles = {
             '3607': {
-                'name': 'Wayzata', 
+                'name': get_store_name('3607'), 
                 'brand': 'A1 Rent It',
                 'address': '3607 Shoreline Drive, Wayzata, MN 55391',
                 'construction_ratio': 0.90, 
@@ -32,7 +39,7 @@ class EquipmentCategorizationService:
                 'specialization': 'Lake Minnetonka DIY/homeowners + limited events'
             },
             '6800': {
-                'name': 'Brooklyn Park', 
+                'name': get_store_name('6800'), 
                 'brand': 'A1 Rent It',
                 'construction_ratio': 1.00, 
                 'events_ratio': 0.00, 
@@ -40,7 +47,7 @@ class EquipmentCategorizationService:
                 'specialization': 'Pure construction/industrial - no party equipment'
             },
             '8101': {
-                'name': 'Fridley', 
+                'name': get_store_name('8101'), 
                 'brand': 'Broadway Tent & Event',
                 'address': '8101 Ashton Ave NE, Fridley, MN',
                 'construction_ratio': 0.00, 
@@ -49,7 +56,7 @@ class EquipmentCategorizationService:
                 'specialization': 'Pure events/weddings/corporate functions'
             },
             '728': {
-                'name': 'Elk River', 
+                'name': get_store_name('728'), 
                 'brand': 'A1 Rent It',
                 'construction_ratio': 0.90, 
                 'events_ratio': 0.10, 

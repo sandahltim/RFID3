@@ -10,6 +10,12 @@ from datetime import datetime, timedelta, timezone, date
 from typing import Dict, List, Optional, Tuple, Set
 from sqlalchemy import text, and_, or_, func
 from app import db
+from app.config.stores import (
+    STORES, STORE_MAPPING, STORE_MANAGERS,
+    STORE_BUSINESS_TYPES, STORE_OPENING_DATES,
+    get_store_name, get_store_manager, get_store_business_type,
+    get_store_opening_date, get_active_store_codes
+)
 from app.services.logger import get_logger
 from app.models.weather_models import (
     EquipmentCategorization, MinnesotaSeasonalPattern,
@@ -107,7 +113,7 @@ class MinnesotaIndustryAnalytics:
     # Minnesota store characteristics
     STORE_PROFILES = {
         '3607': {  # Wayzata
-            'name': 'Wayzata',
+            'name': get_store_name('3607'),
             'brand': 'A1 Rent It',  # ADDED brand identification
             'address': '3607 Shoreline Drive, Wayzata, MN 55391',  # ADDED verified address
             'market_type': 'affluent_mixed',  # UPDATED to reflect mixed model
@@ -117,7 +123,7 @@ class MinnesotaIndustryAnalytics:
             'specialties': ['high-end_diy', 'lake_properties', 'premium_events']  # CORRECTED specialties
         },
         '6800': {  # Brooklyn Park
-            'name': 'Brooklyn Park',
+            'name': get_store_name('6800'),
             'brand': 'A1 Rent It',  # ADDED brand identification
             'market_type': 'construction_specialist',  # CORRECTED market type
             'primary_segments': ['construction_diy'],  # CORRECTED - pure construction focus
@@ -126,7 +132,7 @@ class MinnesotaIndustryAnalytics:
             'specialties': ['commercial_construction', 'industrial_equipment', 'contractor_tools']  # CORRECTED specialties
         },
         '728': {   # CORRECTED - Elk River not Fridley
-            'name': 'Elk River',
+            'name': get_store_name('728'),
             'brand': 'A1 Rent It',  # ADDED brand identification
             'market_type': 'rural_mixed',  # UPDATED to reflect mixed model
             'primary_segments': ['construction_diy', 'landscaping', 'party_event'],  # Matches 90/10 mix
@@ -135,7 +141,7 @@ class MinnesotaIndustryAnalytics:
             'specialties': ['agricultural', 'large_property_maintenance', 'rural_events']
         },
         '8101': {  # CORRECTED - Fridley not Elk River
-            'name': 'Fridley',
+            'name': get_store_name('8101'),
             'brand': 'Broadway Tent & Event',  # ADDED brand identification
             'market_type': 'events_specialist',  # CORRECTED market type
             'primary_segments': ['party_event'],  # CORRECTED - pure events focus
@@ -719,4 +725,3 @@ class MinnesotaIndustryAnalytics:
             self.logger.error(f"Failed to get categorization settings: {e}")
             return {'error': str(e)}
 
-import calendar

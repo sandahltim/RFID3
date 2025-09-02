@@ -1,0 +1,496 @@
+{% extends "base.html" %}
+{% block title %}{{ store_info.manager }}'s Dashboard - {{ store_info.name }} - RFID DASHBOARD{% endblock %}
+
+{% block extra_head %}
+<style>
+.general-header {
+    background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+    color: white;
+    padding: 2rem 0;
+    margin-bottom: 2rem;
+    border-radius: 0 0 15px 15px;
+}
+
+.kpi-card {
+    border: none;
+    border-radius: 12px;
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+    transition: transform 0.3s ease;
+    height: 100%;
+}
+
+.kpi-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.15);
+}
+
+.kpi-value {
+    font-size: 2.5rem;
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+}
+
+.kpi-label {
+    font-size: 0.9rem;
+    color: #6c757d;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.kpi-change {
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-top: 0.5rem;
+}
+
+.kpi-change.positive {
+    color: #28a745;
+}
+
+.kpi-change.negative {
+    color: #dc3545;
+}
+
+.general-icon {
+    font-size: 3rem;
+    color: #3498db;
+    margin-bottom: 1rem;
+}
+
+.performance-card {
+    background: linear-gradient(135deg, #34495e 0%, #2c3e50 100%);
+    color: white;
+    border-radius: 15px;
+}
+
+.metric-item {
+    text-align: center;
+    padding: 1rem;
+}
+
+.metric-item h4 {
+    color: #3498db;
+    margin-bottom: 0.5rem;
+}
+
+.alert-general {
+    border-left: 4px solid #3498db;
+    background-color: rgba(52, 152, 219, 0.1);
+}
+
+.btn-general {
+    background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+    border: none;
+    color: white;
+    font-weight: 600;
+}
+
+.btn-general:hover {
+    background: linear-gradient(135deg, #2980b9 0%, #3498db 100%);
+    color: white;
+}
+
+.category-item {
+    margin-bottom: 1rem;
+    padding: 1rem;
+    border-radius: 8px;
+    background: #f8f9fa;
+    border-left: 4px solid #3498db;
+}
+
+.category-name {
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    color: #3498db;
+}
+
+.utilization-bar {
+    height: 8px;
+    background-color: #e9ecef;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.utilization-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #3498db, #2980b9);
+    transition: width 0.3s ease;
+}
+
+.chart-container {
+    position: relative;
+    height: 300px;
+    margin-bottom: 2rem;
+}
+
+@media (max-width: 768px) {
+    .general-header {
+        padding: 1.5rem 0;
+        margin-bottom: 1.5rem;
+    }
+    
+    .kpi-value {
+        font-size: 2rem;
+    }
+    
+    .chart-container {
+        height: 250px;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="general-header">
+    <div class="container-fluid">
+        <div class="row align-items-center">
+            <div class="col-md-8">
+                <h1 class="display-5 mb-2">
+                    <i class="fas fa-chart-line me-3"></i>{{ store_info.manager }}'s Dashboard
+                </h1>
+                <p class="lead mb-0">{{ store_info.name }} - {{ store_info.location }}</p>
+                <p class="mb-0 mt-1">
+                    <span class="badge bg-light text-dark">{{ store_info.business_type }}</span>
+                    <span class="badge bg-warning ms-2">{{ store_info.approximate_items }} items</span>
+                </p>
+            </div>
+            <div class="col-md-4 text-md-end">
+                <div class="general-icon">
+                    <i class="fas fa-store"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="container-fluid">
+    <!-- Key Performance Indicators -->
+    <div class="row mb-4">
+        <div class="col-md-3 mb-3">
+            <div class="card kpi-card text-center">
+                <div class="card-body">
+                    <i class="fas fa-boxes text-primary mb-2" style="font-size: 2rem;"></i>
+                    <div class="kpi-value text-primary">
+                        {{ dashboard_data.kpis.inventory.total_items if dashboard_data.kpis.inventory else 0 }}
+                    </div>
+                    <div class="kpi-label">Total Items</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3 mb-3">
+            <div class="card kpi-card text-center">
+                <div class="card-body">
+                    <i class="fas fa-percentage text-success mb-2" style="font-size: 2rem;"></i>
+                    <div class="kpi-value text-success">
+                        {{ dashboard_data.kpis.inventory.utilization_rate if dashboard_data.kpis.inventory else 0 }}%
+                    </div>
+                    <div class="kpi-label">Utilization Rate</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3 mb-3">
+            <div class="card kpi-card text-center">
+                <div class="card-body">
+                    <i class="fas fa-dollar-sign text-warning mb-2" style="font-size: 2rem;"></i>
+                    <div class="kpi-value text-warning">
+                        ${{ "{:,.0f}".format(dashboard_data.financial_summary.current_revenue if dashboard_data.financial_summary else 0) }}
+                    </div>
+                    <div class="kpi-label">Monthly Revenue</div>
+                    {% if dashboard_data.financial_summary and dashboard_data.financial_summary.revenue_change_percent %}
+                    <div class="kpi-change {{ 'positive' if dashboard_data.financial_summary.revenue_change_percent > 0 else 'negative' }}">
+                        {{ "+" if dashboard_data.financial_summary.revenue_change_percent > 0 else "" }}{{ dashboard_data.financial_summary.revenue_change_percent }}% vs last month
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3 mb-3">
+            <div class="card kpi-card text-center">
+                <div class="card-body">
+                    <i class="fas fa-file-contract text-info mb-2" style="font-size: 2rem;"></i>
+                    <div class="kpi-value text-info">
+                        {{ dashboard_data.kpis.contracts.active_contracts if dashboard_data.kpis.contracts else 0 }}
+                    </div>
+                    <div class="kpi-label">Active Contracts</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Performance Overview -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card performance-card">
+                <div class="card-header bg-transparent">
+                    <h5 class="text-white mb-0">
+                        <i class="fas fa-tachometer-alt me-2"></i>Store Performance Overview
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <div class="metric-item">
+                                <h4>{{ dashboard_data.kpis.inventory.available_items if dashboard_data.kpis.inventory else 0 }}</h4>
+                                <p class="mb-0">Available Items</p>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="metric-item">
+                                <h4>{{ dashboard_data.kpis.inventory.rented_items if dashboard_data.kpis.inventory else 0 }}</h4>
+                                <p class="mb-0">Currently Rented</p>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="metric-item">
+                                <h4>{{ dashboard_data.kpis.inventory.maintenance_items if dashboard_data.kpis.inventory else 0 }}</h4>
+                                <p class="mb-0">In Maintenance</p>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="metric-item">
+                                <h4>${{ "{:.2f}".format(dashboard_data.financial_summary.avg_transaction_current if dashboard_data.financial_summary else 0) }}</h4>
+                                <p class="mb-0">Avg Transaction</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Category Performance -->
+        <div class="col-lg-8 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-chart-bar me-2"></i>Category Performance
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if dashboard_data.inventory_summary and dashboard_data.inventory_summary.top_categories %}
+                        {% for category in dashboard_data.inventory_summary.top_categories %}
+                        <div class="category-item">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div class="category-name">
+                                    <i class="fas fa-tags me-2"></i>{{ category.category }}
+                                </div>
+                                <div>
+                                    <span class="badge bg-secondary">{{ category.total_items }} items</span>
+                                    <span class="badge bg-primary">{{ category.utilization_rate }}% utilized</span>
+                                </div>
+                            </div>
+                            <div class="utilization-bar mt-2">
+                                <div class="utilization-fill" style="width: {{ category.utilization_rate }}%"></div>
+                            </div>
+                            <small class="text-muted">
+                                {{ category.rented }} rented, {{ category.available }} available, {{ category.maintenance }} in maintenance
+                            </small>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <p class="text-muted">Loading category data...</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Alerts and Insights -->
+        <div class="col-lg-4 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-bell me-2"></i>Store Alerts
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if dashboard_data.alerts %}
+                        {% for alert in dashboard_data.alerts %}
+                        <div class="alert alert-general mb-3">
+                            <h6 class="alert-heading">{{ alert.title }}</h6>
+                            <p class="mb-1">{{ alert.message }}</p>
+                            {% if alert.action %}
+                            <small class="text-muted">
+                                <i class="fas fa-arrow-right me-1"></i>{{ alert.action }}
+                            </small>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="alert alert-success">
+                            <i class="fas fa-check-circle me-2"></i>Store operations running smoothly!
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- High-Value Items -->
+            {% if dashboard_data.inventory_summary and dashboard_data.inventory_summary.high_value_items %}
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-star me-2"></i>High-Value Items
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% for item in dashboard_data.inventory_summary.high_value_items[:5] %}
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div>
+                            <div class="fw-bold">{{ item.description[:30] }}{{ "..." if item.description|length > 30 }}</div>
+                            <small class="text-muted">{{ item.category }}</small>
+                        </div>
+                        <div class="text-end">
+                            <div class="fw-bold">${{ item.rental_rate }}/day</div>
+                            <span class="badge {{ 'bg-success' if item.status == 'rented' else 'bg-warning' if item.status == 'available' else 'bg-danger' }}">
+                                {{ item.status }}
+                            </span>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Revenue Trends Chart -->
+    <div class="row">
+        <div class="col-12 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-chart-line me-2"></i>Revenue Trends (Last 30 Days)
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="chart-container">
+                        <canvas id="generalTrendsChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-bolt me-2"></i>Manager Actions
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-2 mb-3">
+                            <button class="btn btn-general w-100" onclick="refreshDashboard()">
+                                <i class="fas fa-sync-alt me-2"></i>Refresh Data
+                            </button>
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <a href="/tab/1?store={{ store_code }}" class="btn btn-outline-secondary w-100">
+                                <i class="fas fa-warehouse me-2"></i>View Inventory
+                            </a>
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <a href="/tab/2?store={{ store_code }}" class="btn btn-outline-secondary w-100">
+                                <i class="fas fa-file-contract me-2"></i>Contracts
+                            </a>
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <a href="/tab/3?store={{ store_code }}" class="btn btn-outline-warning w-100">
+                                <i class="fas fa-wrench me-2"></i>Service
+                            </a>
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <a href="/tab/5?store={{ store_code }}" class="btn btn-outline-info w-100">
+                                <i class="fas fa-tag me-2"></i>Resale
+                            </a>
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <a href="/manager/executive" class="btn btn-outline-primary w-100">
+                                <i class="fas fa-chart-line me-2"></i>Executive View
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize General Trends Chart
+    const generalCtx = document.getElementById('generalTrendsChart').getContext('2d');
+    const revenueData = {{ dashboard_data.performance_trends.daily_revenue | tojson if dashboard_data.performance_trends else [] }};
+    
+    new Chart(generalCtx, {
+        type: 'line',
+        data: {
+            labels: revenueData.map(item => {
+                const date = new Date(item.date);
+                return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            }),
+            datasets: [{
+                label: 'Daily Revenue',
+                data: revenueData.map(item => item.value),
+                borderColor: '#3498db',
+                backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                borderWidth: 3,
+                fill: true,
+                tension: 0.4,
+                pointBackgroundColor: '#3498db',
+                pointBorderColor: '#ffffff',
+                pointBorderWidth: 2,
+                pointRadius: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            return '$' + value.toLocaleString();
+                        }
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return 'Revenue: $' + context.parsed.y.toLocaleString();
+                        }
+                    }
+                }
+            }
+        }
+    });
+    
+    // Auto-refresh dashboard every 5 minutes
+    setInterval(refreshDashboard, 300000);
+});
+
+function refreshDashboard() {
+    const refreshBtn = document.querySelector('.btn-general');
+    const originalText = refreshBtn.innerHTML;
+    refreshBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Refreshing...';
+    refreshBtn.disabled = true;
+    
+    setTimeout(() => {
+        window.location.reload();
+    }, 1000);
+}
+</script>
+{% endblock %}

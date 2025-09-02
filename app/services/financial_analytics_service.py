@@ -22,6 +22,13 @@ from app.services.logger import get_logger
 from app.models.financial_models import PayrollTrendsData, ScorecardTrendsData
 from app.models.db_models import PLData
 from app.models.pos_models import POSTransaction, POSTransactionItem, POSEquipment, POSCustomer
+from app.config.stores import (
+    STORES, STORE_MAPPING, STORE_MANAGERS,
+    STORE_BUSINESS_TYPES, STORE_OPENING_DATES,
+    get_store_name, get_store_manager, get_store_business_type,
+    get_store_opening_date, get_active_store_codes
+)
+
 
 logger = get_logger(__name__)
 
@@ -31,21 +38,21 @@ class FinancialAnalyticsService:
     Focuses on multi-store operations across 4 locations: Wayzata, Brooklyn Park, Fridley, Elk River
     """
     
-    # CORRECTED store codes based on comprehensive CSV analysis and web research
-    STORE_CODES = {
-        '3607': 'Wayzata',        # A1 Rent It - 90% DIY/10% Events - 3607 Shoreline Dr
-        '6800': 'Brooklyn Park',  # A1 Rent It - 100% DIY Construction - Pure commercial
-        '728': 'Elk River',       # A1 Rent It - 90% DIY/10% Events - Rural/agricultural
-        '8101': 'Fridley'         # Broadway Tent & Event - 100% Events - 8101 Ashton Ave NE
-    }
+    # Use centralized store configuration
+    STORE_CODES = {code: get_store_name(code) for code in get_active_store_codes()}
     
-    # Business mix profiles for accurate analytics
-    STORE_BUSINESS_MIX = {
-        '3607': {'construction': 0.90, 'events': 0.10, 'brand': 'A1 Rent It'},
-        '6800': {'construction': 1.00, 'events': 0.00, 'brand': 'A1 Rent It'},
-        '728': {'construction': 0.90, 'events': 0.10, 'brand': 'A1 Rent It'},
-        '8101': {'construction': 0.00, 'events': 1.00, 'brand': 'Broadway Tent & Event'}
-    }
+    # Business mix profiles from centralized configuration
+    STORE_BUSINESS_MIX = {}
+    for store_code in get_active_store_codes():
+        business_type = get_store_business_type(store_code)
+        if '100% Construction' in business_type:
+            STORE_BUSINESS_MIX[store_code] = {'construction': 1.00, 'events': 0.00}
+        elif '100% Events' in business_type:
+            STORE_BUSINESS_MIX[store_code] = {'construction': 0.00, 'events': 1.00}
+        elif '90% DIY/10% Events' in business_type:
+            STORE_BUSINESS_MIX[store_code] = {'construction': 0.90, 'events': 0.10}
+        else:
+            STORE_BUSINESS_MIX[store_code] = {'construction': 0.50, 'events': 0.50}
     
     # Revenue percentages from 2024 TTM analysis
     STORE_REVENUE_TARGETS = {
@@ -99,8 +106,8 @@ class FinancialAnalyticsService:
                     total_weekly_revenue,
                     revenue_3607,
                     revenue_6800, 
-                    revenue_728,
-                    revenue_8101
+                    revenue_728_temp,
+                    revenue_728
                 FROM scorecard_trends_data 
                 WHERE week_ending BETWEEN :start_date AND :end_date
                 ORDER BY week_ending
@@ -119,8 +126,8 @@ class FinancialAnalyticsService:
                 'total_revenue': float(row.total_weekly_revenue or 0),
                 'wayzata': float(row.revenue_3607 or 0),
                 'brooklyn_park': float(row.revenue_6800 or 0),
-                'fridley': float(row.revenue_728 or 0),
-                'elk_river': float(row.revenue_8101 or 0)
+                'fridley': float(row.revenue_728_temp or 0),
+                'elk_river': float(row.revenue_728 or 0)
             } for row in result])
             
             # Calculate 3-week rolling averages
@@ -301,7 +308,7 @@ class FinancialAnalyticsService:
                     EXTRACT(WEEK FROM week_ending) as week_num,
                     week_ending,
                     total_weekly_revenue,
-                    revenue_3607 + revenue_6800 + revenue_728 + revenue_8101 as calculated_total
+                    revenue_3607 + revenue_6800 + revenue_728_temp + revenue_728 as calculated_total
                 FROM scorecard_trends_data 
                 WHERE EXTRACT(YEAR FROM week_ending) = :year
                 ORDER BY week_ending
@@ -396,8 +403,8 @@ class FinancialAnalyticsService:
                     EXTRACT(YEAR FROM week_ending) as year,
                     SUM(revenue_3607) as wayzata_total,
                     SUM(revenue_6800) as brooklyn_park_total,
-                    SUM(revenue_728) as fridley_total,
-                    SUM(revenue_8101) as elk_river_total
+                    SUM(revenue_728_temp) as fridley_total,
+                    SUM(revenue_728) as elk_river_total
                 FROM scorecard_trends_data 
                 WHERE EXTRACT(YEAR FROM week_ending) IN (:current_year, :previous_year)
                 GROUP BY EXTRACT(YEAR FROM week_ending)
@@ -497,7 +504,7 @@ class FinancialAnalyticsService:
                 SELECT 
                     s.week_ending,
                     s.total_weekly_revenue,
-                    s.revenue_3607 + s.revenue_6800 + s.revenue_728 + s.revenue_8101 as calculated_revenue,
+                    s.revenue_3607 + s.revenue_6800 + s.revenue_728_temp + s.revenue_728 as calculated_revenue,
                     p.rental_revenue,
                     p.all_revenue,
                     p.payroll_amount,
@@ -670,8 +677,8 @@ class FinancialAnalyticsService:
                 SELECT 
                     '728' as store_code,
                     'Fridley' as store_name,
-                    SUM(revenue_728) as total_revenue,
-                    AVG(revenue_728) as avg_weekly_revenue,
+                    SUM(revenue_728_temp) as total_revenue,
+                    AVG(revenue_728_temp) as avg_weekly_revenue,
                     COUNT(*) as weeks_data,
                     SUM(new_contracts_728) as total_contracts
                 FROM scorecard_trends_data 
@@ -680,8 +687,8 @@ class FinancialAnalyticsService:
                 SELECT 
                     '8101' as store_code,
                     'Elk River' as store_name,
-                    SUM(revenue_8101) as total_revenue,
-                    AVG(revenue_8101) as avg_weekly_revenue,
+                    SUM(revenue_728) as total_revenue,
+                    AVG(revenue_728) as avg_weekly_revenue,
                     COUNT(*) as weeks_data,
                     SUM(new_contracts_8101) as total_contracts
                 FROM scorecard_trends_data 

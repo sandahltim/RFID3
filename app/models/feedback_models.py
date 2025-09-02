@@ -265,7 +265,7 @@ class BusinessContextKnowledge(db.Model):
     __table_args__ = (
         db.Index("idx_context_type", "context_type"),
         db.Index("idx_context_date", "submitted_date"),
-        db.Index("idx_context_store", "store_id"),
+        db.Index("idx_context_store", "store_code"),
         db.Index("idx_context_category", "category"),
     )
     
@@ -276,7 +276,7 @@ class BusinessContextKnowledge(db.Model):
     category = db.Column(db.String(100))     # wedding_season, local_competition, etc.
     
     # Geographic scope
-    store_id = db.Column(db.String(10))
+    store_code = db.Column(db.String(10))
     region = db.Column(db.String(100))
     applies_globally = db.Column(db.Boolean, default=False)
     
@@ -316,7 +316,7 @@ class BusinessContextKnowledge(db.Model):
             'knowledge_id': self.knowledge_id,
             'context_type': self.context_type,
             'category': self.category,
-            'store_id': self.store_id,
+            'store_code': self.store_code,
             'region': self.region,
             'applies_globally': self.applies_globally,
             'seasonal_pattern': self.seasonal_pattern,
