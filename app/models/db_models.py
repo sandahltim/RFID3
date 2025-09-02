@@ -501,13 +501,13 @@ class PayrollTrends(db.Model):
     __tablename__ = "executive_payroll_trends"
     __table_args__ = (
         db.Index("ix_payroll_trends_week_ending", "week_ending"),
-        db.Index("ix_payroll_trends_store_code", "store_code"),
-        db.Index("ix_payroll_trends_week_store", "week_ending", "store_code"),
+        db.Index("ix_payroll_trends_store_id", "store_id"),
+        db.Index("ix_payroll_trends_week_store", "week_ending", "store_id"),
     )
 
     id = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
     week_ending = db.Column(db.Date, nullable=False)
-    store_code = db.Column(db.String(10), nullable=False)  # 6800, 3607, 8101, 728
+    store_id = db.Column(db.String(10), nullable=False)  # 6800, 3607, 8101, 728
     rental_revenue = db.Column(db.DECIMAL(12, 2))
     total_revenue = db.Column(db.DECIMAL(12, 2))
     payroll_cost = db.Column(db.DECIMAL(12, 2))
@@ -527,7 +527,7 @@ class PayrollTrends(db.Model):
         return {
             "id": self.id,
             "week_ending": self.week_ending.isoformat() if self.week_ending else None,
-            "store_code": self.store_code,
+            "store_id": self.store_id,
             "rental_revenue": (
                 float(self.rental_revenue) if self.rental_revenue else None
             ),
@@ -551,12 +551,12 @@ class ScorecardTrends(db.Model):
     __tablename__ = "executive_scorecard_trends"
     __table_args__ = (
         db.Index("ix_scorecard_trends_week_ending", "week_ending"),
-        db.Index("ix_scorecard_trends_store_code", "store_code"),
+        db.Index("ix_scorecard_trends_store_id", "store_id"),
     )
 
     id = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
     week_ending = db.Column(db.Date, nullable=False)
-    store_code = db.Column(db.String(10))  # NULL for company-wide metrics
+    store_id = db.Column(db.String(10))  # NULL for company-wide metrics
 
     # Revenue Metrics
     total_weekly_revenue = db.Column(db.DECIMAL(12, 2))
@@ -588,7 +588,7 @@ class ScorecardTrends(db.Model):
         return {
             "id": self.id,
             "week_ending": self.week_ending.isoformat() if self.week_ending else None,
-            "store_code": self.store_code,
+            "store_id": self.store_id,
             "total_weekly_revenue": (
                 float(self.total_weekly_revenue) if self.total_weekly_revenue else None
             ),
@@ -639,7 +639,7 @@ class ExecutiveKPI(db.Model):
     variance_percent = db.Column(db.DECIMAL(5, 2))
     trend_direction = db.Column(db.String(10))  # 'up', 'down', 'stable'
     period = db.Column(db.String(20))  # 'weekly', 'monthly', 'quarterly', 'yearly'
-    store_code = db.Column(db.String(10))  # NULL for company-wide
+    store_id = db.Column(db.String(10))  # NULL for company-wide
     last_calculated = db.Column(db.DateTime)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     updated_at = db.Column(
@@ -658,7 +658,7 @@ class ExecutiveKPI(db.Model):
             ),
             "trend_direction": self.trend_direction,
             "period": self.period,
-            "store_code": self.store_code,
+            "store_id": self.store_id,
             "last_calculated": (
                 self.last_calculated.isoformat() if self.last_calculated else None
             ),

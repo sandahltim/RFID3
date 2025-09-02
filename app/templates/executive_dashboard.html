@@ -96,6 +96,67 @@
         .text-muted { color: #4b5563 !important; }  /* Darker muted text */
         .small.text-muted { color: #374151 !important; } /* Even darker for small text */
         
+        /* Executive Dashboard Chart Containers */
+        .chart-container {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            margin-bottom: 2rem;
+            height: 400px;
+        }
+
+        .chart-container.large {
+            height: 500px;
+        }
+
+        .chart-container.extra-large {
+            height: 600px;
+        }
+
+        .chart-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: #1f2937;
+            margin-bottom: 1rem;
+        }
+
+        .chart-subtitle {
+            font-size: 0.875rem;
+            color: #6b7280;
+            margin-bottom: 1.5rem;
+        }
+
+        /* Risk indicator styling */
+        .risk-indicator {
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 0.875rem;
+        }
+
+        .risk-low { background-color: #d1fae5; color: #065f46; }
+        .risk-medium { background-color: #fef3c7; color: #92400e; }
+        .risk-high { background-color: #fee2e2; color: #991b1b; }
+
+        /* Correlation matrix styling */
+        .correlation-cell {
+            text-align: center;
+            font-weight: 600;
+            border-radius: 4px;
+            padding: 0.5rem;
+        }
+
+        .correlation-strong { background-color: #1e3a8a; color: white; }
+        .correlation-moderate { background-color: #3b82f6; color: white; }
+        .correlation-weak { background-color: #93c5fd; color: #1e3a8a; }
+        .correlation-negative { background-color: #fca5a5; color: #991b1b; }
+
+        /* Seasonal pattern indicators */
+        .seasonal-peak { color: #059669; font-weight: 700; }
+        .seasonal-trough { color: #dc2626; font-weight: 700; }
+        .seasonal-normal { color: #6b7280; font-weight: 500; }
+
         /* Section headers */
         .section-header {
             color: #1f2937;
@@ -920,6 +981,116 @@
             </div>
         </div>
 
+        <!-- Executive Scorecard Analytics: 2022-2024 Strategic Insights -->
+        <div class="row mb-5">
+            <div class="col-12">
+                <div class="alert alert-info">
+                    <i class="fas fa-chart-line me-2"></i>
+                    <strong>Scorecard Analytics:</strong> 159 weeks of historical data (2022-2024) showing 7x seasonal revenue variation and strong store correlations (0.474-0.862)
+                </div>
+            </div>
+        </div>
+
+        <!-- Multi-Year Revenue Trends with Seasonal Patterns -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="chart-container extra-large">
+                    <div class="chart-title">Multi-Year Revenue Trends & Seasonal Analysis</div>
+                    <div class="chart-subtitle">2022-2024 Weekly Revenue with Peak/Trough Identification (7x Seasonal Variation)</div>
+                    <canvas id="multiYearRevenueChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Store Performance Heat Map & Risk Concentration -->
+        <div class="row mb-4">
+            <div class="col-lg-8">
+                <div class="chart-container large">
+                    <div class="chart-title">Store Performance Heat Map</div>
+                    <div class="chart-subtitle">Weekly Revenue Distribution with Concentration Risk Alerts</div>
+                    <canvas id="storePerformanceHeatMap"></canvas>
+                </div>
+            </div>
+            <div class="col-lg-4">
+                <div class="chart-container large">
+                    <div class="chart-title">Risk Indicators</div>
+                    <div class="chart-subtitle">35 weeks show >40% single-store revenue concentration</div>
+                    <div id="riskIndicators" class="mt-4">
+                        <!-- Risk indicators will be populated here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Contract Pipeline & Conversion Analysis -->
+        <div class="row mb-4">
+            <div class="col-lg-6">
+                <div class="chart-container">
+                    <div class="chart-title">Pipeline Conversion Analysis</div>
+                    <div class="chart-subtitle">126.88% conversion rate with 0.860 correlation to future revenue</div>
+                    <canvas id="pipelineConversionChart"></canvas>
+                </div>
+            </div>
+            <div class="col-lg-6">
+                <div class="chart-container">
+                    <div class="chart-title">Revenue vs New Contracts Correlation</div>
+                    <div class="chart-subtitle">Store correlation range: 0.474-0.862</div>
+                    <canvas id="correlationScatterChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- AR Aging Risk Dashboard -->
+        <div class="row mb-4">
+            <div class="col-lg-8">
+                <div class="chart-container">
+                    <div class="chart-title">AR Aging Risk Trends</div>
+                    <div class="chart-subtitle">Accounts Receivable aging analysis with threshold warnings</div>
+                    <canvas id="arAgingTrendsChart"></canvas>
+                </div>
+            </div>
+            <div class="col-lg-4">
+                <div class="chart-container">
+                    <div class="chart-title">AR Risk Alerts</div>
+                    <div class="chart-subtitle">Current week risk assessment</div>
+                    <div id="arRiskAlerts" class="mt-4">
+                        <!-- AR risk alerts will be populated here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Store Correlation Matrix -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="chart-container">
+                    <div class="chart-title">Business Metric Correlation Matrix</div>
+                    <div class="chart-subtitle">Correlation strength between revenue, contracts, and reservations across all stores</div>
+                    <div id="correlationMatrix" class="mt-4">
+                        <!-- Correlation matrix will be populated here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Forecasting & Predictive Analytics -->
+        <div class="row mb-4">
+            <div class="col-lg-8">
+                <div class="chart-container large">
+                    <div class="chart-title">Revenue Forecasting Model</div>
+                    <div class="chart-subtitle">Predictive analytics based on seasonal patterns and store correlations</div>
+                    <canvas id="revenueForecastChart"></canvas>
+                </div>
+            </div>
+            <div class="col-lg-4">
+                <div class="chart-container large">
+                    <div class="chart-title">Seasonal Decomposition</div>
+                    <div class="chart-subtitle">Trend, seasonal, and residual components</div>
+                    <canvas id="seasonalDecompositionChart"></canvas>
+                </div>
+            </div>
+        </div>
+
         <!-- Geographic Visualization & Comparative Analysis -->
         <div class="row mb-4">
             <div class="col-lg-6 mb-4">
@@ -1212,6 +1383,12 @@
     
     <!-- Enhanced Visualizations -->
     <script src="{{ url_for('static', filename='js/executive-dashboard-visualizations.js') }}"></script>
+    
+    <!-- Scorecard Analytics Visualizations -->
+    <script src="{{ url_for('static', filename='js/executive-scorecard-analytics.js') }}"></script>
+    
+    <!-- Executive Insights Summary -->
+    <script src="{{ url_for('static', filename='js/executive-insights-summary.js') }}"></script>
 
     <script>
         // Global variables

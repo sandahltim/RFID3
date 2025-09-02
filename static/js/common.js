@@ -1372,16 +1372,46 @@ function forceNavbarFixed() {
     }
 }
 
+// CRITICAL: Bootstrap dropdown reinitialization after content loads
+function reinitializeBootstrapDropdowns() {
+    if (typeof bootstrap !== 'undefined') {
+        const dropdownElements = document.querySelectorAll('.dropdown-toggle');
+        dropdownElements.forEach(element => {
+            // Only initialize if not already initialized
+            if (!bootstrap.Dropdown.getInstance(element)) {
+                try {
+                    new bootstrap.Dropdown(element, {
+                        autoClose: true,
+                        boundary: 'viewport'
+                    });
+                } catch (error) {
+                    console.warn('Error initializing dropdown:', error);
+                }
+            }
+        });
+        console.log('Bootstrap dropdowns reinitialized:', dropdownElements.length);
+    }
+}
+
 // Auto-run the navbar fix when this script loads
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', function() {
         forceNavbarFixed();
         setTimeout(forceNavbarFixed, 100);
         setTimeout(forceNavbarFixed, 500);
+        
+        // Reinitialize dropdowns after DOM is loaded
+        setTimeout(reinitializeBootstrapDropdowns, 1000);
     });
 } else {
     // Document already loaded
     forceNavbarFixed();
     setTimeout(forceNavbarFixed, 100);
     setTimeout(forceNavbarFixed, 500);
+    
+    // Reinitialize dropdowns immediately
+    setTimeout(reinitializeBootstrapDropdowns, 100);
 }
+
+// Expose the function globally for use by other scripts
+window.reinitializeBootstrapDropdowns = reinitializeBootstrapDropdowns;

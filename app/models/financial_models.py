@@ -53,6 +53,24 @@ class PayrollTrendsData(db.Model):
             return (float(self.rental_revenue) / float(self.all_revenue)) * 100
         return 0
 
+class ScorecardMetricsDefinition(db.Model):
+    """Metadata definitions for scorecard metrics"""
+    __tablename__ = 'scorecard_metrics_definitions'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    row_number = db.Column(db.Integer, unique=True)  # CSV row number
+    metric_code = db.Column(db.String(100), unique=True)  # e.g., 'total_weekly_revenue'
+    title = db.Column(db.Text)  # Full metric title
+    description = db.Column(db.Text)  # How to calculate/find this metric
+    owner = db.Column(db.String(100))  # Person responsible
+    goal = db.Column(db.String(100))  # Target goal (changes quarterly)
+    status = db.Column(db.String(50))  # at-risk, on-track, etc.
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    def __repr__(self):
+        return f'<ScorecardMetric {self.metric_code}: {self.title}>'
+
 class ScorecardTrendsData(db.Model):
     __tablename__ = 'scorecard_trends_data'
     

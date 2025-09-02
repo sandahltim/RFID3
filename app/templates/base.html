@@ -55,49 +55,51 @@
             </a>
           </li>
           
-          <!-- Inventory Dropdown -->
+          <!-- Operations Dropdown (Core Daily Tasks) -->
           <li class="nav-item dropdown">
             <a class="nav-link dropdown-toggle {% if request.path in ['/tab/1', '/tab/2', '/tab/3', '/tab/4', '/tab/5'] %}active{% endif %}" 
                href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-              <i class="fas fa-boxes me-1"></i>Inventory
+              <i class="fas fa-clipboard-list me-1"></i>Operations
             </a>
             <ul class="dropdown-menu">
+              <li><h6 class="dropdown-header">Daily Operations</h6></li>
               <li><a class="dropdown-item {% if request.path == '/tab/1' %}active{% endif %}" href="/tab/1">
                 <i class="fas fa-warehouse me-2"></i>Rental Inventory</a></li>
               <li><a class="dropdown-item {% if request.path == '/tab/2' %}active{% endif %}" href="/tab/2">
                 <i class="fas fa-file-contract me-2"></i>Open Contracts</a></li>
               <li><a class="dropdown-item {% if request.path == '/tab/3' %}active{% endif %}" href="/tab/3">
-                <i class="fas fa-tools me-2"></i>Service</a></li>
+                <i class="fas fa-tools me-2"></i>Service & Maintenance</a></li>
+              <li><hr class="dropdown-divider"></li>
+              <li><h6 class="dropdown-header">Specialized Operations</h6></li>
               <li><a class="dropdown-item {% if request.path == '/tab/4' %}active{% endif %}" href="/tab/4">
                 <i class="fas fa-tshirt me-2"></i>Laundry Contracts</a></li>
               <li><a class="dropdown-item {% if request.path == '/tab/5' %}active{% endif %}" href="/tab/5">
-                <i class="fas fa-tag me-2"></i>Resale</a></li>
+                <i class="fas fa-tag me-2"></i>Resale Items</a></li>
             </ul>
           </li>
           
-          <!-- Analytics Dropdown -->
+          <!-- Analytics & Reports -->
           <li class="nav-item dropdown">
             <a class="nav-link dropdown-toggle {% if request.path in ['/tab/6', '/tab/7', '/predictive/analytics', '/feedback/dashboard'] %}active{% endif %}" 
                href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
               <i class="fas fa-chart-bar me-1"></i>Analytics
             </a>
             <ul class="dropdown-menu">
-              <li><a class="dropdown-item {% if request.path == '/tab/6' %}active{% endif %}" href="/tab/6">
-                <i class="fas fa-chart-line me-2"></i>Inventory Analytics</a></li>
+              <li><h6 class="dropdown-header">Business Intelligence</h6></li>
               <li><a class="dropdown-item {% if request.path == '/tab/7' %}active{% endif %}" href="/tab/7">
                 <i class="fas fa-tachometer-alt me-2"></i>Executive Dashboard</a></li>
+              <li><a class="dropdown-item {% if request.path == '/tab/6' %}active{% endif %}" href="/tab/6">
+                <i class="fas fa-chart-line me-2"></i>Inventory Analytics</a></li>
               <li><a class="dropdown-item {% if request.path == '/predictive/analytics' %}active{% endif %}" href="/predictive/analytics">
                 <i class="fas fa-brain me-2"></i>Predictive Analytics</a></li>
-              <li><a class="dropdown-item {% if request.path == '/feedback/dashboard' %}active{% endif %}" href="/feedback/dashboard">
-                <i class="fas fa-comments me-2"></i>Feedback Analytics</a></li>
               <li><hr class="dropdown-divider"></li>
+              <li><h6 class="dropdown-header">Store Management</h6></li>
               <li><a class="dropdown-item {% if request.path.startswith('/manager') %}active{% endif %}" href="/manager/">
                 <i class="fas fa-users-cog me-2"></i>Manager Dashboards</a></li>
+              <li><a class="dropdown-item {% if request.path == '/feedback/dashboard' %}active{% endif %}" href="/feedback/dashboard">
+                <i class="fas fa-comments me-2"></i>Feedback Analytics</a></li>
               <li><a class="dropdown-item {% if request.path.startswith('/suggestions') %}active{% endif %}" href="/suggestions">
-                <i class="fas fa-lightbulb me-2"></i>Analytics Suggestions</a></li>
-              <li><hr class="dropdown-divider"></li>
-              <li><a class="dropdown-item {% if request.path.startswith('/config') %}active{% endif %}" href="/config/">
-                <i class="fas fa-cogs me-2"></i>System Configuration</a></li>
+                <i class="fas fa-lightbulb me-2"></i>System Suggestions</a></li>
             </ul>
           </li>
         </ul>
@@ -105,15 +107,18 @@
         <!-- Right side navigation -->
         <ul class="navbar-nav">
           <li class="nav-item dropdown">
-            <a class="nav-link dropdown-toggle {% if request.path.startswith('/config') or request.path == '/categories' %}active{% endif %}" 
+            <a class="nav-link dropdown-toggle {% if request.path.startswith('/config') or request.path == '/categories' or request.path.startswith('/database') or request.path.startswith('/api/import') %}active{% endif %}" 
                href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-              <i class="fas fa-cogs me-1"></i>Tools
+              <i class="fas fa-wrench me-1"></i>Admin
             </a>
             <ul class="dropdown-menu dropdown-menu-end">
+              <li><h6 class="dropdown-header">System Management</h6></li>
+              <li><a class="dropdown-item {% if request.path.startswith('/config') %}active{% endif %}" href="/config/">
+                <i class="fas fa-cogs me-2"></i>System Configuration</a></li>
               <li><a class="dropdown-item {% if request.path == '/categories' %}active{% endif %}" href="/categories">
                 <i class="fas fa-list-ul me-2"></i>Manage Categories</a></li>
-              <li><a class="dropdown-item {% if request.path.startswith('/config') %}active{% endif %}" href="/config/">
-                <i class="fas fa-cogs me-2"></i>Configuration</a></li>
+              <li><hr class="dropdown-divider"></li>
+              <li><h6 class="dropdown-header">Data Tools</h6></li>
               <li><a class="dropdown-item {% if request.path.startswith('/database/viewer') %}active{% endif %}" href="/database/viewer">
                 <i class="fas fa-database me-2"></i>Database Viewer</a></li>
               <li><a class="dropdown-item {% if request.path.startswith('/api/import/dashboard') %}active{% endif %}" href="/api/import/dashboard">
@@ -124,6 +129,63 @@
       </div>
     </div>
   </nav>
+  <!-- Breadcrumb Navigation -->
+  <nav aria-label="breadcrumb" class="bg-light border-bottom">
+    <div class="container-fluid">
+      <ol class="breadcrumb mb-0 py-2">
+        <li class="breadcrumb-item">
+          <a href="/home"><i class="fas fa-home me-1"></i>Dashboard</a>
+        </li>
+        {% if request.path in ['/tab/1', '/tab/2', '/tab/3', '/tab/4', '/tab/5'] %}
+          <li class="breadcrumb-item">
+            <a href="#"><i class="fas fa-clipboard-list me-1"></i>Operations</a>
+          </li>
+          {% if request.path == '/tab/1' %}
+            <li class="breadcrumb-item active" aria-current="page">Rental Inventory</li>
+          {% elif request.path == '/tab/2' %}
+            <li class="breadcrumb-item active" aria-current="page">Open Contracts</li>
+          {% elif request.path == '/tab/3' %}
+            <li class="breadcrumb-item active" aria-current="page">Service & Maintenance</li>
+          {% elif request.path == '/tab/4' %}
+            <li class="breadcrumb-item active" aria-current="page">Laundry Contracts</li>
+          {% elif request.path == '/tab/5' %}
+            <li class="breadcrumb-item active" aria-current="page">Resale Items</li>
+          {% endif %}
+        {% elif request.path in ['/tab/6', '/tab/7', '/predictive/analytics', '/feedback/dashboard'] or request.path.startswith('/manager') or request.path.startswith('/suggestions') %}
+          <li class="breadcrumb-item">
+            <a href="#"><i class="fas fa-chart-bar me-1"></i>Analytics</a>
+          </li>
+          {% if request.path == '/tab/6' %}
+            <li class="breadcrumb-item active" aria-current="page">Inventory Analytics</li>
+          {% elif request.path == '/tab/7' %}
+            <li class="breadcrumb-item active" aria-current="page">Executive Dashboard</li>
+          {% elif request.path == '/predictive/analytics' %}
+            <li class="breadcrumb-item active" aria-current="page">Predictive Analytics</li>
+          {% elif request.path == '/feedback/dashboard' %}
+            <li class="breadcrumb-item active" aria-current="page">Feedback Analytics</li>
+          {% elif request.path.startswith('/manager') %}
+            <li class="breadcrumb-item active" aria-current="page">Manager Dashboards</li>
+          {% elif request.path.startswith('/suggestions') %}
+            <li class="breadcrumb-item active" aria-current="page">System Suggestions</li>
+          {% endif %}
+        {% elif request.path.startswith('/config') or request.path == '/categories' or request.path.startswith('/database') or request.path.startswith('/api/import') %}
+          <li class="breadcrumb-item">
+            <a href="#"><i class="fas fa-wrench me-1"></i>Admin</a>
+          </li>
+          {% if request.path.startswith('/config') %}
+            <li class="breadcrumb-item active" aria-current="page">System Configuration</li>
+          {% elif request.path == '/categories' %}
+            <li class="breadcrumb-item active" aria-current="page">Manage Categories</li>
+          {% elif request.path.startswith('/database') %}
+            <li class="breadcrumb-item active" aria-current="page">Database Viewer</li>
+          {% elif request.path.startswith('/api/import') %}
+            <li class="breadcrumb-item active" aria-current="page">CSV Import</li>
+          {% endif %}
+        {% endif %}
+      </ol>
+    </div>
+  </nav>
+
   <!-- Main Content Container with responsive spacing -->
   <main class="main-content">
     <div class="container-fluid">
@@ -151,17 +213,17 @@
     }
     </script>
     
-    <!-- Simple Navbar Close Script -->
+    <!-- ENHANCED Navbar Close Script with Dropdown Management -->
     <script>
     document.addEventListener('DOMContentLoaded', function() {
-        // Close mobile navbar when clicking nav links
-        const navLinks = document.querySelectorAll('.navbar-nav .nav-link:not(.dropdown-toggle)');
+        // Close mobile navbar when clicking nav links (but NOT dropdown toggles)
+        const navLinks = document.querySelectorAll('.navbar-nav .nav-link:not(.dropdown-toggle), .navbar-nav .dropdown-item');
         const navbarCollapse = document.getElementById('navbarNav');
         
         navLinks.forEach(link => {
-            link.addEventListener('click', () => {
-                // Only close on mobile screens
-                if (window.innerWidth < 992) {
+            link.addEventListener('click', (e) => {
+                // Only close on mobile screens and if it's not a dropdown toggle
+                if (window.innerWidth < 992 && !link.classList.contains('dropdown-toggle')) {
                     const bsCollapse = bootstrap.Collapse.getInstance(navbarCollapse);
                     if (bsCollapse) {
                         bsCollapse.hide();
@@ -169,6 +231,29 @@
                 }
             });
         });
+        
+        // Ensure dropdowns work properly after page navigation
+        const reinitializeDropdowns = () => {
+            setTimeout(() => {
+                const dropdownElements = document.querySelectorAll('.dropdown-toggle');
+                dropdownElements.forEach(element => {
+                    if (!bootstrap.Dropdown.getInstance(element)) {
+                        new bootstrap.Dropdown(element, {
+                            autoClose: true,
+                            boundary: 'viewport'
+                        });
+                    }
+                });
+                console.log('Dropdowns reinitialized after navigation');
+            }, 100);
+        };
+        
+        // Reinitialize dropdowns when content changes
+        const observer = new MutationObserver(() => {
+            reinitializeDropdowns();
+        });
+        
+        observer.observe(document.body, { childList: true, subtree: true });
     });
     </script>
     
@@ -200,64 +285,82 @@
       <!-- Predictive analytics script loaded in template to prevent double loading -->
     {% endif %}
     
-    <!-- External Libraries - Bootstrap for mobile navigation -->
+    <!-- External Libraries - Bootstrap for mobile navigation - MOVED TO TOP FOR PROPER INITIALIZATION -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Initialize Bootstrap dropdowns BEFORE other scripts -->
+    <script>
+    // CRITICAL: Initialize Bootstrap dropdowns on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        // Initialize all dropdowns
+        var dropdownElementList = [].slice.call(document.querySelectorAll('.dropdown-toggle'));
+        var dropdownList = dropdownElementList.map(function (dropdownToggleEl) {
+            return new bootstrap.Dropdown(dropdownToggleEl, {
+                autoClose: true,
+                boundary: 'viewport'
+            });
+        });
+        console.log('Bootstrap dropdowns initialized:', dropdownList.length);
+    });
+    </script>
     <!-- jsQR library for QR code scanning -->
     <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
     
-    <!-- Mobile navbar close functionality -->
+    <!-- FIXED Mobile navbar close functionality with proper Bootstrap integration -->
     <script>
     document.addEventListener('DOMContentLoaded', function() {
-        // Auto-close mobile navbar when clicking nav links
         const navbarToggler = document.querySelector('.navbar-toggler');
         const navbarCollapse = document.querySelector('.navbar-collapse');
-        const navLinks = document.querySelectorAll('.nav-link, .dropdown-item');
+        const dropdownItems = document.querySelectorAll('.dropdown-item');
         
         let isClosing = false;
         
-        navLinks.forEach(function(link) {
-            link.addEventListener('click', function(event) {
-                // Don't close if this is a dropdown toggle
-                if (link.classList.contains('dropdown-toggle')) {
-                    return; // Let Bootstrap handle dropdown toggle
-                }
-                
+        // Close navbar when clicking dropdown items (actual navigation)
+        dropdownItems.forEach(function(item) {
+            item.addEventListener('click', function(event) {
                 // Only close on mobile screens and if navbar is open
-                if (window.innerWidth < 992 && navbarCollapse.classList.contains('show')) {
-                    event.stopPropagation(); // Prevent event bubbling
+                if (window.innerWidth < 992 && navbarCollapse.classList.contains('show') && !isClosing) {
                     isClosing = true;
                     
-                    const bsCollapse = new bootstrap.Collapse(navbarCollapse, {
-                        toggle: false
+                    // Close any open dropdowns first
+                    document.querySelectorAll('.dropdown-menu.show').forEach(menu => {
+                        const dropdown = bootstrap.Dropdown.getInstance(menu.previousElementSibling);
+                        if (dropdown) dropdown.hide();
                     });
-                    bsCollapse.hide();
                     
-                    // Reset flag after animation completes
+                    // Then close the navbar
                     setTimeout(() => {
-                        isClosing = false;
-                    }, 350);
+                        const bsCollapse = bootstrap.Collapse.getInstance(navbarCollapse) || 
+                                         new bootstrap.Collapse(navbarCollapse, { toggle: false });
+                        bsCollapse.hide();
+                        
+                        setTimeout(() => {
+                            isClosing = false;
+                        }, 350);
+                    }, 100);
                 }
             });
         });
         
-        // Prevent toggler from reopening during close animation
+        // Prevent toggler issues during animations
         navbarToggler.addEventListener('click', function(event) {
             if (isClosing) {
                 event.preventDefault();
                 event.stopPropagation();
+                return false;
             }
         });
         
-        // Also close when clicking outside the navbar
+        // Close navbar when clicking outside (but not dropdown toggles)
         document.addEventListener('click', function(event) {
             if (window.innerWidth < 992 && 
                 navbarCollapse.classList.contains('show') && 
                 !event.target.closest('.navbar') &&
                 !isClosing) {
+                
                 isClosing = true;
-                const bsCollapse = new bootstrap.Collapse(navbarCollapse, {
-                    toggle: false
-                });
+                const bsCollapse = bootstrap.Collapse.getInstance(navbarCollapse) || 
+                                 new bootstrap.Collapse(navbarCollapse, { toggle: false });
                 bsCollapse.hide();
                 
                 setTimeout(() => {
@@ -265,6 +368,8 @@
                 }, 350);
             }
         });
+        
+        console.log('Enhanced navbar functionality initialized');
     });
     </script>
   {% endblock %}
