@@ -1019,20 +1019,22 @@ class FinancialCSVImportService:
         return imported_count
 
     def import_all_financial_files(self) -> Dict:
-        """Import all financial CSV files with enhanced processing"""
-        logger.info("Starting comprehensive enhanced financial data import")
+        """Import all CSV files including financial and POS equipment data with enhanced processing"""
+        logger.info("Starting comprehensive enhanced CSV import (financial + equipment)")
         
         # Create import batch
         self.import_batch_id = self.create_import_batch()
         
         results = {}
         
-        # Import each file type
+        # Import each file type - expanded to include POS equipment and transaction data
         file_imports = [
             ('scorecard_trends', self.import_scorecard_trends),
             ('payroll_trends', self.import_payroll_trends),
             ('profit_loss', self.import_profit_loss),
-            ('customers', self.import_customers)
+            ('customers', self.import_customers),
+            ('equipment_data', self.import_equipment_data_pos),
+            ('transitems_data', self.import_transitems_data_pos)
         ]
         
         for name, import_func in file_imports:
@@ -1135,6 +1137,113 @@ class FinancialCSVImportService:
                     }
         
         return verification
+    
+    def import_equipment_data_pos(self) -> Dict:
+        """Import POS equipment data with POS-prefixed file discovery"""
+        logger.info("Starting POS equipment import with POS-prefixed file discovery")
+        
+        try:
+            # Import equipment data using the existing equipment import service
+            from app.services.equipment_import_service import EquipmentImportService
+            equipment_importer = EquipmentImportService()
+            
+            # Find latest equipment file - try POS prefix first, then original
+            pos_pattern = os.path.join(self.CSV_BASE_PATH, "equipPOS*.csv")
+            old_pattern = os.path.join(self.CSV_BASE_PATH, "equip*.csv")
+            
+            pos_files = glob.glob(pos_pattern)
+            old_files = glob.glob(old_pattern)
+            
+            # Prefer POS-prefixed files if available
+            files = pos_files if pos_files else old_files
+            
+            if not files:
+                logger.warning("No equipment CSV files found (POS or legacy format)")
+                return {
+                    'success': False,
+                    'error': 'No equipment files found',
+                    'files_checked': [pos_pattern, old_pattern]
+                }
+            
+            file_path = max(files, key=os.path.getctime)
+            logger.info(f"Using equipment file: {file_path}")
+            
+            # Import equipment data
+            result = equipment_importer.import_equipment_data(file_path)
+            
+            # Update our import stats
+            if result.get('success'):
+                self.import_stats['files_processed'] += 1
+                self.import_stats['total_records_processed'] += result.get('total_records', 0)
+                self.import_stats['total_records_imported'] += result.get('imported_records', 0)
+            else:
+                self.import_stats['errors'].append(f"Equipment import: {result.get('error')}")
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"POS equipment import failed: {str(e)}")
+            self.import_stats['errors'].append(f"POS equipment import: {str(e)}")
+            return {
+                'success': False,
+                'error': str(e)
+            }
+    
+    def import_transitems_data_pos(self) -> Dict:
+        """Import POS transitems (transaction items) data with POS-prefixed file discovery"""
+        logger.info("Starting POS transitems import with POS-prefixed file discovery")
+        
+        try:
+            # Import transitems data using the existing transitems import service
+            from app.services.transitems_import_service import TransitemsImportService
+            transitems_importer = TransitemsImportService()
+            
+            # Find latest transitems file - try POS prefix first, then original
+            pos_pattern = os.path.join(self.CSV_BASE_PATH, "transitemsPOS*.csv")
+            old_pattern = os.path.join(self.CSV_BASE_PATH, "transitems*.csv")
+            
+            pos_files = glob.glob(pos_pattern)
+            old_files = glob.glob(old_pattern)
+            
+            # Prefer POS-prefixed files if available
+            files = pos_files if pos_files else old_files
+            
+            if not files:
+                logger.warning("No transitems CSV files found (POS or legacy format)")
+                return {
+                    'success': False,
+                    'error': 'No transitems files found',
+                    'files_checked': [pos_pattern, old_pattern]
+                }
+            
+            file_path = max(files, key=os.path.getctime)
+            logger.info(f"Using transitems file: {file_path}")
+            
+            # Import transitems data
+            import_batch = f"pos_transitems_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+            result = transitems_importer.import_transitems_csv(file_path, import_batch)
+            
+            # Update our import stats
+            if result.get('success'):
+                self.import_stats['files_processed'] += 1
+                self.import_stats['total_records_processed'] += result.get('total_rows', 0)
+                self.import_stats['total_records_imported'] += result.get('imported_rows', 0)
+            else:
+                self.import_stats['errors'].append(f"Transitems import: {result.get('error')}")
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"POS transitems import failed: {str(e)}")
+            self.import_stats['errors'].append(f"POS transitems import: {str(e)}")
+            return {
+                'success': False,
+                'error': str(e)
+            }
+    
+    def import_all_csv_files(self) -> Dict:
+        """Alias for import_all_financial_files to maintain scheduler compatibility"""
+        return self.import_all_financial_files()
 
     def diagnostic_csv_analysis(self, file_path: str = None) -> Dict:
         """Diagnostic analysis of CSV structure and parsing issues"""
