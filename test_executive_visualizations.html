@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Executive Dashboard Visualizations Test</title>
+    
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Additional visualization libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://cdn.jsdelivr.net/npm/countup.js@2.0.8"></script>
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        body {
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+            font-family: 'Segoe UI', system-ui, sans-serif;
+        }
+        
+        .demo-section {
+            background: white;
+            border-radius: 12px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        
+        .demo-title {
+            color: #1e3a8a;
+            font-weight: 700;
+            margin-bottom: 1.5rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 3px solid #3b82f6;
+        }
+        
+        /* Include key styles from executive-dashboard.css */
+        .kpi-card {
+            background: white;
+            border: none;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s ease-in-out;
+            height: 180px;
+        }
+
+        .kpi-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+
+        .kpi-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            line-height: 1;
+            margin-bottom: 0.5rem;
+        }
+
+        .kpi-label {
+            font-size: 0.875rem;
+            color: #374151;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 0.5rem;
+        }
+
+        .sparkline-container {
+            width: 100%;
+            height: 40px;
+            margin-top: 0.5rem;
+        }
+
+        .animated-counter {
+            font-variant-numeric: tabular-nums;
+            transition: color 0.3s ease;
+        }
+
+        .gauge-container {
+            position: relative;
+            width: 200px;
+            height: 200px;
+            margin: 0 auto;
+        }
+
+        .gauge-svg {
+            transform: rotate(-90deg);
+        }
+
+        .gauge-background {
+            fill: none;
+            stroke: #e5e7eb;
+            stroke-width: 20;
+        }
+
+        .gauge-progress {
+            fill: none;
+            stroke-width: 20;
+            stroke-linecap: round;
+            transition: stroke-dasharray 1s ease-in-out;
+        }
+
+        .gauge-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+        }
+
+        .gauge-value {
+            font-size: 2rem;
+            font-weight: 700;
+            line-height: 1;
+        }
+
+        .heatmap-cell {
+            border-radius: 8px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            color: white;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+            position: relative;
+            overflow: hidden;
+            min-height: 120px;
+        }
+
+        .performance-excellent { background: linear-gradient(45deg, #059669, #10b981); }
+        .performance-good { background: linear-gradient(45deg, #0369a1, #3b82f6); }
+        .performance-average { background: linear-gradient(45deg, #d97706, #f59e0b); }
+        .performance-poor { background: linear-gradient(45deg, #dc2626, #ef4444); }
+
+        .map-container {
+            height: 400px;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 5px rgba(59, 130, 246, 0.5); }
+            50% { box-shadow: 0 0 20px rgba(59, 130, 246, 0.8); }
+        }
+
+        .pulse-animation {
+            animation: pulse-glow 2s infinite;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid py-4">
+        <div class="row">
+            <div class="col-12">
+                <div class="text-center mb-5">
+                    <h1 class="display-4 fw-bold text-primary">Executive Dashboard Visualizations</h1>
+                    <p class="lead text-muted">Enhanced Multi-Location Equipment Rental Analytics</p>
+                </div>
+
+                <!-- KPI Cards with Sparklines -->
+                <div class="demo-section">
+                    <h2 class="demo-title">Enhanced KPI Cards with Animated Counters & Sparklines</h2>
+                    <div class="row">
+                        <div class="col-lg-3 col-md-6 mb-3">
+                            <div class="card kpi-card">
+                                <div class="card-body d-flex flex-column justify-content-center">
+                                    <div class="kpi-label">Total Revenue</div>
+                                    <div class="kpi-value text-primary animated-counter" id="revenueKPI">$0</div>
+                                    <div class="kpi-trend text-success">
+                                        <i class="fas fa-arrow-up"></i> +12.5% vs last month
+                                    </div>
+                                    <div class="sparkline-container">
+                                        <canvas id="revenueSparkline" class="sparkline-canvas"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-lg-3 col-md-6 mb-3">
+                            <div class="card kpi-card">
+                                <div class="card-body d-flex flex-column justify-content-center">
+                                    <div class="kpi-label">Equipment Utilization</div>
+                                    <div class="kpi-value text-warning animated-counter" id="utilizationKPI">0%</div>
+                                    <div class="kpi-trend text-success">
+                                        <i class="fas fa-tools"></i> +5.2% efficiency
+                                    </div>
+                                    <div class="sparkline-container">
+                                        <canvas id="utilizationSparkline" class="sparkline-canvas"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-lg-3 col-md-6 mb-3">
+                            <div class="card kpi-card">
+                                <div class="card-body d-flex flex-column justify-content-center">
+                                    <div class="kpi-label">YoY Growth</div>
+                                    <div class="kpi-value text-success animated-counter" id="growthKPI">0%</div>
+                                    <div class="kpi-trend text-success">
+                                        <i class="fas fa-chart-line"></i> Strong growth trend
+                                    </div>
+                                    <div class="sparkline-container">
+                                        <canvas id="growthSparkline" class="sparkline-canvas"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-lg-3 col-md-6 mb-3">
+                            <div class="card kpi-card">
+                                <div class="card-body d-flex flex-column justify-content-center">
+                                    <div class="kpi-label">Business Health</div>
+                                    <div class="kpi-value text-info animated-counter" id="healthKPI">0</div>
+                                    <div class="kpi-trend text-success">
+                                        <i class="fas fa-heartbeat"></i> Excellent status
+                                    </div>
+                                    <div class="sparkline-container">
+                                        <canvas id="healthSparkline" class="sparkline-canvas"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Location Performance Heatmap -->
+                <div class="demo-section">
+                    <h2 class="demo-title">Location Performance Heatmap</h2>
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <p class="mb-0 text-muted">Interactive performance matrix with color-coded intensity</p>
+                        <div class="btn-group" role="group">
+                            <button type="button" class="btn btn-sm btn-outline-primary active" id="heatmapRevenue">Revenue</button>
+                            <button type="button" class="btn btn-sm btn-outline-primary" id="heatmapUtilization">Utilization</button>
+                            <button type="button" class="btn btn-sm btn-outline-primary" id="heatmapHealth">Health Score</button>
+                        </div>
+                    </div>
+                    <div id="performanceHeatmap" class="row g-3">
+                        <!-- Heatmap will be populated by JavaScript -->
+                    </div>
+                </div>
+
+                <!-- Gauge Charts -->
+                <div class="demo-section">
+                    <h2 class="demo-title">Animated Gauge Charts</h2>
+                    <div class="row">
+                        <div class="col-lg-4 col-md-6 mb-3">
+                            <div class="card h-100">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title">Overall Utilization</h6>
+                                    <div class="gauge-container">
+                                        <svg class="gauge-svg" width="200" height="200">
+                                            <circle class="gauge-background" cx="100" cy="100" r="80"></circle>
+                                            <circle class="gauge-progress" cx="100" cy="100" r="80" id="utilizationGauge" style="stroke: #f59e0b;"></circle>
+                                        </svg>
+                                        <div class="gauge-text">
+                                            <div class="gauge-value" id="utilizationGaugeValue">0%</div>
+                                            <div class="gauge-label">Utilization Rate</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-lg-4 col-md-6 mb-3">
+                            <div class="card h-100">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title">Business Health</h6>
+                                    <div class="gauge-container">
+                                        <svg class="gauge-svg" width="200" height="200">
+                                            <circle class="gauge-background" cx="100" cy="100" r="80"></circle>
+                                            <circle class="gauge-progress" cx="100" cy="100" r="80" id="healthGauge" style="stroke: #10b981;"></circle>
+                                        </svg>
+                                        <div class="gauge-text">
+                                            <div class="gauge-value" id="healthGaugeValue">0</div>
+                                            <div class="gauge-label">Health Score</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-lg-4 col-md-6 mb-3">
+                            <div class="card h-100">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title">Efficiency Index</h6>
+                                    <div class="gauge-container">
+                                        <svg class="gauge-svg" width="200" height="200">
+                                            <circle class="gauge-background" cx="100" cy="100" r="80"></circle>
+                                            <circle class="gauge-progress" cx="100" cy="100" r="80" id="efficiencyGauge" style="stroke: #3b82f6;"></circle>
+                                        </svg>
+                                        <div class="gauge-text">
+                                            <div class="gauge-value" id="efficiencyGaugeValue">0%</div>
+                                            <div class="gauge-label">Efficiency</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Waterfall Chart -->
+                <div class="demo-section">
+                    <h2 class="demo-title">Revenue Waterfall Analysis</h2>
+                    <div style="background: white; border-radius: 12px; padding: 1.5rem;">
+                        <canvas id="waterfallChart" height="100"></canvas>
+                    </div>
+                </div>
+
+                <!-- Geographic Visualization -->
+                <div class="demo-section">
+                    <h2 class="demo-title">Geographic Location Map</h2>
+                    <div class="row">
+                        <div class="col-lg-8">
+                            <div id="locationMap" class="map-container"></div>
+                        </div>
+                        <div class="col-lg-4">
+                            <div class="card h-100">
+                                <div class="card-header">
+                                    <h6 class="mb-0">Performance Comparison</h6>
+                                </div>
+                                <div class="card-body">
+                                    <canvas id="performanceComparisonChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Control Panel -->
+                <div class="demo-section">
+                    <h2 class="demo-title">Interactive Controls</h2>
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="btn-group me-3" role="group">
+                                <button type="button" class="btn btn-primary" onclick="startDemo()">
+                                    <i class="fas fa-play"></i> Start Demo
+                                </button>
+                                <button type="button" class="btn btn-secondary" onclick="refreshData()">
+                                    <i class="fas fa-refresh"></i> Refresh Data
+                                </button>
+                                <button type="button" class="btn btn-info" onclick="exportData()">
+                                    <i class="fas fa-download"></i> Export Data
+                                </button>
+                            </div>
+                            <div class="alert alert-info">
+                                <strong>Keyboard Shortcuts:</strong> 
+                                Ctrl+1 (Revenue), Ctrl+2 (Utilization), Ctrl+3 (Health Score)
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Simple demonstration implementation
+        class DemoVisualizations {
+            constructor() {
+                this.init();
+            }
+
+            init() {
+                this.initAnimatedCounters();
+                this.initSparklines();
+                this.initGauges();
+                this.initHeatmap();
+                this.initWaterfallChart();
+                this.initLocationMap();
+                this.initPerformanceComparison();
+                this.setupControls();
+            }
+
+            initAnimatedCounters() {
+                const counters = {
+                    revenueKPI: new CountUp('revenueKPI', 0, { prefix: '$', suffix: 'K' }),
+                    utilizationKPI: new CountUp('utilizationKPI', 0, { suffix: '%' }),
+                    growthKPI: new CountUp('growthKPI', 0, { suffix: '%', decimal: '.' }),
+                    healthKPI: new CountUp('healthKPI', 0, { decimal: '.' })
+                };
+
+                // Animate to demo values
+                setTimeout(() => {
+                    counters.revenueKPI.update(379);
+                    counters.utilizationKPI.update(87);
+                    counters.growthKPI.update(15.3);
+                    counters.healthKPI.update(8.7);
+                }, 500);
+            }
+
+            initSparklines() {
+                const sparklineData = {
+                    revenue: [45, 52, 48, 61, 55, 67, 63],
+                    utilization: [82, 85, 79, 87, 84, 89, 87],
+                    growth: [12, 14, 13, 16, 15, 17, 15],
+                    health: [8.2, 8.5, 8.1, 8.7, 8.4, 8.9, 8.7]
+                };
+
+                Object.keys(sparklineData).forEach(key => {
+                    const canvas = document.getElementById(`${key}Sparkline`);
+                    if (canvas) {
+                        new Chart(canvas.getContext('2d'), {
+                            type: 'line',
+                            data: {
+                                labels: ['W1', 'W2', 'W3', 'W4', 'W5', 'W6', 'W7'],
+                                datasets: [{
+                                    data: sparklineData[key],
+                                    borderColor: key === 'revenue' ? '#3b82f6' : 
+                                               key === 'utilization' ? '#f59e0b' :
+                                               key === 'growth' ? '#10b981' : '#0369a1',
+                                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                                    borderWidth: 2,
+                                    fill: true,
+                                    tension: 0.4,
+                                    pointRadius: 0
+                                }]
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                plugins: { legend: { display: false } },
+                                scales: { x: { display: false }, y: { display: false } }
+                            }
+                        });
+                    }
+                });
+            }
+
+            initGauges() {
+                this.updateGauge('utilizationGauge', 'utilizationGaugeValue', 87);
+                this.updateGauge('healthGauge', 'healthGaugeValue', 87, false);
+                this.updateGauge('efficiencyGauge', 'efficiencyGaugeValue', 92);
+            }
+
+            updateGauge(gaugeId, valueId, percentage, isPercentage = true) {
+                const gauge = document.getElementById(gaugeId);
+                const valueEl = document.getElementById(valueId);
+                
+                if (gauge && valueEl) {
+                    const circumference = 2 * Math.PI * 80;
+                    gauge.style.strokeDasharray = `${circumference} ${circumference}`;
+                    
+                    setTimeout(() => {
+                        const offset = circumference - (percentage / 100) * circumference;
+                        gauge.style.strokeDashoffset = offset;
+                        gauge.style.transition = 'stroke-dashoffset 2s ease-in-out';
+                        
+                        if (isPercentage) {
+                            valueEl.textContent = `${percentage}%`;
+                        } else {
+                            valueEl.textContent = (percentage / 10).toFixed(1);
+                        }
+                    }, 500);
+                }
+            }
+
+            initHeatmap() {
+                this.renderHeatmap('revenue');
+            }
+
+            renderHeatmap(metric) {
+                const data = {
+                    revenue: { 'Wayzata': 92, 'Brooklyn Park': 87, 'Fridley': 73, 'Elk River': 89 },
+                    utilization: { 'Wayzata': 85, 'Brooklyn Park': 92, 'Fridley': 78, 'Elk River': 83 },
+                    health: { 'Wayzata': 8.7, 'Brooklyn Park': 9.2, 'Fridley': 7.3, 'Elk River': 8.9 }
+                };
+
+                const container = document.getElementById('performanceHeatmap');
+                const metricData = data[metric];
+                const maxValue = Math.max(...Object.values(metricData));
+                
+                container.innerHTML = '';
+
+                Object.keys(metricData).forEach(location => {
+                    const value = metricData[location];
+                    const intensity = value / maxValue;
+                    const performanceClass = intensity >= 0.9 ? 'performance-excellent' :
+                                           intensity >= 0.75 ? 'performance-good' :
+                                           intensity >= 0.6 ? 'performance-average' : 'performance-poor';
+                    
+                    const cell = document.createElement('div');
+                    cell.className = 'col-lg-3 col-md-6 mb-3';
+                    cell.innerHTML = `
+                        <div class="heatmap-cell ${performanceClass}">
+                            <div class="text-center">
+                                <h5 class="mb-1">${location}</h5>
+                                <div class="fs-4 fw-bold">
+                                    ${metric === 'health' ? value.toFixed(1) : `${value}%`}
+                                </div>
+                                <small class="opacity-75">
+                                    ${metric === 'health' ? 'Health Score' : 
+                                      metric === 'revenue' ? 'Revenue Target' : 'Utilization Rate'}
+                                </small>
+                            </div>
+                        </div>
+                    `;
+                    container.appendChild(cell);
+                });
+
+                // Update active button
+                document.querySelectorAll('[id^="heatmap"]').forEach(btn => btn.classList.remove('active'));
+                document.getElementById(`heatmap${metric.charAt(0).toUpperCase() + metric.slice(1)}`).classList.add('active');
+            }
+
+            initWaterfallChart() {
+                const ctx = document.getElementById('waterfallChart');
+                new Chart(ctx.getContext('2d'), {
+                    type: 'bar',
+                    data: {
+                        labels: ['Starting', 'Wayzata', 'Brooklyn Park', 'Fridley', 'Elk River', 'Total'],
+                        datasets: [{
+                            label: 'Revenue ($K)',
+                            data: [0, 125, 98, 67, 89, 379],
+                            backgroundColor: ['#6b7280', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#059669']
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { display: false } },
+                        scales: { y: { beginAtZero: true } }
+                    }
+                });
+            }
+
+            initLocationMap() {
+                const map = L.map('locationMap').setView([45.0, -93.4], 10);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+                const locations = [
+                    { name: 'Wayzata', lat: 44.9737, lng: -93.5067, color: '#3b82f6' },
+                    { name: 'Brooklyn Park', lat: 45.0942, lng: -93.3563, color: '#10b981' },
+                    { name: 'Fridley', lat: 45.0861, lng: -93.2635, color: '#f59e0b' },
+                    { name: 'Elk River', lat: 45.3077, lng: -93.5677, color: '#ef4444' }
+                ];
+
+                locations.forEach(location => {
+                    L.circleMarker([location.lat, location.lng], {
+                        radius: 12,
+                        color: location.color,
+                        fillColor: location.color,
+                        fillOpacity: 0.8
+                    }).addTo(map).bindPopup(`<strong>${location.name}</strong><br>Performance: Excellent`);
+                });
+            }
+
+            initPerformanceComparison() {
+                const ctx = document.getElementById('performanceComparisonChart');
+                new Chart(ctx.getContext('2d'), {
+                    type: 'radar',
+                    data: {
+                        labels: ['Revenue', 'Utilization', 'Health', 'Growth', 'Efficiency'],
+                        datasets: [{
+                            label: 'Wayzata',
+                            data: [92, 85, 87, 78, 89],
+                            borderColor: '#3b82f6',
+                            backgroundColor: 'rgba(59, 130, 246, 0.1)'
+                        }, {
+                            label: 'Brooklyn Park',
+                            data: [87, 92, 92, 85, 88],
+                            borderColor: '#10b981',
+                            backgroundColor: 'rgba(16, 185, 129, 0.1)'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: { r: { beginAtZero: true, max: 100 } }
+                    }
+                });
+            }
+
+            setupControls() {
+                document.getElementById('heatmapRevenue')?.addEventListener('click', () => this.renderHeatmap('revenue'));
+                document.getElementById('heatmapUtilization')?.addEventListener('click', () => this.renderHeatmap('utilization'));
+                document.getElementById('heatmapHealth')?.addEventListener('click', () => this.renderHeatmap('health'));
+            }
+        }
+
+        function startDemo() {
+            // Add pulse animation to all counters
+            document.querySelectorAll('.animated-counter').forEach(el => {
+                el.classList.add('pulse-animation');
+                setTimeout(() => el.classList.remove('pulse-animation'), 3000);
+            });
+        }
+
+        function refreshData() {
+            location.reload();
+        }
+
+        function exportData() {
+            const data = { timestamp: new Date().toISOString(), demo: 'executive-visualizations' };
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'demo-data.json';
+            a.click();
+        }
+
+        // Initialize demo
+        document.addEventListener('DOMContentLoaded', () => {
+            new DemoVisualizations();
+        });
+    </script>
+</body>
+</html>

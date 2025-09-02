@@ -987,21 +987,21 @@ class CSVImportService:
                     self._insert_scorecard_record(session, company_record)
                     imported_count += 1
                     
-                    # STORE-SPECIFIC RECORDS (store_code = store codes)
-                    # Create individual records for each store with their specific data
-                    for store_code, store_name in STORE_MAPPING.items():
-                        store_record = {
-                            **base_data,
-                            'store_code': store_code,
-                            'import_batch_id': int(datetime.now().strftime('%m%d%H%M')),
-                        # Skip created_at - it auto-generates
-                        }
-                        
-                        # Add store-specific metrics
-                        store_record.update(self._extract_store_specific_metrics(row, df.columns, store_code))
-                        
-                        # Only insert if store has meaningful data
-                        if self._has_meaningful_store_data(store_record):
+                    # STORE-SPECIFIC RECORDS (store_code = store codes)  
+                    # Only create store records when there's actual store-specific data in CSV
+                    if self._has_store_specific_data_in_csv(row, df.columns):
+                        for store_code, store_name in STORE_MAPPING.items():
+                            store_record = {
+                                **base_data,
+                                'store_code': store_code,
+                                'import_batch_id': int(datetime.now().strftime('%m%d%H%M')),
+                            # Skip created_at - it auto-generates
+                            }
+                            
+                            # Add store-specific metrics
+                            store_record.update(self._extract_store_specific_metrics(row, df.columns, store_code))
+                            
+                            # Insert store record (ON DUPLICATE KEY UPDATE will handle duplicates)
                             self._insert_scorecard_record(session, store_record)
                             imported_count += 1
                         else:
@@ -1086,12 +1086,18 @@ class CSVImportService:
                     base_data['week_ending_sunday'] = date_val
                     break
         
-        # Extract total weekly revenue 
+        # Extract total weekly revenue with proper cleaning
         for col in columns:
             if 'total weekly revenue' in col.lower():
                 revenue_val = row[col]
                 if pd.notna(revenue_val):
-                    base_data['total_weekly_revenue'] = float(revenue_val)
+                    # Clean currency data: remove $, commas, spaces
+                    cleaned_value = str(revenue_val).replace('$', '').replace(',', '').strip()
+                    if cleaned_value and cleaned_value != '':
+                        try:
+                            base_data['total_weekly_revenue'] = float(cleaned_value)
+                        except (ValueError, TypeError):
+                            logger.warning(f"Could not convert total revenue '{revenue_val}' to float")
                     break
         
         return base_data
@@ -1119,26 +1125,44 @@ class CSVImportService:
         """Extract store-specific metrics for given store code"""
         metrics = {}
         
-        # Store revenue
+        # Store revenue - map to correct database column name
         revenue_col = f'{store_code} Revenue'
         for col in columns:
             if revenue_col.lower() in col.lower():
                 if pd.notna(row[col]):
-                    metrics[f'revenue_{store_code}'] = float(row[col])
+                    # Clean currency data: remove $, commas, spaces
+                    cleaned_value = str(row[col]).replace('$', '').replace(',', '').strip()
+                    if cleaned_value and cleaned_value != '':
+                        try:
+                            metrics[f'col_{store_code}_revenue'] = float(cleaned_value)
+                        except (ValueError, TypeError):
+                            logger.warning(f"Could not convert revenue '{row[col]}' to float for store {store_code}")
                 break
         
         # Store contracts
         for col in columns:
             if f'# new open contracts {store_code}' in col.lower():
                 if pd.notna(row[col]):
-                    metrics[f'new_open_contracts_{store_code}'] = int(row[col])
+                    # Clean numeric data
+                    cleaned_value = str(row[col]).replace(',', '').strip()
+                    if cleaned_value and cleaned_value != '':
+                        try:
+                            metrics[f'new_open_contracts_{store_code}'] = int(float(cleaned_value))
+                        except (ValueError, TypeError):
+                            logger.warning(f"Could not convert contracts '{row[col]}' to int for store {store_code}")
                 break
         
-        # Store reservations
+        # Store reservations  
         for col in columns:
             if f'total $ on reservation {store_code}' in col.lower():
                 if pd.notna(row[col]):
-                    metrics[f'total_on_reservation_{store_code}'] = float(row[col])
+                    # Clean currency data
+                    cleaned_value = str(row[col]).replace('$', '').replace(',', '').strip()
+                    if cleaned_value and cleaned_value != '':
+                        try:
+                            metrics[f'total_on_reservation_{store_code}'] = float(cleaned_value)
+                        except (ValueError, TypeError):
+                            logger.warning(f"Could not convert reservation '{row[col]}' to float for store {store_code}")
                 break
         
         # Store-specific deliveries (8101 only based on CSV)
@@ -1172,11 +1196,26 @@ class CSVImportService:
         
         return False
 
+    def _has_store_specific_data_in_csv(self, row, columns) -> bool:
+        """Check if CSV row has store-specific data based on column headers with store numbers"""
+        # Store-specific columns have store numbers in headers (3607, 6800, 728, 8101)
+        # Company-wide columns do NOT have store numbers in headers
+        store_indicators = ['3607', '6800', '728', '8101']
+        
+        for col in columns:
+            # Check if column header contains store numbers AND has data
+            if any(store_num in col for store_num in store_indicators):
+                value = row[col]
+                if pd.notna(value) and value != 0 and str(value).strip() not in ['', '0', '$0']:
+                    return True
+        
+        return False
+
     def _has_meaningful_store_data(self, store_record: Dict) -> bool:
         """Check if store record has any meaningful data beyond base fields"""
         # Check if any store-specific fields have non-zero values
         store_fields = [
-            f'revenue_{store_record["store_code"]}',
+            f'col_{store_record["store_code"]}_revenue',
             f'new_open_contracts_{store_record["store_code"]}', 
             f'total_on_reservation_{store_record["store_code"]}',
             'deliveries_scheduled_next_7_days_weds_tues_8101'
