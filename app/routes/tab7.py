@@ -166,7 +166,7 @@ def tab7_view():
         "Loading Executive Dashboard at %s",
         datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
     )
-    return render_template("tab7.html", store_mapping=STORE_MAPPING)
+    return render_template("executive_dashboard.html", store_mapping=STORE_MAPPING)
 
 
 @tab7_bp.route("/api/executive/data_availability", methods=["GET"])
