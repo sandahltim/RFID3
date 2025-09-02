@@ -170,7 +170,7 @@ class FeedbackService:
             context = BusinessContextKnowledge(
                 context_type=context_data.get('context_type', 'seasonal'),
                 category=context_data.get('category'),
-                store_id=context_data.get('store_id'),
+                store_code=context_data.get('store_code'),
                 region=context_data.get('region'),
                 applies_globally=context_data.get('applies_globally', False),
                 seasonal_pattern=context_data.get('seasonal_pattern'),
@@ -387,7 +387,7 @@ class FeedbackService:
                 'error': str(e)
             }
     
-    def get_business_context(self, context_type: str = None, store_id: str = None) -> Dict[str, Any]:
+    def get_business_context(self, context_type: str = None, store_code: str = None) -> Dict[str, Any]:
         """Get business context knowledge"""
         try:
             query = BusinessContextKnowledge.query
@@ -395,9 +395,9 @@ class FeedbackService:
             if context_type:
                 query = query.filter(BusinessContextKnowledge.context_type == context_type)
             
-            if store_id:
+            if store_code:
                 query = query.filter(or_(
-                    BusinessContextKnowledge.store_id == store_id,
+                    BusinessContextKnowledge.store_code == store_code,
                     BusinessContextKnowledge.applies_globally == True
                 ))
             

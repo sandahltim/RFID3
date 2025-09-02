@@ -2234,9 +2234,9 @@ document.addEventListener('DOMContentLoaded', function() {
         };
         
         container.innerHTML = storePerformance.map(store => `
-            <div class="d-flex justify-content-between align-items-center mb-2 p-2" style="background: linear-gradient(135deg, ${storeColors[store.store_id] || '#ccc'}, ${storeColors[store.store_id] || '#ccc'}aa); border-radius: 8px;">
+            <div class="d-flex justify-content-between align-items-center mb-2 p-2" style="background: linear-gradient(135deg, ${storeColors[store.store_code] || '#ccc'}, ${storeColors[store.store_code] || '#ccc'}aa); border-radius: 8px;">
                 <div>
-                    <strong style="color: white;">${storeNames[store.store_id] || store.store_name}</strong>
+                    <strong style="color: white;">${storeNames[store.store_code] || store.store_name}</strong>
                     <div class="revenue-per-hour-display">
                         <i class="fas fa-clock"></i>
                         ${formatCurrency(store.revenue_per_hour)}/hr
@@ -2810,8 +2810,8 @@ document.addEventListener('DOMContentLoaded', function() {
                                store.efficiency < 35 ? 'status-good' :
                                store.efficiency < 45 ? 'status-warning' : 'status-poor';
 
-            const storeColor = storeColors[store.store_id] || '#ccc';
-            const managerName = storeManagers[store.store_id] || store.store_name;
+            const storeColor = storeColors[store.store_code] || '#ccc';
+            const managerName = storeManagers[store.store_code] || store.store_name;
 
             return `
                 <tr class="table-row-executive">
@@ -2819,7 +2819,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         <div class="d-flex align-items-center">
                             <span class="store-indicator" style="background: ${storeColor};"></span>
                             <div>
-                                <strong style="color: #2d3748;">${store.store_id} - ${managerName}</strong>
+                                <strong style="color: #2d3748;">${store.store_code} - ${managerName}</strong>
                                 <div style="font-size: 0.8rem; color: #6c757d;">${store.store_name}</div>
                             </div>
                         </div>

@@ -144,18 +144,18 @@ class ScorecardTrendsData(db.Model):
                 'total_reservations': float(self.total_reservation_6800 or 0)
             },
             'Fridley': {
-                'code': '728',
-                'revenue': float(self.revenue_728 or 0),
-                'contracts': self.new_contracts_728 or 0,
-                'pipeline': float(self.reservation_next14_728 or 0),
-                'total_reservations': float(self.total_reservation_728 or 0)
-            },
-            'Elk River': {
                 'code': '8101',
                 'revenue': float(self.revenue_8101 or 0),
                 'contracts': self.new_contracts_8101 or 0,
                 'pipeline': float(self.reservation_next14_8101 or 0),
-                'total_reservations': float(self.total_reservation_8101 or 0),
+                'total_reservations': float(self.total_reservation_8101 or 0)
+            },
+            'Elk River': {
+                'code': '728',
+                'revenue': float(self.revenue_728 or 0),
+                'contracts': self.new_contracts_728 or 0,
+                'pipeline': float(self.reservation_next14_728 or 0),
+                'total_reservations': float(self.total_reservation_728 or 0),
                 'deliveries_scheduled': self.deliveries_scheduled_8101 or 0,
                 'open_quotes': self.open_quotes_8101 or 0
             }

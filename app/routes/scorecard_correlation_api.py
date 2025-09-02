@@ -52,17 +52,17 @@ def get_store_metrics():
             'error': str(e)
         }), 500
 
-@scorecard_correlation_bp.route('/revenue-prediction/<store_id>', methods=['GET'])
-def get_revenue_prediction(store_id):
+@scorecard_correlation_bp.route('/revenue-prediction/<store_code>', methods=['GET'])
+def get_revenue_prediction(store_code):
     """Get revenue prediction for a specific store"""
     try:
         service = get_scorecard_service()
-        prediction = service.get_revenue_predictions(store_id)
+        prediction = service.get_revenue_predictions(store_code)
         
         if prediction:
             return jsonify({
                 'success': True,
-                'store_id': store_id,
+                'store_code': store_code,
                 'prediction': prediction
             })
         else:

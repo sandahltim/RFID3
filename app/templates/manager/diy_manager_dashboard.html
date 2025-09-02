@@ -1,0 +1,658 @@
+{% extends "base.html" %}
+{% block title %}{{ store_info.manager }}'s Dashboard - {{ store_info.name }} - RFID DASHBOARD{% endblock %}
+
+{% block extra_head %}
+<style>
+.diy-header {
+    background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%);
+    color: white;
+    padding: 2rem 0;
+    margin-bottom: 2rem;
+    border-radius: 0 0 15px 15px;
+}
+
+.kpi-card {
+    border: none;
+    border-radius: 12px;
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+    transition: transform 0.3s ease;
+    height: 100%;
+}
+
+.kpi-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.15);
+}
+
+.kpi-value {
+    font-size: 2.5rem;
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+}
+
+.kpi-label {
+    font-size: 0.9rem;
+    color: #6c757d;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.kpi-change {
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-top: 0.5rem;
+}
+
+.kpi-change.positive {
+    color: #28a745;
+}
+
+.kpi-change.negative {
+    color: #dc3545;
+}
+
+.diy-icon {
+    font-size: 3rem;
+    color: #27ae60;
+    margin-bottom: 1rem;
+}
+
+.diy-tools-card {
+    background: linear-gradient(135deg, #34495e 0%, #2c3e50 100%);
+    color: white;
+    border-radius: 15px;
+}
+
+.tool-metric {
+    text-align: center;
+    padding: 1rem;
+}
+
+.tool-metric h4 {
+    color: #27ae60;
+    margin-bottom: 0.5rem;
+}
+
+.alert-diy {
+    border-left: 4px solid #27ae60;
+    background-color: rgba(39, 174, 96, 0.1);
+}
+
+.btn-diy {
+    background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%);
+    border: none;
+    color: white;
+    font-weight: 600;
+}
+
+.btn-diy:hover {
+    background: linear-gradient(135deg, #2ecc71 0%, #27ae60 100%);
+    color: white;
+}
+
+.weekend-indicator {
+    padding: 1rem;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+}
+
+.weekend-high {
+    background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+    color: white;
+}
+
+.weekend-medium {
+    background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);
+    color: white;
+}
+
+.weekend-low {
+    background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+    color: white;
+}
+
+.tool-category {
+    margin-bottom: 1rem;
+    padding: 1rem;
+    border-radius: 8px;
+    background: #f8f9fa;
+    border-left: 4px solid #27ae60;
+}
+
+.category-name {
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    color: #27ae60;
+    display: flex;
+    align-items: center;
+}
+
+.utilization-bar {
+    height: 8px;
+    background-color: #e9ecef;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.utilization-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #27ae60, #2ecc71);
+    transition: width 0.3s ease;
+}
+
+.chart-container {
+    position: relative;
+    height: 300px;
+    margin-bottom: 2rem;
+}
+
+.store-experience-badge {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.store-veteran {
+    background: linear-gradient(135deg, #8e44ad 0%, #9b59b6 100%);
+    color: white;
+}
+
+.store-new {
+    background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+    color: white;
+}
+
+.popular-tools {
+    background: linear-gradient(135deg, #27ae60 10%, #2ecc71 90%);
+    color: white;
+    border-radius: 10px;
+    padding: 1.5rem;
+}
+
+@media (max-width: 768px) {
+    .diy-header {
+        padding: 1.5rem 0;
+        margin-bottom: 1.5rem;
+    }
+    
+    .kpi-value {
+        font-size: 2rem;
+    }
+    
+    .chart-container {
+        height: 250px;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="diy-header">
+    <div class="container-fluid">
+        <div class="row align-items-center">
+            <div class="col-md-8">
+                <h1 class="display-5 mb-2">
+                    <i class="fas fa-tools me-3"></i>{{ store_info.manager }}'s DIY Dashboard
+                </h1>
+                <p class="lead mb-0">{{ store_info.name }} - {{ store_info.location }}</p>
+                <p class="mb-0 mt-1">
+                    <span class="badge bg-light text-dark">{{ store_info.business_type }}</span>
+                    <span class="badge bg-warning ms-2">{{ store_info.approximate_items }} items</span>
+                    {% if store_info.opened_date.startswith('2008') %}
+                        <span class="badge store-veteran ms-2">Original Location</span>
+                    {% elif store_info.opened_date.startswith('2024') %}
+                        <span class="badge store-new ms-2">Newest Location</span>
+                    {% endif %}
+                </p>
+            </div>
+            <div class="col-md-4 text-md-end">
+                <div class="diy-icon">
+                    <i class="fas fa-hammer"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="container-fluid">
+    <!-- Key Performance Indicators -->
+    <div class="row mb-4">
+        <div class="col-md-3 mb-3">
+            <div class="card kpi-card text-center">
+                <div class="card-body">
+                    <i class="fas fa-toolbox text-primary mb-2" style="font-size: 2rem;"></i>
+                    <div class="kpi-value text-primary">
+                        {{ dashboard_data.kpis.inventory.total_items if dashboard_data.kpis.inventory else 0 }}
+                    </div>
+                    <div class="kpi-label">DIY Tools & Equipment</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3 mb-3">
+            <div class="card kpi-card text-center">
+                <div class="card-body">
+                    <i class="fas fa-percentage text-success mb-2" style="font-size: 2rem;"></i>
+                    <div class="kpi-value text-success">
+                        {{ dashboard_data.kpis.inventory.utilization_rate if dashboard_data.kpis.inventory else 0 }}%
+                    </div>
+                    <div class="kpi-label">Tool Utilization</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3 mb-3">
+            <div class="card kpi-card text-center">
+                <div class="card-body">
+                    <i class="fas fa-dollar-sign text-warning mb-2" style="font-size: 2rem;"></i>
+                    <div class="kpi-value text-warning">
+                        ${{ "{:,.0f}".format(dashboard_data.financial_summary.current_revenue if dashboard_data.financial_summary else 0) }}
+                    </div>
+                    <div class="kpi-label">Monthly Revenue</div>
+                    {% if dashboard_data.financial_summary and dashboard_data.financial_summary.revenue_change_percent %}
+                    <div class="kpi-change {{ 'positive' if dashboard_data.financial_summary.revenue_change_percent > 0 else 'negative' }}">
+                        {{ "+" if dashboard_data.financial_summary.revenue_change_percent > 0 else "" }}{{ dashboard_data.financial_summary.revenue_change_percent }}% vs last month
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3 mb-3">
+            <div class="card kpi-card text-center">
+                <div class="card-body">
+                    <i class="fas fa-calendar-weekend text-info mb-2" style="font-size: 2rem;"></i>
+                    <div class="kpi-value text-info">
+                        {{ dashboard_data.kpis.inventory.available_items if dashboard_data.kpis.inventory else 0 }}
+                    </div>
+                    <div class="kpi-label">Ready for Weekend</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- DIY Tools Focus Section -->
+    {% if dashboard_data.diy_metrics %}
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card diy-tools-card">
+                <div class="card-header bg-transparent">
+                    <h5 class="text-white mb-0">
+                        <i class="fas fa-wrench me-2"></i>Popular DIY Tool Categories
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        {% for category in dashboard_data.diy_metrics.diy_categories[:4] %}
+                        <div class="col-md-3">
+                            <div class="tool-metric">
+                                <h4>{{ category.total }}</h4>
+                                <p class="mb-1">{{ category.category }}</p>
+                                <small class="text-muted">{{ category.utilization_rate }}% in use</small>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="row">
+        <!-- Tool Categories & Weekend Patterns -->
+        <div class="col-lg-8 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-chart-bar me-2"></i>Tool Category Performance
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if dashboard_data.inventory_summary and dashboard_data.inventory_summary.top_categories %}
+                        {% for category in dashboard_data.inventory_summary.top_categories %}
+                        <div class="tool-category">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div class="category-name">
+                                    <i class="fas fa-{{ 'drill' if 'drill' in category.category.lower() else 'cut' if 'saw' in category.category.lower() else 'paint-brush' if 'paint' in category.category.lower() else 'hammer' if 'hammer' in category.category.lower() else 'tools' }} me-2"></i>
+                                    {{ category.category }}
+                                </div>
+                                <div>
+                                    <span class="badge bg-secondary">{{ category.total_items }} tools</span>
+                                    <span class="badge bg-primary">{{ category.utilization_rate }}% utilized</span>
+                                </div>
+                            </div>
+                            <div class="utilization-bar mt-2">
+                                <div class="utilization-fill" style="width: {{ category.utilization_rate }}%"></div>
+                            </div>
+                            <small class="text-muted">
+                                {{ category.rented }} rented, {{ category.available }} available, {{ category.maintenance }} in maintenance
+                            </small>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <p class="text-muted">Loading tool category data...</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Weekend Usage Patterns -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-calendar-week me-2"></i>DIY Usage Patterns
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="weekend-indicator weekend-high">
+                                <h6><i class="fas fa-calendar-weekend me-2"></i>Weekend Peak</h6>
+                                <p class="mb-0">Friday-Sunday: 70% of weekly rentals</p>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="weekend-indicator weekend-medium">
+                                <h6><i class="fas fa-calendar-day me-2"></i>Weekday Steady</h6>
+                                <p class="mb-0">Monday-Thursday: Professional contractors</p>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="weekend-indicator weekend-low">
+                                <h6><i class="fas fa-calendar-times me-2"></i>Maintenance Window</h6>
+                                <p class="mb-0">Early mornings: Tool servicing time</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Alerts and DIY Insights -->
+        <div class="col-lg-4 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-exclamation-triangle me-2"></i>Tool Alerts
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if dashboard_data.alerts %}
+                        {% for alert in dashboard_data.alerts %}
+                        <div class="alert alert-diy mb-3">
+                            <h6 class="alert-heading">{{ alert.title }}</h6>
+                            <p class="mb-1">{{ alert.message }}</p>
+                            {% if alert.action %}
+                            <small class="text-muted">
+                                <i class="fas fa-arrow-right me-1"></i>{{ alert.action }}
+                            </small>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="alert alert-success">
+                            <i class="fas fa-check-circle me-2"></i>All DIY tools ready for weekend rush!
+                        </div>
+                    {% endif %}
+
+                    <!-- Store-specific insights -->
+                    {% if store_info.opened_date.startswith('2008') %}
+                    <div class="alert alert-info mt-3">
+                        <h6><i class="fas fa-history me-2"></i>Veteran Location Advantage</h6>
+                        <p class="mb-0">Established customer base with specialty DIY needs and high-end tool preferences.</p>
+                    </div>
+                    {% elif store_info.opened_date.startswith('2024') %}
+                    <div class="alert alert-info mt-3">
+                        <h6><i class="fas fa-rocket me-2"></i>New Location Growth</h6>
+                        <p class="mb-0">Building customer base - focus on weekend availability and competitive pricing.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Popular DIY Tools -->
+            {% if dashboard_data.inventory_summary and dashboard_data.inventory_summary.high_value_items %}
+            <div class="popular-tools mt-4">
+                <h5 class="mb-3">
+                    <i class="fas fa-star me-2"></i>Popular DIY Tools
+                </h5>
+                {% for item in dashboard_data.inventory_summary.high_value_items[:5] %}
+                <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom border-light">
+                    <div>
+                        <div class="fw-bold">{{ item.description[:30] }}{{ "..." if item.description|length > 30 }}</div>
+                        <small class="text-light opacity-75">{{ item.category }}</small>
+                    </div>
+                    <div class="text-end">
+                        <div class="fw-bold">${{ item.rental_rate }}/day</div>
+                        <span class="badge {{ 'bg-light text-dark' if item.status == 'rented' else 'bg-warning text-dark' if item.status == 'available' else 'bg-danger' }}">
+                            {{ item.status }}
+                        </span>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- DIY Rental Trends Chart -->
+    <div class="row">
+        <div class="col-12 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-chart-line me-2"></i>DIY Tool Rental Trends (Last 30 Days)
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="chart-container">
+                        <canvas id="diyTrendsChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-bolt me-2"></i>DIY Management Actions
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-2 mb-3">
+                            <button class="btn btn-diy w-100" onclick="refreshDashboard()">
+                                <i class="fas fa-sync-alt me-2"></i>Refresh
+                            </button>
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <a href="/tab/1?store={{ store_code }}&category=drill" class="btn btn-outline-secondary w-100">
+                                <i class="fas fa-drill me-2"></i>Drills
+                            </a>
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <a href="/tab/1?store={{ store_code }}&category=saw" class="btn btn-outline-secondary w-100">
+                                <i class="fas fa-cut me-2"></i>Saws
+                            </a>
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <a href="/tab/1?store={{ store_code }}&category=ladder" class="btn btn-outline-secondary w-100">
+                                <i class="fas fa-ladder me-2"></i>Ladders
+                            </a>
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <a href="/tab/3?store={{ store_code }}" class="btn btn-outline-warning w-100">
+                                <i class="fas fa-wrench me-2"></i>Service
+                            </a>
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <a href="/manager/executive" class="btn btn-outline-primary w-100">
+                                <i class="fas fa-chart-line me-2"></i>Executive
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize DIY Trends Chart
+    const diyCtx = document.getElementById('diyTrendsChart').getContext('2d');
+    const revenueData = {{ dashboard_data.performance_trends.daily_revenue | tojson if dashboard_data.performance_trends else [] }};
+    
+    // Create gradient
+    const gradient = diyCtx.createLinearGradient(0, 0, 0, 300);
+    gradient.addColorStop(0, 'rgba(39, 174, 96, 0.3)');
+    gradient.addColorStop(1, 'rgba(39, 174, 96, 0.05)');
+    
+    new Chart(diyCtx, {
+        type: 'line',
+        data: {
+            labels: revenueData.map(item => {
+                const date = new Date(item.date);
+                return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            }),
+            datasets: [{
+                label: 'Daily DIY Rentals',
+                data: revenueData.map(item => item.value),
+                borderColor: '#27ae60',
+                backgroundColor: gradient,
+                borderWidth: 3,
+                fill: true,
+                tension: 0.4,
+                pointBackgroundColor: '#27ae60',
+                pointBorderColor: '#ffffff',
+                pointBorderWidth: 2,
+                pointRadius: 5,
+                pointHoverRadius: 7
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            return '$' + value.toLocaleString();
+                        }
+                    },
+                    grid: {
+                        color: 'rgba(0,0,0,0.1)'
+                    }
+                },
+                x: {
+                    grid: {
+                        display: false
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    callbacks: {
+                        title: function(context) {
+                            const dayOfWeek = new Date(revenueData[context[0].dataIndex].date).toLocaleDateString('en-US', { weekday: 'long' });
+                            return dayOfWeek + ' Rentals';
+                        },
+                        label: function(context) {
+                            return '$' + context.parsed.y.toLocaleString() + ' in DIY tool rentals';
+                        }
+                    },
+                    backgroundColor: 'rgba(39, 174, 96, 0.9)',
+                    titleColor: '#ffffff',
+                    bodyColor: '#ffffff',
+                    borderColor: '#27ae60',
+                    borderWidth: 1,
+                    cornerRadius: 8
+                }
+            }
+        }
+    });
+    
+    // Weekend usage indicator
+    highlightWeekendPatterns();
+    
+    // Auto-refresh dashboard every 5 minutes
+    setInterval(refreshDashboard, 300000);
+});
+
+function highlightWeekendPatterns() {
+    const today = new Date().getDay();
+    const weekendCards = document.querySelectorAll('.weekend-indicator');
+    
+    if (today === 0 || today === 6 || today === 5) { // Sunday, Saturday, Friday
+        weekendCards[0].style.animation = 'pulse 2s infinite';
+    }
+}
+
+function refreshDashboard() {
+    const refreshBtn = document.querySelector('.btn-diy');
+    const originalText = refreshBtn.innerHTML;
+    refreshBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Refreshing...';
+    refreshBtn.disabled = true;
+    
+    setTimeout(() => {
+        window.location.reload();
+    }, 1000);
+}
+
+// Weekend rush preparation notification
+function checkWeekendPrep() {
+    const today = new Date().getDay();
+    const hour = new Date().getHours();
+    
+    // Thursday evening or Friday morning - weekend prep time
+    if ((today === 4 && hour >= 16) || (today === 5 && hour <= 10)) {
+        showNotification('Weekend rush approaching - verify tool availability and maintenance status', 'info');
+    }
+}
+
+function showNotification(message, type) {
+    const notification = document.createElement('div');
+    notification.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
+    notification.style.top = '80px';
+    notification.style.right = '20px';
+    notification.style.zIndex = '9999';
+    notification.style.maxWidth = '350px';
+    notification.innerHTML = `
+        <i class="fas fa-tools me-2"></i>${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+        notification.remove();
+    }, 7000);
+}
+
+// Add CSS animation for weekend highlight
+const style = document.createElement('style');
+style.textContent = `
+    @keyframes pulse {
+        0% { transform: scale(1); }
+        50% { transform: scale(1.05); }
+        100% { transform: scale(1); }
+    }
+`;
+document.head.appendChild(style);
+
+// Initialize weekend preparation check
+setTimeout(checkWeekendPrep, 2000);
+</script>
+{% endblock %}

@@ -15,6 +15,7 @@ from sqlalchemy import text, create_engine, MetaData, Table, Column, Integer, St
 from sqlalchemy.orm import sessionmaker
 from app import db
 from app.services.logger import get_logger
+from app.services.payroll_import_service import PayrollImportService
 from config import DB_CONFIG
 
 logger = get_logger(__name__)
@@ -570,6 +571,42 @@ class FinancialCSVImportService:
                 "error": str(e),
                 "file_path": file_path
             }
+    def import_payroll_trends_corrected(self, file_path: str = None) -> Dict:
+        """
+        Use the new PayrollImportService for corrected horizontal data processing
+        This method replaces the flawed original implementation
+        """
+        logger.info("Using CORRECTED PayrollImportService for horizontal data processing")
+        
+        try:
+            # Initialize the dedicated payroll service
+            payroll_service = PayrollImportService()
+            
+            # Use the corrected import method
+            result = payroll_service.import_payroll_trends_corrected(file_path)
+            
+            # Update our import stats
+            if result.get('success'):
+                self.import_stats["files_processed"] += 1
+                self.import_stats["total_records_processed"] += result.get('original_records', 0)
+                self.import_stats["total_records_imported"] += result.get('imported_records', 0)
+                
+                logger.info(f"Corrected payroll import completed: {result.get('imported_records')} records")
+                logger.info(f"Store correlations: {result.get('store_correlations', {})}")
+            else:
+                self.import_stats["errors"].append(f"Corrected Payroll: {result.get('error')}")
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"Corrected payroll import failed: {str(e)}", exc_info=True)
+            self.import_stats["errors"].append(f"Corrected Payroll: {str(e)}")
+            return {
+                "success": False,
+                "error": str(e),
+                "file_path": file_path or "auto-detected"
+            }
+
 
     def import_profit_loss(self, file_path: str = None) -> Dict:
         """Enhanced P&L import - profit and loss statements"""

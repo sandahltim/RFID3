@@ -17,6 +17,13 @@ from app import db
 from app.services.logger import get_logger
 from app.models.financial_models import PayrollTrendsData, ScorecardTrendsData
 from app.services.financial_analytics_service import FinancialAnalyticsService
+from app.config.stores import (
+    STORES, STORE_MAPPING, STORE_MANAGERS,
+    STORE_BUSINESS_TYPES, STORE_OPENING_DATES,
+    get_store_name, get_store_manager, get_store_business_type,
+    get_store_opening_date, get_active_store_codes
+)
+
 
 logger = get_logger(__name__)
 
@@ -414,12 +421,12 @@ class ExecutiveInsightsService:
                 SELECT 
                     s.week_ending,
                     s.total_weekly_revenue,
-                    s.revenue_3607 + s.revenue_6800 + s.revenue_728 + s.revenue_8101 as calculated_revenue,
+                    s.revenue_3607 + s.revenue_6800 + s.revenue_728 + s.revenue_728 as calculated_revenue,
                     s.new_contracts_3607 + s.new_contracts_6800 + 
-                    s.new_contracts_728 + s.new_contracts_8101 as total_contracts,
-                    s.revenue_3607, s.revenue_6800, s.revenue_728, s.revenue_8101,
+                    s.new_contracts_728 + s.new_contracts_728 as total_contracts,
+                    s.revenue_3607, s.revenue_6800, s.revenue_728, s.revenue_728,
                     s.new_contracts_3607, s.new_contracts_6800, 
-                    s.new_contracts_728, s.new_contracts_8101,
+                    s.new_contracts_728, s.new_contracts_728,
                     p.all_revenue as payroll_revenue,
                     p.payroll_amount,
                     p.wage_hours
@@ -448,11 +455,11 @@ class ExecutiveInsightsService:
                 'wayzata_revenue': float(row.revenue_3607 or 0),
                 'brooklyn_park_revenue': float(row.revenue_6800 or 0),
                 'fridley_revenue': float(row.revenue_728 or 0),
-                'elk_river_revenue': float(row.revenue_8101 or 0),
+                'elk_river_revenue': float(row.revenue_728 or 0),
                 'wayzata_contracts': int(row.new_contracts_3607 or 0),
                 'brooklyn_park_contracts': int(row.new_contracts_6800 or 0),
                 'fridley_contracts': int(row.new_contracts_728 or 0),
-                'elk_river_contracts': int(row.new_contracts_8101 or 0),
+                'elk_river_contracts': int(row.new_contracts_728 or 0),
                 'payroll_cost': float(row.payroll_amount or 0),
                 'labor_hours': float(row.wage_hours or 0),
                 'gross_profit': float(row.total_weekly_revenue or row.calculated_revenue or 0) - float(row.payroll_amount or 0)
@@ -567,12 +574,18 @@ class ExecutiveInsightsService:
         anomalies = []
         
         try:
-            stores = [
-                ('wayzata_revenue', 'Wayzata'),
-                ('brooklyn_park_revenue', 'Brooklyn Park'),
-                ('fridley_revenue', 'Fridley'),
-                ('elk_river_revenue', 'Elk River')
-            ]
+            # Use centralized store configuration
+            stores = []
+            for store_code in get_active_store_codes():
+                store_name = get_store_name(store_code)
+                if store_code == '3607':
+                    stores.append(('wayzata_revenue', store_name))
+                elif store_code == '6800':
+                    stores.append(('brooklyn_park_revenue', store_name))
+                elif store_code == '8101':
+                    stores.append(('fridley_revenue', store_name))
+                elif store_code == '728':
+                    stores.append(('elk_river_revenue', store_name))
             
             for revenue_col, store_name in stores:
                 if revenue_col not in df.columns:
@@ -707,7 +720,7 @@ class ExecutiveInsightsService:
             # Minnesota construction season analysis
             construction_season = self._get_construction_season_info(month)
             
-            if construction_season and store != "Elk River":  # Elk River is events-focused
+            if construction_season and store_code != "728":  # Elk River is events-focused
                 if anomaly_type in ["revenue_spike", "contract_surge"] and construction_season["activity_level"] == "peak":
                     return {
                         "date": anomaly_date.strftime('%Y-%m-%d'),

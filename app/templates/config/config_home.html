@@ -1,0 +1,324 @@
+{% extends "base.html" %}
+
+{% block title %}Configuration Management{% endblock %}
+
+{% block head %}
+<style>
+    .config-card {
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+        background: #fff;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+    
+    .config-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    }
+    
+    .config-icon {
+        font-size: 3rem;
+        margin-bottom: 1rem;
+        display: block;
+    }
+    
+    .config-title {
+        font-size: 1.25rem;
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+        color: #2c3e50;
+    }
+    
+    .config-description {
+        color: #6c757d;
+        margin-bottom: 1rem;
+    }
+    
+    .config-stats {
+        background: #f8f9fa;
+        padding: 0.75rem;
+        border-radius: 6px;
+        margin-bottom: 1rem;
+    }
+    
+    .stats-item {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 0.25rem;
+    }
+    
+    .stats-item:last-child {
+        margin-bottom: 0;
+    }
+    
+    .btn-config {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border: none;
+        color: white;
+        padding: 0.5rem 1rem;
+        border-radius: 6px;
+        text-decoration: none;
+        display: inline-block;
+        transition: opacity 0.2s;
+    }
+    
+    .btn-config:hover {
+        opacity: 0.9;
+        color: white;
+        text-decoration: none;
+    }
+    
+    .store-summary {
+        background: #e3f2fd;
+        padding: 1rem;
+        border-radius: 6px;
+        margin-top: 1rem;
+    }
+    
+    .manager-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin-top: 0.5rem;
+    }
+    
+    .manager-badge {
+        background: #28a745;
+        color: white;
+        padding: 0.25rem 0.5rem;
+        border-radius: 4px;
+        font-size: 0.875rem;
+        font-weight: 500;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-3">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="h3">⚙️ Configuration Management</h1>
+                <div>
+                    <span class="text-muted">System Configuration & Settings</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row">
+        <!-- Store Configuration -->
+        <div class="col-lg-6 col-md-6 mb-4">
+            <div class="config-card">
+                <div class="text-center">
+                    <span class="config-icon">🏬</span>
+                    <div class="config-title">Store Configuration</div>
+                    <p class="config-description">
+                        Manage store locations, business types, and operational settings
+                    </p>
+                </div>
+                
+                <div class="config-stats">
+                    <div class="stats-item">
+                        <span>Total Stores:</span>
+                        <strong>{{ stores|length }}</strong>
+                    </div>
+                    <div class="stats-item">
+                        <span>Active Stores:</span>
+                        <strong>{{ stores.values() | selectattr('active') | list | length }}</strong>
+                    </div>
+                    <div class="stats-item">
+                        <span>Business Models:</span>
+                        <strong>DIY, Construction, Events</strong>
+                    </div>
+                </div>
+                
+                <div class="store-summary">
+                    <strong>Store Locations:</strong>
+                    <ul class="mb-0 mt-2">
+                        {% for store_code, store_info in stores.items() %}
+                        {% if store_info.active %}
+                        <li>{{ store_info.emoji }} <strong>{{ store_info.name }}</strong> - {{ store_info.location }}</li>
+                        {% endif %}
+                        {% endfor %}
+                    </ul>
+                </div>
+                
+                <div class="text-center mt-3">
+                    <a href="{{ url_for('config.store_config') }}" class="btn-config">
+                        📝 Manage Stores
+                    </a>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Manager Assignment -->
+        <div class="col-lg-6 col-md-6 mb-4">
+            <div class="config-card">
+                <div class="text-center">
+                    <span class="config-icon">👥</span>
+                    <div class="config-title">Manager Assignments</div>
+                    <p class="config-description">
+                        Configure manager assignments and responsibilities for each store location
+                    </p>
+                </div>
+                
+                <div class="config-stats">
+                    <div class="stats-item">
+                        <span>Active Managers:</span>
+                        <strong>{{ managers.values() | unique | list | length }}</strong>
+                    </div>
+                    <div class="stats-item">
+                        <span>Managed Locations:</span>
+                        <strong>{{ managers.keys() | list | length }}</strong>
+                    </div>
+                    <div class="stats-item">
+                        <span>Assignments:</span>
+                        <strong>Editable</strong>
+                    </div>
+                </div>
+                
+                <div class="store-summary">
+                    <strong>Current Managers:</strong>
+                    <div class="manager-list">
+                        {% for store_code, manager_name in managers.items() %}
+                        {% set store_info = stores[store_code] %}
+                        {% if store_info.active %}
+                        <span class="manager-badge">
+                            {{ manager_name }} - {{ store_info.name }}
+                        </span>
+                        {% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+                
+                <div class="text-center mt-3">
+                    <a href="{{ url_for('config.manager_config') }}" class="btn-config">
+                        👤 Manage Assignments
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- System Information -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="config-card">
+                <div class="row">
+                    <div class="col-md-8">
+                        <div class="config-title">🔧 System Information</div>
+                        <p class="config-description mb-3">
+                            Current system configuration and centralized store mapping status
+                        </p>
+                        
+                        <div class="row">
+                            <div class="col-sm-6">
+                                <div class="config-stats">
+                                    <div class="stats-item">
+                                        <span>Configuration Source:</span>
+                                        <strong>app/config/stores.py</strong>
+                                    </div>
+                                    <div class="stats-item">
+                                        <span>Field Standard:</span>
+                                        <strong>store_code</strong>
+                                    </div>
+                                    <div class="stats-item">
+                                        <span>POS Integration:</span>
+                                        <strong>Active (001-004, 000)</strong>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-sm-6">
+                                <div class="config-stats">
+                                    <div class="stats-item">
+                                        <span>CSV Imports:</span>
+                                        <strong>Scorecard, P&L, Payroll</strong>
+                                    </div>
+                                    <div class="stats-item">
+                                        <span>Analytics:</span>
+                                        <strong>Fully Correlated</strong>
+                                    </div>
+                                    <div class="stats-item">
+                                        <span>Manager Dashboards:</span>
+                                        <strong>Operational</strong>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4 text-center">
+                        <div class="mt-3">
+                            <div class="text-success mb-2">
+                                <i class="fas fa-check-circle fa-2x"></i>
+                            </div>
+                            <strong class="text-success">System Status: Healthy</strong>
+                            <p class="text-muted small mt-1">
+                                All store mappings centralized and correlated
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Quick Actions -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="config-card">
+                <div class="config-title">⚡ Quick Actions</div>
+                <p class="config-description">Common configuration tasks</p>
+                
+                <div class="row mt-3">
+                    <div class="col-md-3 text-center mb-3">
+                        <a href="{{ url_for('config.store_config') }}" class="btn btn-outline-primary btn-sm">
+                            🏪 Edit Store Details
+                        </a>
+                    </div>
+                    <div class="col-md-3 text-center mb-3">
+                        <a href="{{ url_for('config.manager_config') }}" class="btn btn-outline-success btn-sm">
+                            👤 Reassign Managers
+                        </a>
+                    </div>
+                    <div class="col-md-3 text-center mb-3">
+                        <a href="{{ url_for('manager_dashboards.manager_home') }}" class="btn btn-outline-info btn-sm">
+                            📊 View Manager Dashboards
+                        </a>
+                    </div>
+                    <div class="col-md-3 text-center mb-3">
+                        <a href="{{ url_for('executive_dashboard.dashboard') }}" class="btn btn-outline-warning btn-sm">
+                            📈 Executive Overview
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Configuration management JavaScript
+document.addEventListener('DOMContentLoaded', function() {
+    // Add any interactive features for the config home page
+    console.log('Configuration Management loaded');
+    
+    // Add hover effects for cards
+    const configCards = document.querySelectorAll('.config-card');
+    configCards.forEach(card => {
+        card.addEventListener('mouseenter', function() {
+            this.style.transform = 'translateY(-3px)';
+        });
+        
+        card.addEventListener('mouseleave', function() {
+            this.style.transform = 'translateY(0)';
+        });
+    });
+});
+</script>
+{% endblock %}

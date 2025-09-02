@@ -17,9 +17,80 @@ from app.models.weather_models import StoreRegionalAnalytics, WeatherRentalCorre
 from app.models.pos_models import POSTransaction, POSTransactionItem, POSEquipment
 import json
 from decimal import Decimal
+from app.config.stores import (
+    STORES, STORE_MAPPING, STORE_MANAGERS,
+    STORE_BUSINESS_TYPES, STORE_OPENING_DATES,
+    get_store_name, get_store_manager, get_store_business_type,
+    get_store_opening_date, get_active_store_codes
+)
+
 
 logger = get_logger(__name__)
 
+
+    # Minnesota store geographic and market data from centralized configuration
+    STORE_GEOGRAPHIC_DATA = {}
+    
+    # Build geographic data from centralized store configuration
+    for store_code, store_info in STORES.items():
+        if not store_info.active:
+            continue
+            
+        geographic_data = {
+            'name': store_info.name,
+            'manager': store_info.manager,
+            'opened_date': store_info.opened_date,
+            'business_type': store_info.business_type
+        }
+        
+        # Add specific geographic data based on store
+        if store_code == '3607':  # Wayzata
+            geographic_data.update({
+                'coordinates': (44.9733, -93.5066),
+                'county': 'Hennepin',
+                'market_characteristics': {
+                    'affluent_suburban': True,
+                    'lake_access': True,
+                    'high_event_demand': True,
+                    'premium_pricing_tolerance': 'high'
+                }
+            })
+        elif store_code == '6800':  # Brooklyn Park
+            geographic_data.update({
+                'coordinates': (45.0941, -93.3563),
+                'county': 'Hennepin',
+                'market_characteristics': {
+                    'suburban_mixed': True,
+                    'construction_demand': True,
+                    'premium_pricing_tolerance': 'medium'
+                }
+            })
+        elif store_code == '728':  # Elk River
+            geographic_data.update({
+                'coordinates': (45.3033, -93.5677),
+                'county': 'Sherburne',
+                'market_characteristics': {
+                    'rural_suburban': True,
+                    'agricultural_support': True,
+                    'diy_homeowner_base': True,
+                    'premium_pricing_tolerance': 'medium'
+                }
+            })
+        elif store_code == '8101':  # Fridley
+            geographic_data.update({
+                'coordinates': (45.0863, -93.2636),
+                'county': 'Anoka',
+                'address': '8101 Ashton Ave NE, Fridley, MN',
+                'brand': 'Broadway Tent & Event',
+                'market_characteristics': {
+                    'events_focused': True,
+                    'wedding_venues_nearby': True,
+                    'corporate_event_demand': True,
+                    'premium_pricing_tolerance': 'high'
+                }
+            })
+        
+        STORE_GEOGRAPHIC_DATA[store_code] = geographic_data
 class MultiStoreAnalyticsService:
     """Service for multi-store comparison and regional demand analysis"""
     

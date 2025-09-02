@@ -140,6 +140,8 @@ def create_app():
         from app.routes.system_health import system_health_bp
         from app.routes.executive_dashboard import executive_bp
         from app.routes.scorecard_correlation_api import scorecard_correlation_bp
+        from app.routes.manager_dashboards import manager_bp
+        from app.routes.config_management import config_bp as config_mgmt_bp
 
         app.register_blueprint(home_bp)
         app.register_blueprint(tab1_bp)
@@ -175,6 +177,8 @@ def create_app():
         app.register_blueprint(system_health_bp)
         app.register_blueprint(executive_bp)
         app.register_blueprint(scorecard_correlation_bp)
+        app.register_blueprint(manager_bp)
+        app.register_blueprint(config_mgmt_bp)
         app.logger.info("Blueprints registered successfully")
 
         # Set up performance monitoring middleware
