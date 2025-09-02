@@ -1,502 +1,504 @@
 #!/usr/bin/env python3
 """
-Comprehensive Scorecard Trends Correlation Analysis
-Identifies high-value insights for executive dashboard
+Scorecard Data Correlation Analysis
+Comprehensive analysis of business metrics relationships
 """
 
+from app import create_app, db
+from app.models.financial_models import (
+    ScorecardTrendsData, 
+    ScorecardMetricsDefinition,
+    PayrollTrendsData,
+    FinancialMetrics,
+    StorePerformanceBenchmarks
+)
+from sqlalchemy import func, distinct, and_, or_, case
+from datetime import datetime, timedelta
 import pandas as pd
 import numpy as np
-from scipy import stats
-from datetime import datetime, timedelta
-import json
-import warnings
-warnings.filterwarnings('ignore')
+from decimal import Decimal
 
-def load_and_clean_data():
-    """Load and clean the scorecard trends data"""
-    # Load data
-    df = pd.read_csv('shared/POR/ScorecardTrends9.1.25.csv')
+def analyze_data_quality():
+    """Comprehensive data quality assessment"""
+    print("\n" + "="*80)
+    print("DATA QUALITY ASSESSMENT")
+    print("="*80)
     
-    # Select relevant columns (ignore empty Column1-29)
-    relevant_cols = [
-        'Week ending Sunday',
-        'Total Weekly Revenue',
-        '3607 Revenue', '6800 Revenue', '728 Revenue', '8101 Revenue',
-        '# New Open Contracts 3607', '# New Open Contracts 6800', 
-        '# New Open Contracts 728', '# New Open Contracts 8101',
-        '# Deliveries Scheduled next 7 days Weds-Tues 8101',
-        '$ on Reservation - Next 14 days - 3607', '$ on Reservation - Next 14 days - 6800',
-        '$ on Reservation - Next 14 days - 728', '$ on Reservation - Next 14 days - 8101',
-        'Total $ on Reservation 3607', 'Total $ on Reservation 6800',
-        'Total $ on Reservation 728', 'Total $ on Reservation 8101',
-        '% -Total AR ($) > 45 days',
-        'Total Discount $ Company Wide',
-        'WEEK NUMBER',
-        '# Open Quotes 8101',
-        '$ Total AR (Cash Customers)'
+    # Basic statistics
+    scorecard_count = db.session.query(func.count(ScorecardTrendsData.id)).scalar()
+    metrics_def_count = db.session.query(func.count(ScorecardMetricsDefinition.id)).scalar()
+    payroll_count = db.session.query(func.count(PayrollTrendsData.id)).scalar()
+    
+    # Date coverage
+    min_date = db.session.query(func.min(ScorecardTrendsData.week_ending)).scalar()
+    max_date = db.session.query(func.max(ScorecardTrendsData.week_ending)).scalar()
+    
+    print(f"\n Current State Assessment:")
+    print(f"  - Scorecard Records: {scorecard_count}")
+    print(f"  - Metrics Definitions: {metrics_def_count}")
+    print(f"  - Payroll Records: {payroll_count}")
+    print(f"  - Date Range: {min_date} to {max_date}")
+    
+    if min_date and max_date:
+        weeks_covered = (max_date - min_date).days // 7
+        print(f"  - Weeks Covered: {weeks_covered}")
+    
+    # Data completeness analysis
+    print(f"\n Data Completeness Analysis:")
+    
+    # Check for null values in critical fields
+    critical_fields = [
+        ('total_weekly_revenue', 'Total Revenue'),
+        ('ar_over_45_days_percent', 'AR Over 45 Days %'),
+        ('total_discount', 'Total Discount'),
+        ('total_ar_cash_customers', 'Total AR Cash Customers')
     ]
     
-    df = df[relevant_cols].copy()
+    for field, label in critical_fields:
+        null_count = db.session.query(func.count(ScorecardTrendsData.id)).filter(
+            getattr(ScorecardTrendsData, field).is_(None)
+        ).scalar()
+        completeness = ((scorecard_count - null_count) / scorecard_count * 100) if scorecard_count > 0 else 0
+        print(f"  - {label}: {completeness:.1f}% complete ({null_count} nulls)")
     
-    # Rename columns for easier access
-    column_mapping = {
-        'Week ending Sunday': 'week_ending',
-        'Total Weekly Revenue': 'total_weekly_revenue',
-        '3607 Revenue': 'revenue_3607',
-        '6800 Revenue': 'revenue_6800',
-        '728 Revenue': 'revenue_728',
-        '8101 Revenue': 'revenue_8101',
-        '# New Open Contracts 3607': 'new_contracts_3607',
-        '# New Open Contracts 6800': 'new_contracts_6800',
-        '# New Open Contracts 728': 'new_contracts_728',
-        '# New Open Contracts 8101': 'new_contracts_8101',
-        '# Deliveries Scheduled next 7 days Weds-Tues 8101': 'deliveries_scheduled_8101',
-        '$ on Reservation - Next 14 days - 3607': 'reservation_next14_3607',
-        '$ on Reservation - Next 14 days - 6800': 'reservation_next14_6800',
-        '$ on Reservation - Next 14 days - 728': 'reservation_next14_728',
-        '$ on Reservation - Next 14 days - 8101': 'reservation_next14_8101',
-        'Total $ on Reservation 3607': 'total_reservation_3607',
-        'Total $ on Reservation 6800': 'total_reservation_6800',
-        'Total $ on Reservation 728': 'total_reservation_728',
-        'Total $ on Reservation 8101': 'total_reservation_8101',
-        '% -Total AR ($) > 45 days': 'ar_over_45_days_percent',
-        'Total Discount $ Company Wide': 'total_discount',
-        'WEEK NUMBER': 'week_number',
-        '# Open Quotes 8101': 'open_quotes_8101',
-        '$ Total AR (Cash Customers)': 'total_ar_cash'
-    }
+    # Check for data consistency
+    print(f"\n Data Consistency Issues:")
     
-    df.rename(columns=column_mapping, inplace=True)
+    # Find weeks with mismatched revenue totals
+    mismatched_revenue = db.session.query(ScorecardTrendsData).filter(
+        func.abs(
+            ScorecardTrendsData.total_weekly_revenue - 
+            (func.coalesce(ScorecardTrendsData.revenue_3607, 0) +
+             func.coalesce(ScorecardTrendsData.revenue_6800, 0) +
+             func.coalesce(ScorecardTrendsData.revenue_728, 0) +
+             func.coalesce(ScorecardTrendsData.revenue_8101, 0))
+        ) > 1
+    ).count()
     
-    # Convert week_ending to datetime (Excel serial date)
-    df['week_ending'] = pd.to_datetime('1899-12-30') + pd.to_timedelta(df['week_ending'], 'D')
+    print(f"  - Revenue Total Mismatches: {mismatched_revenue}")
     
-    # Remove rows with all NaN values in revenue columns
-    revenue_cols = ['revenue_3607', 'revenue_6800', 'revenue_728', 'revenue_8101']
-    df = df.dropna(subset=revenue_cols, how='all')
+    # Check for duplicate weeks
+    duplicates = db.session.query(
+        ScorecardTrendsData.week_ending,
+        func.count(ScorecardTrendsData.id).label('count')
+    ).group_by(ScorecardTrendsData.week_ending).having(
+        func.count(ScorecardTrendsData.id) > 1
+    ).all()
     
-    # Sort by date
-    df.sort_values('week_ending', inplace=True)
+    print(f"  - Duplicate Week Entries: {len(duplicates)}")
+    if duplicates:
+        for week, count in duplicates[:5]:  # Show first 5
+            print(f"    - {week}: {count} entries")
     
-    return df
+    # Check for data gaps
+    if min_date and max_date:
+        expected_weeks = set()
+        current_date = min_date
+        while current_date <= max_date:
+            expected_weeks.add(current_date)
+            current_date += timedelta(days=7)
+        
+        actual_weeks = set([r[0] for r in db.session.query(ScorecardTrendsData.week_ending).distinct().all()])
+        missing_weeks = expected_weeks - actual_weeks
+        
+        print(f"  - Missing Week Entries: {len(missing_weeks)}")
+        if missing_weeks:
+            for week in sorted(list(missing_weeks))[:5]:  # Show first 5
+                print(f"    - {week}")
+    
+    return scorecard_count > 0
 
-def calculate_correlations(df):
-    """Calculate correlation matrix and identify significant relationships"""
+def analyze_correlations():
+    """Identify key correlations in the data"""
+    print("\n" + "="*80)
+    print("RELATIONSHIP MAPPINGS & CORRELATIONS")
+    print("="*80)
     
-    # Select numeric columns for correlation
-    numeric_cols = df.select_dtypes(include=[np.number]).columns
-    numeric_cols = [col for col in numeric_cols if col != 'week_number']  # Exclude week number
+    # Get all scorecard data for correlation analysis
+    data = db.session.query(ScorecardTrendsData).order_by(ScorecardTrendsData.week_ending).all()
     
-    # Calculate correlation matrix
-    corr_matrix = df[numeric_cols].corr()
+    if not data:
+        print("No data available for correlation analysis")
+        return
     
-    # Find strong correlations (abs > 0.7)
-    strong_correlations = []
-    for i in range(len(corr_matrix.columns)):
-        for j in range(i+1, len(corr_matrix.columns)):
-            corr_value = corr_matrix.iloc[i, j]
-            if abs(corr_value) > 0.7 and not pd.isna(corr_value):
-                strong_correlations.append({
-                    'var1': corr_matrix.columns[i],
-                    'var2': corr_matrix.columns[j],
-                    'correlation': round(corr_value, 3)
-                })
-    
-    # Sort by absolute correlation
-    strong_correlations.sort(key=lambda x: abs(x['correlation']), reverse=True)
-    
-    return corr_matrix, strong_correlations
-
-def analyze_store_performance(df):
-    """Analyze cross-store performance patterns"""
-    
-    store_analysis = {}
-    stores = ['3607', '6800', '728', '8101']
-    
-    for store in stores:
-        revenue_col = f'revenue_{store}'
-        contracts_col = f'new_contracts_{store}'
-        
-        if revenue_col in df.columns:
-            store_data = df[[revenue_col, contracts_col]].dropna()
-            
-            if len(store_data) > 0:
-                store_analysis[store] = {
-                    'avg_revenue': round(store_data[revenue_col].mean(), 2),
-                    'std_revenue': round(store_data[revenue_col].std(), 2),
-                    'cv_revenue': round(store_data[revenue_col].std() / store_data[revenue_col].mean(), 3) if store_data[revenue_col].mean() > 0 else 0,
-                    'avg_contracts': round(store_data[contracts_col].mean(), 1) if contracts_col in store_data.columns else 0,
-                    'revenue_per_contract': round(store_data[revenue_col].mean() / store_data[contracts_col].mean(), 2) if contracts_col in store_data.columns and store_data[contracts_col].mean() > 0 else 0,
-                    'data_points': len(store_data)
-                }
-    
-    # Calculate store rankings
-    if store_analysis:
-        # Rank by average revenue
-        revenue_ranking = sorted(store_analysis.items(), key=lambda x: x[1]['avg_revenue'], reverse=True)
-        
-        # Rank by revenue stability (lower CV is better)
-        stability_ranking = sorted(store_analysis.items(), key=lambda x: x[1]['cv_revenue'])
-        
-        # Rank by revenue per contract efficiency
-        efficiency_ranking = sorted(store_analysis.items(), key=lambda x: x[1]['revenue_per_contract'], reverse=True)
-    
-    return store_analysis, {
-        'revenue_ranking': revenue_ranking if store_analysis else [],
-        'stability_ranking': stability_ranking if store_analysis else [],
-        'efficiency_ranking': efficiency_ranking if store_analysis else []
-    }
-
-def analyze_predictive_relationships(df):
-    """Analyze predictive relationships between reservations and future revenue"""
-    
-    predictive_analysis = {}
-    stores = ['3607', '6800', '8101']  # Store 728 has no reservation data
-    
-    for store in stores:
-        revenue_col = f'revenue_{store}'
-        reservation_14d_col = f'reservation_next14_{store}'
-        total_reservation_col = f'total_reservation_{store}'
-        
-        if all(col in df.columns for col in [revenue_col, reservation_14d_col]):
-            # Create lagged features (reservations from 1-2 weeks ago)
-            store_df = df[[revenue_col, reservation_14d_col, total_reservation_col, 'week_ending']].copy()
-            store_df[f'reservation_14d_lag1'] = store_df[reservation_14d_col].shift(1)
-            store_df[f'reservation_14d_lag2'] = store_df[reservation_14d_col].shift(2)
-            store_df[f'total_reservation_lag1'] = store_df[total_reservation_col].shift(1)
-            
-            # Calculate correlations with lagged features
-            clean_df = store_df.dropna()
-            
-            if len(clean_df) > 10:
-                predictive_analysis[store] = {
-                    'current_week_correlation': round(clean_df[revenue_col].corr(clean_df[reservation_14d_col]), 3),
-                    '1_week_lag_correlation': round(clean_df[revenue_col].corr(clean_df['reservation_14d_lag1']), 3),
-                    '2_week_lag_correlation': round(clean_df[revenue_col].corr(clean_df['reservation_14d_lag2']), 3),
-                    'total_reservation_correlation': round(clean_df[revenue_col].corr(clean_df['total_reservation_lag1']), 3),
-                    'sample_size': len(clean_df)
-                }
-                
-                # Simple linear regression for predictive power (using numpy instead of sklearn)
-                X = clean_df[['reservation_14d_lag1', 'total_reservation_lag1']].values
-                y = clean_df[revenue_col].values
-                
-                if len(X) > 5:
-                    # Add intercept term
-                    X_with_intercept = np.column_stack([np.ones(len(X)), X])
-                    
-                    # Calculate coefficients using normal equation
-                    try:
-                        coefficients = np.linalg.lstsq(X_with_intercept, y, rcond=None)[0]
-                        y_pred = X_with_intercept @ coefficients
-                        
-                        # Calculate R-squared
-                        ss_res = np.sum((y - y_pred) ** 2)
-                        ss_tot = np.sum((y - np.mean(y)) ** 2)
-                        r2 = 1 - (ss_res / ss_tot) if ss_tot > 0 else 0
-                        
-                        predictive_analysis[store]['r2_score'] = round(r2, 3)
-                        predictive_analysis[store]['predictive_power'] = 'Strong' if r2 > 0.5 else 'Moderate' if r2 > 0.3 else 'Weak'
-                    except:
-                        predictive_analysis[store]['r2_score'] = 0
-                        predictive_analysis[store]['predictive_power'] = 'Unable to calculate'
-    
-    return predictive_analysis
-
-def analyze_financial_health(df):
-    """Analyze financial health correlations"""
-    
-    financial_cols = ['ar_over_45_days_percent', 'total_discount', 'total_weekly_revenue', 'total_ar_cash']
-    financial_df = df[financial_cols].dropna()
-    
-    financial_insights = {}
-    
-    if len(financial_df) > 10:
-        # AR aging impact on revenue
-        ar_revenue_corr = financial_df['ar_over_45_days_percent'].corr(financial_df['total_weekly_revenue'])
-        
-        # Discount impact on revenue
-        discount_revenue_corr = financial_df['total_discount'].corr(financial_df['total_weekly_revenue'])
-        
-        # Calculate financial health score components
-        financial_df['ar_health_score'] = 100 * (1 - financial_df['ar_over_45_days_percent'])
-        financial_df['discount_health_score'] = 100 * (1 - financial_df['total_discount'] / financial_df['total_weekly_revenue'].clip(lower=1))
-        
-        financial_insights = {
-            'ar_revenue_correlation': round(ar_revenue_corr, 3),
-            'discount_revenue_correlation': round(discount_revenue_corr, 3),
-            'avg_ar_over_45_days': round(financial_df['ar_over_45_days_percent'].mean() * 100, 1),
-            'median_ar_over_45_days': round(financial_df['ar_over_45_days_percent'].median() * 100, 1),
-            'ar_volatility': round(financial_df['ar_over_45_days_percent'].std() * 100, 1),
-            'critical_ar_threshold': round(financial_df['ar_over_45_days_percent'].quantile(0.75) * 100, 1),
-            'discount_as_pct_revenue': round((financial_df['total_discount'] / financial_df['total_weekly_revenue'].clip(lower=1)).mean() * 100, 2)
-        }
-        
-        # Identify alert thresholds
-        financial_insights['alert_thresholds'] = {
-            'ar_critical': financial_df['ar_over_45_days_percent'].quantile(0.9),
-            'ar_warning': financial_df['ar_over_45_days_percent'].quantile(0.75),
-            'discount_critical': financial_df['total_discount'].quantile(0.9),
-            'revenue_critical_low': financial_df['total_weekly_revenue'].quantile(0.1)
-        }
-    
-    return financial_insights
-
-def analyze_operational_efficiency(df):
-    """Analyze operational efficiency metrics"""
-    
-    efficiency_metrics = {}
-    
-    # Focus on store 8101 which has delivery data
-    store_df = df[['revenue_8101', 'new_contracts_8101', 'deliveries_scheduled_8101', 'open_quotes_8101']].dropna()
-    
-    if len(store_df) > 10:
-        # Contract to revenue conversion
-        contract_revenue_corr = store_df['new_contracts_8101'].corr(store_df['revenue_8101'])
-        
-        # Delivery scheduling efficiency
-        delivery_revenue_corr = store_df['deliveries_scheduled_8101'].corr(store_df['revenue_8101'])
-        
-        # Quote conversion analysis
-        quote_contract_corr = store_df['open_quotes_8101'].corr(store_df['new_contracts_8101'])
-        
-        efficiency_metrics = {
-            'contract_revenue_correlation': round(contract_revenue_corr, 3),
-            'delivery_revenue_correlation': round(delivery_revenue_corr, 3),
-            'quote_contract_correlation': round(quote_contract_corr, 3),
-            'avg_contracts_per_week': round(store_df['new_contracts_8101'].mean(), 1),
-            'avg_deliveries_per_week': round(store_df['deliveries_scheduled_8101'].mean(), 1),
-            'avg_open_quotes': round(store_df['open_quotes_8101'].mean(), 1),
-            'revenue_per_contract': round(store_df['revenue_8101'].sum() / store_df['new_contracts_8101'].sum(), 2) if store_df['new_contracts_8101'].sum() > 0 else 0,
-            'delivery_fulfillment_ratio': round(store_df['deliveries_scheduled_8101'].sum() / store_df['new_contracts_8101'].sum(), 2) if store_df['new_contracts_8101'].sum() > 0 else 0
-        }
-    
-    return efficiency_metrics
-
-def identify_executive_alerts(df, financial_insights, efficiency_metrics):
-    """Identify key metrics for executive alerts"""
-    
-    alerts = {
-        'critical_metrics': [],
-        'leading_indicators': [],
-        'performance_triggers': []
-    }
-    
-    # Critical financial health metrics
-    if financial_insights:
-        if 'alert_thresholds' in financial_insights:
-            alerts['critical_metrics'].append({
-                'metric': 'AR Over 45 Days',
-                'critical_threshold': f"{financial_insights['alert_thresholds']['ar_critical']*100:.1f}%",
-                'warning_threshold': f"{financial_insights['alert_thresholds']['ar_warning']*100:.1f}%",
-                'current_avg': f"{financial_insights['avg_ar_over_45_days']:.1f}%",
-                'alert_type': 'financial_health'
-            })
-    
-    # Leading indicators from reservations
-    alerts['leading_indicators'].append({
-        'metric': '14-Day Reservation Pipeline',
-        'description': 'Strong predictor of revenue 1-2 weeks ahead',
-        'monitoring_frequency': 'Weekly',
-        'alert_type': 'predictive'
-    })
-    
-    # Performance triggers
-    if efficiency_metrics:
-        alerts['performance_triggers'].append({
-            'metric': 'Contract to Revenue Conversion',
-            'optimal_range': 'Correlation > 0.7',
-            'current_value': efficiency_metrics.get('contract_revenue_correlation', 'N/A'),
-            'alert_type': 'operational'
+    # Convert to pandas DataFrame for easier analysis
+    df_data = []
+    for row in data:
+        df_data.append({
+            'week_ending': row.week_ending,
+            'total_revenue': float(row.total_weekly_revenue or 0),
+            'revenue_3607': float(row.revenue_3607 or 0),
+            'revenue_6800': float(row.revenue_6800 or 0),
+            'revenue_728': float(row.revenue_728 or 0),
+            'revenue_8101': float(row.revenue_8101 or 0),
+            'contracts_3607': row.new_contracts_3607 or 0,
+            'contracts_6800': row.new_contracts_6800 or 0,
+            'contracts_728': row.new_contracts_728 or 0,
+            'contracts_8101': row.new_contracts_8101 or 0,
+            'ar_over_45_pct': float(row.ar_over_45_days_percent or 0),
+            'discount': float(row.total_discount or 0),
+            'deliveries_8101': row.deliveries_scheduled_8101 or 0,
+            'reservation_14d_total': float((row.reservation_next14_3607 or 0) + 
+                                         (row.reservation_next14_6800 or 0) +
+                                         (row.reservation_next14_728 or 0) +
+                                         (row.reservation_next14_8101 or 0))
         })
     
-    # Week-over-week revenue volatility
-    revenue_data = df['total_weekly_revenue'].dropna()
-    if len(revenue_data) > 4:
-        weekly_changes = revenue_data.pct_change().dropna()
-        volatility = weekly_changes.std()
+    df = pd.DataFrame(df_data)
+    
+    print("\n Key Correlations Identified:")
+    
+    # 1. Revenue vs Contracts correlation by store
+    print("\n1. Store Revenue vs New Contracts Correlation:")
+    stores = [
+        ('3607', 'Wayzata'),
+        ('6800', 'Brooklyn Park'),
+        ('728', 'Elk River'),
+        ('8101', 'Fridley')
+    ]
+    
+    for code, name in stores:
+        if f'revenue_{code}' in df.columns and f'contracts_{code}' in df.columns:
+            # Filter out zero values for better correlation
+            mask = (df[f'revenue_{code}'] > 0) & (df[f'contracts_{code}'] > 0)
+            if mask.any():
+                corr = df[mask][f'revenue_{code}'].corr(df[mask][f'contracts_{code}'])
+                avg_contract_value = df[mask][f'revenue_{code}'].sum() / df[mask][f'contracts_{code}'].sum()
+                print(f"  - {name} ({code}): {corr:.3f} correlation, ${avg_contract_value:,.0f} avg contract")
+    
+    # 2. AR Aging vs Revenue Performance
+    print("\n2. AR Aging Impact on Revenue:")
+    if 'ar_over_45_pct' in df.columns and 'total_revenue' in df.columns:
+        # Categorize AR aging
+        df['ar_category'] = pd.cut(df['ar_over_45_pct'], 
+                                   bins=[0, 5, 10, 20, 100],
+                                   labels=['Low (<5%)', 'Moderate (5-10%)', 'High (10-20%)', 'Critical (>20%)'])
         
-        alerts['performance_triggers'].append({
-            'metric': 'Weekly Revenue Volatility',
-            'critical_threshold': f"{volatility*2*100:.1f}% change",
-            'normal_range': f"±{volatility*100:.1f}%",
-            'alert_type': 'revenue'
+        ar_impact = df.groupby('ar_category').agg({
+            'total_revenue': ['mean', 'count']
         })
+        
+        print("  Revenue by AR Aging Category:")
+        for category in ar_impact.index:
+            if pd.notna(category):
+                mean_rev = ar_impact.loc[category, ('total_revenue', 'mean')]
+                count = ar_impact.loc[category, ('total_revenue', 'count')]
+                print(f"    - {category}: ${mean_rev:,.0f} avg revenue ({count} weeks)")
     
-    return alerts
+    # 3. Seasonality Analysis
+    print("\n3. Seasonal Patterns:")
+    df['month'] = pd.to_datetime(df['week_ending']).dt.month
+    df['quarter'] = pd.to_datetime(df['week_ending']).dt.quarter
+    
+    monthly_avg = df.groupby('month')['total_revenue'].mean()
+    quarterly_avg = df.groupby('quarter')['total_revenue'].mean()
+    
+    print("  Monthly Revenue Averages:")
+    for month in sorted(monthly_avg.index):
+        print(f"    - Month {month:02d}: ${monthly_avg[month]:,.0f}")
+    
+    # 4. Store Performance Concentration
+    print("\n4. Revenue Concentration Risk:")
+    high_concentration_weeks = 0
+    for _, row in df.iterrows():
+        store_revenues = [row['revenue_3607'], row['revenue_6800'], 
+                         row['revenue_728'], row['revenue_8101']]
+        total = sum(store_revenues)
+        if total > 0:
+            max_concentration = max(store_revenues) / total * 100
+            if max_concentration > 40:  # Flag high concentration
+                high_concentration_weeks += 1
+                if high_concentration_weeks <= 3:  # Show first 3
+                    dominant_store = stores[store_revenues.index(max(store_revenues))][1]
+                    print(f"  WARNING: {row['week_ending']}: {dominant_store} = {max_concentration:.1f}% of revenue")
+    
+    if high_concentration_weeks > 3:
+        print(f"  ... and {high_concentration_weeks - 3} more weeks with high concentration")
+    
+    # 5. Pipeline to Revenue Conversion
+    print("\n5. Reservation Pipeline Analysis:")
+    if 'reservation_14d_total' in df.columns:
+        # Shift reservation data by 2 weeks to see conversion
+        df['future_revenue'] = df['total_revenue'].shift(-2)
+        
+        mask = (df['reservation_14d_total'] > 0) & (df['future_revenue'].notna())
+        if mask.any():
+            conversion_rate = df[mask]['future_revenue'].sum() / df[mask]['reservation_14d_total'].sum()
+            print(f"  - Pipeline Conversion Rate: {conversion_rate:.2%}")
+            
+            corr = df[mask]['reservation_14d_total'].corr(df[mask]['future_revenue'])
+            print(f"  - Pipeline-to-Revenue Correlation: {corr:.3f}")
 
-def generate_executive_summary(all_results):
-    """Generate executive summary with key findings"""
+def identify_integration_opportunities():
+    """Identify opportunities for dashboard integration"""
+    print("\n" + "="*80)
+    print("INTEGRATION RECOMMENDATIONS")
+    print("="*80)
     
-    summary = {
-        'key_findings': [],
-        'actionable_insights': [],
-        'dashboard_recommendations': []
-    }
+    print("\n Dashboard Enhancement Opportunities:")
     
-    # Key findings
-    if all_results['store_rankings']['revenue_ranking']:
-        top_store = all_results['store_rankings']['revenue_ranking'][0]
-        summary['key_findings'].append(
-            f"Store {top_store[0]} is the revenue leader with ${top_store[1]['avg_revenue']:,.0f} weekly average"
-        )
+    # 1. Executive Dashboard (Tab 7)
+    print("\n1. Executive Dashboard Enhancements:")
+    print("  - Add rolling 4-week revenue trends with YoY comparison")
+    print("  - Implement store performance heat map showing:")
+    print("    - Revenue contribution %")
+    print("    - Contract conversion rates")
+    print("    - AR aging by location")
+    print("  - Create predictive revenue forecast based on:")
+    print("    - Historical patterns")
+    print("    - Reservation pipeline")
+    print("    - Seasonal adjustments")
+    print("  - Add alerting for:")
+    print("    - Revenue concentration > 40% in single store")
+    print("    - AR aging > 15%")
+    print("    - Contract volume drops > 20% week-over-week")
     
-    if all_results['predictive_analysis']:
-        best_predictor = max(all_results['predictive_analysis'].items(), 
-                           key=lambda x: x[1].get('r2_score', 0))
-        if best_predictor[1].get('r2_score', 0) > 0.3:
-            summary['key_findings'].append(
-                f"Store {best_predictor[0]} reservations show {best_predictor[1]['predictive_power']} predictive power (R²={best_predictor[1]['r2_score']})"
-            )
+    # 2. Manager Dashboard
+    print("\n2. Manager/Operations Dashboard:")
+    print("  - Store-specific KPI scorecards with:")
+    print("    - Weekly performance vs goals")
+    print("    - Contract pipeline visualization")
+    print("    - Delivery scheduling optimization")
+    print("  - Comparative store analytics:")
+    print("    - Peer store benchmarking")
+    print("    - Best practice identification")
+    print("    - Resource allocation recommendations")
     
-    if all_results['financial_health']:
-        summary['key_findings'].append(
-            f"AR over 45 days averages {all_results['financial_health']['avg_ar_over_45_days']:.1f}% with high volatility (±{all_results['financial_health']['ar_volatility']:.1f}%)"
-        )
+    # 3. Financial Analytics
+    print("\n3. Financial Analytics Integration:")
+    print("  - Link scorecard metrics to payroll data for:")
+    print("    - Revenue per labor hour")
+    print("    - Labor efficiency scores")
+    print("    - Optimal staffing recommendations")
+    print("  - Implement cash flow forecasting using:")
+    print("    - AR aging trends")
+    print("    - Reservation pipeline")
+    print("    - Historical collection patterns")
+
+def suggest_database_optimizations():
+    """Suggest database schema and performance optimizations"""
+    print("\n" + "="*80)
+    print("DATABASE OPTIMIZATION RECOMMENDATIONS")
+    print("="*80)
     
-    # Actionable insights
-    summary['actionable_insights'] = [
-        "Implement weekly monitoring of 14-day reservation pipeline as revenue predictor",
-        "Set AR aging alerts at 75th percentile for early intervention",
-        "Focus on improving contract-to-revenue conversion in underperforming stores",
-        "Monitor quote-to-contract conversion as leading indicator"
-    ]
+    print("\n Schema Enhancements:")
     
-    # Dashboard recommendations
-    summary['dashboard_recommendations'] = [
-        {
-            'widget': 'Store Performance Scorecard',
-            'metrics': ['Weekly Revenue', 'Contract Volume', 'Revenue/Contract'],
-            'update_frequency': 'Weekly',
-            'visualization': 'Comparative bar charts with trend lines'
-        },
-        {
-            'widget': 'Revenue Predictor',
-            'metrics': ['14-Day Reservations', 'Predicted Revenue', 'Confidence Interval'],
-            'update_frequency': 'Daily',
-            'visualization': 'Time series with forecast bands'
-        },
-        {
-            'widget': 'Financial Health Monitor',
-            'metrics': ['AR Aging %', 'Discount Rate', 'Cash Position'],
-            'update_frequency': 'Daily',
-            'visualization': 'Gauge charts with alert zones'
-        },
-        {
-            'widget': 'Executive Alert Panel',
-            'metrics': ['Critical Thresholds', 'Anomaly Detection', 'Action Items'],
-            'update_frequency': 'Real-time',
-            'visualization': 'Alert cards with severity indicators'
-        }
-    ]
+    print("\n1. Add Missing Relationships:")
+    print("  - Create StoreLocationMaster table:")
+    print("    - store_code (PK)")
+    print("    - store_name")
+    print("    - region")
+    print("    - square_footage")
+    print("    - employee_count")
+    print("    - market_size")
+    print("  - Link ScorecardTrendsData to StoreLocationMaster via foreign keys")
+    print("  - Create junction table for multi-store metrics aggregation")
     
-    return summary
+    print("\n2. Add Calculated Columns (via triggers or materialized views):")
+    print("  - revenue_variance_pct (actual vs sum of stores)")
+    print("  - contract_conversion_rate (contracts to revenue ratio)")
+    print("  - pipeline_coverage_ratio (pipeline / avg weekly revenue)")
+    print("  - ar_health_score (composite of AR metrics)")
+    
+    print("\n3. Implement Data Validation Constraints:")
+    print("  - CHECK constraint: total_weekly_revenue = sum of store revenues")
+    print("  - CHECK constraint: ar_over_45_days_percent BETWEEN 0 AND 100")
+    print("  - UNIQUE constraint: week_ending (prevent duplicates)")
+    print("  - NOT NULL constraints on critical metrics")
+    
+    print("\n4. Add Performance Indexes:")
+    print("  - Composite index: (week_ending, store_code) for time-series queries")
+    print("  - Partial index: WHERE ar_over_45_days_percent > 10 for risk queries")
+    print("  - Covering index: (week_ending, total_weekly_revenue, all store revenues)")
+    
+    print("\n5. Data Archival Strategy:")
+    print("  - Move data > 2 years to archive tables")
+    print("  - Create summary tables for historical aggregates")
+    print("  - Implement partitioning by year for large datasets")
+
+def create_correlation_matrix():
+    """Create comprehensive correlation matrix for predictive analytics"""
+    print("\n" + "="*80)
+    print("AI READINESS EVALUATION")
+    print("="*80)
+    
+    # Get recent data for analysis
+    recent_data = db.session.query(ScorecardTrendsData).filter(
+        ScorecardTrendsData.week_ending >= datetime.now().date() - timedelta(days=365)
+    ).all()
+    
+    if len(recent_data) < 20:
+        print("\n WARNING: Insufficient data for robust AI modeling (need at least 52 weeks)")
+        return
+    
+    print("\n AI & Predictive Analytics Readiness:")
+    
+    print("\n1. Available Features for ML Models:")
+    print("  Time-series features:")
+    print("    - Weekly revenue by store (4 features)")
+    print("    - New contracts by store (4 features)")
+    print("    - Reservation pipeline (8 features)")
+    print("    - AR aging metrics (2 features)")
+    print("    - Seasonal indicators (week number)")
+    
+    print("\n2. Potential Target Variables:")
+    print("  - Next week revenue (regression)")
+    print("  - Contract conversion probability (classification)")
+    print("  - AR default risk (classification)")
+    print("  - Store performance tier (multi-class)")
+    
+    print("\n3. Data Quality for AI:")
+    data_points = len(recent_data)
+    features = 20  # Approximate feature count
+    samples_per_feature = data_points / features
+    
+    print(f"  - Data points: {data_points}")
+    print(f"  - Features available: ~{features}")
+    print(f"  - Samples per feature ratio: {samples_per_feature:.1f}")
+    
+    if samples_per_feature < 10:
+        print("  WARNING: Need more data for robust models (aim for 10+ samples/feature)")
+    else:
+        print("  SUCCESS: Sufficient data for initial modeling")
+    
+    print("\n4. Recommended ML Applications:")
+    print("  - Revenue Forecasting: ARIMA or Prophet for time-series")
+    print("  - Store Classification: Random Forest for performance tiers")
+    print("  - Anomaly Detection: Isolation Forest for outlier detection")
+    print("  - Contract Optimization: Gradient Boosting for conversion prediction")
+    
+    print("\n5. Data Preparation Requirements:")
+    print("  - Handle missing values (imputation strategy needed)")
+    print("  - Create lag features (previous 4 weeks)")
+    print("  - Generate rolling statistics (3-week, 13-week averages)")
+    print("  - Encode categorical variables (store codes)")
+    print("  - Normalize numerical features for neural networks")
+
+def generate_sql_examples():
+    """Generate SQL queries for implementation"""
+    print("\n" + "="*80)
+    print("IMPLEMENTATION SQL QUERIES")
+    print("="*80)
+    
+    print("\n-- 1. Create Store Master Table")
+    print("""
+CREATE TABLE store_location_master (
+    store_code VARCHAR(10) PRIMARY KEY,
+    store_name VARCHAR(100) NOT NULL,
+    region VARCHAR(50),
+    market_type VARCHAR(20),
+    square_footage DECIMAL(10,2),
+    employee_count INTEGER,
+    opened_date DATE,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- Insert store data
+INSERT INTO store_location_master (store_code, store_name, region, market_type) VALUES
+('3607', 'Wayzata', 'West Metro', 'Suburban'),
+('6800', 'Brooklyn Park', 'North Metro', 'Suburban'),
+('728', 'Elk River', 'North', 'Rural'),
+('8101', 'Fridley', 'North Metro', 'Urban');
+""")
+    
+    print("\n-- 2. Create Materialized View for Analytics")
+    print("""
+CREATE MATERIALIZED VIEW mv_weekly_store_performance AS
+SELECT 
+    s.week_ending,
+    s.week_number,
+    -- Store performance metrics
+    COALESCE(s.revenue_3607, 0) as wayzata_revenue,
+    COALESCE(s.revenue_6800, 0) as brooklyn_park_revenue,
+    COALESCE(s.revenue_728, 0) as elk_river_revenue,
+    COALESCE(s.revenue_8101, 0) as fridley_revenue,
+    -- Calculated metrics
+    (COALESCE(s.revenue_3607,0) + COALESCE(s.revenue_6800,0) + 
+     COALESCE(s.revenue_728,0) + COALESCE(s.revenue_8101,0)) as calculated_total,
+    -- Risk indicators
+    CASE 
+        WHEN s.ar_over_45_days_percent > 20 THEN 'HIGH'
+        WHEN s.ar_over_45_days_percent > 10 THEN 'MEDIUM'
+        ELSE 'LOW'
+    END as ar_risk_level
+FROM scorecard_trends_data s
+ORDER BY s.week_ending DESC;
+""")
+    
+    print("\n-- 3. Correlation Analysis Query")
+    print("""
+-- Find correlations between contracts and revenue
+WITH store_metrics AS (
+    SELECT 
+        week_ending,
+        revenue_3607 as revenue,
+        new_contracts_3607 as contracts,
+        '3607' as store_code
+    FROM scorecard_trends_data
+    WHERE revenue_3607 > 0 AND new_contracts_3607 > 0
+    
+    UNION ALL
+    
+    SELECT 
+        week_ending,
+        revenue_6800,
+        new_contracts_6800,
+        '6800'
+    FROM scorecard_trends_data
+    WHERE revenue_6800 > 0 AND new_contracts_6800 > 0
+)
+SELECT 
+    store_code,
+    COUNT(*) as data_points,
+    AVG(revenue / NULLIF(contracts, 0)) as avg_contract_value
+FROM store_metrics
+GROUP BY store_code;
+""")
 
 def main():
-    """Main analysis execution"""
+    """Run comprehensive correlation analysis"""
+    app = create_app()
     
-    print("=" * 80)
-    print("SCORECARD TRENDS CORRELATION ANALYSIS")
-    print("=" * 80)
-    
-    # Load and clean data
-    print("\n1. LOADING AND CLEANING DATA...")
-    df = load_and_clean_data()
-    print(f"   - Loaded {len(df)} valid records")
-    print(f"   - Date range: {df['week_ending'].min().date()} to {df['week_ending'].max().date()}")
-    
-    # Calculate correlations
-    print("\n2. CALCULATING CORRELATIONS...")
-    corr_matrix, strong_correlations = calculate_correlations(df)
-    print(f"   - Found {len(strong_correlations)} strong correlations (|r| > 0.7)")
-    
-    # Store performance analysis
-    print("\n3. ANALYZING STORE PERFORMANCE...")
-    store_analysis, store_rankings = analyze_store_performance(df)
-    print(f"   - Analyzed {len(store_analysis)} stores")
-    
-    # Predictive analysis
-    print("\n4. ANALYZING PREDICTIVE RELATIONSHIPS...")
-    predictive_analysis = analyze_predictive_relationships(df)
-    print(f"   - Evaluated predictive models for {len(predictive_analysis)} stores")
-    
-    # Financial health analysis
-    print("\n5. ANALYZING FINANCIAL HEALTH...")
-    financial_health = analyze_financial_health(df)
-    
-    # Operational efficiency
-    print("\n6. ANALYZING OPERATIONAL EFFICIENCY...")
-    operational_efficiency = analyze_operational_efficiency(df)
-    
-    # Executive alerts
-    print("\n7. IDENTIFYING EXECUTIVE ALERTS...")
-    executive_alerts = identify_executive_alerts(df, financial_health, operational_efficiency)
-    
-    # Compile all results
-    all_results = {
-        'analysis_date': datetime.now().isoformat(),
-        'data_summary': {
-            'total_records': len(df),
-            'date_range': f"{df['week_ending'].min().date()} to {df['week_ending'].max().date()}",
-            'weeks_analyzed': df['week_ending'].nunique()
-        },
-        'strong_correlations': strong_correlations[:10],  # Top 10
-        'store_analysis': store_analysis,
-        'store_rankings': store_rankings,
-        'predictive_analysis': predictive_analysis,
-        'financial_health': financial_health,
-        'operational_efficiency': operational_efficiency,
-        'executive_alerts': executive_alerts
-    }
-    
-    # Generate executive summary
-    print("\n8. GENERATING EXECUTIVE SUMMARY...")
-    executive_summary = generate_executive_summary(all_results)
-    all_results['executive_summary'] = executive_summary
-    
-    # Save results
-    output_file = f"scorecard_correlation_analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-    with open(output_file, 'w') as f:
-        json.dump(all_results, f, indent=2, default=str)
-    
-    print(f"\n✓ Analysis complete! Results saved to: {output_file}")
-    
-    # Print key insights
-    print("\n" + "=" * 80)
-    print("KEY INSIGHTS FOR EXECUTIVE DASHBOARD")
-    print("=" * 80)
-    
-    print("\n📊 CROSS-STORE PERFORMANCE PATTERNS:")
-    if store_rankings['revenue_ranking']:
-        print("\n   Revenue Leaders:")
-        for i, (store, metrics) in enumerate(store_rankings['revenue_ranking'][:3], 1):
-            print(f"   {i}. Store {store}: ${metrics['avg_revenue']:,.0f}/week (σ=${metrics['std_revenue']:,.0f})")
-    
-    print("\n🔮 REVENUE PREDICTABILITY:")
-    for store, pred in predictive_analysis.items():
-        if 'r2_score' in pred:
-            print(f"   Store {store}: {pred['predictive_power']} prediction (R²={pred['r2_score']:.2f})")
-            print(f"      - 1-week lag correlation: {pred['1_week_lag_correlation']:.2f}")
-    
-    print("\n💰 FINANCIAL HEALTH CORRELATIONS:")
-    if financial_health:
-        print(f"   - AR >45 days impact on revenue: r={financial_health['ar_revenue_correlation']:.2f}")
-        print(f"   - Average AR >45 days: {financial_health['avg_ar_over_45_days']:.1f}%")
-        print(f"   - Critical threshold (75th %ile): {financial_health['critical_ar_threshold']:.1f}%")
-    
-    print("\n⚙️ OPERATIONAL EFFICIENCY:")
-    if operational_efficiency:
-        print(f"   - Contract→Revenue correlation: {operational_efficiency['contract_revenue_correlation']:.2f}")
-        print(f"   - Revenue per contract: ${operational_efficiency['revenue_per_contract']:,.0f}")
-        print(f"   - Delivery fulfillment ratio: {operational_efficiency['delivery_fulfillment_ratio']:.2f}")
-    
-    print("\n🚨 EXECUTIVE ALERT INDICATORS:")
-    for alert in executive_alerts['critical_metrics']:
-        print(f"   - {alert['metric']}: Current {alert['current_avg']}, Alert at {alert['critical_threshold']}")
-    
-    print("\n" + "=" * 80)
-    
-    return all_results
+    with app.app_context():
+        print("\n" + "="*80)
+        print(" SCORECARD DATA CORRELATION ANALYSIS REPORT")
+        print(" Generated: " + datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+        print("="*80)
+        
+        # Run analysis modules
+        if analyze_data_quality():
+            analyze_correlations()
+            identify_integration_opportunities()
+            suggest_database_optimizations()
+            create_correlation_matrix()
+            generate_sql_examples()
+            
+            print("\n" + "="*80)
+            print("ACTIONABLE NEXT STEPS")
+            print("="*80)
+            
+            print("\n Priority 1 (Immediate):")
+            print("  1. Fix data quality issues (duplicates, nulls)")
+            print("  2. Add unique constraints to prevent duplicates")
+            print("  3. Implement data validation checks")
+            
+            print("\n Priority 2 (This Week):")
+            print("  1. Create store master table and relationships")
+            print("  2. Build materialized views for performance")
+            print("  3. Integrate scorecard data into executive dashboard")
+            
+            print("\n Priority 3 (This Month):")
+            print("  1. Develop predictive models for revenue forecasting")
+            print("  2. Implement automated anomaly detection")
+            print("  3. Create comprehensive BI dashboard suite")
+            
+            print("\n" + "="*80)
+            print(" END OF REPORT")
+            print("="*80)
+        else:
+            print("\n ERROR: No scorecard data found. Please import data first.")
 
 if __name__ == "__main__":
-    results = main()
+    main()

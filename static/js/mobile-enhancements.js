@@ -127,106 +127,47 @@
         });
     };
 
-    // CRITICAL: Enhanced dropdown behavior with overlap fixes
+    // FIXED: Enhanced dropdown behavior - LET BOOTSTRAP HANDLE NAVBAR DROPDOWNS
     const enhanceDropdowns = () => {
-        if (isMobile()) {
-            const dropdowns = document.querySelectorAll('.dropdown-toggle');
-            dropdowns.forEach(dropdown => {
-                if (enhancedElements.has(dropdown)) return;
-                enhancedElements.add(dropdown);
+        // Only handle select dropdowns and form controls - NOT navbar dropdowns
+        // Bootstrap will handle navbar dropdowns properly
+        
+        const selectElements = document.querySelectorAll('select.form-select, select.form-control');
+        selectElements.forEach(select => {
+            if (!enhancedElements.has(select)) {
+                enhancedElements.add(select);
                 
-                dropdown.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    
-                    const menu = this.nextElementSibling;
-                    if (menu && menu.classList.contains('dropdown-menu')) {
-                        // Close other dropdowns first
-                        document.querySelectorAll('.dropdown-menu.show').forEach(otherMenu => {
-                            if (otherMenu !== menu) {
-                                otherMenu.classList.remove('show');
-                                otherMenu.style.transform = '';
-                                otherMenu.style.top = '';
-                                otherMenu.style.zIndex = '';
-                            }
-                        });
-                        
-                        menu.classList.toggle('show');
-                        
-                        // CRITICAL: Smart positioning for mobile with z-index fixes
-                        if (menu.classList.contains('show')) {
-                            const rect = this.getBoundingClientRect();
-                            const viewportHeight = window.innerHeight;
-                            const viewportWidth = window.innerWidth;
-                            const menuHeight = menu.offsetHeight || 200;
-                            
-                            // Set high z-index to prevent overlaps
-                            menu.style.zIndex = '1060';
-                            menu.style.position = 'absolute';
-                            
-                            // Vertical positioning
-                            if (rect.bottom + menuHeight > viewportHeight) {
-                                menu.style.transform = 'translateY(-100%)';
-                                menu.style.top = '0';
-                            } else {
-                                menu.style.transform = '';
-                                menu.style.top = '100%';
-                            }
-                            
-                            // Horizontal positioning for narrow screens
-                            if (rect.right + menu.offsetWidth > viewportWidth) {
-                                menu.style.left = 'auto';
-                                menu.style.right = '0';
-                            }
-                            
-                            // Ensure menu doesn't exceed viewport
-                            menu.style.maxWidth = Math.min(300, viewportWidth - 40) + 'px';
-                            menu.style.maxHeight = Math.min(250, viewportHeight - rect.bottom - 20) + 'px';
-                            menu.style.overflowY = 'auto';
-                        }
-                    }
+                select.addEventListener('focus', function() {
+                    this.style.zIndex = '1050';
+                    this.style.position = 'relative';
                 });
-            });
-
-            // Enhanced outside click handler
-            let clickTimeout;
-            document.addEventListener('click', (e) => {
-                clearTimeout(clickTimeout);
-                clickTimeout = setTimeout(() => {
-                    if (!e.target.closest('.dropdown')) {
-                        document.querySelectorAll('.dropdown-menu.show').forEach(menu => {
-                            menu.classList.remove('show');
-                            menu.style.transform = '';
-                            menu.style.top = '';
-                            menu.style.zIndex = '';
-                            menu.style.position = '';
-                            menu.style.maxWidth = '';
-                            menu.style.maxHeight = '';
-                        });
-                    }
-                }, 10);
-            }, true);
+                
+                select.addEventListener('blur', function() {
+                    setTimeout(() => {
+                        this.style.zIndex = '';
+                        this.style.position = '';
+                    }, 100);
+                });
+            }
+        });
+        
+        // Only enhance non-navbar dropdowns if needed (like in forms)
+        const formDropdowns = document.querySelectorAll('.dropdown:not(.navbar .dropdown) .dropdown-toggle');
+        formDropdowns.forEach(dropdown => {
+            if (enhancedElements.has(dropdown)) return;
+            enhancedElements.add(dropdown);
             
-            // Handle select dropdowns specifically
-            const selectElements = document.querySelectorAll('select.form-select, select.form-control');
-            selectElements.forEach(select => {
-                if (!enhancedElements.has(select)) {
-                    enhancedElements.add(select);
-                    
-                    select.addEventListener('focus', function() {
-                        this.style.zIndex = '1050';
-                        this.style.position = 'relative';
-                    });
-                    
-                    select.addEventListener('blur', function() {
-                        setTimeout(() => {
-                            this.style.zIndex = '';
-                            this.style.position = '';
-                        }, 100);
-                    });
-                }
-            });
-        }
+            // Add touch feedback only
+            dropdown.addEventListener('touchstart', function() {
+                this.style.opacity = '0.8';
+            }, { passive: true });
+            
+            dropdown.addEventListener('touchend', function() {
+                this.style.opacity = '1';
+            }, { passive: true });
+        });
+        
+        console.log('Mobile dropdown enhancements applied (Bootstrap-compatible)');
     };
 
     // Enhance navbar toggle behavior
@@ -579,36 +520,23 @@
             }
         });
         
-        // Fix dropdown toggles in executive dashboard
-        const dashboardDropdowns = document.querySelectorAll('.executive-dashboard .dropdown-toggle');
-        dashboardDropdowns.forEach(dropdown => {
-            if (!enhancedElements.has(dropdown)) {
-                enhancedElements.add(dropdown);
+        // Let Bootstrap handle executive dashboard dropdowns too
+        // Only fix z-index positioning for select elements
+        const dashboardSelects = document.querySelectorAll('.executive-dashboard select');
+        dashboardSelects.forEach(select => {
+            if (!enhancedElements.has(select)) {
+                enhancedElements.add(select);
                 
-                dropdown.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    
-                    const menu = this.nextElementSibling;
-                    if (menu && menu.classList.contains('dropdown-menu')) {
-                        // Close others
-                        document.querySelectorAll('.executive-dashboard .dropdown-menu.show').forEach(other => {
-                            if (other !== menu) {
-                                other.classList.remove('show');
-                            }
-                        });
-                        
-                        menu.classList.toggle('show');
-                        
-                        if (menu.classList.contains('show')) {
-                            menu.style.zIndex = '1070';
-                            menu.style.position = 'absolute';
-                            menu.style.top = '100%';
-                            menu.style.left = '0';
-                            menu.style.minWidth = '200px';
-                            menu.style.maxWidth = '90vw';
-                        }
-                    }
+                select.addEventListener('focus', function() {
+                    this.style.zIndex = '100';
+                    this.style.position = 'relative';
+                });
+                
+                select.addEventListener('blur', function() {
+                    setTimeout(() => {
+                        this.style.zIndex = '20';
+                        this.style.position = '';
+                    }, 100);
                 });
             }
         });

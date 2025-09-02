@@ -56,8 +56,8 @@ body {
         background-color: rgba(255, 255, 255, 0.1);
     }
     
-    /* CRITICAL FIX: Mobile dropdown positioning */
-    .dropdown-menu {
+    /* IMPROVED FIX: Mobile dropdown positioning - Bootstrap compatible */
+    .navbar-collapse .dropdown-menu {
         position: static !important;
         float: none !important;
         border: none;
@@ -65,7 +65,7 @@ body {
         background-color: rgba(255, 255, 255, 0.1);
         margin: 0.5rem 0;
         transform: none !important; /* Remove transforms that cause overlaps */
-        z-index: 1051; /* Above navbar */
+        z-index: auto; /* Let Bootstrap handle z-index */
         max-height: 300px;
         overflow-y: auto;
         width: 100%;
@@ -337,17 +337,20 @@ table thead th {
     }
 }
 
-/* Z-index management for overlapping elements */
+/* Z-index management for overlapping elements - Bootstrap compatible */
 .navbar {
     z-index: 1030;
 }
 
-.dropdown-menu {
-    z-index: 1031;
+/* Don't override Bootstrap's dropdown z-index on desktop */
+@media (min-width: 992px) {
+    .dropdown-menu {
+        z-index: 1000; /* Bootstrap default */
+    }
 }
 
 .modal {
-    z-index: 1050;
+    z-index: 1055; /* Bootstrap default */
 }
 
 .tooltip {
