@@ -1,7 +1,7 @@
 /**
  * RFID3 Executive Dashboard Styles
  * Fortune 500-Level Visual Enhancement
- * Version: 2025-08-28 - Executive Visual Overhaul
+ * Version: 2025-09-02 - Enhanced Visualizations Update
  */
 
 :root {
@@ -702,5 +702,242 @@
     .chart-container:hover,
     .metric-card:hover {
         transform: none;
+    }
+}
+
+/* Enhanced Visualizations Styles - 2025-09-02 */
+
+/* Sparkline Canvas Styling */
+.sparkline-canvas {
+    width: 100% !important;
+    height: 40px !important;
+    margin-top: 8px;
+}
+
+/* Heatmap Enhanced Styling */
+.heatmap-cell {
+    position: relative;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.heatmap-cell::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: linear-gradient(45deg, transparent 30%, rgba(255,255,255,0.15) 50%, transparent 70%);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.heatmap-cell:hover::after {
+    opacity: 1;
+}
+
+/* Gauge Chart Enhancements */
+.gauge-container {
+    position: relative;
+    display: inline-block;
+}
+
+.gauge-progress {
+    transition: stroke-dashoffset 1.5s cubic-bezier(0.4, 0, 0.2, 1);
+    filter: drop-shadow(0 0 6px currentColor);
+}
+
+.gauge-text {
+    pointer-events: none;
+}
+
+.gauge-value {
+    background: linear-gradient(45deg, #3b82f6, #1e40af);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    font-weight: 800;
+}
+
+/* Map Container Styling */
+.map-container {
+    border: 3px solid var(--executive-primary);
+    box-shadow: var(--shadow-card);
+    transition: all 0.3s ease;
+}
+
+.map-container:hover {
+    box-shadow: var(--shadow-hover);
+    transform: translateY(-2px);
+}
+
+/* Waterfall Chart Container */
+.waterfall-container canvas {
+    border-radius: 8px;
+    background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%);
+}
+
+/* Performance Indicators */
+.performance-excellent {
+    background: linear-gradient(135deg, #059669, #10b981);
+    box-shadow: 0 8px 32px rgba(5, 150, 105, 0.3);
+}
+
+.performance-good {
+    background: linear-gradient(135deg, #0369a1, #3b82f6);
+    box-shadow: 0 8px 32px rgba(3, 105, 161, 0.3);
+}
+
+.performance-average {
+    background: linear-gradient(135deg, #d97706, #f59e0b);
+    box-shadow: 0 8px 32px rgba(217, 119, 6, 0.3);
+}
+
+.performance-poor {
+    background: linear-gradient(135deg, #dc2626, #ef4444);
+    box-shadow: 0 8px 32px rgba(220, 38, 38, 0.3);
+}
+
+/* Animated Counter Styling */
+.animated-counter {
+    font-variant-numeric: tabular-nums;
+    position: relative;
+    display: inline-block;
+}
+
+.animated-counter::before {
+    content: '';
+    position: absolute;
+    inset: -4px;
+    border-radius: 8px;
+    background: linear-gradient(45deg, transparent, rgba(59, 130, 246, 0.1), transparent);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.animated-counter.pulse-animation::before {
+    opacity: 1;
+    animation: pulse-glow 2s ease-in-out;
+}
+
+/* Location Marker Styling */
+.location-marker {
+    backdrop-filter: blur(10px);
+    border: 2px solid white;
+    position: relative;
+    overflow: hidden;
+}
+
+.location-marker::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at center, rgba(255,255,255,0.3) 0%, transparent 70%);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.location-marker:hover::before {
+    opacity: 1;
+}
+
+/* Trend Indicators Enhanced */
+.trend-indicator {
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,0.2);
+    position: relative;
+    overflow: hidden;
+}
+
+.trend-indicator::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.1) 50%, transparent 100%);
+    transform: translateX(-100%);
+    transition: transform 0.6s ease;
+}
+
+.trend-indicator:hover::before {
+    transform: translateX(100%);
+}
+
+/* Mobile Optimizations for Enhanced Visualizations */
+@media (max-width: 768px) {
+    .sparkline-container {
+        height: 30px;
+        margin-top: 4px;
+    }
+    
+    .gauge-container {
+        width: 150px;
+        height: 150px;
+    }
+    
+    .gauge-svg {
+        width: 150px;
+        height: 150px;
+    }
+    
+    .gauge-value {
+        font-size: 1.5rem;
+    }
+    
+    .heatmap-cell {
+        margin-bottom: 1rem;
+        min-height: 100px;
+    }
+    
+    .map-container {
+        height: 300px;
+    }
+    
+    .visualization-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* High DPI Display Optimizations */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+    .sparkline-canvas,
+    canvas {
+        image-rendering: -webkit-optimize-contrast;
+        image-rendering: crisp-edges;
+    }
+}
+
+/* Dark Mode Support for Enhanced Visualizations */
+@media (prefers-color-scheme: dark) {
+    .heatmap-container,
+    .waterfall-container,
+    .gauge-container .card {
+        background: rgba(31, 41, 55, 0.95);
+        border: 1px solid rgba(75, 85, 99, 0.3);
+    }
+    
+    .gauge-background {
+        stroke: #374151;
+    }
+    
+    .sparkline-canvas {
+        filter: brightness(1.1);
+    }
+}
+
+/* Print Optimizations */
+@media print {
+    .sparkline-container,
+    .gauge-container,
+    .heatmap-container,
+    .map-container {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+    
+    .heatmap-cell:hover::before,
+    .heatmap-cell:hover::after {
+        display: none;
+    }
+    
+    .pulse-animation {
+        animation: none !important;
     }
 }

@@ -204,8 +204,8 @@ def init_scheduler(app):
                     with acquire_lock(redis_client, csv_import_lock_key, csv_import_lock_timeout):
                         logger.info("🚀 Starting Tuesday 8am CSV imports (all POS files)")
                         
-                        from .csv_import_service import CSVImportService
-                        importer = CSVImportService()
+                        from .financial_csv_import_service import FinancialCSVImportService
+                        importer = FinancialCSVImportService()
                         
                         import_results = importer.import_all_csv_files()
                         successful = import_results.get("successful_imports", 0)
