@@ -11,6 +11,7 @@ from app.models.financial_models import (
     FinancialMetrics,
     StorePerformanceBenchmarks
 )
+from app.models.config_models import BusinessAnalyticsConfiguration
 from sqlalchemy import func, and_, or_, case, text
 from datetime import datetime, timedelta
 import pandas as pd
@@ -81,9 +82,15 @@ class ScorecardAnalyticsService:
                 ar_pct = float(row.ar_over_45_days_percent or 0)
                 revenue = float(row.total_weekly_revenue or 0)
                 
-                if ar_pct < 5:
+                # OLD - HARDCODED (WRONG): if ar_pct < 5: / elif ar_pct < 15:
+                # NEW - CONFIGURABLE (CORRECT):
+                config = self._get_config()
+                ar_low_threshold = config.get_threshold('ar_aging_low_threshold')
+                ar_medium_threshold = config.get_threshold('ar_aging_medium_threshold')
+                
+                if ar_pct < ar_low_threshold:
                     ar_categories['low'].append(revenue)
-                elif ar_pct < 15:
+                elif ar_pct < ar_medium_threshold:
                     ar_categories['medium'].append(revenue)
                 else:
                     ar_categories['high'].append(revenue)
@@ -301,7 +308,10 @@ class ScorecardAnalyticsService:
                 total = sum(store_revenues)
                 if total > 0:
                     max_concentration = max(store_revenues) / total
-                    if max_concentration > 0.4:
+                    # OLD - HARDCODED (WRONG): if max_concentration > 0.4:
+                    # NEW - CONFIGURABLE (CORRECT):
+                    concentration_threshold = config.get_threshold('revenue_concentration_risk_threshold')
+                    if max_concentration > concentration_threshold:
                         insights['risk_indicators'].append({
                             'type': 'concentration',
                             'severity': 'medium',
@@ -319,7 +329,10 @@ class ScorecardAnalyticsService:
                 
                 if recent_store_revenues:
                     trend = cls._calculate_trend(recent_store_revenues)
-                    if trend < -0.1:  # Declining more than 10%
+                    # OLD - HARDCODED (WRONG): if trend < -0.1:  # Declining more than 10%
+                    # NEW - CONFIGURABLE (CORRECT):
+                    declining_threshold = config.get_threshold('declining_trend_threshold')
+                    if trend < declining_threshold:
                         insights['opportunities'].append({
                             'type': 'store_improvement',
                             'store': store_name,
@@ -457,3 +470,42 @@ class ScorecardAnalyticsService:
             return 'moderate'
         else:
             return 'low'
+    
+    def _get_config(self):
+        """Get business analytics configuration with safe defaults"""
+        try:
+            config = BusinessAnalyticsConfiguration.query.filter_by(
+                user_id='default_user', 
+                config_name='default'
+            ).first()
+            
+            if config:
+                return config
+                
+            # Create a mock config object with default values if none exists
+            class MockConfig:
+                def __init__(self):
+                    self.ar_aging_low_threshold = 5.0
+                    self.ar_aging_medium_threshold = 15.0
+                    self.revenue_concentration_risk_threshold = 0.4
+                    self.declining_trend_threshold = -0.1
+                
+                def get_threshold(self, threshold_type: str):
+                    return getattr(self, threshold_type, 5.0)
+            
+            return MockConfig()
+                
+        except Exception as e:
+            logging.warning(f"Failed to load business analytics config: {e}. Using defaults.")
+            # Create a mock config object with default values
+            class MockConfig:
+                def __init__(self):
+                    self.ar_aging_low_threshold = 5.0
+                    self.ar_aging_medium_threshold = 15.0
+                    self.revenue_concentration_risk_threshold = 0.4
+                    self.declining_trend_threshold = -0.1
+                
+                def get_threshold(self, threshold_type: str):
+                    return getattr(self, threshold_type, 5.0)
+            
+            return MockConfig()

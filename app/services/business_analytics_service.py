@@ -11,6 +11,7 @@ from sqlalchemy import text, func
 from app import db
 from app.services.logger import get_logger
 from app.models.pos_models import POSCustomer, POSEquipment, POSTransaction, POSTransactionItem
+from app.models.config_models import BusinessAnalyticsConfiguration, get_default_business_analytics_config
 
 logger = get_logger(__name__)
 
@@ -19,6 +20,7 @@ class BusinessAnalyticsService:
     
     def __init__(self):
         self.logger = logger
+        self.config = self._get_config()
         
     def calculate_equipment_utilization_analytics(self) -> Dict:
         """Calculate comprehensive equipment utilization metrics"""
@@ -78,7 +80,10 @@ class BusinessAnalyticsService:
     def _identify_underperformers(self, df: pd.DataFrame) -> Dict:
         """Identify underperforming equipment for potential resale"""
         # Items with zero or very low turnover
-        underperformers = df[df['turnover_ytd'] <= 50]  # Less than $50 YTD
+        # OLD - HARDCODED (WRONG): underperformers = df[df['turnover_ytd'] <= 50]  # Less than $50 YTD
+        # NEW - CONFIGURABLE (CORRECT):
+        underperformer_threshold = self.config.get_threshold('equipment_underperformer_threshold')
+        underperformers = df[df['turnover_ytd'] <= underperformer_threshold]
         
         return {
             "count": len(underperformers),
@@ -124,7 +129,10 @@ class BusinessAnalyticsService:
         # Criteria for resale recommendation
         resale_candidates = df[
             (df['turnover_ytd'] == 0) |  # No turnover this year
-            ((df['turnover_ytd'] < 25) & (df['sell_price'] > 100))  # Low turnover but high value
+            # OLD - HARDCODED (WRONG): ((df['turnover_ytd'] < 25) & (df['sell_price'] > 100))  # Low turnover but high value
+            # NEW - CONFIGURABLE (CORRECT):
+            ((df['turnover_ytd'] < self.config.get_threshold('low_turnover_threshold')) & 
+             (df['sell_price'] > 100))  # Keep $100 threshold for now, will make configurable in next phase
         ]
         
         # Priority scoring: higher sell price + lower turnover = higher priority
@@ -132,7 +140,10 @@ class BusinessAnalyticsService:
             resale_candidates['sell_price'] / (resale_candidates['turnover_ytd'] + 1)
         ).round(2)
         
-        high_priority = resale_candidates[resale_candidates['resale_priority'] > 10].sort_values('resale_priority', ascending=False)
+        # OLD - HARDCODED (WRONG): high_priority = resale_candidates[resale_candidates['resale_priority'] > 10].sort_values('resale_priority', ascending=False)
+        # NEW - CONFIGURABLE (CORRECT):
+        high_priority_threshold = self.config.get_threshold('high_resale_priority_threshold')
+        high_priority = resale_candidates[resale_candidates['resale_priority'] > high_priority_threshold].sort_values('resale_priority', ascending=False)
         
         return {
             "total_candidates": len(resale_candidates),
@@ -158,9 +169,14 @@ class BusinessAnalyticsService:
             "overall_roi_percentage": float((total_ytd_revenue / total_inventory_value * 100) if total_inventory_value > 0 else 0),
             "roi_by_category": roi_by_category.to_dict(),
             "optimization_opportunities": {
-                "underutilized_inventory_value": float(df[df['turnover_ytd'] < 50]['sell_price'].sum()),
+                # OLD - HARDCODED (WRONG): "underutilized_inventory_value": float(df[df['turnover_ytd'] < 50]['sell_price'].sum()),
+                # NEW - CONFIGURABLE (CORRECT):
+                "underutilized_inventory_value": float(df[df['turnover_ytd'] < underperformer_threshold]['sell_price'].sum()),
                 "zero_revenue_items": len(df[df['turnover_ytd'] == 0]),
-                "high_value_low_usage": len(df[(df['sell_price'] > 500) & (df['turnover_ytd'] < 100)])
+                # OLD - HARDCODED (WRONG): "high_value_low_usage": len(df[(df['sell_price'] > 500) & (df['turnover_ytd'] < 100)])
+                # NEW - CONFIGURABLE (CORRECT):
+                "high_value_low_usage": len(df[(df['sell_price'] > self.config.get_threshold('high_value_equipment_threshold')) & 
+                                             (df['turnover_ytd'] < self.config.get_threshold('low_turnover_threshold'))])
             }
         }
     
@@ -225,3 +241,66 @@ class BusinessAnalyticsService:
         except Exception as e:
             logger.error(f"Failed to generate executive metrics: {e}")
             return {"error": str(e)}
+    
+    def _get_config(self):
+        """Get business analytics configuration with safe defaults"""
+        try:
+            config = BusinessAnalyticsConfiguration.query.filter_by(
+                user_id='default_user', 
+                config_name='default'
+            ).first()
+            
+            if config:
+                return config
+                
+            # Create a mock config object with default values if none exists
+            class MockConfig:
+                def __init__(self):
+                    defaults = get_default_business_analytics_config()
+                    self.equipment_underperformer_threshold = defaults['equipment_thresholds']['underperformer_ytd']
+                    self.high_value_threshold = defaults['equipment_thresholds']['high_value']
+                    self.low_turnover_threshold = defaults['equipment_thresholds']['low_turnover']
+                    self.low_usage_threshold = defaults['equipment_thresholds']['low_usage']
+                    self.resale_priority_threshold = defaults['equipment_thresholds']['resale_priority']
+                    self.ar_aging_low_threshold = defaults['financial_risk']['ar_aging_low']
+                    self.ar_aging_medium_threshold = defaults['financial_risk']['ar_aging_medium']
+                    self.revenue_concentration_risk_threshold = defaults['financial_risk']['concentration_risk']
+                    self.declining_trend_threshold = defaults['financial_risk']['declining_trend']
+                
+                def get_threshold(self, threshold_type: str):
+                    """Map threshold type to attribute value"""
+                    threshold_map = {
+                        'equipment_underperformer_threshold': self.equipment_underperformer_threshold,
+                        'high_value_threshold': self.high_value_threshold,
+                        'low_turnover_threshold': self.low_turnover_threshold,
+                        'low_usage_threshold': self.low_usage_threshold,
+                        'resale_priority_threshold': self.resale_priority_threshold,
+                        'ar_aging_low_threshold': self.ar_aging_low_threshold,
+                        'ar_aging_medium_threshold': self.ar_aging_medium_threshold,
+                        'revenue_concentration_risk_threshold': self.revenue_concentration_risk_threshold,
+                        'declining_trend_threshold': self.declining_trend_threshold,
+                        'high_resale_priority_threshold': self.resale_priority_threshold
+                    }
+                    return threshold_map.get(threshold_type, 50.0)
+            
+            return MockConfig()
+                
+        except Exception as e:
+            logger.warning(f"Failed to load business analytics config: {e}. Using defaults.")
+            # Create a mock config object with default values
+            class MockConfig:
+                def __init__(self):
+                    self.equipment_underperformer_threshold = 50.0
+                    self.high_value_threshold = 500.0
+                    self.low_turnover_threshold = 25.0
+                    self.low_usage_threshold = 100.0
+                    self.resale_priority_threshold = 10.0
+                    self.ar_aging_low_threshold = 5.0
+                    self.ar_aging_medium_threshold = 15.0
+                    self.revenue_concentration_risk_threshold = 0.4
+                    self.declining_trend_threshold = -0.1
+                
+                def get_threshold(self, threshold_type: str):
+                    return getattr(self, threshold_type, 50.0)
+            
+            return MockConfig()

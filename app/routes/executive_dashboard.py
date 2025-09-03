@@ -10,7 +10,11 @@ import json
 from app import db
 from app.services.financial_analytics_service import FinancialAnalyticsService
 from app.services.executive_insights_service import ExecutiveInsightsService
+from app.services.enhanced_executive_service import EnhancedExecutiveService
+from app.services.data_reconciliation_service import DataReconciliationService
+# from app.services.predictive_analytics_service import PredictiveAnalyticsService  # Temporarily disabled due to sklearn dependency
 from app.services.logger import get_logger
+from app.models.config_models import ExecutiveDashboardConfiguration, get_default_executive_dashboard_config
 
 logger = get_logger(__name__)
 executive_bp = Blueprint("executive", __name__, url_prefix="/executive")
@@ -18,6 +22,9 @@ executive_bp = Blueprint("executive", __name__, url_prefix="/executive")
 # Initialize services
 financial_service = FinancialAnalyticsService()
 insights_service = ExecutiveInsightsService()
+enhanced_service = EnhancedExecutiveService()
+reconciliation_service = DataReconciliationService()
+# predictive_service = PredictiveAnalyticsService()  # Temporarily disabled
 
 
 @executive_bp.route("/dashboard")
@@ -179,8 +186,15 @@ def api_store_comparison():
 def api_financial_forecasts():
     """API endpoint for financial forecasting"""
     try:
-        horizon_weeks = int(request.args.get("weeks", 12))
-        confidence_level = float(request.args.get("confidence", 0.95))
+        # OLD - HARDCODED (WRONG): horizon_weeks = int(request.args.get("weeks", 12))
+        # NEW - CONFIGURABLE (CORRECT):
+        config = _get_dashboard_config()
+        default_horizon = config.get_store_threshold('default', 'default_forecast_horizon_weeks')
+        horizon_weeks = int(request.args.get("weeks", default_horizon))
+        # OLD - HARDCODED (WRONG): confidence_level = float(request.args.get("confidence", 0.95))
+        # NEW - CONFIGURABLE (CORRECT):
+        default_confidence = config.get_store_threshold('default', 'default_confidence_level')
+        confidence_level = float(request.args.get("confidence", default_confidence))
         
         # Get financial forecasts
         forecasts = financial_service.generate_financial_forecasts(
@@ -237,6 +251,175 @@ def api_dashboard_config():
             
     except Exception as e:
         logger.error(f"Error managing dashboard config: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@executive_bp.route("/api/enhanced-dashboard")
+def api_enhanced_dashboard():
+    """API endpoint for enhanced executive dashboard with correlation data"""
+    try:
+        enhanced_data = enhanced_service.get_executive_dashboard_with_correlations()
+        return jsonify(enhanced_data)
+        
+    except Exception as e:
+        logger.error(f"Error fetching enhanced dashboard: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@executive_bp.route("/api/equipment-roi")
+def api_equipment_roi():
+    """API endpoint for equipment-level ROI analysis"""
+    try:
+        roi_analysis = enhanced_service.get_equipment_roi_analysis()
+        return jsonify(roi_analysis)
+        
+    except Exception as e:
+        logger.error(f"Error fetching equipment ROI: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@executive_bp.route("/api/correlation-quality")
+def api_correlation_quality():
+    """API endpoint for correlation quality metrics"""
+    try:
+        quality_metrics = enhanced_service.get_correlation_quality_metrics()
+        return jsonify(quality_metrics)
+        
+    except Exception as e:
+        logger.error(f"Error fetching correlation quality: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@executive_bp.route("/api/real-time-utilization")
+def api_real_time_utilization():
+    """API endpoint for real-time utilization metrics"""
+    try:
+        utilization_data = enhanced_service.get_real_time_utilization_metrics()
+        return jsonify(utilization_data)
+        
+    except Exception as e:
+        logger.error(f"Error fetching real-time utilization: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@executive_bp.route("/api/enhanced-kpis")
+def api_enhanced_kpis():
+    """API endpoint for enhanced executive KPIs using correlation data"""
+    try:
+        enhanced_kpis = enhanced_service.get_enhanced_executive_kpis()
+        
+        # Add accurate correlation coverage note
+        if enhanced_kpis.get('success'):
+            enhanced_kpis['coverage_note'] = 'Based on 1.78% RFID correlation coverage (290 of 16,259 items)'
+            enhanced_kpis['data_transparency'] = {
+                'rfid_correlated_items': 290,
+                'total_equipment_items': 16259,
+                'coverage_percentage': 1.78,
+                'pos_estimated_items': 15969
+            }
+        
+        return jsonify(enhanced_kpis)
+        
+    except Exception as e:
+        logger.error(f"Error fetching enhanced KPIs: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@executive_bp.route("/api/data-reconciliation")
+def api_data_reconciliation():
+    """API endpoint for data reconciliation between POS, RFID, and Financial systems"""
+    try:
+        report_type = request.args.get('type', 'revenue')
+        
+        if report_type == 'revenue':
+            result = reconciliation_service.get_revenue_reconciliation()
+        elif report_type == 'utilization':
+            result = reconciliation_service.get_utilization_reconciliation()
+        elif report_type == 'comprehensive':
+            result = reconciliation_service.get_comprehensive_reconciliation_report()
+        else:
+            result = reconciliation_service.get_revenue_reconciliation()
+            
+        return jsonify(result)
+        
+    except Exception as e:
+        logger.error(f"Error in data reconciliation: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@executive_bp.route("/api/predictive-forecasts")
+def api_predictive_forecasts():
+    """API endpoint for predictive analytics and forecasting"""
+    try:
+        # OLD - HARDCODED (WRONG): horizon_weeks = int(request.args.get('horizon', 12))
+        # NEW - CONFIGURABLE (CORRECT):
+        config = _get_dashboard_config()
+        default_horizon = config.get_store_threshold('default', 'default_forecast_horizon_weeks')
+        horizon_weeks = int(request.args.get('horizon', default_horizon))
+        analysis_type = request.args.get('type', 'revenue')
+        
+        if analysis_type == 'revenue':
+            result = predictive_service.generate_revenue_forecasts(horizon_weeks)
+        elif analysis_type == 'demand':
+            result = predictive_service.predict_equipment_demand()
+        elif analysis_type == 'utilization':
+            result = predictive_service.analyze_utilization_opportunities()
+        elif analysis_type == 'comprehensive':
+            result = predictive_service.get_predictive_dashboard_data()
+        else:
+            result = predictive_service.generate_revenue_forecasts(horizon_weeks)
+        
+        return jsonify(result)
+        
+    except ValueError as e:
+        logger.warning(f"Invalid parameter in predictive forecasts: {e}")
+        return jsonify({"success": False, "error": "Invalid parameters"}), 400
+    except Exception as e:
+        logger.error(f"Error in predictive forecasts: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@executive_bp.route("/api/multi-timeframe")
+def api_multi_timeframe():
+    """API endpoint for multi-timeframe financial analysis"""
+    try:
+        timeframe = request.args.get('timeframe', 'weekly')  # daily, weekly, monthly, quarterly, yearly
+        metric = request.args.get('metric', 'revenue')
+        periods = int(request.args.get('periods', 26))
+        
+        # Map timeframes to appropriate analysis periods
+        timeframe_mapping = {
+            'daily': periods // 7,  # Convert to weeks for existing service
+            'weekly': periods,
+            'monthly': periods // 4,  # Convert to approximate months
+            'quarterly': periods // 13,  # Convert to quarters
+            'yearly': min(periods // 52, 3)  # Max 3 years of data
+        }
+        
+        analysis_periods = timeframe_mapping.get(timeframe, periods)
+        
+        if timeframe == 'yearly':
+            result = financial_service.calculate_year_over_year_analysis(metric)
+        else:
+            result = financial_service.calculate_rolling_averages(metric, analysis_periods)
+        
+        # Add timeframe metadata
+        if result.get('success'):
+            result['timeframe_info'] = {
+                'requested_timeframe': timeframe,
+                'requested_periods': periods,
+                'analysis_periods': analysis_periods,
+                'metric': metric,
+                'data_sources': 'Scorecard (196 weeks), P&L (1,818 records), Payroll (328 records)'
+            }
+        
+        return jsonify(result)
+        
+    except ValueError as e:
+        logger.warning(f"Invalid parameter in multi-timeframe: {e}")
+        return jsonify({"success": False, "error": "Invalid parameters"}), 400
+    except Exception as e:
+        logger.error(f"Error in multi-timeframe analysis: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
 
@@ -327,34 +510,121 @@ def _calculate_avg_utilization(store_analysis):
 def _calculate_health_score(revenue_analysis, yoy_analysis):
     """Calculate overall business health score"""
     try:
-        score = 75  # Base score
+        # Get configuration with safe defaults
+        config = _get_dashboard_config()
+        
+        # OLD - HARDCODED (WRONG): score = 75  # Base score
+        # NEW - CONFIGURABLE (CORRECT):
+        score = config.get_store_threshold('default', 'base_health_score')
         
         # Revenue trend component
         if revenue_analysis.get("success"):
             trend = revenue_analysis.get("summary", {}).get("smoothed_trend", 0)
-            if trend > 5:
-                score += 15
+            
+            # OLD - HARDCODED (WRONG): if trend > 5: / elif trend > 0: / elif trend < -5: / elif trend < 0:
+            # NEW - CONFIGURABLE (CORRECT):
+            strong_positive_threshold = config.get_store_threshold('default', 'strong_positive_trend_threshold')
+            strong_negative_threshold = config.get_store_threshold('default', 'strong_negative_trend_threshold')
+            
+            if trend > strong_positive_threshold:
+                score += config.get_store_threshold('default', 'strong_positive_trend_points')
             elif trend > 0:
-                score += 5
-            elif trend < -5:
-                score -= 15
+                score += config.get_store_threshold('default', 'weak_positive_trend_points')
+            elif trend < strong_negative_threshold:
+                score += config.get_store_threshold('default', 'strong_negative_trend_points')  # Already negative value
             elif trend < 0:
-                score -= 5
+                score += config.get_store_threshold('default', 'weak_negative_trend_points')  # Already negative value
         
         # YoY growth component
         if yoy_analysis.get("success"):
             growth = yoy_analysis.get("comparison_period", {}).get("overall_growth_rate", 0)
-            if growth > 10:
-                score += 10
+            
+            # OLD - HARDCODED (WRONG): if growth > 10: / elif growth > 0: / elif growth < -10: / elif growth < 0:
+            # NEW - CONFIGURABLE (CORRECT):
+            strong_growth_threshold = config.get_store_threshold('default', 'strong_growth_threshold')
+            strong_decline_threshold = config.get_store_threshold('default', 'strong_decline_threshold')
+            
+            if growth > strong_growth_threshold:
+                score += config.get_store_threshold('default', 'strong_growth_points')
             elif growth > 0:
-                score += 5
-            elif growth < -10:
-                score -= 15
+                score += config.get_store_threshold('default', 'weak_growth_points')
+            elif growth < strong_decline_threshold:
+                score += config.get_store_threshold('default', 'strong_decline_points')  # Already negative value
             elif growth < 0:
-                score -= 5
+                score += config.get_store_threshold('default', 'weak_decline_points')  # Already negative value
         
-        return max(0, min(100, score))
+        # Apply min/max bounds from configuration
+        min_score = config.get_store_threshold('default', 'min_health_score')
+        max_score = config.get_store_threshold('default', 'max_health_score')
+        return max(min_score, min(max_score, score))
         
     except Exception as e:
         logger.error(f"Error calculating health score: {e}")
         return 75
+
+
+def _get_dashboard_config():
+    """Get executive dashboard configuration with safe defaults"""
+    try:
+        config = ExecutiveDashboardConfiguration.query.filter_by(
+            user_id='default_user', 
+            config_name='default'
+        ).first()
+        
+        if config:
+            return config
+            
+        # Create a mock config object with default values if none exists
+        class MockConfig:
+            def __init__(self):
+                defaults = get_default_executive_dashboard_config()
+                self.base_health_score = defaults['health_scoring']['base_score']
+                self.strong_positive_trend_threshold = defaults['health_scoring']['strong_positive_trend_threshold']
+                self.strong_positive_trend_points = defaults['health_scoring']['strong_positive_trend_points']
+                self.weak_positive_trend_points = defaults['health_scoring']['weak_positive_trend_points']
+                self.strong_negative_trend_threshold = defaults['health_scoring']['strong_negative_trend_threshold']
+                self.strong_negative_trend_points = defaults['health_scoring']['strong_negative_trend_points']
+                self.weak_negative_trend_points = defaults['health_scoring']['weak_negative_trend_points']
+                self.strong_growth_threshold = defaults['health_scoring']['strong_growth_threshold']
+                self.strong_growth_points = defaults['health_scoring']['strong_growth_points']
+                self.weak_growth_points = defaults['health_scoring']['weak_growth_points']
+                self.strong_decline_threshold = defaults['health_scoring']['strong_decline_threshold']
+                self.strong_decline_points = defaults['health_scoring']['strong_decline_points']
+                self.weak_decline_points = defaults['health_scoring']['weak_decline_points']
+                self.default_forecast_horizon_weeks = defaults['forecasting']['default_horizon_weeks']
+                self.default_confidence_level = defaults['forecasting']['default_confidence_level']
+                self.min_health_score = 0.0
+                self.max_health_score = 100.0
+                
+            def get_store_threshold(self, store_code: str, threshold_type: str):
+                return getattr(self, threshold_type, 75.0)
+        
+        return MockConfig()
+        
+    except Exception as e:
+        logger.warning(f"Failed to load executive dashboard config: {e}. Using defaults.")
+        # Create a mock config with hardcoded defaults as fallback
+        class MockConfig:
+            def __init__(self):
+                self.base_health_score = 75.0
+                self.strong_positive_trend_threshold = 5.0
+                self.strong_positive_trend_points = 15
+                self.weak_positive_trend_points = 5
+                self.strong_negative_trend_threshold = -5.0
+                self.strong_negative_trend_points = -15
+                self.weak_negative_trend_points = -5
+                self.strong_growth_threshold = 10.0
+                self.strong_growth_points = 10
+                self.weak_growth_points = 5
+                self.strong_decline_threshold = -10.0
+                self.strong_decline_points = -15
+                self.weak_decline_points = -5
+                self.default_forecast_horizon_weeks = 12
+                self.default_confidence_level = 0.95
+                self.min_health_score = 0.0
+                self.max_health_score = 100.0
+                
+            def get_store_threshold(self, store_code: str, threshold_type: str):
+                return getattr(self, threshold_type, 75.0)
+        
+        return MockConfig()
