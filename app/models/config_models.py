@@ -357,3 +357,352 @@ def get_default_correlation_settings():
             'weather': False
         }
     }
+
+
+class LaborCostConfiguration(db.Model):
+    """Labor cost analysis configuration with store-specific thresholds"""
+    __tablename__ = 'labor_cost_configuration'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.String(50), nullable=False, default='default_user')
+    config_name = db.Column(db.String(100), nullable=False, default='default')
+    
+    # Global labor cost thresholds (defaults for all stores)
+    high_labor_cost_threshold = db.Column(db.Float, default=35.0)  # 35% - stores flagged as high cost
+    labor_cost_warning_level = db.Column(db.Float, default=30.0)   # 30% - warning before high threshold  
+    target_labor_cost_ratio = db.Column(db.Float, default=25.0)    # 25% - target labor cost percentage
+    efficiency_baseline = db.Column(db.Float, default=100.0)       # 100 - efficiency calculation baseline
+    
+    # Store-specific threshold overrides (JSON format)
+    # Example: {"3607": {"high_threshold": 40.0, "target": 30.0}, "6800": {"high_threshold": 32.0}}
+    store_specific_thresholds = db.Column(db.JSON, default={})
+    
+    # Performance analysis settings
+    minimum_hours_for_analysis = db.Column(db.Float, default=1.0)  # Minimum hours to include in analysis
+    labor_efficiency_weight = db.Column(db.Float, default=0.6)     # Weight for efficiency vs cost in scoring
+    cost_control_weight = db.Column(db.Float, default=0.4)         # Weight for cost control in scoring
+    
+    # Processing and performance settings
+    batch_processing_size = db.Column(db.Integer, default=100)     # Batch size (max 200 per user requirement)
+    progress_checkpoint_interval = db.Column(db.Integer, default=500)  # Progress reporting interval
+    query_timeout_seconds = db.Column(db.Integer, default=30)      # Query timeout
+    
+    # Alert and notification settings
+    enable_high_cost_alerts = db.Column(db.Boolean, default=True)
+    enable_trend_alerts = db.Column(db.Boolean, default=True)
+    alert_frequency = db.Column(db.String(20), default='weekly')   # daily, weekly, monthly
+    
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    __table_args__ = (
+        db.UniqueConstraint('user_id', 'config_name'),
+    )
+    
+    def get_store_threshold(self, store_code: str, threshold_type: str = 'high_threshold'):
+        """
+        Get store-specific threshold or fall back to global default.
+        
+        Args:
+            store_code: Store code to get threshold for
+            threshold_type: 'high_threshold', 'warning_level', or 'target'
+            
+        Returns:
+            Threshold value for the store
+        """
+        store_overrides = self.store_specific_thresholds or {}
+        
+        if store_code in store_overrides:
+            store_config = store_overrides[store_code]
+            if threshold_type == 'high_threshold' and 'high_threshold' in store_config:
+                return store_config['high_threshold']
+            elif threshold_type == 'warning_level' and 'warning_level' in store_config:
+                return store_config['warning_level'] 
+            elif threshold_type == 'target' and 'target' in store_config:
+                return store_config['target']
+        
+        # Fall back to global defaults
+        if threshold_type == 'high_threshold':
+            return self.high_labor_cost_threshold
+        elif threshold_type == 'warning_level':
+            return self.labor_cost_warning_level
+        elif threshold_type == 'target':
+            return self.target_labor_cost_ratio
+        else:
+            return self.high_labor_cost_threshold
+    
+    def get_safe_batch_size(self):
+        """Get batch size capped at maximum of 200 per user requirement."""
+        return min(self.batch_processing_size or 100, 200)
+
+
+def get_default_labor_cost_config():
+    """Get default labor cost configuration settings"""
+    return {
+        'global_thresholds': {
+            'high_cost_threshold': 35.0,      # 35% - flag as high cost
+            'warning_level': 30.0,            # 30% - warning level
+            'target_ratio': 25.0,             # 25% - target labor cost
+            'efficiency_baseline': 100.0      # 100 - baseline for efficiency calc
+        },
+        'store_specific': {
+            # Example store-specific overrides (empty by default)
+            # '3607': {'high_threshold': 40.0, 'target': 30.0},  # Wayzata - higher threshold
+            # '6800': {'high_threshold': 32.0, 'target': 24.0}   # Brooklyn Park - lower threshold  
+        },
+        'analysis_settings': {
+            'minimum_hours': 1.0,             # Minimum hours for analysis
+            'efficiency_weight': 0.6,         # 60% efficiency, 40% cost control
+            'cost_weight': 0.4
+        },
+        'performance_settings': {
+            'batch_size': 100,                # Max 200 per user requirement
+            'checkpoint_interval': 500,
+            'query_timeout': 30
+        },
+        'alerts': {
+            'high_cost_enabled': True,
+            'trend_alerts_enabled': True, 
+            'frequency': 'weekly'
+        }
+    }
+
+
+class BusinessAnalyticsConfiguration(db.Model):
+    """Business analytics thresholds and performance evaluation configuration"""
+    __tablename__ = 'business_analytics_configuration'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.String(50), nullable=False, default='default_user')
+    config_name = db.Column(db.String(100), nullable=False, default='default')
+    
+    # Equipment Performance Thresholds
+    equipment_underperformer_threshold = db.Column(db.Float, default=50.0)      # $50 YTD turnover threshold
+    low_turnover_threshold = db.Column(db.Float, default=25.0)                  # $25 low turnover threshold
+    high_value_threshold = db.Column(db.Float, default=500.0)                   # $500 high value threshold
+    low_usage_threshold = db.Column(db.Float, default=100.0)                    # $100 low usage threshold
+    resale_priority_threshold = db.Column(db.Float, default=10.0)               # >10 high priority resale
+    
+    # AR Aging Thresholds (percentages)
+    ar_aging_low_threshold = db.Column(db.Float, default=5.0)                   # <5% considered low AR aging
+    ar_aging_medium_threshold = db.Column(db.Float, default=15.0)               # <15% considered medium AR aging
+    # >15% is automatically high AR aging
+    
+    # Revenue Risk Analysis
+    revenue_concentration_risk_threshold = db.Column(db.Float, default=0.4)     # 40% concentration risk threshold
+    declining_trend_threshold = db.Column(db.Float, default=-0.1)               # -10% declining trend threshold
+    
+    # Data Quality and Analysis Requirements
+    minimum_data_points_correlation = db.Column(db.Integer, default=10)         # Minimum data points for valid analysis
+    confidence_threshold = db.Column(db.Float, default=0.95)                    # Statistical confidence level
+    
+    # Store-specific business analytics overrides (JSON format)
+    # Example: {"3607": {"underperformer_threshold": 75.0}, "6800": {"high_value_threshold": 750.0}}
+    store_specific_thresholds = db.Column(db.JSON, default={})
+    
+    # Alert and reporting settings
+    enable_underperformance_alerts = db.Column(db.Boolean, default=True)
+    enable_high_value_alerts = db.Column(db.Boolean, default=True)
+    enable_ar_aging_alerts = db.Column(db.Boolean, default=True)
+    enable_concentration_risk_alerts = db.Column(db.Boolean, default=True)
+    alert_frequency = db.Column(db.String(20), default='weekly')               # daily, weekly, monthly
+    
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    __table_args__ = (
+        db.UniqueConstraint('user_id', 'config_name'),
+    )
+    
+    def get_store_threshold(self, store_code: str, threshold_type: str):
+        """
+        Get store-specific business analytics threshold or fall back to global default.
+        
+        Args:
+            store_code: Store code to get threshold for
+            threshold_type: Type of threshold (e.g., 'underperformer_threshold', 'high_value_threshold')
+            
+        Returns:
+            Threshold value for the store
+        """
+        store_overrides = self.store_specific_thresholds or {}
+        
+        if store_code in store_overrides and threshold_type in store_overrides[store_code]:
+            return store_overrides[store_code][threshold_type]
+        
+        # Fall back to global defaults
+        threshold_map = {
+            'underperformer_threshold': self.equipment_underperformer_threshold,
+            'low_turnover_threshold': self.low_turnover_threshold,
+            'high_value_threshold': self.high_value_threshold,
+            'low_usage_threshold': self.low_usage_threshold,
+            'resale_priority_threshold': self.resale_priority_threshold,
+            'ar_low_threshold': self.ar_aging_low_threshold,
+            'ar_medium_threshold': self.ar_aging_medium_threshold,
+            'concentration_risk_threshold': self.revenue_concentration_risk_threshold,
+            'declining_trend_threshold': self.declining_trend_threshold
+        }
+        
+        return threshold_map.get(threshold_type, 50.0)  # Safe fallback
+
+
+def get_default_business_analytics_config():
+    """Get default business analytics configuration settings"""
+    return {
+        'equipment_thresholds': {
+            'underperformer_ytd': 50.0,           # $50 YTD turnover threshold
+            'low_turnover': 25.0,                 # $25 low turnover threshold
+            'high_value': 500.0,                  # $500 high value threshold
+            'low_usage': 100.0,                   # $100 low usage threshold
+            'resale_priority': 10.0               # >10 high priority for resale
+        },
+        'financial_risk': {
+            'ar_aging_low': 5.0,                  # <5% low AR aging
+            'ar_aging_medium': 15.0,              # <15% medium AR aging (>15% is high)
+            'concentration_risk': 0.4,            # 40% revenue concentration risk
+            'declining_trend': -0.1               # -10% declining trend threshold
+        },
+        'analysis_quality': {
+            'min_data_points': 10,                # Minimum data points for correlations
+            'confidence_level': 0.95              # Statistical confidence threshold
+        },
+        'store_specific': {
+            # Example store-specific overrides (empty by default)
+            # '3607': {'underperformer_threshold': 75.0},    # Wayzata - higher threshold
+            # '6800': {'high_value_threshold': 750.0}        # Brooklyn Park - higher value threshold
+        },
+        'alerts': {
+            'underperformance_enabled': True,
+            'high_value_enabled': True,
+            'ar_aging_enabled': True,
+            'concentration_risk_enabled': True,
+            'frequency': 'weekly'
+        }
+    }
+
+
+class ExecutiveDashboardConfiguration(db.Model):
+    """Executive dashboard health scoring and display configuration"""
+    __tablename__ = 'executive_dashboard_configuration'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.String(50), nullable=False, default='default_user')
+    config_name = db.Column(db.String(100), nullable=False, default='default')
+    
+    # Health Score Base Parameters
+    base_health_score = db.Column(db.Float, default=75.0)                       # Starting health score (0-100)
+    min_health_score = db.Column(db.Float, default=0.0)                         # Minimum possible score
+    max_health_score = db.Column(db.Float, default=100.0)                       # Maximum possible score
+    
+    # Revenue Trend Scoring Thresholds
+    strong_positive_trend_threshold = db.Column(db.Float, default=5.0)          # >5% strong upward trend
+    strong_positive_trend_points = db.Column(db.Integer, default=15)            # +15 points bonus
+    weak_positive_trend_points = db.Column(db.Integer, default=5)               # +5 points bonus (0 < trend < 5)
+    strong_negative_trend_threshold = db.Column(db.Float, default=-5.0)         # <-5% strong downward trend  
+    strong_negative_trend_points = db.Column(db.Integer, default=-15)           # -15 points penalty
+    weak_negative_trend_points = db.Column(db.Integer, default=-5)              # -5 points penalty (-5 < trend < 0)
+    
+    # Growth Rate Scoring Thresholds  
+    strong_growth_threshold = db.Column(db.Float, default=10.0)                 # >10% strong growth
+    strong_growth_points = db.Column(db.Integer, default=10)                    # +10 points bonus
+    weak_growth_points = db.Column(db.Integer, default=5)                       # +5 points bonus (0 < growth < 10)
+    strong_decline_threshold = db.Column(db.Float, default=-10.0)               # <-10% strong decline
+    strong_decline_points = db.Column(db.Integer, default=-15)                  # -15 points penalty
+    weak_decline_points = db.Column(db.Integer, default=-5)                     # -5 points penalty (-10 < growth < 0)
+    
+    # Forecasting Default Parameters
+    default_forecast_horizon_weeks = db.Column(db.Integer, default=12)          # Default 12-week forecast
+    default_confidence_level = db.Column(db.Float, default=0.95)                # Default 95% confidence
+    min_forecast_horizon = db.Column(db.Integer, default=1)                     # Minimum 1 week
+    max_forecast_horizon = db.Column(db.Integer, default=52)                    # Maximum 52 weeks
+    
+    # Store-specific dashboard overrides (JSON format)
+    # Example: {"3607": {"base_health_score": 80.0}, "6800": {"strong_growth_threshold": 8.0}}
+    store_specific_thresholds = db.Column(db.JSON, default={})
+    
+    # Display and Alert Settings
+    enable_health_score_alerts = db.Column(db.Boolean, default=True)
+    enable_trend_alerts = db.Column(db.Boolean, default=True) 
+    enable_growth_alerts = db.Column(db.Boolean, default=True)
+    alert_frequency = db.Column(db.String(20), default='weekly')                # daily, weekly, monthly
+    
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    __table_args__ = (
+        db.UniqueConstraint('user_id', 'config_name'),
+    )
+    
+    def get_store_threshold(self, store_code: str, threshold_type: str):
+        """
+        Get store-specific executive dashboard threshold or fall back to global default.
+        
+        Args:
+            store_code (str): Store identifier (e.g., '3607', '6800')
+            threshold_type (str): Type of threshold to retrieve
+            
+        Returns:
+            float: Configured threshold value for the store or global default
+        """
+        # Check for store-specific override
+        if self.store_specific_thresholds and store_code in self.store_specific_thresholds:
+            store_config = self.store_specific_thresholds[store_code]
+            if threshold_type in store_config:
+                return store_config[threshold_type]
+        
+        # Fall back to global configuration
+        threshold_map = {
+            'base_health_score': self.base_health_score,
+            'strong_positive_trend_threshold': self.strong_positive_trend_threshold,
+            'strong_positive_trend_points': self.strong_positive_trend_points,
+            'weak_positive_trend_points': self.weak_positive_trend_points,
+            'strong_negative_trend_threshold': self.strong_negative_trend_threshold,
+            'strong_negative_trend_points': self.strong_negative_trend_points,
+            'weak_negative_trend_points': self.weak_negative_trend_points,
+            'strong_growth_threshold': self.strong_growth_threshold,
+            'strong_growth_points': self.strong_growth_points,
+            'weak_growth_points': self.weak_growth_points,
+            'strong_decline_threshold': self.strong_decline_threshold,
+            'strong_decline_points': self.strong_decline_points,
+            'weak_decline_points': self.weak_decline_points,
+            'default_forecast_horizon_weeks': self.default_forecast_horizon_weeks,
+            'default_confidence_level': self.default_confidence_level
+        }
+        
+        return threshold_map.get(threshold_type, 75.0)  # Safe fallback to base health score
+
+
+def get_default_executive_dashboard_config():
+    """Get default executive dashboard configuration settings"""
+    return {
+        'health_scoring': {
+            'base_score': 75.0,                          # Starting health score
+            'strong_positive_trend_threshold': 5.0,      # >5% strong upward trend
+            'strong_positive_trend_points': 15,          # +15 points bonus
+            'weak_positive_trend_points': 5,             # +5 points bonus
+            'strong_negative_trend_threshold': -5.0,     # <-5% strong downward trend
+            'strong_negative_trend_points': -15,         # -15 points penalty
+            'weak_negative_trend_points': -5,            # -5 points penalty
+            'strong_growth_threshold': 10.0,             # >10% strong growth
+            'strong_growth_points': 10,                  # +10 points bonus
+            'weak_growth_points': 5,                     # +5 points bonus
+            'strong_decline_threshold': -10.0,           # <-10% strong decline
+            'strong_decline_points': -15,                # -15 points penalty
+            'weak_decline_points': -5                    # -5 points penalty
+        },
+        'forecasting': {
+            'default_horizon_weeks': 12,                 # Default 12-week forecast
+            'default_confidence_level': 0.95,            # Default 95% confidence
+            'min_horizon': 1,                            # Minimum 1 week
+            'max_horizon': 52                            # Maximum 52 weeks
+        },
+        'alerts': {
+            'enable_health_alerts': True,
+            'enable_trend_alerts': True,
+            'enable_growth_alerts': True,
+            'frequency': 'weekly'
+        }
+    }
