@@ -601,11 +601,15 @@ class QRScanner {
             this.video.srcObject = null;
         }
         
-        // Update UI
-        this.elements.toggleBtn.innerHTML = '<i class="fas fa-camera"></i> Start Scanner';
-        this.elements.toggleBtn.classList.remove('btn-outline-danger');
-        this.elements.toggleBtn.classList.add('btn-outline-primary');
-        this.elements.scannerContainer.style.display = 'none';
+        // Update UI - with null check
+        if (this.elements.toggleBtn) {
+            this.elements.toggleBtn.innerHTML = '<i class="fas fa-camera"></i> Start Scanner';
+            this.elements.toggleBtn.classList.remove('btn-outline-danger');
+            this.elements.toggleBtn.classList.add('btn-outline-primary');
+        }
+        if (this.elements.scannerContainer) {
+            this.elements.scannerContainer.style.display = 'none';
+        }
         
         this.updateStatus('Scanner stopped');
         this.hideError();

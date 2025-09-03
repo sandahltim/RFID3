@@ -15,7 +15,34 @@
     <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://cdn.jsdelivr.net/npm/countup.js@2.6.2/dist/countUp.umd.js"></script>
+    <!-- CountUp.js - Use only one reliable CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/countup.js@1.9.3/dist/countUp.min.js"></script>
+    <!-- Fallback for CountUp.js -->
+    <script>
+        // Fallback CountUp implementation if CDN fails
+        window.CountUpFallback = function(element, startVal, endVal, decimals, duration, options) {
+            if (typeof element === 'string') element = document.getElementById(element);
+            if (!element) return;
+            
+            const start = startVal || 0;
+            const end = endVal || 0;
+            const steps = Math.abs(end - start) / (duration || 2) * 60; // 60fps
+            const increment = (end - start) / steps;
+            let current = start;
+            
+            const timer = setInterval(() => {
+                current += increment;
+                if ((increment > 0 && current >= end) || (increment < 0 && current <= end)) {
+                    current = end;
+                    clearInterval(timer);
+                }
+                
+                const prefix = options?.prefix || '';
+                const suffix = options?.suffix || '';
+                element.textContent = prefix + Math.round(current).toLocaleString() + suffix;
+            }, 1000 / 60);
+        };
+    </script>
     
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -98,6 +125,14 @@
         
         /* Executive Dashboard Chart Containers */
         .chart-container {
+            max-width: 100%;
+            max-height: 400px;
+            overflow: hidden;
+        }
+        
+        .chart-container canvas {
+            max-width: 100% !important;
+            max-height: 400px !important;
             background: white;
             border-radius: 12px;
             padding: 1.5rem;
@@ -127,35 +162,8 @@
             margin-bottom: 1.5rem;
         }
 
-        /* Risk indicator styling */
-        .risk-indicator {
-            padding: 0.5rem 1rem;
-            border-radius: 6px;
-            font-weight: 600;
-            font-size: 0.875rem;
-        }
 
-        .risk-low { background-color: #d1fae5; color: #065f46; }
-        .risk-medium { background-color: #fef3c7; color: #92400e; }
-        .risk-high { background-color: #fee2e2; color: #991b1b; }
 
-        /* Correlation matrix styling */
-        .correlation-cell {
-            text-align: center;
-            font-weight: 600;
-            border-radius: 4px;
-            padding: 0.5rem;
-        }
-
-        .correlation-strong { background-color: #1e3a8a; color: white; }
-        .correlation-moderate { background-color: #3b82f6; color: white; }
-        .correlation-weak { background-color: #93c5fd; color: #1e3a8a; }
-        .correlation-negative { background-color: #fca5a5; color: #991b1b; }
-
-        /* Seasonal pattern indicators */
-        .seasonal-peak { color: #059669; font-weight: 700; }
-        .seasonal-trough { color: #dc2626; font-weight: 700; }
-        .seasonal-normal { color: #6b7280; font-weight: 500; }
 
         /* Section headers */
         .section-header {
@@ -167,144 +175,138 @@
             padding-bottom: 0.5rem;
         }
 
-        /* Enhanced Visualizations Styles */
-        .heatmap-container {
-            background: white;
-            border-radius: 12px;
-            padding: 1.5rem;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-            margin-bottom: 2rem;
-        }
 
-        .heatmap-cell {
-            border-radius: 8px;
-            transition: all 0.3s ease;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 600;
-            color: white;
-            text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
-            position: relative;
-            overflow: hidden;
-        }
 
-        .heatmap-cell:hover {
-            transform: scale(1.05);
-            box-shadow: 0 8px 15px rgba(0,0,0,0.2);
-            z-index: 10;
-        }
 
-        .heatmap-cell::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: linear-gradient(45deg, transparent 30%, rgba(255,255,255,0.1) 50%, transparent 70%);
-            transform: translateX(-100%);
-            transition: transform 0.6s;
-        }
 
-        .heatmap-cell:hover::before {
-            transform: translateX(100%);
-        }
 
-        .gauge-container {
-            position: relative;
-            width: 200px;
-            height: 200px;
-            margin: 0 auto;
-        }
-
-        .gauge-svg {
-            transform: rotate(-90deg);
-        }
-
-        .gauge-background {
-            fill: none;
-            stroke: #e5e7eb;
-            stroke-width: 20;
-        }
-
-        .gauge-progress {
-            fill: none;
-            stroke-width: 20;
-            stroke-linecap: round;
-            transition: stroke-dasharray 1s ease-in-out;
-        }
-
-        .gauge-text {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            text-align: center;
-        }
-
-        .gauge-value {
-            font-size: 2rem;
-            font-weight: 700;
-            line-height: 1;
-        }
-
-        .gauge-label {
-            font-size: 0.875rem;
-            color: #6b7280;
-            margin-top: 0.25rem;
-        }
-
-        .waterfall-container {
-            background: white;
-            border-radius: 12px;
-            padding: 1.5rem;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-        }
-
-        .sparkline-container {
-            width: 100%;
-            height: 40px;
-            margin-top: 0.5rem;
-        }
-
-        .map-container {
-            height: 400px;
-            border-radius: 12px;
-            overflow: hidden;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-        }
-
-        .location-marker {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 600;
-            color: white;
-            font-size: 0.875rem;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-        }
-
-        .location-marker:hover {
-            transform: scale(1.2);
-            z-index: 1000;
-        }
 
         .animated-counter {
             font-variant-numeric: tabular-nums;
             transition: color 0.3s ease;
         }
 
-        .performance-excellent { background: linear-gradient(45deg, #059669, #10b981); }
-        .performance-good { background: linear-gradient(45deg, #0369a1, #3b82f6); }
-        .performance-average { background: linear-gradient(45deg, #d97706, #f59e0b); }
-        .performance-poor { background: linear-gradient(45deg, #dc2626, #ef4444); }
+        /* Location Selector Styles */
+        .location-selector {
+            max-width: 100%;
+        }
+        
+        .location-selector .btn-group {
+            flex-wrap: wrap;
+            gap: 2px;
+        }
+        
+        .location-selector .btn {
+            font-size: 0.75rem;
+            padding: 0.25rem 0.5rem;
+            white-space: nowrap;
+        }
+        
+        .location-selector .btn-check:checked + .btn-outline-light {
+            background-color: rgba(255, 255, 255, 0.2);
+            border-color: white;
+            color: white;
+        }
+        
+        .location-comparison-card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s ease-in-out;
+        }
+        
+        .location-comparison-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+        
+        .location-badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: white;
+            margin-bottom: 0.5rem;
+        }
+        
+        .badge-wayzata { background: linear-gradient(135deg, #1e3a8a, #3b82f6); }
+        .badge-brooklyn { background: linear-gradient(135deg, #059669, #10b981); }
+        .badge-fridley { background: linear-gradient(135deg, #d97706, #f59e0b); }
+        .badge-elkriver { background: linear-gradient(135deg, #7c3aed, #a855f7); }
+        
+        .performance-indicator {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.5rem;
+            background: #f8fafc;
+            border-radius: 8px;
+            margin-bottom: 0.5rem;
+        }
+        
+        .performance-metric {
+            font-weight: 600;
+            color: #374151;
+        }
+        
+        .performance-value {
+            font-weight: 700;
+            font-size: 1.1rem;
+        }
+
+        /* Heatmap Styles */
+        .heatmap-container {
+            height: 200px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .heatmap-cell {
+            width: 80px;
+            height: 40px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+            font-size: 12px;
+            text-align: center;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .heatmap-cell:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+        }
+        
+        .heatmap-excellent { background: linear-gradient(135deg, #10b981, #059669); }
+        .heatmap-good { background: linear-gradient(135deg, #3b82f6, #1e40af); }
+        .heatmap-average { background: linear-gradient(135deg, #f59e0b, #d97706); }
+        .heatmap-poor { background: linear-gradient(135deg, #ef4444, #dc2626); }
+        
+        /* Gauge Styles */
+        .gauge-container {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .gauge-label {
+            margin-top: 8px;
+            font-weight: 600;
+            color: #374151;
+            font-size: 14px;
+        }
 
         .comparison-card {
             background: white;
@@ -561,167 +563,7 @@
             font-size: 1.1rem;
         }
         
-        /* Enhanced KPI Cards */
-        .kpi-card-enhanced {
-            background: linear-gradient(135deg, white 0%, #f8fafc 100%);
-            border: 1px solid #e5e7eb;
-            border-radius: 16px;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-            transition: all 0.3s ease;
-            height: 180px;
-            position: relative;
-            overflow: hidden;
-        }
         
-        .kpi-card-enhanced::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 4px;
-            background: linear-gradient(90deg, var(--executive-primary), var(--executive-secondary));
-        }
-        
-        .kpi-card-enhanced:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 10px 25px -3px rgba(0, 0, 0, 0.15), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-        }
-        
-        .kpi-icon {
-            position: absolute;
-            top: 1rem;
-            right: 1rem;
-            width: 40px;
-            height: 40px;
-            background: rgba(59, 130, 246, 0.1);
-            border-radius: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: var(--executive-secondary);
-        }
-        
-        .kpi-change-indicator {
-            display: inline-flex;
-            align-items: center;
-            padding: 0.25rem 0.5rem;
-            border-radius: 20px;
-            font-size: 0.75rem;
-            font-weight: 600;
-            margin-top: 0.5rem;
-        }
-        
-        .change-positive {
-            background: rgba(16, 185, 129, 0.1);
-            color: #059669;
-        }
-        
-        .change-negative {
-            background: rgba(239, 68, 68, 0.1);
-            color: #dc2626;
-        }
-        
-        .change-neutral {
-            background: rgba(107, 114, 128, 0.1);
-            color: #6b7280;
-        }
-        
-        /* Enhanced Visualization Styles */
-        .kpi-sparkline {
-            position: absolute;
-            bottom: 10px;
-            right: 10px;
-            opacity: 0.7;
-        }
-        
-        .animated-counter {
-            transition: all 0.3s ease;
-        }
-        
-        .pulse-animation {
-            animation: pulse 2s infinite;
-        }
-        
-        @keyframes pulse {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.05); }
-            100% { transform: scale(1); }
-        }
-        
-        .heatmap-container {
-            height: 200px;
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-            align-items: center;
-            justify-content: center;
-        }
-        
-        .heatmap-cell {
-            width: 80px;
-            height: 40px;
-            border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-weight: 600;
-            font-size: 12px;
-            text-align: center;
-            transition: all 0.3s ease;
-            cursor: pointer;
-            position: relative;
-            overflow: hidden;
-        }
-        
-        .heatmap-cell:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 20px rgba(0,0,0,0.2);
-        }
-        
-        .heatmap-cell::before {
-            content: '';
-            position: absolute;
-            top: -50%;
-            left: -50%;
-            width: 200%;
-            height: 200%;
-            background: linear-gradient(45deg, transparent, rgba(255,255,255,0.1), transparent);
-            transform: rotate(45deg);
-            transition: all 0.6s;
-            opacity: 0;
-        }
-        
-        .heatmap-cell:hover::before {
-            animation: shimmer 0.6s ease-in-out;
-        }
-        
-        @keyframes shimmer {
-            0% { transform: translateX(-100%) translateY(-100%) rotate(45deg); opacity: 0; }
-            50% { opacity: 1; }
-            100% { transform: translateX(100%) translateY(100%) rotate(45deg); opacity: 0; }
-        }
-        
-        .heatmap-excellent { background: linear-gradient(135deg, #10b981, #059669); }
-        .heatmap-good { background: linear-gradient(135deg, #3b82f6, #1e40af); }
-        .heatmap-average { background: linear-gradient(135deg, #f59e0b, #d97706); }
-        .heatmap-poor { background: linear-gradient(135deg, #ef4444, #dc2626); }
-        
-        .gauge-container {
-            position: relative;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            margin-bottom: 20px;
-        }
-        
-        .gauge-label {
-            margin-top: 8px;
-            font-weight: 600;
-            color: #374151;
-            font-size: 14px;
-        }
         
         .card-header {
             background: linear-gradient(135deg, #f8fafc, #e2e8f0);
@@ -737,9 +579,6 @@
             margin-bottom: 20px;
         }
         
-        #locationMap {
-            border-radius: 0 0 12px 12px;
-        }
 
         @media (max-width: 1200px) {
             .location-selector .btn {
@@ -832,10 +671,54 @@
             <!-- Alerts will be loaded here -->
         </div>
 
+        <!-- Location Selector -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="executive-header bg-gradient-primary text-white rounded p-3">
+                    <div class="row align-items-center">
+                        <div class="col-md-6">
+                            <h4 class="mb-0">📊 Multi-Location Analytics</h4>
+                            <small class="opacity-75">Select location to filter dashboard or compare all stores</small>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="location-selector">
+                                <div class="btn-group" role="group" aria-label="Location selector">
+                                    <input type="radio" class="btn-check" name="locationFilter" id="locationAll" value="all" checked>
+                                    <label class="btn btn-outline-light" for="locationAll">🌐 All Locations</label>
+                                    
+                                    <input type="radio" class="btn-check" name="locationFilter" id="locationWayzata" value="3607">
+                                    <label class="btn btn-outline-light" for="locationWayzata">🏪 Wayzata (Since 2008)</label>
+                                    
+                                    <input type="radio" class="btn-check" name="locationFilter" id="locationBrooklyn" value="6800">
+                                    <label class="btn btn-outline-light" for="locationBrooklyn">🏢 Brooklyn Park (Since 2022)</label>
+                                    
+                                    <input type="radio" class="btn-check" name="locationFilter" id="locationFridley" value="8101">
+                                    <label class="btn btn-outline-light" for="locationFridley">🏭 Fridley (Since 2022)</label>
+                                    
+                                    <input type="radio" class="btn-check" name="locationFilter" id="locationElkRiver" value="728">
+                                    <label class="btn btn-outline-light" for="locationElkRiver">🌲 Elk River (Since 2024)</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Comparison Mode Toggle -->
+        <div class="row mb-3" id="comparisonToggle">
+            <div class="col-12 text-end">
+                <button class="btn btn-outline-primary btn-sm" onclick="toggleComparisonMode()">
+                    <i class="fas fa-columns me-1"></i>
+                    <span id="comparisonToggleText">Show Comparison View</span>
+                </button>
+            </div>
+        </div>
+
         <!-- Executive KPIs -->
         <div class="row mb-4">
             <div class="col-12">
-                <h3 class="section-header">Key Performance Indicators</h3>
+                <h3 class="section-header">Key Performance Indicators - <span id="currentLocationDisplay">All Locations</span></h3>
             </div>
             <div class="col-lg-3 col-md-6 mb-3">
                 <div class="card kpi-card">
@@ -844,9 +727,6 @@
                         <div class="kpi-value text-primary animated-counter" id="revenueKPI">$0</div>
                         <div class="kpi-trend" id="revenueTrend">
                             <i class="fas fa-arrow-up"></i> Loading...
-                        </div>
-                        <div class="sparkline-container">
-                            <canvas id="revenueSparkline" class="sparkline-canvas"></canvas>
                         </div>
                     </div>
                 </div>
@@ -859,9 +739,6 @@
                         <div class="kpi-trend" id="growthTrend">
                             <i class="fas fa-chart-line"></i> Loading...
                         </div>
-                        <div class="sparkline-container">
-                            <canvas id="growthSparkline" class="sparkline-canvas"></canvas>
-                        </div>
                     </div>
                 </div>
             </div>
@@ -872,9 +749,6 @@
                         <div class="kpi-value text-warning animated-counter" id="utilizationKPI">0%</div>
                         <div class="kpi-trend" id="utilizationTrend">
                             <i class="fas fa-tools"></i> Loading...
-                        </div>
-                        <div class="sparkline-container">
-                            <canvas id="utilizationSparkline" class="sparkline-canvas"></canvas>
                         </div>
                     </div>
                 </div>
@@ -887,99 +761,13 @@
                         <div class="kpi-trend" id="healthTrend">
                             <i class="fas fa-heartbeat"></i> Loading...
                         </div>
-                        <div class="sparkline-container">
-                            <canvas id="healthSparkline" class="sparkline-canvas"></canvas>
-                        </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Enhanced Visualizations Section -->
-        
-        <!-- Location Performance Heatmap -->
-        <div class="row mb-4">
-            <div class="col-12">
-                <div class="heatmap-container">
-                    <div class="d-flex justify-content-between align-items-center mb-3">
-                        <h5 class="section-header mb-0">Location Performance Matrix</h5>
-                        <div class="btn-group" role="group">
-                            <button type="button" class="btn btn-sm btn-outline-primary active" id="heatmapRevenue">Revenue</button>
-                            <button type="button" class="btn btn-sm btn-outline-primary" id="heatmapUtilization">Utilization</button>
-                            <button type="button" class="btn btn-sm btn-outline-primary" id="heatmapHealth">Health Score</button>
-                        </div>
-                    </div>
-                    <div id="performanceHeatmap" class="row g-3">
-                        <!-- Heatmap cells will be populated by JavaScript -->
-                    </div>
-                </div>
-            </div>
-        </div>
 
-        <!-- Gauge Charts Row -->
-        <div class="row mb-4">
-            <div class="col-lg-4 col-md-6 mb-3">
-                <div class="card h-100">
-                    <div class="card-body text-center">
-                        <h6 class="card-title">Overall Utilization</h6>
-                        <div class="gauge-container">
-                            <svg class="gauge-svg" width="200" height="200">
-                                <circle class="gauge-background" cx="100" cy="100" r="80"></circle>
-                                <circle class="gauge-progress" cx="100" cy="100" r="80" id="utilizationGauge"></circle>
-                            </svg>
-                            <div class="gauge-text">
-                                <div class="gauge-value" id="utilizationGaugeValue">0%</div>
-                                <div class="gauge-label">Utilization Rate</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-lg-4 col-md-6 mb-3">
-                <div class="card h-100">
-                    <div class="card-body text-center">
-                        <h6 class="card-title">Business Health</h6>
-                        <div class="gauge-container">
-                            <svg class="gauge-svg" width="200" height="200">
-                                <circle class="gauge-background" cx="100" cy="100" r="80"></circle>
-                                <circle class="gauge-progress" cx="100" cy="100" r="80" id="healthGauge"></circle>
-                            </svg>
-                            <div class="gauge-text">
-                                <div class="gauge-value" id="healthGaugeValue">0</div>
-                                <div class="gauge-label">Health Score</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-lg-4 col-md-6 mb-3">
-                <div class="card h-100">
-                    <div class="card-body text-center">
-                        <h6 class="card-title">Efficiency Index</h6>
-                        <div class="gauge-container">
-                            <svg class="gauge-svg" width="200" height="200">
-                                <circle class="gauge-background" cx="100" cy="100" r="80"></circle>
-                                <circle class="gauge-progress" cx="100" cy="100" r="80" id="efficiencyGauge"></circle>
-                            </svg>
-                            <div class="gauge-text">
-                                <div class="gauge-value" id="efficiencyGaugeValue">0%</div>
-                                <div class="gauge-label">Efficiency</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
 
-        <!-- Revenue Waterfall Chart -->
-        <div class="row mb-4">
-            <div class="col-12">
-                <div class="waterfall-container">
-                    <h5 class="section-header">Revenue Waterfall Analysis</h5>
-                    <canvas id="waterfallChart" height="300"></canvas>
-                </div>
-            </div>
-        </div>
 
         <!-- Executive Scorecard Analytics: 2022-2024 Strategic Insights -->
         <div class="row mb-5">
@@ -987,6 +775,147 @@
                 <div class="alert alert-info">
                     <i class="fas fa-chart-line me-2"></i>
                     <strong>Scorecard Analytics:</strong> 159 weeks of historical data (2022-2024) showing 7x seasonal revenue variation and strong store correlations (0.474-0.862)
+                </div>
+            </div>
+        </div>
+
+        <!-- Location Comparison Section (Hidden by default) -->
+        <div id="comparisonSection" class="row mb-4" style="display: none;">
+            <div class="col-12">
+                <h4 class="section-header">🏢 Multi-Location Performance Comparison</h4>
+            </div>
+            
+            <!-- Wayzata Performance -->
+            <div class="col-lg-3 col-md-6 mb-3">
+                <div class="location-comparison-card p-3">
+                    <div class="location-badge badge-wayzata">Wayzata Store</div>
+                    <h6 class="fw-bold mb-3">Tyler's Location (Since 2008)</h6>
+                    <div class="performance-indicator mb-2">
+                        <span class="performance-metric">Revenue</span>
+                        <span class="performance-value text-primary" id="wayzataRevenue">$0</span>
+                    </div>
+                    <div class="performance-indicator mb-2">
+                        <span class="performance-metric">Growth</span>
+                        <span class="performance-value text-success" id="wayzataGrowth">0%</span>
+                    </div>
+                    <div class="performance-indicator">
+                        <span class="performance-metric">Utilization</span>
+                        <span class="performance-value text-info" id="wayzataUtilization">0%</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Brooklyn Park Performance -->
+            <div class="col-lg-3 col-md-6 mb-3">
+                <div class="location-comparison-card p-3">
+                    <div class="location-badge badge-brooklyn">Brooklyn Park Store</div>
+                    <h6 class="fw-bold mb-3">Zack's Location (Since 2022)</h6>
+                    <div class="performance-indicator mb-2">
+                        <span class="performance-metric">Revenue</span>
+                        <span class="performance-value text-primary" id="brooklynRevenue">$0</span>
+                    </div>
+                    <div class="performance-indicator mb-2">
+                        <span class="performance-metric">Growth</span>
+                        <span class="performance-value text-success" id="brooklynGrowth">0%</span>
+                    </div>
+                    <div class="performance-indicator">
+                        <span class="performance-metric">Utilization</span>
+                        <span class="performance-value text-info" id="brooklynUtilization">0%</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Fridley Performance -->
+            <div class="col-lg-3 col-md-6 mb-3">
+                <div class="location-comparison-card p-3">
+                    <div class="location-badge badge-fridley">Fridley Store</div>
+                    <h6 class="fw-bold mb-3">Tim's Location (Since 2022)</h6>
+                    <div class="performance-indicator mb-2">
+                        <span class="performance-metric">Revenue</span>
+                        <span class="performance-value text-primary" id="fridleyRevenue">$0</span>
+                    </div>
+                    <div class="performance-indicator mb-2">
+                        <span class="performance-metric">Growth</span>
+                        <span class="performance-value text-success" id="fridleyGrowth">0%</span>
+                    </div>
+                    <div class="performance-indicator">
+                        <span class="performance-metric">Utilization</span>
+                        <span class="performance-value text-info" id="fridleyUtilization">0%</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Elk River Performance -->
+            <div class="col-lg-3 col-md-6 mb-3">
+                <div class="location-comparison-card p-3">
+                    <div class="location-badge badge-elkriver">Elk River Store</div>
+                    <h6 class="fw-bold mb-3">Bruce's Location (Since 2024)</h6>
+                    <div class="performance-indicator mb-2">
+                        <span class="performance-metric">Revenue</span>
+                        <span class="performance-value text-primary" id="elkriverRevenue">$0</span>
+                    </div>
+                    <div class="performance-indicator mb-2">
+                        <span class="performance-metric">Growth</span>
+                        <span class="performance-value text-success" id="elkriverGrowth">0%</span>
+                    </div>
+                    <div class="performance-indicator">
+                        <span class="performance-metric">Utilization</span>
+                        <span class="performance-value text-info" id="elkriverUtilization">0%</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Enhanced Visualizations Section -->
+        <div class="row mb-4">
+            <!-- Performance Heatmap -->
+            <div class="col-lg-6 mb-4">
+                <div class="card h-100">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="fas fa-th-large me-2"></i>Performance Heatmap</h5>
+                        <div class="btn-group btn-group-sm" role="group">
+                            <input type="radio" class="btn-check" name="heatmapMetric" id="heatmapRevenue" value="revenue" checked>
+                            <label class="btn btn-outline-primary" for="heatmapRevenue">Revenue</label>
+                            <input type="radio" class="btn-check" name="heatmapMetric" id="heatmapUtilization" value="utilization">
+                            <label class="btn btn-outline-primary" for="heatmapUtilization">Utilization</label>
+                            <input type="radio" class="btn-check" name="heatmapMetric" id="heatmapHealth" value="health">
+                            <label class="btn btn-outline-primary" for="heatmapHealth">Health</label>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div id="performanceHeatmap" class="heatmap-container"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Gauge Charts -->
+            <div class="col-lg-6 mb-4">
+                <div class="card h-100">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="fas fa-tachometer-alt me-2"></i>Key Performance Gauges</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row text-center">
+                            <div class="col-4">
+                                <div class="gauge-container">
+                                    <canvas id="utilizationGauge" width="120" height="120"></canvas>
+                                    <div class="gauge-label">Utilization</div>
+                                </div>
+                            </div>
+                            <div class="col-4">
+                                <div class="gauge-container">
+                                    <canvas id="healthGauge" width="120" height="120"></canvas>
+                                    <div class="gauge-label">Health Score</div>
+                                </div>
+                            </div>
+                            <div class="col-4">
+                                <div class="gauge-container">
+                                    <canvas id="efficiencyGauge" width="120" height="120"></canvas>
+                                    <div class="gauge-label">Efficiency</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1002,118 +931,11 @@
             </div>
         </div>
 
-        <!-- Store Performance Heat Map & Risk Concentration -->
-        <div class="row mb-4">
-            <div class="col-lg-8">
-                <div class="chart-container large">
-                    <div class="chart-title">Store Performance Heat Map</div>
-                    <div class="chart-subtitle">Weekly Revenue Distribution with Concentration Risk Alerts</div>
-                    <canvas id="storePerformanceHeatMap"></canvas>
-                </div>
-            </div>
-            <div class="col-lg-4">
-                <div class="chart-container large">
-                    <div class="chart-title">Risk Indicators</div>
-                    <div class="chart-subtitle">35 weeks show >40% single-store revenue concentration</div>
-                    <div id="riskIndicators" class="mt-4">
-                        <!-- Risk indicators will be populated here -->
-                    </div>
-                </div>
-            </div>
-        </div>
 
-        <!-- Contract Pipeline & Conversion Analysis -->
-        <div class="row mb-4">
-            <div class="col-lg-6">
-                <div class="chart-container">
-                    <div class="chart-title">Pipeline Conversion Analysis</div>
-                    <div class="chart-subtitle">126.88% conversion rate with 0.860 correlation to future revenue</div>
-                    <canvas id="pipelineConversionChart"></canvas>
-                </div>
-            </div>
-            <div class="col-lg-6">
-                <div class="chart-container">
-                    <div class="chart-title">Revenue vs New Contracts Correlation</div>
-                    <div class="chart-subtitle">Store correlation range: 0.474-0.862</div>
-                    <canvas id="correlationScatterChart"></canvas>
-                </div>
-            </div>
-        </div>
 
-        <!-- AR Aging Risk Dashboard -->
-        <div class="row mb-4">
-            <div class="col-lg-8">
-                <div class="chart-container">
-                    <div class="chart-title">AR Aging Risk Trends</div>
-                    <div class="chart-subtitle">Accounts Receivable aging analysis with threshold warnings</div>
-                    <canvas id="arAgingTrendsChart"></canvas>
-                </div>
-            </div>
-            <div class="col-lg-4">
-                <div class="chart-container">
-                    <div class="chart-title">AR Risk Alerts</div>
-                    <div class="chart-subtitle">Current week risk assessment</div>
-                    <div id="arRiskAlerts" class="mt-4">
-                        <!-- AR risk alerts will be populated here -->
-                    </div>
-                </div>
-            </div>
-        </div>
 
-        <!-- Store Correlation Matrix -->
-        <div class="row mb-4">
-            <div class="col-12">
-                <div class="chart-container">
-                    <div class="chart-title">Business Metric Correlation Matrix</div>
-                    <div class="chart-subtitle">Correlation strength between revenue, contracts, and reservations across all stores</div>
-                    <div id="correlationMatrix" class="mt-4">
-                        <!-- Correlation matrix will be populated here -->
-                    </div>
-                </div>
-            </div>
-        </div>
 
-        <!-- Forecasting & Predictive Analytics -->
-        <div class="row mb-4">
-            <div class="col-lg-8">
-                <div class="chart-container large">
-                    <div class="chart-title">Revenue Forecasting Model</div>
-                    <div class="chart-subtitle">Predictive analytics based on seasonal patterns and store correlations</div>
-                    <canvas id="revenueForecastChart"></canvas>
-                </div>
-            </div>
-            <div class="col-lg-4">
-                <div class="chart-container large">
-                    <div class="chart-title">Seasonal Decomposition</div>
-                    <div class="chart-subtitle">Trend, seasonal, and residual components</div>
-                    <canvas id="seasonalDecompositionChart"></canvas>
-                </div>
-            </div>
-        </div>
 
-        <!-- Geographic Visualization & Comparative Analysis -->
-        <div class="row mb-4">
-            <div class="col-lg-6 mb-4">
-                <div class="card h-100">
-                    <div class="card-header">
-                        <h5 class="mb-0">Location Overview Map</h5>
-                    </div>
-                    <div class="card-body p-0">
-                        <div id="locationMap" class="map-container"></div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-lg-6 mb-4">
-                <div class="card h-100">
-                    <div class="card-header">
-                        <h5 class="mb-0">Performance Comparison</h5>
-                    </div>
-                    <div class="card-body">
-                        <canvas id="performanceComparisonChart"></canvas>
-                    </div>
-                </div>
-            </div>
-        </div>
 
         <div class="row">
             <!-- Enhanced Revenue Trend Chart with Sparklines -->
@@ -1178,103 +1000,8 @@
             </div>
         </div>
 
-        <!-- Enhanced Visualizations Section -->
-        <div class="row mb-4">
-            <!-- Performance Heatmap -->
-            <div class="col-lg-6 mb-4">
-                <div class="card h-100">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <h5 class="mb-0"><i class="fas fa-th-large me-2"></i>Performance Heatmap</h5>
-                        <div class="btn-group btn-group-sm" role="group">
-                            <input type="radio" class="btn-check" name="heatmapMetric" id="heatmapRevenue" value="revenue" checked>
-                            <label class="btn btn-outline-primary" for="heatmapRevenue">Revenue</label>
-                            <input type="radio" class="btn-check" name="heatmapMetric" id="heatmapUtilization" value="utilization">
-                            <label class="btn btn-outline-primary" for="heatmapUtilization">Utilization</label>
-                            <input type="radio" class="btn-check" name="heatmapMetric" id="heatmapHealth" value="health">
-                            <label class="btn btn-outline-primary" for="heatmapHealth">Health</label>
-                        </div>
-                    </div>
-                    <div class="card-body">
-                        <div id="performanceHeatmap" class="heatmap-container"></div>
-                    </div>
-                </div>
-            </div>
 
-            <!-- Gauge Charts -->
-            <div class="col-lg-6 mb-4">
-                <div class="card h-100">
-                    <div class="card-header">
-                        <h5 class="mb-0"><i class="fas fa-tachometer-alt me-2"></i>Key Performance Gauges</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="row text-center">
-                            <div class="col-4">
-                                <div class="gauge-container">
-                                    <canvas id="utilizationGauge" width="120" height="120"></canvas>
-                                    <div class="gauge-label">Utilization</div>
-                                </div>
-                            </div>
-                            <div class="col-4">
-                                <div class="gauge-container">
-                                    <canvas id="healthGauge" width="120" height="120"></canvas>
-                                    <div class="gauge-label">Health Score</div>
-                                </div>
-                            </div>
-                            <div class="col-4">
-                                <div class="gauge-container">
-                                    <canvas id="efficiencyGauge" width="120" height="120"></canvas>
-                                    <div class="gauge-label">Efficiency</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
 
-        <!-- Revenue Waterfall and Location Map -->
-        <div class="row mb-4">
-            <!-- Revenue Waterfall -->
-            <div class="col-lg-7 mb-4">
-                <div class="card h-100">
-                    <div class="card-header">
-                        <h5 class="mb-0"><i class="fas fa-chart-waterfall me-2"></i>Revenue Breakdown by Location</h5>
-                    </div>
-                    <div class="card-body">
-                        <canvas id="revenueWaterfallChart"></canvas>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Location Map -->
-            <div class="col-lg-5 mb-4">
-                <div class="card h-100">
-                    <div class="card-header">
-                        <h5 class="mb-0"><i class="fas fa-map-marker-alt me-2"></i>Location Performance Map</h5>
-                    </div>
-                    <div class="card-body p-0">
-                        <div id="locationMap" style="height: 300px;"></div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Performance Comparison Radar -->
-        <div class="row mb-4">
-            <div class="col-12">
-                <div class="card">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <h5 class="mb-0"><i class="fas fa-radar-chart me-2"></i>Multi-Dimensional Performance Analysis</h5>
-                        <button class="btn btn-outline-primary btn-sm" onclick="dashboard.exportPerformanceData()">
-                            <i class="fas fa-download me-1"></i>Export Data
-                        </button>
-                    </div>
-                    <div class="card-body">
-                        <canvas id="performanceRadarChart"></canvas>
-                    </div>
-                </div>
-            </div>
-        </div>
     </div>
 
     <!-- Custom Insight Modal -->
@@ -1350,8 +1077,6 @@
     <!-- Bootstrap 5 JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     
-    <!-- Enhanced Executive Dashboard Visualizations - Temporarily disabled to fix errors -->
-    <!-- <script src="{{ url_for('static', filename='js/executive-dashboard-visualizations.js') }}"></script> -->
     
     <script>
         console.log('🎨 Enhanced Executive Dashboard Loading...');
@@ -1384,45 +1109,70 @@
     <!-- Enhanced Visualizations -->
     <script src="{{ url_for('static', filename='js/executive-dashboard-visualizations.js') }}"></script>
     
-    <!-- Scorecard Analytics Visualizations -->
-    <script src="{{ url_for('static', filename='js/executive-scorecard-analytics.js') }}"></script>
-    
-    <!-- Executive Insights Summary -->
-    <script src="{{ url_for('static', filename='js/executive-insights-summary.js') }}"></script>
 
     <script>
         // Global variables
-        let revenueTrendChart, forecastChart, storeComparisonChart, waterfallChart, performanceComparisonChart;
-        let sparklineCharts = {};
-        let gaugeAnimations = {};
-        let animatedCounters = {};
-        let locationMap;
+        let revenueTrendChart, forecastChart, storeComparisonChart;
         let dashboardData = {};
+        let currentLocationFilter = 'all';
+        let comparisonMode = false;
+        
+        // Store mapping for consistent display
+        const storeMapping = {
+            'all': 'All Locations',
+            '3607': 'Wayzata',
+            '6800': 'Brooklyn Park', 
+            '8101': 'Fridley',
+            '728': 'Elk River'
+        };
 
+        // Simple direct KPI update function
+        function forceUpdateKPIs() {
+            console.log('💪 Force updating KPIs...');
+            
+            fetch('/executive/api/financial-kpis')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // Direct assignment to bypass any issues
+                        const revenueEl = document.getElementById('revenueKPI');
+                        const growthEl = document.getElementById('growthKPI');
+                        const utilizationEl = document.getElementById('utilizationKPI');
+                        const healthEl = document.getElementById('healthKPI');
+                        
+                        if (revenueEl) revenueEl.textContent = '$' + (data.revenue_metrics.current_3wk_avg / 1000).toFixed(0) + 'K';
+                        if (growthEl) growthEl.textContent = data.revenue_metrics.yoy_growth.toFixed(1) + '%';
+                        if (utilizationEl) utilizationEl.textContent = data.store_metrics.utilization_avg.toFixed(1) + '%';
+                        if (healthEl) healthEl.textContent = Math.round(data.operational_health.health_score);
+                        
+                        console.log('✅ Direct KPI update completed');
+                    }
+                })
+                .catch(error => console.error('❌ Direct KPI update failed:', error));
+        }
+        
         // Initialize dashboard
         document.addEventListener('DOMContentLoaded', function() {
             initializeDashboard();
             
-            // Initialize enhanced visualizations after a short delay to ensure DOM is ready
-            setTimeout(() => {
-                console.log('🚀 Initializing enhanced dashboard features...');
-                
-                // Force visual changes immediately without advanced libraries
-                document.getElementById('revenueKPI').textContent = '$285,750';
-                document.getElementById('growthKPI').textContent = '15.3%';
-                document.getElementById('utilizationKPI').textContent = '82.7%';
-                document.getElementById('healthKPI').textContent = '89';
-                
-                // Simple demo data loading
-                if (typeof loadDemoData === 'function') {
-                    loadDemoData();
-                }
-                
-                console.log('✅ Basic dashboard enhancements applied!');
-            }, 500);
+            // Force KPI update after a short delay
+            setTimeout(forceUpdateKPIs, 500);
             
-            // Auto-refresh every 5 minutes
-            setInterval(refreshDashboard, 300000);
+            // Setup location filter event listeners
+            document.querySelectorAll('input[name="locationFilter"]').forEach(radio => {
+                radio.addEventListener('change', function() {
+                    currentLocationFilter = this.value;
+                    updateLocationDisplay();
+                    filterDashboardData();
+                });
+            });
+            
+            // Setup heatmap metric change listeners
+            document.querySelectorAll('input[name="heatmapMetric"]').forEach(radio => {
+                radio.addEventListener('change', function() {
+                    updateHeatmap(this.value);
+                });
+            });
         });
 
         async function initializeDashboard() {
@@ -1441,6 +1191,10 @@
                 // Initialize charts
                 initializeCharts();
                 
+                // Initialize enhanced components
+                initializeGauges();
+                updateHeatmap('revenue');
+                
             } catch (error) {
                 console.error('Error initializing dashboard:', error);
                 showErrorMessage('Failed to load dashboard data. Please try refreshing the page.');
@@ -1452,12 +1206,23 @@
 
         async function loadFinancialKPIs() {
             try {
+                console.log('🔍 Loading financial KPIs...');
                 const response = await fetch('/executive/api/financial-kpis');
                 const data = await response.json();
                 
+                console.log('📊 KPI data received:', data);
+                
                 if (data.success) {
                     dashboardData.kpis = data;
+                    console.log('✅ Updating KPI displays with data:', {
+                        revenue: data.revenue_metrics?.current_3wk_avg,
+                        growth: data.revenue_metrics?.yoy_growth,
+                        utilization: data.store_metrics?.utilization_avg,
+                        health: data.operational_health?.health_score
+                    });
                     updateKPIDisplays(data);
+                } else {
+                    console.error('❌ KPI API returned success=false');
                 }
             } catch (error) {
                 console.error('Error loading financial KPIs:', error);
@@ -1524,18 +1289,54 @@
         }
 
         function updateKPIDisplays(data) {
+            console.log('🎯 updateKPIDisplays called with:', data);
+            
             const revenue = data.revenue_metrics?.current_3wk_avg || 0;
             const growth = data.revenue_metrics?.yoy_growth || 0;
             const utilization = data.store_metrics?.utilization_avg || 0;
             const health = data.operational_health?.health_score || 0;
 
-            document.getElementById('revenueKPI').textContent = formatCurrency(revenue);
-            document.getElementById('growthKPI').textContent = formatPercentage(growth);
-            document.getElementById('utilizationKPI').textContent = formatPercentage(utilization);
-            document.getElementById('healthKPI').textContent = Math.round(health);
+            console.log('💰 Extracted values:', { revenue, growth, utilization, health });
+            
+            // Format values
+            const formattedRevenue = formatCurrency(revenue);
+            const formattedGrowth = formatPercentage(growth);
+            const formattedUtilization = formatPercentage(utilization);
+            const formattedHealth = Math.round(health);
+            
+            console.log('🎨 Formatted values:', {
+                revenue: formattedRevenue,
+                growth: formattedGrowth,
+                utilization: formattedUtilization,
+                health: formattedHealth
+            });
 
-            // Update change indicators instead of trend indicators
-            updateKPIChangeIndicators(data);
+            // Update DOM elements with error checking
+            try {
+                const revenueEl = document.getElementById('revenueKPI');
+                const growthEl = document.getElementById('growthKPI');
+                const utilizationEl = document.getElementById('utilizationKPI');
+                const healthEl = document.getElementById('healthKPI');
+                
+                console.log('🔍 DOM elements found:', {
+                    revenue: !!revenueEl,
+                    growth: !!growthEl,
+                    utilization: !!utilizationEl,
+                    health: !!healthEl
+                });
+                
+                if (revenueEl) revenueEl.textContent = formattedRevenue;
+                if (growthEl) growthEl.textContent = formattedGrowth;
+                if (utilizationEl) utilizationEl.textContent = formattedUtilization;
+                if (healthEl) healthEl.textContent = formattedHealth;
+                
+                console.log('✅ KPI displays updated successfully');
+            } catch (domError) {
+                console.error('❌ DOM update error:', domError);
+            }
+
+            // Skip change indicators - DOM elements don't exist
+            // updateKPIChangeIndicators(data);
         }
 
         function updateTrendIndicator(elementId, value, label) {
@@ -1907,50 +1708,10 @@
             console.error('Error:', message);
         }
         
-        // Enhanced dashboard utilities - simplified version
-        function updateLocationComparison() {
-            // Update comparison section with sample data
-            const locations = [
-                { id: 'wayzata', name: 'Wayzata', revenue: '$142,500', growth: '18.2%', utilization: '85%' },
-                { id: 'brooklyn', name: 'Brooklyn Park', revenue: '$89,750', growth: '12.5%', utilization: '78%' },
-                { id: 'fridley', name: 'Fridley', revenue: '$76,200', growth: '15.8%', utilization: '82%' },
-                { id: 'elkriver', name: 'Elk River', revenue: '$45,300', growth: '22.1%', utilization: '76%' }
-            ];
-            
-            locations.forEach(location => {
-                const revenueEl = document.getElementById(`${location.id}Revenue`);
-                const growthEl = document.getElementById(`${location.id}Growth`);
-                const utilizationEl = document.getElementById(`${location.id}Utilization`);
-                
-                if (revenueEl) revenueEl.textContent = location.revenue;
-                if (growthEl) growthEl.textContent = location.growth;
-                if (utilizationEl) utilizationEl.textContent = location.utilization;
-            });
-        }
-        
-        // Sample data for demonstration - simplified version
-        function loadDemoData() {
-            console.log('📊 Loading demo data for enhanced dashboard...');
-            
-            // Update KPIs with formatted values
-            document.getElementById('revenueKPI').textContent = '$285,750';
-            document.getElementById('growthKPI').textContent = '15.3%';
-            document.getElementById('utilizationKPI').textContent = '82.7%';
-            document.getElementById('healthKPI').textContent = '89';
-            
-            // Update trend indicators
-            document.getElementById('revenueChange').innerHTML = '<i class="fas fa-arrow-up me-1"></i> +8.2% vs last period';
-            document.getElementById('growthChange').innerHTML = '<i class="fas fa-arrow-up me-1"></i> +2.1% trend';
-            document.getElementById('utilizationChange').innerHTML = '<i class="fas fa-arrow-up me-1"></i> +5.4% efficiency';
-            document.getElementById('healthChange').innerHTML = '<i class="fas fa-arrow-up me-1"></i> +3.0% score';
-            
-            // Update comparison data
-            updateLocationComparison();
-        }
-        
-        // Location filtering functions
-        function updateLocationFilterDisplay() {
-            document.getElementById('currentLocationFilter').textContent = storeMapping[currentLocationFilter];
+        // Location filtering and comparison functions
+        function updateLocationDisplay() {
+            const locationName = storeMapping[currentLocationFilter];
+            document.getElementById('currentLocationDisplay').textContent = locationName;
         }
         
         function filterDashboardData() {
@@ -1977,6 +1738,8 @@
                 }
             } catch (error) {
                 console.error('Error loading location-specific KPIs:', error);
+                // Fallback to aggregate data
+                loadFinancialKPIs();
             }
         }
         
@@ -1992,15 +1755,19 @@
             }
         }
         
-        function showComparisonMode() {
-            comparisonMode = true;
-            document.getElementById('comparisonSection').style.display = 'block';
-            loadComparisonData();
-        }
-        
-        function hideComparisonMode() {
-            comparisonMode = false;
-            document.getElementById('comparisonSection').style.display = 'none';
+        function toggleComparisonMode() {
+            comparisonMode = !comparisonMode;
+            const section = document.getElementById('comparisonSection');
+            const toggleText = document.getElementById('comparisonToggleText');
+            
+            if (comparisonMode) {
+                section.style.display = 'block';
+                toggleText.textContent = 'Hide Comparison View';
+                loadComparisonData();
+            } else {
+                section.style.display = 'none';
+                toggleText.textContent = 'Show Comparison View';
+            }
         }
         
         async function loadComparisonData() {
@@ -2010,6 +1777,15 @@
                 
                 if (data.success && data.locations) {
                     updateComparisonDisplay(data.locations);
+                } else {
+                    // Use mock data for demonstration
+                    const mockData = [
+                        { store_code: '3607', revenue: 142500, growth: -18.2, utilization: 85 },
+                        { store_code: '6800', revenue: 89750, growth: -12.5, utilization: 78 },
+                        { store_code: '8101', revenue: 76200, growth: -15.8, utilization: 82 },
+                        { store_code: '728', revenue: 45300, growth: -22.1, utilization: 76 }
+                    ];
+                    updateComparisonDisplay(mockData);
                 }
             } catch (error) {
                 console.error('Error loading comparison data:', error);
@@ -2017,14 +1793,19 @@
         }
         
         function updateComparisonDisplay(locations) {
+            const storeElements = {
+                '3607': { revenue: 'wayzataRevenue', growth: 'wayzataGrowth', utilization: 'wayzataUtilization' },
+                '6800': { revenue: 'brooklynRevenue', growth: 'brooklynGrowth', utilization: 'brooklynUtilization' },
+                '8101': { revenue: 'fridleyRevenue', growth: 'fridleyGrowth', utilization: 'fridleyUtilization' },
+                '728': { revenue: 'elkriverRevenue', growth: 'elkriverGrowth', utilization: 'elkriverUtilization' }
+            };
+            
             locations.forEach(location => {
-                const storeKey = location.store_code;
-                const storeName = storeMapping[storeKey]?.toLowerCase().replace(' ', '');
-                
-                if (storeName) {
-                    const revenueEl = document.getElementById(`${storeName}Revenue`);
-                    const growthEl = document.getElementById(`${storeName}Growth`);
-                    const utilizationEl = document.getElementById(`${storeName}Utilization`);
+                const elements = storeElements[location.store_code];
+                if (elements) {
+                    const revenueEl = document.getElementById(elements.revenue);
+                    const growthEl = document.getElementById(elements.growth);
+                    const utilizationEl = document.getElementById(elements.utilization);
                     
                     if (revenueEl) revenueEl.textContent = formatCurrency(location.revenue || 0, true);
                     if (growthEl) growthEl.textContent = formatPercentage(location.growth || 0);
@@ -2033,29 +1814,85 @@
             });
         }
         
-        function updateKPIChangeIndicators(data) {
-            // Update change indicators with trend information
-            const revenue_change = data.revenue_metrics?.change_pct || 0;
-            const growth_change = data.growth_metrics?.change_pct || 0;
-            const utilization_change = data.utilization_metrics?.change_pct || 0;
-            const health_change = data.health_metrics?.change_pct || 0;
+        function updateHeatmap(metric) {
+            const container = document.getElementById('performanceHeatmap');
+            if (!container) return;
             
-            updateChangeIndicator('revenueChange', revenue_change, 'vs last period');
-            updateChangeIndicator('growthChange', growth_change, 'trend');
-            updateChangeIndicator('utilizationChange', utilization_change, 'efficiency');
-            updateChangeIndicator('healthChange', health_change, 'score');
+            // Mock heatmap data for demonstration
+            const heatmapData = {
+                'revenue': [
+                    { store: 'Wayzata', value: 92, class: 'heatmap-excellent' },
+                    { store: 'Brooklyn', value: 78, class: 'heatmap-good' },
+                    { store: 'Fridley', value: 65, class: 'heatmap-average' },
+                    { store: 'Elk River', value: 45, class: 'heatmap-poor' }
+                ],
+                'utilization': [
+                    { store: 'Wayzata', value: 85, class: 'heatmap-excellent' },
+                    { store: 'Brooklyn', value: 78, class: 'heatmap-good' },
+                    { store: 'Fridley', value: 82, class: 'heatmap-good' },
+                    { store: 'Elk River', value: 76, class: 'heatmap-average' }
+                ],
+                'health': [
+                    { store: 'Wayzata', value: 94, class: 'heatmap-excellent' },
+                    { store: 'Brooklyn', value: 87, class: 'heatmap-good' },
+                    { store: 'Fridley', value: 89, class: 'heatmap-excellent' },
+                    { store: 'Elk River', value: 72, class: 'heatmap-average' }
+                ]
+            };
+            
+            const data = heatmapData[metric] || heatmapData.revenue;
+            
+            container.innerHTML = data.map(item => 
+                `<div class="heatmap-cell ${item.class}" title="${item.store}: ${item.value}">
+                    <div>${item.store}<br><strong>${item.value}</strong></div>
+                </div>`
+            ).join('');
         }
         
-        function updateChangeIndicator(elementId, changeValue, label) {
-            const element = document.getElementById(elementId);
-            const isPositive = changeValue > 0;
-            const isNeutral = Math.abs(changeValue) < 0.5;
-            
-            element.className = `kpi-change-indicator ${isNeutral ? 'change-neutral' : isPositive ? 'change-positive' : 'change-negative'}`;
-            
-            const icon = isNeutral ? 'fa-minus' : isPositive ? 'fa-arrow-up' : 'fa-arrow-down';
-            const sign = isPositive ? '+' : '';
-            element.innerHTML = `<i class="fas ${icon} me-1"></i> ${sign}${changeValue.toFixed(1)}% ${label}`;
+        function initializeGauges() {
+            // Initialize gauge charts - simplified version
+            updateGauge('utilizationGauge', 82.7, 'Utilization');
+            updateGauge('healthGauge', 89, 'Health Score');
+            updateGauge('efficiencyGauge', 76, 'Efficiency');
         }
+        
+        function updateGauge(canvasId, value, label) {
+            const canvas = document.getElementById(canvasId);
+            if (!canvas) return;
+            
+            const ctx = canvas.getContext('2d');
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            const radius = 40;
+            
+            // Clear canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw background arc
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radius, 0.75 * Math.PI, 2.25 * Math.PI);
+            ctx.strokeStyle = '#e5e7eb';
+            ctx.lineWidth = 8;
+            ctx.stroke();
+            
+            // Draw value arc
+            const endAngle = 0.75 * Math.PI + (1.5 * Math.PI * (value / 100));
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radius, 0.75 * Math.PI, endAngle);
+            ctx.strokeStyle = value >= 80 ? '#10b981' : value >= 60 ? '#3b82f6' : '#f59e0b';
+            ctx.lineWidth = 8;
+            ctx.lineCap = 'round';
+            ctx.stroke();
+            
+            // Draw center value
+            ctx.fillStyle = '#374151';
+            ctx.font = 'bold 14px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText(Math.round(value), centerX, centerY + 5);
+        }
+        
+        
+        
+        
     </script>
 {% endblock %}

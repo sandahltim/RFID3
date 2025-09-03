@@ -68,14 +68,18 @@ class ManagerAnalyticsService:
                 # All stores KPIs
                 store_filter = ""
             
-            # Inventory KPIs
+            # Inventory KPIs using the new combined_inventory view
             inventory_query = text(f"""
                 SELECT 
                     COUNT(*) as total_items,
-                    COUNT(CASE WHEN status = 'rented' THEN 1 END) as rented_items,
+                    COUNT(CASE WHEN status = 'fully_rented' OR status = 'partially_rented' THEN 1 END) as rented_items,
                     COUNT(CASE WHEN status = 'available' THEN 1 END) as available_items,
                     COUNT(CASE WHEN status = 'maintenance' THEN 1 END) as maintenance_items,
-                    COUNT(CASE WHEN status = 'lost' THEN 1 END) as lost_items
+                    COUNT(CASE WHEN status = 'inactive' THEN 1 END) as inactive_items,
+                    SUM(pos_quantity) as total_pos_inventory,
+                    SUM(rfid_tag_count) as total_rfid_tags,
+                    ROUND(AVG(utilization_percentage), 2) as avg_utilization,
+                    SUM(current_rental_revenue) as current_revenue
                 FROM combined_inventory 
                 WHERE 1=1 {store_filter}
             """)
@@ -87,19 +91,29 @@ class ManagerAnalyticsService:
                 rented_items = inventory_result.rented_items or 0
                 available_items = inventory_result.available_items or 0
                 maintenance_items = inventory_result.maintenance_items or 0
-                lost_items = inventory_result.lost_items or 0
+                inactive_items = inventory_result.inactive_items or 0
+                total_pos_inventory = inventory_result.total_pos_inventory or 0
+                total_rfid_tags = inventory_result.total_rfid_tags or 0
+                avg_utilization = inventory_result.avg_utilization or 0
+                current_revenue = float(inventory_result.current_revenue or 0)
                 
                 utilization_rate = (rented_items / total_items * 100) if total_items > 0 else 0
                 availability_rate = (available_items / total_items * 100) if total_items > 0 else 0
+                correlation_coverage = (total_rfid_tags / total_pos_inventory * 100) if total_pos_inventory > 0 else 0
                 
                 kpis['inventory'] = {
                     'total_items': total_items,
                     'rented_items': rented_items,
                     'available_items': available_items,
                     'maintenance_items': maintenance_items,
-                    'lost_items': lost_items,
+                    'inactive_items': inactive_items,
+                    'total_pos_inventory': total_pos_inventory,
+                    'total_rfid_tags': total_rfid_tags,
+                    'correlation_coverage': round(correlation_coverage, 1),
                     'utilization_rate': round(utilization_rate, 1),
-                    'availability_rate': round(availability_rate, 1)
+                    'availability_rate': round(availability_rate, 1),
+                    'avg_utilization_percentage': round(avg_utilization, 1),
+                    'current_rental_revenue': round(current_revenue, 2)
                 }
             
             # Financial KPIs from POS data

@@ -293,7 +293,22 @@ class PayrollImportService:
     def import_normalized_payroll_data(self, normalized_data: List[Dict]) -> int:
         """Import normalized payroll data using the PayrollTrendsData model"""
         imported_count = 0
-        batch_size = 100
+        # OLD - HARDCODED (WRONG): batch_size = 100
+        # NEW - CONFIGURABLE (CORRECT): Use LaborCostConfiguration batch_processing_size (capped at 200)
+        from app.models.config_models import LaborCostConfiguration, get_default_labor_cost_config
+        try:
+            config = LaborCostConfiguration.query.filter_by(
+                user_id='default_user', 
+                config_name='default'
+            ).first()
+            
+            if config:
+                batch_size = min(config.batch_processing_size, 200)  # Cap at 200 as per user requirement
+            else:
+                defaults = get_default_labor_cost_config()
+                batch_size = min(defaults['batch_processing']['default_batch_size'], 200)
+        except Exception:
+            batch_size = 100  # Safe fallback
         
         with self.Session() as session:
             try:

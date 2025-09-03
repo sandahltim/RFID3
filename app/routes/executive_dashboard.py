@@ -38,7 +38,11 @@ def executive_dashboard():
         insights_data = insights_service.get_executive_insights()
         
         # Get store performance summary
-        store_performance = financial_service.analyze_multi_store_performance(26)
+        # OLD - HARDCODED (WRONG): store_performance = financial_service.analyze_multi_store_performance(26)
+        # NEW - CONFIGURABLE (CORRECT):
+        config = _get_dashboard_config()
+        analysis_period = int(config.get_store_threshold('default', 'default_analysis_period_weeks'))
+        store_performance = financial_service.analyze_multi_store_performance(analysis_period)
         
         # Get real-time KPIs
         kpis = _get_executive_kpis()
@@ -76,9 +80,15 @@ def api_financial_kpis():
     """API endpoint for executive financial KPIs"""
     try:
         # Get comprehensive financial analytics
-        revenue_analysis = financial_service.calculate_rolling_averages('revenue', 26)
+        # OLD - HARDCODED (WRONG): revenue_analysis = financial_service.calculate_rolling_averages('revenue', 26)
+        # NEW - CONFIGURABLE (CORRECT):
+        config = _get_dashboard_config()
+        analysis_period = int(config.get_store_threshold('default', 'default_analysis_period_weeks'))
+        revenue_analysis = financial_service.calculate_rolling_averages('revenue', analysis_period)
         yoy_analysis = financial_service.calculate_year_over_year_analysis('revenue')
-        store_analysis = financial_service.analyze_multi_store_performance(26)
+        # OLD - HARDCODED (WRONG): store_analysis = financial_service.analyze_multi_store_performance(26)
+        # NEW - CONFIGURABLE (CORRECT):
+        store_analysis = financial_service.analyze_multi_store_performance(analysis_period)
         
         # Extract key metrics
         kpis = {
@@ -125,7 +135,11 @@ def api_intelligent_insights():
 def api_store_comparison():
     """API endpoint for store performance comparison"""
     try:
-        analysis_period = int(request.args.get("weeks", 26))
+        # OLD - HARDCODED (WRONG): analysis_period = int(request.args.get("weeks", 26))
+        # NEW - CONFIGURABLE (CORRECT):
+        config = _get_dashboard_config()
+        default_weeks = int(config.get_store_threshold('default', 'default_analysis_period_weeks'))
+        analysis_period = int(request.args.get("weeks", default_weeks))
         
         # Get comprehensive store analysis
         store_data = financial_service.analyze_multi_store_performance(analysis_period)
@@ -310,11 +324,19 @@ def api_enhanced_kpis():
         
         # Add accurate correlation coverage note
         if enhanced_kpis.get('success'):
-            enhanced_kpis['coverage_note'] = 'Based on 1.78% RFID correlation coverage (290 of 16,259 items)'
+            # OLD - HARDCODED (WRONG): enhanced_kpis['coverage_note'] = 'Based on 1.78% RFID correlation coverage (290 of 16,259 items)'
+            # NEW - CONFIGURABLE (CORRECT):
+            config = _get_dashboard_config()
+            coverage_pct = config.get_store_threshold('default', 'rfid_coverage_percentage')
+            correlated_items = int(config.get_store_threshold('default', 'rfid_correlated_items'))
+            total_items = int(config.get_store_threshold('default', 'total_equipment_items'))
+            enhanced_kpis['coverage_note'] = f'Based on {coverage_pct}% RFID correlation coverage ({correlated_items} of {total_items:,} items)'
             enhanced_kpis['data_transparency'] = {
-                'rfid_correlated_items': 290,
-                'total_equipment_items': 16259,
-                'coverage_percentage': 1.78,
+                # OLD - HARDCODED (WRONG): 'rfid_correlated_items': 290, 'total_equipment_items': 16259, 'coverage_percentage': 1.78,
+                # NEW - CONFIGURABLE (CORRECT):
+                'rfid_correlated_items': correlated_items,
+                'total_equipment_items': total_items,
+                'coverage_percentage': coverage_pct,
                 'pos_estimated_items': 15969
             }
         
@@ -385,7 +407,11 @@ def api_multi_timeframe():
     try:
         timeframe = request.args.get('timeframe', 'weekly')  # daily, weekly, monthly, quarterly, yearly
         metric = request.args.get('metric', 'revenue')
-        periods = int(request.args.get('periods', 26))
+        # OLD - HARDCODED (WRONG): periods = int(request.args.get('periods', 26))
+        # NEW - CONFIGURABLE (CORRECT):
+        config = _get_dashboard_config()
+        default_periods = int(config.get_store_threshold('default', 'default_analysis_period_weeks'))
+        periods = int(request.args.get('periods', default_periods))
         
         # Map timeframes to appropriate analysis periods
         timeframe_mapping = {
@@ -593,6 +619,10 @@ def _get_dashboard_config():
                 self.weak_decline_points = defaults['health_scoring']['weak_decline_points']
                 self.default_forecast_horizon_weeks = defaults['forecasting']['default_horizon_weeks']
                 self.default_confidence_level = defaults['forecasting']['default_confidence_level']
+                self.default_analysis_period_weeks = defaults['analysis']['default_period_weeks']
+                self.rfid_coverage_percentage = defaults['rfid_coverage']['coverage_percentage']
+                self.rfid_correlated_items = defaults['rfid_coverage']['correlated_items']
+                self.total_equipment_items = defaults['rfid_coverage']['total_equipment_items']
                 self.min_health_score = 0.0
                 self.max_health_score = 100.0
                 
@@ -621,6 +651,10 @@ def _get_dashboard_config():
                 self.weak_decline_points = -5
                 self.default_forecast_horizon_weeks = 12
                 self.default_confidence_level = 0.95
+                self.default_analysis_period_weeks = 26
+                self.rfid_coverage_percentage = 1.78
+                self.rfid_correlated_items = 290
+                self.total_equipment_items = 16259
                 self.min_health_score = 0.0
                 self.max_health_score = 100.0
                 

@@ -34,24 +34,37 @@ class ExecutiveDashboardVisualizations {
     initializeAnimatedCounters() {
         const counterElements = document.querySelectorAll('.animated-counter');
         
+        // Check if CountUp is available, use fallback if not
+        const CountUpClass = window.CountUp || window.CountUpFallback;
+        if (!CountUpClass) {
+            console.warn('CountUp.js not loaded and no fallback available, skipping animated counters');
+            return;
+        }
+        
         counterElements.forEach(element => {
-            const countUp = new CountUp(element.id, 0, {
-                duration: 2,
-                useEasing: true,
-                useGrouping: true,
-                separator: ',',
-                decimal: '.',
-                prefix: element.textContent.includes('$') ? '$' : '',
-                suffix: element.textContent.includes('%') ? '%' : ''
-            });
-            
-            this.counters[element.id] = countUp;
+            try {
+                const countUp = new CountUpClass(element.id, 0, {
+                    duration: 2,
+                    useEasing: true,
+                    useGrouping: true,
+                    separator: ',',
+                    decimal: '.',
+                    prefix: element.textContent.includes('$') ? '$' : '',
+                    suffix: element.textContent.includes('%') ? '%' : ''
+                });
+                
+                this.counters[element.id] = countUp;
+            } catch (error) {
+                console.warn(`Failed to initialize counter for ${element.id}:`, error);
+            }
         });
     }
 
     updateAnimatedCounter(elementId, value, options = {}) {
-        if (this.counters[elementId]) {
+        if (this.counters[elementId] && this.counters[elementId].options) {
             const element = document.getElementById(elementId);
+            if (!element) return;
+            
             const prefix = options.prefix || (element.textContent.includes('$') ? '$' : '');
             const suffix = options.suffix || (element.textContent.includes('%') ? '%' : '');
             
@@ -484,10 +497,10 @@ class ExecutiveDashboardVisualizations {
             }
         });
 
-        // Add refresh data functionality
-        setInterval(() => {
-            this.refreshAllVisualizations();
-        }, 30000); // Refresh every 30 seconds
+        // Disable auto-refresh to prevent UX issues
+        // setInterval(() => {
+        //     this.refreshAllVisualizations();
+        // }, 30000); // Refresh every 30 seconds
     }
 
     // Public methods for updating data
