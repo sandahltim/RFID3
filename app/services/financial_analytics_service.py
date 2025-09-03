@@ -28,6 +28,7 @@ from app.config.stores import (
     get_store_name, get_store_manager, get_store_business_type,
     get_store_opening_date, get_active_store_codes
 )
+from app.models.config_models import LaborCostConfiguration, get_default_labor_cost_config
 
 
 logger = get_logger(__name__)
@@ -54,30 +55,242 @@ class FinancialAnalyticsService:
         else:
             STORE_BUSINESS_MIX[store_code] = {'construction': 0.50, 'events': 0.50}
     
-    # Revenue percentages from 2024 TTM analysis
-    STORE_REVENUE_TARGETS = {
-        '3607': 0.153,  # 15.3% of total revenue
-        '6800': 0.275,  # 27.5% of total revenue - largest operation
-        '728': 0.121,   # 12.1% of total revenue - smallest operation
-        '8101': 0.248   # 24.8% of total revenue - major events operation
-    }
+    # COMMENTED OUT: Old hardcoded revenue percentages - replaced with calculated actual performance
+    # STORE_REVENUE_TARGETS = {
+    #     '3607': 0.153,  # 15.3% of total revenue
+    #     '6800': 0.275,  # 27.5% of total revenue - largest operation
+    #     '728': 0.121,   # 12.1% of total revenue - smallest operation
+    #     '8101': 0.248   # 24.8% of total revenue - major events operation
+    # }
+    
+    # Revenue targets should be configurable business goals (moved to config system)
+    # Actual performance is now calculated from real data using calculate_actual_store_performance()
     
     def __init__(self):
         self.logger = logger
+        
+    def get_analysis_config(self) -> Dict:
+        """
+        Get configurable analysis parameters. 
+        TODO: Move to database configuration system when implemented.
+        For now, provides centralized defaults with future configurability.
+        
+        Returns:
+            Dict with analysis configuration parameters
+        """
+        # TODO: Replace with database configuration lookup
+        # For now, centralized configurable defaults
+        return {
+            'rolling_window_weeks': 3,          # Default 3-week rolling averages
+            'default_analysis_weeks': 26,       # Default 26-week lookback period  
+            'trend_analysis_window': 3,         # Window for trend calculations
+            'smoothing_center': True,           # Center the rolling window
+            'min_data_points': 10,              # Minimum data points for valid analysis
+            'confidence_threshold': 0.95,       # Statistical confidence level
+            'volatility_threshold': 15.0        # Percentage threshold for high volatility
+        }
+    
+    def get_config_value(self, key: str, default=None):
+        """
+        Get a specific configuration value with fallback default.
+        
+        Args:
+            key: Configuration key to retrieve
+            default: Fallback value if key not found
+            
+        Returns:
+            Configuration value or default
+        """
+        config = self.get_analysis_config()
+        return config.get(key, default)
+    
+    def get_labor_cost_config(self, user_id: str = 'default_user'):
+        """
+        Get labor cost configuration from database or defaults.
+        
+        Args:
+            user_id: User ID to get configuration for
+            
+        Returns:
+            LaborCostConfiguration instance or default values
+        """
+        try:
+            config = db.session.query(LaborCostConfiguration).filter(
+                LaborCostConfiguration.user_id == user_id,
+                LaborCostConfiguration.is_active == True
+            ).first()
+            
+            if config:
+                return config
+            
+            # Create default configuration if none exists
+            default_config = LaborCostConfiguration(user_id=user_id)
+            db.session.add(default_config)
+            db.session.commit()
+            return default_config
+            
+        except Exception as e:
+            logger.error(f"Error getting labor cost config: {e}")
+            # Return a temporary config with defaults if database fails
+            return type('DefaultConfig', (), get_default_labor_cost_config()['global_thresholds'])()
+    
+    def get_store_labor_threshold(self, store_code: str, threshold_type: str = 'high_threshold', user_id: str = 'default_user'):
+        """
+        Get store-specific labor cost threshold with fallback to global defaults.
+        
+        Args:
+            store_code: Store code to get threshold for
+            threshold_type: 'high_threshold', 'warning_level', or 'target'  
+            user_id: User ID for configuration
+            
+        Returns:
+            Threshold value for the store
+        """
+        try:
+            config = self.get_labor_cost_config(user_id)
+            if hasattr(config, 'get_store_threshold'):
+                return config.get_store_threshold(store_code, threshold_type)
+            else:
+                # Fallback to global defaults if config object doesn't have method
+                defaults = get_default_labor_cost_config()['global_thresholds']
+                threshold_map = {
+                    'high_threshold': 'high_cost_threshold',
+                    'warning_level': 'warning_level', 
+                    'target': 'target_ratio'
+                }
+                return defaults.get(threshold_map.get(threshold_type, 'high_cost_threshold'), 35.0)
+        except Exception as e:
+            logger.error(f"Error getting store labor threshold: {e}")
+            return 35.0  # Safe fallback
+    
+    # ==========================================
+    # ACTUAL STORE PERFORMANCE CALCULATIONS
+    # ==========================================
+    
+    def calculate_actual_store_performance(self, timeframe: str = 'monthly', custom_start: date = None, custom_end: date = None) -> Dict:
+        """
+        Calculate actual store contribution both in dollars and percentage of total company revenue.
+        
+        Args:
+            timeframe: 'weekly', 'monthly', 'quarterly', 'yearly', 'ytd', 'custom'
+            custom_start: Start date for custom timeframe
+            custom_end: End date for custom timeframe
+            
+        Returns:
+            Dict with actual performance data per store (dollars + percentages)
+        """
+        try:
+            # Calculate date range based on timeframe
+            end_date = datetime.now().date()
+            
+            if timeframe == 'weekly':
+                start_date = end_date - timedelta(weeks=1)
+            elif timeframe == 'monthly':
+                start_date = end_date - timedelta(days=30)
+            elif timeframe == 'quarterly':
+                start_date = end_date - timedelta(days=90)
+            elif timeframe == 'yearly':
+                start_date = end_date - timedelta(days=365)
+            elif timeframe == 'ytd':
+                start_date = date(end_date.year, 1, 1)
+            elif timeframe == 'custom' and custom_start and custom_end:
+                start_date = custom_start
+                end_date = custom_end
+            else:
+                start_date = end_date - timedelta(days=30)  # Default to monthly
+            
+            # Query actual store performance from scorecard data
+            query = text("""
+                SELECT 
+                    'Wayzata' as store_name, '3607' as store_code,
+                    COALESCE(SUM(revenue_3607), 0) as actual_revenue_dollars
+                FROM scorecard_trends_data 
+                WHERE week_ending BETWEEN :start_date AND :end_date
+                
+                UNION ALL
+                
+                SELECT 
+                    'Brooklyn Park' as store_name, '6800' as store_code,
+                    COALESCE(SUM(revenue_6800), 0) as actual_revenue_dollars
+                FROM scorecard_trends_data 
+                WHERE week_ending BETWEEN :start_date AND :end_date
+                
+                UNION ALL
+                
+                SELECT 
+                    'Elk River' as store_name, '728' as store_code,
+                    COALESCE(SUM(revenue_728), 0) as actual_revenue_dollars
+                FROM scorecard_trends_data 
+                WHERE week_ending BETWEEN :start_date AND :end_date
+                
+                UNION ALL
+                
+                SELECT 
+                    'Fridley' as store_name, '8101' as store_code,
+                    COALESCE(SUM(revenue_8101), 0) as actual_revenue_dollars
+                FROM scorecard_trends_data 
+                WHERE week_ending BETWEEN :start_date AND :end_date
+            """)
+            
+            results = db.session.execute(query, {
+                'start_date': start_date,
+                'end_date': end_date
+            }).fetchall()
+            
+            if not results:
+                return {"error": "No store performance data available for the specified period"}
+            
+            # Calculate total company revenue for percentage calculations
+            total_company_revenue = sum(float(row.actual_revenue_dollars) for row in results)
+            
+            # Build store performance data
+            store_performance = {}
+            for row in results:
+                actual_dollars = float(row.actual_revenue_dollars)
+                actual_percentage = (actual_dollars / total_company_revenue * 100) if total_company_revenue > 0 else 0
+                
+                store_performance[row.store_name] = {
+                    'store_code': row.store_code,
+                    'actual_revenue_dollars': round(actual_dollars, 2),
+                    'actual_revenue_percentage': round(actual_percentage, 2),
+                    'timeframe': timeframe,
+                    'period_start': start_date.isoformat(),
+                    'period_end': end_date.isoformat()
+                }
+            
+            return {
+                "success": True,
+                "total_company_revenue": round(total_company_revenue, 2),
+                "store_performance": store_performance,
+                "timeframe_info": {
+                    "timeframe": timeframe,
+                    "start_date": start_date.isoformat(),
+                    "end_date": end_date.isoformat(),
+                    "days_analyzed": (end_date - start_date).days
+                }
+            }
+            
+        except Exception as e:
+            logger.error(f"Error calculating actual store performance: {e}")
+            return {"error": str(e)}
         
     # ==========================================
     # 3-WEEK ROLLING AVERAGES ANALYSIS
     # ==========================================
     
-    def calculate_rolling_averages(self, metric_type: str = 'revenue', weeks_back: int = 26) -> Dict:
+    def calculate_rolling_averages(self, metric_type: str = 'revenue', weeks_back: int = None) -> Dict:
         """
-        Calculate 3-week rolling averages for financial metrics
+        Calculate rolling averages for financial metrics using configurable parameters.
         
         Args:
             metric_type: 'revenue', 'contracts', 'utilization', 'profitability'
-            weeks_back: Number of weeks to analyze
+            weeks_back: Number of weeks to analyze (uses config default if None)
         """
         try:
+            # Use configurable analysis period if not specified
+            if weeks_back is None:
+                weeks_back = self.get_config_value('default_analysis_weeks', 26)
+                
             end_date = datetime.now().date()
             start_date = end_date - timedelta(weeks=weeks_back)
             
@@ -99,15 +312,15 @@ class FinancialAnalyticsService:
     def _calculate_revenue_rolling_averages(self, start_date: date, end_date: date) -> Dict:
         """Calculate 3-week rolling averages for revenue metrics"""
         try:
-            # Get weekly revenue data from scorecard trends
+            # Get weekly revenue data from scorecard trends  
             query = text("""
                 SELECT 
                     week_ending,
                     total_weekly_revenue,
                     revenue_3607,
                     revenue_6800, 
-                    revenue_728_temp,
-                    revenue_728
+                    revenue_728,
+                    revenue_8101
                 FROM scorecard_trends_data 
                 WHERE week_ending BETWEEN :start_date AND :end_date
                 ORDER BY week_ending
@@ -126,54 +339,63 @@ class FinancialAnalyticsService:
                 'total_revenue': float(row.total_weekly_revenue or 0),
                 'wayzata': float(row.revenue_3607 or 0),
                 'brooklyn_park': float(row.revenue_6800 or 0),
-                'fridley': float(row.revenue_728_temp or 0),
-                'elk_river': float(row.revenue_728 or 0)
+                'elk_river': float(row.revenue_728 or 0),
+                'fridley': float(row.revenue_8101 or 0)
             } for row in result])
             
-            # Calculate 3-week rolling averages
-            df['total_3wk_avg'] = df['total_revenue'].rolling(window=3, center=True).mean()
-            df['wayzata_3wk_avg'] = df['wayzata'].rolling(window=3, center=True).mean()
-            df['brooklyn_park_3wk_avg'] = df['brooklyn_park'].rolling(window=3, center=True).mean()
-            df['fridley_3wk_avg'] = df['fridley'].rolling(window=3, center=True).mean()
-            df['elk_river_3wk_avg'] = df['elk_river'].rolling(window=3, center=True).mean()
+            # Get configurable rolling window parameters
+            rolling_window = self.get_config_value('rolling_window_weeks', 3)
+            center_window = self.get_config_value('smoothing_center', True)
+            
+            # Calculate configurable rolling averages (was hardcoded window=3)
+            df['total_avg'] = df['total_revenue'].rolling(window=rolling_window, center=center_window).mean()
+            df['wayzata_avg'] = df['wayzata'].rolling(window=rolling_window, center=center_window).mean()
+            df['brooklyn_park_avg'] = df['brooklyn_park'].rolling(window=rolling_window, center=center_window).mean()
+            df['fridley_avg'] = df['fridley'].rolling(window=rolling_window, center=center_window).mean()
+            df['elk_river_avg'] = df['elk_river'].rolling(window=rolling_window, center=center_window).mean()
             
             # Calculate forward and backward rolling averages for trend analysis
-            df['total_forward_3wk'] = df['total_revenue'].rolling(window=3).mean()
-            df['total_backward_3wk'] = df['total_revenue'].rolling(window=3).mean().shift(-2)
+            trend_window = self.get_config_value('trend_analysis_window', 3)
+            df['total_forward_avg'] = df['total_revenue'].rolling(window=trend_window).mean()
+            df['total_backward_avg'] = df['total_revenue'].rolling(window=trend_window).mean().shift(-(trend_window-1))
             
-            # Trend analysis
-            df['revenue_trend'] = ((df['total_forward_3wk'] - df['total_backward_3wk']) / 
-                                 df['total_backward_3wk'] * 100).fillna(0)
+            # Trend analysis using configurable windows
+            df['revenue_trend'] = ((df['total_forward_avg'] - df['total_backward_avg']) / 
+                                 df['total_backward_avg'] * 100).fillna(0)
             
-            # Store performance analysis
+            # Store performance analysis using configurable windows
             store_metrics = {}
+            window_size = rolling_window  # Use the same configurable window
+            
             for store_key, store_name in [('wayzata', 'Wayzata'), ('brooklyn_park', 'Brooklyn Park'), 
                                         ('fridley', 'Fridley'), ('elk_river', 'Elk River')]:
                 store_metrics[store_name] = {
-                    'current_3wk_avg': float(df[f'{store_key}_3wk_avg'].iloc[-3:].mean()),
-                    'previous_3wk_avg': float(df[f'{store_key}_3wk_avg'].iloc[-6:-3].mean()),
+                    'current_avg': float(df[f'{store_key}_avg'].iloc[-window_size:].mean()),
+                    'previous_avg': float(df[f'{store_key}_avg'].iloc[-(window_size*2):-window_size].mean()),
                     'growth_rate': 0,
                     'volatility': float(df[store_key].std()),
                     'contribution_pct': float(df[store_key].sum() / df['total_revenue'].sum() * 100)
                 }
                 
-                # Calculate growth rate
-                if store_metrics[store_name]['previous_3wk_avg'] > 0:
+                # Calculate growth rate using configurable periods
+                if store_metrics[store_name]['previous_avg'] > 0:
                     store_metrics[store_name]['growth_rate'] = (
-                        (store_metrics[store_name]['current_3wk_avg'] - 
-                         store_metrics[store_name]['previous_3wk_avg']) /
-                        store_metrics[store_name]['previous_3wk_avg'] * 100
+                        (store_metrics[store_name]['current_avg'] - 
+                         store_metrics[store_name]['previous_avg']) /
+                        store_metrics[store_name]['previous_avg'] * 100
                     )
             
-            # Summary metrics
+            # Summary metrics using configurable windows
             summary = {
                 'total_periods': len(df),
-                'current_3wk_avg': float(df['total_3wk_avg'].iloc[-3:].mean()),
-                'previous_3wk_avg': float(df['total_3wk_avg'].iloc[-6:-3].mean()),
-                'smoothed_trend': float(df['revenue_trend'].iloc[-3:].mean()),
-                'trend_strength': 'strong' if abs(df['revenue_trend'].iloc[-3:].mean()) > 5 else 'moderate',
+                'current_avg': float(df['total_avg'].iloc[-window_size:].mean()),
+                'previous_avg': float(df['total_avg'].iloc[-(window_size*2):-window_size].mean()),
+                'smoothed_trend': float(df['revenue_trend'].iloc[-window_size:].mean()),
+                'trend_strength': 'strong' if abs(df['revenue_trend'].iloc[-window_size:].mean()) > 5 else 'moderate',
                 'peak_week': df.loc[df['total_revenue'].idxmax(), 'week_ending'].strftime('%Y-%m-%d'),
-                'peak_revenue': float(df['total_revenue'].max())
+                'peak_revenue': float(df['total_revenue'].max()),
+                'rolling_window_weeks': rolling_window,
+                'analysis_weeks': (end_date - start_date).days // 7
             }
             
             return {
@@ -228,10 +450,13 @@ class FinancialAnalyticsService:
                 'elk_river': int(row.new_contracts_8101 or 0)
             } for row in result])
             
-            # 3-week rolling averages
+            # Configurable rolling averages
+            # OLD - HARDCODED (WRONG): df[f'{col}_3wk_avg'] = df[col].rolling(window=3, center=True).mean()
+            # NEW - CONFIGURABLE (CORRECT):
+            rolling_window = self.get_config_value('rolling_window_weeks', 3)
             for col in ['total_contracts', 'wayzata', 'brooklyn_park', 'fridley', 'elk_river']:
-                df[f'{col}_3wk_avg'] = df[col].rolling(window=3, center=True).mean()
-                df[f'{col}_trend'] = df[col].rolling(window=3).mean().pct_change() * 100
+                df[f'{col}_3wk_avg'] = df[col].rolling(window=rolling_window, center=True).mean()
+                df[f'{col}_trend'] = df[col].rolling(window=rolling_window).mean().pct_change() * 100
             
             # Performance analysis
             store_analysis = {}
@@ -1230,9 +1455,12 @@ class FinancialAnalyticsService:
                 store_df = df[df['store_code'] == store_code].copy()
                 store_df = store_df.sort_values('week_ending')
                 
-                # 3-week rolling averages
-                store_df['profit_3wk_avg'] = store_df['gross_profit'].rolling(window=3, center=True).mean()
-                store_df['margin_3wk_avg'] = store_df['margin_pct'].rolling(window=3, center=True).mean()
+                # Configurable rolling averages
+                # OLD - HARDCODED (WRONG): store_df['profit_3wk_avg'] = store_df['gross_profit'].rolling(window=3, center=True).mean()
+                # NEW - CONFIGURABLE (CORRECT):
+                rolling_window = self.get_config_value('rolling_window_weeks', 3)
+                store_df['profit_3wk_avg'] = store_df['gross_profit'].rolling(window=rolling_window, center=True).mean()
+                store_df['margin_3wk_avg'] = store_df['margin_pct'].rolling(window=rolling_window, center=True).mean()
                 
                 # Trend analysis
                 recent_avg_profit = float(store_df['profit_3wk_avg'].iloc[-3:].mean())
@@ -1255,7 +1483,10 @@ class FinancialAnalyticsService:
             }).reset_index()
             
             company_df['margin_pct'] = (company_df['gross_profit'] / company_df['revenue'] * 100).fillna(0)
-            company_df['profit_3wk_avg'] = company_df['gross_profit'].rolling(window=3, center=True).mean()
+            # OLD - HARDCODED (WRONG): company_df['profit_3wk_avg'] = company_df['gross_profit'].rolling(window=3, center=True).mean()
+            # NEW - CONFIGURABLE (CORRECT):
+            rolling_window = self.get_config_value('rolling_window_weeks', 3)
+            company_df['profit_3wk_avg'] = company_df['gross_profit'].rolling(window=rolling_window, center=True).mean()
             
             return {
                 "success": True,
@@ -1382,9 +1613,12 @@ class FinancialAnalyticsService:
                 revenue_per_hour = float(row.avg_revenue_per_hour or 0)
                 labor_cost_ratio = float(row.avg_labor_cost_ratio or 0)
                 
-                # Efficiency score (higher revenue per hour, lower labor cost ratio = better)
+                # Efficiency score using configurable baseline (higher revenue per hour, lower labor cost ratio = better)
+                config = self.get_labor_cost_config()
+                efficiency_baseline = getattr(config, 'efficiency_baseline', 100.0)
+                
                 revenue_efficiency = min(100, revenue_per_hour / 10)  # Cap at 100 for $1000/hour
-                cost_efficiency = max(0, 100 - labor_cost_ratio)
+                cost_efficiency = max(0, efficiency_baseline - labor_cost_ratio)
                 overall_efficiency = (revenue_efficiency + cost_efficiency) / 2
                 
                 efficiency_scores[store_name] = {
@@ -1513,11 +1747,24 @@ class FinancialAnalyticsService:
                 insights.append(f"{worst_store[0]} needs efficiency improvement (score: {worst_store[1]['overall_efficiency_score']:.1f})")
             
             # Labor cost insights
-            high_labor_cost_stores = [store for store, metrics in efficiency_scores.items() 
-                                    if metrics['labor_cost_ratio_pct'] > 35]
+            # Use configurable labor cost thresholds instead of hardcoded 35%
+            high_labor_cost_stores = []
+            for store, metrics in efficiency_scores.items():
+                # Get store-specific or global threshold
+                store_codes = {'Wayzata': '3607', 'Brooklyn Park': '6800', 'Elk River': '728', 'Fridley': '8101'}
+                store_code = store_codes.get(store, '3607')  # Default to first store if not found
+                threshold = self.get_store_labor_threshold(store_code, 'high_threshold')
+                
+                if metrics['labor_cost_ratio_pct'] > threshold:
+                    high_labor_cost_stores.append({'store': store, 'ratio': metrics['labor_cost_ratio_pct'], 'threshold': threshold})
             
             if high_labor_cost_stores:
-                insights.append(f"{len(high_labor_cost_stores)} stores have high labor cost ratios (>35%)")
+                thresholds_used = set([store['threshold'] for store in high_labor_cost_stores])
+                if len(thresholds_used) == 1:
+                    threshold_text = f">{list(thresholds_used)[0]:.1f}%"
+                else:
+                    threshold_text = "above configured thresholds"
+                insights.append(f"{len(high_labor_cost_stores)} stores have high labor cost ratios ({threshold_text})")
             
             # Revenue per hour insights
             low_productivity_stores = [store for store, metrics in efficiency_scores.items() 

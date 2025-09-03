@@ -3038,27 +3038,110 @@ def get_enhanced_dashboard_summary():
 @executive_api_bp.route("/api/financial-kpis", methods=["GET"])
 def financial_kpis():
     """Get financial KPIs for the dashboard"""
+    session = None
     try:
-        # Return simple sample data for now to avoid errors
+        # CALCULATE FROM DATABASE - NO HARDCODED VALUES!
+        from sqlalchemy import text
+        session = db.session()
+        
+        # Calculate 3-week revenue average from actual scorecard data
+        revenue_query = text("""
+            SELECT AVG(total_weekly_revenue) as avg_3wk
+            FROM scorecard_trends_data 
+            WHERE total_weekly_revenue IS NOT NULL
+            ORDER BY week_ending DESC 
+            LIMIT 3
+        """)
+        current_3wk_avg = session.execute(revenue_query).scalar() or 0
+        
+        # Calculate YoY growth by comparing same weeks to previous year
+        yoy_query = text("""
+            SELECT 
+                AVG(CASE WHEN YEAR(week_ending) = YEAR(CURDATE()) 
+                    THEN total_weekly_revenue END) as current_avg,
+                AVG(CASE WHEN YEAR(week_ending) = YEAR(CURDATE()) - 1 
+                    THEN total_weekly_revenue END) as previous_avg
+            FROM scorecard_trends_data 
+            WHERE total_weekly_revenue IS NOT NULL
+                AND week_ending >= DATE_SUB(CURDATE(), INTERVAL 18 MONTH)
+        """)
+        yoy_result = session.execute(yoy_query).fetchone()
+        
+        yoy_growth = 0
+        if yoy_result and yoy_result.current_avg and yoy_result.previous_avg:
+            yoy_growth = ((yoy_result.current_avg - yoy_result.previous_avg) / yoy_result.previous_avg) * 100
+        
+        # Calculate equipment utilization from combined_inventory
+        utilization_query = text("""
+            SELECT 
+                COUNT(CASE WHEN status IN ('fully_rented', 'partially_rented') THEN 1 END) * 100.0
+                / NULLIF(COUNT(*), 0) as utilization_rate
+            FROM combined_inventory 
+            WHERE rental_rate > 0
+        """)
+        utilization_avg = session.execute(utilization_query).scalar() or 0
+        
+        # Calculate business health score based on multiple factors
+        health_score = 50  # Base score
+        
+        # Revenue performance (25 points max)
+        if current_3wk_avg > 100000:
+            health_score += 25
+        elif current_3wk_avg > 75000:
+            health_score += 20
+        elif current_3wk_avg > 50000:
+            health_score += 15
+        elif current_3wk_avg > 25000:
+            health_score += 10
+            
+        # YoY growth performance (25 points max) 
+        if yoy_growth > 10:
+            health_score += 25
+        elif yoy_growth > 0:
+            health_score += 15
+        elif yoy_growth > -5:
+            health_score += 10
+        elif yoy_growth > -15:
+            health_score += 5
+            
+        # Utilization performance (25 points max)
+        if utilization_avg > 85:
+            health_score += 25
+        elif utilization_avg > 75:
+            health_score += 20
+        elif utilization_avg > 65:
+            health_score += 15
+        elif utilization_avg > 50:
+            health_score += 10
+            
+        # Cap at 100
+        health_score = min(100, max(0, health_score))
+        
+        logger.info(f"Calculated KPIs: Revenue=${current_3wk_avg:,.0f}, YoY={yoy_growth:.1f}%, Util={utilization_avg:.1f}%, Health={health_score}")
+        
         return jsonify({
             "success": True,
             "revenue_metrics": {
-                "current_3wk_avg": 285750,
-                "yoy_growth": 15.3,
-                "change_pct": 8.2
+                "current_3wk_avg": round(float(current_3wk_avg)),
+                "yoy_growth": round(float(yoy_growth), 1),
+                "change_pct": 0  # Would need week-over-week calculation
             },
             "store_metrics": {
-                "utilization_avg": 82.7,
-                "change_pct": 5.4
+                "utilization_avg": round(float(utilization_avg), 1),
+                "change_pct": 0  # Would need historical comparison
             },
             "operational_health": {
-                "health_score": 89,
-                "change_pct": 3.0
+                "health_score": round(float(health_score)),
+                "change_pct": 0  # Would need historical comparison
             }
         })
+        
     except Exception as e:
-        logger.error(f"Error in financial KPIs: {str(e)}", exc_info=True)
-        return jsonify({"success": False, "error": str(e)}), 500
+        logger.error(f"Error calculating financial KPIs from database: {str(e)}", exc_info=True)
+        return jsonify({"success": False, "error": f"KPI calculation failed: {str(e)}"}), 500
+    finally:
+        if session:
+            session.close()
 
 @executive_api_bp.route("/api/location-kpis/<store_code>", methods=["GET"])
 def location_specific_kpis(store_code):

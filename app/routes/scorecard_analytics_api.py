@@ -46,7 +46,7 @@ def get_scorecard_analytics():
                 total_reservation_728,
                 total_reservation_8101
             FROM scorecard_trends_data
-            WHERE week_ending >= DATE('now', '-' || :weeks || ' weeks')
+            WHERE week_ending >= DATE_SUB(CURDATE(), INTERVAL :weeks WEEK)
             ORDER BY week_ending ASC
         """)
         
@@ -84,14 +84,15 @@ def get_scorecard_analytics():
                 '8101': float(row.revenue_8101 or 0)
             }
             
-            # Calculate concentration risk (single store >40% of total)
-            max_store_pct = max(store_revenues.values()) / total_revenue * 100 if total_revenue > 0 else 0
+            # Calculate concentration risk (single store >40% of total)  
+            total_revenue_float = float(total_revenue) if total_revenue else 0
+            max_store_pct = max(store_revenues.values()) / total_revenue_float * 100 if total_revenue_float > 0 else 0
             concentration_risk = max_store_pct > 40
             
             # Multi-year trend data point
             analytics_data["multi_year_trends"].append({
                 "week_ending": week_ending.isoformat() if hasattr(week_ending, 'isoformat') else str(week_ending),
-                "total_revenue": float(total_revenue),
+                "total_revenue": total_revenue_float,
                 "store_revenues": store_revenues,
                 "concentration_risk": concentration_risk,
                 "max_store_percentage": round(max_store_pct, 1)
@@ -132,7 +133,9 @@ def get_scorecard_analytics():
         seasonal_analysis = {}
         for data_point in analytics_data["multi_year_trends"]:
             if isinstance(data_point["week_ending"], str):
-                week_date = datetime.strptime(data_point["week_ending"], '%Y-%m-%d').date()
+                # Handle both date formats: YYYY-MM-DD and YYYY-MM-DDTHH:MM:SS
+                date_str = data_point["week_ending"].split('T')[0]  # Remove time component if present
+                week_date = datetime.strptime(date_str, '%Y-%m-%d').date()
             else:
                 week_date = data_point["week_ending"]
             
@@ -217,7 +220,7 @@ def get_correlation_matrix():
                 new_contracts_3607, new_contracts_6800, new_contracts_728, new_contracts_8101,
                 total_reservation_3607, total_reservation_6800, total_reservation_728, total_reservation_8101
             FROM scorecard_trends_data
-            WHERE week_ending >= DATE('now', '-104 weeks')  -- 2 years of data
+            WHERE week_ending >= DATE_SUB(CURDATE(), INTERVAL 104 WEEK)  -- 2 years of data
             ORDER BY week_ending ASC
         """)
         

@@ -204,13 +204,12 @@ def init_scheduler(app):
                     with acquire_lock(redis_client, csv_import_lock_key, csv_import_lock_timeout):
                         logger.info("🚀 Starting Tuesday 8am CSV imports (all POS files)")
                         
-                        from .financial_csv_import_service import FinancialCSVImportService
-                        importer = FinancialCSVImportService()
+                        from .pos_import_service import pos_import_service
                         
-                        import_results = importer.import_all_csv_files()
-                        successful = import_results.get("successful_imports", 0)
-                        total = import_results.get("total_file_types", 0)
-                        logger.info(f"🏁 Tuesday CSV imports completed: {successful}/{total} file types successful")
+                        import_results = pos_import_service.import_all_pos_data()
+                        successful = import_results.get("total_imported", 0)
+                        failed = import_results.get("total_failed", 0)
+                        logger.info(f"🏁 Tuesday CSV imports completed: {successful} imported, {failed} failed")
                         
                 except LockError:
                     logger.debug("CSV import lock exists, skipping import")

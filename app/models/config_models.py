@@ -618,6 +618,14 @@ class ExecutiveDashboardConfiguration(db.Model):
     min_forecast_horizon = db.Column(db.Integer, default=1)                     # Minimum 1 week
     max_forecast_horizon = db.Column(db.Integer, default=52)                    # Maximum 52 weeks
     
+    # Analysis Period Parameters
+    default_analysis_period_weeks = db.Column(db.Integer, default=26)           # Default 26-week analysis period
+    
+    # RFID Coverage Data Parameters  
+    rfid_coverage_percentage = db.Column(db.Float, default=1.78)                # Current RFID correlation coverage %
+    rfid_correlated_items = db.Column(db.Integer, default=290)                  # Number of RFID-correlated items
+    total_equipment_items = db.Column(db.Integer, default=16259)                # Total equipment items in system
+    
     # Store-specific dashboard overrides (JSON format)
     # Example: {"3607": {"base_health_score": 80.0}, "6800": {"strong_growth_threshold": 8.0}}
     store_specific_thresholds = db.Column(db.JSON, default={})
@@ -669,7 +677,11 @@ class ExecutiveDashboardConfiguration(db.Model):
             'strong_decline_points': self.strong_decline_points,
             'weak_decline_points': self.weak_decline_points,
             'default_forecast_horizon_weeks': self.default_forecast_horizon_weeks,
-            'default_confidence_level': self.default_confidence_level
+            'default_confidence_level': self.default_confidence_level,
+            'default_analysis_period_weeks': self.default_analysis_period_weeks,
+            'rfid_coverage_percentage': self.rfid_coverage_percentage,
+            'rfid_correlated_items': self.rfid_correlated_items,
+            'total_equipment_items': self.total_equipment_items
         }
         
         return threshold_map.get(threshold_type, 75.0)  # Safe fallback to base health score
@@ -699,10 +711,122 @@ def get_default_executive_dashboard_config():
             'min_horizon': 1,                            # Minimum 1 week
             'max_horizon': 52                            # Maximum 52 weeks
         },
+        'analysis': {
+            'default_period_weeks': 26                   # Default 26-week analysis period
+        },
+        'rfid_coverage': {
+            'coverage_percentage': 1.78,                 # Current RFID correlation coverage %
+            'correlated_items': 290,                     # Number of RFID-correlated items  
+            'total_equipment_items': 16259               # Total equipment items in system
+        },
         'alerts': {
             'enable_health_alerts': True,
             'enable_trend_alerts': True,
             'enable_growth_alerts': True,
             'frequency': 'weekly'
+        }
+    }
+
+
+class PredictiveAnalyticsConfiguration(db.Model):
+    """Predictive analytics forecasting configuration"""
+    __tablename__ = 'predictive_analytics_configuration'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.String(50), nullable=False, default='default_user')
+    config_name = db.Column(db.String(100), nullable=False, default='default')
+    
+    # Forecast Horizon Parameters
+    short_term_horizon_weeks = db.Column(db.Integer, default=4)                 # Short term: 4 weeks
+    medium_term_horizon_weeks = db.Column(db.Integer, default=12)               # Medium term: 12 weeks (quarterly)
+    long_term_horizon_weeks = db.Column(db.Integer, default=52)                 # Long term: 52 weeks (yearly)
+    default_forecast_horizon = db.Column(db.Integer, default=12)                # Default horizon when not specified
+    
+    # Data Quality Requirements
+    minimum_data_points_required = db.Column(db.Integer, default=10)            # Minimum records for reliable analysis
+    query_limit_records = db.Column(db.Integer, default=100)                    # Default query record limit
+    historical_data_limit_weeks = db.Column(db.Integer, default=52)             # Last year of data (LIMIT 52)
+    
+    # Analysis Quality Thresholds
+    minimum_trend_confidence = db.Column(db.Float, default=0.7)                 # 70% confidence for trend analysis
+    seasonal_analysis_periods = db.Column(db.Integer, default=12)               # 12 periods for seasonal analysis
+    forecast_accuracy_threshold = db.Column(db.Float, default=0.8)              # 80% accuracy threshold
+    
+    # Store-specific predictive overrides (JSON format)
+    # Example: {"3607": {"short_term_horizon_weeks": 6}, "6800": {"minimum_data_points_required": 15}}
+    store_specific_thresholds = db.Column(db.JSON, default={})
+    
+    # Predictive Analytics Settings
+    enable_seasonal_adjustment = db.Column(db.Boolean, default=True)
+    enable_trend_analysis = db.Column(db.Boolean, default=True)
+    enable_outlier_detection = db.Column(db.Boolean, default=True)
+    forecasting_method = db.Column(db.String(50), default='auto')               # auto, linear, exponential, seasonal
+    
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    __table_args__ = (
+        db.UniqueConstraint('user_id', 'config_name'),
+    )
+    
+    def get_store_threshold(self, store_code: str, threshold_type: str):
+        """
+        Get store-specific predictive analytics threshold or fall back to global default.
+        
+        Args:
+            store_code (str): Store identifier (e.g., '3607', '6800')
+            threshold_type (str): Type of threshold to retrieve
+            
+        Returns:
+            float/int: Configured threshold value for the store or global default
+        """
+        # Check for store-specific override
+        if self.store_specific_thresholds and store_code in self.store_specific_thresholds:
+            store_config = self.store_specific_thresholds[store_code]
+            if threshold_type in store_config:
+                return store_config[threshold_type]
+        
+        # Fall back to global configuration
+        threshold_map = {
+            'short_term_horizon_weeks': self.short_term_horizon_weeks,
+            'medium_term_horizon_weeks': self.medium_term_horizon_weeks,
+            'long_term_horizon_weeks': self.long_term_horizon_weeks,
+            'default_forecast_horizon': self.default_forecast_horizon,
+            'minimum_data_points_required': self.minimum_data_points_required,
+            'query_limit_records': self.query_limit_records,
+            'historical_data_limit_weeks': self.historical_data_limit_weeks,
+            'minimum_trend_confidence': self.minimum_trend_confidence,
+            'seasonal_analysis_periods': self.seasonal_analysis_periods,
+            'forecast_accuracy_threshold': self.forecast_accuracy_threshold
+        }
+        
+        return threshold_map.get(threshold_type, 12)  # Safe fallback to 12 weeks
+
+
+def get_default_predictive_analytics_config():
+    """Get default predictive analytics configuration settings"""
+    return {
+        'forecast_horizons': {
+            'short_term_weeks': 4,                       # Short term forecasting horizon
+            'medium_term_weeks': 12,                     # Medium term forecasting horizon (quarterly)
+            'long_term_weeks': 52,                       # Long term forecasting horizon (yearly)
+            'default_horizon_weeks': 12                  # Default when not specified
+        },
+        'data_quality': {
+            'minimum_data_points': 10,                   # Minimum records for reliable analysis
+            'query_limit_records': 100,                  # Default query record limit
+            'historical_data_weeks': 52                  # Historical data lookback period
+        },
+        'analysis_quality': {
+            'minimum_trend_confidence': 0.7,             # 70% confidence for trend analysis
+            'seasonal_periods': 12,                      # Periods for seasonal analysis
+            'forecast_accuracy_threshold': 0.8           # 80% accuracy threshold
+        },
+        'features': {
+            'enable_seasonal_adjustment': True,
+            'enable_trend_analysis': True,
+            'enable_outlier_detection': True,
+            'forecasting_method': 'auto'
         }
     }

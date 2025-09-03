@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KPI Loading Debug Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .kpi-card { border: 1px solid #ccc; padding: 20px; margin: 10px; display: inline-block; width: 200px; }
+        .kpi-value { font-size: 24px; font-weight: bold; color: #0066cc; }
+        .debug-info { background: #f5f5f5; padding: 10px; margin: 10px 0; border-left: 4px solid #ccc; }
+        .error { color: red; }
+        .success { color: green; }
+    </style>
+</head>
+<body>
+    <h1>KVI Loading Debug Test</h1>
+    
+    <div class="debug-info">
+        <h3>Test Status:</h3>
+        <div id="debugStatus">Initializing...</div>
+    </div>
+    
+    <h2>KPI Cards</h2>
+    
+    <div class="kpi-card">
+        <div>Revenue (3-Week Avg)</div>
+        <div class="kpi-value" id="revenueKPI">Loading...</div>
+    </div>
+    
+    <div class="kpi-card">
+        <div>YoY Growth</div>
+        <div class="kpi-value" id="growthKPI">Loading...</div>
+    </div>
+    
+    <div class="kpi-card">
+        <div>Equipment Utilization</div>
+        <div class="kpi-value" id="utilizationKPI">Loading...</div>
+    </div>
+    
+    <div class="kpi-card">
+        <div>Business Health</div>
+        <div class="kpi-value" id="healthKPI">Loading...</div>
+    </div>
+    
+    <div class="debug-info">
+        <h3>Debug Log:</h3>
+        <div id="debugLog"></div>
+    </div>
+    
+    <button onclick="testKPILoading()">Reload KPIs</button>
+    <button onclick="testDirectAPI()">Test API Direct</button>
+    <button onclick="clearDebug()">Clear Log</button>
+
+<script>
+// Debug logging function
+function debugLog(message) {
+    console.log(message);
+    const logDiv = document.getElementById('debugLog');
+    logDiv.innerHTML += '<div>' + new Date().toISOString() + ': ' + message + '</div>';
+}
+
+// Format currency
+function formatCurrency(value, abbreviated = false) {
+    if (!value) return '$0';
+    
+    if (abbreviated && value >= 1000) {
+        if (value >= 1000000) {
+            return '$' + (value / 1000000).toFixed(1) + 'M';
+        } else if (value >= 1000) {
+            return '$' + (value / 1000).toFixed(0) + 'K';
+        }
+    }
+    
+    return '$' + value.toLocaleString();
+}
+
+// Format percentage
+function formatPercentage(value) {
+    if (value === null || value === undefined) return '0%';
+    return value.toFixed(1) + '%';
+}
+
+// Test KPI loading function
+async function testKPILoading() {
+    debugLog('🔍 Starting KPI loading test...');
+    document.getElementById('debugStatus').textContent = 'Loading...';
+    
+    try {
+        const response = await fetch('/executive/api/financial-kpis');
+        debugLog('📡 Fetch response status: ' + response.status);
+        
+        if (!response.ok) {
+            throw new Error('HTTP ' + response.status);
+        }
+        
+        const data = await response.json();
+        debugLog('📊 API Response received: ' + JSON.stringify(data));
+        
+        if (data.success) {
+            updateKPIDisplays(data);
+            document.getElementById('debugStatus').innerHTML = '<span class="success">✅ KPIs loaded successfully</span>';
+        } else {
+            debugLog('❌ API returned success=false');
+            document.getElementById('debugStatus').innerHTML = '<span class="error">❌ API returned success=false</span>';
+        }
+        
+    } catch (error) {
+        debugLog('❌ Error loading KPIs: ' + error.message);
+        document.getElementById('debugStatus').innerHTML = '<span class="error">❌ Error: ' + error.message + '</span>';
+    }
+}
+
+// Test direct API call
+async function testDirectAPI() {
+    debugLog('🧪 Testing direct API call...');
+    
+    try {
+        const result = await fetch('/executive/api/financial-kpis')
+            .then(r => r.json());
+        debugLog('📊 Direct API result: ' + JSON.stringify(result, null, 2));
+        console.log('Direct API result:', result);
+    } catch (error) {
+        debugLog('❌ Direct API test failed: ' + error.message);
+    }
+}
+
+// Update KPI displays
+function updateKPIDisplays(data) {
+    debugLog('🎯 updateKPIDisplays called with data');
+    
+    const revenue = data.revenue_metrics?.current_3wk_avg || 0;
+    const growth = data.revenue_metrics?.yoy_growth || 0;
+    const utilization = data.store_metrics?.utilization_avg || 0;
+    const health = data.operational_health?.health_score || 0;
+
+    debugLog('💰 Extracted values: revenue=' + revenue + ', growth=' + growth + ', utilization=' + utilization + ', health=' + health);
+    
+    // Format values
+    const formattedRevenue = formatCurrency(revenue);
+    const formattedGrowth = formatPercentage(growth);
+    const formattedUtilization = formatPercentage(utilization);
+    const formattedHealth = Math.round(health);
+    
+    debugLog('🎨 Formatted values: ' + JSON.stringify({
+        revenue: formattedRevenue,
+        growth: formattedGrowth,
+        utilization: formattedUtilization,
+        health: formattedHealth
+    }));
+
+    // Check if DOM elements exist
+    const elements = {
+        revenue: document.getElementById('revenueKPI'),
+        growth: document.getElementById('growthKPI'),
+        utilization: document.getElementById('utilizationKPI'),
+        health: document.getElementById('healthKPI')
+    };
+    
+    debugLog('🔍 DOM elements check: ' + JSON.stringify({
+        revenue: !!elements.revenue,
+        growth: !!elements.growth,
+        utilization: !!elements.utilization,
+        health: !!elements.health
+    }));
+
+    // Update DOM elements
+    if (elements.revenue) {
+        elements.revenue.textContent = formattedRevenue;
+        debugLog('✅ Revenue updated to: ' + formattedRevenue);
+    } else {
+        debugLog('❌ Revenue element not found');
+    }
+    
+    if (elements.growth) {
+        elements.growth.textContent = formattedGrowth;
+        debugLog('✅ Growth updated to: ' + formattedGrowth);
+    } else {
+        debugLog('❌ Growth element not found');
+    }
+    
+    if (elements.utilization) {
+        elements.utilization.textContent = formattedUtilization;
+        debugLog('✅ Utilization updated to: ' + formattedUtilization);
+    } else {
+        debugLog('❌ Utilization element not found');
+    }
+    
+    if (elements.health) {
+        elements.health.textContent = formattedHealth;
+        debugLog('✅ Health updated to: ' + formattedHealth);
+    } else {
+        debugLog('❌ Health element not found');
+    }
+    
+    debugLog('✅ KPI displays update complete');
+}
+
+// Clear debug log
+function clearDebug() {
+    document.getElementById('debugLog').innerHTML = '';
+}
+
+// Initialize on page load
+window.addEventListener('DOMContentLoaded', function() {
+    debugLog('🚀 Page loaded, starting initial KPI test...');
+    testKPILoading();
+});
+
+</script>
+
+</body>
+</html>

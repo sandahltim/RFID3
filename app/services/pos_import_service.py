@@ -11,7 +11,7 @@ from typing import Dict, List, Tuple, Optional
 from sqlalchemy import and_, or_, func
 from app import db
 from app.models.pos_models import (
-    POSTransaction, POSTransactionItem, POSCustomer,
+    POSTransaction, POSTransactionItem, POSCustomer, POSEquipment,
     POSImportLog, POSRFIDCorrelation, POSInventoryDiscrepancy
 )
 from app.services.logger import get_logger
@@ -332,6 +332,91 @@ class POSImportService:
         
         return imported, failed, errors
     
+    def import_equipment(self, file_path: str) -> Tuple[int, int, List[str]]:
+        """Import POS equipment from CSV file."""
+        logger.info(f"Starting equipment import from: {file_path}")
+        
+        imported = 0
+        failed = 0 
+        errors = []
+        
+        try:
+            with open(file_path, 'r', encoding='utf-8-sig') as f:
+                reader = csv.DictReader(f)
+                
+                for row_num, row in enumerate(reader, start=2):
+                    try:
+                        item_num = row.get('ItemNum', '').strip()
+                        
+                        if not item_num:
+                            logger.warning(f"Row {row_num}: Missing ItemNum, skipping")
+                            continue
+                        
+                        # Check if equipment already exists
+                        existing = POSEquipment.query.filter_by(item_num=item_num).first()
+                        
+                        if existing:
+                            # Update existing equipment
+                            existing.name = row.get('Name', '').strip() or existing.name
+                            existing.category = row.get('Category', '').strip() or existing.category
+                            existing.current_store = row.get('Current Store', '').strip() or existing.current_store
+                            existing.qty = int(row.get('Qty', 0) or 0)
+                            existing.inactive = self.parse_bool(row.get('Inactive'))
+                            logger.debug(f"Updated equipment: {item_num}")
+                        else:
+                            # Create new equipment
+                            equipment = POSEquipment(
+                                item_num=item_num,
+                                key_field=row.get('Key', '').strip() or None,
+                                name=row.get('Name', '').strip() or None,
+                                loc=row.get('Loc', '').strip() or None,
+                                category=row.get('Category', '').strip() or None,
+                                department=row.get('Department', '').strip() or None,
+                                type_desc=row.get('Type Desc', '').strip() or None,
+                                qty=int(row.get('Qty', 0) or 0),
+                                home_store=row.get('Home Store', '').strip() or None,
+                                current_store=row.get('Current Store', '').strip() or None,
+                                group_field=row.get('Group', '').strip() or None,
+                                manf=row.get('MANF', '').strip() or None,
+                                model_no=row.get('ModelNo', '').strip() or None,
+                                serial_no=row.get('SerialNo', '').strip() or None,
+                                part_no=row.get('PartNo', '').strip() or None,
+                                license_no=row.get('License No', '').strip() or None,
+                                model_year=row.get('Model Year', '').strip() or None,
+                                sell_price=self.parse_decimal(row.get('Sell Price')),
+                                retail_price=self.parse_decimal(row.get('RetailPrice')),
+                                deposit=self.parse_decimal(row.get('Deposit')),
+                                inactive=self.parse_bool(row.get('Inactive')),
+                                import_batch=self.batch_id
+                            )
+                            
+                            db.session.add(equipment)
+                        
+                        imported += 1
+                        
+                        # Commit in batches  
+                        if imported % 100 == 0:
+                            db.session.commit()
+                            logger.info(f"Processed {imported} equipment items...")
+                            
+                    except Exception as e:
+                        failed += 1
+                        error_msg = f"Row {row_num}: {str(e)}"
+                        errors.append(error_msg)
+                        logger.error(error_msg)
+                        db.session.rollback()
+                
+                # Final commit
+                db.session.commit()
+                logger.info(f"Equipment import complete: {imported} processed, {failed} failed")
+                
+        except Exception as e:
+            logger.error(f"Failed to import equipment: {str(e)}")
+            db.session.rollback()
+            raise
+        
+        return imported, failed, errors
+    
     def import_all_pos_data(self, base_path: str = '/home/tim/RFID3/shared/POR') -> Dict:
         """Import all POS data files from directory."""
         self.batch_id = self.generate_batch_id()
@@ -352,13 +437,14 @@ class POSImportService:
             'transactions': {'imported': 0, 'failed': 0, 'errors': []},
             'items': {'imported': 0, 'failed': 0, 'errors': []},
             'customers': {'imported': 0, 'failed': 0, 'errors': []},
+            'equipment': {'imported': 0, 'failed': 0, 'errors': []},
             'total_imported': 0,
             'total_failed': 0
         }
         
         try:
-            # Import transactions
-            trans_file = os.path.join(base_path, 'transactions8.26.25.csv')
+            # Import transactions  
+            trans_file = os.path.join(base_path, 'transactionsPOS8.26.25.csv')
             if os.path.exists(trans_file):
                 imported, failed, errors = self.import_transactions(trans_file)
                 results['transactions'] = {
@@ -370,7 +456,7 @@ class POSImportService:
                 results['total_failed'] += failed
             
             # Import transaction items
-            items_file = os.path.join(base_path, 'transitems8.26.25.csv')
+            items_file = os.path.join(base_path, 'transitemsPOS8.26.25.csv')
             if os.path.exists(items_file):
                 imported, failed, errors = self.import_transaction_items(items_file)
                 results['items'] = {
@@ -382,10 +468,22 @@ class POSImportService:
                 results['total_failed'] += failed
             
             # Import customers
-            cust_file = os.path.join(base_path, 'customer8.26.25.csv')
+            cust_file = os.path.join(base_path, 'customerPOS8.26.25.csv')
             if os.path.exists(cust_file):
                 imported, failed, errors = self.import_customers(cust_file)
                 results['customers'] = {
+                    'imported': imported,
+                    'failed': failed,
+                    'errors': errors[:10]
+                }
+                results['total_imported'] += imported
+                results['total_failed'] += failed
+            
+            # Import equipment
+            equip_file = os.path.join(base_path, 'equipPOS8.26.25.csv')
+            if os.path.exists(equip_file):
+                imported, failed, errors = self.import_equipment(equip_file)
+                results['equipment'] = {
                     'imported': imported,
                     'failed': failed,
                     'errors': errors[:10]
