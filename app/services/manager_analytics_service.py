@@ -22,6 +22,44 @@ class ManagerAnalyticsService:
         """Initialize service for specific store or all stores."""
         self.store_code = store_code
         self.store_info = STORES.get(store_code) if store_code else None
+    
+    def _get_manager_config(self):
+        """Get manager configuration with fallback defaults."""
+        try:
+            from app.models.config_models import ManagerDashboardConfiguration
+            config = ManagerDashboardConfiguration.query.filter_by(
+                user_id='default_user', 
+                config_name='default'
+            ).first()
+            if config:
+                return config
+        except Exception as e:
+            logger.warning(f"Could not load manager configuration: {e}")
+        
+        # Fallback configuration with default values
+        class MockManagerConfig:
+            def get_store_threshold(self, store_code, metric_name):
+                defaults = {
+                    'recent_activity_period_days': 30,
+                    'comparison_period_days': 60,
+                    'max_categories_displayed': 10,
+                    'high_value_threshold': 100.0,
+                    'max_high_value_items': 20,
+                    'recent_transaction_days': 30,
+                    'default_activity_limit': 10
+                }
+                return defaults.get(metric_name, 30)
+        
+        return MockManagerConfig()
+    
+    def _table_exists(self, table_name: str) -> bool:
+        """Check if a table exists in the database."""
+        try:
+            query = text(f"SELECT 1 FROM {table_name} LIMIT 1")
+            result = db.session.execute(query).fetchone()
+            return True
+        except Exception:
+            return False
         
     def get_manager_dashboard_data(self) -> Dict[str, Any]:
         """Get comprehensive dashboard data for manager."""
@@ -131,12 +169,12 @@ class ManagerAnalyticsService:
                 financial_query = text(f"""
                     SELECT 
                         COUNT(*) as total_transactions,
-                        SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END) as total_revenue,
-                        AVG(CASE WHEN amount > 0 THEN amount ELSE 0 END) as avg_transaction_value,
-                        COUNT(CASE WHEN DATE(transaction_date) >= :thirty_days_ago THEN 1 END) as recent_transactions,
-                        SUM(CASE WHEN DATE(transaction_date) >= :thirty_days_ago AND amount > 0 THEN amount ELSE 0 END) as recent_revenue
+                        SUM(CASE WHEN total > 0 THEN total ELSE 0 END) as total_revenue,
+                        AVG(CASE WHEN total > 0 THEN total ELSE 0 END) as avg_transaction_value,
+                        COUNT(CASE WHEN DATE(contract_date) >= :thirty_days_ago THEN 1 END) as recent_transactions,
+                        SUM(CASE WHEN DATE(contract_date) >= :thirty_days_ago AND total > 0 THEN total ELSE 0 END) as recent_revenue
                     FROM pos_transactions 
-                    WHERE transaction_date IS NOT NULL {store_filter.replace('store_code', 'store_id')}
+                    WHERE contract_date IS NOT NULL {store_filter.replace('store_code', 'store_no')}
                 """)
                 
                 financial_result = db.session.execute(financial_query, {
@@ -296,16 +334,16 @@ class ManagerAnalyticsService:
             summary = {}
             
             if self._table_exists('pos_transactions'):
-                store_filter = f"AND store_id = '{self.store_code}'" if self.store_code else ""
+                store_filter = f"AND store_no = '{self.store_code}'" if self.store_code else ""
                 
                 financial_query = text(f"""
                     SELECT 
-                        SUM(CASE WHEN DATE(transaction_date) >= :start_date AND amount > 0 THEN amount ELSE 0 END) as current_revenue,
-                        COUNT(CASE WHEN DATE(transaction_date) >= :start_date THEN 1 END) as current_transactions,
-                        SUM(CASE WHEN DATE(transaction_date) >= :prev_start_date AND DATE(transaction_date) < :start_date AND amount > 0 THEN amount ELSE 0 END) as previous_revenue,
-                        COUNT(CASE WHEN DATE(transaction_date) >= :prev_start_date AND DATE(transaction_date) < :start_date THEN 1 END) as previous_transactions
+                        SUM(CASE WHEN DATE(contract_date) >= :start_date AND total > 0 THEN total ELSE 0 END) as current_revenue,
+                        COUNT(CASE WHEN DATE(contract_date) >= :start_date THEN 1 END) as current_transactions,
+                        SUM(CASE WHEN DATE(contract_date) >= :prev_start_date AND DATE(contract_date) < :start_date AND total > 0 THEN total ELSE 0 END) as previous_revenue,
+                        COUNT(CASE WHEN DATE(contract_date) >= :prev_start_date AND DATE(contract_date) < :start_date THEN 1 END) as previous_transactions
                     FROM pos_transactions 
-                    WHERE transaction_date IS NOT NULL {store_filter}
+                    WHERE contract_date IS NOT NULL {store_filter}
                 """)
                 
                 result = db.session.execute(financial_query, {
@@ -352,19 +390,19 @@ class ManagerAnalyticsService:
             trends = {}
             
             if self._table_exists('pos_transactions'):
-                store_filter = f"AND store_id = '{self.store_code}'" if self.store_code else ""
+                store_filter = f"AND store_no = '{self.store_code}'" if self.store_code else ""
                 
                 # Daily revenue trends
                 daily_trends_query = text(f"""
                     SELECT 
-                        DATE(transaction_date) as date,
-                        SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END) as daily_revenue,
+                        DATE(contract_date) as date,
+                        SUM(CASE WHEN total > 0 THEN total ELSE 0 END) as daily_revenue,
                         COUNT(*) as daily_transactions
                     FROM pos_transactions 
-                    WHERE DATE(transaction_date) >= :start_date 
-                    AND transaction_date IS NOT NULL {store_filter}
-                    GROUP BY DATE(transaction_date)
-                    ORDER BY DATE(transaction_date)
+                    WHERE DATE(contract_date) >= :start_date 
+                    AND contract_date IS NOT NULL {store_filter}
+                    GROUP BY DATE(contract_date)
+                    ORDER BY DATE(contract_date)
                 """)
                 
                 daily_result = db.session.execute(daily_trends_query, {'start_date': start_date}).fetchall()
@@ -597,14 +635,14 @@ class ManagerAnalyticsService:
             if self._table_exists('pos_transactions') and self.store_code:
                 recent_query = text("""
                     SELECT 
-                        transaction_date,
-                        amount,
-                        transaction_type,
-                        description
+                        contract_date,
+                        total,
+                        type,
+                        CONCAT('Contract ', contract_no, ' - ', COALESCE(contact, 'Unknown Customer')) as description
                     FROM pos_transactions 
-                    WHERE store_id = :store_code
-                    AND transaction_date >= DATE_SUB(NOW(), INTERVAL :recent_transaction_days DAY)
-                    ORDER BY transaction_date DESC
+                    WHERE store_no = :store_code
+                    AND contract_date >= DATE_SUB(NOW(), INTERVAL :recent_transaction_days DAY)
+                    ORDER BY contract_date DESC
                     LIMIT :limit
                 """)
                 
@@ -623,10 +661,10 @@ class ManagerAnalyticsService:
                 
                 for row in recent_result:
                     activities.append({
-                        'timestamp': row.transaction_date,
-                        'type': row.transaction_type or 'transaction',
-                        'description': row.description or f'${row.amount:.2f} transaction',
-                        'amount': row.amount
+                        'timestamp': row.contract_date,
+                        'type': row.type or 'transaction',
+                        'description': row.description or f'${row.total:.2f} transaction',
+                        'amount': row.total
                     })
             
             return activities
