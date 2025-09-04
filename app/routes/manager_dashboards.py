@@ -105,7 +105,20 @@ def get_performance_trends(store_code):
         if store_code not in ACTIVE_STORES:
             return jsonify({'error': 'Invalid store code'}), 404
         
-        days = request.args.get('days', 30, type=int)
+        # OLD - HARDCODED (WRONG): days = request.args.get('days', 30, type=int)
+        # NEW - CONFIGURABLE (CORRECT):
+        from app.models.config_models import ManagerDashboardConfiguration, get_default_manager_dashboard_config
+        try:
+            config = ManagerDashboardConfiguration.query.filter_by(user_id='default_user', config_name='default').first()
+            if config:
+                default_days = config.get_store_threshold(store_code, 'default_trend_period_days')
+            else:
+                defaults = get_default_manager_dashboard_config()
+                default_days = defaults['time_periods']['default_trend_days']
+        except Exception:
+            default_days = 30  # Safe fallback
+        
+        days = request.args.get('days', default_days, type=int)
         analytics_service = ManagerAnalyticsService(store_code)
         trends = analytics_service.get_performance_trends(days)
         
