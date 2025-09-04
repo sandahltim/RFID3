@@ -56,8 +56,18 @@ class ManagerAnalyticsService:
         """Get key performance indicators for manager."""
         try:
             current_date = datetime.now().date()
-            thirty_days_ago = current_date - timedelta(days=30)
-            last_month = current_date - timedelta(days=60)
+            # OLD - HARDCODED (WRONG): thirty_days_ago = current_date - timedelta(days=30)
+            # OLD - HARDCODED (WRONG): last_month = current_date - timedelta(days=60)
+            # NEW - CONFIGURABLE (CORRECT):
+            try:
+                config = self._get_manager_config()
+                recent_days = config.get_store_threshold(self.store_code or 'default', 'recent_activity_period_days')
+                comparison_days = config.get_store_threshold(self.store_code or 'default', 'comparison_period_days')
+            except Exception as e:
+                logger.warning(f"Config loading error in get_manager_kpis, using defaults: {str(e)}")
+                recent_days, comparison_days = 30, 60
+            thirty_days_ago = current_date - timedelta(days=recent_days)
+            last_month = current_date - timedelta(days=comparison_days)
             
             kpis = {}
             
@@ -184,6 +194,13 @@ class ManagerAnalyticsService:
             summary = {}
             
             # Base inventory counts by category
+            try:
+                config = self._get_manager_config()
+                max_categories = config.get_store_threshold(self.store_code, 'max_categories_displayed')
+            except Exception as e:
+                logger.warning(f"Config loading error in get_inventory_summary, using defaults: {str(e)}")
+                max_categories = 10
+            
             category_query = text("""
                 SELECT 
                     category,
@@ -195,10 +212,13 @@ class ManagerAnalyticsService:
                 WHERE store_code = :store_code
                 GROUP BY category
                 ORDER BY item_count DESC
-                LIMIT 10
+                LIMIT :max_categories
             """)
             
-            category_result = db.session.execute(category_query, {'store_code': self.store_code}).fetchall()
+            category_result = db.session.execute(category_query, {
+                'store_code': self.store_code,
+                'max_categories': max_categories
+            }).fetchall()
             
             summary['top_categories'] = []
             for row in category_result:
@@ -213,6 +233,13 @@ class ManagerAnalyticsService:
                 })
             
             # High-value items tracking
+            try:
+                high_value_threshold = config.get_store_threshold(self.store_code, 'high_value_threshold')
+                max_high_value_items = config.get_store_threshold(self.store_code, 'max_high_value_items')
+            except Exception as e:
+                logger.warning(f"Config loading error for high-value items, using defaults: {str(e)}")
+                high_value_threshold, max_high_value_items = 100.0, 20
+            
             high_value_query = text("""
                 SELECT 
                     description,
@@ -221,12 +248,16 @@ class ManagerAnalyticsService:
                     COALESCE(rental_rate, 0) as rental_rate
                 FROM combined_inventory 
                 WHERE store_code = :store_code 
-                AND COALESCE(rental_rate, 0) > 100
+                AND COALESCE(rental_rate, 0) > :high_value_threshold
                 ORDER BY rental_rate DESC
-                LIMIT 20
+                LIMIT :max_high_value_items
             """)
             
-            high_value_result = db.session.execute(high_value_query, {'store_code': self.store_code}).fetchall()
+            high_value_result = db.session.execute(high_value_query, {
+                'store_code': self.store_code,
+                'high_value_threshold': high_value_threshold,
+                'max_high_value_items': max_high_value_items
+            }).fetchall()
             
             summary['high_value_items'] = []
             for row in high_value_result:
@@ -248,13 +279,16 @@ class ManagerAnalyticsService:
         try:
             current_date = datetime.now().date()
             
+            config = self._get_manager_config()
+            quarter_comparison_days = config.get_store_threshold(self.store_code or 'default', 'quarter_comparison_days')
+            
             if period == 'month':
                 start_date = current_date.replace(day=1)
                 prev_start_date = (start_date - timedelta(days=1)).replace(day=1)
             elif period == 'quarter':
                 quarter_start_month = ((current_date.month - 1) // 3) * 3 + 1
                 start_date = current_date.replace(month=quarter_start_month, day=1)
-                prev_start_date = (start_date - timedelta(days=90))
+                prev_start_date = (start_date - timedelta(days=quarter_comparison_days))
             else:  # year
                 start_date = current_date.replace(month=1, day=1)
                 prev_start_date = start_date.replace(year=start_date.year - 1)
@@ -305,9 +339,13 @@ class ManagerAnalyticsService:
             logger.error(f"Error getting financial summary: {str(e)}")
             return {}
 
-    def get_performance_trends(self, days: int = 30) -> Dict[str, Any]:
+    def get_performance_trends(self, days: int = None) -> Dict[str, Any]:
         """Get performance trend data."""
         try:
+            config = self._get_manager_config()
+            if days is None:
+                days = config.get_store_threshold(self.store_code or 'default', 'default_trend_period_days')
+            
             end_date = datetime.now().date()
             start_date = end_date - timedelta(days=days)
             
@@ -355,10 +393,14 @@ class ManagerAnalyticsService:
                     WHERE store_code = :store_code
                     GROUP BY category
                     ORDER BY COUNT(*) DESC
-                    LIMIT 10
+                    LIMIT :max_trend_categories
                 """)
                 
-                utilization_result = db.session.execute(utilization_query, {'store_code': self.store_code}).fetchall()
+                max_trend_categories = config.get_store_threshold(self.store_code, 'max_trend_categories')
+                utilization_result = db.session.execute(utilization_query, {
+                    'store_code': self.store_code,
+                    'max_trend_categories': max_trend_categories
+                }).fetchall()
                 
                 trends['category_utilization'] = []
                 for row in utilization_result:
@@ -389,6 +431,10 @@ class ManagerAnalyticsService:
                 return insights
             
             # Check for underutilized high-value items
+            config = self._get_manager_config()
+            underutilized_threshold = config.get_store_threshold(self.store_code, 'underutilized_value_threshold')
+            max_opportunities = config.get_store_threshold(self.store_code, 'max_opportunities_displayed')
+            
             underutilized_query = text("""
                 SELECT 
                     description,
@@ -397,13 +443,17 @@ class ManagerAnalyticsService:
                     status
                 FROM combined_inventory 
                 WHERE store_code = :store_code 
-                AND COALESCE(rental_rate, 0) > 50
+                AND COALESCE(rental_rate, 0) > :underutilized_threshold
                 AND status = 'available'
                 ORDER BY rental_rate DESC
-                LIMIT 10
+                LIMIT :max_opportunities
             """)
             
-            underutilized_result = db.session.execute(underutilized_query, {'store_code': self.store_code}).fetchall()
+            underutilized_result = db.session.execute(underutilized_query, {
+                'store_code': self.store_code,
+                'underutilized_threshold': underutilized_threshold,
+                'max_opportunities': max_opportunities
+            }).fetchall()
             
             for row in underutilized_result:
                 insights['opportunities'].append({
@@ -423,17 +473,21 @@ class ManagerAnalyticsService:
                 WHERE store_code = :store_code 
                 AND status = 'maintenance'
                 GROUP BY category
-                HAVING COUNT(*) > 2
+                HAVING COUNT(*) > :maintenance_backlog_threshold
                 ORDER BY COUNT(*) DESC
             """)
             
-            maintenance_result = db.session.execute(maintenance_query, {'store_code': self.store_code}).fetchall()
+            maintenance_backlog_threshold = config.get_store_threshold(self.store_code, 'maintenance_backlog_threshold')
+            maintenance_result = db.session.execute(maintenance_query, {
+                'store_code': self.store_code,
+                'maintenance_backlog_threshold': maintenance_backlog_threshold
+            }).fetchall()
             
             for row in maintenance_result:
                 insights['alerts'].append({
                     'type': 'maintenance_backlog',
                     'message': f"{row.maintenance_count} {row.category} items need maintenance",
-                    'priority': 'high' if row.maintenance_count > 5 else 'medium',
+                    'priority': 'high' if row.maintenance_count > config.get_store_threshold(self.store_code, 'high_priority_maintenance_threshold') else 'medium',
                     'count': row.maintenance_count,
                     'avg_value': round(row.avg_value, 2)
                 })
@@ -486,7 +540,10 @@ class ManagerAnalyticsService:
             
             maintenance_count = db.session.execute(maintenance_query, {'store_code': self.store_code}).scalar() or 0
             
-            if maintenance_count > 10:
+            config = self._get_manager_config()
+            critical_maintenance_threshold = config.get_store_threshold(self.store_code, 'critical_maintenance_threshold')
+            
+            if maintenance_count > critical_maintenance_threshold:
                 alerts.append({
                     'type': 'warning',
                     'title': 'High Maintenance Backlog',
@@ -504,11 +561,18 @@ class ManagerAnalyticsService:
                 FROM combined_inventory 
                 WHERE store_code = :store_code
                 GROUP BY category
-                HAVING COUNT(CASE WHEN status = 'available' THEN 1 END) < 3
-                AND COUNT(*) > 5
+                HAVING COUNT(CASE WHEN status = 'available' THEN 1 END) < :low_stock_threshold
+                AND COUNT(*) > :min_category_size
             """)
             
-            low_stock_result = db.session.execute(low_stock_query, {'store_code': self.store_code}).fetchall()
+            low_stock_threshold = config.get_store_threshold(self.store_code, 'low_stock_threshold')
+            min_category_size = config.get_store_threshold(self.store_code, 'min_category_size')
+            
+            low_stock_result = db.session.execute(low_stock_query, {
+                'store_code': self.store_code,
+                'low_stock_threshold': low_stock_threshold,
+                'min_category_size': min_category_size
+            }).fetchall()
             
             for row in low_stock_result:
                 alerts.append({
@@ -525,7 +589,7 @@ class ManagerAnalyticsService:
             logger.error(f"Error getting manager alerts: {str(e)}")
             return []
 
-    def get_recent_activity(self, limit: int = 10) -> List[Dict[str, Any]]:
+    def get_recent_activity(self, limit: int = None) -> List[Dict[str, Any]]:
         """Get recent activity for the store."""
         try:
             activities = []
@@ -539,14 +603,22 @@ class ManagerAnalyticsService:
                         description
                     FROM pos_transactions 
                     WHERE store_id = :store_code
-                    AND transaction_date >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+                    AND transaction_date >= DATE_SUB(NOW(), INTERVAL :recent_transaction_days DAY)
                     ORDER BY transaction_date DESC
                     LIMIT :limit
                 """)
                 
+                config = self._get_manager_config()
+                recent_transaction_days = config.get_store_threshold(self.store_code, 'recent_transaction_days')
+                
+                # Handle limit parameter
+                if limit is None:
+                    limit = config.get_store_threshold(self.store_code, 'default_activity_limit')
+                
                 recent_result = db.session.execute(recent_query, {
                     'store_code': self.store_code,
-                    'limit': limit
+                    'limit': limit,
+                    'recent_transaction_days': recent_transaction_days
                 }).fetchall()
                 
                 for row in recent_result:
@@ -578,10 +650,16 @@ class ManagerAnalyticsService:
                 WHERE store_code = :store_code
                 AND (category LIKE '%excavator%' OR category LIKE '%loader%' 
                      OR category LIKE '%crane%' OR category LIKE '%bulldozer%'
-                     OR COALESCE(rental_rate, 0) > 200)
+                     OR COALESCE(rental_rate, 0) > :heavy_equipment_threshold)
             """)
             
-            result = db.session.execute(heavy_equipment_query, {'store_code': self.store_code}).fetchone()
+            config = self._get_manager_config()
+            heavy_equipment_threshold = config.get_store_threshold(self.store_code, 'construction_heavy_equipment_threshold')
+            
+            result = db.session.execute(heavy_equipment_query, {
+                'store_code': self.store_code,
+                'heavy_equipment_threshold': heavy_equipment_threshold
+            }).fetchone()
             
             if result:
                 metrics['heavy_equipment'] = {
@@ -647,10 +725,16 @@ class ManagerAnalyticsService:
                      OR category LIKE '%ladder%' OR category LIKE '%paint%')
                 GROUP BY category
                 ORDER BY COUNT(*) DESC
-                LIMIT 10
+                LIMIT :diy_max_categories
             """)
             
-            result = db.session.execute(diy_categories_query, {'store_code': self.store_code}).fetchall()
+            config = self._get_manager_config()
+            diy_max_categories = config.get_store_threshold(self.store_code, 'diy_max_categories')
+            
+            result = db.session.execute(diy_categories_query, {
+                'store_code': self.store_code,
+                'diy_max_categories': diy_max_categories
+            }).fetchall()
             
             metrics['diy_categories'] = []
             for row in result:
@@ -763,9 +847,13 @@ class ManagerAnalyticsService:
                 metrics['store_age_months'] = store_age_months
                 
                 # Experience factor (newer stores might have different patterns)
-                if store_age_months < 12:
+                config = self._get_manager_config()
+                new_store_threshold = config.get_store_threshold(self.store_code, 'new_store_threshold_months')
+                developing_store_threshold = config.get_store_threshold(self.store_code, 'developing_store_threshold_months')
+                
+                if store_age_months < new_store_threshold:
                     metrics['experience_level'] = 'new'
-                elif store_age_months < 24:
+                elif store_age_months < developing_store_threshold:
                     metrics['experience_level'] = 'developing'
                 else:
                     metrics['experience_level'] = 'mature'
@@ -794,3 +882,96 @@ class ManagerAnalyticsService:
             return result is not None
         except Exception:
             return False
+    
+    def _get_manager_config(self):
+        """Get manager dashboard configuration with safe defaults"""
+        try:
+            from app.models.config_models import ManagerDashboardConfiguration, get_default_manager_dashboard_config
+            
+            config = ManagerDashboardConfiguration.query.filter_by(
+                user_id='default_user',
+                config_name='default'
+            ).first()
+            
+            if config:
+                return config
+            
+            # Create MockConfig with defaults if none exists
+            class MockConfig:
+                def __init__(self):
+                    defaults = get_default_manager_dashboard_config()
+                    
+                    # Time periods
+                    self.recent_activity_period_days = defaults['time_periods']['recent_activity_days']
+                    self.comparison_period_days = defaults['time_periods']['comparison_period_days']
+                    self.default_trend_period_days = defaults['time_periods']['default_trend_days']
+                    self.recent_transaction_days = defaults['time_periods']['recent_transaction_days']
+                    self.quarter_comparison_days = defaults['time_periods']['quarter_comparison_days']
+                    
+                    # Display limits
+                    self.max_categories_displayed = defaults['display_limits']['max_categories']
+                    self.max_high_value_items = defaults['display_limits']['max_high_value_items']
+                    self.max_trend_categories = defaults['display_limits']['max_trend_categories']
+                    self.max_opportunities_displayed = defaults['display_limits']['max_opportunities']
+                    self.default_activity_limit = defaults['display_limits']['default_activity_limit']
+                    self.diy_max_categories = defaults['display_limits']['diy_max_categories']
+                    
+                    # Business thresholds
+                    self.high_value_threshold = defaults['business_thresholds']['high_value_threshold']
+                    self.underutilized_value_threshold = defaults['business_thresholds']['underutilized_threshold']
+                    self.construction_heavy_equipment_threshold = defaults['business_thresholds']['construction_heavy_equipment']
+                    
+                    # Alert thresholds
+                    self.maintenance_backlog_threshold = defaults['alert_thresholds']['maintenance_backlog']
+                    self.high_priority_maintenance_threshold = defaults['alert_thresholds']['high_priority_maintenance']
+                    self.critical_maintenance_threshold = defaults['alert_thresholds']['critical_maintenance']
+                    self.low_stock_threshold = defaults['alert_thresholds']['low_stock_threshold']
+                    self.min_category_size = defaults['alert_thresholds']['min_category_size']
+                    
+                    # Store classification
+                    self.new_store_threshold_months = defaults['store_classification']['new_store_months']
+                    self.developing_store_threshold_months = defaults['store_classification']['developing_store_months']
+                    
+                    # Business insights
+                    self.diy_weekend_percentage = defaults['business_insights']['diy_weekend_percentage']
+                
+                def get_store_threshold(self, store_code: str, threshold_type: str):
+                    """Get threshold value with fallback to attribute defaults"""
+                    return getattr(self, threshold_type, 30)
+            
+            return MockConfig()
+            
+        except Exception as e:
+            logger.warning(f"Could not load manager configuration, using safe fallback: {str(e)}")
+            
+            # Ultra-safe fallback MockConfig
+            class SafeMockConfig:
+                def get_store_threshold(self, store_code: str, threshold_type: str):
+                    """Safe fallback with hardcoded defaults"""
+                    defaults = {
+                        'recent_activity_period_days': 30,
+                        'comparison_period_days': 60,
+                        'default_trend_period_days': 30,
+                        'recent_transaction_days': 7,
+                        'quarter_comparison_days': 90,
+                        'max_categories_displayed': 10,
+                        'max_high_value_items': 20,
+                        'max_trend_categories': 10,
+                        'max_opportunities_displayed': 10,
+                        'default_activity_limit': 10,
+                        'diy_max_categories': 10,
+                        'high_value_threshold': 100.0,
+                        'underutilized_value_threshold': 50.0,
+                        'construction_heavy_equipment_threshold': 200.0,
+                        'maintenance_backlog_threshold': 2,
+                        'high_priority_maintenance_threshold': 5,
+                        'critical_maintenance_threshold': 10,
+                        'low_stock_threshold': 3,
+                        'min_category_size': 5,
+                        'new_store_threshold_months': 12,
+                        'developing_store_threshold_months': 24,
+                        'diy_weekend_percentage': 70.0
+                    }
+                    return defaults.get(threshold_type, 30)
+            
+            return SafeMockConfig()

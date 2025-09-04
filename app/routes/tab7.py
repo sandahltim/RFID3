@@ -3044,6 +3044,42 @@ def financial_kpis():
         from sqlalchemy import text
         session = db.session()
         
+        # Load executive dashboard configuration
+        from app.models.config_models import ExecutiveDashboardConfiguration
+        try:
+            config = ExecutiveDashboardConfiguration.query.filter_by(user_id='default_user', config_name='default').first()
+            if not config:
+                logger.warning("No executive dashboard configuration found, using defaults")
+                config = ExecutiveDashboardConfiguration()
+        except Exception as config_error:
+            logger.error(f"Error loading executive dashboard configuration: {config_error}")
+            # Fallback MockConfig for robust error handling
+            class MockConfig:
+                base_health_score = 75.0
+                revenue_tier_1_threshold = 100000.0
+                revenue_tier_1_points = 25
+                revenue_tier_2_threshold = 75000.0
+                revenue_tier_2_points = 20  
+                revenue_tier_3_threshold = 50000.0
+                revenue_tier_3_points = 15
+                revenue_tier_4_points = 10
+                yoy_excellent_threshold = 10.0
+                yoy_excellent_points = 25
+                yoy_good_threshold = 5.0
+                yoy_good_points = 15
+                yoy_fair_threshold = 0.0
+                yoy_fair_points = 10
+                yoy_poor_points = 5
+                utilization_excellent_threshold = 85.0
+                utilization_excellent_points = 25
+                utilization_good_threshold = 75.0
+                utilization_good_points = 20
+                utilization_fair_threshold = 65.0
+                utilization_fair_points = 15
+                utilization_poor_threshold = 50.0
+                utilization_poor_points = 10
+            config = MockConfig()
+        
         # Calculate 3-week revenue average from actual scorecard data
         revenue_query = text("""
             SELECT AVG(total_weekly_revenue) as avg_3wk
@@ -3082,37 +3118,45 @@ def financial_kpis():
         utilization_avg = session.execute(utilization_query).scalar() or 0
         
         # Calculate business health score based on multiple factors
-        health_score = 50  # Base score
+        # OLD - HARDCODED (WRONG): health_score = 50  # Base score
+        # NEW - CONFIGURABLE (CORRECT):
+        health_score = config.base_health_score
         
-        # Revenue performance (25 points max)
-        if current_3wk_avg > 100000:
-            health_score += 25
-        elif current_3wk_avg > 75000:
-            health_score += 20
-        elif current_3wk_avg > 50000:
-            health_score += 15
-        elif current_3wk_avg > 25000:
-            health_score += 10
+        # Revenue performance (configurable points max)
+        # OLD - HARDCODED (WRONG): if current_3wk_avg > 100000:
+        # NEW - CONFIGURABLE (CORRECT):
+        if current_3wk_avg > config.revenue_tier_1_threshold:
+            health_score += config.revenue_tier_1_points
+        elif current_3wk_avg > config.revenue_tier_2_threshold:
+            health_score += config.revenue_tier_2_points
+        elif current_3wk_avg > config.revenue_tier_3_threshold:
+            health_score += config.revenue_tier_3_points
+        else:
+            health_score += config.revenue_tier_4_points
             
-        # YoY growth performance (25 points max) 
-        if yoy_growth > 10:
-            health_score += 25
-        elif yoy_growth > 0:
-            health_score += 15
-        elif yoy_growth > -5:
-            health_score += 10
-        elif yoy_growth > -15:
-            health_score += 5
+        # YoY growth performance (configurable points max)
+        # OLD - HARDCODED (WRONG): if yoy_growth > 10:
+        # NEW - CONFIGURABLE (CORRECT):
+        if yoy_growth > config.yoy_excellent_threshold:
+            health_score += config.yoy_excellent_points
+        elif yoy_growth > config.yoy_good_threshold:
+            health_score += config.yoy_good_points  
+        elif yoy_growth > config.yoy_fair_threshold:
+            health_score += config.yoy_fair_points
+        else:
+            health_score += config.yoy_poor_points
             
-        # Utilization performance (25 points max)
-        if utilization_avg > 85:
-            health_score += 25
-        elif utilization_avg > 75:
-            health_score += 20
-        elif utilization_avg > 65:
-            health_score += 15
-        elif utilization_avg > 50:
-            health_score += 10
+        # Utilization performance (configurable points max)
+        # OLD - HARDCODED (WRONG): if utilization_avg > 85:
+        # NEW - CONFIGURABLE (CORRECT):
+        if utilization_avg > config.utilization_excellent_threshold:
+            health_score += config.utilization_excellent_points
+        elif utilization_avg > config.utilization_good_threshold:
+            health_score += config.utilization_good_points
+        elif utilization_avg > config.utilization_fair_threshold:
+            health_score += config.utilization_fair_points
+        elif utilization_avg > config.utilization_poor_threshold:
+            health_score += config.utilization_poor_points
             
         # Cap at 100
         health_score = min(100, max(0, health_score))

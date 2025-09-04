@@ -612,6 +612,43 @@ class ExecutiveDashboardConfiguration(db.Model):
     strong_decline_points = db.Column(db.Integer, default=-15)                  # -15 points penalty
     weak_decline_points = db.Column(db.Integer, default=-5)                     # -5 points penalty (-10 < growth < 0)
     
+    # Revenue-Based Health Score Thresholds (from tab7.py health scoring logic)
+    revenue_tier_1_threshold = db.Column(db.Float, default=100000.0)            # Top tier revenue threshold
+    revenue_tier_1_points = db.Column(db.Integer, default=25)                   # +25 points for top tier
+    revenue_tier_2_threshold = db.Column(db.Float, default=75000.0)             # Second tier revenue threshold  
+    revenue_tier_2_points = db.Column(db.Integer, default=20)                   # +20 points for second tier
+    revenue_tier_3_threshold = db.Column(db.Float, default=50000.0)             # Third tier revenue threshold
+    revenue_tier_3_points = db.Column(db.Integer, default=15)                   # +15 points for third tier
+    revenue_tier_4_points = db.Column(db.Integer, default=10)                   # +10 points for below tier 3
+    
+    # YoY Growth-Based Health Score Thresholds (from tab7.py YoY scoring logic)  
+    yoy_excellent_threshold = db.Column(db.Float, default=10.0)                 # >10% YoY growth (excellent)
+    yoy_excellent_points = db.Column(db.Integer, default=25)                    # +25 points for excellent growth
+    yoy_good_threshold = db.Column(db.Float, default=5.0)                       # 5-10% YoY growth (good) 
+    yoy_good_points = db.Column(db.Integer, default=15)                         # +15 points for good growth
+    yoy_fair_threshold = db.Column(db.Float, default=0.0)                       # 0-5% YoY growth (fair)
+    yoy_fair_points = db.Column(db.Integer, default=10)                         # +10 points for fair growth
+    yoy_poor_points = db.Column(db.Integer, default=5)                          # +5 points for negative growth
+    
+    # Margin-Based Health Score Thresholds (from tab7.py margin scoring logic)
+    margin_excellent_threshold = db.Column(db.Float, default=15.0)              # >15% margin (excellent)
+    margin_excellent_points = db.Column(db.Integer, default=25)                 # +25 points for excellent margin
+    margin_good_threshold = db.Column(db.Float, default=10.0)                   # 10-15% margin (good)
+    margin_good_points = db.Column(db.Integer, default=20)                      # +20 points for good margin  
+    margin_fair_threshold = db.Column(db.Float, default=5.0)                    # 5-10% margin (fair)
+    margin_fair_points = db.Column(db.Integer, default=15)                      # +15 points for fair margin
+    margin_poor_points = db.Column(db.Integer, default=10)                      # +10 points for poor margin
+    
+    # Utilization-Based Health Score Thresholds (from tab7.py utilization scoring logic)
+    utilization_excellent_threshold = db.Column(db.Float, default=85.0)         # >85% utilization (excellent) 
+    utilization_excellent_points = db.Column(db.Integer, default=25)            # +25 points for excellent utilization
+    utilization_good_threshold = db.Column(db.Float, default=75.0)              # 75-85% utilization (good)
+    utilization_good_points = db.Column(db.Integer, default=20)                 # +20 points for good utilization
+    utilization_fair_threshold = db.Column(db.Float, default=65.0)              # 65-75% utilization (fair)
+    utilization_fair_points = db.Column(db.Integer, default=15)                 # +15 points for fair utilization
+    utilization_poor_threshold = db.Column(db.Float, default=50.0)              # 50-65% utilization (poor)
+    utilization_poor_points = db.Column(db.Integer, default=10)                 # +10 points for poor utilization
+    
     # Forecasting Default Parameters
     default_forecast_horizon_weeks = db.Column(db.Integer, default=12)          # Default 12-week forecast
     default_confidence_level = db.Column(db.Float, default=0.95)                # Default 95% confidence
@@ -676,6 +713,40 @@ class ExecutiveDashboardConfiguration(db.Model):
             'strong_decline_threshold': self.strong_decline_threshold,
             'strong_decline_points': self.strong_decline_points,
             'weak_decline_points': self.weak_decline_points,
+            # Revenue-based health scoring thresholds
+            'revenue_tier_1_threshold': self.revenue_tier_1_threshold,
+            'revenue_tier_1_points': self.revenue_tier_1_points,
+            'revenue_tier_2_threshold': self.revenue_tier_2_threshold,
+            'revenue_tier_2_points': self.revenue_tier_2_points,
+            'revenue_tier_3_threshold': self.revenue_tier_3_threshold,
+            'revenue_tier_3_points': self.revenue_tier_3_points,
+            'revenue_tier_4_points': self.revenue_tier_4_points,
+            # YoY growth-based health scoring thresholds  
+            'yoy_excellent_threshold': self.yoy_excellent_threshold,
+            'yoy_excellent_points': self.yoy_excellent_points,
+            'yoy_good_threshold': self.yoy_good_threshold,
+            'yoy_good_points': self.yoy_good_points,
+            'yoy_fair_threshold': self.yoy_fair_threshold,
+            'yoy_fair_points': self.yoy_fair_points,
+            'yoy_poor_points': self.yoy_poor_points,
+            # Margin-based health scoring thresholds
+            'margin_excellent_threshold': self.margin_excellent_threshold,
+            'margin_excellent_points': self.margin_excellent_points,
+            'margin_good_threshold': self.margin_good_threshold,
+            'margin_good_points': self.margin_good_points,
+            'margin_fair_threshold': self.margin_fair_threshold,
+            'margin_fair_points': self.margin_fair_points,
+            'margin_poor_points': self.margin_poor_points,
+            # Utilization-based health scoring thresholds
+            'utilization_excellent_threshold': self.utilization_excellent_threshold,
+            'utilization_excellent_points': self.utilization_excellent_points,
+            'utilization_good_threshold': self.utilization_good_threshold,
+            'utilization_good_points': self.utilization_good_points,
+            'utilization_fair_threshold': self.utilization_fair_threshold,
+            'utilization_fair_points': self.utilization_fair_points,
+            'utilization_poor_threshold': self.utilization_poor_threshold,
+            'utilization_poor_points': self.utilization_poor_points,
+            # Other configuration parameters
             'default_forecast_horizon_weeks': self.default_forecast_horizon_weeks,
             'default_confidence_level': self.default_confidence_level,
             'default_analysis_period_weeks': self.default_analysis_period_weeks,
@@ -685,6 +756,126 @@ class ExecutiveDashboardConfiguration(db.Model):
         }
         
         return threshold_map.get(threshold_type, 75.0)  # Safe fallback to base health score
+
+
+class ExecutiveInsightsConfiguration(db.Model):
+    """Executive insights and anomaly detection configuration"""
+    __tablename__ = 'executive_insights_configuration'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.String(50), nullable=False, default='default_user')
+    config_name = db.Column(db.String(100), nullable=False, default='default')
+    
+    # Z-Score Anomaly Detection Thresholds
+    revenue_anomaly_threshold = db.Column(db.Float, default=2.0)               # Revenue anomaly Z-score threshold
+    revenue_high_severity_threshold = db.Column(db.Float, default=3.0)         # High severity revenue Z-score
+    contract_anomaly_threshold = db.Column(db.Float, default=1.8)              # Contract anomaly Z-score threshold
+    contract_high_severity_threshold = db.Column(db.Float, default=2.5)        # High severity contract Z-score  
+    margin_anomaly_threshold = db.Column(db.Float, default=2.0)                # Margin anomaly Z-score threshold
+    margin_high_severity_threshold = db.Column(db.Float, default=3.0)          # High severity margin Z-score
+    store_performance_anomaly_threshold = db.Column(db.Float, default=2.0)     # Store performance anomaly Z-score
+    store_performance_high_severity_threshold = db.Column(db.Float, default=3.0) # High severity store Z-score
+    
+    # Weather Correlation Thresholds
+    freezing_temperature_threshold = db.Column(db.Float, default=32.0)         # Freezing temp threshold (°F)
+    extreme_heat_threshold = db.Column(db.Float, default=95.0)                 # Extreme heat threshold (°F)
+    heavy_precipitation_threshold = db.Column(db.Float, default=1.0)           # Heavy precipitation threshold (inches)
+    weather_temp_low_default = db.Column(db.Float, default=50.0)               # Default low temp for missing data
+    weather_temp_high_default = db.Column(db.Float, default=70.0)              # Default high temp for missing data
+    
+    # Holiday & Event Correlation Parameters  
+    holiday_correlation_window_days = db.Column(db.Integer, default=3)         # Days around holiday to consider
+    close_correlation_strength = db.Column(db.Float, default=0.8)              # Correlation strength for close events (<=1 day)
+    medium_correlation_strength = db.Column(db.Float, default=0.6)             # Correlation strength for medium events (>1 day)
+    
+    # Impact & Priority Assessment Thresholds
+    high_impact_threshold = db.Column(db.Float, default=0.7)                   # High impact magnitude threshold
+    critical_magnitude_threshold = db.Column(db.Float, default=0.8)            # Critical magnitude threshold
+    medium_magnitude_threshold = db.Column(db.Float, default=0.5)              # Medium magnitude threshold  
+    strong_correlation_threshold = db.Column(db.Float, default=0.7)            # Strong correlation threshold
+    
+    # Correlation Significance Counts (minimum required for significance)
+    min_weather_correlations = db.Column(db.Integer, default=2)                # Minimum weather correlations for significance
+    min_seasonal_correlations = db.Column(db.Integer, default=3)               # Minimum seasonal correlations for significance  
+    min_holiday_correlations = db.Column(db.Integer, default=2)                # Minimum holiday correlations for significance
+    
+    # Anomaly Counting & Alert Thresholds
+    high_anomaly_count_threshold = db.Column(db.Integer, default=5)            # High anomaly count threshold
+    medium_anomaly_count_threshold = db.Column(db.Integer, default=2)          # Medium anomaly count threshold
+    high_severity_alert_threshold = db.Column(db.Integer, default=2)           # High severity count alert threshold
+    
+    # Store-specific insights overrides (JSON format)
+    # Example: {"3607": {"revenue_anomaly_threshold": 2.5}, "6800": {"high_impact_threshold": 0.8}}
+    store_specific_thresholds = db.Column(db.JSON, default={})
+    
+    # Alert and Processing Settings
+    enable_anomaly_detection = db.Column(db.Boolean, default=True)
+    enable_weather_correlations = db.Column(db.Boolean, default=True)
+    enable_holiday_correlations = db.Column(db.Boolean, default=True)
+    enable_seasonal_analysis = db.Column(db.Boolean, default=True)
+    
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    __table_args__ = (
+        db.UniqueConstraint('user_id', 'config_name'),
+    )
+    
+    def get_store_threshold(self, store_code: str, threshold_type: str):
+        """
+        Get store-specific executive insights threshold or fall back to global default.
+        
+        Args:
+            store_code (str): Store identifier (e.g., '3607', '6800')
+            threshold_type (str): Type of threshold to retrieve
+            
+        Returns:
+            float/int: Configured threshold value for the store or global default
+        """
+        # Check for store-specific override
+        if self.store_specific_thresholds and store_code in self.store_specific_thresholds:
+            store_config = self.store_specific_thresholds[store_code]
+            if threshold_type in store_config:
+                return store_config[threshold_type]
+        
+        # Fall back to global configuration
+        threshold_map = {
+            # Z-Score thresholds
+            'revenue_anomaly_threshold': self.revenue_anomaly_threshold,
+            'revenue_high_severity_threshold': self.revenue_high_severity_threshold,
+            'contract_anomaly_threshold': self.contract_anomaly_threshold,
+            'contract_high_severity_threshold': self.contract_high_severity_threshold,
+            'margin_anomaly_threshold': self.margin_anomaly_threshold,
+            'margin_high_severity_threshold': self.margin_high_severity_threshold,
+            'store_performance_anomaly_threshold': self.store_performance_anomaly_threshold,
+            'store_performance_high_severity_threshold': self.store_performance_high_severity_threshold,
+            # Weather thresholds
+            'freezing_temperature_threshold': self.freezing_temperature_threshold,
+            'extreme_heat_threshold': self.extreme_heat_threshold,
+            'heavy_precipitation_threshold': self.heavy_precipitation_threshold,
+            'weather_temp_low_default': self.weather_temp_low_default,
+            'weather_temp_high_default': self.weather_temp_high_default,
+            # Correlation parameters
+            'holiday_correlation_window_days': self.holiday_correlation_window_days,
+            'close_correlation_strength': self.close_correlation_strength,
+            'medium_correlation_strength': self.medium_correlation_strength,
+            # Impact assessment
+            'high_impact_threshold': self.high_impact_threshold,
+            'critical_magnitude_threshold': self.critical_magnitude_threshold,
+            'medium_magnitude_threshold': self.medium_magnitude_threshold,
+            'strong_correlation_threshold': self.strong_correlation_threshold,
+            # Significance counts
+            'min_weather_correlations': self.min_weather_correlations,
+            'min_seasonal_correlations': self.min_seasonal_correlations,
+            'min_holiday_correlations': self.min_holiday_correlations,
+            # Alert thresholds
+            'high_anomaly_count_threshold': self.high_anomaly_count_threshold,
+            'medium_anomaly_count_threshold': self.medium_anomaly_count_threshold,
+            'high_severity_alert_threshold': self.high_severity_alert_threshold
+        }
+        
+        return threshold_map.get(threshold_type, 2.0)  # Safe fallback for Z-score thresholds
 
 
 def get_default_executive_dashboard_config():
@@ -828,5 +1019,157 @@ def get_default_predictive_analytics_config():
             'enable_trend_analysis': True,
             'enable_outlier_detection': True,
             'forecasting_method': 'auto'
+        }
+    }
+
+
+class ManagerDashboardConfiguration(db.Model):
+    """Manager dashboard configuration for store-specific analytics and alerts"""
+    __tablename__ = 'manager_dashboard_configuration'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.String(50), nullable=False, default='default_user')
+    config_name = db.Column(db.String(100), nullable=False, default='default')
+    
+    # Time Period Parameters
+    recent_activity_period_days = db.Column(db.Integer, default=30)          # "Recent" activity definition (was days=30)
+    comparison_period_days = db.Column(db.Integer, default=60)               # Month-over-month baseline (was days=60)
+    default_trend_period_days = db.Column(db.Integer, default=30)            # Performance trends default (was days=30)
+    recent_transaction_days = db.Column(db.Integer, default=7)               # Recent activity cutoff (was 7 days)
+    quarter_comparison_days = db.Column(db.Integer, default=90)              # Quarter analysis period (was 90 days)
+    
+    # Display Limit Parameters
+    max_categories_displayed = db.Column(db.Integer, default=10)             # Top categories limit (was LIMIT 10)
+    max_high_value_items = db.Column(db.Integer, default=20)                 # High-value items limit (was LIMIT 20)
+    max_trend_categories = db.Column(db.Integer, default=10)                 # Utilization trends limit (was LIMIT 10)
+    max_opportunities_displayed = db.Column(db.Integer, default=10)          # Underutilized items limit (was LIMIT 10)
+    default_activity_limit = db.Column(db.Integer, default=10)               # Recent activity display (was limit=10)
+    diy_max_categories = db.Column(db.Integer, default=10)                   # DIY-specific categories (was LIMIT 10)
+    
+    # Business Threshold Parameters  
+    high_value_threshold = db.Column(db.Float, default=100.0)                # High-value items threshold (was > 100)
+    underutilized_value_threshold = db.Column(db.Float, default=50.0)        # Opportunity identification (was > 50)
+    construction_heavy_equipment_threshold = db.Column(db.Float, default=200.0)  # Heavy equipment classification (was > 200)
+    
+    # Alert Threshold Parameters
+    maintenance_backlog_threshold = db.Column(db.Integer, default=2)         # Maintenance backlog alert (was > 2)
+    high_priority_maintenance_threshold = db.Column(db.Integer, default=5)   # High priority alert (was > 5)
+    critical_maintenance_threshold = db.Column(db.Integer, default=10)       # Critical maintenance alert (was > 10)
+    low_stock_threshold = db.Column(db.Integer, default=3)                   # Low stock alert (was < 3)
+    min_category_size = db.Column(db.Integer, default=5)                     # Minimum category size (was > 5)
+    
+    # Store Classification Parameters
+    new_store_threshold_months = db.Column(db.Integer, default=12)           # New store classification (was < 12)
+    developing_store_threshold_months = db.Column(db.Integer, default=24)    # Developing store classification (was < 24)
+    
+    # Business Type Specific Parameters
+    diy_weekend_percentage = db.Column(db.Float, default=70.0)               # DIY weekend usage pattern (was 70%)
+    
+    # Store-specific manager dashboard overrides (JSON format)
+    # Example: {"3607": {"recent_activity_period_days": 45}, "6800": {"high_value_threshold": 150.0}}
+    store_specific_thresholds = db.Column(db.JSON, default={})
+    
+    # Manager Dashboard Settings
+    enable_maintenance_alerts = db.Column(db.Boolean, default=True)
+    enable_inventory_alerts = db.Column(db.Boolean, default=True)
+    enable_performance_alerts = db.Column(db.Boolean, default=True)
+    alert_frequency = db.Column(db.String(20), default='daily')              # daily, weekly, monthly
+    
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    __table_args__ = (
+        db.UniqueConstraint('user_id', 'config_name'),
+    )
+    
+    def get_store_threshold(self, store_code: str, threshold_type: str):
+        """
+        Get store-specific manager dashboard threshold or fall back to global default.
+        
+        Args:
+            store_code (str): Store identifier (e.g., '3607', '6800')
+            threshold_type (str): Type of threshold to retrieve
+            
+        Returns:
+            float/int: Configured threshold value for the store or global default
+        """
+        # Check for store-specific override
+        if self.store_specific_thresholds and store_code in self.store_specific_thresholds:
+            store_config = self.store_specific_thresholds[store_code]
+            if threshold_type in store_config:
+                return store_config[threshold_type]
+        
+        # Fall back to global configuration
+        threshold_map = {
+            'recent_activity_period_days': self.recent_activity_period_days,
+            'comparison_period_days': self.comparison_period_days,
+            'default_trend_period_days': self.default_trend_period_days,
+            'recent_transaction_days': self.recent_transaction_days,
+            'quarter_comparison_days': self.quarter_comparison_days,
+            'max_categories_displayed': self.max_categories_displayed,
+            'max_high_value_items': self.max_high_value_items,
+            'max_trend_categories': self.max_trend_categories,
+            'max_opportunities_displayed': self.max_opportunities_displayed,
+            'default_activity_limit': self.default_activity_limit,
+            'diy_max_categories': self.diy_max_categories,
+            'high_value_threshold': self.high_value_threshold,
+            'underutilized_value_threshold': self.underutilized_value_threshold,
+            'construction_heavy_equipment_threshold': self.construction_heavy_equipment_threshold,
+            'maintenance_backlog_threshold': self.maintenance_backlog_threshold,
+            'high_priority_maintenance_threshold': self.high_priority_maintenance_threshold,
+            'critical_maintenance_threshold': self.critical_maintenance_threshold,
+            'low_stock_threshold': self.low_stock_threshold,
+            'min_category_size': self.min_category_size,
+            'new_store_threshold_months': self.new_store_threshold_months,
+            'developing_store_threshold_months': self.developing_store_threshold_months,
+            'diy_weekend_percentage': self.diy_weekend_percentage
+        }
+        
+        return threshold_map.get(threshold_type, 30)  # Safe fallback
+
+
+def get_default_manager_dashboard_config():
+    """Get default manager dashboard configuration settings"""
+    return {
+        'time_periods': {
+            'recent_activity_days': 30,                  # Recent activity definition
+            'comparison_period_days': 60,                # Month-over-month baseline
+            'default_trend_days': 30,                    # Performance trends default
+            'recent_transaction_days': 7,                # Recent activity cutoff
+            'quarter_comparison_days': 90                # Quarter analysis period
+        },
+        'display_limits': {
+            'max_categories': 10,                        # Top categories displayed
+            'max_high_value_items': 20,                  # High-value items shown
+            'max_trend_categories': 10,                  # Utilization trends
+            'max_opportunities': 10,                     # Underutilized items
+            'default_activity_limit': 10,                # Recent activity count
+            'diy_max_categories': 10                     # DIY-specific categories
+        },
+        'business_thresholds': {
+            'high_value_threshold': 100.0,               # High-value items ($)
+            'underutilized_threshold': 50.0,             # Opportunity identification ($)
+            'construction_heavy_equipment': 200.0        # Heavy equipment classification ($)
+        },
+        'alert_thresholds': {
+            'maintenance_backlog': 2,                    # Maintenance backlog trigger
+            'high_priority_maintenance': 5,              # High priority alert
+            'critical_maintenance': 10,                  # Critical maintenance alert
+            'low_stock_threshold': 3,                    # Low stock alert
+            'min_category_size': 5                       # Minimum category size
+        },
+        'store_classification': {
+            'new_store_months': 12,                      # New store threshold
+            'developing_store_months': 24                # Developing store threshold
+        },
+        'business_insights': {
+            'diy_weekend_percentage': 70.0               # DIY weekend usage pattern
+        },
+        'features': {
+            'enable_maintenance_alerts': True,
+            'enable_inventory_alerts': True, 
+            'enable_performance_alerts': True,
+            'alert_frequency': 'daily'
         }
     }
