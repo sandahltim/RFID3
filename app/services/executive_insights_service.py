@@ -42,6 +42,48 @@ class ExecutiveInsightsService:
         self.weather_api_key = "YOUR_WEATHER_API_KEY"  # Replace with actual API key
         self.holiday_data = self._load_minnesota_holidays()
         self.construction_seasons = self._get_construction_seasons()
+    
+    def _get_insights_config(self):
+        """Load executive insights configuration with fallback system"""
+        try:
+            from app.models.config_models import ExecutiveInsightsConfiguration
+            config = ExecutiveInsightsConfiguration.query.filter_by(user_id='default_user', config_name='default').first()
+            if config:
+                return config
+            else:
+                logger.warning("No ExecutiveInsightsConfiguration found, using defaults")
+                return ExecutiveInsightsConfiguration()
+        except Exception as config_error:
+            logger.error(f"Error loading ExecutiveInsightsConfiguration: {config_error}")
+            # Fallback MockConfig for robust error handling
+            class MockInsightsConfig:
+                revenue_anomaly_threshold = 2.0
+                revenue_high_severity_threshold = 3.0
+                contract_anomaly_threshold = 1.8
+                contract_high_severity_threshold = 2.5
+                margin_anomaly_threshold = 2.0
+                margin_high_severity_threshold = 3.0
+                store_performance_anomaly_threshold = 2.0
+                store_performance_high_severity_threshold = 3.0
+                freezing_temperature_threshold = 32.0
+                extreme_heat_threshold = 95.0
+                heavy_precipitation_threshold = 1.0
+                weather_temp_low_default = 50.0
+                weather_temp_high_default = 70.0
+                holiday_correlation_window_days = 3
+                close_correlation_strength = 0.8
+                medium_correlation_strength = 0.6
+                high_impact_threshold = 0.7
+                critical_magnitude_threshold = 0.8
+                medium_magnitude_threshold = 0.5
+                strong_correlation_threshold = 0.7
+                min_weather_correlations = 2
+                min_seasonal_correlations = 3
+                min_holiday_correlations = 2
+                high_anomaly_count_threshold = 5
+                medium_anomaly_count_threshold = 2
+                high_severity_alert_threshold = 2
+            return MockInsightsConfig()
         
     def get_executive_insights(self) -> Dict:
         """
@@ -481,9 +523,12 @@ class ExecutiveInsightsService:
             # Z-score based anomaly detection
             df['revenue_z_score'] = (df['total_revenue'] - df['revenue_3wk_avg']) / df['revenue_std']
             
-            # Detect anomalies (|z-score| > 2)
+            # Detect anomalies using configurable Z-score threshold
+            # OLD - HARDCODED (WRONG): abs(row['revenue_z_score']) > 2
+            # NEW - CONFIGURABLE (CORRECT):
+            config = self._get_insights_config()
             for idx, row in df.iterrows():
-                if pd.notna(row['revenue_z_score']) and abs(row['revenue_z_score']) > 2:
+                if pd.notna(row['revenue_z_score']) and abs(row['revenue_z_score']) > config.revenue_anomaly_threshold:
                     anomaly_type = "revenue_spike" if row['revenue_z_score'] > 0 else "revenue_dip"
                     
                     anomalies.append({
@@ -494,7 +539,9 @@ class ExecutiveInsightsService:
                         "expected_value": row['revenue_3wk_avg'],
                         "magnitude": abs(row['revenue_z_score']),
                         "percentage_deviation": ((row['total_revenue'] - row['revenue_3wk_avg']) / row['revenue_3wk_avg']) * 100,
-                        "severity": "high" if abs(row['revenue_z_score']) > 3 else "medium"
+                        # OLD - HARDCODED (WRONG): "severity": "high" if abs(row['revenue_z_score']) > 3 else "medium"
+                        # NEW - CONFIGURABLE (CORRECT):
+                        "severity": "high" if abs(row['revenue_z_score']) > config.revenue_high_severity_threshold else "medium"
                     })
             
         except Exception as e:
