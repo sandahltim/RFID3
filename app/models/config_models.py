@@ -878,6 +878,84 @@ class ExecutiveInsightsConfiguration(db.Model):
         return threshold_map.get(threshold_type, 2.0)  # Safe fallback for Z-score thresholds
 
 
+class ScorecardAnalyticsConfiguration(db.Model):
+    """Scorecard analytics and business rules configuration"""
+    __tablename__ = 'scorecard_analytics_configuration'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.String(50), nullable=False, default='default_user')
+    config_name = db.Column(db.String(100), nullable=False, default='default')
+    
+    # Risk Assessment Thresholds
+    concentration_risk_threshold = db.Column(db.Float, default=40.0)           # Single store concentration risk (%)
+    peak_season_revenue_threshold = db.Column(db.Float, default=75000.0)       # Peak season revenue threshold
+    trough_season_revenue_threshold = db.Column(db.Float, default=30000.0)     # Trough season revenue threshold
+    
+    # A/R Aging & Risk Thresholds
+    ar_aging_risk_threshold = db.Column(db.Float, default=5.0)                 # A/R aging risk threshold (%)
+    ar_aging_weeks_threshold = db.Column(db.Float, default=5.0)                # A/R weeks over threshold
+    ar_risk_low_threshold = db.Column(db.Float, default=4.0)                   # Low risk threshold
+    ar_risk_medium_threshold = db.Column(db.Float, default=6.0)                # Medium risk threshold
+    
+    # Forecasting Parameters  
+    seasonal_multiplier_coefficient = db.Column(db.Float, default=0.3)         # Seasonal multiplier (30%)
+    confidence_interval_lower_bound = db.Column(db.Float, default=0.85)        # Lower confidence bound (85%)
+    confidence_interval_upper_bound = db.Column(db.Float, default=1.15)        # Upper confidence bound (115%)
+    
+    # Store-specific scorecard overrides (JSON format)
+    # Example: {"3607": {"concentration_risk_threshold": 45.0}, "6800": {"peak_season_revenue_threshold": 80000.0}}
+    store_specific_thresholds = db.Column(db.JSON, default={})
+    
+    # Processing Settings
+    enable_risk_assessment = db.Column(db.Boolean, default=True)
+    enable_seasonal_forecasting = db.Column(db.Boolean, default=True)
+    enable_ar_aging_analysis = db.Column(db.Boolean, default=True)
+    
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    __table_args__ = (
+        db.UniqueConstraint('user_id', 'config_name'),
+    )
+    
+    def get_store_threshold(self, store_code: str, threshold_type: str):
+        """
+        Get store-specific scorecard analytics threshold or fall back to global default.
+        
+        Args:
+            store_code (str): Store identifier (e.g., '3607', '6800')
+            threshold_type (str): Type of threshold to retrieve
+            
+        Returns:
+            float: Configured threshold value for the store or global default
+        """
+        # Check for store-specific override
+        if self.store_specific_thresholds and store_code in self.store_specific_thresholds:
+            store_config = self.store_specific_thresholds[store_code]
+            if threshold_type in store_config:
+                return store_config[threshold_type]
+        
+        # Fall back to global configuration
+        threshold_map = {
+            # Risk assessment thresholds
+            'concentration_risk_threshold': self.concentration_risk_threshold,
+            'peak_season_revenue_threshold': self.peak_season_revenue_threshold,
+            'trough_season_revenue_threshold': self.trough_season_revenue_threshold,
+            # A/R aging thresholds
+            'ar_aging_risk_threshold': self.ar_aging_risk_threshold,
+            'ar_aging_weeks_threshold': self.ar_aging_weeks_threshold,
+            'ar_risk_low_threshold': self.ar_risk_low_threshold,
+            'ar_risk_medium_threshold': self.ar_risk_medium_threshold,
+            # Forecasting parameters
+            'seasonal_multiplier_coefficient': self.seasonal_multiplier_coefficient,
+            'confidence_interval_lower_bound': self.confidence_interval_lower_bound,
+            'confidence_interval_upper_bound': self.confidence_interval_upper_bound
+        }
+        
+        return threshold_map.get(threshold_type, 40.0)  # Safe fallback for percentage thresholds
+
+
 def get_default_executive_dashboard_config():
     """Get default executive dashboard configuration settings"""
     return {
