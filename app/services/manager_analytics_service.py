@@ -110,8 +110,10 @@ class ManagerAnalyticsService:
             kpis = {}
             
             if self.store_code:
-                # Store-specific KPIs
-                store_filter = f"AND store_code = '{self.store_code}'"
+                # Store-specific KPIs - FIXED: Convert store_code to pos_code for database queries
+                # Store codes (8101, 3607, etc.) → POS codes (3, 1, etc.) for pos_transactions table
+                pos_code = self.store_info.pos_code.lstrip('0') if self.store_info else self.store_code
+                store_filter = f"AND store_code = '{pos_code}'"
             else:
                 # All stores KPIs
                 store_filter = ""
@@ -166,6 +168,8 @@ class ManagerAnalyticsService:
             
             # Financial KPIs from POS data
             if self._table_exists('pos_transactions'):
+                # FIXED: Use correct column name and POS code mapping for pos_transactions
+                pos_store_filter = store_filter.replace('store_code', 'store_no') if store_filter else ""
                 financial_query = text(f"""
                     SELECT 
                         COUNT(*) as total_transactions,
@@ -174,7 +178,7 @@ class ManagerAnalyticsService:
                         COUNT(CASE WHEN DATE(contract_date) >= :thirty_days_ago THEN 1 END) as recent_transactions,
                         SUM(CASE WHEN DATE(contract_date) >= :thirty_days_ago AND total > 0 THEN total ELSE 0 END) as recent_revenue
                     FROM pos_transactions 
-                    WHERE contract_date IS NOT NULL {store_filter.replace('store_code', 'store_no')}
+                    WHERE contract_date IS NOT NULL {pos_store_filter}
                 """)
                 
                 financial_result = db.session.execute(financial_query, {
