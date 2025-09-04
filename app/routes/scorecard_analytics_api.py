@@ -27,6 +27,29 @@ def get_scorecard_analytics():
         session = db.session()
         weeks_back = int(request.args.get("weeks", 159))  # Full historical dataset
         
+        # Load scorecard analytics configuration
+        from app.models.config_models import ScorecardAnalyticsConfiguration
+        try:
+            config = ScorecardAnalyticsConfiguration.query.filter_by(user_id='default_user', config_name='default').first()
+            if not config:
+                logger.warning("No scorecard analytics configuration found, using defaults")
+                config = ScorecardAnalyticsConfiguration()
+        except Exception as config_error:
+            logger.error(f"Error loading scorecard analytics configuration: {config_error}")
+            # Fallback MockConfig for robust error handling
+            class MockConfig:
+                concentration_risk_threshold = 40.0
+                peak_season_revenue_threshold = 75000.0
+                trough_season_revenue_threshold = 30000.0
+                ar_aging_risk_threshold = 5.0
+                ar_aging_weeks_threshold = 5.0
+                ar_risk_low_threshold = 4.0
+                ar_risk_medium_threshold = 6.0
+                seasonal_multiplier_coefficient = 0.3
+                confidence_interval_lower_bound = 0.85
+                confidence_interval_upper_bound = 1.15
+            config = MockConfig()
+        
         logger.info(f"Fetching scorecard analytics for {weeks_back} weeks")
         
         # Get scorecard trends data with store-specific revenue columns
@@ -84,10 +107,12 @@ def get_scorecard_analytics():
                 '8101': float(row.revenue_8101 or 0)
             }
             
-            # Calculate concentration risk (single store >40% of total)  
+            # Calculate concentration risk (configurable single store threshold)
+            # OLD - HARDCODED (WRONG): concentration_risk = max_store_pct > 40
+            # NEW - CONFIGURABLE (CORRECT):
             total_revenue_float = float(total_revenue) if total_revenue else 0
             max_store_pct = max(store_revenues.values()) / total_revenue_float * 100 if total_revenue_float > 0 else 0
-            concentration_risk = max_store_pct > 40
+            concentration_risk = max_store_pct > config.concentration_risk_threshold
             
             # Multi-year trend data point
             analytics_data["multi_year_trends"].append({
@@ -162,8 +187,10 @@ def get_scorecard_analytics():
                 "min_revenue": round(min_revenue, 2),
                 "variation_ratio": round(max_revenue / min_revenue, 2) if min_revenue > 0 else 0,
                 "seasonal_classification": (
-                    "peak" if avg_revenue > 75000 else
-                    "trough" if avg_revenue < 30000 else
+                    # OLD - HARDCODED (WRONG): "peak" if avg_revenue > 75000 else
+                    # NEW - CONFIGURABLE (CORRECT):
+                    "peak" if avg_revenue > config.peak_season_revenue_threshold else
+                    "trough" if avg_revenue < config.trough_season_revenue_threshold else
                     "normal"
                 )
             })
@@ -335,11 +362,13 @@ def get_ar_aging_trends():
             ar_data["aging_buckets"]["over_90_days"].insert(0, round(aging_over_90, 1))
             
             # Generate risk alerts for high aging
-            if aging_over_90 > 5:
+            # OLD - HARDCODED (WRONG): if aging_over_90 > 5:
+            # NEW - CONFIGURABLE (CORRECT):
+            if aging_over_90 > config.ar_aging_risk_threshold:
                 ar_data["risk_alerts"].append({
                     "week": week_date.isoformat(),
                     "risk_level": "high",
-                    "message": f"90+ days AR at {aging_over_90:.1f}% (threshold: 5%)"
+                    "message": f"90+ days AR at {aging_over_90:.1f}% (threshold: {config.ar_aging_risk_threshold}%)"
                 })
         
         # Calculate summary metrics
@@ -347,8 +376,12 @@ def get_ar_aging_trends():
             "current_0_30_pct": ar_data["aging_buckets"]["0_30_days"][-1],
             "current_over_90_pct": ar_data["aging_buckets"]["over_90_days"][-1],
             "avg_over_90_pct": round(sum(ar_data["aging_buckets"]["over_90_days"]) / len(ar_data["aging_buckets"]["over_90_days"]), 1),
-            "weeks_over_threshold": len([x for x in ar_data["aging_buckets"]["over_90_days"] if x > 5]),
-            "risk_status": "low" if ar_data["aging_buckets"]["over_90_days"][-1] < 4 else "medium" if ar_data["aging_buckets"]["over_90_days"][-1] < 6 else "high"
+            # OLD - HARDCODED (WRONG): len([x for x in ar_data["aging_buckets"]["over_90_days"] if x > 5])
+            # NEW - CONFIGURABLE (CORRECT):
+            "weeks_over_threshold": len([x for x in ar_data["aging_buckets"]["over_90_days"] if x > config.ar_aging_weeks_threshold]),
+            # OLD - HARDCODED (WRONG): "risk_status": "low" if ar_data["aging_buckets"]["over_90_days"][-1] < 4 else "medium" if ar_data["aging_buckets"]["over_90_days"][-1] < 6 else "high"
+            # NEW - CONFIGURABLE (CORRECT):
+            "risk_status": "low" if ar_data["aging_buckets"]["over_90_days"][-1] < config.ar_risk_low_threshold else "medium" if ar_data["aging_buckets"]["over_90_days"][-1] < config.ar_risk_medium_threshold else "high"
         }
         
         logger.info(f"AR aging trends generated: {ar_data['summary']['risk_status']} risk status")
@@ -416,16 +449,20 @@ def get_seasonal_forecast():
             forecast_date = last_date + timedelta(weeks=week)
             
             # Seasonal multiplier (peak in summer, trough in winter)
+            # OLD - HARDCODED (WRONG): seasonal_multiplier = 1 + 0.3 * math.sin((week_of_year - 10) * 2 * math.pi / 52)
+            # NEW - CONFIGURABLE (CORRECT):
             week_of_year = forecast_date.isocalendar()[1]
-            seasonal_multiplier = 1 + 0.3 * math.sin((week_of_year - 10) * 2 * math.pi / 52)
+            seasonal_multiplier = 1 + config.seasonal_multiplier_coefficient * math.sin((week_of_year - 10) * 2 * math.pi / 52)
             
             # Base forecast with trend and seasonality
             base_forecast = baseline_revenue + (weekly_trend * week)
             seasonal_forecast = base_forecast * seasonal_multiplier
             
-            # Confidence intervals (±15%)
-            lower_bound = seasonal_forecast * 0.85
-            upper_bound = seasonal_forecast * 1.15
+            # Confidence intervals (configurable bounds)
+            # OLD - HARDCODED (WRONG): lower_bound = seasonal_forecast * 0.85; upper_bound = seasonal_forecast * 1.15
+            # NEW - CONFIGURABLE (CORRECT):
+            lower_bound = seasonal_forecast * config.confidence_interval_lower_bound
+            upper_bound = seasonal_forecast * config.confidence_interval_upper_bound
             
             forecast_data["forecast"].append({
                 "week_ending": forecast_date.isoformat(),
