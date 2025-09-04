@@ -533,7 +533,7 @@ class FinancialAnalyticsService:
                     EXTRACT(WEEK FROM week_ending) as week_num,
                     week_ending,
                     total_weekly_revenue,
-                    revenue_3607 + revenue_6800 + revenue_728_temp + revenue_728 as calculated_total
+                    revenue_3607 + revenue_6800 + revenue_8101 + revenue_728 as calculated_total
                 FROM scorecard_trends_data 
                 WHERE EXTRACT(YEAR FROM week_ending) = :year
                 ORDER BY week_ending
@@ -628,7 +628,7 @@ class FinancialAnalyticsService:
                     EXTRACT(YEAR FROM week_ending) as year,
                     SUM(revenue_3607) as wayzata_total,
                     SUM(revenue_6800) as brooklyn_park_total,
-                    SUM(revenue_728_temp) as fridley_total,
+                    SUM(revenue_8101) as fridley_total,
                     SUM(revenue_728) as elk_river_total
                 FROM scorecard_trends_data 
                 WHERE EXTRACT(YEAR FROM week_ending) IN (:current_year, :previous_year)
@@ -729,7 +729,7 @@ class FinancialAnalyticsService:
                 SELECT 
                     s.week_ending,
                     s.total_weekly_revenue,
-                    s.revenue_3607 + s.revenue_6800 + s.revenue_728_temp + s.revenue_728 as calculated_revenue,
+                    s.revenue_3607 + s.revenue_6800 + s.revenue_8101 + s.revenue_728 as calculated_revenue,
                     p.rental_revenue,
                     p.all_revenue,
                     p.payroll_amount,
@@ -901,9 +901,9 @@ class FinancialAnalyticsService:
                 UNION ALL
                 SELECT 
                     '728' as store_code,
-                    'Fridley' as store_name,
-                    SUM(revenue_728_temp) as total_revenue,
-                    AVG(revenue_728_temp) as avg_weekly_revenue,
+                    'Elk River' as store_name,
+                    SUM(revenue_728) as total_revenue,
+                    AVG(revenue_728) as avg_weekly_revenue,
                     COUNT(*) as weeks_data,
                     SUM(new_contracts_728) as total_contracts
                 FROM scorecard_trends_data 
@@ -911,9 +911,9 @@ class FinancialAnalyticsService:
                 UNION ALL
                 SELECT 
                     '8101' as store_code,
-                    'Elk River' as store_name,
-                    SUM(revenue_728) as total_revenue,
-                    AVG(revenue_728) as avg_weekly_revenue,
+                    'Fridley' as store_name,
+                    SUM(revenue_8101) as total_revenue,
+                    AVG(revenue_8101) as avg_weekly_revenue,
                     COUNT(*) as weeks_data,
                     SUM(new_contracts_8101) as total_contracts
                 FROM scorecard_trends_data 
