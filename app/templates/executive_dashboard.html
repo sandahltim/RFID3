@@ -2175,13 +2175,13 @@
                     
                     try {
                         // Fetch store-specific KPI data
-                        const kpiResponse = await fetch(`/executive/api/location-specific-kpis?location=${store.code}`);
+                        const kpiResponse = await fetch(`/executive/api/location-kpis/${store.code}`);
                         const kpiData = await kpiResponse.json();
                         
                         if (kpiData.success) {
                             // Calculate previous week and previous year values from current data
                             const currentRevenue = kpiData.revenue_metrics?.current_3wk_avg || 0;
-                            const yoyGrowth = parseFloat(kpiData.yoy_growth || 0);
+                            const yoyGrowth = parseFloat(kpiData.revenue_metrics?.yoy_growth || 0);
                             
                             // Previous year revenue (reverse calculate from YoY growth)
                             const prevYearRevenue = yoyGrowth !== 0 ? currentRevenue / (1 + yoyGrowth/100) : currentRevenue * 0.95;
@@ -2221,8 +2221,8 @@
                             
                             // Update Utilization cell
                             const utilizationCell = document.getElementById(`util-${store.code}`);
-                            if (utilizationCell && kpiData.utilization_avg !== undefined) {
-                                const util = parseFloat(kpiData.utilization_avg);
+                            if (utilizationCell && kpiData.store_metrics?.utilization_avg !== undefined) {
+                                const util = parseFloat(kpiData.store_metrics.utilization_avg);
                                 utilizationCell.textContent = formatPercentage(util);
                                 utilizationCell.className = `metric-cell ${util >= 75 ? 'trend-positive' : util >= 50 ? 'trend-neutral' : 'trend-negative'}`;
                                 utilizationCell.title = `Equipment utilization: ${formatPercentage(util)}`;
@@ -2230,8 +2230,8 @@
                             
                             // Update Health Score cell
                             const healthCell = document.getElementById(`health-${store.code}`);
-                            if (healthCell && kpiData.health_score !== undefined) {
-                                const health = parseFloat(kpiData.health_score);
+                            if (healthCell && kpiData.operational_health?.health_score !== undefined) {
+                                const health = parseFloat(kpiData.operational_health.health_score);
                                 healthCell.textContent = health.toFixed(1);
                                 healthCell.className = `metric-cell health-cell ${health >= 85 ? 'trend-positive' : health >= 70 ? 'trend-neutral' : 'trend-negative'}`;
                                 healthCell.title = `Overall health score: ${health.toFixed(1)}/100`;
@@ -2246,7 +2246,7 @@
                                 trendCell.title = `Trend: ${growth > 5 ? 'Strong Growth' : growth < -5 ? 'Declining' : 'Stable'}`;
                             }
                             
-                            console.log(`✅ Updated scorecard data for ${store.name}: Revenue=${formatCurrency(kpiData.revenue_metrics?.current_3wk_avg || 0, true)}, YoY=${formatPercentage(kpiData.yoy_growth || 0)}, Util=${formatPercentage(kpiData.utilization_avg || 0)}, Health=${(kpiData.health_score || 0).toFixed(1)}`);
+                            console.log(`✅ Updated scorecard data for ${store.name}: Revenue=${formatCurrency(kpiData.revenue_metrics?.current_3wk_avg || 0, true)}, YoY=${formatPercentage(kpiData.revenue_metrics?.yoy_growth || 0)}, Util=${formatPercentage(kpiData.store_metrics?.utilization_avg || 0)}, Health=${(kpiData.operational_health?.health_score || 0).toFixed(1)}`);
                         }
                         
                     } catch (storeError) {

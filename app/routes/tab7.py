@@ -336,13 +336,29 @@ def get_executive_summary():
                 self.total_discounts = None  # Calculate from transaction data if needed
         
         scorecard_metrics = ScorecardMetricsCompat(pos_scorecard_result)
+        
+        # CRITICAL FIX: Get revenue from scorecard_trends_data (same as working financial-kpis endpoint)
+        # This data source actually has recent data, unlike pos_transaction_items which returns 0
+        from sqlalchemy import text as sql_text
+        working_revenue_query = sql_text("""
+            SELECT AVG(total_weekly_revenue) as avg_3wk
+            FROM scorecard_trends_data 
+            WHERE total_weekly_revenue IS NOT NULL
+            ORDER BY week_ending DESC 
+            LIMIT 3
+        """)
+        working_revenue_result = session.execute(working_revenue_query).fetchone()
+        working_revenue = float(working_revenue_result.avg_3wk) if working_revenue_result and working_revenue_result.avg_3wk else 0
+        
+        # Override scorecard_metrics.total_revenue with working scorecard data
+        scorecard_metrics.total_revenue = working_revenue
 
         # Calculate YoY growth if we have data from last year
         last_year_start = start_date.replace(year=start_date.year - 1)
         last_year_end = end_date.replace(year=end_date.year - 1)
 
-        # Get last year revenue from scorecard trends using correct column names
-        last_year_scorecard_sql = text("""
+        # CRITICAL FIX: Get last year revenue from scorecard_trends_data (consistent with current revenue source)
+        last_year_scorecard_query = sql_text("""
             SELECT SUM(COALESCE(revenue_3607, 0) + 
                       COALESCE(revenue_6800, 0) + 
                       COALESCE(revenue_728, 0) + 
@@ -351,10 +367,10 @@ def get_executive_summary():
             WHERE week_ending BETWEEN :start_date AND :end_date
         """)
         
-        last_year_result = session.execute(last_year_scorecard_sql, {
+        last_year_result = session.execute(last_year_scorecard_query, {
             'start_date': last_year_start, 
             'end_date': last_year_end
-        }).first()
+        }).fetchone()
         
         last_year_revenue = float(last_year_result.total_revenue) if last_year_result and last_year_result.total_revenue else 0
         current_revenue = float(scorecard_metrics.total_revenue or 0)
@@ -3094,12 +3110,13 @@ def financial_kpis():
         yoy_query = text("""
             SELECT 
                 SUM(CASE WHEN period_year = YEAR(CURDATE()) 
-                    THEN COALESCE(total_revenue, 0) END) as current_total,
+                    THEN COALESCE(amount, 0) END) as current_total,
                 SUM(CASE WHEN period_year = YEAR(CURDATE()) - 1 
-                    THEN COALESCE(total_revenue, 0) END) as previous_total
+                    THEN COALESCE(amount, 0) END) as previous_total
             FROM pl_data 
-            WHERE total_revenue IS NOT NULL
+            WHERE amount IS NOT NULL
                 AND period_year >= YEAR(CURDATE()) - 1
+                AND category = 'Revenue'
         """)
         yoy_result = session.execute(yoy_query).fetchone()
         
