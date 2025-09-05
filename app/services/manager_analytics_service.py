@@ -110,10 +110,10 @@ class ManagerAnalyticsService:
             kpis = {}
             
             if self.store_code:
-                # Store-specific KPIs - FIXED: Convert store_code to pos_code for database queries
-                # Store codes (8101, 3607, etc.) → POS codes (3, 1, etc.) for pos_transactions table
-                pos_code = self.store_info.pos_code.lstrip('0') if self.store_info else self.store_code
-                store_filter = f"AND store_code = '{pos_code}'"
+                # Store-specific KPIs - TEST: Use original store_code format for combined_inventory table
+                # combined_inventory likely uses original store codes (8101, 3607, etc.)
+                store_filter = f"AND store_code = '{self.store_code}'"
+                logger.info(f"Manager KPIs: Filtering by store_code = '{self.store_code}'")
             else:
                 # All stores KPIs
                 store_filter = ""

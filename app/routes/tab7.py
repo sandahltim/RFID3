@@ -3090,22 +3090,22 @@ def financial_kpis():
         """)
         current_3wk_avg = session.execute(revenue_query).scalar() or 0
         
-        # Calculate YoY growth by comparing same weeks to previous year
+        # Calculate YoY growth using P&L data (proper revenue source)
         yoy_query = text("""
             SELECT 
-                AVG(CASE WHEN YEAR(week_ending) = YEAR(CURDATE()) 
-                    THEN total_weekly_revenue END) as current_avg,
-                AVG(CASE WHEN YEAR(week_ending) = YEAR(CURDATE()) - 1 
-                    THEN total_weekly_revenue END) as previous_avg
-            FROM scorecard_trends_data 
-            WHERE total_weekly_revenue IS NOT NULL
-                AND week_ending >= DATE_SUB(CURDATE(), INTERVAL 18 MONTH)
+                SUM(CASE WHEN period_year = YEAR(CURDATE()) 
+                    THEN COALESCE(total_revenue, 0) END) as current_total,
+                SUM(CASE WHEN period_year = YEAR(CURDATE()) - 1 
+                    THEN COALESCE(total_revenue, 0) END) as previous_total
+            FROM pl_data 
+            WHERE total_revenue IS NOT NULL
+                AND period_year >= YEAR(CURDATE()) - 1
         """)
         yoy_result = session.execute(yoy_query).fetchone()
         
         yoy_growth = 0
-        if yoy_result and yoy_result.current_avg and yoy_result.previous_avg:
-            yoy_growth = ((yoy_result.current_avg - yoy_result.previous_avg) / yoy_result.previous_avg) * 100
+        if yoy_result and yoy_result.current_total and yoy_result.previous_total:
+            yoy_growth = ((yoy_result.current_total - yoy_result.previous_total) / yoy_result.previous_total) * 100
         
         # Calculate equipment utilization from combined_inventory
         utilization_query = text("""
@@ -3211,20 +3211,116 @@ def location_specific_kpis(store_code):
             avg_revenue = 0
             profit_margin = 0
             
+        # Calculate store-specific YoY growth (using working PayrollTrends for now)
+        # TODO: Switch to P&L data source during formula review sidequest
+        current_year = datetime.now().year
+        previous_year = current_year - 1
+        
+        current_year_revenue = session.query(PayrollTrends).filter(
+            PayrollTrends.store_id == store_code,
+            PayrollTrends.week_ending.between(date(current_year, 1, 1), date(current_year, 12, 31))
+        ).all()
+        
+        previous_year_revenue = session.query(PayrollTrends).filter(
+            PayrollTrends.store_id == store_code,
+            PayrollTrends.week_ending.between(date(previous_year, 1, 1), date(previous_year, 12, 31))
+        ).all()
+        
+        current_total = sum(float(r.total_revenue or 0) for r in current_year_revenue)
+        previous_total = sum(float(r.total_revenue or 0) for r in previous_year_revenue)
+        yoy_growth = ((current_total - previous_total) / previous_total * 100) if previous_total > 0 else 0
+        
+        # Calculate store-specific utilization from inventory data
+        utilization_query = text("""
+            SELECT AVG(CASE 
+                WHEN status = 'rented' OR status = 'partially_rented' THEN 1 
+                ELSE 0 
+            END) * 100 as utilization_rate
+            FROM combined_inventory 
+            WHERE store_code = :store_code
+        """)
+        utilization_result = session.execute(utilization_query, {'store_code': store_code}).fetchone()
+        utilization_avg = float(utilization_result.utilization_rate or 0) if utilization_result else 0
+        
+        # Calculate store-specific health score using same logic as main dashboard
+        from app.models.config_models import ExecutiveDashboardConfiguration
+        try:
+            config = ExecutiveDashboardConfiguration.query.filter_by(user_id='default_user', config_name='default').first()
+            if not config:
+                config = ExecutiveDashboardConfiguration()
+        except Exception as config_error:
+            logger.error(f"Error loading executive dashboard configuration: {config_error}")
+            # Fallback MockConfig for robust error handling
+            class MockConfig:
+                base_health_score = 75.0
+                revenue_tier_1_threshold = 100000.0
+                revenue_tier_1_points = 10.0
+                revenue_tier_2_threshold = 75000.0
+                revenue_tier_2_points = 7.5
+                revenue_tier_3_threshold = 50000.0
+                revenue_tier_3_points = 5.0
+                revenue_tier_4_points = 2.5
+                yoy_excellent_threshold = 10.0
+                yoy_excellent_points = 10.0
+                yoy_good_threshold = 5.0
+                yoy_good_points = 7.5
+                yoy_fair_threshold = 0.0
+                yoy_fair_points = 5.0
+                yoy_poor_points = 0.0
+                utilization_excellent_threshold = 85.0
+                utilization_excellent_points = 10.0
+                utilization_good_threshold = 75.0
+                utilization_good_points = 7.5
+                utilization_fair_threshold = 65.0
+                utilization_fair_points = 5.0
+                utilization_poor_points = 2.5
+            config = MockConfig()
+        health_score = config.base_health_score
+        
+        # Add revenue-based health points
+        if avg_revenue > config.revenue_tier_1_threshold:
+            health_score += config.revenue_tier_1_points
+        elif avg_revenue > config.revenue_tier_2_threshold:
+            health_score += config.revenue_tier_2_points
+        elif avg_revenue > config.revenue_tier_3_threshold:
+            health_score += config.revenue_tier_3_points
+        else:
+            health_score += config.revenue_tier_4_points
+            
+        # Add YoY growth health points
+        if yoy_growth > config.yoy_excellent_threshold:
+            health_score += config.yoy_excellent_points
+        elif yoy_growth > config.yoy_good_threshold:
+            health_score += config.yoy_good_points
+        elif yoy_growth > config.yoy_fair_threshold:
+            health_score += config.yoy_fair_points
+        else:
+            health_score += config.yoy_poor_points
+            
+        # Add utilization health points
+        if utilization_avg > config.utilization_excellent_threshold:
+            health_score += config.utilization_excellent_points
+        elif utilization_avg > config.utilization_good_threshold:
+            health_score += config.utilization_good_points
+        elif utilization_avg > config.utilization_fair_threshold:
+            health_score += config.utilization_fair_points
+        else:
+            health_score += config.utilization_poor_points
+
         return jsonify({
             "success": True,
             "store_name": STORE_LOCATIONS[store_code]["name"],
             "revenue_metrics": {
                 "current_3wk_avg": avg_revenue,
-                "yoy_growth": 0,  # Calculate if needed
+                "yoy_growth": round(yoy_growth, 1),
                 "change_pct": 0
             },
             "store_metrics": {
-                "utilization_avg": 75,  # Placeholder
+                "utilization_avg": round(utilization_avg, 1),
                 "change_pct": 0
             },
             "operational_health": {
-                "health_score": 85,  # Placeholder
+                "health_score": round(min(health_score, 100), 0),  # Cap at 100
                 "change_pct": 0
             }
         })
