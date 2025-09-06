@@ -1395,9 +1395,9 @@
                     const utilizationEl = document.getElementById('utilizationKPI');
                     const healthEl = document.getElementById('healthKPI');
                     
-                    // Update KPI values immediately
+                    // Update KPI values immediately (using consistent formatting)
                     if (revenueEl) {
-                        const revenueValue = '$' + (data.revenue_metrics.current_3wk_avg / 1000).toFixed(0) + 'K';
+                        const revenueValue = formatCurrency(data.revenue_metrics.current_3wk_avg, true);
                         revenueEl.textContent = revenueValue;
                     }
                     if (growthEl) {
@@ -1419,7 +1419,15 @@
                     const utilizationTrend = document.getElementById('utilizationTrend');
                     const healthTrend = document.getElementById('healthTrend');
                     
-                    if (revenueTrend) revenueTrend.innerHTML = '<i class="fas fa-arrow-up"></i> +5.8%';
+                    if (revenueTrend) {
+                        // Use YoY growth for trend (same period last year comparison)
+                        const yoyGrowth = data.revenue_metrics?.yoy_growth || 0;
+                        console.log('🔧 Setting revenue trend to YoY:', yoyGrowth);
+                        const icon = yoyGrowth >= 0 ? 'fa-arrow-up' : 'fa-arrow-down';
+                        const sign = yoyGrowth >= 0 ? '+' : '';
+                        revenueTrend.innerHTML = `<i class="fas ${icon}"></i> ${sign}${yoyGrowth.toFixed(1)}%`;
+                        revenueTrend.title = `vs same period last year`;
+                    }
                     if (growthTrend) growthTrend.innerHTML = '<i class="fas fa-arrow-down"></i> -19.4%';
                     if (utilizationTrend) utilizationTrend.innerHTML = '<i class="fas fa-arrow-up"></i> +2.1%';
                     if (healthTrend) healthTrend.innerHTML = '<i class="fas fa-heartbeat"></i> Excellent';
@@ -1566,8 +1574,8 @@
 
             console.log('💰 Extracted values:', { revenue, growth, utilization, health });
             
-            // Format values
-            const formattedRevenue = formatCurrency(revenue);
+            // Format values (using abbreviated format for consistency)
+            const formattedRevenue = formatCurrency(revenue, true);
             const formattedGrowth = formatPercentage(growth);
             const formattedUtilization = formatPercentage(utilization);
             const formattedHealth = Math.round(health);
@@ -1598,13 +1606,32 @@
                 if (utilizationEl) utilizationEl.textContent = formattedUtilization;
                 if (healthEl) healthEl.textContent = formattedHealth;
                 
+                // Update trend indicators for individual stores
+                const revenueTrend = document.getElementById('revenueTrend');
+                const growthTrend = document.getElementById('growthTrend');
+                const utilizationTrend = document.getElementById('utilizationTrend');
+                const healthTrend = document.getElementById('healthTrend');
+                
+                if (revenueTrend) {
+                    const yoyGrowth = data.revenue_metrics?.yoy_growth || 0;
+                    console.log('🔧 Setting store revenue trend to YoY:', yoyGrowth);
+                    const icon = yoyGrowth >= 0 ? 'fa-arrow-up' : 'fa-arrow-down';
+                    const sign = yoyGrowth >= 0 ? '+' : '';
+                    revenueTrend.innerHTML = `<i class="fas ${icon}"></i> ${sign}${yoyGrowth.toFixed(1)}%`;
+                    revenueTrend.title = `vs same period last year`;
+                }
+                
+                if (growthTrend) {
+                    const yoyGrowth = data.revenue_metrics?.yoy_growth || 0;
+                    const icon = yoyGrowth >= 0 ? 'fa-arrow-up' : 'fa-arrow-down';
+                    const sign = yoyGrowth >= 0 ? '+' : '';
+                    growthTrend.innerHTML = `<i class="fas ${icon}"></i> ${sign}${yoyGrowth.toFixed(1)}%`;
+                }
+                
                 console.log('✅ KPI displays updated successfully');
             } catch (domError) {
                 console.error('❌ DOM update error:', domError);
             }
-
-            // Skip change indicators - DOM elements don't exist
-            // updateKPIChangeIndicators(data);
         }
 
         function updateTrendIndicator(elementId, value, label) {

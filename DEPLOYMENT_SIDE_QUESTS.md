@@ -180,7 +180,39 @@ CREATE TABLE executive_dashboard_configuration (
 - ❌ Query limits: `LIMIT 100` records (hardcoded)
 - ❌ Coverage threshold: `1.78%` RFID correlation (hardcoded)
 
-### **Priority C: Side Quest Hardcodes** *(Minor fixes)*
+### **Priority C: Comprehensive Hardcode Audit Results** *(tab7.py analysis)*
+
+#### **Query Limits - SHOULD_BE_USER_CONFIG**
+- ❌ Line 348: `LIMIT 3` → `top_performers_limit`
+- ❌ Line 3109,3122,3258: `LIMIT 3` → `dashboard_query_limit`  
+- ❌ Line 3533: `LIMIT 12` → `historical_weeks_limit`
+- ❌ Line 3686: `LIMIT 24` → `forecast_weeks_limit`
+- ❌ Line 1442: `limit(52)` → `max_historical_weeks`
+
+#### **Business Thresholds - SHOULD_BE_USER_CONFIG**
+- ❌ Lines 3074-3096: Health Score MockConfig fallback values
+- ❌ Lines 3329-3350: Store Performance Configuration duplicates
+- ❌ Line 3541: `* 0.9` (10% decline) → `decline_threshold_pct`
+- ❌ Line 3550: `* 1.1` (10% growth) → `growth_threshold_pct`
+- ❌ Line 3594: `* 2` (200% gap) → `performance_gap_multiplier`
+
+#### **Time Periods & Rolling Windows - SHOULD_BE_USER_CONFIG**
+- ❌ Line 2757: `weeks_back = 52` → `analysis_period_weeks`
+- ❌ Line 2758,2761: `rolling_window = 12` → `rolling_window_size`
+- ❌ Line 1461: `window=4` → `moving_average_window`
+- ❌ Line 1447: `< 12` → `min_forecast_data_points`
+
+#### **Data Filtering - SHOULD_BE_USER_CONFIG**
+- ❌ Line 1258: `sell_price < 5000` → `max_equipment_price`
+- ❌ Line 1259: `qty < 10000` → `max_inventory_qty`
+- ❌ Line 3165,3615: `rental_rate > 0` → `min_rental_rate`
+
+#### **Statistical Constants - SHOULD_BE_USER_CONFIG**
+- ❌ Line 1510,3732: `* 1.96` → `confidence_z_score`
+- ❌ Line 3623: `utilization < 40` → `low_utilization_threshold`
+- ❌ Line 3635: `utilization > 85` → `high_utilization_threshold`
+
+#### **Legacy Side Quest Hardcodes**
 - ❌ Financial Analytics Service:
   - Line 455-456: `df[f'{col}_3wk_avg'] = df[col].rolling(window=3, center=True).mean()`
   - Line 1456-1457: `store_df['profit_3wk_avg'] = store_df['gross_profit'].rolling(window=3)`  
@@ -194,6 +226,45 @@ CREATE TABLE executive_dashboard_configuration (
 - ❌ Add store-specific override capabilities
 - ❌ Implement configuration validation and testing
 - ❌ Create configuration backup/restore functionality
+
+### **Priority E: Data Lag Fix** *(NEWLY IDENTIFIED)*
+**Status:** ❌ IDENTIFIED - Needs Implementation  
+**Priority:** MEDIUM - Affects KPI accuracy but system functions  
+**Impact:** Executive dashboard shows outdated data
+
+**Issue Description:**
+- Database has data through: 2025-08-31
+- Current date: 2025-09-06
+- Gap: ~6 days of missing recent data
+- Total Revenue shows $103,434 (database) vs $109,955 (CSV with current data)
+- Gap of $6,521 suggests newer data available but not imported
+
+**Root Cause:**
+- CSV import process not automated
+- scorecard_trends_data table not updating with current week data
+- Data pipeline lag between business operations and database
+
+**Action Items:**
+- ❌ Identify and fix data import automation
+- ❌ Add data freshness indicators to dashboard  
+- ❌ Create monitoring for data lag detection
+- ❌ Update KPI calculations to handle data lag gracefully
+
+### **Priority F: Store Selection Trend Consistency** *(NEWLY IDENTIFIED)*
+**Status:** ✅ PARTIALLY FIXED - Revenue trend fixed, others need same treatment  
+**Priority:** LOW-MEDIUM - Affects individual store view accuracy  
+**Impact:** Store selection shows inconsistent trend data
+
+**Issue Description:**
+- Individual store selection uses different code path than "All Stores" view
+- Some trends update correctly, others remain hardcoded when switching stores
+- Functions: `updateKPIs()` vs `updateKPIDisplays()` inconsistency
+
+**Action Items:**
+- ✅ Fixed revenue trend for individual stores 
+- ❌ Fix utilization trend (+2.1% hardcoded) for store selection
+- ❌ Fix health trend ("Excellent" hardcoded) for store selection  
+- ❌ Ensure all trend calculations use same logic across views
 
 ## 📊 IMPACT SUMMARY
 
