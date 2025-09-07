@@ -11,8 +11,36 @@ import json
 from decimal import Decimal
 
 from ..utils.date_ranges import get_date_range_from_params
+from ..models.config_models import ExecutiveDashboardConfiguration
 
 logger = get_logger(__name__)
+
+def _get_executive_config():
+    """Get executive dashboard configuration with fallback to defaults"""
+    try:
+        config = ExecutiveDashboardConfiguration.query.filter_by(
+            user_id='default_user', 
+            config_name='default'
+        ).first()
+        if config:
+            return config
+    except Exception as e:
+        logger.error(f"Error loading executive configuration: {e}")
+    
+    # Fallback to Mock config with defaults matching database schema
+    class MockConfig:
+        executive_summary_revenue_weeks = 3
+        financial_kpis_current_revenue_weeks = 3
+        financial_kpis_debug_weeks = 3
+        location_kpis_revenue_weeks = 3
+        location_kpis_payroll_weeks = 3
+        location_comparison_revenue_weeks = 3
+        insights_profit_margin_weeks = 3
+        insights_trend_analysis_weeks = 12
+        forecasts_historical_weeks = 24
+        forecasting_historical_weeks = 52
+    
+    return MockConfig()
 
 tab7_bp = Blueprint("tab7", __name__)
 executive_api_bp = Blueprint("executive_api", __name__, url_prefix='/executive')
@@ -340,12 +368,13 @@ def get_executive_summary():
         # CRITICAL FIX: Get revenue from scorecard_trends_data (same as working financial-kpis endpoint)
         # This data source actually has recent data, unlike pos_transaction_items which returns 0
         from sqlalchemy import text as sql_text
-        working_revenue_query = sql_text("""
+        config = _get_executive_config()
+        working_revenue_query = sql_text(f"""
             SELECT AVG(total_weekly_revenue) as avg_3wk
             FROM scorecard_trends_data 
             WHERE total_weekly_revenue IS NOT NULL
             ORDER BY week_ending DESC 
-            LIMIT 3
+            LIMIT {config.executive_summary_revenue_weeks}
         """)
         working_revenue_result = session.execute(working_revenue_query).fetchone()
         working_revenue = float(working_revenue_result.avg_3wk) if working_revenue_result and working_revenue_result.avg_3wk else 0
@@ -1436,10 +1465,11 @@ def get_forecasting():
         if store_filter != "all":
             query = query.filter(PayrollTrends.store_id == store_filter)
 
+        config = _get_executive_config()
         query = (
             query.group_by(PayrollTrends.week_ending)
             .order_by(PayrollTrends.week_ending.desc())
-            .limit(52)
+            .limit(config.forecasting_historical_weeks)
         )
 
         historical_data = query.all()
@@ -3097,7 +3127,8 @@ def financial_kpis():
             config = MockConfig()
         
         # Use total_weekly_revenue column directly (no calculation needed as per requirement)
-        revenue_query = text("""
+        config = _get_executive_config()
+        revenue_query = text(f"""
             SELECT AVG(total_weekly_revenue) as avg_3wk
             FROM (
                 SELECT total_weekly_revenue 
@@ -3106,20 +3137,20 @@ def financial_kpis():
                     AND total_weekly_revenue > 0
                     AND week_ending <= CURDATE()
                 ORDER BY week_ending DESC 
-                LIMIT 3
+                LIMIT {config.financial_kpis_current_revenue_weeks}
             ) recent_weeks
         """)
         current_3wk_avg = session.execute(revenue_query).scalar() or 0
         
         # Debug: Show what weeks we're using
-        debug_query = text("""
+        debug_query = text(f"""
             SELECT week_ending, total_weekly_revenue
             FROM scorecard_trends_data 
             WHERE total_weekly_revenue IS NOT NULL 
                 AND total_weekly_revenue > 0
                 AND week_ending <= CURDATE()
             ORDER BY week_ending DESC 
-            LIMIT 3
+            LIMIT {config.financial_kpis_debug_weeks}
         """)
         debug_result = session.execute(debug_query).fetchall()
         logger.info(f"Using weeks for revenue calculation:")
@@ -3248,6 +3279,7 @@ def location_specific_kpis(store_code):
         session = db.session
         
         # STANDARDIZED: Use same data source and calculation as company total (scorecard_trends_data)
+        config = _get_executive_config()
         revenue_query = text(f"""
             SELECT AVG(revenue_{store_code}) as avg_revenue
             FROM (
@@ -3255,7 +3287,7 @@ def location_specific_kpis(store_code):
                 FROM scorecard_trends_data 
                 WHERE revenue_{store_code} IS NOT NULL
                 ORDER BY week_ending DESC 
-                LIMIT 3
+                LIMIT {config.location_kpis_revenue_weeks}
             ) recent_weeks
         """)
         avg_revenue = session.execute(revenue_query).scalar() or 0
@@ -3297,7 +3329,7 @@ def location_specific_kpis(store_code):
         # Get profit margin from payroll data (with type conversion)
         profit_margin_query = session.query(PayrollTrends).filter(
             PayrollTrends.store_id == store_code
-        ).order_by(desc(PayrollTrends.week_ending)).limit(3).all()
+        ).order_by(desc(PayrollTrends.week_ending)).limit(config.location_kpis_payroll_weeks).all()
         
         profit_margin = 0
         if profit_margin_query:
@@ -3414,6 +3446,7 @@ def location_comparison():
         # Use same data source as working location-kpis endpoints (scorecard_trends_data)
         for store_code, store_info in STORE_LOCATIONS.items():
             # STANDARDIZED: Get current revenue using same method as other endpoints
+            config = _get_executive_config()
             revenue_query = text(f"""
                 SELECT AVG(revenue_{store_code}) as current_revenue
                 FROM (
@@ -3421,7 +3454,7 @@ def location_comparison():
                     FROM scorecard_trends_data 
                     WHERE revenue_{store_code} IS NOT NULL
                     ORDER BY week_ending DESC 
-                    LIMIT 3
+                    LIMIT {config.location_comparison_revenue_weeks}
                 ) recent_weeks
             """)
             current_result = session.execute(revenue_query).fetchone()
@@ -3472,12 +3505,12 @@ def location_comparison():
             utilization = float(util_result.utilization_pct) if util_result and util_result.utilization_pct else 0
             
             # Get profit margin from payroll data
-            payroll_query = text("""
+            payroll_query = text(f"""
                 SELECT AVG(total_revenue) as avg_revenue, AVG(payroll_cost) as avg_payroll
                 FROM executive_payroll_trends 
                 WHERE store_id = :store_code
                 ORDER BY week_ending DESC 
-                LIMIT 3
+                LIMIT {config.insights_profit_margin_weeks}
             """)
             payroll_result = session.execute(payroll_query, {"store_code": store_code}).fetchone()
             
@@ -3521,7 +3554,8 @@ def intelligent_insights():
         insights = []
         
         # 1. Revenue Trend Analysis (using scorecard_trends_data)
-        revenue_trend_query = text("""
+        config = _get_executive_config()
+        revenue_trend_query = text(f"""
             SELECT 
                 week_ending,
                 total_weekly_revenue,
@@ -3530,7 +3564,7 @@ def intelligent_insights():
             FROM scorecard_trends_data 
             WHERE total_weekly_revenue IS NOT NULL
             ORDER BY week_ending DESC 
-            LIMIT 12
+            LIMIT {config.insights_trend_analysis_weeks}
         """)
         revenue_data = session.execute(revenue_trend_query).fetchall()
         
@@ -3673,7 +3707,8 @@ def financial_forecasts():
         forecast_weeks = int(request.args.get('weeks', 12))  # Default 12 weeks
         
         # Get historical weekly revenue data for trend analysis
-        historical_query = text("""
+        config = _get_executive_config()
+        historical_query = text(f"""
             SELECT 
                 week_ending,
                 total_weekly_revenue,
@@ -3683,7 +3718,7 @@ def financial_forecasts():
             WHERE total_weekly_revenue IS NOT NULL
                 AND total_weekly_revenue > 0
             ORDER BY week_ending DESC 
-            LIMIT 24
+            LIMIT {config.forecasts_historical_weeks}
         """)
         historical_data = session.execute(historical_query).fetchall()
         

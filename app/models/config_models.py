@@ -663,6 +663,18 @@ class ExecutiveDashboardConfiguration(db.Model):
     rfid_correlated_items = db.Column(db.Integer, default=290)                  # Number of RFID-correlated items
     total_equipment_items = db.Column(db.Integer, default=16259)                # Total equipment items in system
     
+    # Query Limit Parameters (from hardcode conversion Phase 2)
+    executive_summary_revenue_weeks = db.Column(db.Integer, default=3)          # Weeks for executive summary revenue (LIMIT 3)
+    financial_kpis_current_revenue_weeks = db.Column(db.Integer, default=3)     # Weeks for current revenue in financial KPIs
+    financial_kpis_debug_weeks = db.Column(db.Integer, default=3)               # Debug query weeks for revenue calculation
+    location_kpis_revenue_weeks = db.Column(db.Integer, default=3)              # Location-specific revenue weeks
+    location_kpis_payroll_weeks = db.Column(db.Integer, default=3)              # Location-specific payroll weeks
+    location_comparison_revenue_weeks = db.Column(db.Integer, default=3)        # Location comparison revenue weeks
+    insights_profit_margin_weeks = db.Column(db.Integer, default=3)             # Profit margin calculation weeks
+    insights_trend_analysis_weeks = db.Column(db.Integer, default=12)           # Trend analysis weeks (LIMIT 12)
+    forecasts_historical_weeks = db.Column(db.Integer, default=24)              # Financial forecasts historical weeks (LIMIT 24)
+    forecasting_historical_weeks = db.Column(db.Integer, default=52)            # Predictive forecasting weeks (52 weeks/.limit(52))
+    
     # Store-specific dashboard overrides (JSON format)
     # Example: {"3607": {"base_health_score": 80.0}, "6800": {"strong_growth_threshold": 8.0}}
     store_specific_thresholds = db.Column(db.JSON, default={})
@@ -752,7 +764,18 @@ class ExecutiveDashboardConfiguration(db.Model):
             'default_analysis_period_weeks': self.default_analysis_period_weeks,
             'rfid_coverage_percentage': self.rfid_coverage_percentage,
             'rfid_correlated_items': self.rfid_correlated_items,
-            'total_equipment_items': self.total_equipment_items
+            'total_equipment_items': self.total_equipment_items,
+            # Query limit parameters (Phase 2 hardcode conversion)
+            'executive_summary_revenue_weeks': self.executive_summary_revenue_weeks,
+            'financial_kpis_current_revenue_weeks': self.financial_kpis_current_revenue_weeks,
+            'financial_kpis_debug_weeks': self.financial_kpis_debug_weeks,
+            'location_kpis_revenue_weeks': self.location_kpis_revenue_weeks,
+            'location_kpis_payroll_weeks': self.location_kpis_payroll_weeks,
+            'location_comparison_revenue_weeks': self.location_comparison_revenue_weeks,
+            'insights_profit_margin_weeks': self.insights_profit_margin_weeks,
+            'insights_trend_analysis_weeks': self.insights_trend_analysis_weeks,
+            'forecasts_historical_weeks': self.forecasts_historical_weeks,
+            'forecasting_historical_weeks': self.forecasting_historical_weeks
         }
         
         return threshold_map.get(threshold_type, 75.0)  # Safe fallback to base health score
