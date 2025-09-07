@@ -14,6 +14,8 @@ class ConfigurationManager {
 
     init() {
         console.log('Initializing Configuration Manager...');
+        console.log('Bootstrap available:', typeof bootstrap !== 'undefined');
+        console.log('Tab elements found:', document.querySelectorAll('[data-bs-toggle="pill"]').length);
         this.initializeBootstrapTabs();
         this.setupEventListeners();
         this.loadConfigurations();
@@ -1622,8 +1624,28 @@ class ConfigurationManager {
 let configManager;
 
 document.addEventListener('DOMContentLoaded', () => {
-    configManager = new ConfigurationManager();
+    console.log('DOMContentLoaded fired - initializing configuration manager');
+    console.log('Document ready state:', document.readyState);
+    console.log('Bootstrap available at DOM ready:', typeof bootstrap !== 'undefined');
+    
+    // Wait a bit to ensure Bootstrap is fully loaded
+    setTimeout(() => {
+        console.log('Starting configuration manager initialization');
+        configManager = new ConfigurationManager();
+        window.configManager = configManager;
+    }, 100);
 });
 
-// Export for global access
-window.configManager = configManager;
+// Fallback initialization if DOMContentLoaded already fired
+if (document.readyState === 'loading') {
+    console.log('Document still loading, waiting for DOMContentLoaded');
+} else {
+    console.log('Document already loaded, initializing immediately');
+    setTimeout(() => {
+        if (!configManager) {
+            console.log('Fallback: initializing configuration manager');
+            configManager = new ConfigurationManager();
+            window.configManager = configManager;
+        }
+    }, 100);
+}
