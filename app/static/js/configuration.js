@@ -4,19 +4,84 @@
  * Version: 2025-08-29
  */
 
+console.log('🔥 CONFIGURATION.JS FILE LOADED');
+console.log('🔥 Script timestamp:', new Date().toISOString());
+console.log('🔥 Document ready state at load:', document.readyState);
+
+console.log('🔥 About to define ConfigurationManager class');
+
+// EMERGENCY TAB FIX - Direct DOM manipulation
+document.addEventListener('DOMContentLoaded', () => {
+    console.log('🚨 EMERGENCY TAB FIX LOADED');
+    setTimeout(() => {
+        const tabs = document.querySelectorAll('[data-bs-toggle="pill"]');
+        const panels = document.querySelectorAll('.tab-pane');
+        console.log('🚨 Found tabs:', tabs.length, 'panels:', panels.length);
+        
+        tabs.forEach(tab => {
+            tab.addEventListener('click', (e) => {
+                console.log('🚨 EMERGENCY: Tab clicked:', tab.id);
+                e.preventDefault();
+                
+                // Remove active from all tabs and panels
+                tabs.forEach(t => t.classList.remove('active'));
+                panels.forEach(p => p.classList.remove('active', 'show'));
+                
+                // Add active to clicked tab
+                tab.classList.add('active');
+                
+                // Show target panel
+                const targetId = tab.getAttribute('data-bs-target');
+                const targetPanel = document.querySelector(targetId);
+                if (targetPanel) {
+                    targetPanel.classList.add('active', 'show');
+                    console.log('🚨 EMERGENCY: Panel activated:', targetPanel.id);
+                }
+            });
+        });
+    }, 500);
+});
+
 class ConfigurationManager {
     constructor() {
-        this.currentConfig = {};
-        this.unsavedChanges = false;
-        this.validationRules = this.initValidationRules();
-        this.init();
+        try {
+            console.log('ConfigurationManager constructor starting...');
+            this.currentConfig = {};
+            console.log('Set currentConfig');
+            
+            this.unsavedChanges = false;
+            console.log('Set unsavedChanges');
+            
+            console.log('Calling initValidationRules...');
+            this.validationRules = this.initValidationRules();
+            console.log('initValidationRules completed');
+            
+            console.log('Calling init...');
+            this.init();
+            console.log('init completed');
+        } catch (error) {
+            console.error('FATAL ERROR in constructor:', error);
+        }
     }
 
     init() {
         try {
             console.log('Initializing Configuration Manager...');
-            console.log('Bootstrap available:', typeof bootstrap !== 'undefined');
-            console.log('Tab elements found:', document.querySelectorAll('[data-bs-toggle="pill"]').length);
+            
+            try {
+                console.log('Checking Bootstrap...');
+                console.log('Bootstrap available:', typeof bootstrap !== 'undefined');
+            } catch (e) {
+                console.error('Error checking Bootstrap:', e);
+            }
+            
+            try {
+                console.log('Checking tab elements...');
+                const tabElements = document.querySelectorAll('[data-bs-toggle="pill"]');
+                console.log('Tab elements found:', tabElements.length);
+            } catch (e) {
+                console.error('Error finding tab elements:', e);
+            }
             
             console.log('Step 1: initializeBootstrapTabs');
             this.initializeBootstrapTabs();
@@ -1686,9 +1751,17 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Wait a bit to ensure Bootstrap is fully loaded
     setTimeout(() => {
-        console.log('Starting configuration manager initialization');
-        configManager = new ConfigurationManager();
-        window.configManager = configManager;
+        try {
+            console.log('Starting configuration manager initialization');
+            console.log('About to create new ConfigurationManager...');
+            configManager = new ConfigurationManager();
+            console.log('ConfigurationManager created successfully');
+            window.configManager = configManager;
+            console.log('ConfigurationManager assigned to window');
+        } catch (error) {
+            console.error('FATAL ERROR creating ConfigurationManager:', error);
+            console.error('Error stack:', error.stack);
+        }
     }, 100);
 });
 
@@ -1699,9 +1772,17 @@ if (document.readyState === 'loading') {
     console.log('Document already loaded, initializing immediately');
     setTimeout(() => {
         if (!configManager) {
-            console.log('Fallback: initializing configuration manager');
-            configManager = new ConfigurationManager();
-            window.configManager = configManager;
+            try {
+                console.log('Fallback: initializing configuration manager');
+                console.log('About to create ConfigurationManager via fallback...');
+                configManager = new ConfigurationManager();
+                console.log('Fallback ConfigurationManager created successfully');
+                window.configManager = configManager;
+                console.log('Fallback ConfigurationManager assigned to window');
+            } catch (error) {
+                console.error('FATAL ERROR in fallback initialization:', error);
+                console.error('Fallback error stack:', error.stack);
+            }
         }
     }, 100);
 }
