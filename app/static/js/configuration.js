@@ -60,28 +60,41 @@ class ConfigurationManager {
         tabElements.forEach(tabElement => {
             tabElement.addEventListener('click', (event) => {
                 event.preventDefault();
-                
-                // Remove active class from all tabs and panels
-                tabElements.forEach(tab => tab.classList.remove('active'));
-                tabPanels.forEach(panel => panel.classList.remove('active', 'show'));
-                
-                // Add active class to clicked tab
-                tabElement.classList.add('active');
-                
-                // Show corresponding panel
-                const targetId = tabElement.getAttribute('data-bs-target');
-                if (targetId) {
-                    const targetPanel = document.querySelector(targetId);
-                    if (targetPanel) {
-                        targetPanel.classList.add('active', 'show');
-                    }
-                }
-                
-                this.onTabChange(tabElement);
+                this.switchToTab(tabElement);
             });
         });
         
         console.log('Fallback tabs initialized:', tabElements.length);
+    }
+
+    switchToTab(clickedTab) {
+        console.log('Switching to tab:', clickedTab.id);
+        
+        // Remove active class from all tabs and panels
+        const tabElements = document.querySelectorAll('[data-bs-toggle="pill"]');
+        const tabPanels = document.querySelectorAll('.tab-pane');
+        
+        tabElements.forEach(tab => tab.classList.remove('active'));
+        tabPanels.forEach(panel => panel.classList.remove('active', 'show'));
+        
+        // Add active class to clicked tab
+        clickedTab.classList.add('active');
+        
+        // Show corresponding panel
+        const targetId = clickedTab.getAttribute('data-bs-target');
+        console.log('Target panel ID:', targetId);
+        
+        if (targetId) {
+            const targetPanel = document.querySelector(targetId);
+            if (targetPanel) {
+                targetPanel.classList.add('active', 'show');
+                console.log('Panel activated:', targetPanel.id);
+            } else {
+                console.error('Target panel not found:', targetId);
+            }
+        }
+        
+        this.onTabChange(clickedTab);
     }
 
     initValidationRules() {
@@ -108,20 +121,31 @@ class ConfigurationManager {
 
     setupEventListeners() {
         // Tab navigation - handle both click and shown events
-        document.querySelectorAll('[data-bs-toggle="pill"]').forEach(tab => {
+        const tabElements = document.querySelectorAll('[data-bs-toggle="pill"]');
+        console.log('Setting up event listeners for', tabElements.length, 'tabs');
+        
+        tabElements.forEach((tab, index) => {
+            console.log(`Setting up tab ${index}: ${tab.id}`);
+            
             // Handle click events for immediate response
             tab.addEventListener('click', (event) => {
-                console.log('Tab clicked:', event.target.id);
-                const targetId = event.target.getAttribute('data-bs-target');
-                if (targetId) {
-                    this.onTabChange(event.target);
-                }
+                console.log('Tab clicked:', event.target.id, event.target);
+                event.preventDefault();
+                event.stopPropagation();
+                
+                // Manual tab switching
+                this.switchToTab(event.target);
             });
             
             // Handle shown events for Bootstrap completion
             tab.addEventListener('shown.bs.tab', (event) => {
                 console.log('Tab shown:', event.target.id);
                 this.onTabChange(event.target);
+            });
+            
+            // Add mousedown for debugging
+            tab.addEventListener('mousedown', (event) => {
+                console.log('Tab mousedown:', event.target.id);
             });
         });
 
