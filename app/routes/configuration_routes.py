@@ -7,8 +7,9 @@ from app import db
 from app.models.config_models import (
     UserConfiguration, PredictionParameters, CorrelationSettings,
     BusinessIntelligenceConfig, DataIntegrationSettings, UserPreferences,
-    ConfigurationAudit, get_user_config, set_user_config,
-    get_default_prediction_params, get_default_correlation_settings
+    ConfigurationAudit, LaborCostConfiguration, get_user_config, set_user_config,
+    get_default_prediction_params, get_default_correlation_settings,
+    get_default_labor_cost_config
 )
 from datetime import datetime
 import json
@@ -419,6 +420,149 @@ def business_intelligence_config():
             return jsonify({'success': False, 'error': str(e)}), 500
 
 
+@config_bp.route('/api/labor-cost-configuration', methods=['GET', 'POST'])
+def labor_cost_configuration():
+    """Labor cost configuration API endpoint"""
+    user_id = session.get('user_id', DEFAULT_USER_ID)
+    
+    if request.method == 'GET':
+        try:
+            labor_config = LaborCostConfiguration.query.filter_by(
+                user_id=user_id, is_active=True
+            ).first()
+            
+            if not labor_config:
+                labor_config = LaborCostConfiguration(user_id=user_id)
+                db.session.add(labor_config)
+                db.session.commit()
+            
+            return jsonify({
+                'success': True,
+                'data': {
+                    'global_thresholds': {
+                        'high_cost_threshold': labor_config.high_labor_cost_threshold,
+                        'warning_level': labor_config.labor_cost_warning_level,
+                        'target_ratio': labor_config.target_labor_cost_ratio,
+                        'efficiency_baseline': labor_config.efficiency_baseline
+                    },
+                    'analysis_settings': {
+                        'minimum_hours': labor_config.minimum_hours_for_analysis,
+                        'efficiency_weight': labor_config.labor_efficiency_weight,
+                        'cost_control_weight': labor_config.cost_control_weight
+                    },
+                    'processing_settings': {
+                        'batch_size': labor_config.batch_processing_size,
+                        'checkpoint_interval': labor_config.progress_checkpoint_interval,
+                        'query_timeout': labor_config.query_timeout_seconds
+                    },
+                    'alert_settings': {
+                        'high_cost_alerts': labor_config.enable_high_cost_alerts,
+                        'trend_alerts': labor_config.enable_trend_alerts,
+                        'frequency': labor_config.alert_frequency
+                    },
+                    'store_overrides': labor_config.store_specific_thresholds or {},
+                    'metadata': {
+                        'config_name': labor_config.config_name,
+                        'created_at': labor_config.created_at.isoformat() if labor_config.created_at else None,
+                        'updated_at': labor_config.updated_at.isoformat() if labor_config.updated_at else None
+                    }
+                }
+            })
+        except Exception as e:
+            logger.error(f"Error retrieving labor cost configuration: {str(e)}")
+            return jsonify({'success': False, 'error': str(e)}), 500
+    
+    elif request.method == 'POST':
+        try:
+            data = request.get_json()
+            
+            labor_config = LaborCostConfiguration.query.filter_by(
+                user_id=user_id, is_active=True
+            ).first()
+            
+            if not labor_config:
+                labor_config = LaborCostConfiguration(user_id=user_id)
+                db.session.add(labor_config)
+            
+            # Store old values for audit trail
+            old_values = {
+                'global_thresholds': {
+                    'high_cost_threshold': labor_config.high_labor_cost_threshold,
+                    'warning_level': labor_config.labor_cost_warning_level,
+                    'target_ratio': labor_config.target_labor_cost_ratio,
+                    'efficiency_baseline': labor_config.efficiency_baseline
+                },
+                'store_overrides': labor_config.store_specific_thresholds or {}
+            }
+            
+            # Update configuration from request data
+            if 'global_thresholds' in data:
+                thresholds = data['global_thresholds']
+                labor_config.high_labor_cost_threshold = thresholds.get('high_cost_threshold', 35.0)
+                labor_config.labor_cost_warning_level = thresholds.get('warning_level', 30.0)
+                labor_config.target_labor_cost_ratio = thresholds.get('target_ratio', 25.0)
+                labor_config.efficiency_baseline = thresholds.get('efficiency_baseline', 100.0)
+            
+            if 'analysis_settings' in data:
+                analysis = data['analysis_settings']
+                labor_config.minimum_hours_for_analysis = analysis.get('minimum_hours', 1.0)
+                labor_config.labor_efficiency_weight = analysis.get('efficiency_weight', 0.6)
+                labor_config.cost_control_weight = analysis.get('cost_control_weight', 0.4)
+            
+            if 'processing_settings' in data:
+                processing = data['processing_settings']
+                # Cap batch size at 200 per requirement
+                batch_size = min(processing.get('batch_size', 100), 200)
+                labor_config.batch_processing_size = batch_size
+                labor_config.progress_checkpoint_interval = processing.get('checkpoint_interval', 500)
+                labor_config.query_timeout_seconds = processing.get('query_timeout', 30)
+            
+            if 'alert_settings' in data:
+                alerts = data['alert_settings']
+                labor_config.enable_high_cost_alerts = alerts.get('high_cost_alerts', True)
+                labor_config.enable_trend_alerts = alerts.get('trend_alerts', True)
+                labor_config.alert_frequency = alerts.get('frequency', 'weekly')
+            
+            if 'store_overrides' in data:
+                # Validate store override format
+                store_overrides = data['store_overrides']
+                if isinstance(store_overrides, dict):
+                    labor_config.store_specific_thresholds = store_overrides
+                else:
+                    logger.warning(f"Invalid store_overrides format: {type(store_overrides)}")
+            
+            labor_config.updated_at = datetime.utcnow()
+            db.session.commit()
+            
+            # Create audit log
+            audit = ConfigurationAudit(
+                user_id=user_id,
+                config_type='labor_cost_configuration',
+                config_id=labor_config.id,
+                action='update',
+                old_values=old_values,
+                new_values=data,
+                ip_address=request.remote_addr,
+                user_agent=request.user_agent.string
+            )
+            db.session.add(audit)
+            db.session.commit()
+            
+            return jsonify({
+                'success': True,
+                'message': 'Labor cost configuration updated successfully',
+                'data': {
+                    'batch_size_capped': labor_config.get_safe_batch_size(),
+                    'updated_at': labor_config.updated_at.isoformat()
+                }
+            })
+            
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Error updating labor cost configuration: {str(e)}")
+            return jsonify({'success': False, 'error': str(e)}), 500
+
+
 @config_bp.route('/api/data-integration', methods=['GET', 'POST'])
 def data_integration_settings():
     """Data Integration settings API endpoint"""
@@ -751,6 +895,32 @@ def reset_configuration(config_type):
                 prediction_params.high_stock_threshold = 2.0
                 prediction_params.demand_spike_threshold = 1.5
                 prediction_params.updated_at = datetime.utcnow()
+                
+                db.session.commit()
+        
+        elif config_type == 'labor-cost':
+            # Reset labor cost configuration to defaults
+            labor_config = LaborCostConfiguration.query.filter_by(
+                user_id=user_id, is_active=True
+            ).first()
+            
+            if labor_config:
+                # Reset to default values
+                labor_config.high_labor_cost_threshold = 35.0
+                labor_config.labor_cost_warning_level = 30.0
+                labor_config.target_labor_cost_ratio = 25.0
+                labor_config.efficiency_baseline = 100.0
+                labor_config.minimum_hours_for_analysis = 1.0
+                labor_config.labor_efficiency_weight = 0.6
+                labor_config.cost_control_weight = 0.4
+                labor_config.batch_processing_size = 100
+                labor_config.progress_checkpoint_interval = 500
+                labor_config.query_timeout_seconds = 30
+                labor_config.enable_high_cost_alerts = True
+                labor_config.enable_trend_alerts = True
+                labor_config.alert_frequency = 'weekly'
+                labor_config.store_specific_thresholds = {}
+                labor_config.updated_at = datetime.utcnow()
                 
                 db.session.commit()
         
