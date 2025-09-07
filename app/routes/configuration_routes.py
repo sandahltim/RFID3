@@ -7,9 +7,9 @@ from app import db
 from app.models.config_models import (
     UserConfiguration, PredictionParameters, CorrelationSettings,
     BusinessIntelligenceConfig, DataIntegrationSettings, UserPreferences,
-    ConfigurationAudit, LaborCostConfiguration, get_user_config, set_user_config,
-    get_default_prediction_params, get_default_correlation_settings,
-    get_default_labor_cost_config
+    ConfigurationAudit, LaborCostConfiguration, ExecutiveDashboardConfiguration,
+    get_user_config, set_user_config, get_default_prediction_params, 
+    get_default_correlation_settings, get_default_labor_cost_config
 )
 from datetime import datetime
 import json
@@ -560,6 +560,190 @@ def labor_cost_configuration():
         except Exception as e:
             db.session.rollback()
             logger.error(f"Error updating labor cost configuration: {str(e)}")
+            return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@config_bp.route('/api/executive-dashboard-configuration', methods=['GET', 'POST'])
+def executive_dashboard_configuration():
+    """Executive dashboard configuration API endpoint"""
+    user_id = session.get('user_id', DEFAULT_USER_ID)
+    
+    if request.method == 'GET':
+        try:
+            exec_config = ExecutiveDashboardConfiguration.query.filter_by(
+                user_id=user_id, is_active=True
+            ).first()
+            
+            if not exec_config:
+                exec_config = ExecutiveDashboardConfiguration(user_id=user_id)
+                db.session.add(exec_config)
+                db.session.commit()
+            
+            return jsonify({
+                'success': True,
+                'data': {
+                    'query_limits': {
+                        'executive_summary_revenue_weeks': exec_config.executive_summary_revenue_weeks,
+                        'financial_kpis_current_revenue_weeks': exec_config.financial_kpis_current_revenue_weeks,
+                        'location_kpis_revenue_weeks': exec_config.location_kpis_revenue_weeks,
+                        'insights_trend_analysis_weeks': exec_config.insights_trend_analysis_weeks,
+                        'forecasts_historical_weeks': exec_config.forecasts_historical_weeks,
+                        'forecasting_historical_weeks': exec_config.forecasting_historical_weeks
+                    },
+                    'health_scoring': {
+                        'base_health_score': exec_config.base_health_score,
+                        'min_health_score': exec_config.min_health_score,
+                        'max_health_score': exec_config.max_health_score
+                    },
+                    'revenue_tiers': {
+                        'tier_1_threshold': exec_config.revenue_tier_1_threshold,
+                        'tier_1_points': exec_config.revenue_tier_1_points,
+                        'tier_2_threshold': exec_config.revenue_tier_2_threshold,
+                        'tier_2_points': exec_config.revenue_tier_2_points,
+                        'tier_3_threshold': exec_config.revenue_tier_3_threshold,
+                        'tier_3_points': exec_config.revenue_tier_3_points
+                    },
+                    'utilization_scoring': {
+                        'excellent_threshold': exec_config.utilization_excellent_threshold,
+                        'excellent_points': exec_config.utilization_excellent_points,
+                        'good_threshold': exec_config.utilization_good_threshold,
+                        'good_points': exec_config.utilization_good_points,
+                        'fair_threshold': exec_config.utilization_fair_threshold,
+                        'fair_points': exec_config.utilization_fair_points
+                    },
+                    'forecasting': {
+                        'default_horizon_weeks': exec_config.default_forecast_horizon_weeks,
+                        'default_confidence_level': exec_config.default_confidence_level,
+                        'min_horizon': exec_config.min_forecast_horizon,
+                        'max_horizon': exec_config.max_forecast_horizon
+                    },
+                    'store_overrides': exec_config.store_specific_thresholds or {},
+                    'alert_settings': {
+                        'health_score_alerts': exec_config.enable_health_score_alerts,
+                        'trend_alerts': exec_config.enable_trend_alerts,
+                        'growth_alerts': exec_config.enable_growth_alerts,
+                        'frequency': exec_config.alert_frequency
+                    },
+                    'metadata': {
+                        'config_name': exec_config.config_name,
+                        'created_at': exec_config.created_at.isoformat() if exec_config.created_at else None,
+                        'updated_at': exec_config.updated_at.isoformat() if exec_config.updated_at else None
+                    }
+                }
+            })
+        except Exception as e:
+            logger.error(f"Error retrieving executive dashboard configuration: {str(e)}")
+            return jsonify({'success': False, 'error': str(e)}), 500
+    
+    elif request.method == 'POST':
+        try:
+            data = request.get_json()
+            
+            exec_config = ExecutiveDashboardConfiguration.query.filter_by(
+                user_id=user_id, is_active=True
+            ).first()
+            
+            if not exec_config:
+                exec_config = ExecutiveDashboardConfiguration(user_id=user_id)
+                db.session.add(exec_config)
+            
+            # Store old values for audit trail
+            old_values = {
+                'query_limits': {
+                    'executive_summary_revenue_weeks': exec_config.executive_summary_revenue_weeks,
+                    'financial_kpis_current_revenue_weeks': exec_config.financial_kpis_current_revenue_weeks,
+                    'insights_trend_analysis_weeks': exec_config.insights_trend_analysis_weeks
+                },
+                'health_scoring': {
+                    'base_health_score': exec_config.base_health_score
+                },
+                'store_overrides': exec_config.store_specific_thresholds or {}
+            }
+            
+            # Update configuration from request data
+            if 'query_limits' in data:
+                limits = data['query_limits']
+                exec_config.executive_summary_revenue_weeks = limits.get('executive_summary_revenue_weeks', 3)
+                exec_config.financial_kpis_current_revenue_weeks = limits.get('financial_kpis_current_revenue_weeks', 3)
+                exec_config.location_kpis_revenue_weeks = limits.get('location_kpis_revenue_weeks', 3)
+                exec_config.insights_trend_analysis_weeks = limits.get('insights_trend_analysis_weeks', 12)
+                exec_config.forecasts_historical_weeks = limits.get('forecasts_historical_weeks', 24)
+                exec_config.forecasting_historical_weeks = limits.get('forecasting_historical_weeks', 52)
+            
+            if 'health_scoring' in data:
+                health = data['health_scoring']
+                exec_config.base_health_score = health.get('base_health_score', 75.0)
+                exec_config.min_health_score = health.get('min_health_score', 0.0)
+                exec_config.max_health_score = health.get('max_health_score', 100.0)
+            
+            if 'revenue_tiers' in data:
+                tiers = data['revenue_tiers']
+                exec_config.revenue_tier_1_threshold = tiers.get('tier_1_threshold', 100000.0)
+                exec_config.revenue_tier_1_points = tiers.get('tier_1_points', 25)
+                exec_config.revenue_tier_2_threshold = tiers.get('tier_2_threshold', 75000.0)
+                exec_config.revenue_tier_2_points = tiers.get('tier_2_points', 20)
+                exec_config.revenue_tier_3_threshold = tiers.get('tier_3_threshold', 50000.0)
+                exec_config.revenue_tier_3_points = tiers.get('tier_3_points', 15)
+            
+            if 'utilization_scoring' in data:
+                util = data['utilization_scoring']
+                exec_config.utilization_excellent_threshold = util.get('excellent_threshold', 85.0)
+                exec_config.utilization_excellent_points = util.get('excellent_points', 25)
+                exec_config.utilization_good_threshold = util.get('good_threshold', 75.0)
+                exec_config.utilization_good_points = util.get('good_points', 20)
+                exec_config.utilization_fair_threshold = util.get('fair_threshold', 65.0)
+                exec_config.utilization_fair_points = util.get('fair_points', 15)
+            
+            if 'forecasting' in data:
+                forecast = data['forecasting']
+                exec_config.default_forecast_horizon_weeks = forecast.get('default_horizon_weeks', 12)
+                exec_config.default_confidence_level = forecast.get('default_confidence_level', 0.95)
+                exec_config.min_forecast_horizon = forecast.get('min_horizon', 1)
+                exec_config.max_forecast_horizon = forecast.get('max_horizon', 52)
+            
+            if 'alert_settings' in data:
+                alerts = data['alert_settings']
+                exec_config.enable_health_score_alerts = alerts.get('health_score_alerts', True)
+                exec_config.enable_trend_alerts = alerts.get('trend_alerts', True)
+                exec_config.enable_growth_alerts = alerts.get('growth_alerts', True)
+                exec_config.alert_frequency = alerts.get('frequency', 'weekly')
+            
+            if 'store_overrides' in data:
+                # Validate store override format
+                store_overrides = data['store_overrides']
+                if isinstance(store_overrides, dict):
+                    exec_config.store_specific_thresholds = store_overrides
+                else:
+                    logger.warning(f"Invalid store_overrides format: {type(store_overrides)}")
+            
+            exec_config.updated_at = datetime.utcnow()
+            db.session.commit()
+            
+            # Create audit log
+            audit = ConfigurationAudit(
+                user_id=user_id,
+                config_type='executive_dashboard_configuration',
+                config_id=exec_config.id,
+                action='update',
+                old_values=old_values,
+                new_values=data,
+                ip_address=request.remote_addr,
+                user_agent=request.user_agent.string
+            )
+            db.session.add(audit)
+            db.session.commit()
+            
+            return jsonify({
+                'success': True,
+                'message': 'Executive dashboard configuration updated successfully',
+                'data': {
+                    'updated_at': exec_config.updated_at.isoformat()
+                }
+            })
+            
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Error updating executive dashboard configuration: {str(e)}")
             return jsonify({'success': False, 'error': str(e)}), 500
 
 
