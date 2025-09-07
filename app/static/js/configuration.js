@@ -13,43 +13,75 @@ class ConfigurationManager {
     }
 
     init() {
-        console.log('Initializing Configuration Manager...');
-        console.log('Bootstrap available:', typeof bootstrap !== 'undefined');
-        console.log('Tab elements found:', document.querySelectorAll('[data-bs-toggle="pill"]').length);
-        this.initializeBootstrapTabs();
-        this.setupEventListeners();
-        this.loadConfigurations();
-        this.initializeSliders();
-        this.setupFormValidation();
-        this.setupAutoSave();
+        try {
+            console.log('Initializing Configuration Manager...');
+            console.log('Bootstrap available:', typeof bootstrap !== 'undefined');
+            console.log('Tab elements found:', document.querySelectorAll('[data-bs-toggle="pill"]').length);
+            
+            console.log('Step 1: initializeBootstrapTabs');
+            this.initializeBootstrapTabs();
+            
+            console.log('Step 2: setupEventListeners');
+            this.setupEventListeners();
+            
+            console.log('Step 3: loadConfigurations');
+            this.loadConfigurations();
+            
+            console.log('Step 4: initializeSliders');
+            this.initializeSliders();
+            
+            console.log('Step 5: setupFormValidation');
+            this.setupFormValidation();
+            
+            console.log('Step 6: setupAutoSave');
+            this.setupAutoSave();
+            
+            console.log('Configuration Manager initialization complete');
+        } catch (error) {
+            console.error('Error during Configuration Manager initialization:', error);
+        }
     }
 
     initializeBootstrapTabs() {
-        // Initialize Bootstrap 5 tab functionality with retry logic
-        const attemptBootstrapInit = (attempt = 1) => {
-            if (typeof bootstrap !== 'undefined') {
-                const tabElements = document.querySelectorAll('[data-bs-toggle="pill"]');
-                tabElements.forEach(tabElement => {
-                    try {
-                        new bootstrap.Tab(tabElement);
-                    } catch (e) {
-                        console.warn('Error initializing tab:', tabElement.id, e);
+        try {
+            console.log('Starting Bootstrap tabs initialization...');
+            // Initialize Bootstrap 5 tab functionality with retry logic
+            const attemptBootstrapInit = (attempt = 1) => {
+                try {
+                    console.log(`Bootstrap init attempt ${attempt}`);
+                    if (typeof bootstrap !== 'undefined') {
+                        const tabElements = document.querySelectorAll('[data-bs-toggle="pill"]');
+                        console.log('Found tab elements for Bootstrap init:', tabElements.length);
+                        tabElements.forEach(tabElement => {
+                            try {
+                                new bootstrap.Tab(tabElement);
+                            } catch (e) {
+                                console.warn('Error initializing tab:', tabElement.id, e);
+                            }
+                        });
+                        console.log('Bootstrap tabs initialized:', tabElements.length);
+                        return true;
+                    } else if (attempt < 5) {
+                        console.warn(`Bootstrap not loaded yet, retrying... (attempt ${attempt}/5)`);
+                        setTimeout(() => attemptBootstrapInit(attempt + 1), 200);
+                        return false;
+                    } else {
+                        console.error('Bootstrap failed to load after 5 attempts, using fallback tab functionality');
+                        this.initializeFallbackTabs();
+                        return false;
                     }
-                });
-                console.log('Bootstrap tabs initialized:', tabElements.length);
-                return true;
-            } else if (attempt < 5) {
-                console.warn(`Bootstrap not loaded yet, retrying... (attempt ${attempt}/5)`);
-                setTimeout(() => attemptBootstrapInit(attempt + 1), 200);
-                return false;
-            } else {
-                console.error('Bootstrap failed to load after 5 attempts, using fallback tab functionality');
-                this.initializeFallbackTabs();
-                return false;
-            }
-        };
-        
-        attemptBootstrapInit();
+                } catch (error) {
+                    console.error('Error in attemptBootstrapInit:', error);
+                    this.initializeFallbackTabs();
+                    return false;
+                }
+            };
+            
+            attemptBootstrapInit();
+        } catch (error) {
+            console.error('Error in initializeBootstrapTabs:', error);
+            this.initializeFallbackTabs();
+        }
     }
 
     initializeFallbackTabs() {
