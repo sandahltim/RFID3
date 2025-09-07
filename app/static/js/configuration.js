@@ -14,11 +14,25 @@ class ConfigurationManager {
 
     init() {
         console.log('Initializing Configuration Manager...');
+        this.initializeBootstrapTabs();
         this.setupEventListeners();
         this.loadConfigurations();
         this.initializeSliders();
         this.setupFormValidation();
         this.setupAutoSave();
+    }
+
+    initializeBootstrapTabs() {
+        // Initialize Bootstrap 5 tab functionality
+        if (typeof bootstrap !== 'undefined') {
+            const tabElements = document.querySelectorAll('[data-bs-toggle="pill"]');
+            tabElements.forEach(tabElement => {
+                new bootstrap.Tab(tabElement);
+            });
+            console.log('Bootstrap tabs initialized:', tabElements.length);
+        } else {
+            console.warn('Bootstrap not loaded, tab functionality may not work');
+        }
     }
 
     initValidationRules() {
@@ -44,9 +58,20 @@ class ConfigurationManager {
     }
 
     setupEventListeners() {
-        // Tab navigation
+        // Tab navigation - handle both click and shown events
         document.querySelectorAll('[data-bs-toggle="pill"]').forEach(tab => {
+            // Handle click events for immediate response
+            tab.addEventListener('click', (event) => {
+                console.log('Tab clicked:', event.target.id);
+                const targetId = event.target.getAttribute('data-bs-target');
+                if (targetId) {
+                    this.onTabChange(event.target);
+                }
+            });
+            
+            // Handle shown events for Bootstrap completion
             tab.addEventListener('shown.bs.tab', (event) => {
+                console.log('Tab shown:', event.target.id);
                 this.onTabChange(event.target);
             });
         });
