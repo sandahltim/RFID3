@@ -23,16 +23,63 @@ class ConfigurationManager {
     }
 
     initializeBootstrapTabs() {
-        // Initialize Bootstrap 5 tab functionality
-        if (typeof bootstrap !== 'undefined') {
-            const tabElements = document.querySelectorAll('[data-bs-toggle="pill"]');
-            tabElements.forEach(tabElement => {
-                new bootstrap.Tab(tabElement);
+        // Initialize Bootstrap 5 tab functionality with retry logic
+        const attemptBootstrapInit = (attempt = 1) => {
+            if (typeof bootstrap !== 'undefined') {
+                const tabElements = document.querySelectorAll('[data-bs-toggle="pill"]');
+                tabElements.forEach(tabElement => {
+                    try {
+                        new bootstrap.Tab(tabElement);
+                    } catch (e) {
+                        console.warn('Error initializing tab:', tabElement.id, e);
+                    }
+                });
+                console.log('Bootstrap tabs initialized:', tabElements.length);
+                return true;
+            } else if (attempt < 5) {
+                console.warn(`Bootstrap not loaded yet, retrying... (attempt ${attempt}/5)`);
+                setTimeout(() => attemptBootstrapInit(attempt + 1), 200);
+                return false;
+            } else {
+                console.error('Bootstrap failed to load after 5 attempts, using fallback tab functionality');
+                this.initializeFallbackTabs();
+                return false;
+            }
+        };
+        
+        attemptBootstrapInit();
+    }
+
+    initializeFallbackTabs() {
+        // Fallback tab functionality if Bootstrap fails
+        const tabElements = document.querySelectorAll('[data-bs-toggle="pill"]');
+        const tabPanels = document.querySelectorAll('.tab-pane');
+        
+        tabElements.forEach(tabElement => {
+            tabElement.addEventListener('click', (event) => {
+                event.preventDefault();
+                
+                // Remove active class from all tabs and panels
+                tabElements.forEach(tab => tab.classList.remove('active'));
+                tabPanels.forEach(panel => panel.classList.remove('active', 'show'));
+                
+                // Add active class to clicked tab
+                tabElement.classList.add('active');
+                
+                // Show corresponding panel
+                const targetId = tabElement.getAttribute('data-bs-target');
+                if (targetId) {
+                    const targetPanel = document.querySelector(targetId);
+                    if (targetPanel) {
+                        targetPanel.classList.add('active', 'show');
+                    }
+                }
+                
+                this.onTabChange(tabElement);
             });
-            console.log('Bootstrap tabs initialized:', tabElements.length);
-        } else {
-            console.warn('Bootstrap not loaded, tab functionality may not work');
-        }
+        });
+        
+        console.log('Fallback tabs initialized:', tabElements.length);
     }
 
     initValidationRules() {
