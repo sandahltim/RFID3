@@ -15,6 +15,7 @@ from ..models.db_models import (
     LaundryContractStatus,
 )
 from ..services.logger import get_logger
+from ..services.contract_snapshots import ContractSnapshotService
 from sqlalchemy import func, desc, or_
 from ..utils.filters import apply_global_filters
 from sqlalchemy.exc import ProgrammingError
@@ -2138,15 +2139,38 @@ def finalize_contract():
             )
             session.add(status_record)
 
+        # Store the finalized date before commit
+        finalized_date = status_record.finalized_date
+        
         session.commit()
         logger.info(f"Contract {contract_number} finalized by {user}")
+
+        # Automatically create complete contract snapshot when sent to laundry
+        snapshot_success = False
+        try:
+            logger.info(f"Creating complete snapshot for contract {contract_number} as it's being sent to laundry")
+            snapshot_count = ContractSnapshotService.create_complete_contract_snapshot(
+                contract_number=contract_number,
+                snapshot_type="contract_sent",
+                created_by=user
+            )
+            logger.info(f"Created snapshot for contract {contract_number}: {snapshot_count} items captured")
+            snapshot_success = True
+        except Exception as snapshot_error:
+            logger.error(
+                f"Failed to create snapshot for contract {contract_number}: {str(snapshot_error)}", 
+                exc_info=True
+            )
+            # Continue with the finalization even if snapshot fails
+            # The contract status should still be updated
 
         return jsonify(
             {
                 "success": True,
-                "message": f"Contract {contract_number} has been finalized",
+                "message": f"Contract {contract_number} has been finalized" + (" and snapshot created" if snapshot_success else ""),
                 "status": "finalized",
-                "finalized_date": status_record.finalized_date.isoformat(),
+                "finalized_date": finalized_date.isoformat(),
+                "snapshot_created": snapshot_success
             }
         )
 
@@ -2301,3 +2325,132 @@ def reactivate_contract():
     finally:
         if session:
             session.close()
+
+
+@tab4_bp.route("/tab/4/create_snapshot", methods=["POST"])
+def create_snapshot():
+    """Create a manual snapshot of a contract including both RFID and hand counted items"""
+    session = None
+    try:
+        data = request.get_json()
+        contract_number = data.get("contract_number")
+        created_by = data.get("created_by", "manual")
+        snapshot_type = data.get("snapshot_type", "manual")
+        
+        if not contract_number:
+            return jsonify({"error": "Contract number is required"}), 400
+            
+        logger.info(f"Creating snapshot for contract {contract_number}")
+        
+        # Import here to avoid circular imports
+        from ..services.contract_snapshots import ContractSnapshotService
+        
+        # Create complete snapshot (RFID + hand counted)
+        result = ContractSnapshotService.create_complete_contract_snapshot(
+            contract_number=contract_number,
+            snapshot_type=snapshot_type,
+            created_by=created_by
+        )
+        
+        message = f"Snapshot created for {contract_number}: {result['rfid_items']} RFID items, {result['hand_counted_items']} hand counted items"
+        logger.info(message)
+        
+        return jsonify({
+            "success": True,
+            "message": message,
+            "snapshot_data": result
+        })
+        
+    except Exception as e:
+        logger.error(f"Error creating snapshot: {str(e)}", exc_info=True)
+        return jsonify({"error": str(e)}), 500
+
+
+@tab4_bp.route("/tab/4/contract_sent", methods=["POST"])
+def mark_contract_sent():
+    """Mark a contract as sent and automatically create snapshot"""
+    session = None
+    try:
+        session = db.session()
+        data = request.get_json()
+        contract_number = data.get("contract_number")
+        sent_by = data.get("sent_by", "system")
+        
+        if not contract_number:
+            return jsonify({"error": "Contract number is required"}), 400
+            
+        logger.info(f"Marking contract {contract_number} as sent")
+        
+        # Update or create laundry contract status
+        status_record = session.query(LaundryContractStatus).filter_by(
+            contract_number=contract_number
+        ).first()
+        
+        if status_record:
+            status_record.status = "sent"
+            status_record.sent_date = datetime.utcnow()
+            status_record.sent_by = sent_by
+        else:
+            status_record = LaundryContractStatus(
+                contract_number=contract_number,
+                status="sent",
+                sent_date=datetime.utcnow(),
+                sent_by=sent_by
+            )
+            session.add(status_record)
+            
+        session.commit()
+        
+        # Create snapshot when contract is sent
+        from ..services.contract_snapshots import ContractSnapshotService
+        
+        snapshot_result = ContractSnapshotService.create_complete_contract_snapshot(
+            contract_number=contract_number,
+            snapshot_type="contract_sent",
+            created_by=sent_by
+        )
+        
+        message = f"Contract {contract_number} marked as sent. Snapshot created: {snapshot_result['rfid_items']} RFID items, {snapshot_result['hand_counted_items']} hand counted items"
+        logger.info(message)
+        
+        return jsonify({
+            "success": True,
+            "message": message,
+            "status": "sent",
+            "snapshot_data": snapshot_result
+        })
+        
+    except Exception as e:
+        if session:
+            session.rollback()
+        logger.error(f"Error marking contract as sent: {str(e)}", exc_info=True)
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if session:
+            session.close()
+
+
+@tab4_bp.route("/tab/4/get_snapshots/<contract_number>", methods=["GET"])
+def get_contract_snapshots(contract_number):
+    """Get all snapshots for a contract"""
+    try:
+        from ..services.contract_snapshots import ContractSnapshotService
+        
+        # Get RFID snapshots
+        rfid_snapshots = ContractSnapshotService.get_contract_snapshot(contract_number)
+        
+        # Get hand counted snapshots
+        hand_counted_snapshots = ContractSnapshotService.get_hand_counted_snapshot(contract_number)
+        
+        return jsonify({
+            "success": True,
+            "contract_number": contract_number,
+            "rfid_snapshots": [s.to_dict() for s in rfid_snapshots],
+            "hand_counted_snapshots": [s.to_dict() for s in hand_counted_snapshots],
+            "total_rfid_snapshots": len(rfid_snapshots),
+            "total_hand_counted_snapshots": len(hand_counted_snapshots)
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting snapshots for {contract_number}: {str(e)}", exc_info=True)
+        return jsonify({"error": str(e)}), 500

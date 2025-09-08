@@ -16,6 +16,7 @@ sys.path.append(project_dir)
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from app.models.db_models import LaundryContractStatus, ItemMaster, HandCountedItems
+from app.services.contract_snapshots import ContractSnapshotService
 from config import DB_CONFIG
 
 # Set up logging
@@ -138,6 +139,23 @@ def finalize_contract(session, contract_number):
         
         session.commit()
         logger.info(f"Successfully auto-finalized contract {contract_number}")
+        
+        # Create complete contract snapshot for auto-finalized contract
+        try:
+            logger.info(f"Creating complete snapshot for auto-finalized contract {contract_number}")
+            snapshot_count = ContractSnapshotService.create_complete_contract_snapshot(
+                contract_number=contract_number,
+                snapshot_type="auto_finalized",
+                created_by="auto-system"
+            )
+            logger.info(f"Created snapshot for auto-finalized contract {contract_number}: {snapshot_count} items captured")
+        except Exception as snapshot_error:
+            logger.error(
+                f"Failed to create snapshot for auto-finalized contract {contract_number}: {str(snapshot_error)}", 
+                exc_info=True
+            )
+            # Continue with the process even if snapshot fails
+        
         return True
         
     except Exception as e:

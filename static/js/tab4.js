@@ -584,12 +584,13 @@ window.updateItemDropdownHierarchical = function updateItemDropdownHierarchical(
 };
 
 window.addHandCountedItem = function addHandCountedItem() {
-    const contractDropdown = document.getElementById('hand-counted-contract-number');
-    const newContractInput = document.getElementById('new-contract-number');
-    const itemDropdown = document.getElementById('hand-counted-item-name');
-    const newItemInput = document.getElementById('new-item-name');
-    const quantityInput = document.getElementById('hand-counted-quantity');
-    const employeeInput = document.getElementById('hand-counted-employee');
+    // Use add-mode specific IDs
+    const contractDropdown = document.getElementById('add-contract-number');
+    const newContractInput = document.getElementById('add-new-contract-number');
+    const itemDropdown = document.getElementById('add-item-name');
+    const newItemInput = document.getElementById('add-new-item-name');
+    const quantityInput = document.getElementById('add-quantity');
+    const employeeInput = document.getElementById('add-employee');
     const contractNumber = newContractInput.style.display === 'block' ? newContractInput.value : contractDropdown.value;
     const itemValue = itemDropdown.value;
     const itemName = itemValue === '__other' ? newItemInput.value : itemValue;
@@ -650,23 +651,18 @@ window.addHandCountedItem = function addHandCountedItem() {
 };
 
 window.removeHandCountedItem = function removeHandCountedItem() {
-    const contractDropdown = document.getElementById('hand-counted-contract-number');
-    const newContractInput = document.getElementById('new-contract-number');
-    const itemDropdown = document.getElementById('hand-counted-item-name');
-    const newItemInput = document.getElementById('new-item-name');
-    const quantityInput = document.getElementById('hand-counted-quantity');
-    const employeeInput = document.getElementById('hand-counted-employee');
-    const contractNumber = newContractInput.style.display === 'block' ? newContractInput.value : contractDropdown.value;
+    // Use remove-mode specific IDs  
+    const contractDropdown = document.getElementById('remove-contract-number');
+    const itemDropdown = document.getElementById('remove-item-name');
+    const quantityInput = document.getElementById('remove-quantity');
+    const employeeInput = document.getElementById('remove-employee');
+    const contractNumber = contractDropdown.value;
     const itemValue = itemDropdown.value;
-    const itemName = itemValue === '__other' ? newItemInput.value : itemValue;
+    const itemName = itemValue; // Remove mode doesn't have "other" option
     const quantity = parseInt(quantityInput.value);
     const employeeName = employeeInput.value;
     if (!contractNumber || !itemName || !quantity || quantity < 1 || !employeeName) {
         alert('Please fill in all fields: Contract Number, Item Name, Quantity (positive number), and Employee Name.');
-        return;
-    }
-    if (itemValue === '__other' && !newItemInput.value) {
-        alert('Please enter an item name for "Other".');
         return;
     }
     fetch('/tab/4/remove_hand_counted_item', {
@@ -1411,3 +1407,244 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 });
+
+// Dual-mode hand counted interface functions
+let currentMode = 'add';
+
+function switchToAddMode() {
+    console.log('Switching to add mode');
+    currentMode = 'add';
+    populateContractDropdowns();
+    populateCategoryDropdowns();
+}
+
+function switchToRemoveMode() {
+    console.log('Switching to remove mode');
+    currentMode = 'remove';
+    populateContractDropdowns();
+    // Hide progressive fields initially
+    document.getElementById('remove-item-group').style.display = 'none';
+    document.getElementById('remove-quantity-group').style.display = 'none';
+    document.getElementById('remove-employee-group').style.display = 'none';
+    document.getElementById('remove-button-group').style.display = 'none';
+}
+
+function populateContractDropdowns() {
+    const contractSelect = document.getElementById(currentMode === 'add' ? 'add-contract-number' : 'remove-contract-number');
+    if (!contractSelect) return;
+    
+    // Clear existing options
+    contractSelect.innerHTML = '<option value="">Select Contract...</option>';
+    
+    // Get contracts from the main table
+    const contractRows = document.querySelectorAll('tr[data-contract-status]');
+    const contracts = new Set();
+    
+    contractRows.forEach(row => {
+        const contractCell = row.cells[0];
+        if (contractCell) {
+            const contractText = contractCell.textContent.trim();
+            const contractMatch = contractText.match(/^(L\d+)/);
+            if (contractMatch) {
+                contracts.add(contractMatch[1]);
+            }
+        }
+    });
+    
+    // Add contracts to dropdown
+    Array.from(contracts).sort().forEach(contract => {
+        const option = document.createElement('option');
+        option.value = contract;
+        option.textContent = contract;
+        contractSelect.appendChild(option);
+    });
+    
+    console.log(`Populated ${currentMode} contract dropdown with ${contracts.size} contracts`);
+}
+
+function loadRemovableItems() {
+    const contractNumber = document.getElementById('remove-contract-number').value;
+    if (!contractNumber) {
+        document.getElementById('remove-item-group').style.display = 'none';
+        document.getElementById('remove-quantity-group').style.display = 'none';
+        document.getElementById('remove-employee-group').style.display = 'none';
+        document.getElementById('remove-button-group').style.display = 'none';
+        return;
+    }
+    
+    console.log('Loading removable items for contract:', contractNumber);
+    
+    // Fetch hand counted items for this contract
+    fetch(`/tab/4/hand_counted_items_for_contract/${contractNumber}`)
+        .then(response => response.json())
+        .then(data => {
+            const itemSelect = document.getElementById('remove-item-name');
+            itemSelect.innerHTML = '<option value="">Select Item...</option>';
+            
+            if (data.items && data.items.length > 0) {
+                // Group items by name and calculate net quantities
+                const itemTotals = {};
+                data.items.forEach(item => {
+                    const itemName = item.item_name;
+                    if (!itemTotals[itemName]) {
+                        itemTotals[itemName] = { added: 0, removed: 0 };
+                    }
+                    if (item.action === 'Added') {
+                        itemTotals[itemName].added += item.quantity;
+                    } else if (item.action === 'Removed') {
+                        itemTotals[itemName].removed += item.quantity;
+                    }
+                });
+                
+                // Add items with positive net quantities to dropdown
+                Object.entries(itemTotals).forEach(([itemName, totals]) => {
+                    const netQuantity = totals.added - totals.removed;
+                    if (netQuantity > 0) {
+                        const option = document.createElement('option');
+                        option.value = itemName;
+                        option.textContent = `${itemName} (Available: ${netQuantity})`;
+                        option.dataset.maxQuantity = netQuantity;
+                        itemSelect.appendChild(option);
+                    }
+                });
+                
+                document.getElementById('remove-item-group').style.display = 'block';
+            } else {
+                document.getElementById('remove-item-group').style.display = 'none';
+            }
+        })
+        .catch(error => {
+            console.error('Error loading removable items:', error);
+        });
+}
+
+function updateMaxRemovalQuantity() {
+    const itemSelect = document.getElementById('remove-item-name');
+    const selectedOption = itemSelect.options[itemSelect.selectedIndex];
+    
+    if (selectedOption && selectedOption.value) {
+        const maxQuantity = selectedOption.dataset.maxQuantity;
+        document.getElementById('max-removal-quantity').textContent = maxQuantity;
+        document.getElementById('remove-quantity').max = maxQuantity;
+        document.getElementById('remove-quantity').value = '';
+        
+        document.getElementById('remove-quantity-group').style.display = 'block';
+        document.getElementById('remove-employee-group').style.display = 'block';
+        document.getElementById('remove-button-group').style.display = 'block';
+    } else {
+        document.getElementById('remove-quantity-group').style.display = 'none';
+        document.getElementById('remove-employee-group').style.display = 'none';
+        document.getElementById('remove-button-group').style.display = 'none';
+    }
+}
+
+// Updated function calls to support mode parameter
+function updateItemDropdownHierarchical(mode = null) {
+    if (!mode) mode = currentMode;
+    
+    const categorySelect = document.getElementById(`${mode}-category`);
+    const subcategorySelect = document.getElementById(`${mode}-subcategory`);
+    const itemSelect = document.getElementById(`${mode}-item-name`);
+    
+    if (!categorySelect || !subcategorySelect) return;
+    
+    const category = categorySelect.value;
+    const subcategory = subcategorySelect.value;
+    
+    // Clear item dropdown
+    itemSelect.innerHTML = '<option value="">Select Item...</option>';
+    
+    if (category && subcategory) {
+        console.log(`Fetching items for category: ${category}, subcategory: ${subcategory}`);
+        
+        fetch(`/tab/4/items_for_category_subcategory/${encodeURIComponent(category)}/${encodeURIComponent(subcategory)}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.items && data.items.length > 0) {
+                    data.items.forEach(item => {
+                        const option = document.createElement('option');
+                        option.value = item.item_name;
+                        option.textContent = item.display_name || item.item_name;
+                        itemSelect.appendChild(option);
+                    });
+                    console.log(`Loaded ${data.items.length} items for ${category}/${subcategory}`);
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching items:', error);
+            });
+    }
+}
+
+function updateSubcategoryDropdown(mode = null) {
+    if (!mode) mode = currentMode;
+    
+    const categorySelect = document.getElementById(`${mode}-category`);
+    const subcategorySelect = document.getElementById(`${mode}-subcategory`);
+    const itemSelect = document.getElementById(`${mode}-item-name`);
+    
+    if (!categorySelect || !subcategorySelect) return;
+    
+    // Clear subcategory and item dropdowns
+    subcategorySelect.innerHTML = '<option value="">Select Subcategory...</option>';
+    itemSelect.innerHTML = '<option value="">Select Item...</option>';
+    
+    const category = categorySelect.value;
+    if (category) {
+        console.log(`Fetching subcategories for category: ${category}`);
+        
+        fetch(`/tab/4/subcategories_for_category/${encodeURIComponent(category)}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.subcategories && data.subcategories.length > 0) {
+                    data.subcategories.forEach(subcategory => {
+                        const option = document.createElement('option');
+                        option.value = subcategory;
+                        option.textContent = subcategory;
+                        subcategorySelect.appendChild(option);
+                    });
+                    console.log(`Loaded ${data.subcategories.length} subcategories for ${category}`);
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching subcategories:', error);
+            });
+    }
+}
+
+function handleItemSelection(mode = null) {
+    if (!mode) mode = currentMode;
+    
+    const itemSelect = document.getElementById(`${mode}-item-name`);
+    const newItemInput = document.getElementById(`${mode}-new-item-name`);
+    
+    if (itemSelect.value === 'new') {
+        newItemInput.style.display = 'block';
+        newItemInput.focus();
+    } else {
+        newItemInput.style.display = 'none';
+    }
+}
+
+function toggleNewContractInput(mode = null) {
+    if (!mode) mode = currentMode;
+    
+    const contractSelect = document.getElementById(`${mode}-contract-number`);
+    const newContractInput = document.getElementById(`${mode}-new-contract-number`);
+    
+    if (newContractInput.style.display === 'none') {
+        newContractInput.style.display = 'block';
+        contractSelect.style.display = 'none';
+        newContractInput.focus();
+    } else {
+        newContractInput.style.display = 'none';
+        contractSelect.style.display = 'block';
+    }
+}
+
+// Expose new functions globally
+window.switchToAddMode = switchToAddMode;
+window.switchToRemoveMode = switchToRemoveMode;
+window.loadRemovableItems = loadRemovableItems;
+window.updateMaxRemovalQuantity = updateMaxRemovalQuantity;
+window.populateContractDropdowns = populateContractDropdowns;

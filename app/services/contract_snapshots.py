@@ -182,6 +182,122 @@ class ContractSnapshotService:
                 session.close()
 
     @staticmethod
+    def create_complete_contract_snapshot(contract_number, snapshot_type="manual", created_by="system"):
+        """
+        Create a complete snapshot capturing both RFID items and hand counted items.
+        
+        Args:
+            contract_number (str): The contract number to snapshot
+            snapshot_type (str): Type of snapshot
+            created_by (str): Who created the snapshot
+            
+        Returns:
+            dict: Summary of items captured
+        """
+        try:
+            # Create RFID item snapshot
+            rfid_count = ContractSnapshotService.create_contract_snapshot(
+                contract_number, snapshot_type, created_by
+            )
+            
+            # Create hand counted item snapshot
+            hand_count = ContractSnapshotService.create_hand_counted_snapshot(
+                contract_number, snapshot_type, created_by
+            )
+            
+            logger.info(f"Complete snapshot created for {contract_number}: {rfid_count} RFID items, {hand_count} hand counted items")
+            
+            return {
+                "rfid_items": rfid_count,
+                "hand_counted_items": hand_count,
+                "total_items": rfid_count + hand_count
+            }
+            
+        except Exception as e:
+            logger.error(f"Error creating complete snapshot for {contract_number}: {str(e)}", exc_info=True)
+            raise
+
+    @staticmethod
+    def create_hand_counted_snapshot(contract_number, snapshot_type="manual", created_by="system"):
+        """
+        Create a snapshot of hand counted items for a contract using the unified contract_snapshots table.
+        
+        Args:
+            contract_number (str): The contract number to snapshot
+            snapshot_type (str): Type of snapshot
+            created_by (str): Who created the snapshot
+            
+        Returns:
+            int: Number of hand counted items snapshotted
+        """
+        session = None
+        try:
+            from ..models.db_models import HandCountedItems, Transaction
+            session = db.session()
+            
+            # Get all hand counted items for this contract
+            hand_counted_items = (
+                session.query(HandCountedItems)
+                .filter(HandCountedItems.contract_number == contract_number)
+                .all()
+            )
+            
+            if not hand_counted_items:
+                logger.info(f"No hand counted items found for contract {contract_number}")
+                return 0
+            
+            # Get client name from transactions
+            client_info = (
+                session.query(Transaction.client_name)
+                .filter(Transaction.contract_number == contract_number)
+                .first()
+            )
+            client_name = client_info.client_name if client_info else None
+            
+            # Calculate net quantities by item
+            item_totals = {}
+            for item in hand_counted_items:
+                key = item.item_name
+                if key not in item_totals:
+                    item_totals[key] = {"added": 0, "removed": 0}
+                
+                if item.action == "Added":
+                    item_totals[key]["added"] += item.quantity
+                elif item.action == "Removed":
+                    item_totals[key]["removed"] += item.quantity
+            
+            # Create snapshots for items with net positive quantities using the unified table
+            snapshot_count = 0
+            for item_name, totals in item_totals.items():
+                net_quantity = totals["added"] - totals["removed"]
+                if net_quantity > 0:
+                    snapshot = ContractSnapshot(
+                        contract_number=contract_number,
+                        tag_id=None,  # No tag_id for hand counted items
+                        item_name=item_name,
+                        net_quantity=net_quantity,
+                        client_name=client_name,
+                        snapshot_date=datetime.now(timezone.utc),
+                        snapshot_type=snapshot_type,
+                        created_by=created_by
+                    )
+                    session.add(snapshot)
+                    snapshot_count += 1
+            
+            session.commit()
+            logger.info(f"Created {snapshot_count} hand counted snapshots for contract {contract_number}")
+            return snapshot_count
+            
+        except Exception as e:
+            if session:
+                session.rollback()
+            logger.error(f"Error creating hand counted snapshot for {contract_number}: {str(e)}", exc_info=True)
+            raise
+        finally:
+            if session:
+                session.close()
+
+    @staticmethod
     def get_contract_history_with_snapshots(contract_number):
         """
         Get comprehensive contract history using both current data and snapshots.

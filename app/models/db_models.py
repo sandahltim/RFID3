@@ -248,7 +248,9 @@ class ContractSnapshot(db.Model):
 
     id = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
     contract_number = db.Column(db.String(255), nullable=False)
-    tag_id = db.Column(db.String(255), nullable=False)
+    tag_id = db.Column(db.String(255), nullable=True)  # Nullable for hand counted items
+    item_name = db.Column(db.String(255), nullable=True)  # For hand counted items
+    net_quantity = db.Column(db.Integer, nullable=True)  # For hand counted items
     client_name = db.Column(db.String(255))
     common_name = db.Column(db.String(255))
     rental_class_num = db.Column(db.String(255))
@@ -272,6 +274,8 @@ class ContractSnapshot(db.Model):
             "id": self.id,
             "contract_number": self.contract_number,
             "tag_id": self.tag_id,
+            "item_name": self.item_name,
+            "net_quantity": self.net_quantity,
             "client_name": self.client_name,
             "common_name": self.common_name,
             "rental_class_num": self.rental_class_num,
@@ -288,6 +292,7 @@ class ContractSnapshot(db.Model):
             "latitude": float(self.latitude) if self.latitude else None,
             "longitude": float(self.longitude) if self.longitude else None,
         }
+
 
 
 class LaundryContractStatus(db.Model):

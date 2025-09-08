@@ -180,49 +180,102 @@
     </div>
     
     <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">Hand-Counted Items Management</h5>
+        </div>
         <div class="card-body">
-            <form id="hand-counted-form">
-                <div class="form-group">
-                    <label for="hand-counted-contract-number">Select Contract Number:</label>
-                    <select id="hand-counted-contract-number" class="form-control" onchange="updateItemDropdownHierarchical()">
-                        <option value="">Select Contract...</option>
-                    </select>
-                    <input type="text" id="new-contract-number" class="form-control mt-2" placeholder="Enter New Contract" style="display:none;">
-                    <button type="button" class="btn btn-sm btn-secondary mt-2" onclick="toggleNewContractInput()">Toggle New Contract</button>
+            <!-- Bootstrap Nav Tabs -->
+            <ul class="nav nav-tabs" id="handCountedTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="add-items-tab" data-bs-toggle="tab" data-bs-target="#add-items" type="button" role="tab" aria-controls="add-items" aria-selected="true" onclick="switchToAddMode()">
+                        Add Items
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="remove-items-tab" data-bs-toggle="tab" data-bs-target="#remove-items" type="button" role="tab" aria-controls="remove-items" aria-selected="false" onclick="switchToRemoveMode()">
+                        Remove Items
+                    </button>
+                </li>
+            </ul>
+
+            <!-- Tab Content -->
+            <div class="tab-content" id="handCountedTabContent">
+                <!-- Add Items Tab -->
+                <div class="tab-pane fade show active" id="add-items" role="tabpanel" aria-labelledby="add-items-tab">
+                    <form id="hand-counted-add-form" class="mt-3">
+                        <div class="form-group">
+                            <label for="add-contract-number">Select Contract Number:</label>
+                            <select id="add-contract-number" class="form-control" onchange="updateItemDropdownHierarchical('add')">
+                                <option value="">Select Contract...</option>
+                            </select>
+                            <input type="text" id="add-new-contract-number" class="form-control mt-2" placeholder="Enter New Contract" style="display:none;">
+                            <button type="button" class="btn btn-sm btn-secondary mt-2" onclick="toggleNewContractInput('add')">Toggle New Contract</button>
+                        </div>
+                        <div class="form-group">
+                            <label for="add-category">Select Category:</label>
+                            <select id="add-category" class="form-control" onchange="updateSubcategoryDropdown('add')">
+                                <option value="">Select Category...</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="add-subcategory">Select Subcategory:</label>
+                            <select id="add-subcategory" class="form-control" onchange="updateItemDropdownHierarchical('add')">
+                                <option value="">Select Subcategory...</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="add-item-name">Select Item:</label>
+                            <select id="add-item-name" class="form-control" onchange="handleItemSelection('add')">
+                                <option value="">Select Item...</option>
+                            </select>
+                            <input type="text" id="add-new-item-name" class="form-control mt-2" placeholder="Enter Item Name" style="display:none;">
+                            <small class="form-text text-muted">Select category and subcategory first to see available items</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="add-quantity">Quantity:</label>
+                            <input type="number" id="add-quantity" class="form-control" min="1" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="add-employee">Employee Name:</label>
+                            <input type="text" id="add-employee" class="form-control" required>
+                        </div>
+                        <div class="btn-group">
+                            <button type="button" class="btn btn-success" onclick="addHandCountedItem()">Add Item</button>
+                        </div>
+                    </form>
                 </div>
-                <div class="form-group">
-                    <label for="hand-counted-category">Select Category:</label>
-                    <select id="hand-counted-category" class="form-control" onchange="updateSubcategoryDropdown()">
-                        <option value="">Select Category...</option>
-                    </select>
+
+                <!-- Remove Items Tab -->
+                <div class="tab-pane fade" id="remove-items" role="tabpanel" aria-labelledby="remove-items-tab">
+                    <form id="hand-counted-remove-form" class="mt-3">
+                        <div class="form-group">
+                            <label for="remove-contract-number">Select Contract Number:</label>
+                            <select id="remove-contract-number" class="form-control" onchange="loadRemovableItems()">
+                                <option value="">Select Contract...</option>
+                            </select>
+                        </div>
+                        <div class="form-group" id="remove-item-group" style="display:none;">
+                            <label for="remove-item-name">Select Item to Remove:</label>
+                            <select id="remove-item-name" class="form-control" onchange="updateMaxRemovalQuantity()">
+                                <option value="">Select Item...</option>
+                            </select>
+                            <small class="form-text text-muted" id="available-quantity-text"></small>
+                        </div>
+                        <div class="form-group" id="remove-quantity-group" style="display:none;">
+                            <label for="remove-quantity">Quantity to Remove:</label>
+                            <input type="number" id="remove-quantity" class="form-control" min="1" required>
+                            <small class="form-text text-muted">Maximum available: <span id="max-removal-quantity">0</span></small>
+                        </div>
+                        <div class="form-group" id="remove-employee-group" style="display:none;">
+                            <label for="remove-employee">Employee Name:</label>
+                            <input type="text" id="remove-employee" class="form-control" required>
+                        </div>
+                        <div class="btn-group" id="remove-button-group" style="display:none;">
+                            <button type="button" class="btn btn-danger" onclick="removeHandCountedItem()">Remove Item</button>
+                        </div>
+                    </form>
                 </div>
-                <div class="form-group">
-                    <label for="hand-counted-subcategory">Select Subcategory:</label>
-                    <select id="hand-counted-subcategory" class="form-control" onchange="updateItemDropdownHierarchical()">
-                        <option value="">Select Subcategory...</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label for="hand-counted-item-name">Select Item:</label>
-                    <select id="hand-counted-item-name" class="form-control" onchange="handleItemSelection()">
-                        <option value="">Select Item...</option>
-                    </select>
-                    <input type="text" id="new-item-name" class="form-control mt-2" placeholder="Enter Item Name" style="display:none;">
-                    <small class="form-text text-muted">Select category and subcategory first to see available items</small>
-                </div>
-                <div class="form-group">
-                    <label for="hand-counted-quantity">Quantity:</label>
-                    <input type="number" id="hand-counted-quantity" class="form-control" min="1" required>
-                </div>
-                <div class="form-group">
-                    <label for="hand-counted-employee">Employee Name:</label>
-                    <input type="text" id="hand-counted-employee" class="form-control" required>
-                </div>
-                <div class="btn-group">
-                    <button type="button" class="btn btn-sm btn-success" onclick="addHandCountedItem()">Add</button>
-                    <button type="button" class="btn btn-sm btn-danger" onclick="removeHandCountedItem()">Remove</button>
-                </div>
-            </form>
+            </div>
         </div>
     </div>
 
