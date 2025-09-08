@@ -3,62 +3,254 @@
 {% block content %}
     <h2>Open Contracts</h2>
 
+    {% include 'global_filters.html' %}
+
     {% if error %}
         <div class="alert alert-danger" role="alert">
             Error loading contracts: {{ error }}
         </div>
     {% endif %}
     
-    	<table class="table table-bordered table-hover category-table" id="category-table">
-            <thead class="thead-dark">
+    <!-- Pagination and performance info -->
+    {% if total_contracts is defined %}
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div class="text-muted">
+            <small>Showing {{ (page - 1) * per_page + 1 }} to {{ page * per_page if page * per_page < total_contracts else total_contracts }} of {{ total_contracts }} contracts</small>
+        </div>
+        <div class="btn-group" role="group">
+            <select class="form-select form-select-sm" id="per-page-selector" onchange="updatePerPage(this.value)">
+                <option value="10" {{ 'selected' if per_page == 10 else '' }}>10 per page</option>
+                <option value="20" {{ 'selected' if per_page == 20 else '' }}>20 per page</option>
+                <option value="50" {{ 'selected' if per_page == 50 else '' }}>50 per page</option>
+                <option value="100" {{ 'selected' if per_page == 100 else '' }}>100 per page</option>
+            </select>
+        </div>
+    </div>
+    {% endif %}
+    
+    	<!-- Responsive table with mobile-optimized layout -->
+	<div class="table-responsive">
+		<table class="table table-hover category-table" id="category-table">
+            <thead class="table-dark">
                 <tr>
-                    <th onclick="window.sortContracts('contract_number')">Contract Number <span class="sort-arrow"></span></th>
-                    <th onclick="window.sortContracts('client_name')">Customer Name <span class="sort-arrow"></span></th>
-                    <th>Items on Contract</th>
-                    <th>Total Items in Inventory</th>
-                    <th onclick="window.sortContracts('scan_date')">Last Scanned Date <span class="sort-arrow"></span></th>
-                    <th>Actions</th>
+                    <th onclick="window.sortContracts('contract_number')" class="mobile-hide" style="cursor: pointer;">
+                    	Contract <span class="sort-arrow"></span>
+                    </th>
+                    <th onclick="window.sortContracts('client')" style="cursor: pointer;">
+                    	Customer <span class="sort-arrow"></span>
+                    </th>
+                    <th class="text-center">Items</th>
+                    <th class="text-center desktop-only">Total</th>
+                    <th onclick="window.sortContracts('scan')" class="mobile-hide" style="cursor: pointer;">
+                    	Last Scan <span class="sort-arrow"></span>
+                    </th>
+                    <th class="text-center" style="min-width: 120px;">Actions</th>
                 </tr>
             </thead>
             <tbody id="category-rows">
                 {% if contracts %}
                     {% for contract in contracts %}
                         <tr class="{% if contract.is_stale %}stale-contract{% endif %}">
-                            <td>{{ contract.contract_number }}</td>
-                            <td>{{ contract.client_name }}</td>
-                            <td>{{ contract.items_on_contract }}</td>
-                            <td>{{ contract.total_items_inventory }}</td>
-                            <td>{{ contract.scan_date }}</td>
+                            <td class="mobile-hide">
+                            	<span class="fw-semibold">{{ contract.contract_number }}</span>
+                            </td>
                             <td>
-                                <button class="btn btn-sm btn-secondary expand-btn" data-target-id="common-{{ contract.contract_number|replace(' ', '_') }}" data-contract-number="{{ contract.contract_number }}">Expand</button>
-                                <button class="btn btn-sm btn-secondary collapse-btn" data-collapse-target="common-{{ contract.contract_number|replace(' ', '_') }}" style="display:none;">Collapse</button>
-                                <button class="btn btn-sm btn-info print-btn" data-print-level="Contract" data-print-id="common-{{ contract.contract_number|replace(' ', '_') }}" data-category="{{ contract.contract_number }}">Print</button>
+                            	<div class="fw-semibold">{{ contract.client_name }}</div>
+                            	<small class="text-muted mobile-only">{{ contract.contract_number }}</small>
+                            	<div class="mobile-only mt-1">
+                            		<small class="badge bg-primary">{{ contract.items_on_contract }} items</small>
+                            		{% if contract.scan_date %}
+                            			<small class="text-muted d-block">{{ contract.scan_date }}</small>
+                            		{% endif %}
+                            	</div>
+                            </td>
+                            <td class="text-center">
+                            	<span class="badge bg-primary">{{ contract.items_on_contract }}</span>
+                            </td>
+                            <td class="text-center desktop-only">
+                            	<span class="badge bg-secondary">{{ contract.total_items_inventory }}</span>
+                            </td>
+                            <td class="mobile-hide">
+                            	<small>{{ contract.scan_date or 'No scan' }}</small>
+                            </td>
+                            <td>
+                            	<!-- Mobile-optimized button group -->
+                                <div class="btn-group-vertical btn-group-sm d-lg-none" role="group">
+                                    <button class="btn btn-outline-primary expand-btn" data-target-id="common-{{ contract.contract_number|replace(' ', '_') }}" data-contract-number="{{ contract.contract_number }}">
+                                    	<i class="fas fa-chevron-down"></i> Expand
+                                    </button>
+                                    <button class="btn btn-outline-primary collapse-btn" data-collapse-target="common-{{ contract.contract_number|replace(' ', '_') }}" style="display:none;">
+                                    	<i class="fas fa-chevron-up"></i> Collapse
+                                    </button>
+                                    <button class="btn btn-outline-info print-btn" data-print-level="Contract" data-print-id="common-{{ contract.contract_number|replace(' ', '_') }}" data-category="{{ contract.contract_number }}">
+                                    	<i class="fas fa-print"></i> Print
+                                    </button>
+                                </div>
+                                
+                                <!-- Desktop button group -->
+                                <div class="btn-group btn-group-sm d-none d-lg-inline-flex" role="group">
+                                    <button class="btn btn-secondary expand-btn" data-target-id="common-{{ contract.contract_number|replace(' ', '_') }}" data-contract-number="{{ contract.contract_number }}">Expand</button>
+                                    <button class="btn btn-secondary collapse-btn" data-collapse-target="common-{{ contract.contract_number|replace(' ', '_') }}" style="display:none;">Collapse</button>
+                                    <button class="btn btn-info print-btn" data-print-level="Contract" data-print-id="common-{{ contract.contract_number|replace(' ', '_') }}" data-category="{{ contract.contract_number }}">Print</button>
+                                </div>
+                                
+                                <!-- Stale contract controls -->
                                 {% if contract.is_stale %}
-                                    <select id="bulk-status-{{ contract.contract_number|replace(' ', '_') }}" class="form-control form-control-sm d-inline-block w-auto">
-                                        <option value="">Status</option>
-                                        <option value="Ready to Rent">Ready to Rent</option>
-                                        <option value="Sold">Sold</option>
-                                        <option value="Repair">Repair</option>
-                                        <option value="Needs to be Inspected">Needs to be Inspected</option>
-                                        <option value="Wash">Wash</option>
-                                        <option value="Wet">Wet</option>
-                                    </select>
-                                    <button class="btn btn-sm btn-warning" onclick="window.updateContractStatus('{{ contract.contract_number }}', '{{ contract.contract_number|replace(' ', '_') }}')">Update All</button>
+                                    <div class="mt-2">
+                                        <select id="bulk-status-{{ contract.contract_number|replace(' ', '_') }}" class="form-select form-select-sm">
+                                            <option value="">Update Status</option>
+                                            <option value="Ready to Rent">Ready to Rent</option>
+                                            <option value="Sold">Sold</option>
+                                            <option value="Repair">Repair</option>
+                                            <option value="Needs to be Inspected">Needs to be Inspected</option>
+                                            <option value="Wash">Wash</option>
+                                            <option value="Wet">Wet</option>
+                                        </select>
+                                        <button class="btn btn-sm btn-warning mt-1 w-100 d-lg-inline-block d-lg-w-auto" onclick="window.updateContractStatus('{{ contract.contract_number }}', '{{ contract.contract_number|replace(' ', '_') }}')">
+                                        	<i class="fas fa-save me-1"></i>Update All
+                                        </button>
+                                    </div>
                                 {% endif %}
-                                <div id="loading-common-{{ contract.contract_number|replace(' ', '_') }}" style="display:none;" class="loading-indicator">Loading...</div>
+                                <div id="loading-common-{{ contract.contract_number|replace(' ', '_') }}" style="display:none;" class="loading-indicator">
+                                	<div class="spinner-border spinner-border-sm" role="status"></div>
+                                	<span class="ms-2">Loading...</span>
+                                </div>
                             </td>
                         </tr>
                         <tr>
-                            <td colspan="6">
+                            <td colspan="6" class="p-0">
                                 <div id="common-{{ contract.contract_number|replace(' ', '_') }}" class="expandable collapsed subcategory-container"></div>
                             </td>
                         </tr>
                     {% endfor %}
                 {% else %}
                     <tr>
-                        <td colspan="6">No open contracts found. Please try refreshing or check data synchronization.</td>
+                        <td colspan="6" class="text-center py-5">
+                        	<div class="text-muted">
+                        		<i class="fas fa-inbox fa-2x mb-3"></i>
+                        		<p class="mb-0">No open contracts found</p>
+                        		<small>Please try refreshing or check data synchronization.</small>
+                        	</div>
+                        </td>
                     </tr>
                 {% endif %}
             </tbody>
         </table>
+        </div>
+        
+        <!-- Pagination Controls -->
+        {% if total_pages is defined and total_pages > 1 %}
+        <nav aria-label="Contracts pagination" class="mt-4">
+            <ul class="pagination justify-content-center">
+                <!-- Previous button -->
+                <li class="page-item {{ 'disabled' if not has_prev else '' }}">
+                    <a class="page-link" href="#" onclick="loadPage({{ page - 1 if has_prev else page }})" aria-label="Previous">
+                        <span aria-hidden="true">&laquo;</span>
+                    </a>
+                </li>
+                
+                <!-- Page numbers -->
+                {% set start_page = [1, page - 2]|max %}
+                {% set end_page = [total_pages, page + 2]|min %}
+                
+                {% if start_page > 1 %}
+                    <li class="page-item">
+                        <a class="page-link" href="#" onclick="loadPage(1)">1</a>
+                    </li>
+                    {% if start_page > 2 %}
+                        <li class="page-item disabled">
+                            <span class="page-link">...</span>
+                        </li>
+                    {% endif %}
+                {% endif %}
+                
+                {% for p in range(start_page, end_page + 1) %}
+                    <li class="page-item {{ 'active' if p == page else '' }}">
+                        <a class="page-link" href="#" onclick="loadPage({{ p }})">{{ p }}</a>
+                    </li>
+                {% endfor %}
+                
+                {% if end_page < total_pages %}
+                    {% if end_page < total_pages - 1 %}
+                        <li class="page-item disabled">
+                            <span class="page-link">...</span>
+                        </li>
+                    {% endif %}
+                    <li class="page-item">
+                        <a class="page-link" href="#" onclick="loadPage({{ total_pages }})">{{ total_pages }}</a>
+                    </li>
+                {% endif %}
+                
+                <!-- Next button -->
+                <li class="page-item {{ 'disabled' if not has_next else '' }}">
+                    <a class="page-link" href="#" onclick="loadPage({{ page + 1 if has_next else page }})" aria-label="Next">
+                        <span aria-hidden="true">&raquo;</span>
+                    </a>
+                </li>
+            </ul>
+        </nav>
+        {% endif %}
+        
+        <script>
+        // Pagination and performance optimization JavaScript
+        let currentPage = {{ page or 1 }};
+        let currentPerPage = {{ per_page or 20 }};
+        let currentSort = null;
+        
+        function loadPage(page) {
+            if (page === currentPage) return;
+            
+            const params = new URLSearchParams(window.location.search);
+            params.set('page', page);
+            params.set('per_page', currentPerPage);
+            
+            // Show loading indicator
+            showPageLoading();
+            
+            window.location.href = window.location.pathname + '?' + params.toString();
+        }
+        
+        function updatePerPage(perPage) {
+            const params = new URLSearchParams(window.location.search);
+            params.set('per_page', perPage);
+            params.set('page', 1); // Reset to first page when changing per page
+            
+            window.location.href = window.location.pathname + '?' + params.toString();
+        }
+        
+        function showPageLoading() {
+            // Add loading overlay
+            const loadingDiv = document.createElement('div');
+            loadingDiv.id = 'page-loading';
+            loadingDiv.className = 'position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center';
+            loadingDiv.style.backgroundColor = 'rgba(255, 255, 255, 0.8)';
+            loadingDiv.style.zIndex = '9999';
+            loadingDiv.innerHTML = `
+                <div class="text-center">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <div class="mt-2">Loading contracts...</div>
+                </div>
+            `;
+            document.body.appendChild(loadingDiv);
+        }
+        
+        // Enhanced sort function with pagination support
+        window.sortContracts = function(column) {
+            const currentSort = new URLSearchParams(window.location.search).get('sort');
+            let newSort = column + '_asc';
+            
+            if (currentSort && currentSort.startsWith(column + '_')) {
+                newSort = currentSort.endsWith('_asc') ? column + '_desc' : column + '_asc';
+            }
+            
+            const params = new URLSearchParams(window.location.search);
+            params.set('sort', newSort);
+            params.set('page', 1); // Reset to first page when sorting
+            
+            showPageLoading();
+            window.location.href = window.location.pathname + '?' + params.toString();
+        };
+        </script>
 {% endblock %}

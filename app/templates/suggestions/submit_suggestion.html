@@ -1,0 +1,674 @@
+{% extends "base.html" %}
+
+{% block title %}Submit Analytics Suggestion{% endblock %}
+
+{% block extra_css %}
+<style>
+.suggestion-form {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+    padding: 20px 0;
+}
+
+.form-container {
+    background: white;
+    border-radius: 15px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+    padding: 40px;
+    margin: 20px auto;
+    max-width: 900px;
+}
+
+.category-card {
+    border: 2px solid #e9ecef;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 15px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.category-card:hover {
+    border-color: #667eea;
+    transform: translateY(-2px);
+}
+
+.category-card.selected {
+    border-color: #667eea;
+    background-color: #f8f9ff;
+}
+
+.category-icon {
+    font-size: 2.5rem;
+    margin-bottom: 15px;
+    color: #667eea;
+}
+
+.form-section {
+    margin-bottom: 30px;
+    padding: 25px;
+    border: 1px solid #e9ecef;
+    border-radius: 10px;
+    background-color: #fafbfc;
+}
+
+.section-title {
+    color: #495057;
+    margin-bottom: 20px;
+    font-weight: 600;
+}
+
+.impact-indicator {
+    display: inline-block;
+    padding: 5px 12px;
+    border-radius: 20px;
+    font-size: 0.9em;
+    font-weight: 500;
+    margin-right: 10px;
+    margin-bottom: 5px;
+}
+
+.impact-low { background-color: #d4edda; color: #155724; }
+.impact-medium { background-color: #fff3cd; color: #856404; }
+.impact-high { background-color: #f8d7da; color: #721c24; }
+.impact-critical { background-color: #d1ecf1; color: #0c5460; }
+
+.confidence-slider {
+    width: 100%;
+    margin: 15px 0;
+}
+
+.confidence-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.9em;
+    color: #6c757d;
+}
+
+.btn-submit {
+    background: linear-gradient(45deg, #667eea, #764ba2);
+    border: none;
+    color: white;
+    padding: 15px 40px;
+    border-radius: 25px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+    transition: all 0.3s ease;
+}
+
+.btn-submit:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+}
+
+.dynamic-fields {
+    display: none;
+    animation: fadeIn 0.5s ease-in;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.minnesota-context {
+    background: linear-gradient(135deg, #e3f2fd 0%, #f3e5f5 100%);
+    border-radius: 10px;
+    padding: 20px;
+    margin-top: 20px;
+}
+
+.evidence-upload {
+    border: 2px dashed #667eea;
+    border-radius: 10px;
+    padding: 30px;
+    text-align: center;
+    background-color: #f8f9ff;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="suggestion-form">
+    <div class="container">
+        <div class="form-container">
+            <div class="text-center mb-4">
+                <h1 class="display-4 text-primary mb-3">
+                    <i class="fas fa-lightbulb"></i>
+                    Analytics Suggestion
+                </h1>
+                <p class="lead">Help improve our predictive analytics by sharing your insights about correlations, patterns, and business intelligence opportunities for Minnesota equipment rental operations.</p>
+            </div>
+
+            <form id="suggestionForm" class="needs-validation" novalidate>
+                <!-- Category Selection -->
+                <div class="form-section">
+                    <h3 class="section-title">
+                        <i class="fas fa-tags"></i> Suggestion Category
+                    </h3>
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <div class="category-card" data-category="WEATHER_CORRELATION">
+                                <div class="text-center">
+                                    <div class="category-icon"><i class="fas fa-cloud-rain"></i></div>
+                                    <h5>Weather Correlation</h5>
+                                    <p class="text-muted">Temperature, precipitation, wind patterns affecting rental demand</p>
+                                    <small class="text-success"><strong>Example:</strong> "Heater rentals increase 300% when temp drops below 40°F"</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <div class="category-card" data-category="SEASONAL_PATTERN">
+                                <div class="text-center">
+                                    <div class="category-icon"><i class="fas fa-calendar-alt"></i></div>
+                                    <h5>Seasonal Pattern</h5>
+                                    <p class="text-muted">Recurring patterns throughout the year</p>
+                                    <small class="text-success"><strong>Example:</strong> "Wedding season starts 2 weeks earlier near Lake Minnetonka"</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <div class="category-card" data-category="ECONOMIC_INDICATOR">
+                                <div class="text-center">
+                                    <div class="category-icon"><i class="fas fa-chart-line"></i></div>
+                                    <h5>Economic Indicator</h5>
+                                    <p class="text-muted">Economic factors predicting rental demand</p>
+                                    <small class="text-success"><strong>Example:</strong> "Construction permits predict tool demand 3 months ahead"</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <div class="category-card" data-category="OPERATIONAL_INSIGHT">
+                                <div class="text-center">
+                                    <div class="category-icon"><i class="fas fa-cogs"></i></div>
+                                    <h5>Operational Insight</h5>
+                                    <p class="text-muted">Internal operations affecting performance</p>
+                                    <small class="text-success"><strong>Example:</strong> "Thursday deliveries boost weekend event success"</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <div class="category-card" data-category="CUSTOMER_BEHAVIOR">
+                                <div class="text-center">
+                                    <div class="category-icon"><i class="fas fa-users"></i></div>
+                                    <h5>Customer Behavior</h5>
+                                    <p class="text-muted">Customer patterns and cross-selling opportunities</p>
+                                    <small class="text-success"><strong>Example:</strong> "Tent renters need tables 80% of the time"</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <div class="category-card" data-category="GEOGRAPHIC_PATTERN">
+                                <div class="text-center">
+                                    <div class="category-icon"><i class="fas fa-map-marked-alt"></i></div>
+                                    <h5>Geographic Pattern</h5>
+                                    <p class="text-muted">Location-specific trends and patterns</p>
+                                    <small class="text-success"><strong>Example:</strong> "Wayzata sees higher party rentals during sailing season"</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <input type="hidden" id="selectedCategory" name="category" required>
+                </div>
+
+                <!-- Basic Information -->
+                <div class="form-section">
+                    <h3 class="section-title">
+                        <i class="fas fa-info-circle"></i> Your Information
+                    </h3>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <label for="userName" class="form-label">Your Name *</label>
+                            <input type="text" class="form-control" id="userName" name="user_name" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="userRole" class="form-label">Your Role *</label>
+                            <select class="form-select" id="userRole" name="user_role" required>
+                                <option value="">Select your role...</option>
+                                <option value="Store Manager">Store Manager</option>
+                                <option value="Assistant Manager">Assistant Manager</option>
+                                <option value="Regional Director">Regional Director</option>
+                                <option value="Executive">Executive</option>
+                                <option value="Sales Representative">Sales Representative</option>
+                                <option value="Operations">Operations</option>
+                                <option value="Customer Service">Customer Service</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row mt-3">
+                        <div class="col-md-6">
+                            <label for="storeLocation" class="form-label">Store Location</label>
+                            <select class="form-select" id="storeLocation" name="store_location">
+                                <option value="All Stores">All Stores</option>
+                                <option value="Minneapolis">Minneapolis</option>
+                                <option value="St. Paul">St. Paul</option>
+                                <option value="Duluth">Duluth</option>
+                                <option value="Rochester">Rochester</option>
+                                <option value="Bloomington">Bloomington</option>
+                                <option value="Plymouth">Plymouth</option>
+                                <option value="Woodbury">Woodbury</option>
+                                <option value="Wayzata">Wayzata</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="yearsExperience" class="form-label">Years of Experience</label>
+                            <select class="form-select" id="yearsExperience" name="years_experience">
+                                <option value="">Select...</option>
+                                <option value="1">Less than 1 year</option>
+                                <option value="2">1-2 years</option>
+                                <option value="5">3-5 years</option>
+                                <option value="10">6-10 years</option>
+                                <option value="15">More than 10 years</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Suggestion Details -->
+                <div class="form-section">
+                    <h3 class="section-title">
+                        <i class="fas fa-edit"></i> Suggestion Details
+                    </h3>
+                    <div class="mb-3">
+                        <label for="suggestionTitle" class="form-label">Title *</label>
+                        <input type="text" class="form-control" id="suggestionTitle" name="title" placeholder="Briefly describe your insight..." required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="suggestionDescription" class="form-label">Detailed Description *</label>
+                        <textarea class="form-control" id="suggestionDescription" name="description" rows="4" placeholder="Describe the correlation or pattern you've observed..." required></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label for="businessJustification" class="form-label">Business Justification *</label>
+                        <textarea class="form-control" id="businessJustification" name="business_justification" rows="3" placeholder="Why is this insight valuable? How could it improve our business?" required></textarea>
+                    </div>
+                </div>
+
+                <!-- Dynamic Category-Specific Fields -->
+                <div id="correlationFields" class="form-section dynamic-fields">
+                    <h3 class="section-title">
+                        <i class="fas fa-link"></i> Correlation Details
+                    </h3>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <label for="correlationFactor1" class="form-label">Primary Factor</label>
+                            <input type="text" class="form-control" id="correlationFactor1" name="correlation_factor_1" placeholder="e.g., Temperature, Customer age, Day of week...">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="correlationFactor2" class="form-label">Secondary Factor</label>
+                            <input type="text" class="form-control" id="correlationFactor2" name="correlation_factor_2" placeholder="e.g., Heater rentals, Tent demand...">
+                        </div>
+                    </div>
+                    <div class="row mt-3">
+                        <div class="col-md-6">
+                            <label for="expectedRelationship" class="form-label">Expected Relationship</label>
+                            <select class="form-select" id="expectedRelationship" name="expected_relationship">
+                                <option value="">Select relationship type...</option>
+                                <option value="positive">Positive (as A increases, B increases)</option>
+                                <option value="negative">Negative (as A increases, B decreases)</option>
+                                <option value="seasonal">Seasonal/Cyclic</option>
+                                <option value="threshold">Threshold-based</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="correlationStrength" class="form-label">Expected Strength</label>
+                            <select class="form-select" id="correlationStrength" name="correlation_strength_estimate">
+                                <option value="">How strong is this correlation?</option>
+                                <option value="weak">Weak (slight influence)</option>
+                                <option value="moderate">Moderate (noticeable impact)</option>
+                                <option value="strong">Strong (major driver)</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="indicatorFields" class="form-section dynamic-fields">
+                    <h3 class="section-title">
+                        <i class="fas fa-stopwatch"></i> Indicator Timing
+                    </h3>
+                    <div class="row">
+                        <div class="col-md-4">
+                            <label for="indicatorType" class="form-label">Indicator Type</label>
+                            <select class="form-select" id="indicatorType" name="indicator_type">
+                                <option value="">Select type...</option>
+                                <option value="leading">Leading (predicts future events)</option>
+                                <option value="trailing">Trailing (confirms past events)</option>
+                                <option value="coincident">Coincident (occurs simultaneously)</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="timeLagEstimate" class="form-label">Time Lag</label>
+                            <input type="text" class="form-control" id="timeLagEstimate" name="time_lag_estimate" placeholder="e.g., 2 weeks, 1 month, seasonal">
+                        </div>
+                        <div class="col-md-4">
+                            <label for="predictiveWindow" class="form-label">Predictive Window</label>
+                            <input type="text" class="form-control" id="predictiveWindow" name="predictive_window" placeholder="How far ahead/behind?">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Minnesota-Specific Context -->
+                <div class="minnesota-context">
+                    <h3 class="section-title">
+                        <i class="fas fa-map"></i> Minnesota Context
+                    </h3>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <label for="seasonalRelevance" class="form-label">Seasonal Relevance</label>
+                            <select class="form-select" id="seasonalRelevance" name="seasonal_relevance">
+                                <option value="">When does this apply?</option>
+                                <option value="spring">Spring (March - May)</option>
+                                <option value="summer">Summer (June - August)</option>
+                                <option value="fall">Fall (September - November)</option>
+                                <option value="winter">Winter (December - February)</option>
+                                <option value="year-round">Year-round</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="weatherDependency" class="form-label">Weather Dependency</label>
+                            <select class="form-select" id="weatherDependency" name="weather_dependency">
+                                <option value="">Select weather factor...</option>
+                                <option value="temperature">Temperature</option>
+                                <option value="precipitation">Precipitation (rain/snow)</option>
+                                <option value="wind">Wind</option>
+                                <option value="humidity">Humidity</option>
+                                <option value="none">Not weather dependent</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row mt-3">
+                        <div class="col-md-6">
+                            <label for="geographicScope" class="form-label">Geographic Scope</label>
+                            <select class="form-select" id="geographicScope" name="geographic_scope">
+                                <option value="single store">Single Store</option>
+                                <option value="regional">Regional (Twin Cities area)</option>
+                                <option value="statewide">Statewide</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="marketSegment" class="form-label">Market Segment</label>
+                            <select class="form-select" id="marketSegment" name="market_segment">
+                                <option value="all">All Segments</option>
+                                <option value="DIY">DIY/Consumer</option>
+                                <option value="construction">Construction/Contractors</option>
+                                <option value="events">Events/Parties</option>
+                                <option value="landscaping">Landscaping</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Business Impact -->
+                <div class="form-section">
+                    <h3 class="section-title">
+                        <i class="fas fa-dollar-sign"></i> Expected Business Impact
+                    </h3>
+                    <div class="row">
+                        <div class="col-md-3">
+                            <label for="expectedImpact" class="form-label">Impact Level *</label>
+                            <select class="form-select" id="expectedImpact" name="expected_business_impact" required>
+                                <option value="">Select level...</option>
+                                <option value="low">Low</option>
+                                <option value="medium">Medium</option>
+                                <option value="high">High</option>
+                                <option value="critical">Critical</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="revenueImpact" class="form-label">Revenue Impact ($)</label>
+                            <input type="number" class="form-control" id="revenueImpact" name="revenue_impact_estimate" placeholder="Annual estimate">
+                        </div>
+                        <div class="col-md-3">
+                            <label for="costSavings" class="form-label">Cost Savings ($)</label>
+                            <input type="number" class="form-control" id="costSavings" name="cost_savings_estimate" placeholder="Annual estimate">
+                        </div>
+                        <div class="col-md-3">
+                            <label for="efficiencyGain" class="form-label">Efficiency Gain</label>
+                            <input type="text" class="form-control" id="efficiencyGain" name="efficiency_gain_estimate" placeholder="e.g., 15% faster">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Supporting Evidence -->
+                <div class="form-section">
+                    <h3 class="section-title">
+                        <i class="fas fa-clipboard-check"></i> Supporting Evidence
+                    </h3>
+                    <div class="mb-3">
+                        <label for="historicalExamples" class="form-label">Historical Examples</label>
+                        <textarea class="form-control" id="historicalExamples" name="historical_examples" rows="3" placeholder="Specific examples you've observed that support this correlation..."></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label for="dataSources" class="form-label">Suggested Data Sources</label>
+                        <textarea class="form-control" id="dataSources" name="data_sources_suggested" rows="2" placeholder="Where can we find data to validate this? (e.g., weather.com, construction permits database...)"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label for="confidenceLevel" class="form-label">Your Confidence Level</label>
+                        <input type="range" class="form-range confidence-slider" id="confidenceLevel" name="confidence_level" min="1" max="5" step="1" value="3">
+                        <div class="confidence-labels">
+                            <span>Not Sure</span>
+                            <span>Somewhat Sure</span>
+                            <span>Confident</span>
+                            <span>Very Confident</span>
+                            <span>Absolutely Certain</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Implementation Details -->
+                <div class="form-section">
+                    <h3 class="section-title">
+                        <i class="fas fa-tools"></i> Implementation Considerations
+                    </h3>
+                    <div class="row">
+                        <div class="col-md-4">
+                            <label for="implementationComplexity" class="form-label">Implementation Complexity</label>
+                            <select class="form-select" id="implementationComplexity" name="implementation_complexity">
+                                <option value="low">Low (Easy to implement)</option>
+                                <option value="medium" selected>Medium (Some effort required)</option>
+                                <option value="high">High (Complex implementation)</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="estimatedTimeline" class="form-label">Estimated Timeline</label>
+                            <input type="text" class="form-control" id="estimatedTimeline" name="estimated_timeline" placeholder="e.g., 2 weeks, 1 month">
+                        </div>
+                        <div class="col-md-4">
+                            <label for="requiredResources" class="form-label">Required Resources</label>
+                            <input type="text" class="form-control" id="requiredResources" name="required_resources" placeholder="Personnel, tools, budget...">
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <label for="technicalRequirements" class="form-label">Technical Requirements</label>
+                        <textarea class="form-control" id="technicalRequirements" name="technical_requirements" rows="2" placeholder="Any specific technical needs or integrations required..."></textarea>
+                    </div>
+                </div>
+
+                <!-- Submit Button -->
+                <div class="text-center">
+                    <button type="submit" class="btn btn-submit btn-lg">
+                        <i class="fas fa-paper-plane"></i>
+                        Submit Suggestion
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Success Modal -->
+<div class="modal fade" id="successModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title">
+                    <i class="fas fa-check-circle"></i>
+                    Suggestion Submitted Successfully!
+                </h5>
+            </div>
+            <div class="modal-body">
+                <p>Thank you for your valuable insight! Your suggestion has been submitted and assigned ID: <strong><span id="suggestionId"></span></strong></p>
+                <p>Our analytics team will review your suggestion and validate it using our machine learning systems. You'll receive notifications about the status updates.</p>
+                <div class="alert alert-info">
+                    <strong>What happens next:</strong>
+                    <ul class="mb-0">
+                        <li>Automated statistical validation (within 24 hours)</li>
+                        <li>Expert review and feasibility assessment</li>
+                        <li>Implementation planning if approved</li>
+                        <li>Recognition if suggestion generates business value</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-success" onclick="window.location.href='/suggestions'">
+                    View All Suggestions
+                </button>
+                <button type="button" class="btn btn-secondary" onclick="window.location.reload()">
+                    Submit Another
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Category selection handling
+    document.querySelectorAll('.category-card').forEach(card => {
+        card.addEventListener('click', function() {
+            // Remove selected class from all cards
+            document.querySelectorAll('.category-card').forEach(c => c.classList.remove('selected'));
+            
+            // Add selected class to clicked card
+            this.classList.add('selected');
+            
+            // Set hidden input value
+            const category = this.getAttribute('data-category');
+            document.getElementById('selectedCategory').value = category;
+            
+            // Show/hide dynamic fields based on category
+            showCategoryFields(category);
+        });
+    });
+    
+    // Form submission
+    document.getElementById('suggestionForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        if (!this.checkValidity()) {
+            this.classList.add('was-validated');
+            return;
+        }
+        
+        submitSuggestion();
+    });
+    
+    // Confidence level display
+    document.getElementById('confidenceLevel').addEventListener('input', function() {
+        const labels = ['Not Sure', 'Somewhat Sure', 'Confident', 'Very Confident', 'Absolutely Certain'];
+        const value = parseInt(this.value);
+        this.setAttribute('title', labels[value - 1]);
+    });
+    
+    // Auto-generate user ID (in real implementation, this would come from authentication)
+    document.getElementById('userName').addEventListener('change', function() {
+        if (!window.currentUserId) {
+            window.currentUserId = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        }
+    });
+});
+
+function showCategoryFields(category) {
+    // Hide all dynamic fields
+    document.querySelectorAll('.dynamic-fields').forEach(field => {
+        field.style.display = 'none';
+    });
+    
+    // Show relevant fields based on category
+    if (['WEATHER_CORRELATION', 'SEASONAL_PATTERN', 'CUSTOMER_BEHAVIOR', 'GEOGRAPHIC_PATTERN'].includes(category)) {
+        document.getElementById('correlationFields').style.display = 'block';
+    }
+    
+    if (['LEADING_INDICATOR', 'TRAILING_INDICATOR'].includes(category)) {
+        document.getElementById('correlationFields').style.display = 'block';
+        document.getElementById('indicatorFields').style.display = 'block';
+    }
+}
+
+async function submitSuggestion() {
+    const formData = new FormData(document.getElementById('suggestionForm'));
+    
+    // Add user ID
+    if (!window.currentUserId) {
+        window.currentUserId = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+    }
+    formData.append('user_id', window.currentUserId);
+    
+    // Convert FormData to JSON
+    const data = {};
+    formData.forEach((value, key) => {
+        if (value !== '') {
+            // Convert numeric fields
+            if (['years_experience', 'confidence_level', 'revenue_impact_estimate', 'cost_savings_estimate'].includes(key)) {
+                data[key] = value ? parseInt(value) || null : null;
+            } else {
+                data[key] = value;
+            }
+        }
+    });
+    
+    try {
+        // Show loading state
+        const submitBtn = document.querySelector('.btn-submit');
+        const originalText = submitBtn.innerHTML;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Submitting...';
+        submitBtn.disabled = true;
+        
+        const response = await fetch('/api/suggestions/submit', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(data)
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+            // Show success modal
+            document.getElementById('suggestionId').textContent = result.suggestion_id;
+            new bootstrap.Modal(document.getElementById('successModal')).show();
+        } else {
+            throw new Error(result.error || 'Submission failed');
+        }
+        
+    } catch (error) {
+        alert('Error submitting suggestion: ' + error.message);
+        console.error('Submission error:', error);
+    } finally {
+        // Restore button
+        const submitBtn = document.querySelector('.btn-submit');
+        submitBtn.innerHTML = originalText;
+        submitBtn.disabled = false;
+    }
+}
+
+// Impact level styling
+document.getElementById('expectedImpact').addEventListener('change', function() {
+    const impact = this.value;
+    const indicators = document.querySelectorAll('.impact-indicator');
+    indicators.forEach(indicator => indicator.style.display = 'none');
+    
+    if (impact) {
+        const indicator = document.createElement('span');
+        indicator.className = `impact-indicator impact-${impact}`;
+        indicator.textContent = impact.toUpperCase();
+        this.parentNode.appendChild(indicator);
+    }
+});
+</script>
+{% endblock %}

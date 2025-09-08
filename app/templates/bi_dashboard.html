@@ -1,0 +1,537 @@
+{% extends "base.html" %}
+
+{% block title %}Executive Dashboard - Business Intelligence{% endblock %}
+
+{% block extra_head %}
+<!-- Executive Dashboard Enhanced Styles and Scripts -->
+<link href="{{ url_for('static', filename='css/executive-dashboard.css') }}" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.min.js"></script>
+<script src="{{ url_for('static', filename='js/chart-utilities.js') }}"></script>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid executive-dashboard mt-4">
+    <!-- Enhanced Executive Header -->
+    <div class="dashboard-header">
+        <div class="container-fluid">
+            <div class="row">
+                <div class="col-12">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h1 class="display-6 mb-2">
+                                <i class="fas fa-chart-line me-3"></i>
+                                Executive Business Intelligence
+                            </h1>
+                            <p class="mb-0 opacity-90">
+                                <i class="fas fa-calendar-alt me-2"></i>
+                                Period Ending: <strong>{{ kpis.period or 'Current Week' }}</strong>
+                                <span class="mx-3">|</span>
+                                <span class="data-refresh-indicator live" id="refreshStatus">
+                                    <i class="fas fa-circle"></i> Live Data
+                                </span>
+                            </p>
+                        </div>
+                        <div>
+                            <button class="btn btn-light btn-executive me-2" onclick="refreshDashboard()">
+                                <i class="fas fa-sync-alt"></i> Refresh
+                            </button>
+                            <button class="btn btn-outline-light" onclick="exportReport()">
+                                <i class="fas fa-download"></i> Export
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alert Banner -->
+    {% if alerts %}
+    <div class="row mb-3">
+        <div class="col-12">
+            <div class="alert alert-warning alert-dismissible fade show" role="alert">
+                <strong>Active Alerts:</strong>
+                {% for alert in alerts %}
+                    <div class="mt-2">
+                        <span class="badge bg-{{ 'danger' if alert.status == 'CRITICAL' else 'warning' }}">
+                            {{ alert.status }}
+                        </span>
+                        {{ alert.rule_name }}: {{ alert.metric }} = {{ "%.1f"|format(alert.current_value) }}
+                        (Threshold: {{ "%.1f"|format(alert.threshold) }})
+                    </div>
+                {% endfor %}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Executive KPI Scorecard -->
+    <div id="executive-kpis" class="mb-4">
+        <!-- KPIs will be populated by JavaScript -->
+    </div>
+
+    <!-- Quick Actions Panel -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="filter-controls">
+                <div class="row align-items-end">
+                    <div class="col-md-3">
+                        <label class="form-label fw-semibold">Time Period</label>
+                        <select class="form-control" id="periodFilter" onchange="updateDashboardPeriod()">
+                            <option value="4">Last 4 Weeks</option>
+                            <option value="12" selected>Last 12 Weeks</option>
+                            <option value="26">Last 26 Weeks</option>
+                            <option value="52">Last Year</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label fw-semibold">Store Filter</label>
+                        <select class="form-control" id="storeFilter" onchange="updateDashboardFilters()">
+                            <option value="all">All Stores</option>
+                            <option value="6800">Brooklyn Park</option>
+                            <option value="3607">Wayzata</option>
+                            <option value="8101">Fridley</option>
+                            <option value="728">Elk River</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label fw-semibold">Auto Refresh</label>
+                        <div class="form-check form-switch mt-2">
+                            <input class="form-check-input" type="checkbox" id="autoRefreshToggle" checked onchange="toggleAutoRefresh()">
+                            <label class="form-check-label" for="autoRefreshToggle">
+                                Every 5 minutes
+                            </label>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label fw-semibold">&nbsp;</label>
+                        <div>
+                            <button class="btn btn-executive" onclick="refreshDashboard()">
+                                <i class="fas fa-sync-alt"></i> Refresh Now
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+            <div class="card">
+                <div class="card-body">
+                    <h6 class="card-subtitle mb-2 text-muted">Total Revenue</h6>
+                    <h3 class="card-title">${{ "{:,.0f}".format(kpis.current.revenue) }}</h3>
+                    <span class="text-{{ 'success' if kpis.current.growth > 0 else 'danger' }}">
+                        <i class="bi bi-{{ 'arrow-up' if kpis.current.growth > 0 else 'arrow-down' }}"></i>
+                        {{ "%.1f"|format((kpis.current.growth|abs)) }}%
+                    </span>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card">
+                <div class="card-body">
+                    <h6 class="card-subtitle mb-2 text-muted">Gross Margin</h6>
+                    <h3 class="card-title">{{ "%.1f"|format(kpis.current.margin * 100) }}%</h3>
+                    <div class="progress mt-2" style="height: 5px;">
+                        <div class="progress-bar bg-success" style="width: {{ kpis.current.margin * 100 }}%"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card">
+                <div class="card-body">
+                    <h6 class="card-subtitle mb-2 text-muted">Labor Cost Ratio</h6>
+                    <h3 class="card-title">{{ "%.1f"|format((kpis.current.get('labor_ratio', 0.32)) * 100) }}%</h3>
+                    <div class="progress mt-2" style="height: 5px;">
+                        <div class="progress-bar {{ 'bg-success' if (kpis.current.get('labor_ratio', 0.32)) < 0.35 else 'bg-warning' if (kpis.current.get('labor_ratio', 0.32)) < 0.45 else 'bg-danger' }}" 
+                             style="width: {{ (kpis.current.get('labor_ratio', 0.32)) * 100 }}%"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card">
+                <div class="card-body">
+                    <h6 class="card-subtitle mb-2 text-muted">Inventory Turnover</h6>
+                    <h3 class="card-title">{{ "%.2f"|format(kpis.current.get('turnover', 4.2)) }}x</h3>
+                    <small class="text-muted">Annual Rate</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card">
+                <div class="card-body">
+                    <h6 class="card-subtitle mb-2 text-muted">Total Inventory Value</h6>
+                    <h3 class="card-title">$11.49M</h3>
+                    <small class="text-muted">65,942 items</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card">
+                <div class="card-body">
+                    <h6 class="card-subtitle mb-2 text-muted">Utilization Rate</h6>
+                    <h3 class="card-title">68.5%</h3>
+                    <small class="text-muted">45,172 on rent</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Store Performance Comparison -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Store Performance Comparison</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Store</th>
+                                    <th class="text-end">Revenue</th>
+                                    <th class="text-end">Growth %</th>
+                                    <th class="text-end">Labor Ratio</th>
+                                    <th class="text-end">$/Hour</th>
+                                    <th class="text-end">New Contracts</th>
+                                    <th class="text-end">AR > 45 Days</th>
+                                    <th>Performance</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for store in store_comparison %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ store.store }}</strong>
+                                        {% if loop.index == 1 %}
+                                        <span class="badge bg-success ms-2">Top Performer</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-end">${{ "{:,.0f}".format(store.revenue) }}</td>
+                                    <td class="text-end">
+                                        <span class="text-{{ 'success' if store.growth > 0 else 'danger' }}">
+                                            {{ "%.1f"|format(store.growth) }}%
+                                        </span>
+                                    </td>
+                                    <td class="text-end">{{ "%.1f"|format((store.get('labor_ratio', 0.32)) * 100) }}%</td>
+                                    <td class="text-end">${{ "%.2f"|format(store.efficiency) }}</td>
+                                    <td class="text-end">{{ store.contracts }}</td>
+                                    <td class="text-end">
+                                        <span class="text-{{ 'success' if store.ar_aging < 0.25 else 'warning' if store.ar_aging < 0.40 else 'danger' }}">
+                                            {{ "%.1f"|format(store.ar_aging * 100) }}%
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <div class="progress" style="height: 20px;">
+                                            <div class="progress-bar bg-primary" 
+                                                 style="width: {{ (store.revenue / store_comparison[0].revenue * 100) }}%">
+                                                {{ "%.0f"|format(store.revenue / store_comparison[0].revenue * 100) }}%
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Executive Analytics Charts -->
+    <div class="row mb-4">
+        <div class="col-lg-8">
+            <div class="chart-container">
+                <div class="chart-header">
+                    <h5>
+                        <i class="fas fa-chart-line"></i>
+                        Revenue Performance Trend
+                    </h5>
+                    <div class="data-refresh-indicator" id="revenueChartStatus">
+                        <i class="fas fa-circle"></i> Live
+                    </div>
+                </div>
+                <div class="chart-body">
+                    <canvas id="revenueTrendChart"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-4">
+            <div class="chart-container">
+                <div class="chart-header">
+                    <h5>
+                        <i class="fas fa-tachometer-alt"></i>
+                        Overall Utilization
+                    </h5>
+                </div>
+                <div class="chart-body">
+                    <canvas id="utilizationGauge"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="chart-container">
+                <div class="chart-header">
+                    <h5>
+                        <i class="fas fa-store"></i>
+                        Store Performance Comparison
+                    </h5>
+                </div>
+                <div class="chart-body">
+                    <canvas id="storePerformanceChart"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="chart-container">
+                <div class="chart-header">
+                    <h5>
+                        <i class="fas fa-boxes"></i>
+                        Inventory Distribution
+                    </h5>
+                </div>
+                <div class="chart-body">
+                    <canvas id="inventoryDistributionChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Predictive Analytics and Business Intelligence -->
+    <div class="row mb-4">
+        <div class="col-lg-8">
+            <div class="chart-container">
+                <div class="chart-header">
+                    <h5>
+                        <i class="fas fa-crystal-ball"></i>
+                        Revenue Forecast & Predictive Analytics
+                    </h5>
+                    <div class="data-refresh-indicator info" id="forecastChartStatus">
+                        <i class="fas fa-brain"></i> AI Powered
+                    </div>
+                </div>
+                <div class="chart-body">
+                    <canvas id="forecastChart"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-4">
+            <div class="chart-container">
+                <div class="chart-header">
+                    <h5>
+                        <i class="fas fa-trophy"></i>
+                        Top Performing Categories
+                    </h5>
+                </div>
+                <div class="chart-body">
+                    <div id="topCategoriesDisplay"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Action Items -->
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0">Recommended Actions</h5>
+                </div>
+                <div class="card-body">
+                    <ul class="list-group list-group-flush">
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            Review high AR aging at Store 728
+                            <span class="badge bg-danger rounded-pill">High Priority</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            Optimize labor scheduling at Store 8101
+                            <span class="badge bg-warning rounded-pill">Medium</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            Increase inventory for high-demand classes
+                            <span class="badge bg-info rounded-pill">Opportunity</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">Recent Achievements</h5>
+                </div>
+                <div class="card-body">
+                    <ul class="list-group list-group-flush">
+                        <li class="list-group-item">
+                            <i class="bi bi-check-circle-fill text-success me-2"></i>
+                            Store 6800 exceeded revenue target by 15%
+                        </li>
+                        <li class="list-group-item">
+                            <i class="bi bi-check-circle-fill text-success me-2"></i>
+                            Labor efficiency improved 8% company-wide
+                        </li>
+                        <li class="list-group-item">
+                            <i class="bi bi-check-circle-fill text-success me-2"></i>
+                            Inventory utilization reached 68.5% (target: 65%)
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Chart.js Scripts -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+// Revenue Trend Chart
+const revenueTrendCtx = document.getElementById('revenueTrendChart').getContext('2d');
+new Chart(revenueTrendCtx, {
+    type: 'line',
+    data: {
+        labels: {{ kpis.trends.revenue | length }} > 0 ? 
+                [...Array({{ kpis.trends.revenue | length }})].map((_, i) => `Week ${i+1}`) : [],
+        datasets: [{
+            label: 'Total Revenue',
+            data: {{ kpis.trends.revenue | tojson }},
+            borderColor: 'rgb(75, 192, 192)',
+            backgroundColor: 'rgba(75, 192, 192, 0.2)',
+            tension: 0.1
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: { display: false }
+        },
+        scales: {
+            y: {
+                beginAtZero: false,
+                ticks: {
+                    callback: function(value) {
+                        return '$' + (value/1000).toFixed(0) + 'K';
+                    }
+                }
+            }
+        }
+    }
+});
+
+// Labor Efficiency Chart
+const laborCtx = document.getElementById('laborEfficiencyChart').getContext('2d');
+new Chart(laborCtx, {
+    type: 'bar',
+    data: {
+        labels: {{ store_comparison | map(attribute='store') | list | tojson }},
+        datasets: [{
+            label: 'Revenue per Hour',
+            data: {{ store_comparison | map(attribute='efficiency') | list | tojson }},
+            backgroundColor: [
+                'rgba(54, 162, 235, 0.8)',
+                'rgba(255, 206, 86, 0.8)',
+                'rgba(75, 192, 192, 0.8)',
+                'rgba(153, 102, 255, 0.8)'
+            ]
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: { display: false }
+        },
+        scales: {
+            y: {
+                beginAtZero: true,
+                ticks: {
+                    callback: function(value) {
+                        return '$' + value.toFixed(0);
+                    }
+                }
+            }
+        }
+    }
+});
+
+// Forecast Chart
+const forecastCtx = document.getElementById('forecastChart').getContext('2d');
+const forecastData = {{ predictions | tojson }};
+const revenueForecasts = forecastData.filter(p => p.metric === 'total_revenue');
+
+if (revenueForecasts.length > 0) {
+    new Chart(forecastCtx, {
+        type: 'line',
+        data: {
+            labels: revenueForecasts.map(p => p.date),
+            datasets: [{
+                label: 'Predicted Revenue',
+                data: revenueForecasts.map(p => p.value),
+                borderColor: 'rgb(255, 99, 132)',
+                backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                borderDash: [5, 5]
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false }
+            },
+            scales: {
+                y: {
+                    beginAtZero: false,
+                    ticks: {
+                        callback: function(value) {
+                            return '$' + (value/1000).toFixed(0) + 'K';
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Functions
+function refreshDashboard() {
+    window.location.reload();
+}
+
+function exportReport() {
+    window.location.href = '/bi/export/executive-report?end_date={{ end_date }}&weeks={{ weeks }}';
+}
+
+// Load inventory ROI data
+fetch('/bi/api/inventory-analytics')
+    .then(response => response.json())
+    .then(data => {
+        const topClasses = data.sort((a, b) => b.roi_percentage - a.roi_percentage).slice(0, 5);
+        const roiHtml = topClasses.map(item => `
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span>${item.class_name}</span>
+                <div>
+                    <span class="badge bg-success">${item.roi_percentage.toFixed(1)}% ROI</span>
+                    <span class="badge bg-secondary">${item.utilization_rate.toFixed(1)}% Util</span>
+                </div>
+            </div>
+        `).join('');
+</script>
+
+<!-- Enhanced Page Cleanup -->
+<script>
+// Cleanup resources when page unloads
+window.addEventListener('beforeunload', function() {
+    if (window.chartManager) {
+        window.chartManager.destroyAllCharts();
+        window.chartManager.disableAutoRefresh();
+    }
+});
+</script>
+{% endblock %}

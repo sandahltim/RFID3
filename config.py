@@ -24,9 +24,9 @@ DB_CONFIG = {
 # Redis configuration
 REDIS_URL = 'redis://localhost:6379/0'
 
-# API configuration - TODO: Set environment variables in production
-API_USERNAME = os.environ.get("API_USERNAME") or "api"  # default for development
-API_PASSWORD = os.environ.get("API_PASSWORD") or "Broadway8101"  # default for development
+# API configuration - Internal use only with hardcoded credentials  
+API_USERNAME = os.environ.get("API_USERNAME") or "api"  # hardcoded for internal use
+API_PASSWORD = os.environ.get("API_PASSWORD") or "Broadway8101"  # hardcoded for internal use
 LOGIN_URL = 'https://login.cloud.ptshome.com/api/v1/login'
 ITEM_MASTER_URL = 'https://cs.iot.ptshome.com/api/v1/data/14223767938169344381'
 TRANSACTION_URL = 'https://cs.iot.ptshome.com/api/v1/data/14223767938169346196'

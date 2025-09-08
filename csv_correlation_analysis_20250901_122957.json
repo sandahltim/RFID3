@@ -1,0 +1,489 @@
+{
+  "analysis_timestamp": "2025-09-01T12:29:56.579598",
+  "files_analyzed": [
+    "/home/tim/RFID3/shared/POR/customer8.26.25.csv",
+    "/home/tim/RFID3/shared/POR/equip8.26.25.csv",
+    "/home/tim/RFID3/shared/POR/transactions8.26.25.csv",
+    "/home/tim/RFID3/shared/POR/transitems8.26.25.csv",
+    "/home/tim/RFID3/shared/POR/PayrollTrends8.26.25.csv",
+    "/home/tim/RFID3/shared/POR/PL8.28.25.csv",
+    "/home/tim/RFID3/shared/POR/ScorecardTrends9.1.25.csv",
+    "/home/tim/RFID3/shared/rfid_tags.csv"
+  ],
+  "data_structures": {
+    "pos_customers": {
+      "rows": 10000,
+      "columns": 62,
+      "column_names": [
+        "Key",
+        "CNUM",
+        "Name",
+        "Address",
+        "Address2",
+        "City",
+        "Zip",
+        "Zip4",
+        "DriversLicense",
+        "Birthdate",
+        "Employer",
+        "Auto License",
+        "Auto State",
+        "Phone",
+        "Work Phone",
+        "Mobile Phone",
+        "Fax",
+        "Open Date",
+        "Last Active Date",
+        "Last Contract"
+      ],
+      "dtypes": {
+        "float64": 28,
+        "object": 27,
+        "int64": 6,
+        "bool": 1
+      },
+      "null_counts": {},
+      "potential_keys": []
+    },
+    "pos_equipment": {
+      "rows": 10000,
+      "columns": 72,
+      "column_names": [
+        "ItemNum",
+        "Key",
+        "Name",
+        "Loc",
+        "Category",
+        "Department",
+        "Type Desc",
+        "Qty",
+        "Home Store",
+        "Current Store",
+        "Group",
+        "MANF",
+        "ModelNo",
+        "SerialNo",
+        "PartNo",
+        "License No",
+        "Model Year",
+        "T/O MTD",
+        "T/O YTD",
+        "T/O LTD"
+      ],
+      "dtypes": {
+        "int64": 28,
+        "float64": 24,
+        "object": 18,
+        "bool": 2
+      },
+      "null_counts": {},
+      "potential_keys": []
+    },
+    "pos_transactions": {
+      "rows": 10000,
+      "columns": 39,
+      "column_names": [
+        "Contract No",
+        "Store No",
+        "Customer No",
+        "Stat",
+        "Status",
+        "Contract Date",
+        "Contract Time",
+        "Last Modified Date",
+        "Close Date",
+        "Billed Date",
+        "Completed Date",
+        "Rent Amt",
+        "Sale Amt",
+        "Tax Amt",
+        "Dmg Wvr Amt",
+        "Total",
+        "Total Paid",
+        "PaymentMethod",
+        "Total Owed",
+        "Deposit Paid Amt"
+      ],
+      "dtypes": {
+        "object": 22,
+        "float64": 12,
+        "int64": 5
+      },
+      "null_counts": {},
+      "potential_keys": []
+    },
+    "pos_trans_items": {
+      "rows": 10000,
+      "columns": 26,
+      "column_names": [
+        "Contract No",
+        "ItemNum",
+        "Qty",
+        "Hours",
+        "Due Date",
+        "Due Time",
+        "Line Status",
+        "Price",
+        "Desc",
+        "DmgWvr",
+        "ItemPercentage",
+        "DiscountPercent",
+        "Nontaxable",
+        "Nondiscount",
+        "Discount Amt",
+        "Daily Amt",
+        "Weekly Amt",
+        "Monthly Amt",
+        "Minimum Amt",
+        "Meter Out"
+      ],
+      "dtypes": {
+        "float64": 15,
+        "int64": 5,
+        "object": 4,
+        "bool": 2
+      },
+      "null_counts": {},
+      "potential_keys": []
+    },
+    "pos_payroll": {
+      "rows": 104,
+      "columns": 17,
+      "column_names": [
+        "2 WEEK ENDING SUN",
+        " Rental Revenue 6800 ",
+        " All Revenue 6800 ",
+        " Payroll 6800 ",
+        "Wage Hours 6800",
+        " Rental Revenue 3607 ",
+        " All Revenue 3607 ",
+        " Payroll 3607 ",
+        "Wage Hours 3607",
+        " Rental Revenue 8101 ",
+        " All Revenue 8101 ",
+        " Payroll 8101 ",
+        "Wage Hours 8101",
+        " Rental Revenue 728 ",
+        " All Revenue 728 ",
+        " Payroll 728 ",
+        "Wage Hours 728"
+      ],
+      "dtypes": {
+        "object": 15,
+        "int64": 1,
+        "float64": 1
+      },
+      "null_counts": {
+        "2 WEEK ENDING SUN": 0,
+        " Rental Revenue 6800 ": 0,
+        " All Revenue 6800 ": 0,
+        " Payroll 6800 ": 0,
+        "Wage Hours 6800": 0,
+        " Rental Revenue 3607 ": 0,
+        " All Revenue 3607 ": 0,
+        " Payroll 3607 ": 0,
+        "Wage Hours 3607": 0,
+        " Rental Revenue 8101 ": 0,
+        " All Revenue 8101 ": 0,
+        " Payroll 8101 ": 0,
+        "Wage Hours 8101": 0,
+        " Rental Revenue 728 ": 52,
+        " All Revenue 728 ": 52,
+        " Payroll 728 ": 52,
+        "Wage Hours 728": 52
+      },
+      "potential_keys": []
+    },
+    "pos_pl_data": {
+      "rows": 72,
+      "columns": 42,
+      "column_names": [
+        "Unnamed: 0",
+        "Unnamed: 1",
+        "3607",
+        "6800",
+        "728",
+        "8101",
+        "Sales Revenue",
+        "3607.1",
+        "6800.1",
+        "728.1",
+        "8101.1",
+        "Other Revenue",
+        "Damage Waiver Fees",
+        "Sale New Equipment",
+        "Sale Used Equipment",
+        "Total Revenue",
+        "COGS",
+        "Merchandise",
+        "Repair Parts",
+        "Shop Supplies"
+      ],
+      "dtypes": {
+        "float64": 41,
+        "object": 1
+      },
+      "null_counts": {
+        "Unnamed: 0": 2,
+        "Unnamed: 1": 10,
+        "3607": 2,
+        "6800": 2,
+        "728": 35,
+        "8101": 2,
+        "Sales Revenue": 72,
+        "3607.1": 2,
+        "6800.1": 2,
+        "728.1": 35,
+        "8101.1": 2,
+        "Other Revenue": 72,
+        "Damage Waiver Fees": 0,
+        "Sale New Equipment": 37,
+        "Sale Used Equipment": 11,
+        "Total Revenue": 2,
+        "COGS": 72,
+        "Merchandise": 2,
+        "Repair Parts": 0,
+        "Shop Supplies": 0,
+        "Vehicle Fuel": 0,
+        "Shop Oil & Gas": 2,
+        "Subrent/Leased Equip": 2,
+        "Employee Uniforms": 2,
+        "Freight": 2,
+        "Outside Repairs": 2,
+        "New Small Equip": 0,
+        "Direct Costs": 2,
+        "Total COGS": 2,
+        "Gross Profit": 0,
+        "Expenses": 72,
+        "Loan payments": 0,
+        "New Large Equip": 0,
+        "   Total Payroll & Benefits": 0,
+        "   Contract Labor": 2,
+        "   Accounting & Professional": 0,
+        "   Advertising": 0,
+        "   Education & Training": 0,
+        "   Office Expenses": 0,
+        "   Occupancy Expense": 0,
+        "Total Expenses": 2,
+        "Net Income": 0
+      },
+      "potential_keys": []
+    },
+    "pos_scorecard": {
+      "rows": 1999,
+      "columns": 52,
+      "column_names": [
+        "Week ending Sunday",
+        " Total Weekly Revenue ",
+        " 3607 Revenue ",
+        " 6800 Revenue ",
+        " 728 Revenue ",
+        " 8101 Revenue ",
+        "# New Open Contracts 3607",
+        "# New Open Contracts 6800",
+        "# New Open Contracts 728",
+        "# New Open Contracts 8101",
+        "# Deliveries Scheduled next 7 days Weds-Tues 8101",
+        " $ on Reservation - Next 14 days - 3607 ",
+        " $ on Reservation - Next 14 days - 6800 ",
+        " $ on Reservation - Next 14 days - 728 ",
+        " $ on Reservation - Next 14 days - 8101 ",
+        " Total $ on Reservation 3607 ",
+        " Total $ on Reservation 6800 ",
+        "Total $ on Reservation 728",
+        " Total $ on Reservation 8101 ",
+        "% -Total AR ($) > 45 days"
+      ],
+      "dtypes": {
+        "float64": 34,
+        "object": 17,
+        "int64": 1
+      },
+      "null_counts": {
+        "Week ending Sunday": 1637,
+        " Total Weekly Revenue ": 1812,
+        " 3607 Revenue ": 1915,
+        " 6800 Revenue ": 1915,
+        " 728 Revenue ": 1915,
+        " 8101 Revenue ": 1915,
+        "# New Open Contracts 3607": 1812,
+        "# New Open Contracts 6800": 1812,
+        "# New Open Contracts 728": 1915,
+        "# New Open Contracts 8101": 1812,
+        "# Deliveries Scheduled next 7 days Weds-Tues 8101": 1812,
+        " $ on Reservation - Next 14 days - 3607 ": 1863,
+        " $ on Reservation - Next 14 days - 6800 ": 1863,
+        " $ on Reservation - Next 14 days - 728 ": 1915,
+        " $ on Reservation - Next 14 days - 8101 ": 1863,
+        " Total $ on Reservation 3607 ": 1812,
+        " Total $ on Reservation 6800 ": 1812,
+        "Total $ on Reservation 728": 1915,
+        " Total $ on Reservation 8101 ": 1812,
+        "% -Total AR ($) > 45 days": 1822,
+        " Total Discount $ Company Wide ": 1871,
+        "WEEK NUMBER": 0,
+        "# Open Quotes 8101": 1868,
+        " $ Total AR (Cash Customers) ": 1974,
+        "Column1": 1999,
+        "Column3": 1999,
+        "Column4": 1999,
+        "Column5": 1999,
+        "Column6": 1999,
+        "Column7": 1999,
+        "Column8": 1999,
+        "Column9": 1999,
+        "Column10": 1999,
+        "Column11": 1999,
+        "Column12": 1999,
+        "Column13": 1999,
+        "Column14": 1999,
+        "Column15": 1999,
+        "Column16": 1999,
+        "Column17": 1999,
+        "Column18": 1999,
+        "Column19": 1999,
+        "Column20": 1999,
+        "Column21": 1999,
+        "Column22": 1999,
+        "Column23": 1999,
+        "Column24": 1999,
+        "Column25": 1999,
+        "Column26": 1999,
+        "Column27": 1999,
+        "Column28": 1999,
+        "Column29": 1999
+      },
+      "potential_keys": []
+    },
+    "rfid_rfid_tags": {
+      "rows": 3,
+      "columns": 6,
+      "column_names": [
+        "tag_id",
+        "common_name",
+        "subcategory",
+        "short_common_name",
+        "status",
+        "bin_location"
+      ],
+      "dtypes": {
+        "object": 5,
+        "float64": 1
+      },
+      "null_counts": {
+        "tag_id": 0,
+        "common_name": 0,
+        "subcategory": 0,
+        "short_common_name": 3,
+        "status": 0,
+        "bin_location": 0
+      },
+      "potential_keys": [
+        "tag_id"
+      ]
+    }
+  },
+  "correlations": {
+    "exact_matches": [],
+    "fuzzy_matches": [
+      {
+        "pos_column": "Status",
+        "rfid_column": "status",
+        "similarity": 1.0
+      },
+      {
+        "pos_column": "Category",
+        "rfid_column": "subcategory",
+        "similarity": 0.73
+      }
+    ],
+    "cross_references": [
+      {
+        "type": "EQUIPMENT_REFERENCE",
+        "pos_field": "ItemNum",
+        "rfid_field": "tag_id",
+        "confidence": "HIGH"
+      }
+    ]
+  },
+  "data_quality": {
+    "overall_score": 66.15,
+    "issues": [
+      {
+        "dataset": "pos_customers",
+        "type": "HIGH_NULL_VALUES",
+        "severity": "HIGH",
+        "percentage": 53.68,
+        "recommendation": "Review and clean null values in pos_customers"
+      },
+      {
+        "dataset": "pos_transactions",
+        "type": "HIGH_NULL_VALUES",
+        "severity": "MEDIUM",
+        "percentage": 41.45,
+        "recommendation": "Review and clean null values in pos_transactions"
+      },
+      {
+        "dataset": "pos_scorecard",
+        "type": "HIGH_NULL_VALUES",
+        "severity": "HIGH",
+        "percentage": 94.89,
+        "recommendation": "Review and clean null values in pos_scorecard"
+      }
+    ],
+    "completeness": {
+      "pos_customers": 46.32,
+      "pos_equipment": 75.24,
+      "pos_transactions": 58.55,
+      "pos_trans_items": 87.37,
+      "pos_payroll": 88.24,
+      "pos_pl_data": 85.05,
+      "pos_scorecard": 5.11,
+      "rfid_rfid_tags": 83.33
+    },
+    "consistency": {},
+    "freshness": {}
+  },
+  "recommendations": {
+    "immediate_actions": [
+      {
+        "action": "Review and clean null values in pos_customers",
+        "dataset": "pos_customers",
+        "type": "HIGH_NULL_VALUES",
+        "priority": "CRITICAL"
+      },
+      {
+        "action": "Review and clean null values in pos_scorecard",
+        "dataset": "pos_scorecard",
+        "type": "HIGH_NULL_VALUES",
+        "priority": "CRITICAL"
+      }
+    ],
+    "integration_opportunities": [
+      {
+        "action": "Link EQUIPMENT_REFERENCE between POS and RFID",
+        "pos_field": "ItemNum",
+        "rfid_field": "tag_id",
+        "priority": "HIGH",
+        "effort": "2-3 days"
+      }
+    ],
+    "data_cleaning": [
+      {
+        "action": "Review and clean null values in pos_transactions",
+        "dataset": "pos_transactions",
+        "type": "HIGH_NULL_VALUES",
+        "priority": "MEDIUM"
+      }
+    ],
+    "ai_readiness": {
+      "status": "MODERATE",
+      "message": "Some data cleaning required before ML",
+      "next_steps": [
+        "Address high-priority issues",
+        "Improve data completeness",
+        "Then proceed with ML"
+      ]
+    }
+  }
+}

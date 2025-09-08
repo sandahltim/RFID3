@@ -1,0 +1,233 @@
+{
+  "total_tests": 21,
+  "passed_tests": 7,
+  "failed_tests": 14,
+  "endpoints_tested": [
+    "/api/nonexistent-endpoint",
+    "/api/enhanced/dashboard/store-performance",
+    "/api/enhanced/business-analytics/utilization",
+    "/bi/api/store-performance",
+    "/api/predictive/optimization/inventory",
+    "/api/predictive/insights/leading-indicators",
+    "/api/predictive/demand/forecast",
+    "/bi/api/inventory-kpis",
+    "/api/predictive/correlations/analyze",
+    "/api/predictive/external-data/summary",
+    "/api/enhanced/dashboard/kpis",
+    "/api/predictive/external-data/fetch"
+  ],
+  "test_results": [
+    {
+      "endpoint": "/api/predictive/external-data/fetch",
+      "test_name": "External Data Fetch - Basic",
+      "status": "FAILED",
+      "status_code": 404,
+      "response_time_ms": 2.74,
+      "timestamp": "2025-08-28T22:28:59.857601",
+      "error": "HTTP 404: <!doctype html>\n<html lang=en>\n<title>404 Not Found</title>\n<h1>Not Found</h1>\n<p>The requested URL was not found on the server. If you entered the URL manually please check your spelling and try agai",
+      "response_preview": null
+    },
+    {
+      "endpoint": "/api/predictive/external-data/summary",
+      "test_name": "External Data Summary",
+      "status": "FAILED",
+      "status_code": 404,
+      "response_time_ms": 2.44,
+      "timestamp": "2025-08-28T22:28:59.860347",
+      "error": "HTTP 404: <!doctype html>\n<html lang=en>\n<title>404 Not Found</title>\n<h1>Not Found</h1>\n<p>The requested URL was not found on the server. If you entered the URL manually please check your spelling and try agai",
+      "response_preview": null
+    },
+    {
+      "endpoint": "/api/predictive/correlations/analyze",
+      "test_name": "Correlation Analysis - Basic",
+      "status": "FAILED",
+      "status_code": 404,
+      "response_time_ms": 2.69,
+      "timestamp": "2025-08-28T22:28:59.863272",
+      "error": "HTTP 404: <!doctype html>\n<html lang=en>\n<title>404 Not Found</title>\n<h1>Not Found</h1>\n<p>The requested URL was not found on the server. If you entered the URL manually please check your spelling and try agai",
+      "response_preview": null
+    },
+    {
+      "endpoint": "/api/predictive/demand/forecast",
+      "test_name": "Demand Forecast - Default Parameters",
+      "status": "FAILED",
+      "status_code": 404,
+      "response_time_ms": 2.36,
+      "timestamp": "2025-08-28T22:28:59.865868",
+      "error": "HTTP 404: <!doctype html>\n<html lang=en>\n<title>404 Not Found</title>\n<h1>Not Found</h1>\n<p>The requested URL was not found on the server. If you entered the URL manually please check your spelling and try agai",
+      "response_preview": null
+    },
+    {
+      "endpoint": "/api/predictive/demand/forecast",
+      "test_name": "Demand Forecast - Custom Parameters (6 weeks, store 6800)",
+      "status": "FAILED",
+      "status_code": 404,
+      "response_time_ms": 2.68,
+      "timestamp": "2025-08-28T22:28:59.868708",
+      "error": "HTTP 404: <!doctype html>\n<html lang=en>\n<title>404 Not Found</title>\n<h1>Not Found</h1>\n<p>The requested URL was not found on the server. If you entered the URL manually please check your spelling and try agai",
+      "response_preview": null
+    },
+    {
+      "endpoint": "/api/predictive/demand/forecast",
+      "test_name": "Demand Forecast - Edge Case (1 week)",
+      "status": "FAILED",
+      "status_code": 404,
+      "response_time_ms": 2.46,
+      "timestamp": "2025-08-28T22:28:59.871325",
+      "error": "HTTP 404: <!doctype html>\n<html lang=en>\n<title>404 Not Found</title>\n<h1>Not Found</h1>\n<p>The requested URL was not found on the server. If you entered the URL manually please check your spelling and try agai",
+      "response_preview": null
+    },
+    {
+      "endpoint": "/api/predictive/insights/leading-indicators",
+      "test_name": "Leading Indicators Analysis",
+      "status": "FAILED",
+      "status_code": 404,
+      "response_time_ms": 3.4,
+      "timestamp": "2025-08-28T22:28:59.874951",
+      "error": "HTTP 404: <!doctype html>\n<html lang=en>\n<title>404 Not Found</title>\n<h1>Not Found</h1>\n<p>The requested URL was not found on the server. If you entered the URL manually please check your spelling and try agai",
+      "response_preview": null
+    },
+    {
+      "endpoint": "/api/predictive/optimization/inventory",
+      "test_name": "Inventory Optimization - Default",
+      "status": "FAILED",
+      "status_code": 404,
+      "response_time_ms": 5.14,
+      "timestamp": "2025-08-28T22:28:59.880305",
+      "error": "HTTP 404: <!doctype html>\n<html lang=en>\n<title>404 Not Found</title>\n<h1>Not Found</h1>\n<p>The requested URL was not found on the server. If you entered the URL manually please check your spelling and try agai",
+      "response_preview": null
+    },
+    {
+      "endpoint": "/api/predictive/optimization/inventory",
+      "test_name": "Inventory Optimization - Store 6800",
+      "status": "FAILED",
+      "status_code": 404,
+      "response_time_ms": 3.95,
+      "timestamp": "2025-08-28T22:28:59.884399",
+      "error": "HTTP 404: <!doctype html>\n<html lang=en>\n<title>404 Not Found</title>\n<h1>Not Found</h1>\n<p>The requested URL was not found on the server. If you entered the URL manually please check your spelling and try agai",
+      "response_preview": null
+    },
+    {
+      "endpoint": "/api/enhanced/dashboard/kpis",
+      "test_name": "Enhanced KPIs - Default",
+      "status": "PASSED",
+      "status_code": 200,
+      "response_time_ms": 64.19,
+      "timestamp": "2025-08-28T22:28:59.948868",
+      "error": null,
+      "response_preview": "{\"data\": {\"active_alerts\": 25, \"avg_efficiency\": 83.267917, \"efficiency_trend\": 0, \"filter_context\": {\"store\": \"all\", \"total_items_in_view\": 65942, \"weeks\": 12}, \"items_available\": 11346, \"items_in_se..."
+    },
+    {
+      "endpoint": "/api/enhanced/dashboard/kpis",
+      "test_name": "Enhanced KPIs - 8 weeks, Store 6800",
+      "status": "PASSED",
+      "status_code": 200,
+      "response_time_ms": 140.76,
+      "timestamp": "2025-08-28T22:29:00.089903",
+      "error": null,
+      "response_preview": "{\"data\": {\"active_alerts\": 25, \"avg_efficiency\": 74.325, \"efficiency_trend\": 0, \"filter_context\": {\"store\": \"6800\", \"total_items_in_view\": 22389, \"weeks\": 8}, \"items_available\": 0, \"items_in_service\":..."
+    },
+    {
+      "endpoint": "/api/enhanced/dashboard/store-performance",
+      "test_name": "Store Performance - Default",
+      "status": "PASSED",
+      "status_code": 200,
+      "response_time_ms": 8.28,
+      "timestamp": "2025-08-28T22:29:00.098578",
+      "error": null,
+      "response_preview": "{\"data\": [{\"avg_revenue\": 31711.5, \"efficiency\": 93.62, \"labor_ratio\": 26.49, \"store_code\": \"3607\", \"store_name\": \"Wayzata\"}, {\"avg_revenue\": 26416.0, \"efficiency\": 80.17, \"labor_ratio\": 27.17, \"store..."
+    },
+    {
+      "endpoint": "/api/enhanced/dashboard/store-performance",
+      "test_name": "Store Performance - 6 weeks",
+      "status": "PASSED",
+      "status_code": 200,
+      "response_time_ms": 14.23,
+      "timestamp": "2025-08-28T22:29:00.113041",
+      "error": null,
+      "response_preview": "{\"data\": [{\"avg_revenue\": 33616.333333, \"efficiency\": 94.733333, \"labor_ratio\": 25.853333, \"store_code\": \"3607\", \"store_name\": \"Wayzata\"}, {\"avg_revenue\": 26887.666667, \"efficiency\": 81.99, \"labor_rat..."
+    },
+    {
+      "endpoint": "/api/enhanced/business-analytics/utilization",
+      "test_name": "Equipment Utilization Analytics",
+      "status": "FAILED",
+      "status_code": 404,
+      "response_time_ms": 2.15,
+      "timestamp": "2025-08-28T22:29:00.115531",
+      "error": "HTTP 404: <!doctype html>\n<html lang=en>\n<title>404 Not Found</title>\n<h1>Not Found</h1>\n<p>The requested URL was not found on the server. If you entered the URL manually please check your spelling and try agai",
+      "response_preview": null
+    },
+    {
+      "endpoint": "/bi/api/inventory-kpis",
+      "test_name": "BI Inventory KPIs",
+      "status": "PASSED",
+      "status_code": 200,
+      "response_time_ms": 76.93,
+      "timestamp": "2025-08-28T22:29:00.192734",
+      "error": null,
+      "response_preview": "{\"data\": {\"current\": {\"active_alerts\": 25, \"growth\": 5.2, \"inventory_value\": 11493791.57, \"on_rent\": 436, \"recent_activity\": 6835, \"revenue\": 124850.0, \"total_items\": 65942, \"utilization\": 0.7}, \"heal..."
+    },
+    {
+      "endpoint": "/bi/api/store-performance",
+      "test_name": "BI Store Performance",
+      "status": "FAILED",
+      "status_code": 500,
+      "response_time_ms": 11.71,
+      "timestamp": "2025-08-28T22:29:00.204685",
+      "error": "HTTP 500: {\"error\":\"(mysql.connector.errors.ProgrammingError) 1054 (42S22): Unknown column 'sp.revenue_growth_pct' in 'SELECT'\\n[SQL: \\n            SELECT \\n                sp.period_ending,\\n                sp",
+      "response_preview": null
+    },
+    {
+      "endpoint": "/api/nonexistent-endpoint",
+      "test_name": "Non-existent Endpoint (Expected 404)",
+      "status": "FAILED",
+      "status_code": 404,
+      "response_time_ms": 2.38,
+      "timestamp": "2025-08-28T22:29:00.207293",
+      "error": "HTTP 404: <!doctype html>\n<html lang=en>\n<title>404 Not Found</title>\n<h1>Not Found</h1>\n<p>The requested URL was not found on the server. If you entered the URL manually please check your spelling and try agai",
+      "response_preview": null
+    },
+    {
+      "endpoint": "/api/predictive/demand/forecast",
+      "test_name": "Invalid Parameters (Expected Error)",
+      "status": "FAILED",
+      "status_code": 404,
+      "response_time_ms": 5.42,
+      "timestamp": "2025-08-28T22:29:00.212829",
+      "error": "HTTP 404: <!doctype html>\n<html lang=en>\n<title>404 Not Found</title>\n<h1>Not Found</h1>\n<p>The requested URL was not found on the server. If you entered the URL manually please check your spelling and try agai",
+      "response_preview": null
+    },
+    {
+      "endpoint": "/api/predictive/external-data/summary",
+      "test_name": "Performance Test - /api/predictive/external-data/summary",
+      "status": "FAILED",
+      "status_code": 404,
+      "response_time_ms": 3.43,
+      "timestamp": "2025-08-28T22:29:00.216502",
+      "error": "HTTP 404: <!doctype html>\n<html lang=en>\n<title>404 Not Found</title>\n<h1>Not Found</h1>\n<p>The requested URL was not found on the server. If you entered the URL manually please check your spelling and try agai",
+      "response_preview": null
+    },
+    {
+      "endpoint": "/api/enhanced/dashboard/kpis",
+      "test_name": "Performance Test - /api/enhanced/dashboard/kpis",
+      "status": "PASSED",
+      "status_code": 200,
+      "response_time_ms": 58.21,
+      "timestamp": "2025-08-28T22:29:00.274868",
+      "error": null,
+      "response_preview": "{\"data\": {\"active_alerts\": 25, \"avg_efficiency\": 83.267917, \"efficiency_trend\": 0, \"filter_context\": {\"store\": \"all\", \"total_items_in_view\": 65942, \"weeks\": 12}, \"items_available\": 11346, \"items_in_se..."
+    },
+    {
+      "endpoint": "/api/enhanced/dashboard/store-performance",
+      "test_name": "Performance Test - /api/enhanced/dashboard/store-performance",
+      "status": "PASSED",
+      "status_code": 200,
+      "response_time_ms": 6.58,
+      "timestamp": "2025-08-28T22:29:00.281692",
+      "error": null,
+      "response_preview": "{\"data\": [{\"avg_revenue\": 31711.5, \"efficiency\": 93.62, \"labor_ratio\": 26.49, \"store_code\": \"3607\", \"store_name\": \"Wayzata\"}, {\"avg_revenue\": 26416.0, \"efficiency\": 80.17, \"labor_ratio\": 27.17, \"store..."
+    }
+  ],
+  "start_time": "2025-08-28T22:28:59.847077",
+  "end_time": "2025-08-28T22:29:00.281966"
+}

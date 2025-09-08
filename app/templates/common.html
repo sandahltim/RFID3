@@ -2,6 +2,9 @@
 
 {% block content %}
     <div class="container mt-4">
+        <!-- Global Store & Inventory Type Filters -->
+        {% include 'global_filters.html' %}
+        
         <h2>
             {% if tab_num == 1 %}Rental Inventory
             {% elif tab_num == 2 %}Open Contracts

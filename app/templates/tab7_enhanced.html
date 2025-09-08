@@ -1,0 +1,876 @@
+{% extends 'base.html' %}
+
+{% block title %}Executive Dashboard - RFID System{% endblock %}
+
+{% block extra_head %}
+<!-- Include existing styles from tab7.html -->
+<link rel="stylesheet" href="{{ url_for('static', filename='css/executive-dashboard.css') }}">
+
+<!-- Date range picker styles -->
+<link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.css" />
+
+<style>
+    /* Enhanced Executive Dashboard Styles */
+    .date-range-container {
+        background: white;
+        border-radius: 12px;
+        padding: 20px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        margin-bottom: 25px;
+    }
+    
+    .comparison-controls {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        flex-wrap: wrap;
+    }
+    
+    .comparison-type-selector {
+        display: inline-flex;
+        background: #f8f9fa;
+        border-radius: 8px;
+        padding: 4px;
+    }
+    
+    .comparison-type-selector button {
+        padding: 8px 16px;
+        border: none;
+        background: transparent;
+        border-radius: 6px;
+        font-weight: 500;
+        transition: all 0.3s;
+        cursor: pointer;
+    }
+    
+    .comparison-type-selector button.active {
+        background: var(--accent-gradient);
+        color: white;
+    }
+    
+    .comparison-card {
+        background: white;
+        border-radius: 12px;
+        padding: 25px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        margin-bottom: 25px;
+    }
+    
+    .comparison-metric {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 12px 0;
+        border-bottom: 1px solid rgba(0,0,0,0.05);
+    }
+    
+    .comparison-metric:last-child {
+        border-bottom: none;
+    }
+    
+    .metric-change {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-weight: 600;
+    }
+    
+    .metric-change.positive {
+        color: #10b981;
+    }
+    
+    .metric-change.negative {
+        color: #ef4444;
+    }
+    
+    .date-display {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 8px 16px;
+        border-radius: 8px;
+        font-weight: 500;
+        display: inline-block;
+    }
+    
+    .data-freshness-indicator {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 16px;
+        border-radius: 8px;
+        font-size: 0.9em;
+        font-weight: 500;
+    }
+    
+    .data-fresh {
+        background: #d1fae5;
+        color: #065f46;
+    }
+    
+    .data-stale {
+        background: #fed7aa;
+        color: #92400e;
+    }
+    
+    .data-old {
+        background: #fee2e2;
+        color: #991b1b;
+    }
+    
+    .comparison-period-display {
+        display: grid;
+        grid-template-columns: 1fr auto 1fr;
+        gap: 20px;
+        align-items: center;
+        margin: 20px 0;
+    }
+    
+    .period-box {
+        padding: 15px;
+        border-radius: 10px;
+        background: #f8f9fa;
+        text-align: center;
+    }
+    
+    .period-box.current {
+        background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+    }
+    
+    .period-box.comparison {
+        background: linear-gradient(135deg, #ddd6fe 0%, #c4b5fd 100%);
+    }
+    
+    .vs-indicator {
+        font-size: 1.5em;
+        font-weight: 700;
+        color: #6b7280;
+    }
+    
+    .metric-selector {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin: 15px 0;
+    }
+    
+    .metric-checkbox {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 16px;
+        background: white;
+        border: 2px solid #e5e7eb;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.3s;
+    }
+    
+    .metric-checkbox:hover {
+        border-color: #667eea;
+    }
+    
+    .metric-checkbox input[type="checkbox"] {
+        cursor: pointer;
+    }
+    
+    .metric-checkbox.selected {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-color: transparent;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Executive Header with Data Freshness -->
+    <div class="executive-header">
+        <div class="row align-items-center">
+            <div class="col-md-6">
+                <h1 class="mb-2">Executive Dashboard</h1>
+                <p class="mb-0">Real-time business intelligence and financial analytics</p>
+            </div>
+            <div class="col-md-3">
+                <div id="data-freshness" class="data-freshness-indicator">
+                    <i class="fas fa-database"></i>
+                    <span id="freshness-text">Checking data...</span>
+                </div>
+            </div>
+            <div class="col-md-3 text-end">
+                <div class="text-white-50">Last Updated</div>
+                <div id="last-updated" class="h5">--:--:--</div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Enhanced Date Range and Filter Section -->
+    <div class="date-range-container">
+        <div class="row">
+            <div class="col-md-12">
+                <h5 class="mb-3">Analysis Period Selection</h5>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-md-3">
+                <label class="form-label">Store Location</label>
+                <select id="store-filter" class="form-select">
+                    <option value="all">All Stores</option>
+                    <option value="6800">Brooklyn Park</option>
+                    <option value="3607">Wayzata</option>
+                    <option value="8101">Fridley</option>
+                    <option value="728">Elk River</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Quick Periods</label>
+                <select id="period-filter" class="form-select">
+                    <option value="4weeks">Last 4 Weeks</option>
+                    <option value="12weeks">Last 12 Weeks</option>
+                    <option value="52weeks">Last 52 Weeks</option>
+                    <option value="ytd">Year to Date</option>
+                    <option value="custom">Custom Range</option>
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Custom Date Range</label>
+                <div class="input-group">
+                    <input type="text" id="date-range-picker" class="form-control" 
+                           placeholder="Select date range" />
+                    <button class="btn btn-outline-secondary" type="button" id="apply-date-range">
+                        <i class="fas fa-calendar"></i> Apply
+                    </button>
+                </div>
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+                <button id="refresh-data" class="btn btn-primary me-2">
+                    <i class="fas fa-sync-alt"></i> Refresh
+                </button>
+                <button id="export-data" class="btn btn-outline-primary">
+                    <i class="fas fa-download"></i> Export
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Period Comparison Section -->
+    <div class="comparison-card">
+        <h5 class="mb-3">Period-over-Period Comparison</h5>
+        <div class="comparison-controls">
+            <div class="comparison-type-selector">
+                <button data-comparison="wow" class="active">Week/Week</button>
+                <button data-comparison="mom">Month/Month</button>
+                <button data-comparison="yoy">Year/Year</button>
+                <button data-comparison="custom">Custom</button>
+            </div>
+            <div class="flex-grow-1"></div>
+            <button id="load-comparison" class="btn btn-sm btn-primary">
+                <i class="fas fa-chart-line"></i> Analyze
+            </button>
+        </div>
+        
+        <div class="comparison-period-display">
+            <div class="period-box current">
+                <small class="text-muted">Current Period</small>
+                <div class="fw-bold" id="current-period-display">--</div>
+            </div>
+            <div class="vs-indicator">VS</div>
+            <div class="period-box comparison">
+                <small class="text-muted">Comparison Period</small>
+                <div class="fw-bold" id="comparison-period-display">--</div>
+            </div>
+        </div>
+        
+        <div id="comparison-metrics" class="mt-4">
+            <!-- Dynamic comparison metrics will be loaded here -->
+        </div>
+    </div>
+    
+    <!-- Trending Analysis with Selectable Metrics -->
+    <div class="chart-container">
+        <h5>Trending Analysis</h5>
+        <div class="metric-selector">
+            <label class="metric-checkbox selected">
+                <input type="checkbox" value="revenue" checked> Revenue
+            </label>
+            <label class="metric-checkbox selected">
+                <input type="checkbox" value="payroll" checked> Payroll
+            </label>
+            <label class="metric-checkbox">
+                <input type="checkbox" value="profit"> Profit
+            </label>
+            <label class="metric-checkbox">
+                <input type="checkbox" value="profit_margin"> Margin %
+            </label>
+            <label class="metric-checkbox">
+                <input type="checkbox" value="efficiency"> Efficiency
+            </label>
+            <label class="metric-checkbox">
+                <input type="checkbox" value="revenue_per_hour"> $/Hour
+            </label>
+        </div>
+        <canvas id="trending-chart"></canvas>
+    </div>
+    
+    <!-- Key Metrics Row (existing) -->
+    <div class="row mb-4">
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="metric-card">
+                <div class="metric-label">Total Revenue</div>
+                <div class="metric-value" id="total-revenue">--</div>
+                <div class="metric-change" id="revenue-change">
+                    <i class="fas fa-arrow-up"></i>
+                    <span>--% vs prior</span>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="metric-card">
+                <div class="metric-label">Labor Efficiency</div>
+                <div class="metric-value" id="labor-efficiency">--%</div>
+                <div class="metric-change" id="efficiency-change">
+                    <i class="fas fa-arrow-down"></i>
+                    <span>--% vs prior</span>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="metric-card">
+                <div class="metric-label">Profit Margin</div>
+                <div class="metric-value" id="profit-margin">--%</div>
+                <div class="metric-change" id="margin-change">
+                    <i class="fas fa-minus"></i>
+                    <span>-- pts vs prior</span>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="metric-card">
+                <div class="metric-label">Revenue/Hour</div>
+                <div class="metric-value" id="revenue-per-hour">$--</div>
+                <div class="metric-change" id="rph-change">
+                    <i class="fas fa-arrow-up"></i>
+                    <span>--% vs prior</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Store Comparison Table (existing structure, will be populated) -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="store-comparison-table">
+                <h5 class="p-3 mb-0">Store Comparison Analysis</h5>
+                <div class="table-responsive">
+                    <table class="table table-hover table-executive mb-0">
+                        <thead>
+                            <tr>
+                                <th>Store</th>
+                                <th>Revenue</th>
+                                <th>Payroll</th>
+                                <th>Profit</th>
+                                <th>Margin</th>
+                                <th>Efficiency</th>
+                                <th>$/Hour</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="store-comparison-tbody">
+                            <!-- Dynamic content -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<!-- Date range picker dependencies -->
+<script type="text/javascript" src="https://cdn.jsdelivr.net/jquery/latest/jquery.min.js"></script>
+<script type="text/javascript" src="https://cdn.jsdelivr.net/momentjs/latest/moment.min.js"></script>
+<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+// Enhanced Executive Dashboard JavaScript
+document.addEventListener('DOMContentLoaded', function() {
+    let trendingChart = null;
+    let currentDateRange = { start: null, end: null };
+    let comparisonType = 'wow';
+    let dataAvailability = null;
+    
+    // Initialize dashboard
+    checkDataAvailability();
+    initializeDateRangePicker();
+    loadExecutiveDashboard();
+    setupEventListeners();
+    
+    async function checkDataAvailability() {
+        try {
+            const response = await fetch('/api/executive/data_availability');
+            dataAvailability = await response.json();
+            
+            // Update data freshness indicator
+            const latestDate = new Date(dataAvailability.overall.latest_date);
+            const currentDate = new Date();
+            const daysDiff = Math.floor((currentDate - latestDate) / (1000 * 60 * 60 * 24));
+            
+            const freshnessEl = document.getElementById('data-freshness');
+            const freshnessText = document.getElementById('freshness-text');
+            
+            if (daysDiff <= 7) {
+                freshnessEl.className = 'data-freshness-indicator data-fresh';
+                freshnessText.textContent = `Data current to ${latestDate.toLocaleDateString()}`;
+            } else if (daysDiff <= 30) {
+                freshnessEl.className = 'data-freshness-indicator data-stale';
+                freshnessText.textContent = `Data ${daysDiff} days old`;
+            } else {
+                freshnessEl.className = 'data-freshness-indicator data-old';
+                freshnessText.textContent = `Data ${daysDiff} days old - Update needed`;
+            }
+            
+            // Set date range picker max date
+            if (dataAvailability.overall.latest_date) {
+                $('#date-range-picker').data('daterangepicker').maxDate = moment(dataAvailability.overall.latest_date);
+            }
+            
+        } catch (error) {
+            console.error('Error checking data availability:', error);
+        }
+    }
+    
+    function initializeDateRangePicker() {
+        // Initialize date range picker with proper bounds
+        $('#date-range-picker').daterangepicker({
+            startDate: moment().subtract(4, 'weeks'),
+            endDate: moment(),
+            ranges: {
+                'Last 7 Days': [moment().subtract(6, 'days'), moment()],
+                'Last 30 Days': [moment().subtract(29, 'days'), moment()],
+                'This Month': [moment().startOf('month'), moment().endOf('month')],
+                'Last Month': [moment().subtract(1, 'month').startOf('month'), moment().subtract(1, 'month').endOf('month')],
+                'Last Quarter': [moment().subtract(3, 'months').startOf('month'), moment().endOf('month')],
+                'This Year': [moment().startOf('year'), moment()],
+                'Last Year': [moment().subtract(1, 'year').startOf('year'), moment().subtract(1, 'year').endOf('year')]
+            },
+            locale: {
+                format: 'YYYY-MM-DD'
+            },
+            showDropdowns: true,
+            minYear: 2022,
+            maxYear: 2025,
+            opens: 'left'
+        }, function(start, end) {
+            currentDateRange = { start: start, end: end };
+            updatePeriodDisplay();
+        });
+        
+        // Set initial date range
+        currentDateRange = {
+            start: moment().subtract(4, 'weeks'),
+            end: moment()
+        };
+    }
+    
+    function setupEventListeners() {
+        // Period filter change
+        document.getElementById('period-filter').addEventListener('change', function() {
+            if (this.value === 'custom') {
+                $('#date-range-picker').data('daterangepicker').show();
+            } else {
+                updateDateRangeFromPeriod(this.value);
+                loadExecutiveDashboard();
+            }
+        });
+        
+        // Apply custom date range
+        document.getElementById('apply-date-range').addEventListener('click', function() {
+            loadExecutiveDashboard();
+        });
+        
+        // Refresh button
+        document.getElementById('refresh-data').addEventListener('click', loadExecutiveDashboard);
+        
+        // Store filter
+        document.getElementById('store-filter').addEventListener('change', loadExecutiveDashboard);
+        
+        // Comparison type selector
+        document.querySelectorAll('.comparison-type-selector button').forEach(btn => {
+            btn.addEventListener('click', function() {
+                document.querySelectorAll('.comparison-type-selector button').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                comparisonType = this.dataset.comparison;
+                updatePeriodDisplay();
+            });
+        });
+        
+        // Load comparison button
+        document.getElementById('load-comparison').addEventListener('click', loadPeriodComparison);
+        
+        // Metric checkboxes
+        document.querySelectorAll('.metric-checkbox input').forEach(checkbox => {
+            checkbox.addEventListener('change', function() {
+                this.closest('.metric-checkbox').classList.toggle('selected', this.checked);
+                loadTrendingAnalysis();
+            });
+        });
+    }
+    
+    function updateDateRangeFromPeriod(period) {
+        const end = moment();
+        let start;
+        
+        switch(period) {
+            case '4weeks':
+                start = moment().subtract(4, 'weeks');
+                break;
+            case '12weeks':
+                start = moment().subtract(12, 'weeks');
+                break;
+            case '52weeks':
+                start = moment().subtract(52, 'weeks');
+                break;
+            case 'ytd':
+                start = moment().startOf('year');
+                break;
+            default:
+                start = moment().subtract(4, 'weeks');
+        }
+        
+        currentDateRange = { start: start, end: end };
+        $('#date-range-picker').data('daterangepicker').setStartDate(start);
+        $('#date-range-picker').data('daterangepicker').setEndDate(end);
+        updatePeriodDisplay();
+    }
+    
+    function updatePeriodDisplay() {
+        if (!currentDateRange.start || !currentDateRange.end) return;
+        
+        const format = 'MMM D, YYYY';
+        document.getElementById('current-period-display').textContent = 
+            `${currentDateRange.start.format(format)} - ${currentDateRange.end.format(format)}`;
+        
+        // Calculate comparison period
+        let compStart, compEnd;
+        const daysDiff = currentDateRange.end.diff(currentDateRange.start, 'days');
+        
+        switch(comparisonType) {
+            case 'wow':
+                compEnd = currentDateRange.start.clone().subtract(1, 'day');
+                compStart = compEnd.clone().subtract(daysDiff, 'days');
+                break;
+            case 'mom':
+                compStart = currentDateRange.start.clone().subtract(1, 'month');
+                compEnd = currentDateRange.end.clone().subtract(1, 'month');
+                break;
+            case 'yoy':
+                compStart = currentDateRange.start.clone().subtract(1, 'year');
+                compEnd = currentDateRange.end.clone().subtract(1, 'year');
+                break;
+            default:
+                compEnd = currentDateRange.start.clone().subtract(1, 'day');
+                compStart = compEnd.clone().subtract(daysDiff, 'days');
+        }
+        
+        document.getElementById('comparison-period-display').textContent = 
+            `${compStart.format(format)} - ${compEnd.format(format)}`;
+    }
+    
+    async function loadExecutiveDashboard() {
+        const store = document.getElementById('store-filter').value;
+        const params = new URLSearchParams({
+            store: store,
+            start_date: currentDateRange.start.format('YYYY-MM-DD'),
+            end_date: currentDateRange.end.format('YYYY-MM-DD')
+        });
+        
+        try {
+            // Load summary metrics
+            const summaryResponse = await fetch(`/api/executive/dashboard_summary?${params}`);
+            const summaryData = await summaryResponse.json();
+            updateSummaryMetrics(summaryData);
+            
+            // Load trending analysis
+            loadTrendingAnalysis();
+            
+            // Load store comparison
+            const comparisonResponse = await fetch(`/api/executive/store_comparison?weeks=4`);
+            const comparisonData = await comparisonResponse.json();
+            updateStoreComparison(comparisonData.stores);
+            
+            // Load period comparison
+            loadPeriodComparison();
+            
+            // Update timestamp
+            document.getElementById('last-updated').textContent = new Date().toLocaleTimeString();
+            
+        } catch (error) {
+            console.error('Error loading dashboard:', error);
+        }
+    }
+    
+    async function loadPeriodComparison() {
+        const store = document.getElementById('store-filter').value;
+        const params = new URLSearchParams({
+            store: store,
+            start_date: currentDateRange.start.format('YYYY-MM-DD'),
+            end_date: currentDateRange.end.format('YYYY-MM-DD'),
+            comparison_type: comparisonType
+        });
+        
+        try {
+            const response = await fetch(`/api/executive/period_comparison?${params}`);
+            const data = await response.json();
+            updateComparisonMetrics(data);
+        } catch (error) {
+            console.error('Error loading comparison:', error);
+        }
+    }
+    
+    async function loadTrendingAnalysis() {
+        const store = document.getElementById('store-filter').value;
+        const selectedMetrics = [];
+        document.querySelectorAll('.metric-checkbox input:checked').forEach(cb => {
+            selectedMetrics.push(cb.value);
+        });
+        
+        const params = new URLSearchParams({
+            store: store,
+            start_date: currentDateRange.start.format('YYYY-MM-DD'),
+            end_date: currentDateRange.end.format('YYYY-MM-DD')
+        });
+        
+        // Add metrics to params
+        selectedMetrics.forEach(metric => params.append('metrics', metric));
+        
+        try {
+            const response = await fetch(`/api/executive/trending_analysis?${params}`);
+            const data = await response.json();
+            updateTrendingChart(data.trending_data, selectedMetrics);
+        } catch (error) {
+            console.error('Error loading trending analysis:', error);
+        }
+    }
+    
+    function updateSummaryMetrics(data) {
+        // Update metric cards
+        document.getElementById('total-revenue').textContent = formatCurrency(data.financial_metrics.total_revenue);
+        document.getElementById('labor-efficiency').textContent = data.financial_metrics.labor_efficiency.toFixed(1) + '%';
+        document.getElementById('profit-margin').textContent = data.health_indicators.profit_margin.toFixed(1) + '%';
+        document.getElementById('revenue-per-hour').textContent = '$' + data.financial_metrics.revenue_per_hour.toFixed(2);
+    }
+    
+    function updateComparisonMetrics(data) {
+        const container = document.getElementById('comparison-metrics');
+        const metrics = [
+            { key: 'revenue', label: 'Revenue', format: 'currency' },
+            { key: 'payroll', label: 'Payroll', format: 'currency' },
+            { key: 'profit', label: 'Profit', format: 'currency' },
+            { key: 'profit_margin', label: 'Profit Margin', format: 'percentage', suffix: ' pts' },
+            { key: 'efficiency', label: 'Labor Efficiency', format: 'percentage' },
+            { key: 'contracts', label: 'New Contracts', format: 'number' },
+            { key: 'revenue_per_hour', label: 'Revenue per Hour', format: 'currency' }
+        ];
+        
+        let html = '';
+        metrics.forEach(metric => {
+            const change = data.changes[metric.key];
+            const baseValue = data.base_period.metrics[metric.key];
+            const compValue = data.comparison_period.metrics[metric.key];
+            const isPositive = (metric.key === 'efficiency' || metric.key === 'payroll') ? change < 0 : change > 0;
+            
+            html += `
+                <div class="comparison-metric">
+                    <div>
+                        <strong>${metric.label}</strong>
+                        <div class="small text-muted">
+                            Current: ${formatValue(baseValue, metric.format)} | 
+                            Prior: ${formatValue(compValue, metric.format)}
+                        </div>
+                    </div>
+                    <div class="metric-change ${isPositive ? 'positive' : 'negative'}">
+                        <i class="fas fa-arrow-${change > 0 ? 'up' : change < 0 ? 'down' : 'minus'}"></i>
+                        <span>${Math.abs(change).toFixed(1)}%${metric.suffix || ''}</span>
+                    </div>
+                </div>
+            `;
+        });
+        
+        container.innerHTML = html;
+        
+        // Update metric cards with comparison data
+        updateMetricCard('revenue-change', data.changes.revenue);
+        updateMetricCard('efficiency-change', -data.changes.efficiency); // Negative is good for efficiency
+        updateMetricCard('margin-change', data.changes.profit_margin, ' pts');
+        updateMetricCard('rph-change', data.changes.revenue_per_hour);
+    }
+    
+    function updateMetricCard(elementId, change, suffix = '%') {
+        const element = document.getElementById(elementId);
+        if (!element) return;
+        
+        const isPositive = change > 0;
+        element.className = `metric-change ${isPositive ? 'positive' : 'negative'}`;
+        element.innerHTML = `
+            <i class="fas fa-arrow-${isPositive ? 'up' : change < 0 ? 'down' : 'minus'}"></i>
+            <span>${Math.abs(change).toFixed(1)}${suffix} vs prior</span>
+        `;
+    }
+    
+    function updateTrendingChart(data, metrics) {
+        const ctx = document.getElementById('trending-chart').getContext('2d');
+        
+        if (trendingChart) {
+            trendingChart.destroy();
+        }
+        
+        const datasets = [];
+        const colors = {
+            revenue: { border: '#10b981', background: 'rgba(16, 185, 129, 0.1)' },
+            payroll: { border: '#ef4444', background: 'rgba(239, 68, 68, 0.1)' },
+            profit: { border: '#3b82f6', background: 'rgba(59, 130, 246, 0.1)' },
+            profit_margin: { border: '#8b5cf6', background: 'rgba(139, 92, 246, 0.1)' },
+            efficiency: { border: '#f59e0b', background: 'rgba(245, 158, 11, 0.1)' },
+            revenue_per_hour: { border: '#06b6d4', background: 'rgba(6, 182, 212, 0.1)' }
+        };
+        
+        metrics.forEach(metric => {
+            const metricData = data.map(d => d[metric]);
+            datasets.push({
+                label: metric.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+                data: metricData,
+                borderColor: colors[metric]?.border || '#6b7280',
+                backgroundColor: colors[metric]?.background || 'rgba(107, 114, 128, 0.1)',
+                borderWidth: 2,
+                tension: 0.4,
+                yAxisID: metric.includes('margin') || metric.includes('efficiency') ? 'y-percentage' : 'y-value'
+            });
+        });
+        
+        trendingChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: data.map(d => new Date(d.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })),
+                datasets: datasets
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                interaction: {
+                    mode: 'index',
+                    intersect: false
+                },
+                plugins: {
+                    legend: {
+                        position: 'top',
+                        align: 'end'
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const metric = metrics[context.datasetIndex];
+                                const value = context.raw;
+                                if (metric.includes('margin') || metric.includes('efficiency')) {
+                                    return `${context.dataset.label}: ${value.toFixed(1)}%`;
+                                } else if (metric === 'revenue_per_hour') {
+                                    return `${context.dataset.label}: $${value.toFixed(2)}`;
+                                } else {
+                                    return `${context.dataset.label}: ${formatCurrency(value)}`;
+                                }
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: {
+                            display: false
+                        }
+                    },
+                    'y-value': {
+                        type: 'linear',
+                        position: 'left',
+                        beginAtZero: true,
+                        ticks: {
+                            callback: function(value) {
+                                return '$' + (value / 1000).toFixed(0) + 'K';
+                            }
+                        }
+                    },
+                    'y-percentage': {
+                        type: 'linear',
+                        position: 'right',
+                        beginAtZero: true,
+                        ticks: {
+                            callback: function(value) {
+                                return value.toFixed(0) + '%';
+                            }
+                        },
+                        grid: {
+                            drawOnChartArea: false
+                        }
+                    }
+                }
+            }
+        });
+    }
+    
+    function updateStoreComparison(stores) {
+        const tbody = document.getElementById('store-comparison-tbody');
+        
+        if (!stores || stores.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="8" class="text-center">No store data available</td></tr>';
+            return;
+        }
+        
+        tbody.innerHTML = stores.map(store => {
+            const marginClass = store.profit_margin > 70 ? 'text-success' : 
+                               store.profit_margin > 60 ? 'text-warning' : 'text-danger';
+            const statusClass = store.efficiency < 25 ? 'status-excellent' : 
+                               store.efficiency < 35 ? 'status-good' : 
+                               store.efficiency < 45 ? 'status-warning' : 'status-poor';
+            
+            return `
+                <tr>
+                    <td><strong>${store.store_name}</strong></td>
+                    <td>${formatCurrency(store.revenue)}</td>
+                    <td>${formatCurrency(store.payroll)}</td>
+                    <td class="text-success">${formatCurrency(store.profit)}</td>
+                    <td class="${marginClass}">${store.profit_margin.toFixed(1)}%</td>
+                    <td>${store.efficiency.toFixed(1)}%</td>
+                    <td>$${store.revenue_per_hour.toFixed(2)}</td>
+                    <td><span class="${statusClass}">
+                        ${store.efficiency < 25 ? 'Excellent' : store.efficiency < 35 ? 'Good' : store.efficiency < 45 ? 'Monitor' : 'Review'}
+                    </span></td>
+                </tr>
+            `;
+        }).join('');
+    }
+    
+    function formatCurrency(value) {
+        if (!value) return '$0';
+        return new Intl.NumberFormat('en-US', {
+            style: 'currency',
+            currency: 'USD',
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 0
+        }).format(value);
+    }
+    
+    function formatValue(value, format) {
+        switch(format) {
+            case 'currency':
+                return formatCurrency(value);
+            case 'percentage':
+                return value.toFixed(1) + '%';
+            case 'number':
+                return Math.round(value).toLocaleString();
+            default:
+                return value.toFixed(2);
+        }
+    }
+});
+</script>
+{% endblock %}

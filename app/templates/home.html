@@ -1,75 +1,214 @@
 {% extends "base.html" %}
 
 {% block title %}RFID Dashboard{% endblock %}
-{% block head %}
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}?v={{ '' | timestamp }}">
-{% endblock %}
 
 {% block content %}
     <h2>RFID Dashboard</h2>
 
-    <div class="row mb-3">
-        <div class="col-md-12">
-            <button class="btn btn-primary mr-2" onclick="triggerFullRefresh()">Full Refresh</button>
-            <button class="btn btn-danger" onclick="clearApiData()">Clear API Data and Refresh</button>
+    <!-- Action Buttons with Mobile-First Layout -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex flex-column flex-sm-row gap-2 justify-content-center">
+                <button class="btn btn-primary" onclick="triggerFullRefresh()">
+                    <i class="fas fa-sync-alt me-2"></i>Full Refresh
+                </button>
+                <button class="btn btn-danger" onclick="clearApiData()">
+                    <i class="fas fa-trash-alt me-2"></i>Clear API Data & Refresh
+                </button>
+            </div>
         </div>
     </div>
 
-    <div class="row">
-        <div class="col-md-4">
-            <div class="card">
-                <div class="card-header">Inventory Summary</div>
-                <div class="card-body">
-                    <p><strong>Total Items:</strong> {{ total_items or 0 }}</p>
-                    <p><strong>Items on Rent:</strong> {{ items_on_rent or 0 }}</p>
-                    <p><strong>Items in Service:</strong> {{ items_in_service or 0 }}</p>
-                    <p><strong>Items Available:</strong> {{ items_available or 0 }}</p>
-                    <p><strong>Status Counts:</strong></p>
-                    <ul>
-                        {% for status, count in status_counts %}
-                            <li>{{ status or 'Unknown' }}: {{ count or 0 }}</li>
-                        {% endfor %}
-                    </ul>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-8">
+    <!-- QR Code Scanner Section -->
+    <div class="row mb-4">
+        <div class="col-md-12">
             <div class="card">
                 <div class="card-header">
                     <div class="d-flex justify-content-between align-items-center">
-                        <span>Recent Scans (Last 50)</span>
+                        <span><i class="fas fa-qrcode"></i> QR Code Scanner</span>
                         <div>
-                            <span id="scan-status" class="badge bg-secondary">Connecting...</span>
-                            <button id="pause-btn" class="btn btn-sm btn-outline-primary ms-2">⏸️ Pause</button>
+                            <button id="toggle-scanner-btn" class="btn btn-sm btn-outline-primary">
+                                <i class="fas fa-camera"></i> Start Scanner
+                            </button>
+                            <button id="manual-entry-btn" class="btn btn-sm btn-outline-secondary">
+                                <i class="fas fa-keyboard"></i> Manual Entry
+                            </button>
                         </div>
                     </div>
                 </div>
+                <div class="card-body" id="scanner-container" style="display: none;">
+                    <!-- Camera Scanner Section -->
+                    <div id="camera-section">
+                        <div class="scanner-preview-container">
+                            <video id="scanner-video" autoplay playsinline muted></video>
+                            <canvas id="scanner-canvas" style="display: none;"></canvas>
+                            <div id="scanner-overlay">
+                                <div class="scanner-crosshair"></div>
+                                <div id="scanner-status" class="scanner-status">Initializing camera...</div>
+                            </div>
+                        </div>
+                        <div class="scanner-controls mt-3">
+                            <button id="switch-camera-btn" class="btn btn-sm btn-secondary" style="display: none;">
+                                <i class="fas fa-sync-alt"></i> Switch Camera
+                            </button>
+                            <div class="scanner-stats">
+                                <small class="text-muted">
+                                    <span id="fps-counter">FPS: --</span> | 
+                                    <span id="scan-attempts">Scans: 0</span>
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Manual Entry Section -->
+                    <div id="manual-section" style="display: none;">
+                        <div class="form-group">
+                            <label for="manual-qr-input">Enter QR Code or Item Number:</label>
+                            <div class="input-group">
+                                <input type="text" id="manual-qr-input" class="form-control" placeholder="Enter QR code, tag ID, or rental class number...">
+                                <div class="input-group-append">
+                                    <button id="manual-lookup-btn" class="btn btn-primary">
+                                        <i class="fas fa-search"></i> Lookup
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Results Section -->
+                    <div id="scan-results" style="display: none;">
+                        <hr>
+                        <h5>Scan Result:</h5>
+                        <div id="result-content">
+                            <!-- Dynamic content will be populated here -->
+                        </div>
+                        <div class="mt-3">
+                            <button id="clear-results-btn" class="btn btn-sm btn-secondary">Clear Results</button>
+                            <button id="scan-again-btn" class="btn btn-sm btn-primary">Scan Again</button>
+                        </div>
+                    </div>
+
+                    <!-- Error/Loading States -->
+                    <div id="scanner-error" class="alert alert-danger" style="display: none;">
+                        <strong>Scanner Error:</strong> <span id="error-message"></span>
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                    
+                    <div id="scanner-loading" class="text-center" style="display: none;">
+                        <div class="spinner-border" role="status">
+                            <span class="sr-only">Loading...</span>
+                        </div>
+                        <p class="mt-2">Processing scan...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dashboard Content with Mobile-First Responsive Layout -->
+    <div class="row">
+        <!-- Inventory Summary - Full width on mobile, sidebar on desktop -->
+        <div class="col-12 col-lg-4 mb-4">
+            <div class="card h-100">
+                <div class="card-header">
+                    <i class="fas fa-chart-pie me-2"></i>Inventory Summary
+                </div>
                 <div class="card-body">
-                    <div id="scan-table-container" style="max-height: 400px; overflow-y: auto;">
-                        <table class="table table-bordered table-striped" id="recent-scans-table">
-                            <thead class="table-dark sticky-top">
+                    <div class="row g-3">
+                        <div class="col-6 col-sm-3 col-lg-6">
+                            <div class="text-center p-2 bg-light rounded">
+                                <div class="h4 mb-0 text-primary">{{ total_items or 0 }}</div>
+                                <small class="text-muted">Total Items</small>
+                            </div>
+                        </div>
+                        <div class="col-6 col-sm-3 col-lg-6">
+                            <div class="text-center p-2 bg-light rounded">
+                                <div class="h4 mb-0 text-warning">{{ items_on_rent or 0 }}</div>
+                                <small class="text-muted">On Rent</small>
+                            </div>
+                        </div>
+                        <div class="col-6 col-sm-3 col-lg-6">
+                            <div class="text-center p-2 bg-light rounded">
+                                <div class="h4 mb-0 text-danger">{{ items_in_service or 0 }}</div>
+                                <small class="text-muted">In Service</small>
+                            </div>
+                        </div>
+                        <div class="col-6 col-sm-3 col-lg-6">
+                            <div class="text-center p-2 bg-light rounded">
+                                <div class="h4 mb-0 text-success">{{ items_available or 0 }}</div>
+                                <small class="text-muted">Available</small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Status Breakdown - Collapsed on mobile -->
+                    <div class="mt-3">
+                        <button class="btn btn-sm btn-outline-secondary d-lg-none w-100" type="button" 
+                                data-bs-toggle="collapse" data-bs-target="#statusBreakdown" aria-expanded="false">
+                            <i class="fas fa-list me-2"></i>View Status Breakdown
+                        </button>
+                        <div class="collapse d-lg-block" id="statusBreakdown">
+                            <h6 class="mt-3 mb-2">Status Breakdown:</h6>
+                            <div class="small">
+                                {% for status, count in status_counts %}
+                                    <div class="d-flex justify-content-between py-1">
+                                        <span>{{ status or 'Unknown' }}:</span>
+                                        <strong>{{ count or 0 }}</strong>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Recent Scans - Main content area -->
+        <div class="col-12 col-lg-8">
+            <div class="card">
+                <div class="card-header">
+                    <div class="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center gap-2">
+                        <div class="d-flex align-items-center">
+                            <i class="fas fa-history me-2"></i>Recent Scans (Last 50)
+                        </div>
+                        <div class="d-flex align-items-center gap-2">
+                            <span id="scan-status" class="badge bg-secondary">Connecting...</span>
+                            <button id="pause-btn" class="btn btn-sm btn-outline-primary">
+                                <i class="fas fa-pause me-1"></i><span class="d-none d-sm-inline">Pause</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <!-- Responsive table wrapper -->
+                    <div class="table-responsive" style="max-height: 400px;">
+                        <table class="table table-hover mb-0" id="recent-scans-table">
+                            <thead class="sticky-top">
                                 <tr>
-                                    <th width="20%">Tag ID</th>
-                                    <th width="25%">Common Name</th>
-                                    <th width="15%">Status</th>
-                                    <th width="15%">Contract</th>
-                                    <th width="25%">Scan Date</th>
+                                    <th class="mobile-hide">Tag ID</th>
+                                    <th>Item</th>
+                                    <th>Status</th>
+                                    <th class="desktop-only">Contract</th>
+                                    <th class="mobile-hide">Scan Date</th>
                                 </tr>
                             </thead>
                             <tbody id="recent-scans-tbody">
                                 {% if recent_scans %}
                                     {% for scan in recent_scans %}
                                         <tr data-timestamp="{{ scan.date_last_scanned | datetimeformat if scan.date_last_scanned else '' }}">
-                                            <td>{{ scan.tag_id or 'N/A' }}</td>
-                                            <td>{{ scan.common_name or 'N/A' }}</td>
+                                            <td class="mobile-hide">{{ scan.tag_id or 'N/A' }}</td>
+                                            <td>
+                                                <div class="fw-semibold">{{ scan.common_name or 'N/A' }}</div>
+                                                <small class="text-muted mobile-only">{{ scan.tag_id or 'N/A' }}</small>
+                                            </td>
                                             <td><span class="badge bg-info">{{ scan.status or 'N/A' }}</span></td>
-                                            <td>{{ scan.last_contract_num or 'N/A' }}</td>
-                                            <td>{{ scan.date_last_scanned | datetimeformat if scan.date_last_scanned else 'No Scan Date' }}</td>
+                                            <td class="desktop-only">{{ scan.last_contract_num or 'N/A' }}</td>
+                                            <td class="mobile-hide">{{ scan.date_last_scanned | datetimeformat if scan.date_last_scanned else 'No Scan Date' }}</td>
                                         </tr>
                                     {% endfor %}
                                 {% else %}
                                     <tr id="no-scans-row">
-                                        <td colspan="5" class="text-center text-muted">No recent scans available.</td>
+                                        <td colspan="5" class="text-center text-muted py-4">No recent scans available.</td>
                                     </tr>
                                 {% endif %}
                             </tbody>
@@ -258,11 +397,14 @@
         };
 
         row.innerHTML = `
-            <td>${scan.tag_id || 'N/A'}</td>
-            <td>${scan.common_name || 'N/A'}</td>
+            <td class="mobile-hide">${scan.tag_id || 'N/A'}</td>
+            <td>
+                <div class="fw-semibold">${scan.common_name || 'N/A'}</div>
+                <small class="text-muted mobile-only">${scan.tag_id || 'N/A'}</small>
+            </td>
             <td><span class="badge ${getStatusBadgeClass(scan.status)}">${scan.status || 'N/A'}</span></td>
-            <td>${scan.last_contract_num || 'N/A'}</td>
-            <td>${formatDate(scan.date_last_scanned)}</td>
+            <td class="desktop-only">${scan.last_contract_num || 'N/A'}</td>
+            <td class="mobile-hide">${formatDate(scan.date_last_scanned)}</td>
         `;
         
         return row;

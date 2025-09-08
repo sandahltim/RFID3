@@ -15,26 +15,26 @@ def _load_mappings(session):
     user_mappings = session.query(UserRentalClassMapping).all()
     mappings_dict = {
         str(m.rental_class_id).strip(): {
-            'category': m.category,
-            'subcategory': m.subcategory,
-            'short_common_name': getattr(m, 'short_common_name', None)
+            "category": m.category,
+            "subcategory": m.subcategory,
+            "short_common_name": getattr(m, "short_common_name", None),
         }
         for m in base_mappings
     }
     for um in user_mappings:
         mappings_dict[str(um.rental_class_id).strip()] = {
-            'category': um.category,
-            'subcategory': um.subcategory,
-            'short_common_name': getattr(um, 'short_common_name', None)
+            "category": um.category,
+            "subcategory": um.subcategory,
+            "short_common_name": getattr(um, "short_common_name", None),
         }
     return mappings_dict
 
 
 def get_cached_mappings(session):
     """Return rental class mappings using Redis or in-memory cache."""
-    cache_key = 'rental_class_mappings'
+    cache_key = "rental_class_mappings"
     mappings_dict = None
-    if getattr(cache, 'get', None):
+    if getattr(cache, "get", None):
         try:
             cached = cache.get(cache_key)
             if cached:
@@ -53,9 +53,11 @@ def get_cached_mappings(session):
             mappings_dict = _load_mappings(session)
             _mappings_cache = mappings_dict
             _mappings_cache_time = time()
-            if getattr(cache, 'set', None):
+            if getattr(cache, "set", None):
                 try:
-                    cache.set(cache_key, json.dumps(mappings_dict), ex=MAPPINGS_CACHE_TIMEOUT)
+                    cache.set(
+                        cache_key, json.dumps(mappings_dict), ex=MAPPINGS_CACHE_TIMEOUT
+                    )
                 except Exception:
                     pass
     return mappings_dict

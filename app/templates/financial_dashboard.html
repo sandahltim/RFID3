@@ -1,0 +1,818 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Financial Analytics Dashboard - Minnesota Equipment Rental</title>
+    
+    <!-- Bootstrap 5 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --secondary-color: #3498db;
+            --success-color: #27ae60;
+            --warning-color: #f39c12;
+            --danger-color: #e74c3c;
+            --light-bg: #f8f9fa;
+            --card-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+            --hover-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+        }
+        
+        .navbar-brand {
+            font-weight: 700;
+            color: var(--primary-color) !important;
+        }
+        
+        .dashboard-header {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            color: white;
+            padding: 2rem 0;
+        }
+        
+        .metric-card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: var(--card-shadow);
+            transition: all 0.3s ease;
+            border: 1px solid rgba(0,0,0,0.05);
+        }
+        
+        .metric-card:hover {
+            box-shadow: var(--hover-shadow);
+            transform: translateY(-2px);
+        }
+        
+        .metric-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 0;
+        }
+        
+        .metric-label {
+            color: #6c757d;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .trend-indicator {
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+        
+        .trend-up { color: var(--success-color); }
+        .trend-down { color: var(--danger-color); }
+        .trend-stable { color: var(--warning-color); }
+        
+        .chart-container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: var(--card-shadow);
+            padding: 1.5rem;
+            height: 400px;
+        }
+        
+        .store-ranking {
+            background: white;
+            border-radius: 12px;
+            box-shadow: var(--card-shadow);
+        }
+        
+        .store-rank-item {
+            padding: 1rem;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .store-rank-item:last-child {
+            border-bottom: none;
+        }
+        
+        .rank-badge {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            color: white;
+            font-size: 0.9rem;
+        }
+        
+        .rank-1 { background-color: #ffd700; color: #333 !important; }
+        .rank-2 { background-color: #c0c0c0; color: #333 !important; }
+        .rank-3 { background-color: #cd7f32; }
+        .rank-4, .rank-5 { background-color: #6c757d; }
+        
+        .forecast-chart {
+            height: 350px;
+        }
+        
+        .insight-card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: var(--card-shadow);
+            border-left: 4px solid var(--secondary-color);
+        }
+        
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid var(--secondary-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .health-score {
+            font-size: 3rem;
+            font-weight: 700;
+        }
+        
+        .health-excellent { color: var(--success-color); }
+        .health-good { color: #28a745; }
+        .health-fair { color: var(--warning-color); }
+        .health-poor { color: var(--danger-color); }
+        
+        .btn-refresh {
+            background: var(--secondary-color);
+            border: none;
+            color: white;
+            border-radius: 8px;
+            padding: 0.5rem 1rem;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-refresh:hover {
+            background: #2980b9;
+            transform: translateY(-1px);
+        }
+        
+        .tab-content {
+            padding-top: 2rem;
+        }
+        
+        .nav-tabs .nav-link {
+            border-radius: 8px 8px 0 0;
+            color: var(--primary-color);
+            font-weight: 600;
+        }
+        
+        .nav-tabs .nav-link.active {
+            background-color: var(--secondary-color);
+            color: white;
+            border-color: var(--secondary-color);
+        }
+    </style>
+</head>
+<body class="bg-light">
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm">
+        <div class="container">
+            <a class="navbar-brand" href="#">
+                <i class="fas fa-chart-line me-2"></i>
+                Financial Analytics
+            </a>
+            <div class="navbar-nav ms-auto">
+                <button class="btn btn-refresh" onclick="refreshDashboard()">
+                    <i class="fas fa-sync-alt me-1"></i>
+                    Refresh Data
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Dashboard Header -->
+    <div class="dashboard-header">
+        <div class="container">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <h1 class="display-4 fw-bold mb-0">Financial Performance Dashboard</h1>
+                    <p class="lead mb-0">Advanced Analytics for Minnesota Equipment Rental Network</p>
+                </div>
+                <div class="col-md-4 text-end">
+                    <div class="health-score-container">
+                        <div class="health-score" id="healthScore">--</div>
+                        <div class="text-muted">Health Score</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="container my-5">
+        <!-- Executive Summary Cards -->
+        <div class="row g-4 mb-5">
+            <div class="col-md-3">
+                <div class="metric-card p-4">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <div>
+                            <div class="metric-value" id="totalRevenue">$0</div>
+                            <div class="metric-label">Total Revenue (3wk avg)</div>
+                            <div class="trend-indicator" id="revenueTrend">
+                                <i class="fas fa-minus"></i> 0%
+                            </div>
+                        </div>
+                        <div class="text-primary">
+                            <i class="fas fa-dollar-sign fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-3">
+                <div class="metric-card p-4">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <div>
+                            <div class="metric-value" id="yoyGrowth">0%</div>
+                            <div class="metric-label">Year-over-Year Growth</div>
+                            <div class="trend-indicator" id="yoyTrend">
+                                <i class="fas fa-minus"></i> vs Last Year
+                            </div>
+                        </div>
+                        <div class="text-success">
+                            <i class="fas fa-chart-line fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-3">
+                <div class="metric-card p-4">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <div>
+                            <div class="metric-value" id="profitMargin">0%</div>
+                            <div class="metric-label">Profit Margin</div>
+                            <div class="trend-indicator" id="marginTrend">
+                                <i class="fas fa-minus"></i> Rolling Avg
+                            </div>
+                        </div>
+                        <div class="text-warning">
+                            <i class="fas fa-percentage fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-3">
+                <div class="metric-card p-4">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <div>
+                            <div class="metric-value" id="forecastAccuracy">--</div>
+                            <div class="metric-label">Forecast Confidence</div>
+                            <div class="trend-indicator" id="confidenceTrend">
+                                <i class="fas fa-chart-area"></i> 12-week outlook
+                            </div>
+                        </div>
+                        <div class="text-info">
+                            <i class="fas fa-crystal-ball fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Analytics Tabs -->
+        <ul class="nav nav-tabs" id="analyticsTab" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="rolling-tab" data-bs-toggle="tab" data-bs-target="#rolling" type="button" role="tab">
+                    <i class="fas fa-wave-square me-1"></i>
+                    Rolling Averages
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="yoy-tab" data-bs-toggle="tab" data-bs-target="#yoy" type="button" role="tab">
+                    <i class="fas fa-calendar-alt me-1"></i>
+                    Year-over-Year
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="forecast-tab" data-bs-toggle="tab" data-bs-target="#forecast" type="button" role="tab">
+                    <i class="fas fa-chart-line me-1"></i>
+                    Forecasts
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="stores-tab" data-bs-toggle="tab" data-bs-target="#stores" type="button" role="tab">
+                    <i class="fas fa-store me-1"></i>
+                    Store Performance
+                </button>
+            </li>
+        </ul>
+
+        <div class="tab-content" id="analyticsTabContent">
+            <!-- Rolling Averages Tab -->
+            <div class="tab-pane fade show active" id="rolling" role="tabpanel">
+                <div class="row g-4">
+                    <div class="col-lg-8">
+                        <div class="chart-container">
+                            <h5 class="mb-3">3-Week Rolling Revenue Averages</h5>
+                            <canvas id="rollingRevenueChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="col-lg-4">
+                        <div class="insight-card p-4 h-100">
+                            <h5 class="mb-3">
+                                <i class="fas fa-lightbulb me-2 text-warning"></i>
+                                Key Insights
+                            </h5>
+                            <div id="rollingInsights">
+                                <div class="loading-spinner"></div>
+                                <span class="ms-2">Loading insights...</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row g-4 mt-3">
+                    <div class="col-md-6">
+                        <div class="chart-container">
+                            <h5 class="mb-3">Contract Volume Trends</h5>
+                            <canvas id="contractsChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="chart-container">
+                            <h5 class="mb-3">Profitability Trends</h5>
+                            <canvas id="profitabilityChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Year-over-Year Tab -->
+            <div class="tab-pane fade" id="yoy" role="tabpanel">
+                <div class="row g-4">
+                    <div class="col-lg-8">
+                        <div class="chart-container">
+                            <h5 class="mb-3">Year-over-Year Revenue Comparison</h5>
+                            <canvas id="yoyRevenueChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="col-lg-4">
+                        <div class="insight-card p-4 h-100">
+                            <h5 class="mb-3">
+                                <i class="fas fa-calendar-check me-2 text-info"></i>
+                                Seasonal Analysis
+                            </h5>
+                            <div id="seasonalInsights">
+                                <div class="loading-spinner"></div>
+                                <span class="ms-2">Loading seasonal data...</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row g-4 mt-3">
+                    <div class="col-md-12">
+                        <div class="chart-container">
+                            <h5 class="mb-3">Monthly Growth Rate Analysis</h5>
+                            <canvas id="monthlyGrowthChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Forecasts Tab -->
+            <div class="tab-pane fade" id="forecast" role="tabpanel">
+                <div class="row g-4">
+                    <div class="col-lg-12">
+                        <div class="chart-container forecast-chart">
+                            <h5 class="mb-3">12-Week Revenue Forecast with Confidence Intervals</h5>
+                            <canvas id="forecastChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row g-4 mt-3">
+                    <div class="col-md-6">
+                        <div class="chart-container">
+                            <h5 class="mb-3">Cash Flow Projections</h5>
+                            <canvas id="cashFlowChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="insight-card p-4 h-100">
+                            <h5 class="mb-3">
+                                <i class="fas fa-magic me-2 text-success"></i>
+                                Forecast Insights
+                            </h5>
+                            <div id="forecastInsights">
+                                <div class="loading-spinner"></div>
+                                <span class="ms-2">Generating forecasts...</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Store Performance Tab -->
+            <div class="tab-pane fade" id="stores" role="tabpanel">
+                <div class="row g-4">
+                    <div class="col-lg-8">
+                        <div class="chart-container">
+                            <h5 class="mb-3">Store Revenue Comparison</h5>
+                            <canvas id="storeRevenueChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="col-lg-4">
+                        <div class="store-ranking">
+                            <div class="p-3 border-bottom">
+                                <h5 class="mb-0">
+                                    <i class="fas fa-trophy me-2 text-warning"></i>
+                                    Store Rankings
+                                </h5>
+                            </div>
+                            <div id="storeRankings">
+                                <div class="p-3">
+                                    <div class="loading-spinner"></div>
+                                    <span class="ms-2">Loading rankings...</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row g-4 mt-3">
+                    <div class="col-md-6">
+                        <div class="chart-container">
+                            <h5 class="mb-3">Efficiency Metrics</h5>
+                            <canvas id="efficiencyChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="chart-container">
+                            <h5 class="mb-3">Profit Margin by Store</h5>
+                            <canvas id="storeProfitChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Dashboard JavaScript -->
+    <script>
+        // Global chart instances
+        let charts = {};
+        
+        // Initialize dashboard
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeDashboard();
+        });
+        
+        async function initializeDashboard() {
+            try {
+                showLoading();
+                await Promise.all([
+                    loadExecutiveSummary(),
+                    loadRollingAverages(),
+                    loadYearOverYear(),
+                    loadForecasts(),
+                    loadStorePerformance()
+                ]);
+                hideLoading();
+            } catch (error) {
+                console.error('Error initializing dashboard:', error);
+                showError('Failed to load dashboard data');
+            }
+        }
+        
+        async function loadExecutiveSummary() {
+            try {
+                const response = await fetch('/api/financial/executive/summary');
+                const data = await response.json();
+                
+                if (data.success) {
+                    updateExecutiveMetrics(data.data);
+                }
+            } catch (error) {
+                console.error('Error loading executive summary:', error);
+            }
+        }
+        
+        function updateExecutiveMetrics(summaryData) {
+            // Update health score
+            const healthScore = 85; // Mock score
+            document.getElementById('healthScore').textContent = healthScore;
+            document.getElementById('healthScore').className = `health-score health-${getHealthLevel(healthScore)}`;
+            
+            // Update metric cards with mock data
+            document.getElementById('totalRevenue').textContent = '$125,430';
+            document.getElementById('yoyGrowth').textContent = '+12.5%';
+            document.getElementById('profitMargin').textContent = '24.8%';
+            document.getElementById('forecastAccuracy').textContent = 'High';
+            
+            // Update trend indicators
+            updateTrendIndicator('revenueTrend', 8.2, true);
+            updateTrendIndicator('yoyTrend', 12.5, false);
+            updateTrendIndicator('marginTrend', 2.1, true);
+        }
+        
+        function updateTrendIndicator(elementId, value, isPercent) {
+            const element = document.getElementById(elementId);
+            const isPositive = value > 0;
+            const icon = isPositive ? 'fa-arrow-up' : value < 0 ? 'fa-arrow-down' : 'fa-minus';
+            const colorClass = isPositive ? 'trend-up' : value < 0 ? 'trend-down' : 'trend-stable';
+            
+            element.className = `trend-indicator ${colorClass}`;
+            element.innerHTML = `<i class="fas ${icon}"></i> ${isPercent ? '+' : ''}${value.toFixed(1)}${isPercent ? '%' : ''}`;
+        }
+        
+        async function loadRollingAverages() {
+            try {
+                const response = await fetch('/api/financial/rolling-averages?metric_type=comprehensive');
+                const data = await response.json();
+                
+                if (data.success) {
+                    createRollingAverageCharts(data.data);
+                    updateRollingInsights(data.data);
+                }
+            } catch (error) {
+                console.error('Error loading rolling averages:', error);
+            }
+        }
+        
+        function createRollingAverageCharts(data) {
+            // Revenue rolling average chart
+            const ctx = document.getElementById('rollingRevenueChart').getContext('2d');
+            
+            // Mock data for demonstration
+            const mockData = {
+                labels: ['Week 1', 'Week 2', 'Week 3', 'Week 4', 'Week 5', 'Week 6', 'Week 7', 'Week 8'],
+                datasets: [
+                    {
+                        label: 'Total Revenue',
+                        data: [120000, 125000, 118000, 132000, 128000, 135000, 130000, 140000],
+                        borderColor: '#3498db',
+                        backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                        fill: true
+                    },
+                    {
+                        label: '3-Week Rolling Average',
+                        data: [null, null, 121000, 125000, 126000, 131000, 131000, 135000],
+                        borderColor: '#e74c3c',
+                        backgroundColor: 'transparent',
+                        borderWidth: 3,
+                        pointRadius: 5
+                    }
+                ]
+            };
+            
+            charts.rollingRevenue = new Chart(ctx, {
+                type: 'line',
+                data: mockData,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top'
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            ticks: {
+                                callback: function(value) {
+                                    return '$' + (value / 1000) + 'k';
+                                }
+                            }
+                        }
+                    },
+                    interaction: {
+                        intersect: false,
+                        mode: 'index'
+                    }
+                }
+            });
+        }
+        
+        function updateRollingInsights(data) {
+            const insights = [
+                "Revenue shows 8.2% upward trend over last 3 weeks",
+                "Wayzata leads growth with 15% increase",
+                "Brooklyn Park showing consistent performance",
+                "Contract volume up 12% from rolling average"
+            ];
+            
+            const insightsHtml = insights.map(insight => 
+                `<div class="mb-2"><i class="fas fa-check-circle text-success me-2"></i>${insight}</div>`
+            ).join('');
+            
+            document.getElementById('rollingInsights').innerHTML = insightsHtml;
+        }
+        
+        async function loadYearOverYear() {
+            // Mock year-over-year chart
+            const ctx = document.getElementById('yoyRevenueChart');
+            if (!ctx) return;
+            
+            const mockData = {
+                labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+                datasets: [
+                    {
+                        label: 'Current Year',
+                        data: [450000, 480000, 520000, 490000, 530000, 580000, 620000, 590000, 550000, 570000, 540000, 590000],
+                        borderColor: '#3498db',
+                        backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                        fill: true
+                    },
+                    {
+                        label: 'Previous Year',
+                        data: [420000, 440000, 460000, 450000, 480000, 510000, 540000, 520000, 500000, 520000, 490000, 530000],
+                        borderColor: '#95a5a6',
+                        backgroundColor: 'rgba(149, 165, 166, 0.1)',
+                        fill: true
+                    }
+                ]
+            };
+            
+            charts.yoyRevenue = new Chart(ctx, {
+                type: 'line',
+                data: mockData,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top'
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            ticks: {
+                                callback: function(value) {
+                                    return '$' + (value / 1000) + 'k';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        async function loadForecasts() {
+            // Mock forecast chart
+            const ctx = document.getElementById('forecastChart');
+            if (!ctx) return;
+            
+            const historicalData = [580000, 590000, 570000, 590000];
+            const forecastData = [null, null, null, 590000, 600000, 610000, 595000, 615000, 625000, 605000, 620000, 635000];
+            const confidenceLow = [null, null, null, 570000, 575000, 580000, 565000, 585000, 590000, 570000, 585000, 595000];
+            const confidenceHigh = [null, null, null, 610000, 625000, 640000, 625000, 645000, 660000, 640000, 655000, 675000];
+            
+            const mockData = {
+                labels: ['Week -3', 'Week -2', 'Week -1', 'Now', 'Week +1', 'Week +2', 'Week +3', 'Week +4', 
+                        'Week +5', 'Week +6', 'Week +7', 'Week +8'],
+                datasets: [
+                    {
+                        label: 'Historical',
+                        data: [...historicalData, ...Array(8).fill(null)],
+                        borderColor: '#2c3e50',
+                        backgroundColor: '#2c3e50',
+                        pointRadius: 4
+                    },
+                    {
+                        label: 'Forecast',
+                        data: forecastData,
+                        borderColor: '#3498db',
+                        backgroundColor: '#3498db',
+                        borderDash: [5, 5],
+                        pointRadius: 4
+                    },
+                    {
+                        label: 'Confidence Range',
+                        data: confidenceHigh,
+                        borderColor: 'rgba(52, 152, 219, 0.3)',
+                        backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                        fill: '+1'
+                    },
+                    {
+                        label: '',
+                        data: confidenceLow,
+                        borderColor: 'rgba(52, 152, 219, 0.3)',
+                        backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                        fill: false
+                    }
+                ]
+            };
+            
+            charts.forecast = new Chart(ctx, {
+                type: 'line',
+                data: mockData,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            labels: {
+                                filter: function(item) {
+                                    return item.text !== '';
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            ticks: {
+                                callback: function(value) {
+                                    return '$' + (value / 1000) + 'k';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        async function loadStorePerformance() {
+            // Mock store rankings
+            const mockRankings = [
+                { name: 'Wayzata', rank: 1, revenue: '$145,200', efficiency: 92 },
+                { name: 'Brooklyn Park', rank: 2, revenue: '$132,800', efficiency: 87 },
+                { name: 'Elk River', rank: 3, revenue: '$118,400', efficiency: 83 },
+                { name: 'Fridley', rank: 4, revenue: '$108,600', efficiency: 78 }
+            ];
+            
+            const rankingsHtml = mockRankings.map(store => `
+                <div class="store-rank-item">
+                    <div class="d-flex align-items-center">
+                        <div class="rank-badge rank-${store.rank}">${store.rank}</div>
+                        <div class="ms-3">
+                            <div class="fw-bold">${store.name}</div>
+                            <div class="text-muted small">${store.revenue} revenue</div>
+                        </div>
+                    </div>
+                    <div class="text-end">
+                        <div class="fw-bold">${store.efficiency}%</div>
+                        <div class="text-muted small">Efficiency</div>
+                    </div>
+                </div>
+            `).join('');
+            
+            document.getElementById('storeRankings').innerHTML = rankingsHtml;
+        }
+        
+        function getHealthLevel(score) {
+            if (score >= 85) return 'excellent';
+            if (score >= 70) return 'good';
+            if (score >= 50) return 'fair';
+            return 'poor';
+        }
+        
+        function showLoading() {
+            // Show loading indicators
+        }
+        
+        function hideLoading() {
+            // Hide loading indicators
+        }
+        
+        function showError(message) {
+            console.error(message);
+            // Show error notification
+        }
+        
+        async function refreshDashboard() {
+            const btn = document.querySelector('.btn-refresh');
+            const originalContent = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Refreshing...';
+            btn.disabled = true;
+            
+            try {
+                await initializeDashboard();
+            } catch (error) {
+                showError('Failed to refresh dashboard');
+            } finally {
+                btn.innerHTML = originalContent;
+                btn.disabled = false;
+            }
+        }
+    </script>
+</body>
+</html>

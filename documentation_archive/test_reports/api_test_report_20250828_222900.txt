@@ -1,0 +1,134 @@
+================================================================================
+RFID3 API ENDPOINTS COMPREHENSIVE TEST REPORT
+================================================================================
+Test Duration: 2025-08-28T22:28:59.847077 to 2025-08-28T22:29:00.281966
+Base URL: http://localhost:6801
+
+SUMMARY
+--------------------
+Total Tests: 21
+Passed Tests: 7
+Failed Tests: 14
+Success Rate: 33.3%
+Endpoints Tested: 12
+
+ENDPOINTS TESTED
+--------------------
+  • /api/enhanced/business-analytics/utilization
+  • /api/enhanced/dashboard/kpis
+  • /api/enhanced/dashboard/store-performance
+  • /api/nonexistent-endpoint
+  • /api/predictive/correlations/analyze
+  • /api/predictive/demand/forecast
+  • /api/predictive/external-data/fetch
+  • /api/predictive/external-data/summary
+  • /api/predictive/insights/leading-indicators
+  • /api/predictive/optimization/inventory
+  • /bi/api/inventory-kpis
+  • /bi/api/store-performance
+
+PASSED TESTS
+--------------------
+  ✅ /api/enhanced/dashboard/kpis - Enhanced KPIs - Default (200) - 64.19ms
+  ✅ /api/enhanced/dashboard/kpis - Enhanced KPIs - 8 weeks, Store 6800 (200) - 140.76ms
+  ✅ /api/enhanced/dashboard/store-performance - Store Performance - Default (200) - 8.28ms
+  ✅ /api/enhanced/dashboard/store-performance - Store Performance - 6 weeks (200) - 14.23ms
+  ✅ /bi/api/inventory-kpis - BI Inventory KPIs (200) - 76.93ms
+  ✅ /api/enhanced/dashboard/kpis - Performance Test - /api/enhanced/dashboard/kpis (200) - 58.21ms
+  ✅ /api/enhanced/dashboard/store-performance - Performance Test - /api/enhanced/dashboard/store-performance (200) - 6.58ms
+
+FAILED TESTS
+--------------------
+  ❌ /api/predictive/external-data/fetch - External Data Fetch - Basic (404)
+     Error: HTTP 404: <!doctype html>
+<html lang=en>
+<title>404 Not Found</title>
+<h1>Not Found</h1>
+<p>The requested URL was not found on the server. If you entered the URL manually please check your spelling and try agai
+  ❌ /api/predictive/external-data/summary - External Data Summary (404)
+     Error: HTTP 404: <!doctype html>
+<html lang=en>
+<title>404 Not Found</title>
+<h1>Not Found</h1>
+<p>The requested URL was not found on the server. If you entered the URL manually please check your spelling and try agai
+  ❌ /api/predictive/correlations/analyze - Correlation Analysis - Basic (404)
+     Error: HTTP 404: <!doctype html>
+<html lang=en>
+<title>404 Not Found</title>
+<h1>Not Found</h1>
+<p>The requested URL was not found on the server. If you entered the URL manually please check your spelling and try agai
+  ❌ /api/predictive/demand/forecast - Demand Forecast - Default Parameters (404)
+     Error: HTTP 404: <!doctype html>
+<html lang=en>
+<title>404 Not Found</title>
+<h1>Not Found</h1>
+<p>The requested URL was not found on the server. If you entered the URL manually please check your spelling and try agai
+  ❌ /api/predictive/demand/forecast - Demand Forecast - Custom Parameters (6 weeks, store 6800) (404)
+     Error: HTTP 404: <!doctype html>
+<html lang=en>
+<title>404 Not Found</title>
+<h1>Not Found</h1>
+<p>The requested URL was not found on the server. If you entered the URL manually please check your spelling and try agai
+  ❌ /api/predictive/demand/forecast - Demand Forecast - Edge Case (1 week) (404)
+     Error: HTTP 404: <!doctype html>
+<html lang=en>
+<title>404 Not Found</title>
+<h1>Not Found</h1>
+<p>The requested URL was not found on the server. If you entered the URL manually please check your spelling and try agai
+  ❌ /api/predictive/insights/leading-indicators - Leading Indicators Analysis (404)
+     Error: HTTP 404: <!doctype html>
+<html lang=en>
+<title>404 Not Found</title>
+<h1>Not Found</h1>
+<p>The requested URL was not found on the server. If you entered the URL manually please check your spelling and try agai
+  ❌ /api/predictive/optimization/inventory - Inventory Optimization - Default (404)
+     Error: HTTP 404: <!doctype html>
+<html lang=en>
+<title>404 Not Found</title>
+<h1>Not Found</h1>
+<p>The requested URL was not found on the server. If you entered the URL manually please check your spelling and try agai
+  ❌ /api/predictive/optimization/inventory - Inventory Optimization - Store 6800 (404)
+     Error: HTTP 404: <!doctype html>
+<html lang=en>
+<title>404 Not Found</title>
+<h1>Not Found</h1>
+<p>The requested URL was not found on the server. If you entered the URL manually please check your spelling and try agai
+  ❌ /api/enhanced/business-analytics/utilization - Equipment Utilization Analytics (404)
+     Error: HTTP 404: <!doctype html>
+<html lang=en>
+<title>404 Not Found</title>
+<h1>Not Found</h1>
+<p>The requested URL was not found on the server. If you entered the URL manually please check your spelling and try agai
+  ❌ /bi/api/store-performance - BI Store Performance (500)
+     Error: HTTP 500: {"error":"(mysql.connector.errors.ProgrammingError) 1054 (42S22): Unknown column 'sp.revenue_growth_pct' in 'SELECT'\n[SQL: \n            SELECT \n                sp.period_ending,\n                sp
+  ❌ /api/nonexistent-endpoint - Non-existent Endpoint (Expected 404) (404)
+     Error: HTTP 404: <!doctype html>
+<html lang=en>
+<title>404 Not Found</title>
+<h1>Not Found</h1>
+<p>The requested URL was not found on the server. If you entered the URL manually please check your spelling and try agai
+  ❌ /api/predictive/demand/forecast - Invalid Parameters (Expected Error) (404)
+     Error: HTTP 404: <!doctype html>
+<html lang=en>
+<title>404 Not Found</title>
+<h1>Not Found</h1>
+<p>The requested URL was not found on the server. If you entered the URL manually please check your spelling and try agai
+  ❌ /api/predictive/external-data/summary - Performance Test - /api/predictive/external-data/summary (404)
+     Error: HTTP 404: <!doctype html>
+<html lang=en>
+<title>404 Not Found</title>
+<h1>Not Found</h1>
+<p>The requested URL was not found on the server. If you entered the URL manually please check your spelling and try agai
+
+PERFORMANCE SUMMARY
+--------------------
+Average Response Time: 20.10ms
+Fast Responses (<1s): 21
+Slow Responses (>5s): 0
+
+RECOMMENDATIONS
+--------------------
+• Address failed endpoint tests to ensure system reliability
+• Critical: Low success rate indicates system issues need immediate attention
+
+================================================================================

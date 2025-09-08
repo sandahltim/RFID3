@@ -1,0 +1,551 @@
+{% extends "base.html" %}
+
+{% block title %}Predictive Analytics - RFID DASHBOARD{% endblock %}
+
+{% block extra_head %}
+<!-- Chart.js for advanced visualizations - UMD version to avoid module conflicts -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/date-fns@2.30.0/index.min.js"></script>
+<!-- Font Awesome for icons -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<style>
+/* Predictive Analytics Specific Styles */
+.predictive-analytics {
+    background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+    min-height: 100vh;
+}
+
+.analytics-header {
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+    color: white;
+    padding: 2rem 0;
+    margin-bottom: 2rem;
+    position: relative;
+    overflow: hidden;
+}
+
+.analytics-header::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    right: -20%;
+    width: 100px;
+    height: 200%;
+    background: rgba(255, 255, 255, 0.1);
+    transform: rotate(15deg);
+}
+
+.section-card {
+    background: white;
+    border-radius: 16px;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+    border: 1px solid rgba(0, 0, 0, 0.05);
+    margin-bottom: 2rem;
+    transition: all 0.3s ease;
+}
+
+.section-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 15px 45px rgba(0, 0, 0, 0.2);
+}
+
+.section-header {
+    background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+    border-radius: 16px 16px 0 0;
+    padding: 1.5rem;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.section-body {
+    padding: 1.5rem;
+}
+
+.config-panel {
+    background: rgba(99, 102, 241, 0.05);
+    border: 1px solid rgba(99, 102, 241, 0.2);
+    border-radius: 12px;
+    padding: 1.25rem;
+    margin-bottom: 1.5rem;
+}
+
+.insight-card {
+    background: linear-gradient(135deg, #fef7ff 0%, #f3e8ff 100%);
+    border: 1px solid rgba(139, 92, 246, 0.2);
+    border-radius: 12px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.correlation-strength {
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.correlation-strong { background: rgba(16, 185, 129, 0.2); color: #059669; }
+.correlation-moderate { background: rgba(251, 191, 36, 0.2); color: #d97706; }
+.correlation-weak { background: rgba(239, 68, 68, 0.2); color: #dc2626; }
+
+.indicator-card {
+    background: white;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    border-radius: 12px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    transition: all 0.3s ease;
+}
+
+.indicator-card:hover {
+    border-color: rgba(99, 102, 241, 0.3);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+.forecast-confidence {
+    background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+    border: 1px solid rgba(16, 185, 129, 0.2);
+    border-radius: 8px;
+    padding: 0.75rem;
+    margin-top: 1rem;
+}
+
+.optimization-recommendation {
+    background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+    border-left: 4px solid #f59e0b;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    border-radius: 0 8px 8px 0;
+}
+
+.feedback-form {
+    background: rgba(16, 185, 129, 0.05);
+    border: 1px solid rgba(16, 185, 129, 0.2);
+    border-radius: 12px;
+    padding: 1.25rem;
+}
+
+.btn-predictive {
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 0.75rem 1.5rem;
+    font-weight: 600;
+    transition: all 0.3s ease;
+}
+
+.btn-predictive:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3);
+    color: white;
+}
+
+.status-indicator {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.375rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.status-live { background: rgba(16, 185, 129, 0.2); color: #059669; }
+.status-processing { background: rgba(251, 191, 36, 0.2); color: #d97706; }
+.status-error { background: rgba(239, 68, 68, 0.2); color: #dc2626; }
+
+@media (max-width: 768px) {
+    .analytics-header {
+        padding: 1.5rem 0;
+        margin-bottom: 1.5rem;
+    }
+    
+    .section-card {
+        border-radius: 12px;
+        margin-bottom: 1.5rem;
+    }
+    
+    .section-header,
+    .section-body {
+        padding: 1rem;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="predictive-analytics">
+    <!-- Analytics Header -->
+    <div class="analytics-header">
+        <div class="container">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <h1 class="mb-2"><i class="fas fa-chart-line me-3"></i>Predictive Analytics</h1>
+                    <p class="mb-0 opacity-90">ML-powered insights and demand forecasting for data-driven decisions</p>
+                </div>
+                <div class="col-md-4 text-md-end">
+                    <div class="status-indicator status-live">
+                        <i class="fas fa-circle me-2" style="font-size: 0.6rem;"></i>
+                        Real-time Data
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- Configuration Panel -->
+        <div class="section-card">
+            <div class="section-header">
+                <h4 class="mb-0"><i class="fas fa-cog me-2 text-primary"></i>Analytics Configuration</h4>
+            </div>
+            <div class="section-body">
+                <div class="config-panel">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <label for="store-filter" class="form-label fw-semibold">Store Filter</label>
+                            <select id="store-filter" class="form-select">
+                                <option value="all">All Stores</option>
+                                <option value="6800">Brooklyn Park</option>
+                                <option value="3607">Wayzata</option>
+                                <option value="8101">Fridley</option>
+                                <option value="728">Elk River</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="forecast-weeks" class="form-label fw-semibold">Forecast Period</label>
+                            <select id="forecast-weeks" class="form-select">
+                                <option value="2">2 Weeks</option>
+                                <option value="4" selected>4 Weeks</option>
+                                <option value="8">8 Weeks</option>
+                                <option value="12">12 Weeks</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="confidence-level" class="form-label fw-semibold">Confidence Level</label>
+                            <select id="confidence-level" class="form-select">
+                                <option value="80">80%</option>
+                                <option value="90" selected>90%</option>
+                                <option value="95">95%</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3 d-flex align-items-end">
+                            <button id="update-analytics" class="btn btn-predictive w-100">
+                                <i class="fas fa-refresh me-2"></i>Update Analysis
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- External Data Status -->
+                <div class="row mt-3">
+                    <div class="col-md-6">
+                        <div class="d-flex align-items-center">
+                            <strong class="me-3">External Data Sources:</strong>
+                            <span id="external-data-status" class="status-indicator status-processing">
+                                <i class="fas fa-spinner fa-spin me-2"></i>Loading...
+                            </span>
+                        </div>
+                    </div>
+                    <div class="col-md-6 text-md-end">
+                        <button id="fetch-external-data" class="btn btn-outline-primary btn-sm">
+                            <i class="fas fa-download me-2"></i>Refresh External Data
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Leading Indicators Section -->
+        <div class="section-card">
+            <div class="section-header">
+                <h4 class="mb-0"><i class="fas fa-tachometer-alt me-2 text-info"></i>Leading Indicators</h4>
+                <small class="text-muted">Factors that predict business changes 2-4 weeks ahead</small>
+            </div>
+            <div class="section-body">
+                <div id="leading-indicators-container">
+                    <div class="text-center py-4">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading leading indicators...</span>
+                        </div>
+                        <p class="text-muted mt-2">Analyzing leading indicators...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Correlation Analysis Section -->
+        <div class="section-card" data-correlation-id="external-factors-analysis">
+            <div class="section-header">
+                <h4 class="mb-0"><i class="fas fa-project-diagram me-2 text-success"></i>External Factor Correlations</h4>
+                <small class="text-muted">Relationships between business metrics and external factors</small>
+            </div>
+            <div class="section-body">
+                <div class="row">
+                    <div class="col-lg-8">
+                        <div style="position: relative; height: 400px;">
+                            <canvas id="correlation-chart"></canvas>
+                        </div>
+                    </div>
+                    <div class="col-lg-4">
+                        <div id="correlation-insights">
+                            <div class="text-center py-4">
+                                <div class="spinner-border text-success" role="status">
+                                    <span class="visually-hidden">Loading correlations...</span>
+                                </div>
+                                <p class="text-muted mt-2">Running correlation analysis...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Correlation Feedback Widget will be automatically inserted here -->
+            </div>
+        </div>
+
+        <!-- Demand Forecasting Section -->
+        <div class="section-card" data-prediction-id="demand-forecast-4weeks">
+            <div class="section-header">
+                <h4 class="mb-0"><i class="fas fa-crystal-ball me-2 text-warning"></i>Demand Forecasting</h4>
+                <small class="text-muted">Revenue predictions with confidence intervals</small>
+            </div>
+            <div class="section-body">
+                <div class="row">
+                    <div class="col-lg-9">
+                        <div style="position: relative; height: 450px;">
+                            <canvas id="forecast-chart"></canvas>
+                        </div>
+                    </div>
+                    <div class="col-lg-3">
+                        <div id="forecast-summary">
+                            <div class="text-center py-4">
+                                <div class="spinner-border text-warning" role="status">
+                                    <span class="visually-hidden">Generating forecast...</span>
+                                </div>
+                                <p class="text-muted mt-2">Computing predictions...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Enhanced Prediction Validation Widget -->
+                <div class="mt-4">
+                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-outline-success btn-sm" onclick="validatePrediction('demand-forecast-4weeks', 'accurate')">
+                                <i class="fas fa-check-circle me-1"></i>Accurate Prediction
+                            </button>
+                            <button class="btn btn-outline-warning btn-sm" onclick="validatePrediction('demand-forecast-4weeks', 'close')">
+                                <i class="fas fa-exclamation-circle me-1"></i>Close but Off
+                            </button>
+                            <button class="btn btn-outline-danger btn-sm" onclick="validatePrediction('demand-forecast-4weeks', 'inaccurate')">
+                                <i class="fas fa-times-circle me-1"></i>Inaccurate
+                            </button>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-primary btn-sm" onclick="showConfidenceFeedback()">
+                                <i class="fas fa-chart-bar me-1"></i>Rate Confidence
+                            </button>
+                            <button class="btn btn-info btn-sm" onclick="suggestImprovement()">
+                                <i class="fas fa-lightbulb me-1"></i>Suggest Improvement
+                            </button>
+                        </div>
+                    </div>
+                    <div class="mt-2">
+                        <small class="text-muted">
+                            <i class="fas fa-users me-1"></i>
+                            Community feedback helps improve accuracy: 
+                            <span class="text-success">87% find predictions helpful</span>
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Inventory Optimization Section -->
+        <div class="section-card">
+            <div class="section-header">
+                <h4 class="mb-0"><i class="fas fa-chart-bar me-2 text-danger"></i>Inventory Optimization</h4>
+                <small class="text-muted">AI-powered recommendations for inventory management</small>
+            </div>
+            <div class="section-body">
+                <div id="optimization-recommendations">
+                    <div class="text-center py-4">
+                        <div class="spinner-border text-danger" role="status">
+                            <span class="visually-hidden">Calculating optimizations...</span>
+                        </div>
+                        <p class="text-muted mt-2">Analyzing inventory optimization opportunities...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- User Feedback Section -->
+        <div class="section-card">
+            <div class="section-header">
+                <h4 class="mb-0"><i class="fas fa-comments me-2 text-secondary"></i>Insights Feedback</h4>
+                <small class="text-muted">Help improve our predictive models with your feedback</small>
+            </div>
+            <div class="section-body">
+                <div class="feedback-form">
+                    <form id="feedback-form">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <label for="feedback-type" class="form-label fw-semibold">Feedback Type</label>
+                                <select id="feedback-type" class="form-select" required>
+                                    <option value="">Select feedback type...</option>
+                                    <option value="correlation_suggestion">New Correlation Suggestion</option>
+                                    <option value="accuracy_feedback">Prediction Accuracy Feedback</option>
+                                    <option value="factor_importance">Factor Importance Rating</option>
+                                    <option value="general_improvement">General Improvement Idea</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="feedback-factor" class="form-label fw-semibold">Related Factor (Optional)</label>
+                                <select id="feedback-factor" class="form-select">
+                                    <option value="">Select factor...</option>
+                                    <option value="weather_temperature">Weather - Temperature</option>
+                                    <option value="economic_confidence">Economic - Consumer Confidence</option>
+                                    <option value="seasonal_events">Seasonal Events</option>
+                                    <option value="local_market">Local Market Conditions</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="mt-3">
+                            <label for="feedback-comment" class="form-label fw-semibold">Your Feedback</label>
+                            <textarea id="feedback-comment" class="form-control" rows="3" 
+                                placeholder="Share your insights on correlations, prediction accuracy, or suggestions for improvement..." required></textarea>
+                        </div>
+                        <div class="text-end mt-3">
+                            <button type="submit" class="btn btn-predictive">
+                                <i class="fas fa-paper-plane me-2"></i>Submit Feedback
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Toast Container for Notifications -->
+<div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1050;">
+    <div id="success-toast" class="toast align-items-center text-white bg-success border-0" role="alert">
+        <div class="d-flex">
+            <div class="toast-body">
+                <i class="fas fa-check-circle me-2"></i><span></span>
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+        </div>
+    </div>
+    <div id="error-toast" class="toast align-items-center text-white bg-danger border-0" role="alert">
+        <div class="d-flex">
+            <div class="toast-body">
+                <i class="fas fa-exclamation-circle me-2"></i><span></span>
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script src="/static/js/chart-utilities.js?cb={{ cache_bust }}"></script>
+<script src="/static/js/predictive-analytics.js?cb={{ cache_bust }}"></script>
+<script src="/static/js/feedback-system.js?cb={{ cache_bust }}"></script>
+<link rel="stylesheet" href="/static/css/feedback-system.css?cb={{ cache_bust }}">
+<script>
+// Integration code to connect predictive analytics with feedback system
+document.addEventListener('DOMContentLoaded', function() {
+    // Add suggestions panel after predictive analytics loads
+    setTimeout(() => {
+        const feedbackSection = document.querySelector('.section-card:last-child');
+        if (feedbackSection && !document.getElementById('suggestions-panel')) {
+            const suggestionsHtml = `
+                <div class="section-card mt-4">
+                    <div class="section-header">
+                        <h4 class="mb-0"><i class="fas fa-lightbulb me-2 text-info"></i>Community Suggestions</h4>
+                        <small class="text-muted">User suggestions for improving correlations and predictions</small>
+                    </div>
+                    <div class="section-body">
+                        <div id="suggestions-panel"></div>
+                    </div>
+                </div>
+            `;
+            feedbackSection.insertAdjacentHTML('afterend', suggestionsHtml);
+        }
+        
+        // Add feedback summary widget
+        const analyticsHeader = document.querySelector('.analytics-header');
+        if (analyticsHeader && !document.getElementById('feedback-summary')) {
+            const summaryHtml = `
+                <div class="container mt-3">
+                    <div class="row">
+                        <div class="col-12">
+                            <div id="feedback-summary"></div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            analyticsHeader.insertAdjacentHTML('afterend', summaryHtml);
+        }
+    }, 1000);
+});
+
+// Enhanced feedback submission for predictive analytics
+document.getElementById('feedback-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(e.target);
+    const feedbackData = {
+        feedback_type: 'CORRELATION_SUGGESTION',
+        title: formData.get('feedback-type').replace('_', ' ').toUpperCase(),
+        description: formData.get('feedback-comment'),
+        business_context: `Related to ${formData.get('feedback-factor') || 'general analytics'}`,
+        context_data: {
+            page: 'predictive_analytics',
+            factor: formData.get('feedback-factor'),
+            store_filter: document.getElementById('store-filter').value,
+            timestamp: new Date().toISOString()
+        }
+    };
+    
+    try {
+        const response = await fetch('/api/feedback/correlation', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-User-ID': 'analytics_user',
+                'X-User-Name': 'Analytics User',
+                'X-User-Role': 'Business User'
+            },
+            body: JSON.stringify(feedbackData)
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            // Show success toast
+            const successToast = document.getElementById('success-toast');
+            successToast.querySelector('.toast-body span').textContent = 'Feedback submitted successfully!';
+            const toast = new bootstrap.Toast(successToast);
+            toast.show();
+            
+            // Reset form
+            e.target.reset();
+        } else {
+            throw new Error(result.error);
+        }
+        
+    } catch (error) {
+        console.error('Feedback submission error:', error);
+        const errorToast = document.getElementById('error-toast');
+        errorToast.querySelector('.toast-body span').textContent = 'Failed to submit feedback. Please try again.';
+        const toast = new bootstrap.Toast(errorToast);
+        toast.show();
+    }
+});
+</script>
+{% endblock %}

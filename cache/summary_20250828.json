@@ -1,0 +1,25 @@
+{
+  "inventory_overview": {
+    "total_items": 65800,
+    "items_on_rent": 400,
+    "items_available": 11200,
+    "items_in_service": 95,
+    "utilization_rate": 0.61
+  },
+  "health_metrics": {
+    "health_score": 85.0,
+    "active_alerts": 25,
+    "critical_alerts": 2,
+    "high_alerts": 8,
+    "medium_alerts": 12,
+    "low_alerts": 3
+  },
+  "activity_metrics": {
+    "recent_scans": 750,
+    "scan_rate_per_day": 107.1
+  },
+  "data_source": "backup_fallback",
+  "backup_date": "2025-08-28",
+  "timestamp": "2025-08-28T18:43:31.485933",
+  "notice": "Using backup data from 2025-08-28 while API refresh is in progress"
+}

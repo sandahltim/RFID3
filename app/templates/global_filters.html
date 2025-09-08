@@ -1,0 +1,219 @@
+<!-- Global Store & Inventory Type Filters Component -->
+<div class="global-filters-container mb-3" style="background: #f8f9fa; padding: 15px; border-radius: 8px; border-left: 4px solid #007bff;">
+    <div class="row align-items-center">
+        <div class="col-md-3">
+            <label for="global-store-filter" class="form-label fw-bold text-primary">
+                <i class="fas fa-store me-1"></i>Store Location
+            </label>
+            <select id="global-store-filter" class="form-select form-select-sm" onchange="GlobalFilters.update('store', this.value)">
+                <option value="all">🏢 All Stores</option>
+                <option value="6800">🏪 Brooklyn Park (22K+ items)</option>
+                <option value="3607">🏬 Wayzata (5K+ items)</option>
+                <option value="8101">🏢 Fridley (3K+ items)</option>
+                <option value="728">🏭 Elk River (3K+ items)</option>
+                <option value="000">❓ Legacy/Unassigned (20K+ items)</option>
+            </select>
+        </div>
+        
+        <div class="col-md-3">
+            <label for="global-type-filter" class="form-label fw-bold text-success">
+                <i class="fas fa-tags me-1"></i>Inventory Type
+            </label>
+            <select id="global-type-filter" class="form-select form-select-sm" onchange="GlobalFilters.update('type', this.value)">
+                <option value="all">📦 All Types</option>
+                <option value="RFID">📡 RFID Tagged (12.5K)</option>
+                <option value="QR">📱 QR Codes (42.2K)</option>
+                <option value="Sticker">🏷️ Stickers (1.5K)</option>
+                <option value="Serialized">🔢 Serialized Items (43.7K)</option>
+                <option value="Bulk">📚 Bulk Items (9.7K)</option>
+            </select>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="d-flex align-items-end h-100">
+                <button id="clear-filters-btn" class="btn btn-outline-secondary btn-sm" onclick="GlobalFilters.clearAll()" title="Reset all filters">
+                    <i class="fas fa-undo me-1"></i>Reset Filters
+                </button>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="text-end">
+                <small id="filter-status" class="text-muted fw-bold">
+                    <i class="fas fa-filter me-1"></i>
+                    <span id="filter-count">All items visible</span>
+                </small>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Filter Summary Badge -->
+    <div id="active-filters" class="mt-2" style="display: none;">
+        <small class="text-info">
+            <i class="fas fa-info-circle me-1"></i>
+            <strong>Active Filters:</strong> 
+            <span id="active-filters-text"></span>
+        </small>
+    </div>
+</div>
+
+<script>
+// Global Filter State Management
+const GlobalFilters = {
+    store: localStorage.getItem('selected_store') || 'all',
+    type: localStorage.getItem('selected_type') || 'all',
+    
+    init: function() {
+        // Restore saved filters on page load
+        document.getElementById('global-store-filter').value = this.store;
+        document.getElementById('global-type-filter').value = this.type;
+        this.updateDisplay();
+    },
+    
+    update: function(filterType, value) {
+        console.log(`Updating ${filterType} filter to: ${value}`);
+        this[filterType] = value;
+        localStorage.setItem(`selected_${filterType}`, value);
+        this.updateDisplay();
+        this.refreshCurrentData();
+    },
+    
+    clearAll: function() {
+        console.log('Clearing all filters');
+        this.store = 'all';
+        this.type = 'all';
+        localStorage.removeItem('selected_store');
+        localStorage.removeItem('selected_type');
+        document.getElementById('global-store-filter').value = 'all';
+        document.getElementById('global-type-filter').value = 'all';
+        this.updateDisplay();
+        this.refreshCurrentData();
+    },
+    
+    updateDisplay: function() {
+        const activeFilters = [];
+        const storeSelect = document.getElementById('global-store-filter');
+        const typeSelect = document.getElementById('global-type-filter');
+        
+        if (this.store !== 'all') {
+            const storeText = storeSelect.options[storeSelect.selectedIndex].text;
+            activeFilters.push(`Store: ${storeText}`);
+        }
+        
+        if (this.type !== 'all') {
+            const typeText = typeSelect.options[typeSelect.selectedIndex].text;
+            activeFilters.push(`Type: ${typeText}`);
+        }
+        
+        const activeFiltersDiv = document.getElementById('active-filters');
+        const activeFiltersText = document.getElementById('active-filters-text');
+        
+        if (activeFilters.length > 0) {
+            activeFiltersDiv.style.display = 'block';
+            activeFiltersText.textContent = activeFilters.join(' • ');
+            document.getElementById('filter-count').textContent = 'Filtered view active';
+        } else {
+            activeFiltersDiv.style.display = 'none';
+            document.getElementById('filter-count').textContent = 'All items visible';
+        }
+    },
+    
+    refreshCurrentData: function() {
+        // Trigger refresh of current tab data with new filters
+        const currentPath = window.location.pathname;
+        console.log('Current path for filter refresh:', currentPath);
+        
+        // Call tab-specific refresh functions based on current page
+        if (currentPath.includes('/tab/6') && typeof refreshAnalyticsData === 'function') {
+            console.log('Refreshing Tab 6 Analytics data with filters:', this.getApiParams());
+            refreshAnalyticsData();
+        } else if (currentPath.includes('/tab/1') && typeof refreshDashboardData === 'function') {
+            console.log('Refreshing Tab 1 Dashboard data...');
+            refreshDashboardData();
+        } else if (currentPath.includes('/tab/2') && typeof refreshSearchData === 'function') {
+            console.log('Refreshing Tab 2 Search data...');
+            refreshSearchData();
+        } else if (currentPath.includes('/tab/3') && typeof refreshInventoryData === 'function') {
+            console.log('Refreshing Tab 3 Inventory data...');
+            refreshInventoryData();
+        } else if (currentPath.includes('/database/viewer') && typeof refreshDatabaseData === 'function') {
+            console.log('Refreshing Database Viewer data with filters:', this.getApiParams());
+            refreshDatabaseData();
+        }
+        
+        // Show loading indicator
+        this.showLoadingIndicator();
+    },
+    
+    showLoadingIndicator: function() {
+        // Add subtle loading indicator to filter status
+        const filterStatus = document.getElementById('filter-count');
+        const originalText = filterStatus.textContent;
+        filterStatus.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Updating...';
+        
+        // Reset after 2 seconds
+        setTimeout(() => {
+            filterStatus.textContent = originalText;
+        }, 2000);
+    },
+    
+    // Helper function to get current filter parameters for API calls
+    getApiParams: function() {
+        return {
+            store: this.store,
+            type: this.type
+        };
+    },
+    
+    // Helper function to build URL parameters for API calls
+    getUrlParams: function() {
+        const params = new URLSearchParams();
+        if (this.store !== 'all') params.append('store', this.store);
+        if (this.type !== 'all') params.append('type', this.type);
+        return params.toString();
+    }
+};
+
+// Initialize filters when DOM is loaded
+document.addEventListener('DOMContentLoaded', function() {
+    GlobalFilters.init();
+});
+
+// Export for use in other scripts
+window.GlobalFilters = GlobalFilters;
+</script>
+
+<style>
+.global-filters-container {
+    position: sticky;
+    top: 0;
+    z-index: 1020;
+    border: 1px solid #dee2e6;
+}
+
+.global-filters-container select {
+    transition: all 0.3s ease;
+}
+
+.global-filters-container select:focus {
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+#clear-filters-btn {
+    transition: all 0.3s ease;
+}
+
+#clear-filters-btn:hover {
+    background-color: #6c757d;
+    color: white;
+    transform: translateY(-1px);
+}
+
+#filter-status {
+    font-size: 0.85rem;
+}
+
+.fa-spinner {
+    color: #007bff;
+}
+</style>

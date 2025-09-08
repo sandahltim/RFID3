@@ -6,7 +6,15 @@ from logging.handlers import RotatingFileHandler
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_redis import FlaskRedis
-from config import DB_CONFIG, REDIS_URL, LOG_FILE, APP_IP, BASE_DIR, STATIC_DIR, validate_config
+from config import (
+    DB_CONFIG,
+    REDIS_URL,
+    LOG_FILE,
+    APP_IP,
+    BASE_DIR,
+    STATIC_DIR,
+    validate_config,
+)
 from datetime import datetime
 import re
 
@@ -14,12 +22,14 @@ import re
 db = SQLAlchemy()
 cache = FlaskRedis()
 
+
 def create_app():
     """Create and configure the Flask application."""
     app = Flask(__name__, static_folder=str(STATIC_DIR))
 
     # Configure logging using centralized system
     from app.services.logger import setup_app_logging
+
     setup_app_logging(app)
     app.logger.info("Application starting up - logging initialized")
     app.logger.debug(f"Static folder path: {app.static_folder}")
@@ -34,28 +44,34 @@ def create_app():
 
     # Database configuration
     try:
-        app.config['SQLALCHEMY_DATABASE_URI'] = (
+        app.config["SQLALCHEMY_DATABASE_URI"] = (
             f"mysql+mysqlconnector://{DB_CONFIG['user']}:{DB_CONFIG['password']}@"
             f"{DB_CONFIG['host']}/{DB_CONFIG['database']}?charset={DB_CONFIG['charset']}&collation={DB_CONFIG['collation']}"
         )
-        app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-        app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-            'pool_size': 10,
-            'max_overflow': 20,
-            'pool_timeout': 30,
-            'pool_recycle': 1800,
+        app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+        app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+            "pool_size": 10,
+            "max_overflow": 20,
+            "pool_timeout": 30,
+            "pool_recycle": 1800,
         }
-        app.config['REDIS_URL'] = REDIS_URL
-        app.config['APP_IP'] = APP_IP
+        app.config["REDIS_URL"] = REDIS_URL
+        app.config["APP_IP"] = APP_IP
         app.logger.info("Database and Redis configuration set successfully")
     except (KeyError, TypeError) as e:
-        app.logger.error(f"Failed to set database/Redis configuration: {str(e)}", exc_info=True)
+        app.logger.error(
+            f"Failed to set database/Redis configuration: {str(e)}", exc_info=True
+        )
         raise
 
     # Initialize extensions
     try:
         db.init_app(app)
         cache.init_app(app)
+        
+        # Import models to register tables
+        from app.models import db_models, pos_models, financial_models, feedback_models, correlation_models, config_models, suggestion_models
+        
         app.logger.info("Extensions initialized successfully")
     except (ImportError, AttributeError, RuntimeError) as e:
         app.logger.error(f"Failed to initialize extensions: {str(e)}", exc_info=True)
@@ -64,25 +80,28 @@ def create_app():
     # Add custom Jinja2 filters
     def timestamp_filter(value):
         return int(datetime.now().timestamp())
-    app.jinja_env.filters['timestamp'] = timestamp_filter
+
+    app.jinja_env.filters["timestamp"] = timestamp_filter
 
     def datetimeformat(value):
         if value is None:
-            return 'N/A'
+            return "N/A"
         if isinstance(value, str):
             try:
-                value = datetime.fromisoformat(value.replace('Z', '+00:00'))
+                value = datetime.fromisoformat(value.replace("Z", "+00:00"))
             except ValueError:
                 return value
-        return value.strftime('%Y-%m-%d %H:%M:%S')
-    app.jinja_env.filters['datetimeformat'] = datetimeformat
+        return value.strftime("%Y-%m-%d %H:%M:%S")
+
+    app.jinja_env.filters["datetimeformat"] = datetimeformat
 
     def regex_replace(value, pattern, replace):
         """Replace characters matching pattern with replace string."""
         if not value:
             return value
         return re.sub(pattern, replace, str(value))
-    app.jinja_env.filters['regex_replace'] = regex_replace
+
+    app.jinja_env.filters["regex_replace"] = regex_replace
 
     # Note: Database table creation should be handled explicitly via migration scripts
     # or administrative commands, not automatically on every application startup
@@ -95,12 +114,35 @@ def create_app():
         from app.routes.tab3 import tab3_bp
         from app.routes.tab4 import tab4_bp
         from app.routes.tab5 import tab5_bp
+        from app.routes.tab7 import tab7_bp, executive_api_bp
         from app.routes.categories import categories_bp
         from app.routes.health import health_bp
         from app.routes.tabs import tabs_bp
         from app.routes.inventory_analytics import inventory_analytics_bp
+        from app.routes.enhanced_analytics_api import enhanced_analytics_bp
+        from app.routes.bi_dashboard import bi_bp
         from app.routes.performance import performance_bp
         from app.services.refresh import refresh_bp
+        from app.routes.correlation_routes import correlation_bp
+        from app.routes.pos_routes import pos_bp
+        from app.routes.predictive_analytics_api import predictive_bp
+        from app.routes.predictive_analytics_routes import predictive_routes_bp
+        from app.routes.configuration_routes import config_bp, config_redirect_bp
+        from app.routes.feedback_api import feedback_bp
+        from app.routes.feedback_dashboard_route import feedback_dashboard_bp
+        from app.routes.manual_import_routes import manual_import_bp
+        from app.routes.database_viewer import database_viewer_bp
+        from app.routes.store_correlation_api import store_correlation_bp
+        from app.routes.unified_store_api import unified_store_bp
+        from app.routes.financial_analytics_routes import financial_bp
+        from app.routes.user_suggestions_api import suggestions_api_bp
+        from app.routes.user_suggestions_routes import suggestions_routes_bp
+        from app.routes.system_health import system_health_bp
+        from app.routes.executive_dashboard import executive_bp
+        from app.routes.scorecard_correlation_api import scorecard_correlation_bp
+        from app.routes.scorecard_analytics_api import scorecard_analytics_bp
+        from app.routes.manager_dashboards import manager_bp
+        from app.routes.config_management import config_bp as config_mgmt_bp
 
         app.register_blueprint(home_bp)
         app.register_blueprint(tab1_bp)
@@ -108,16 +150,42 @@ def create_app():
         app.register_blueprint(tab3_bp)
         app.register_blueprint(tab4_bp)
         app.register_blueprint(tab5_bp)
+        app.register_blueprint(tab7_bp)
+        app.register_blueprint(executive_api_bp)
         app.register_blueprint(categories_bp)
         app.register_blueprint(inventory_analytics_bp)
+        app.register_blueprint(enhanced_analytics_bp)
+        app.register_blueprint(bi_bp)
         app.register_blueprint(health_bp)
         app.register_blueprint(tabs_bp)
         app.register_blueprint(performance_bp)
         app.register_blueprint(refresh_bp)
+        app.register_blueprint(correlation_bp)
+        app.register_blueprint(pos_bp)
+        app.register_blueprint(predictive_bp)
+        app.register_blueprint(predictive_routes_bp)
+        app.register_blueprint(config_bp)
+        app.register_blueprint(config_redirect_bp)
+        app.register_blueprint(feedback_bp)
+        app.register_blueprint(feedback_dashboard_bp)
+        app.register_blueprint(manual_import_bp)
+        app.register_blueprint(database_viewer_bp)
+        app.register_blueprint(store_correlation_bp)
+        app.register_blueprint(unified_store_bp)
+        app.register_blueprint(financial_bp)
+        app.register_blueprint(suggestions_api_bp)
+        app.register_blueprint(suggestions_routes_bp)
+        app.register_blueprint(system_health_bp)
+        app.register_blueprint(executive_bp)
+        app.register_blueprint(scorecard_correlation_bp)
+        app.register_blueprint(scorecard_analytics_bp)
+        app.register_blueprint(manager_bp)
+        app.register_blueprint(config_mgmt_bp)
         app.logger.info("Blueprints registered successfully")
-        
+
         # Set up performance monitoring middleware
         from app.routes.performance import track_request_performance
+
         before_request, after_request = track_request_performance()
         app.before_request(before_request)
         app.after_request(after_request)
@@ -125,14 +193,18 @@ def create_app():
         app.logger.error(f"Failed to register blueprints: {str(e)}", exc_info=True)
         raise
 
-    # Initialize scheduler
-    try:
-        from app.services.scheduler import init_scheduler
-        init_scheduler(app)
-        app.logger.info("Scheduler initialized successfully")
-    except (ImportError, RuntimeError) as e:
-        app.logger.error(f"Failed to initialize scheduler: {str(e)}", exc_info=True)
-        raise
+    # Initialize scheduler (skip if environment variable is set)
+    if not os.getenv('FLASK_SKIP_SCHEDULER'):
+        try:
+            from app.services.scheduler import init_scheduler
+
+            init_scheduler(app)
+            app.logger.info("Scheduler initialized successfully")
+        except (ImportError, RuntimeError) as e:
+            app.logger.error(f"Failed to initialize scheduler: {str(e)}", exc_info=True)
+            raise
+    else:
+        app.logger.info("Scheduler initialization skipped per environment variable")
 
     app.logger.info("Application startup completed successfully")
     return app

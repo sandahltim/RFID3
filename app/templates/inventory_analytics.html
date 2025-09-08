@@ -1,46 +1,137 @@
 {% extends "base.html" %}
+
 {% block title %}Inventory & Analytics{% endblock %}
+
 {% block extra_head %}
-<style>
+  <!-- Include Chart.js for enhanced analytics -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- Load Executive Dashboard CSS for Fortune 500 styling -->
+  <link rel="stylesheet" href="/static/css/executive-dashboard.css">
+
+  <style>
+    /* Fortune 500 Analytics Dashboard Styles */
+    :root {
+      --primary-gradient: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+      --analytics-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      --success-gradient: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+      --warning-gradient: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+      --info-gradient: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+      --executive-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+      --card-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+      --hover-shadow: 0 15px 45px rgba(0, 0, 0, 0.2);
+    }
+    
+    body {
+      background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+      min-height: 100vh;
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    }
+    
     .dashboard-card {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        border-radius: 10px;
-        color: white;
-        padding: 20px;
-        margin-bottom: 20px;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+      background: var(--primary-gradient);
+      border-radius: 20px;
+      color: white;
+      padding: 40px;
+      margin-bottom: 30px;
+      box-shadow: var(--executive-shadow);
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .dashboard-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+      background: linear-gradient(90deg, #00d4aa, #00a8ff, #8c7ae6, #ff9ff3);
+    }
+    
+    .dashboard-card::after {
+      content: '';
+      position: absolute;
+      top: -50%;
+      right: -20%;
+      width: 300px;
+      height: 300px;
+      background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+      border-radius: 50%;
+    }
+    
+    .dashboard-card h1 {
+      font-size: 2.6em;
+      font-weight: 700;
+      margin-bottom: 16px;
+      position: relative;
+      z-index: 2;
     }
     
     .metric-card {
-        background: white;
-        border-radius: 8px;
-        padding: 15px;
-        margin-bottom: 15px;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        transition: transform 0.2s;
+      background: white;
+      border-radius: 16px;
+      padding: 28px;
+      margin-bottom: 20px;
+      box-shadow: var(--card-shadow);
+      transition: all 0.4s cubic-bezier(0.23, 1, 0.320, 1);
+      border: 1px solid rgba(255, 255, 255, 0.8);
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .metric-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: var(--analytics-gradient);
+      transform: scaleX(0);
+      transition: transform 0.3s ease;
     }
     
     .metric-card:hover {
-        transform: translateY(-2px);
+        transform: translateY(-8px) scale(1.02);
+        box-shadow: var(--hover-shadow);
+    }
+    
+    .metric-card:hover::before {
+        transform: scaleX(1);
     }
     
     .metric-value {
-        font-size: 2.5rem;
-        font-weight: bold;
-        color: #2c3e50;
+        font-size: 3.2em;
+        font-weight: 700;
+        color: #1a202c;
+        margin: 8px 0 12px 0;
+        line-height: 1;
+        background: var(--analytics-gradient);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
     }
     
     .metric-label {
-        font-size: 0.9rem;
-        color: #7f8c8d;
+        font-size: 0.95em;
+        color: #718096;
+        font-weight: 600;
         text-transform: uppercase;
-        letter-spacing: 1px;
+        letter-spacing: 1.5px;
+        margin-bottom: 8px;
     }
     
     .health-score {
-        font-size: 3rem;
-        font-weight: bold;
-        text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        font-size: 4rem;
+        font-weight: 700;
+        text-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        position: relative;
+        z-index: 2;
+        background: linear-gradient(45deg, #ffffff, rgba(255,255,255,0.8));
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
     }
     
     .alert-badge {
@@ -55,7 +146,25 @@
     .alert-critical { background-color: #dc3545; color: white; }
     .alert-high { background-color: #fd7e14; color: white; }
     .alert-medium { background-color: #ffc107; color: black; }
+    
+    /* Accessibility: Icons for color-independent status identification */
+    .status-icon {
+        margin-right: 0.25rem;
+        font-size: 0.875em;
+    }
     .alert-low { background-color: #28a745; color: white; }
+    
+    /* Accessibility: Enhanced focus indicators for keyboard navigation */
+    .nav-link:focus {
+        box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.5) !important;
+        outline: 2px solid transparent;
+        outline-offset: 2px;
+    }
+    
+    button:focus, .btn:focus {
+        box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.5) !important;
+        outline: 2px solid transparent;
+    }
     
     .stale-item {
         padding: 10px;
@@ -75,6 +184,34 @@
         animation: spin 1s linear infinite;
     }
     
+    /* Phase 1B: Standardized Progress Loading */
+    .progress-loader {
+        text-align: center;
+        padding: 20px;
+        background: #f8f9fa;
+        border-radius: 8px;
+        border-left: 4px solid #007bff;
+        margin: 15px 0;
+    }
+    
+    .progress-loader .spinner-border {
+        width: 1.5rem;
+        height: 1.5rem;
+        margin-right: 0.5rem;
+    }
+    
+    .progress-step {
+        font-weight: 500;
+        color: #495057;
+        margin-bottom: 0.25rem;
+    }
+    
+    .progress-time {
+        font-size: 0.875rem;
+        color: #6c757d;
+        font-style: italic;
+    }
+    
     @keyframes spin {
         0% { transform: rotate(0deg); }
         100% { transform: rotate(360deg); }
@@ -84,102 +221,341 @@
         margin-top: 20px;
     }
     
-    .nav-tabs .nav-link.active {
-        background-color: #667eea;
-        color: white;
-        border-color: #667eea;
+    .card {
+        border-radius: 16px;
+        box-shadow: var(--card-shadow);
+        border: 1px solid rgba(255, 255, 255, 0.8);
+        transition: all 0.3s ease;
     }
-</style>
+    
+    .card:hover {
+        transform: translateY(-4px);
+        box-shadow: var(--hover-shadow);
+    }
+    
+    .card-header {
+        background: var(--analytics-gradient);
+        color: white;
+        border-radius: 16px 16px 0 0 !important;
+        padding: 20px 25px;
+        border: none;
+    }
+    
+    .card-header h5 {
+        font-weight: 700;
+        font-size: 1.3em;
+        margin: 0;
+        display: flex;
+        align-items: center;
+    }
+    
+    .card-header h5 i {
+        margin-right: 12px;
+        font-size: 1.2em;
+    }
+    
+    .card-body {
+        padding: 25px;
+    }
+    
+    .nav-tabs {
+        border-bottom: 3px solid #e2e8f0;
+        margin-bottom: 30px;
+    }
+    
+    .nav-tabs .nav-link {
+        border: none;
+        color: #718096;
+        font-weight: 600;
+        padding: 15px 25px;
+        margin-right: 8px;
+        border-radius: 12px 12px 0 0;
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .nav-tabs .nav-link:hover {
+        color: #4a5568;
+        background: rgba(102, 126, 234, 0.1);
+    }
+    
+    .nav-tabs .nav-link.active {
+        background: var(--analytics-gradient);
+        color: white;
+        border-color: transparent;
+        box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
+    }
+    
+    .nav-tabs .nav-link.active::before {
+        content: '';
+        position: absolute;
+        bottom: -3px;
+        left: 0;
+        right: 0;
+        height: 3px;
+        background: var(--analytics-gradient);
+    }
+    
+    .btn {
+        border-radius: 12px;
+        padding: 12px 24px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        transition: all 0.3s ease;
+    }
+    
+    .btn-primary {
+        background: var(--analytics-gradient);
+        border: none;
+        box-shadow: 0 6px 20px rgba(102, 126, 234, 0.3);
+    }
+    
+    .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+    }
+    
+    .form-select {
+        border-radius: 10px;
+        border: 2px solid rgba(0,0,0,0.1);
+        padding: 10px 14px;
+        font-weight: 500;
+        transition: all 0.3s ease;
+    }
+    
+    .form-select:focus {
+        border-color: #667eea;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+    
+    .alert-info {
+        background: linear-gradient(135deg, rgba(66, 153, 225, 0.1) 0%, rgba(66, 153, 225, 0.05) 100%);
+        border-left: 4px solid #4299e1;
+        border-radius: 12px;
+        padding: 20px;
+    }
+    
+    .text-success { color: #38a169 !important; font-weight: 600; }
+    .text-primary { color: #4299e1 !important; font-weight: 600; }
+    .text-warning { color: #ed8936 !important; font-weight: 600; }
+    .text-info { color: #4fd1c7 !important; font-weight: 600; }
+    .text-muted { color: #718096 !important; font-weight: 500; }
+  </style>
 {% endblock %}
 
 {% block content %}
-<div class="container-fluid mt-3">
+  <div class="container-fluid mt-3">
     <!-- Dashboard Header -->
     <div class="row mb-4">
-        <div class="col-12">
-            <div class="dashboard-card text-center">
-                <h1><i class="fas fa-chart-line"></i> Inventory & Analytics Dashboard</h1>
-                <p class="mb-0">Real-time inventory health monitoring and usage analysis</p>
-                <div class="row mt-3">
-                    <div class="col-md-4">
-                        <div class="health-score" id="health-score">--</div>
-                        <div>Overall Health Score</div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="health-score" id="total-items">--</div>
-                        <div>Total Items</div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="health-score" id="active-alerts">--</div>
-                        <div>Active Alerts</div>
-                    </div>
-                </div>
+      <div class="col-12">
+        <div class="dashboard-card text-center">
+          <h1><i class="fas fa-chart-line" aria-hidden="true"></i> Inventory & Analytics Dashboard</h1>
+          <p class="mb-0">Real-time inventory health monitoring and usage analysis</p>
+          <div class="row mt-3">
+            <div class="col-md-4">
+              <div class="health-score" id="health-score">--</div>
+              <div>Overall Health Score</div>
             </div>
+            <div class="col-md-4">
+              <div class="health-score" id="total-items">--</div>
+              <div>Total Items</div>
+            </div>
+            <div class="col-md-4">
+              <div class="health-score" id="active-alerts">--</div>
+              <div>Active Alerts</div>
+            </div>
+          </div>
         </div>
+      </div>
     </div>
     
     <!-- Key Metrics Row -->
     <div class="row mb-4">
-        <div class="col-md-3">
-            <div class="metric-card text-center">
-                <div class="metric-value text-success" id="items-on-rent">--</div>
-                <div class="metric-label">On Rent</div>
-            </div>
+      <div class="col-md-3">
+        <div class="metric-card text-center">
+          <div class="metric-value text-success" id="items-on-rent">--</div>
+          <div class="metric-label">On Rent</div>
         </div>
-        <div class="col-md-3">
-            <div class="metric-card text-center">
-                <div class="metric-value text-primary" id="items-available">--</div>
-                <div class="metric-label">Available</div>
-            </div>
+      </div>
+      <div class="col-md-3">
+        <div class="metric-card text-center">
+          <div class="metric-value text-primary" id="items-available">--</div>
+          <div class="metric-label">Available</div>
         </div>
-        <div class="col-md-3">
-            <div class="metric-card text-center">
-                <div class="metric-value text-warning" id="items-in-service">--</div>
-                <div class="metric-label">In Service</div>
-            </div>
+      </div>
+      <div class="col-md-3">
+        <div class="metric-card text-center">
+          <div class="metric-value text-warning" id="items-in-service">--</div>
+          <div class="metric-label">In Service</div>
         </div>
-        <div class="col-md-3">
-            <div class="metric-card text-center">
-                <div class="metric-value text-info" id="utilization-rate">--%</div>
-                <div class="metric-label">Utilization Rate</div>
-            </div>
+      </div>
+      <div class="col-md-3">
+        <div class="metric-card text-center">
+          <div class="metric-value text-info" id="utilization-rate">--%</div>
+          <div class="metric-label">Utilization Rate</div>
         </div>
+      </div>
     </div>
+    
+    <!-- Global Store and Inventory Type Filters -->
+    {% include 'global_filters.html' %}
     
     <!-- Tabs for Different Views -->
     <div class="row">
-        <div class="col-12">
+      <div class="col-12">
             <ul class="nav nav-tabs" id="analyticsTab" role="tablist">
                 <li class="nav-item" role="presentation">
-                    <button class="nav-link active" id="alerts-tab" data-mdb-toggle="tab" data-mdb-target="#alerts" type="button" role="tab" aria-controls="alerts" aria-selected="true">
+                    <button class="nav-link active" id="business-intelligence-tab" data-bs-toggle="tab" data-bs-target="#business-intelligence" type="button" role="tab" aria-controls="business-intelligence" aria-selected="true" aria-label="View business intelligence and financial metrics">
+                        <i class="fas fa-chart-line"></i> Business Intelligence
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="alerts-tab" data-bs-toggle="tab" data-bs-target="#alerts" type="button" role="tab" aria-controls="alerts" aria-selected="false" aria-label="View and manage inventory health alerts">
                         <i class="fas fa-exclamation-triangle"></i> Health Alerts
                     </button>
                 </li>
                 <li class="nav-item" role="presentation">
-                    <button class="nav-link" id="stale-items-tab" data-mdb-toggle="tab" data-mdb-target="#stale-items" type="button" role="tab" aria-controls="stale-items" aria-selected="false">
+                    <button class="nav-link" id="stale-items-tab" data-bs-toggle="tab" data-bs-target="#stale-items" type="button" role="tab" aria-controls="stale-items" aria-selected="false" aria-label="View items with limited recent activity">
                         <i class="fas fa-clock"></i> Stale Items
                     </button>
                 </li>
                 <li class="nav-item" role="presentation">
-                    <button class="nav-link" id="usage-analysis-tab" data-mdb-toggle="tab" data-mdb-target="#usage-analysis" type="button" role="tab" aria-controls="usage-analysis" aria-selected="false">
+                    <button class="nav-link" id="usage-analysis-tab" data-bs-toggle="tab" data-bs-target="#usage-analysis" type="button" role="tab" aria-controls="usage-analysis" aria-selected="false" aria-label="Analyze usage patterns and data quality">
                         <i class="fas fa-chart-bar"></i> Usage Analysis
                     </button>
                 </li>
                 <li class="nav-item" role="presentation">
-                    <button class="nav-link" id="resale-tracking-tab" data-mdb-toggle="tab" data-mdb-target="#resale-tracking" type="button" role="tab" aria-controls="resale-tracking" aria-selected="false">
+                    <button class="nav-link" id="resale-tracking-tab" data-bs-toggle="tab" data-bs-target="#resale-tracking" type="button" role="tab" aria-controls="resale-tracking" aria-selected="false" aria-label="Track equipment resale and lifecycle management">
                         <i class="fas fa-shopping-cart"></i> Resale Tracking
                     </button>
                 </li>
                 <li class="nav-item" role="presentation">
-                    <button class="nav-link" id="configuration-tab" data-mdb-toggle="tab" data-mdb-target="#configuration" type="button" role="tab" aria-controls="configuration" aria-selected="false">
+                    <button class="nav-link" id="configuration-tab" data-bs-toggle="tab" data-bs-target="#configuration" type="button" role="tab" aria-controls="configuration" aria-selected="false" aria-label="Configure analytics settings and preferences">
                         <i class="fas fa-cog"></i> Configuration
                     </button>
                 </li>
             </ul>
             
             <div class="tab-content" id="analyticsTabContent">
+                <!-- Business Intelligence Tab -->
+                <div class="tab-pane fade show active" id="business-intelligence" role="tabpanel" aria-labelledby="business-intelligence-tab">
+                    <div class="row">
+                        <!-- Store Performance -->
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5><i class="fas fa-store"></i> Store Performance</h5>
+                                </div>
+                                <div class="card-body">
+                                    <canvas id="store-distribution-chart" height="200"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Inventory Type Distribution -->
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5><i class="fas fa-tags"></i> Inventory Type Distribution</h5>
+                                </div>
+                                <div class="card-body">
+                                    <canvas id="type-distribution-chart" height="200"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mt-3">
+                        <!-- Financial Insights -->
+                        <div class="col-md-8">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5><i class="fas fa-dollar-sign"></i> Financial Insights (Real POS Data)</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row">
+                                        <div class="col-md-3">
+                                            <div class="metric-card text-center">
+                                                <div class="metric-value text-success" id="total-inventory-value">$--</div>
+                                                <div class="metric-label">Total Inventory Value</div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="metric-card text-center">
+                                                <div class="metric-value text-info" id="avg-sell-price">$--</div>
+                                                <div class="metric-label">Average Sell Price</div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="metric-card text-center">
+                                                <div class="metric-value text-warning" id="total-turnover">$--</div>
+                                                <div class="metric-label">Total Turnover YTD</div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="metric-card text-center">
+                                                <div class="metric-value text-danger" id="total-repair-costs">$--</div>
+                                                <div class="metric-label">Total Repair Costs</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="row mt-3">
+                                        <div class="col-md-6">
+                                            <div class="d-flex align-items-center">
+                                                <i class="fas fa-gem text-warning me-2"></i>
+                                                <span>High Value Items (>90th percentile):</span>
+                                                <strong class="ms-2" id="high-value-count">--</strong>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="d-flex align-items-center">
+                                                <i class="fas fa-chart-area text-info me-2"></i>
+                                                <span>Items with Financial Data:</span>
+                                                <strong class="ms-2" id="items-with-data">--</strong>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Top Manufacturers -->
+                        <div class="col-md-4">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5><i class="fas fa-industry"></i> Top Manufacturers</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div id="manufacturers-list">Loading...</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mt-3">
+                        <div class="col-12">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5><i class="fas fa-info-circle"></i> Business Intelligence Summary</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="alert alert-info">
+                                        <strong><i class="fas fa-lightbulb"></i> Insights:</strong>
+                                        <ul id="business-insights" class="mb-0">
+                                            <li>Loading business intelligence insights...</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
                 <!-- Health Alerts Tab -->
-                <div class="tab-pane fade show active" id="alerts" role="tabpanel" aria-labelledby="alerts-tab">
+                <div class="tab-pane fade" id="alerts" role="tabpanel" aria-labelledby="alerts-tab">
                     <div class="row">
                         <div class="col-md-8">
                             <div class="card">
@@ -241,13 +617,19 @@
                                 </div>
                                 <div class="card-body">
                                     <div class="mb-2">
-                                        <span class="alert-badge alert-critical" id="critical-count">0</span> Critical
+                                        <span class="alert-badge alert-critical" id="critical-count" aria-label="Critical alerts count">
+                                            <i class="fas fa-exclamation-triangle status-icon" aria-hidden="true"></i>0
+                                        </span> Critical
                                     </div>
                                     <div class="mb-2">
-                                        <span class="alert-badge alert-high" id="high-count">0</span> High
+                                        <span class="alert-badge alert-high" id="high-count" aria-label="High priority alerts count">
+                                            <i class="fas fa-exclamation-circle status-icon" aria-hidden="true"></i>0
+                                        </span> High
                                     </div>
                                     <div class="mb-2">
-                                        <span class="alert-badge alert-medium" id="medium-count">0</span> Medium
+                                        <span class="alert-badge alert-medium" id="medium-count" aria-label="Medium priority alerts count">
+                                            <i class="fas fa-info-circle status-icon" aria-hidden="true"></i>0
+                                        </span> Medium
                                     </div>
                                     <div class="mb-2">
                                         <span class="alert-badge alert-low" id="low-count">0</span> Low
@@ -392,26 +774,24 @@
                             <h5><i class="fas fa-shopping-cart"></i> Resale & Pack Status Tracking</h5>
                         </div>
                         <div class="card-body">
-                            <p class="text-muted">Specialized tracking for resale items and pack status management coming in Phase 2...</p>
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <h6>Resale Item Features:</h6>
-                                    <ul>
-                                        <li>Automatic restock alerts (7-day threshold)</li>
-                                        <li>Consumption rate tracking</li>
-                                        <li>Low inventory warnings</li>
-                                        <li>Supplier order suggestions</li>
-                                    </ul>
+                            <div id="resale-tracking-loading" class="text-center">
+                                <div class="loading-spinner"></div> Loading resale tracking data...
+                            </div>
+                            <div id="resale-tracking-content" style="display: none;">
+                                <div class="row mb-4">
+                                    <div class="col-md-12">
+                                        <div id="resale-summary-stats"></div>
+                                    </div>
                                 </div>
-                                <div class="col-md-6">
-                                    <h6>Pack Status Management:</h6>
-                                    <ul>
-                                        <li>Pack/unpack recommendations based on demand</li>
-                                        <li>Storage optimization alerts</li>
-                                        <li>Bulk item tracking</li>
-                                        <li>Space utilization analysis</li>
-                                    </ul>
+                                <div class="row">
+                                    <div class="col-md-12">
+                                        <h6>Resale Items</h6>
+                                        <div id="resale-items-table"></div>
+                                    </div>
                                 </div>
+                            </div>
+                            <div id="resale-tracking-error" style="display: none;" class="alert alert-warning">
+                                <i class="fas fa-exclamation-triangle"></i> Unable to load resale tracking data. Please try refreshing the page.
                             </div>
                         </div>
                     </div>
@@ -485,9 +865,9 @@
                     </div>
                 </div>
             </div>
-        </div>
+      </div>
     </div>
-</div>
+  </div>
 {% endblock %}
 
 {% block scripts %}
@@ -508,7 +888,7 @@ class InventoryAnalytics {
     async loadDashboardData() {
         try {
             console.log('Loading dashboard summary data');
-            const response = await fetch('/api/inventory/dashboard_summary');
+            const response = await fetch(withGlobalFilters('/api/inventory/dashboard_summary'));
             const data = await response.json();
             
             if (response.ok) {
@@ -562,7 +942,7 @@ class InventoryAnalytics {
             document.getElementById('alerts-loading').style.display = 'block';
             document.getElementById('alerts-content').style.display = 'none';
             
-            const response = await fetch('/api/inventory/alerts');
+            const response = await fetch(withGlobalFilters('/api/inventory/alerts'));
             const data = await response.json();
             
             if (response.ok) {
@@ -699,7 +1079,7 @@ class InventoryAnalytics {
             button.innerHTML = '<div class="loading-spinner"></div> Generating...';
             button.disabled = true;
             
-            const response = await fetch('/api/inventory/generate_alerts', {
+            const response = await fetch(withGlobalFilters('/api/inventory/generate_alerts'), {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'}
             });
@@ -740,6 +1120,53 @@ class InventoryAnalytics {
             console.log('Auto-refreshing dashboard data');
             this.loadDashboardData();
         }, 5 * 60 * 1000);
+    }
+    
+    // Phase 1B: Standardized Progress Loading Utility
+    showProgressLoader(containerId, steps, currentStep = 1, expectedTime = "<1 sec") {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        
+        const stepDescriptions = {
+            'business-insights': {
+                1: "Loading store data...",
+                2: "Processing financial metrics...",
+                3: "Generating charts..."
+            },
+            'alerts-list': {
+                1: "Loading health alerts...",
+                2: "Applying filters...",
+                3: "Organizing results..."
+            },
+            'stale-items-list': {
+                1: "Analyzing scan history...",
+                2: "Identifying stale items...",
+                3: "Generating report..."
+            }
+        };
+        
+        const descriptions = stepDescriptions[containerId] || {
+            1: "Loading data...",
+            2: "Processing...",
+            3: "Finalizing..."
+        };
+        
+        const stepDescription = descriptions[currentStep] || "Loading...";
+        
+        container.innerHTML = `
+            <div class="progress-loader">
+                <div class="spinner-border text-primary" role="status" aria-hidden="true"></div>
+                <div class="progress-step">${stepDescription} (${currentStep} of ${steps})</div>
+                <div class="progress-time">Expected: ${expectedTime}</div>
+            </div>
+        `;
+    }
+    
+    hideProgressLoader(containerId) {
+        const container = document.getElementById(containerId);
+        if (container && container.querySelector('.progress-loader')) {
+            container.innerHTML = '';
+        }
     }
     
     showError(message, containerId = null) {
@@ -785,7 +1212,7 @@ function generateAlerts() {
 // Configuration management functions
 async function loadConfiguration() {
     try {
-        const response = await fetch('/api/inventory/configuration');
+        const response = await fetch(withGlobalFilters('/api/inventory/configuration'));
         if (response.ok) {
             const config = await response.json();
             
@@ -823,7 +1250,7 @@ async function saveConfiguration() {
             }
         };
         
-        const response = await fetch('/api/inventory/configuration', {
+        const response = await fetch(withGlobalFilters('/api/inventory/configuration'), {
             method: 'PUT',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify(config)
@@ -869,14 +1296,14 @@ async function loadUsagePatterns() {
         document.getElementById('usage-patterns-loading').style.display = 'block';
         document.getElementById('usage-patterns-content').style.display = 'none';
         
-        const response = await fetch('/api/inventory/usage_patterns');
+        const response = await fetch(withGlobalFilters('/api/inventory/usage_analysis?days=30'));
         const data = await response.json();
         
-        if (response.ok) {
-            displayUsagePatterns(data.patterns);
+        if (response.ok && data.success && data.usage_analysis) {
+            displayUsagePatterns(data.usage_analysis.category_patterns || []);
         } else {
             document.getElementById('usage-patterns-list').innerHTML = 
-                `<div class="alert alert-danger">Error loading patterns: ${data.error}</div>`;
+                `<div class="alert alert-danger">Error loading patterns: ${data.error || 'No usage data available'}</div>`;
         }
     } catch (error) {
         console.error('Error loading usage patterns:', error);
@@ -892,22 +1319,25 @@ function displayUsagePatterns(patterns) {
     let html = '';
     if (patterns && patterns.length > 0) {
         patterns.slice(0, 10).forEach(pattern => {
-            const percentage = ((pattern.usage_rate || 0) * 100).toFixed(1);
+            const percentage = (pattern.utilization_rate || 0).toFixed(1);
             html += `
                 <div class="border-bottom pb-2 mb-2">
                     <div class="d-flex justify-content-between">
-                        <strong>${pattern.category || 'Unknown'}</strong>
+                        <strong>${pattern.category || 'Unknown Category'}</strong>
                         <span class="badge bg-${percentage > 70 ? 'success' : percentage > 40 ? 'warning' : 'secondary'}">${percentage}%</span>
                     </div>
-                    <small class="text-muted">${pattern.subcategory || ''}</small>
+                    <small class="text-muted">${pattern.subcategory || ''} • Turnover: ${(pattern.turnover_rate || 0).toFixed(1)}</small>
                     <div class="mt-1">
-                        <small>${pattern.total_items || 0} items • ${pattern.rental_count || 0} rentals</small>
+                        <small>${pattern.total_items || 0} items • ${pattern.transaction_count || 0} transactions</small>
+                    </div>
+                    <div class="mt-1">
+                        <small class="text-info">Activity Score: ${(pattern.activity_score || 0).toFixed(1)}</small>
                     </div>
                 </div>
             `;
         });
     } else {
-        html = '<p class="text-muted">No usage patterns found.</p>';
+        html = '<p class="text-muted">No usage patterns found. This may indicate limited transaction data or missing rental class assignments.</p>';
     }
     document.getElementById('usage-patterns-list').innerHTML = html;
 }
@@ -917,7 +1347,7 @@ async function loadDataDiscrepancies() {
         document.getElementById('discrepancies-loading').style.display = 'block';
         document.getElementById('discrepancies-content').style.display = 'none';
         
-        const response = await fetch('/api/inventory/data_discrepancies');
+        const response = await fetch(withGlobalFilters('/api/inventory/data_discrepancies'));
         const data = await response.json();
         
         if (response.ok) {
@@ -979,6 +1409,109 @@ function refreshAnalysisData() {
     loadDataDiscrepancies();
 }
 
+// Load resale tracking data
+async function loadResaleTrackingData() {
+    try {
+        document.getElementById('resale-tracking-loading').style.display = 'block';
+        document.getElementById('resale-tracking-content').style.display = 'none';
+        document.getElementById('resale-tracking-error').style.display = 'none';
+
+        const response = await fetch('/api/inventory/resale_tracking?days=30');
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        if (data.success && data.resale_tracking) {
+            displayResaleTrackingData(data.resale_tracking);
+        } else {
+            throw new Error('Invalid resale tracking data received');
+        }
+    } catch (error) {
+        console.error('Error loading resale tracking data:', error);
+        document.getElementById('resale-tracking-loading').style.display = 'none';
+        document.getElementById('resale-tracking-error').style.display = 'block';
+    }
+}
+
+function displayResaleTrackingData(resaleData) {
+    document.getElementById('resale-tracking-loading').style.display = 'none';
+    document.getElementById('resale-tracking-content').style.display = 'block';
+    
+    // Display summary stats
+    const summaryHtml = `
+        <div class="row">
+            <div class="col-md-3">
+                <div class="metric-card">
+                    <h4>${resaleData.items ? resaleData.items.length : 0}</h4>
+                    <p>Total Resale Items</p>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="metric-card">
+                    <h4>${resaleData.summary_by_category ? resaleData.summary_by_category.length : 0}</h4>
+                    <p>Categories</p>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="metric-card">
+                    <h4>${resaleData.analysis_period_days || 30}</h4>
+                    <p>Days Analyzed</p>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="metric-card">
+                    <h4>${resaleData.total_resale_items_analyzed || 0}</h4>
+                    <p>Items Analyzed</p>
+                </div>
+            </div>
+        </div>
+    `;
+    document.getElementById('resale-summary-stats').innerHTML = summaryHtml;
+    
+    // Display resale items table
+    if (resaleData.items && resaleData.items.length > 0) {
+        let tableHtml = `
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Item Name</th>
+                            <th>Category</th>
+                            <th>Status</th>
+                            <th>Age (Days)</th>
+                            <th>Sell Price</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+        
+        resaleData.items.forEach(item => {
+            tableHtml += `
+                <tr>
+                    <td>${item.common_name || 'N/A'}</td>
+                    <td>${item.subcategory || 'General'}</td>
+                    <td><span class="badge ${item.status === 'Available' ? 'bg-success' : 'bg-secondary'}">${item.status || 'Unknown'}</span></td>
+                    <td>${item.age_days || 0}</td>
+                    <td>$${(item.sell_price || 0).toFixed(2)}</td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-primary" onclick="navigateToItem('${item.tag_id}')">
+                            <i class="fas fa-eye"></i> View
+                        </button>
+                    </td>
+                </tr>
+            `;
+        });
+        
+        tableHtml += '</tbody></table></div>';
+        document.getElementById('resale-items-table').innerHTML = tableHtml;
+    } else {
+        document.getElementById('resale-items-table').innerHTML = '<p class="text-muted">No resale items found.</p>';
+    }
+}
+
 // Global data storage and pagination state
 let allHealthAlerts = [];
 let allStaleItems = [];
@@ -997,7 +1530,7 @@ async function loadAllHealthAlerts() {
         let hasMore = true;
         
         while (hasMore) {
-            const response = await fetch(`/api/inventory/alerts?limit=${limit}&offset=${offset}`);
+            const response = await fetch(withGlobalFilters(`/api/inventory/alerts?limit=${limit}&offset=${offset}`));
             const data = await response.json();
             
             if (response.ok && data.alerts) {
@@ -1050,7 +1583,7 @@ async function loadAllStaleItems() {
         let hasMore = true;
         
         while (hasMore && allItems.length < maxItems) {
-            const response = await fetch(`/api/inventory/stale_items_simple?limit=${limit}&offset=${offset}`);
+            const response = await fetch(withGlobalFilters(`/api/inventory/stale_items_simple?limit=${limit}&offset=${offset}`));
             const data = await response.json();
             
             if (response.ok && data.items) {
@@ -1108,39 +1641,9 @@ function displayHealthAlerts(alerts) {
         alerts = [];
     }
     
-    // Group alerts by tag_id to eliminate duplicates
-    const groupedAlerts = {};
-    alerts.forEach(alert => {
-        const key = alert.tag_id || `${alert.category}_${alert.subcategory}_${Math.random()}`;
-        if (!groupedAlerts[key]) {
-            groupedAlerts[key] = {
-                ...alert,
-                alertCount: 1,
-                severities: [alert.severity],
-                alertTypes: [alert.alert_type],
-                suggestions: [alert.suggested_action]
-            };
-        } else {
-            // Merge duplicate alerts
-            groupedAlerts[key].alertCount++;
-            if (!groupedAlerts[key].severities.includes(alert.severity)) {
-                groupedAlerts[key].severities.push(alert.severity);
-            }
-            if (!groupedAlerts[key].alertTypes.includes(alert.alert_type)) {
-                groupedAlerts[key].alertTypes.push(alert.alert_type);
-            }
-            if (!groupedAlerts[key].suggestions.includes(alert.suggested_action)) {
-                groupedAlerts[key].suggestions.push(alert.suggested_action);
-            }
-            // Use highest priority severity
-            const severityPriority = { 'critical': 4, 'high': 3, 'medium': 2, 'low': 1 };
-            if (severityPriority[alert.severity] > severityPriority[groupedAlerts[key].severity]) {
-                groupedAlerts[key].severity = alert.severity;
-            }
-        }
-    });
-    
-    const uniqueAlerts = Object.values(groupedAlerts);
+    // Backend now prevents duplicates with proper unique constraints and upsert logic
+    // No need for frontend deduplication - each alert should be unique
+    const uniqueAlerts = alerts;
     
     const perPage = parseInt(document.getElementById('alerts-per-page').value) || 25;
     const totalPages = Math.ceil(uniqueAlerts.length / perPage);
@@ -1150,7 +1653,7 @@ function displayHealthAlerts(alerts) {
     
     // Update count
     document.getElementById('alerts-count').textContent = 
-        `Showing ${startIndex + 1}-${Math.min(endIndex, uniqueAlerts.length)} of ${uniqueAlerts.length} unique items (${alerts.length} total alerts)`;
+        `Showing ${startIndex + 1}-${Math.min(endIndex, uniqueAlerts.length)} of ${uniqueAlerts.length} health alerts`;
     
     // Display alerts
     let html = '';
@@ -1163,37 +1666,32 @@ function displayHealthAlerts(alerts) {
                 'low': 'secondary'
             }[alert.severity] || 'secondary';
             
-            // Create badges for all severities
-            const severityBadges = alert.severities.map(sev => {
-                const color = {'critical': 'danger', 'high': 'warning', 'medium': 'info', 'low': 'secondary'}[sev] || 'secondary';
-                return `<span class="badge bg-${color} me-1">${sev.toUpperCase()}</span>`;
-            }).join('');
+            // Single severity badge since duplicates are prevented at backend
+            const severityBadge = `<span class="badge bg-${severityColor} me-1">${alert.severity.toUpperCase()}</span>`;
             
-            // Create combined suggestions
-            const suggestions = alert.suggestions.filter(s => s && s.trim()).join(' • ');
+            // Single suggestion since no duplicates
+            const suggestions = alert.suggested_action || 'No action suggested';
             
             html += `
                 <div class="alert alert-${severityColor} d-flex justify-content-between align-items-start">
                     <div class="flex-grow-1">
                         <div class="d-flex align-items-center mb-1">
                             <strong class="me-2">${alert.common_name || alert.category || 'Unknown Item'}</strong>
-                            ${alert.alertCount > 1 ? `<span class="badge bg-info">${alert.alertCount} alerts</span>` : ''}
                         </div>
                         ${alert.tag_id ? `<div class="small text-muted mb-1">Tag ID: ${alert.tag_id}</div>` : ''}
                         <div class="small text-muted mb-1">${alert.category || 'No Category'} > ${alert.subcategory || 'No Subcategory'}</div>
                         <div class="mt-1">
-                            <small>${suggestions || 'No action suggested'}</small>
+                            <small>${suggestions}</small>
                         </div>
                         <div class="mt-1">
                             <small class="text-muted">
                                 Created: ${new Date(alert.created_at).toLocaleDateString()}
-                                ${alert.alertCount > 1 ? ` (Latest of ${alert.alertCount} similar alerts)` : ''}
                             </small>
                         </div>
                     </div>
                     <div class="d-flex flex-column align-items-end">
                         <div class="mb-2">
-                            ${severityBadges}
+                            ${severityBadge}
                         </div>
                         ${alert.tag_id ? `
                             <button class="btn btn-outline-primary btn-sm" onclick="navigateToItem('${alert.tag_id}')" 
@@ -1247,7 +1745,7 @@ function filterStaleItems() {
         const subcategorySelect = document.getElementById('stale-subcategory-filter');
         subcategorySelect.innerHTML = '<option value="">All Subcategories</option>';
         subcategories.forEach(sub => {
-            subcategorySelect.innerHTML += `<option value="${sub}"${subcategory === subcategoryFilter ? ' selected' : ''}>${sub}</option>`;
+            subcategorySelect.innerHTML += `<option value="${sub}"${sub === subcategoryFilter ? ' selected' : ''}>${sub}</option>`;
         });
     }
     
@@ -1385,13 +1883,9 @@ function updatePagination(containerId, currentPage, totalPages, onPageChange) {
     });
 }
 
-// Initialize when page loads
-document.addEventListener('DOMContentLoaded', function() {
-    window.inventoryAnalytics = new InventoryAnalytics();
-    
-    // Initialize tabs with fallback for MDB
+// REMOVED: Duplicate initialization moved to single DOMContentLoaded handler below
     function initializeTabs() {
-        const triggerTabList = [].slice.call(document.querySelectorAll('#analyticsTab button[data-mdb-toggle="tab"]'));
+        const triggerTabList = [].slice.call(document.querySelectorAll('#analyticsTab button[data-bs-toggle="tab"]'));
         
         triggerTabList.forEach(function (triggerEl) {
             triggerEl.addEventListener('click', function (event) {
@@ -1407,7 +1901,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 triggerEl.classList.add('active');
                 
                 // Show corresponding content
-                const targetId = triggerEl.getAttribute('data-mdb-target');
+                const targetId = triggerEl.getAttribute('data-bs-target');
                 if (targetId) {
                     const targetPane = document.querySelector(targetId);
                     if (targetPane) {
@@ -1438,7 +1932,11 @@ document.addEventListener('DOMContentLoaded', function() {
         loadUsagePatterns();
         loadDataDiscrepancies();
     });
-});
+    
+    // Load resale tracking when resale tracking tab is clicked
+    document.getElementById('resale-tracking-tab').addEventListener('click', function() {
+        loadResaleTrackingData();
+    });
 
 // Navigate to specific item on Tab 1 (Rental Inventory)
 function navigateToItem(tagId) {
@@ -1488,5 +1986,730 @@ function navigateToItem(tagId) {
         alert(`Error navigating to item ${tagId}`);
     }
 }
+
+// ===== BUSINESS INTELLIGENCE FUNCTIONALITY =====
+
+let storeChart = null;
+let typeChart = null;
+
+// Helper to append global filter parameters to API requests
+function withGlobalFilters(url) {
+    try {
+        const params = window.GlobalFilters?.getUrlParams?.();
+        if (!params) return url;
+        return url.includes('?') ? `${url}&${params}` : `${url}?${params}`;
+    } catch (err) {
+        console.warn('GlobalFilters unavailable:', err);
+        return url;
+    }
+}
+
+// Refresh analytics data based on current filters
+function refreshAnalyticsData() {
+    console.log('Refreshing Analytics Tab 6 data with filters:', GlobalFilters.getApiParams());
+
+    // Update dashboard summary with filters
+    if (window.inventoryAnalytics && typeof window.inventoryAnalytics.loadDashboardData === 'function') {
+        window.inventoryAnalytics.loadDashboardData();
+    }
+
+    // Update business intelligence with filters
+    fetchBusinessIntelligence();
+}
+window.refreshAnalyticsData = refreshAnalyticsData;
+
+// Fetch business intelligence data with real POS data
+function fetchBusinessIntelligence() {
+    // Phase 1B: Progressive loading implementation
+    let params = '';
+    try {
+        if (window.GlobalFilters && typeof GlobalFilters.getUrlParams === 'function') {
+            params = GlobalFilters.getUrlParams();
+        }
+    } catch (error) {
+        console.warn('GlobalFilters not available, using default parameters:', error);
+        params = '';
+    }
+    
+    const url = `/api/inventory/business_intelligence${params ? '?' + params : ''}`;
+    
+    console.log('Fetching business intelligence from:', url);
+    
+    // Phase 1B: Start progress loading sequence
+    if (window.inventoryAnalytics) {
+        window.inventoryAnalytics.showProgressLoader('business-insights', 3, 1, '<1 sec');
+        // Simulate progressive steps for better UX
+        setTimeout(() => window.inventoryAnalytics.showProgressLoader('business-insights', 3, 2, '<1 sec'), 200);
+        setTimeout(() => window.inventoryAnalytics.showProgressLoader('business-insights', 3, 3, '<1 sec'), 400);
+    }
+    
+    fetch(url)
+        .then(response => response.json())
+        .then(data => {
+            console.log('Business intelligence data received:', data);
+            // Phase 1B: Hide progress loader before displaying results
+            if (window.inventoryAnalytics) {
+                window.inventoryAnalytics.hideProgressLoader('business-insights');
+            }
+            updateBusinessIntelligenceDisplay(data);
+        })
+        .catch(error => {
+            console.error('Error fetching business intelligence:', error);
+            // Phase 1B: Hide progress loader on error
+            if (window.inventoryAnalytics) {
+                window.inventoryAnalytics.hideProgressLoader('business-insights');
+            }
+            showBusinessIntelligenceError('Failed to load business intelligence data');
+        });
+}
+
+// Update business intelligence display with real data
+function updateBusinessIntelligenceDisplay(data) {
+    // Update financial metrics
+    const financialInsights = data.financial_insights || {};
+    document.getElementById('total-inventory-value').textContent = formatCurrency(financialInsights.total_inventory_value || 0);
+    document.getElementById('avg-sell-price').textContent = formatCurrency(financialInsights.avg_sell_price || 0);
+    document.getElementById('total-turnover').textContent = formatCurrency(financialInsights.total_turnover_ytd || 0);
+    document.getElementById('total-repair-costs').textContent = formatCurrency(financialInsights.total_repair_costs || 0);
+    document.getElementById('high-value-count').textContent = formatNumber(financialInsights.high_value_items || 0);
+    document.getElementById('items-with-data').textContent = formatNumber(financialInsights.items_with_data || 0);
+    
+    // Update store distribution chart
+    updateStoreDistributionChart(data.store_analysis?.distribution || []);
+    
+    // Update inventory type distribution chart
+    updateTypeDistributionChart(data.inventory_type_analysis?.distribution || []);
+    
+    // Update manufacturers list
+    updateManufacturersList(data.manufacturer_insights?.top_manufacturers || []);
+    
+    // Generate business insights
+    generateBusinessInsights(data);
+}
+
+// Update store distribution chart with Fortune 500 styling
+function updateStoreDistributionChart(storeData) {
+    const ctx = document.getElementById('store-distribution-chart').getContext('2d');
+    
+    // Destroy existing chart
+    if (storeChart) {
+        storeChart.destroy();
+    }
+    
+    // Map store codes to readable names
+    const storeNames = {
+        '6800': 'Brooklyn Park',
+        '3607': 'Wayzata',
+        '8101': 'Fridley',
+        '728': 'Elk River',
+        '000': 'Legacy/Unassigned',
+        'Unassigned': 'Unassigned'
+    };
+    
+    const labels = storeData.map(store => storeNames[store.store_code] || store.store_code);
+    const itemCounts = storeData.map(store => store.item_count);
+    
+    // Professional Fortune 500 color palette
+    const executiveColors = [
+        'rgba(99, 102, 241, 0.9)',  // Indigo
+        'rgba(16, 185, 129, 0.9)',  // Emerald
+        'rgba(245, 101, 101, 0.9)', // Rose
+        'rgba(251, 191, 36, 0.9)',  // Amber
+        'rgba(139, 92, 246, 0.9)',  // Purple
+        'rgba(34, 197, 94, 0.9)'    // Green
+    ];
+    
+    const hoverColors = [
+        'rgba(99, 102, 241, 1)',
+        'rgba(16, 185, 129, 1)',
+        'rgba(245, 101, 101, 1)',
+        'rgba(251, 191, 36, 1)',
+        'rgba(139, 92, 246, 1)',
+        'rgba(34, 197, 94, 1)'
+    ];
+    
+    storeChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: labels,
+            datasets: [{
+                data: itemCounts,
+                backgroundColor: executiveColors.slice(0, labels.length),
+                hoverBackgroundColor: hoverColors.slice(0, labels.length),
+                borderColor: '#ffffff',
+                borderWidth: 4,
+                hoverBorderWidth: 6,
+                borderRadius: 8,
+                hoverBorderColor: '#ffffff'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: '60%',
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        usePointStyle: true,
+                        pointStyle: 'circle',
+                        padding: 20,
+                        font: {
+                            family: "'Segoe UI', system-ui, sans-serif",
+                            size: 13,
+                            weight: '600'
+                        },
+                        color: '#4a5568',
+                        generateLabels: function(chart) {
+                            const data = chart.data;
+                            const total = data.datasets[0].data.reduce((a, b) => a + b, 0);
+                            return data.labels.map((label, index) => {
+                                const value = data.datasets[0].data[index];
+                                const percentage = ((value / total) * 100).toFixed(1);
+                                return {
+                                    text: `${label} (${percentage}%)`,
+                                    fillStyle: data.datasets[0].backgroundColor[index],
+                                    strokeStyle: data.datasets[0].borderColor,
+                                    lineWidth: data.datasets[0].borderWidth,
+                                    pointStyle: 'circle',
+                                    hidden: false,
+                                    index: index
+                                };
+                            });
+                        }
+                    }
+                },
+                tooltip: {
+                    backgroundColor: 'rgba(26, 32, 44, 0.95)',
+                    titleColor: '#ffffff',
+                    bodyColor: '#ffffff',
+                    borderColor: 'rgba(102, 126, 234, 0.8)',
+                    borderWidth: 2,
+                    cornerRadius: 12,
+                    padding: 16,
+                    displayColors: true,
+                    titleFont: {
+                        size: 14,
+                        weight: '600'
+                    },
+                    bodyFont: {
+                        size: 13,
+                        weight: '500'
+                    },
+                    callbacks: {
+                        title: function(context) {
+                            return `${context[0].label} Distribution`;
+                        },
+                        label: function(context) {
+                            const value = formatNumber(context.raw);
+                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                            const percentage = ((context.raw / total) * 100).toFixed(1);
+                            return [
+                                `Items: ${value}`,
+                                `Share: ${percentage}%`
+                            ];
+                        }
+                    }
+                }
+            },
+            animation: {
+                animateRotate: true,
+                animateScale: true,
+                duration: 1000,
+                easing: 'easeOutQuart'
+            },
+            hover: {
+                mode: 'nearest',
+                intersect: true,
+                animationDuration: 300
+            }
+        }
+    });
+    
+    // Add center text for total items
+    const centerText = {
+        id: 'centerTextStore',
+        afterDraw: function(chart) {
+            const ctx = chart.ctx;
+            const centerX = chart.chartArea.left + (chart.chartArea.right - chart.chartArea.left) / 2;
+            const centerY = chart.chartArea.top + (chart.chartArea.bottom - chart.chartArea.top) / 2;
+            const total = chart.data.datasets[0].data.reduce((a, b) => a + b, 0);
+            
+            ctx.save();
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillStyle = '#2d3748';
+            ctx.font = 'bold 16px \'Segoe UI\', system-ui, sans-serif';
+            ctx.fillText('Total Items', centerX, centerY - 12);
+            ctx.font = 'bold 20px \'Segoe UI\', system-ui, sans-serif';
+            ctx.fillText(formatNumber(total), centerX, centerY + 12);
+            ctx.restore();
+        }
+    };
+    
+    if (!Chart.registry.plugins.get('centerTextStore')) {
+        Chart.register(centerText);
+    }
+}
+
+// Update inventory type distribution chart with professional styling
+function updateTypeDistributionChart(typeData) {
+    const ctx = document.getElementById('type-distribution-chart').getContext('2d');
+    
+    // Destroy existing chart
+    if (typeChart) {
+        typeChart.destroy();
+    }
+    
+    const labels = typeData.map(type => type.type);
+    const counts = typeData.map(type => type.count);
+    
+    // Create gradient backgrounds for bars
+    const gradients = labels.map((_, index) => {
+        const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+        const colors = [
+            ['rgba(99, 102, 241, 1)', 'rgba(99, 102, 241, 0.6)'],
+            ['rgba(16, 185, 129, 1)', 'rgba(16, 185, 129, 0.6)'],
+            ['rgba(245, 101, 101, 1)', 'rgba(245, 101, 101, 0.6)'],
+            ['rgba(251, 191, 36, 1)', 'rgba(251, 191, 36, 0.6)'],
+            ['rgba(139, 92, 246, 1)', 'rgba(139, 92, 246, 0.6)'],
+            ['rgba(34, 197, 94, 1)', 'rgba(34, 197, 94, 0.6)']
+        ];
+        const colorPair = colors[index % colors.length];
+        gradient.addColorStop(0, colorPair[0]);
+        gradient.addColorStop(1, colorPair[1]);
+        return gradient;
+    });
+    
+    const borderColors = [
+        'rgba(99, 102, 241, 1)',
+        'rgba(16, 185, 129, 1)',
+        'rgba(245, 101, 101, 1)',
+        'rgba(251, 191, 36, 1)',
+        'rgba(139, 92, 246, 1)',
+        'rgba(34, 197, 94, 1)'
+    ];
+    
+    typeChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Item Count',
+                data: counts,
+                backgroundColor: gradients,
+                borderColor: borderColors.slice(0, labels.length),
+                borderWidth: 3,
+                borderRadius: 8,
+                borderSkipped: false,
+                hoverBackgroundColor: borderColors.slice(0, labels.length),
+                hoverBorderColor: '#ffffff',
+                hoverBorderWidth: 3
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    backgroundColor: 'rgba(26, 32, 44, 0.95)',
+                    titleColor: '#ffffff',
+                    bodyColor: '#ffffff',
+                    borderColor: 'rgba(102, 126, 234, 0.8)',
+                    borderWidth: 2,
+                    cornerRadius: 12,
+                    padding: 16,
+                    displayColors: true,
+                    titleFont: {
+                        size: 14,
+                        weight: '600'
+                    },
+                    bodyFont: {
+                        size: 13,
+                        weight: '500'
+                    },
+                    callbacks: {
+                        title: function(context) {
+                            return `${context[0].label} Category`;
+                        },
+                        label: function(context) {
+                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                            const percentage = ((context.raw / total) * 100).toFixed(1);
+                            return [
+                                `Items: ${formatNumber(context.raw)}`,
+                                `Share: ${percentage}%`
+                            ];
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    grid: {
+                        display: false
+                    },
+                    ticks: {
+                        font: {
+                            family: "'Segoe UI', system-ui, sans-serif",
+                            size: 12,
+                            weight: '600'
+                        },
+                        color: '#4a5568',
+                        maxRotation: 45,
+                        minRotation: 0
+                    }
+                },
+                y: {
+                    beginAtZero: true,
+                    grid: {
+                        color: 'rgba(113, 128, 150, 0.1)',
+                        drawBorder: false
+                    },
+                    ticks: {
+                        font: {
+                            family: "'Segoe UI', system-ui, sans-serif",
+                            size: 12,
+                            weight: '500'
+                        },
+                        color: '#718096',
+                        callback: function(value) {
+                            return formatNumber(value);
+                        },
+                        padding: 12
+                    }
+                }
+            },
+            animation: {
+                duration: 1000,
+                easing: 'easeOutQuart',
+                delay: function(context) {
+                    return context.dataIndex * 100;
+                }
+            },
+            hover: {
+                mode: 'nearest',
+                intersect: true,
+                animationDuration: 300
+            }
+        }
+    });
+}
+
+// Update manufacturers list
+function updateManufacturersList(manufacturers) {
+    const container = document.getElementById('manufacturers-list');
+    
+    if (manufacturers.length === 0) {
+        container.innerHTML = '<p class="text-muted"><em>No manufacturer data available</em></p>';
+        return;
+    }
+    
+    const html = manufacturers.slice(0, 8).map((mfr, index) => `
+        <div class="d-flex justify-content-between align-items-center py-1 ${index !== manufacturers.length - 1 ? 'border-bottom' : ''}">
+            <div>
+                <strong>${mfr.manufacturer}</strong>
+                <br>
+                <small class="text-muted">${formatNumber(mfr.item_count)} items</small>
+            </div>
+            <div class="text-end">
+                <span class="badge bg-primary">${formatCurrency(mfr.avg_price)}</span>
+                <br>
+                <small class="text-muted">avg price</small>
+            </div>
+        </div>
+    `).join('');
+    
+    container.innerHTML = html;
+}
+
+// Generate business insights from the data
+function generateBusinessInsights(data) {
+    const insights = [];
+    const financial = data.financial_insights || {};
+    const stores = data.store_analysis?.distribution || [];
+    const types = data.inventory_type_analysis?.distribution || [];
+    
+    // Financial insights
+    if (financial.total_inventory_value > 1000000) {
+        insights.push(`High-value inventory portfolio worth <strong>${formatCurrency(financial.total_inventory_value)}</strong>`);
+    }
+    
+    if (financial.high_value_items > 0) {
+        insights.push(`<strong>${formatNumber(financial.high_value_items)}</strong> premium items above $${formatNumber(financial.high_value_threshold)} (90th percentile)`);
+    }
+    
+    // Store insights
+    const topStore = stores.reduce((max, store) => store.item_count > max.item_count ? store : max, stores[0] || {});
+    if (topStore.store_code) {
+        const storeName = storeNames[topStore.store_code] || topStore.store_code;
+        insights.push(`<strong>${storeName}</strong> leads with ${formatNumber(topStore.item_count)} items`);
+    }
+    
+    // Type insights  
+    const topType = types.reduce((max, type) => type.count > max.count ? type : max, types[0] || {});
+    if (topType.type) {
+        insights.push(`<strong>${topType.type}</strong> inventory type dominates with ${formatNumber(topType.count)} items`);
+    }
+    
+    // Repair cost insights
+    if (financial.total_repair_costs > 0) {
+        const repairPercentage = ((financial.total_repair_costs / financial.total_inventory_value) * 100).toFixed(1);
+        insights.push(`Repair costs represent <strong>${repairPercentage}%</strong> of total inventory value`);
+    }
+    
+    // Data coverage insight
+    const totalItems = data.filter_context?.total_items_in_view || 0;
+    if (financial.items_with_data > 0 && totalItems > 0) {
+        const dataPercentage = ((financial.items_with_data / totalItems) * 100).toFixed(1);
+        insights.push(`<strong>${dataPercentage}%</strong> of items have complete financial data from POS system`);
+    }
+    
+    // Default insight if no data
+    if (insights.length === 0) {
+        insights.push('Limited business intelligence available for current filter selection');
+    }
+    
+    document.getElementById('business-insights').innerHTML = insights.map(insight => `<li>${insight}</li>`).join('');
+}
+
+// Show error message for business intelligence
+function showBusinessIntelligenceError(message) {
+    document.getElementById('business-insights').innerHTML = `<li class="text-danger"><i class="fas fa-exclamation-triangle"></i> ${message}</li>`;
+}
+
+// Utility function to format currency
+function formatCurrency(amount) {
+    if (amount === 0) return '$0';
+    if (amount < 1000) return `$${amount.toFixed(2)}`;
+    if (amount < 1000000) return `$${(amount / 1000).toFixed(1)}K`;
+    return `$${(amount / 1000000).toFixed(1)}M`;
+}
+
+// Utility function to format numbers
+function formatNumber(num) {
+    if (num === 0) return '0';
+    if (num < 1000) return num.toString();
+    if (num < 1000000) return `${(num / 1000).toFixed(1)}K`;
+    return `${(num / 1000000).toFixed(1)}M`;
+}
+
+// Global store name mapping for consistent use across all functions
+const storeNames = {
+    '6800': 'Brooklyn Park',
+    '3607': 'Wayzata', 
+    '8101': 'Fridley',
+    '728': 'Elk River',
+    '000': 'Legacy/Unassigned',
+    'Unassigned': 'Unassigned'
+};
+
+// Initialize business intelligence when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize main dashboard first
+    console.log('DOMContentLoaded: Initializing analytics dashboard');
+    window.inventoryAnalytics = new InventoryAnalytics();
+    
+    // Load business intelligence data immediately on page load
+    console.log('Loading business intelligence data immediately');
+    fetchBusinessIntelligence();
+    
+    // Refresh data when tab becomes active
+    document.getElementById('business-intelligence-tab').addEventListener('shown.bs.tab', function() {
+        console.log('Business intelligence tab activated, fetching data');
+        fetchBusinessIntelligence();
+    });
+    
+    // Initialize tab-specific data loading on tab activation
+    document.addEventListener('shown.bs.tab', function(event) {
+        const targetTab = event.target.getAttribute('data-bs-target') || event.target.getAttribute('href');
+        console.log('Tab activated:', targetTab);
+        
+        switch(targetTab) {
+            case '#health-alerts':
+                console.log('Loading health alerts for tab activation');
+                loadAllHealthAlerts();
+                break;
+            case '#stale-items':
+                console.log('Loading stale items for tab activation');
+                loadAllStaleItems();
+                break;
+            case '#usage-patterns':
+                console.log('Loading usage patterns for tab activation');
+                loadUsagePatterns();
+                break;
+            case '#data-discrepancies':
+                console.log('Loading data discrepancies for tab activation');
+                loadDataDiscrepancies();
+                break;
+        }
+    });
+});
 </script>
+
+<!-- Load Chart Utilities and Dashboard Integration -->
+<script src="/static/js/chart-utilities.js"></script>
+<script src="/static/js/dashboard-integration.js"></script>
+
+<!-- Initialize advanced chart functionality -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('🚀 ADVANCED INTEGRATION: Initializing chart utilities and dashboard integration...');
+    
+    // Initialize chart defaults for professional presentation
+    if (window.chartManager) {
+        window.chartManager.initializeChartDefaults();
+        console.log('✅ Chart utilities initialized with Fortune 500 styling');
+    }
+    
+    // Initialize dashboard integration for seamless data flow
+    if (window.dashboardIntegration) {
+        window.dashboardIntegration.init().then(() => {
+            console.log('✅ Dashboard integration manager initialized');
+            console.log('🎯 Ready for enterprise-level data visualization');
+        });
+    }
+    
+    // Enhanced data binding for inventory analytics
+    enhanceInventoryAnalytics();
+});
+
+function enhanceInventoryAnalytics() {
+    console.log('🔥 ENHANCEMENT: Upgrading inventory analytics with advanced features...');
+    
+    // Create enhanced utilization gauge for the dashboard
+    const utilizationContainer = document.querySelector('#utilization-rate');
+    if (utilizationContainer && window.chartManager) {
+        // Get current utilization rate
+        const currentRate = parseFloat(utilizationContainer.textContent.replace('%', '')) || 0;
+        
+        // Create a canvas for the gauge
+        const gaugeCanvas = document.createElement('canvas');
+        gaugeCanvas.id = 'utilizationGaugeChart';
+        gaugeCanvas.width = 200;
+        gaugeCanvas.height = 200;
+        gaugeCanvas.style.maxWidth = '150px';
+        gaugeCanvas.style.maxHeight = '150px';
+        gaugeCanvas.style.margin = '10px auto';
+        gaugeCanvas.style.display = 'block';
+        
+        // Insert the gauge after the text
+        utilizationContainer.parentNode.appendChild(gaugeCanvas);
+        
+        // Create the utilization gauge
+        window.chartManager.createUtilizationGauge('utilizationGaugeChart', currentRate, 75);
+        console.log(`📊 Created utilization gauge showing ${currentRate}% utilization`);
+    }
+    
+    // Enhance business intelligence display with charts
+    enhanceBusinessIntelligenceCharts();
+    
+    console.log('✨ Inventory analytics enhancement complete!');
+}
+
+function enhanceBusinessIntelligenceCharts() {
+    console.log('📈 CHART ENHANCEMENT: Adding business intelligence visualizations...');
+    
+    // Add chart containers to business intelligence sections
+    const biSection = document.getElementById('business-intelligence');
+    if (biSection && window.chartManager) {
+        // Add store distribution chart container
+        const storeChartContainer = document.createElement('div');
+        storeChartContainer.innerHTML = `
+            <div class="chart-container mt-4">
+                <div class="chart-header">
+                    <h5><i class="fas fa-store"></i> Store Distribution</h5>
+                    <div class="data-refresh-indicator live">
+                        <i class="fas fa-circle"></i> Live
+                    </div>
+                </div>
+                <div class="chart-body">
+                    <canvas id="storeDistributionChart" style="max-height: 300px;"></canvas>
+                </div>
+            </div>
+        `;
+        
+        // Add inventory type chart container  
+        const typeChartContainer = document.createElement('div');
+        typeChartContainer.innerHTML = `
+            <div class="chart-container mt-4">
+                <div class="chart-header">
+                    <h5><i class="fas fa-chart-pie"></i> Inventory Type Distribution</h5>
+                    <div class="data-refresh-indicator live">
+                        <i class="fas fa-circle"></i> Live
+                    </div>
+                </div>
+                <div class="chart-body">
+                    <canvas id="inventoryTypeChart" style="max-height: 300px;"></canvas>
+                </div>
+            </div>
+        `;
+        
+        // Insert at the end of business intelligence section
+        biSection.appendChild(storeChartContainer);
+        biSection.appendChild(typeChartContainer);
+        
+        console.log('📊 Added chart containers for business intelligence');
+    }
+}
+
+// Override the original business intelligence update function to include charts
+const originalUpdateBI = window.updateBusinessIntelligenceDisplay;
+window.updateBusinessIntelligenceDisplay = function(data) {
+    // Call original function first
+    if (originalUpdateBI) {
+        originalUpdateBI(data);
+    }
+    
+    // Add enhanced chart visualizations
+    updateBusinessIntelligenceCharts(data);
+};
+
+function updateBusinessIntelligenceCharts(data) {
+    if (!window.chartManager || !data) return;
+    
+    console.log('🎨 VISUALIZATION: Updating business intelligence charts with live data...');
+    
+    // Update store distribution chart
+    if (data.store_analysis && data.store_analysis.distribution) {
+        const storeData = {
+            labels: data.store_analysis.distribution.map(store => 
+                store.store_code === 'Unassigned' ? 'Unassigned' : `Store ${store.store_code}`
+            ),
+            values: data.store_analysis.distribution.map(store => store.item_count)
+        };
+        
+        window.chartManager.createStorePerformanceChart('storeDistributionChart', {
+            stores: data.store_analysis.distribution.map(store => ({ code: store.store_code })),
+            values: data.store_analysis.distribution.map(store => store.avg_sell_price || 0)
+        });
+        
+        console.log(`📈 Updated store distribution chart with ${storeData.labels.length} stores`);
+    }
+    
+    // Update inventory type chart
+    if (data.inventory_type_analysis && data.inventory_type_analysis.distribution) {
+        const typeData = {
+            labels: data.inventory_type_analysis.distribution.map(type => 
+                type.type === 'None' ? 'Untyped' : type.type
+            ),
+            values: data.inventory_type_analysis.distribution.map(type => type.count)
+        };
+        
+        window.chartManager.createInventoryDistributionChart('inventoryTypeChart', typeData, {
+            text: `${typeData.values.reduce((a, b) => a + b, 0).toLocaleString()}`,
+            subtext: 'Total Items'
+        });
+        
+        console.log(`🥧 Updated inventory type chart with ${typeData.labels.length} types`);
+    }
+    
+    console.log('✅ Business intelligence charts updated successfully');
+  }
+</script>
+<!-- Tab 6 Fixes - Usage Analysis and Resale Tracking -->
+<script src="/static/js/tab6_fixes.js"></script>
+
 {% endblock %}

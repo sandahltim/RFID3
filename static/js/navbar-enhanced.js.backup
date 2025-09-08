@@ -1,0 +1,297 @@
+/**
+ * Enhanced Navbar JavaScript - Bootstrap 5 Compatible
+ * Fixes all mobile and desktop navbar issues without conflicts
+ */
+
+(function() {
+    'use strict';
+
+    // Mobile detection with caching
+    let isMobileCache = null;
+    const isMobile = () => {
+        if (isMobileCache !== null) return isMobileCache;
+        isMobileCache = window.innerWidth <= 991.98 || /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        return isMobileCache;
+    };
+
+    // Clear mobile cache on resize
+    let resizeTimeout;
+    window.addEventListener('resize', () => {
+        clearTimeout(resizeTimeout);
+        resizeTimeout = setTimeout(() => {
+            isMobileCache = null;
+        }, 150);
+    });
+
+    // Enhanced navbar functionality
+    const initNavbar = () => {
+        const navbar = document.getElementById('main-navbar');
+        const navbarToggler = document.querySelector('.navbar-toggler');
+        const navbarCollapse = document.getElementById('navbarContent');
+        
+        if (!navbar || !navbarToggler || !navbarCollapse) {
+            console.warn('Navbar elements not found');
+            return;
+        }
+
+        // Fix mobile hamburger menu - ensure it works with Bootstrap 5
+        navbarToggler.addEventListener('click', function(e) {
+            // Let Bootstrap handle the toggle, just add visual feedback
+            const isExpanded = this.getAttribute('aria-expanded') === 'true';
+            
+            // Visual feedback for the toggler
+            this.classList.toggle('collapsed', isExpanded);
+            
+            // Smooth animation
+            if (!isExpanded) {
+                navbarCollapse.style.transition = 'all 0.35s ease';
+            }
+        });
+
+        // Close mobile menu when clicking nav links (but not dropdown toggles)
+        navbarCollapse.addEventListener('click', function(e) {
+            const target = e.target;
+            
+            // Only close if it's a direct nav link, not a dropdown toggle
+            if (target.classList.contains('nav-link') && 
+                !target.classList.contains('dropdown-toggle') && 
+                isMobile()) {
+                
+                // Use Bootstrap's collapse method
+                const bsCollapse = new bootstrap.Collapse(navbarCollapse, {
+                    hide: true
+                });
+                
+                // Update toggler state
+                navbarToggler.setAttribute('aria-expanded', 'false');
+                navbarToggler.classList.add('collapsed');
+            }
+        });
+
+        // Enhanced dropdown behavior
+        initDropdowns();
+
+        // Add touch feedback for mobile
+        if (isMobile()) {
+            addTouchFeedback();
+        }
+
+        // Fix navbar positioning issues
+        fixNavbarPositioning();
+    };
+
+    // Initialize dropdown functionality
+    const initDropdowns = () => {
+        const dropdownToggles = document.querySelectorAll('.dropdown-toggle');
+        
+        dropdownToggles.forEach(toggle => {
+            // Remove any existing event listeners to prevent conflicts
+            const newToggle = toggle.cloneNode(true);
+            toggle.parentNode.replaceChild(newToggle, toggle);
+            
+            // Add proper event handling
+            newToggle.addEventListener('click', function(e) {
+                if (isMobile()) {
+                    // On mobile, let Bootstrap handle it but ensure proper behavior
+                    const dropdown = bootstrap.Dropdown.getOrCreateInstance(this);
+                    
+                    // Close other dropdowns first
+                    document.querySelectorAll('.dropdown-menu.show').forEach(menu => {
+                        if (menu !== this.nextElementSibling) {
+                            const otherToggle = menu.previousElementSibling;
+                            if (otherToggle && otherToggle !== this) {
+                                const otherDropdown = bootstrap.Dropdown.getInstance(otherToggle);
+                                if (otherDropdown) {
+                                    otherDropdown.hide();
+                                }
+                            }
+                        }
+                    });
+                } else {
+                    // On desktop, ensure proper positioning
+                    ensureDropdownInViewport(this);
+                }
+            });
+
+            // Add keyboard support
+            newToggle.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    this.click();
+                }
+            });
+        });
+
+        // Close dropdowns when clicking outside
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('.dropdown')) {
+                // Close all open dropdowns
+                document.querySelectorAll('.dropdown-menu.show').forEach(menu => {
+                    const toggle = menu.previousElementSibling;
+                    if (toggle) {
+                        const dropdown = bootstrap.Dropdown.getInstance(toggle);
+                        if (dropdown) {
+                            dropdown.hide();
+                        }
+                    }
+                });
+            }
+        });
+    };
+
+    // Ensure dropdown stays in viewport on desktop
+    const ensureDropdownInViewport = (toggle) => {
+        if (isMobile()) return;
+
+        const dropdown = toggle.nextElementSibling;
+        if (!dropdown) return;
+
+        // Wait for Bootstrap to position the dropdown
+        setTimeout(() => {
+            const rect = dropdown.getBoundingClientRect();
+            const viewportHeight = window.innerHeight;
+            const viewportWidth = window.innerWidth;
+
+            // Adjust horizontal position if needed
+            if (rect.right > viewportWidth) {
+                dropdown.classList.add('dropdown-menu-end');
+            }
+
+            // Adjust vertical position if needed
+            if (rect.bottom > viewportHeight - 20) {
+                dropdown.style.transform = 'translateY(-100%)';
+                dropdown.style.top = 'auto';
+                dropdown.style.bottom = '100%';
+            }
+        }, 10);
+    };
+
+    // Add touch feedback for mobile interactions
+    const addTouchFeedback = () => {
+        const touchElements = document.querySelectorAll('.nav-link, .dropdown-item, .navbar-toggler');
+        
+        touchElements.forEach(element => {
+            element.addEventListener('touchstart', function() {
+                this.style.opacity = '0.7';
+                this.style.transform = 'scale(0.98)';
+            }, { passive: true });
+
+            element.addEventListener('touchend', function() {
+                this.style.opacity = '1';
+                this.style.transform = 'scale(1)';
+            }, { passive: true });
+
+            element.addEventListener('touchcancel', function() {
+                this.style.opacity = '1';
+                this.style.transform = 'scale(1)';
+            }, { passive: true });
+        });
+    };
+
+    // Fix navbar positioning issues
+    const fixNavbarPositioning = () => {
+        const navbar = document.getElementById('main-navbar');
+        if (!navbar) return;
+
+        // Ensure navbar is properly fixed
+        navbar.style.position = 'fixed';
+        navbar.style.top = '0';
+        navbar.style.left = '0';
+        navbar.style.right = '0';
+        navbar.style.zIndex = '1030';
+
+        // Fix body padding
+        const updateBodyPadding = () => {
+            const navbarHeight = navbar.offsetHeight;
+            document.body.style.paddingTop = '0'; // Reset
+            document.querySelector('.main-content').style.marginTop = `${navbarHeight}px`;
+        };
+
+        updateBodyPadding();
+
+        // Update on resize
+        window.addEventListener('resize', debounce(updateBodyPadding, 150));
+    };
+
+    // Utility: Debounce function
+    const debounce = (func, wait) => {
+        let timeout;
+        return function executedFunction(...args) {
+            const later = () => {
+                clearTimeout(timeout);
+                func(...args);
+            };
+            clearTimeout(timeout);
+            timeout = setTimeout(later, wait);
+        };
+    };
+
+    // Performance optimizations for mobile
+    const optimizeForMobile = () => {
+        if (!isMobile()) return;
+
+        // Disable expensive CSS animations on mobile
+        const style = document.createElement('style');
+        style.textContent = `
+            @media (max-width: 991.98px) {
+                * {
+                    -webkit-animation-duration: 0.01ms !important;
+                    animation-duration: 0.01ms !important;
+                    -webkit-animation-iteration-count: 1 !important;
+                    animation-iteration-count: 1 !important;
+                    -webkit-transition-duration: 0.01ms !important;
+                    transition-duration: 0.01ms !important;
+                }
+                
+                .dropdown-menu {
+                    transition: none !important;
+                }
+            }
+        `;
+        document.head.appendChild(style);
+
+        // Enable touch-action for better scrolling
+        document.body.style.touchAction = 'manipulation';
+    };
+
+    // Initialize everything when DOM is ready
+    const init = () => {
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', init);
+            return;
+        }
+
+        console.log('Initializing enhanced navbar...');
+        
+        // Wait for Bootstrap to be available
+        if (typeof bootstrap === 'undefined') {
+            console.warn('Bootstrap not loaded, retrying...');
+            setTimeout(init, 100);
+            return;
+        }
+
+        initNavbar();
+        optimizeForMobile();
+
+        console.log('Enhanced navbar initialized successfully');
+    };
+
+    // Start initialization
+    init();
+
+    // Expose utilities for other scripts
+    window.NavbarEnhanced = {
+        isMobile,
+        reinit: initNavbar,
+        optimizeForMobile
+    };
+
+    // Handle page visibility changes (mobile browser switching)
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) {
+            // Re-check mobile state when page becomes visible
+            isMobileCache = null;
+        }
+    });
+
+})();

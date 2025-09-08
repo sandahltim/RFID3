@@ -1,0 +1,206 @@
+groups:
+  - name: ai-agent.rules
+    rules:
+      # AI Agent Application Health
+      - alert: AIAgentDown
+        expr: up{job="ai-agent"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "AI Agent application is down"
+          description: "AI Agent has been down for more than 1 minute."
+
+      # Query Performance Alerts
+      - alert: SlowQueryResponse
+        expr: histogram_quantile(0.95, rate(ai_agent_query_duration_seconds_bucket[5m])) > 10
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "AI Agent queries are responding slowly"
+          description: "95th percentile of query response time is {{ $value }} seconds."
+
+      - alert: HighQueryErrorRate
+        expr: rate(ai_agent_query_errors_total[5m]) / rate(ai_agent_queries_total[5m]) > 0.05
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High query error rate"
+          description: "Error rate is {{ $value | humanizePercentage }} of queries."
+
+      # LLM Model Health
+      - alert: OllamaModelDown
+        expr: up{job="ollama"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Ollama LLM server is down"
+          description: "Ollama server has been unreachable for more than 2 minutes."
+
+      - alert: LLMInferenceTimeout
+        expr: histogram_quantile(0.90, rate(ollama_inference_duration_seconds_bucket[5m])) > 30
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "LLM inference taking too long"
+          description: "90th percentile inference time is {{ $value }} seconds."
+
+      # GPU Resource Alerts
+      - alert: GPUMemoryHigh
+        expr: DCGM_FI_DEV_MEM_COPY_UTIL > 90
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "GPU memory utilization high"
+          description: "GPU memory utilization is {{ $value }}%."
+
+      - alert: GPUTemperatureHigh
+        expr: DCGM_FI_DEV_GPU_TEMP > 85
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "GPU temperature critical"
+          description: "GPU temperature is {{ $value }}°C."
+
+      # Cache Performance
+      - alert: RedisCacheDown
+        expr: up{job="redis"} == 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Redis cache is down"
+          description: "Redis cache server is unreachable."
+
+      - alert: LowCacheHitRate
+        expr: rate(redis_keyspace_hits_total[5m]) / (rate(redis_keyspace_hits_total[5m]) + rate(redis_keyspace_misses_total[5m])) < 0.5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Low cache hit rate"
+          description: "Cache hit rate is {{ $value | humanizePercentage }}."
+
+      # System Resource Alerts
+      - alert: HighCPUUsage
+        expr: 100 - (avg by(instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage"
+          description: "CPU usage is {{ $value }}%."
+
+      - alert: HighMemoryUsage
+        expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100 > 90
+        for: 3m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High memory usage"
+          description: "Memory usage is {{ $value }}%."
+
+      - alert: LowDiskSpace
+        expr: (node_filesystem_avail_bytes / node_filesystem_size_bytes) * 100 < 10
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Low disk space"
+          description: "Disk space is {{ $value }}% available."
+
+      # Business Intelligence Alerts
+      - alert: NoRecentQueries
+        expr: increase(ai_agent_queries_total[1h]) == 0
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "No queries received in the last hour"
+          description: "AI Agent has not received any queries for 1 hour."
+
+      - alert: HighUserComplaintRate
+        expr: rate(ai_agent_feedback_negative_total[10m]) / rate(ai_agent_feedback_total[10m]) > 0.3
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High negative feedback rate"
+          description: "{{ $value | humanizePercentage }} of recent feedback is negative."
+
+      # Database Connectivity
+      - alert: DatabaseConnectionFail
+        expr: ai_agent_database_connection_failures_total > 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Database connection failures"
+          description: "AI Agent cannot connect to MariaDB database."
+
+      # External API Health
+      - alert: WeatherAPIDown
+        expr: ai_agent_external_api_errors_total{api="weather"} > 5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Weather API experiencing issues"
+          description: "Weather API has {{ $value }} errors in the last 5 minutes."
+
+  - name: security.rules
+    rules:
+      # Security Alerts
+      - alert: SuspiciousQueryPattern
+        expr: increase(ai_agent_security_alerts_total{type="suspicious_query"}[5m]) > 0
+        for: 0s
+        labels:
+          severity: high
+        annotations:
+          summary: "Suspicious query patterns detected"
+          description: "{{ $value }} suspicious queries detected in the last 5 minutes."
+
+      - alert: SQLInjectionAttempt
+        expr: increase(ai_agent_security_alerts_total{type="sql_injection"}[1m]) > 0
+        for: 0s
+        labels:
+          severity: critical
+        annotations:
+          summary: "SQL injection attempt detected"
+          description: "Potential SQL injection attempt detected."
+
+      - alert: UnauthorizedAccess
+        expr: increase(ai_agent_security_alerts_total{type="unauthorized"}[5m]) > 3
+        for: 1m
+        labels:
+          severity: high
+        annotations:
+          summary: "Multiple unauthorized access attempts"
+          description: "{{ $value }} unauthorized access attempts in 5 minutes."
+
+  - name: business.rules
+    rules:
+      # Business Intelligence Metrics
+      - alert: LowBusinessInsightGeneration
+        expr: rate(ai_agent_insights_generated_total[1h]) < 0.1
+        for: 2h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Low business insight generation rate"
+          description: "Only {{ $value }} insights generated per hour."
+
+      - alert: DataCorrelationFailure
+        expr: increase(ai_agent_correlation_failures_total[30m]) > 5
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Multiple data correlation failures"
+          description: "{{ $value }} correlation analysis failures in 30 minutes."
