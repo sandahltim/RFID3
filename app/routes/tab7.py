@@ -194,7 +194,36 @@ def tab7_view():
         "Loading Executive Dashboard at %s",
         datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
     )
-    return render_template("executive_dashboard.html", store_mapping=STORE_MAPPING)
+    
+    # Get dashboard display configuration
+    try:
+        from app.models.config_models import ExecutiveDashboardConfiguration, get_default_executive_dashboard_config
+        config = ExecutiveDashboardConfiguration.query.filter_by(
+            user_id='default_user', 
+            config_name='default'
+        ).first()
+        
+        if config:
+            dashboard_config = {
+                'current_week_view_enabled': config.current_week_view_enabled
+            }
+        else:
+            # Use default configuration
+            defaults = get_default_executive_dashboard_config()
+            dashboard_config = {
+                'current_week_view_enabled': defaults['display']['current_week_view_enabled']
+            }
+    except Exception as e:
+        logger.warning(f"Failed to load dashboard config: {e}. Using defaults.")
+        dashboard_config = {
+            'current_week_view_enabled': True  # Safe default
+        }
+    
+    return render_template(
+        "executive_dashboard.html", 
+        store_mapping=STORE_MAPPING,
+        dashboard_config=dashboard_config
+    )
 
 
 @tab7_bp.route("/api/executive/data_availability", methods=["GET"])

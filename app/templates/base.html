@@ -248,9 +248,48 @@
             }, 100);
         };
         
-        // Reinitialize dropdowns when content changes
-        const observer = new MutationObserver(() => {
-            reinitializeDropdowns();
+        // Throttled dropdown reinitialization to prevent spam
+        let reinitTimer = null;
+        let lastReinit = 0;
+        const REINIT_THROTTLE_MS = 1000; // Max once per second
+        
+        const observer = new MutationObserver((mutations) => {
+            // Skip if we recently reinitialized 
+            const now = Date.now();
+            if (now - lastReinit < REINIT_THROTTLE_MS) {
+                return;
+            }
+            
+            // Only reinitialize if mutations actually affect dropdown elements
+            let needsReinit = false;
+            for (const mutation of mutations) {
+                if (mutation.type === 'childList') {
+                    for (const node of mutation.addedNodes) {
+                        if (node.nodeType === Node.ELEMENT_NODE) {
+                            if (node.classList?.contains('dropdown') || 
+                                node.querySelector?.('.dropdown-toggle')) {
+                                needsReinit = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+                if (needsReinit) break;
+            }
+            
+            if (needsReinit) {
+                // Clear previous timer
+                if (reinitTimer) {
+                    clearTimeout(reinitTimer);
+                }
+                
+                // Throttle reinitializations
+                reinitTimer = setTimeout(() => {
+                    reinitializeDropdowns();
+                    lastReinit = Date.now();
+                    reinitTimer = null;
+                }, 200); // 200ms delay to batch mutations
+            }
         });
         
         observer.observe(document.body, { childList: true, subtree: true });
