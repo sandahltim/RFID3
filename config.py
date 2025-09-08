@@ -9,7 +9,7 @@ STATIC_DIR = BASE_DIR / "static"
 SHARED_DIR = BASE_DIR / "shared"
 
 # Application IP address
-APP_IP = os.environ.get('APP_IP', '192.168.3.110')
+APP_IP = os.environ.get('APP_IP', '100.103.67.41')
 
 # MariaDB configuration
 DB_CONFIG = {
@@ -73,4 +73,5 @@ def validate_config():
         import logging
         logging.warning(f"Using default values for: {', '.join(using_defaults)}. "
                        f"Set environment variables for production security.")
+
 
