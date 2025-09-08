@@ -1,0 +1,233 @@
+{
+  "total_tests": 21,
+  "passed_tests": 17,
+  "failed_tests": 4,
+  "endpoints_tested": [
+    "/api/enhanced/dashboard/kpis",
+    "/api/enhanced/dashboard/store-performance",
+    "/api/predictive/correlations/analyze",
+    "/api/predictive/external-data/fetch",
+    "/api/predictive/optimization/inventory",
+    "/api/predictive/demand/forecast",
+    "/bi/api/store-performance",
+    "/bi/api/inventory-kpis",
+    "/api/nonexistent-endpoint",
+    "/api/predictive/insights/leading-indicators",
+    "/api/predictive/external-data/summary",
+    "/api/enhanced/business-analytics/utilization"
+  ],
+  "test_results": [
+    {
+      "endpoint": "/api/predictive/external-data/fetch",
+      "test_name": "External Data Fetch - Basic",
+      "status": "PASSED",
+      "status_code": 200,
+      "response_time_ms": 776.48,
+      "timestamp": "2025-08-28T22:33:27.199055",
+      "error": null,
+      "response_preview": "{\"data\": {\"by_source\": {\"economic\": 40, \"market\": 6, \"seasonal\": 18, \"weather\": 0}, \"fetch_timestamp\": \"2025-08-28T22:33:27.196436\", \"total_fetched\": 64, \"total_stored\": 64}, \"message\": \"Fetched and s..."
+    },
+    {
+      "endpoint": "/api/predictive/external-data/summary",
+      "test_name": "External Data Summary",
+      "status": "PASSED",
+      "status_code": 200,
+      "response_time_ms": 10.21,
+      "timestamp": "2025-08-28T22:33:27.209742",
+      "error": null,
+      "response_preview": "{\"data\": {\"economic\": {\"consumer_confidence\": {\"avg_value\": 95.39090909, \"date_range\": \"2022-01-01 to 2024-08-01\", \"record_count\": 11}, \"gas_price_avg\": {\"avg_value\": 3.232, \"date_range\": \"2022-01-01 ..."
+    },
+    {
+      "endpoint": "/api/predictive/correlations/analyze",
+      "test_name": "Correlation Analysis - Basic",
+      "status": "FAILED",
+      "status_code": 500,
+      "response_time_ms": 69.84,
+      "timestamp": "2025-08-28T22:33:27.279921",
+      "error": "HTTP 500: {\"error\":\"No aligned data available for analysis\",\"success\":false,\"timestamp\":\"2025-08-28T22:33:27.278267\"}\n",
+      "response_preview": null
+    },
+    {
+      "endpoint": "/api/predictive/demand/forecast",
+      "test_name": "Demand Forecast - Default Parameters",
+      "status": "PASSED",
+      "status_code": 200,
+      "response_time_ms": 3.81,
+      "timestamp": "2025-08-28T22:33:27.287072",
+      "error": null,
+      "response_preview": "{\"data\": {\"confidence_intervals\": {}, \"external_factors_considered\": [\"weather_temperature_avg_f\", \"economic_consumer_confidence\", \"seasonal_wedding_season\", \"seasonal_summer_events\"], \"forecast_perio..."
+    },
+    {
+      "endpoint": "/api/predictive/demand/forecast",
+      "test_name": "Demand Forecast - Custom Parameters (6 weeks, store 6800)",
+      "status": "PASSED",
+      "status_code": 200,
+      "response_time_ms": 3.79,
+      "timestamp": "2025-08-28T22:33:27.291188",
+      "error": null,
+      "response_preview": "{\"data\": {\"confidence_intervals\": {}, \"external_factors_considered\": [\"weather_temperature_avg_f\", \"economic_consumer_confidence\", \"seasonal_wedding_season\", \"seasonal_summer_events\"], \"forecast_perio..."
+    },
+    {
+      "endpoint": "/api/predictive/demand/forecast",
+      "test_name": "Demand Forecast - Edge Case (1 week)",
+      "status": "PASSED",
+      "status_code": 200,
+      "response_time_ms": 3.63,
+      "timestamp": "2025-08-28T22:33:27.295077",
+      "error": null,
+      "response_preview": "{\"data\": {\"confidence_intervals\": {}, \"external_factors_considered\": [\"weather_temperature_avg_f\", \"economic_consumer_confidence\", \"seasonal_wedding_season\", \"seasonal_summer_events\"], \"forecast_perio..."
+    },
+    {
+      "endpoint": "/api/predictive/insights/leading-indicators",
+      "test_name": "Leading Indicators Analysis",
+      "status": "PASSED",
+      "status_code": 200,
+      "response_time_ms": 31.04,
+      "timestamp": "2025-08-28T22:33:27.326438",
+      "error": null,
+      "response_preview": "{\"data\": {\"leading_indicators\": [{\"business_metric\": \"weekly_revenue\", \"correlation\": 0.65, \"factor\": \"weather_temperature_avg_f\", \"interpretation\": \"Temperature increases lead to higher revenue 2 wee..."
+    },
+    {
+      "endpoint": "/api/predictive/optimization/inventory",
+      "test_name": "Inventory Optimization - Default",
+      "status": "PASSED",
+      "status_code": 200,
+      "response_time_ms": 3.74,
+      "timestamp": "2025-08-28T22:33:27.330619",
+      "error": null,
+      "response_preview": "{\"data\": {\"financial_impact\": {\"inventory_investment_needed\": 8500, \"payback_period_months\": 4.2, \"potential_revenue_increase\": 3200, \"roi_estimate\": \"37.6%\"}, \"inventory_optimization\": {\"high_demand_..."
+    },
+    {
+      "endpoint": "/api/predictive/optimization/inventory",
+      "test_name": "Inventory Optimization - Store 6800",
+      "status": "PASSED",
+      "status_code": 200,
+      "response_time_ms": 2.62,
+      "timestamp": "2025-08-28T22:33:27.333509",
+      "error": null,
+      "response_preview": "{\"data\": {\"financial_impact\": {\"inventory_investment_needed\": 8500, \"payback_period_months\": 4.2, \"potential_revenue_increase\": 3200, \"roi_estimate\": \"37.6%\"}, \"inventory_optimization\": {\"high_demand_..."
+    },
+    {
+      "endpoint": "/api/enhanced/dashboard/kpis",
+      "test_name": "Enhanced KPIs - Default",
+      "status": "PASSED",
+      "status_code": 200,
+      "response_time_ms": 78.27,
+      "timestamp": "2025-08-28T22:33:27.412211",
+      "error": null,
+      "response_preview": "{\"data\": {\"active_alerts\": 25, \"avg_efficiency\": 83.267917, \"efficiency_trend\": 0, \"filter_context\": {\"store\": \"all\", \"total_items_in_view\": 65942, \"weeks\": 12}, \"items_available\": 11346, \"items_in_se..."
+    },
+    {
+      "endpoint": "/api/enhanced/dashboard/kpis",
+      "test_name": "Enhanced KPIs - 8 weeks, Store 6800",
+      "status": "PASSED",
+      "status_code": 200,
+      "response_time_ms": 112.56,
+      "timestamp": "2025-08-28T22:33:27.525009",
+      "error": null,
+      "response_preview": "{\"data\": {\"active_alerts\": 25, \"avg_efficiency\": 74.325, \"efficiency_trend\": 0, \"filter_context\": {\"store\": \"6800\", \"total_items_in_view\": 22389, \"weeks\": 8}, \"items_available\": 0, \"items_in_service\":..."
+    },
+    {
+      "endpoint": "/api/enhanced/dashboard/store-performance",
+      "test_name": "Store Performance - Default",
+      "status": "PASSED",
+      "status_code": 200,
+      "response_time_ms": 9.21,
+      "timestamp": "2025-08-28T22:33:27.534616",
+      "error": null,
+      "response_preview": "{\"data\": [{\"avg_revenue\": 31711.5, \"efficiency\": 93.62, \"labor_ratio\": 26.49, \"store_code\": \"3607\", \"store_name\": \"Wayzata\"}, {\"avg_revenue\": 26416.0, \"efficiency\": 80.17, \"labor_ratio\": 27.17, \"store..."
+    },
+    {
+      "endpoint": "/api/enhanced/dashboard/store-performance",
+      "test_name": "Store Performance - 6 weeks",
+      "status": "PASSED",
+      "status_code": 200,
+      "response_time_ms": 9.4,
+      "timestamp": "2025-08-28T22:33:27.544264",
+      "error": null,
+      "response_preview": "{\"data\": [{\"avg_revenue\": 33616.333333, \"efficiency\": 94.733333, \"labor_ratio\": 25.853333, \"store_code\": \"3607\", \"store_name\": \"Wayzata\"}, {\"avg_revenue\": 26887.666667, \"efficiency\": 81.99, \"labor_rat..."
+    },
+    {
+      "endpoint": "/api/enhanced/business-analytics/utilization",
+      "test_name": "Equipment Utilization Analytics",
+      "status": "PASSED",
+      "status_code": 200,
+      "response_time_ms": 83.15,
+      "timestamp": "2025-08-28T22:33:27.628176",
+      "error": null,
+      "response_preview": "{\"data\": {\"category_analysis\": {\"category_performance\": {\"Baby, Beds & Medical Equipment\": {\"avg_revenue\": 0.0, \"item_count\": 3, \"revenue_per_item\": 0.0, \"total_revenue\": 0.0, \"total_value\": 0.0}, \"Ca..."
+    },
+    {
+      "endpoint": "/bi/api/inventory-kpis",
+      "test_name": "BI Inventory KPIs",
+      "status": "PASSED",
+      "status_code": 200,
+      "response_time_ms": 63.87,
+      "timestamp": "2025-08-28T22:33:27.692796",
+      "error": null,
+      "response_preview": "{\"data\": {\"current\": {\"active_alerts\": 25, \"growth\": 5.2, \"inventory_value\": 11493791.57, \"on_rent\": 436, \"recent_activity\": 6835, \"revenue\": 124850.0, \"total_items\": 65942, \"utilization\": 0.7}, \"heal..."
+    },
+    {
+      "endpoint": "/bi/api/store-performance",
+      "test_name": "BI Store Performance",
+      "status": "FAILED",
+      "status_code": 500,
+      "response_time_ms": 7.44,
+      "timestamp": "2025-08-28T22:33:27.700452",
+      "error": "HTTP 500: {\"error\":\"(mysql.connector.errors.ProgrammingError) 1054 (42S22): Unknown column 'sp.revenue_growth_pct' in 'SELECT'\\n[SQL: \\n            SELECT \\n                sp.period_ending,\\n                sp",
+      "response_preview": null
+    },
+    {
+      "endpoint": "/api/nonexistent-endpoint",
+      "test_name": "Non-existent Endpoint (Expected 404)",
+      "status": "FAILED",
+      "status_code": 404,
+      "response_time_ms": 2.71,
+      "timestamp": "2025-08-28T22:33:27.703474",
+      "error": "HTTP 404: <!doctype html>\n<html lang=en>\n<title>404 Not Found</title>\n<h1>Not Found</h1>\n<p>The requested URL was not found on the server. If you entered the URL manually please check your spelling and try agai",
+      "response_preview": null
+    },
+    {
+      "endpoint": "/api/predictive/demand/forecast",
+      "test_name": "Invalid Parameters (Expected Error)",
+      "status": "FAILED",
+      "status_code": 500,
+      "response_time_ms": 3.16,
+      "timestamp": "2025-08-28T22:33:27.706777",
+      "error": "HTTP 500: {\"error\":\"invalid literal for int() with base 10: 'invalid_number'\",\"success\":false,\"timestamp\":\"2025-08-28T22:33:27.705426\"}\n",
+      "response_preview": null
+    },
+    {
+      "endpoint": "/api/predictive/external-data/summary",
+      "test_name": "Performance Test - /api/predictive/external-data/summary",
+      "status": "PASSED",
+      "status_code": 200,
+      "response_time_ms": 4.77,
+      "timestamp": "2025-08-28T22:33:27.711873",
+      "error": null,
+      "response_preview": "{\"data\": {\"economic\": {\"consumer_confidence\": {\"avg_value\": 95.39090909, \"date_range\": \"2022-01-01 to 2024-08-01\", \"record_count\": 11}, \"gas_price_avg\": {\"avg_value\": 3.232, \"date_range\": \"2022-01-01 ..."
+    },
+    {
+      "endpoint": "/api/enhanced/dashboard/kpis",
+      "test_name": "Performance Test - /api/enhanced/dashboard/kpis",
+      "status": "PASSED",
+      "status_code": 200,
+      "response_time_ms": 46.75,
+      "timestamp": "2025-08-28T22:33:27.758883",
+      "error": null,
+      "response_preview": "{\"data\": {\"active_alerts\": 25, \"avg_efficiency\": 83.267917, \"efficiency_trend\": 0, \"filter_context\": {\"store\": \"all\", \"total_items_in_view\": 65942, \"weeks\": 12}, \"items_available\": 11346, \"items_in_se..."
+    },
+    {
+      "endpoint": "/api/enhanced/dashboard/store-performance",
+      "test_name": "Performance Test - /api/enhanced/dashboard/store-performance",
+      "status": "PASSED",
+      "status_code": 200,
+      "response_time_ms": 5.04,
+      "timestamp": "2025-08-28T22:33:27.764175",
+      "error": null,
+      "response_preview": "{\"data\": [{\"avg_revenue\": 31711.5, \"efficiency\": 93.62, \"labor_ratio\": 26.49, \"store_code\": \"3607\", \"store_name\": \"Wayzata\"}, {\"avg_revenue\": 26416.0, \"efficiency\": 80.17, \"labor_ratio\": 27.17, \"store..."
+    }
+  ],
+  "start_time": "2025-08-28T22:33:26.414456",
+  "end_time": "2025-08-28T22:33:27.764496"
+}

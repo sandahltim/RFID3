@@ -1,0 +1,1188 @@
+{% extends "base.html" %}
+
+{% block title %}System Configuration - RFID Dashboard{% endblock %}
+
+{% block extra_head %}
+<style>
+  .config-nav-pills .nav-link {
+    border-radius: 12px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    margin-bottom: 8px;
+  }
+  
+  .config-nav-pills .nav-link.active {
+    background: var(--bg-primary-gradient);
+    box-shadow: var(--shadow-soft);
+  }
+  
+  .configuration-container {
+    background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+    min-height: calc(100vh - 80px);
+    position: relative;
+    top: -80px;
+    margin-bottom: -80px;
+  }
+  
+  /* Override dashboard header for configuration page */
+  .configuration-container .dashboard-header {
+    padding: 10px 0;       /* Much smaller padding */
+    margin-bottom: 10px;   /* Minimal margin */
+    margin-top: 80px;      /* Account for navbar */
+  }
+  
+  .config-section {
+    background: white;
+    border-radius: 16px;
+    box-shadow: var(--shadow-card);
+    border: 1px solid rgba(0, 0, 0, 0.05);
+    transition: all 0.3s ease;
+  }
+  
+  .config-section:hover {
+    box-shadow: var(--shadow-hover);
+  }
+  
+  .section-header {
+    background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+    border-radius: 16px 16px 0 0;
+    padding: 20px 25px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  }
+  
+  .section-header h5 {
+    font-weight: 600;
+    color: var(--executive-primary);
+    margin: 0;
+    display: flex;
+    align-items: center;
+  }
+  
+  .section-header i {
+    margin-right: 10px;
+    color: var(--executive-secondary);
+  }
+  
+  .config-form {
+    padding: 25px;
+  }
+  
+  .form-group-advanced {
+    margin-bottom: 2rem;
+    position: relative;
+  }
+  
+  .form-group-advanced label {
+    font-weight: 600;
+    color: var(--executive-primary);
+    margin-bottom: 8px;
+    display: block;
+  }
+  
+  .form-control-advanced {
+    border-radius: 12px;
+    border: 2px solid rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease;
+    padding: 12px 16px;
+    font-weight: 500;
+  }
+  
+  .form-control-advanced:focus {
+    border-color: var(--executive-primary);
+    box-shadow: 0 0 0 3px rgba(30, 64, 175, 0.1);
+  }
+  
+  .form-check-advanced {
+    margin-bottom: 12px;
+    position: relative;
+  }
+  
+  .form-check-advanced .form-check-input {
+    width: 1.2em;
+    height: 1.2em;
+    margin-top: 0.1em;
+  }
+  
+  .form-check-advanced .form-check-label {
+    font-weight: 500;
+    color: #374151;
+    margin-left: 8px;
+  }
+  
+  .btn-config-primary {
+    background: var(--bg-primary-gradient);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    padding: 12px 24px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    transition: all 0.3s ease;
+    box-shadow: var(--shadow-soft);
+  }
+  
+  .btn-config-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-card);
+    color: white;
+  }
+  
+  .btn-config-secondary {
+    background: var(--bg-secondary-gradient, #6b7280);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    padding: 12px 24px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+  }
+  
+  .config-help-text {
+    font-size: 0.85rem;
+    color: #6b7280;
+    margin-top: 4px;
+    font-style: italic;
+  }
+  
+  .config-divider {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(0,0,0,0.1), transparent);
+    margin: 30px 0;
+  }
+  
+  .alert-config {
+    border: none;
+    border-radius: 12px;
+    padding: 15px 20px;
+    font-weight: 500;
+  }
+  
+  .range-slider {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 8px;
+    border-radius: 5px;
+    background: #e2e8f0;
+    outline: none;
+    transition: all 0.3s ease;
+  }
+  
+  .range-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--executive-primary);
+    cursor: pointer;
+    box-shadow: var(--shadow-soft);
+  }
+  
+  .range-slider::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--executive-primary);
+    cursor: pointer;
+    border: none;
+    box-shadow: var(--shadow-soft);
+  }
+  
+  .config-preview {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 15px;
+    margin-top: 15px;
+  }
+  
+  .config-preview-title {
+    font-weight: 600;
+    color: var(--executive-primary);
+    margin-bottom: 10px;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="configuration-container">
+  <!-- Configuration Header -->
+  <div class="dashboard-header text-center">
+    <div class="container">
+      <h1 class="display-5 fw-bold mb-3">
+        <i class="fas fa-cogs me-3"></i>System Configuration
+      </h1>
+      <p class="lead mb-0">Configure your RFID3 predictive analytics system parameters and preferences</p>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="row">
+      <!-- Navigation Sidebar -->
+      <div class="col-lg-3">
+        <div class="config-section sticky-top" style="top: 20px;">
+          <div class="section-header">
+            <h5><i class="fas fa-list"></i>Configuration Sections</h5>
+          </div>
+          <div class="p-3">
+            <div class="nav flex-column config-nav-pills" id="config-nav-tab" role="tablist">
+              <button class="nav-link active" id="prediction-tab" data-bs-toggle="pill" 
+                      data-bs-target="#prediction-panel" type="button" role="tab">
+                <i class="fas fa-chart-line me-2"></i>Prediction Parameters
+              </button>
+              <button class="nav-link" id="correlation-tab" data-bs-toggle="pill" 
+                      data-bs-target="#correlation-panel" type="button" role="tab">
+                <i class="fas fa-project-diagram me-2"></i>Correlation Analysis
+              </button>
+              <button class="nav-link" id="bi-tab" data-bs-toggle="pill" 
+                      data-bs-target="#bi-panel" type="button" role="tab">
+                <i class="fas fa-chart-bar me-2"></i>Business Intelligence
+              </button>
+              <button class="nav-link" id="integration-tab" data-bs-toggle="pill" 
+                      data-bs-target="#integration-panel" type="button" role="tab">
+                <i class="fas fa-database me-2"></i>Data Integration
+              </button>
+              <button class="nav-link" id="preferences-tab" data-bs-toggle="pill" 
+                      data-bs-target="#preferences-panel" type="button" role="tab">
+                <i class="fas fa-user-cog me-2"></i>User Preferences
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Configuration Panels -->
+      <div class="col-lg-9">
+        <div class="tab-content" id="config-tabContent">
+          
+          <!-- Prediction Parameters Panel -->
+          <div class="tab-pane fade show active" id="prediction-panel" role="tabpanel">
+            <div class="config-section">
+              <div class="section-header">
+                <h5><i class="fas fa-chart-line"></i>Prediction Parameters Configuration</h5>
+              </div>
+              <form class="config-form" id="prediction-form">
+                
+                <!-- Forecast Horizons -->
+                <div class="form-group-advanced">
+                  <label>Forecast Horizons</label>
+                  <div class="row">
+                    <div class="col-md-3">
+                      <div class="form-check-advanced">
+                        <input class="form-check-input" type="checkbox" id="forecast_weekly" checked>
+                        <label class="form-check-label" for="forecast_weekly">Weekly</label>
+                      </div>
+                    </div>
+                    <div class="col-md-3">
+                      <div class="form-check-advanced">
+                        <input class="form-check-input" type="checkbox" id="forecast_monthly" checked>
+                        <label class="form-check-label" for="forecast_monthly">Monthly</label>
+                      </div>
+                    </div>
+                    <div class="col-md-3">
+                      <div class="form-check-advanced">
+                        <input class="form-check-input" type="checkbox" id="forecast_quarterly" checked>
+                        <label class="form-check-label" for="forecast_quarterly">Quarterly</label>
+                      </div>
+                    </div>
+                    <div class="col-md-3">
+                      <div class="form-check-advanced">
+                        <input class="form-check-input" type="checkbox" id="forecast_yearly">
+                        <label class="form-check-label" for="forecast_yearly">Yearly</label>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="config-help-text">Select which forecast horizons to generate predictions for</div>
+                </div>
+
+                <!-- Confidence Intervals -->
+                <div class="form-group-advanced">
+                  <label>Confidence Intervals</label>
+                  <div class="row">
+                    <div class="col-md-4">
+                      <div class="form-check-advanced">
+                        <input class="form-check-input" type="checkbox" id="confidence_80" checked>
+                        <label class="form-check-label" for="confidence_80">80%</label>
+                      </div>
+                    </div>
+                    <div class="col-md-4">
+                      <div class="form-check-advanced">
+                        <input class="form-check-input" type="checkbox" id="confidence_90" checked>
+                        <label class="form-check-label" for="confidence_90">90%</label>
+                      </div>
+                    </div>
+                    <div class="col-md-4">
+                      <div class="form-check-advanced">
+                        <input class="form-check-input" type="checkbox" id="confidence_95">
+                        <label class="form-check-label" for="confidence_95">95%</label>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="mt-3">
+                    <label for="default_confidence">Default Confidence Level</label>
+                    <select class="form-control-advanced form-select" id="default_confidence">
+                      <option value="80">80%</option>
+                      <option value="90" selected>90%</option>
+                      <option value="95">95%</option>
+                    </select>
+                  </div>
+                  <div class="config-help-text">Configure confidence intervals for prediction accuracy</div>
+                </div>
+
+                <div class="config-divider"></div>
+
+                <!-- External Factor Weights -->
+                <div class="form-group-advanced">
+                  <label>External Factor Weights</label>
+                  <div class="row">
+                    <div class="col-md-6">
+                      <label for="seasonality_weight">Seasonality Weight</label>
+                      <input type="range" class="range-slider" id="seasonality_weight" 
+                             min="0" max="1" step="0.1" value="0.3">
+                      <div class="d-flex justify-content-between small text-muted">
+                        <span>0%</span>
+                        <span id="seasonality_value">30%</span>
+                        <span>100%</span>
+                      </div>
+                    </div>
+                    <div class="col-md-6">
+                      <label for="trend_weight">Trend Weight</label>
+                      <input type="range" class="range-slider" id="trend_weight" 
+                             min="0" max="1" step="0.1" value="0.4">
+                      <div class="d-flex justify-content-between small text-muted">
+                        <span>0%</span>
+                        <span id="trend_value">40%</span>
+                        <span>100%</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="row mt-3">
+                    <div class="col-md-6">
+                      <label for="economic_weight">Economic Weight</label>
+                      <input type="range" class="range-slider" id="economic_weight" 
+                             min="0" max="1" step="0.1" value="0.2">
+                      <div class="d-flex justify-content-between small text-muted">
+                        <span>0%</span>
+                        <span id="economic_value">20%</span>
+                        <span>100%</span>
+                      </div>
+                    </div>
+                    <div class="col-md-6">
+                      <label for="promotional_weight">Promotional Weight</label>
+                      <input type="range" class="range-slider" id="promotional_weight" 
+                             min="0" max="1" step="0.1" value="0.1">
+                      <div class="d-flex justify-content-between small text-muted">
+                        <span>0%</span>
+                        <span id="promotional_value">10%</span>
+                        <span>100%</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="config-help-text">Adjust the importance of different external factors in predictions</div>
+                </div>
+
+                <div class="config-divider"></div>
+
+                <!-- Alert Thresholds -->
+                <div class="form-group-advanced">
+                  <label>Alert Thresholds</label>
+                  <div class="row">
+                    <div class="col-md-4">
+                      <label for="low_stock_threshold">Low Stock Threshold</label>
+                      <div class="input-group">
+                        <input type="number" class="form-control-advanced" id="low_stock_threshold" 
+                               value="20" min="5" max="50" step="5">
+                        <span class="input-group-text">%</span>
+                      </div>
+                    </div>
+                    <div class="col-md-4">
+                      <label for="high_stock_threshold">High Stock Threshold</label>
+                      <div class="input-group">
+                        <input type="number" class="form-control-advanced" id="high_stock_threshold" 
+                               value="200" min="150" max="500" step="25">
+                        <span class="input-group-text">%</span>
+                      </div>
+                    </div>
+                    <div class="col-md-4">
+                      <label for="demand_spike_threshold">Demand Spike Threshold</label>
+                      <div class="input-group">
+                        <input type="number" class="form-control-advanced" id="demand_spike_threshold" 
+                               value="150" min="120" max="300" step="10">
+                        <span class="input-group-text">%</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="config-help-text">Set thresholds for inventory alerts relative to average levels</div>
+                </div>
+
+                <!-- Store-Specific Settings -->
+                <div class="form-group-advanced">
+                  <label>Store-Specific Settings</label>
+                  <div class="form-check-advanced">
+                    <input class="form-check-input" type="checkbox" id="store_specific_enabled" checked>
+                    <label class="form-check-label" for="store_specific_enabled">
+                      Enable store-specific prediction parameters
+                    </label>
+                  </div>
+                  <div id="store_mappings_container" class="mt-3">
+                    <div class="config-preview">
+                      <div class="config-preview-title">Store Mappings Preview</div>
+                      <div id="store_mappings_preview">
+                        <small class="text-muted">Configure individual parameters for each store location</small>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="d-flex gap-3 mt-4">
+                  <button type="submit" class="btn btn-config-primary">
+                    <i class="fas fa-save me-2"></i>Save Prediction Settings
+                  </button>
+                  <button type="button" class="btn btn-config-secondary" id="reset-prediction">
+                    <i class="fas fa-undo me-2"></i>Reset to Defaults
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+
+          <!-- Correlation Analysis Panel -->
+          <div class="tab-pane fade" id="correlation-panel" role="tabpanel">
+            <div class="config-section">
+              <div class="section-header">
+                <h5><i class="fas fa-project-diagram"></i>Correlation Analysis Settings</h5>
+              </div>
+              <form class="config-form" id="correlation-form">
+                
+                <!-- Minimum Correlation Thresholds -->
+                <div class="form-group-advanced">
+                  <label>Minimum Correlation Thresholds</label>
+                  <div class="row">
+                    <div class="col-md-4">
+                      <label for="correlation_weak">Weak Correlation</label>
+                      <div class="input-group">
+                        <input type="number" class="form-control-advanced" id="correlation_weak" 
+                               value="0.3" min="0.1" max="0.5" step="0.05">
+                        <span class="input-group-text">r</span>
+                      </div>
+                    </div>
+                    <div class="col-md-4">
+                      <label for="correlation_moderate">Moderate Correlation</label>
+                      <div class="input-group">
+                        <input type="number" class="form-control-advanced" id="correlation_moderate" 
+                               value="0.5" min="0.3" max="0.7" step="0.05">
+                        <span class="input-group-text">r</span>
+                      </div>
+                    </div>
+                    <div class="col-md-4">
+                      <label for="correlation_strong">Strong Correlation</label>
+                      <div class="input-group">
+                        <input type="number" class="form-control-advanced" id="correlation_strong" 
+                               value="0.7" min="0.5" max="0.9" step="0.05">
+                        <span class="input-group-text">r</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="config-help-text">Define minimum correlation coefficients for relationship classification</div>
+                </div>
+
+                <!-- Statistical Significance -->
+                <div class="form-group-advanced">
+                  <label>Statistical Significance Levels</label>
+                  <div class="row">
+                    <div class="col-md-6">
+                      <label for="p_value_threshold">P-Value Threshold</label>
+                      <select class="form-control-advanced form-select" id="p_value_threshold">
+                        <option value="0.01">0.01 (99% confidence)</option>
+                        <option value="0.05" selected>0.05 (95% confidence)</option>
+                        <option value="0.10">0.10 (90% confidence)</option>
+                      </select>
+                    </div>
+                    <div class="col-md-6">
+                      <label for="confidence_level_corr">Confidence Level</label>
+                      <select class="form-control-advanced form-select" id="confidence_level_corr">
+                        <option value="0.90">90%</option>
+                        <option value="0.95" selected>95%</option>
+                        <option value="0.99">99%</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="config-help-text">Configure statistical thresholds for correlation significance testing</div>
+                </div>
+
+                <div class="config-divider"></div>
+
+                <!-- Lag Periods -->
+                <div class="form-group-advanced">
+                  <label>Lag Periods for Time-Series Analysis</label>
+                  <div class="row">
+                    <div class="col-md-4">
+                      <label for="min_lag_periods">Minimum Lag</label>
+                      <input type="number" class="form-control-advanced" id="min_lag_periods" 
+                             value="1" min="1" max="6" step="1">
+                    </div>
+                    <div class="col-md-4">
+                      <label for="max_lag_periods">Maximum Lag</label>
+                      <input type="number" class="form-control-advanced" id="max_lag_periods" 
+                             value="12" min="6" max="24" step="1">
+                    </div>
+                    <div class="col-md-4">
+                      <label for="default_lag_period">Default Lag</label>
+                      <input type="number" class="form-control-advanced" id="default_lag_period" 
+                             value="3" min="1" max="12" step="1">
+                    </div>
+                  </div>
+                  <div class="config-help-text">Define lag periods (in time units) for cross-correlation analysis</div>
+                </div>
+
+                <!-- Factor Selection Preferences -->
+                <div class="form-group-advanced">
+                  <label>Factor Selection Preferences</label>
+                  <div class="row">
+                    <div class="col-md-6">
+                      <div class="form-check-advanced">
+                        <input class="form-check-input" type="checkbox" id="economic_factors" checked>
+                        <label class="form-check-label" for="economic_factors">Economic Factors</label>
+                      </div>
+                      <div class="form-check-advanced">
+                        <input class="form-check-input" type="checkbox" id="seasonal_factors" checked>
+                        <label class="form-check-label" for="seasonal_factors">Seasonal Factors</label>
+                      </div>
+                    </div>
+                    <div class="col-md-6">
+                      <div class="form-check-advanced">
+                        <input class="form-check-input" type="checkbox" id="promotional_factors" checked>
+                        <label class="form-check-label" for="promotional_factors">Promotional Factors</label>
+                      </div>
+                      <div class="form-check-advanced">
+                        <input class="form-check-input" type="checkbox" id="weather_factors">
+                        <label class="form-check-label" for="weather_factors">Weather Factors</label>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="config-help-text">Select which external factors to include in correlation analysis</div>
+                </div>
+
+                <!-- Analysis Types -->
+                <div class="form-group-advanced">
+                  <label>Analysis Types</label>
+                  <div class="row">
+                    <div class="col-md-4">
+                      <div class="form-check-advanced">
+                        <input class="form-check-input" type="checkbox" id="auto_correlation" checked>
+                        <label class="form-check-label" for="auto_correlation">Auto-correlation</label>
+                      </div>
+                    </div>
+                    <div class="col-md-4">
+                      <div class="form-check-advanced">
+                        <input class="form-check-input" type="checkbox" id="cross_correlation" checked>
+                        <label class="form-check-label" for="cross_correlation">Cross-correlation</label>
+                      </div>
+                    </div>
+                    <div class="col-md-4">
+                      <div class="form-check-advanced">
+                        <input class="form-check-input" type="checkbox" id="partial_correlation">
+                        <label class="form-check-label" for="partial_correlation">Partial Correlation</label>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="config-help-text">Enable different types of correlation analysis methods</div>
+                </div>
+
+                <div class="d-flex gap-3 mt-4">
+                  <button type="submit" class="btn btn-config-primary">
+                    <i class="fas fa-save me-2"></i>Save Correlation Settings
+                  </button>
+                  <button type="button" class="btn btn-config-secondary" id="reset-correlation">
+                    <i class="fas fa-undo me-2"></i>Reset to Defaults
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+
+          <!-- Business Intelligence Panel -->
+          <div class="tab-pane fade" id="bi-panel" role="tabpanel">
+            <div class="config-section">
+              <div class="section-header">
+                <h5><i class="fas fa-chart-bar"></i>Business Intelligence Configuration</h5>
+              </div>
+              <form class="config-form" id="bi-form">
+                
+                <!-- KPI Targets and Goals -->
+                <div class="form-group-advanced">
+                  <label>KPI Targets and Goals</label>
+                  <div class="row">
+                    <div class="col-md-4">
+                      <label for="revenue_monthly">Monthly Revenue Target</label>
+                      <div class="input-group">
+                        <span class="input-group-text">$</span>
+                        <input type="number" class="form-control-advanced" id="revenue_monthly" 
+                               value="100000" min="10000" step="5000">
+                      </div>
+                    </div>
+                    <div class="col-md-4">
+                      <label for="revenue_quarterly">Quarterly Revenue Target</label>
+                      <div class="input-group">
+                        <span class="input-group-text">$</span>
+                        <input type="number" class="form-control-advanced" id="revenue_quarterly" 
+                               value="300000" min="30000" step="10000">
+                      </div>
+                    </div>
+                    <div class="col-md-4">
+                      <label for="revenue_yearly">Yearly Revenue Target</label>
+                      <div class="input-group">
+                        <span class="input-group-text">$</span>
+                        <input type="number" class="form-control-advanced" id="revenue_yearly" 
+                               value="1200000" min="100000" step="50000">
+                      </div>
+                    </div>
+                  </div>
+                  <div class="row mt-3">
+                    <div class="col-md-4">
+                      <label for="inventory_turnover">Inventory Turnover Target</label>
+                      <input type="number" class="form-control-advanced" id="inventory_turnover" 
+                             value="6.0" min="2.0" max="12.0" step="0.5">
+                    </div>
+                    <div class="col-md-4">
+                      <label for="profit_margin">Profit Margin Target</label>
+                      <div class="input-group">
+                        <input type="number" class="form-control-advanced" id="profit_margin" 
+                               value="25" min="10" max="50" step="1">
+                        <span class="input-group-text">%</span>
+                      </div>
+                    </div>
+                    <div class="col-md-4">
+                      <label for="customer_satisfaction">Customer Satisfaction Target</label>
+                      <div class="input-group">
+                        <input type="number" class="form-control-advanced" id="customer_satisfaction" 
+                               value="85" min="70" max="100" step="1">
+                        <span class="input-group-text">%</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="config-help-text">Set target KPI values for performance measurement</div>
+                </div>
+
+                <div class="config-divider"></div>
+
+                <!-- Performance Benchmarks -->
+                <div class="form-group-advanced">
+                  <label>Performance Benchmarks</label>
+                  <div class="row">
+                    <div class="col-md-4">
+                      <div class="form-check-advanced">
+                        <input class="form-check-input" type="checkbox" id="industry_benchmark" checked>
+                        <label class="form-check-label" for="industry_benchmark">Industry Average</label>
+                      </div>
+                    </div>
+                    <div class="col-md-4">
+                      <div class="form-check-advanced">
+                        <input class="form-check-input" type="checkbox" id="historical_benchmark" checked>
+                        <label class="form-check-label" for="historical_benchmark">Historical Performance</label>
+                      </div>
+                    </div>
+                    <div class="col-md-4">
+                      <div class="form-check-advanced">
+                        <input class="form-check-input" type="checkbox" id="competitor_benchmark">
+                        <label class="form-check-label" for="competitor_benchmark">Competitor Analysis</label>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="config-help-text">Choose benchmark types for performance comparison</div>
+                </div>
+
+                <!-- ROI Calculation Parameters -->
+                <div class="form-group-advanced">
+                  <label>ROI Calculation Parameters</label>
+                  <div class="row">
+                    <div class="col-md-6">
+                      <label for="roi_period">Calculation Period</label>
+                      <select class="form-control-advanced form-select" id="roi_period">
+                        <option value="monthly">Monthly</option>
+                        <option value="quarterly" selected>Quarterly</option>
+                        <option value="yearly">Yearly</option>
+                      </select>
+                    </div>
+                    <div class="col-md-6">
+                      <label for="discount_rate">Discount Rate</label>
+                      <div class="input-group">
+                        <input type="number" class="form-control-advanced" id="discount_rate" 
+                               value="8" min="3" max="15" step="0.5">
+                        <span class="input-group-text">%</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="row mt-3">
+                    <div class="col-md-6">
+                      <div class="form-check-advanced">
+                        <input class="form-check-input" type="checkbox" id="include_overhead" checked>
+                        <label class="form-check-label" for="include_overhead">Include Overhead Costs</label>
+                      </div>
+                    </div>
+                    <div class="col-md-6">
+                      <div class="form-check-advanced">
+                        <input class="form-check-input" type="checkbox" id="include_labor" checked>
+                        <label class="form-check-label" for="include_labor">Include Labor Costs</label>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="config-help-text">Configure parameters for ROI calculations</div>
+                </div>
+
+                <div class="config-divider"></div>
+
+                <!-- Resale Recommendation Criteria -->
+                <div class="form-group-advanced">
+                  <label>Resale Recommendation Criteria</label>
+                  <div class="row">
+                    <div class="col-md-6">
+                      <label for="resale_profit_margin">Minimum Profit Margin</label>
+                      <div class="input-group">
+                        <input type="number" class="form-control-advanced" id="resale_profit_margin" 
+                               value="15" min="5" max="50" step="1">
+                        <span class="input-group-text">%</span>
+                      </div>
+                    </div>
+                    <div class="col-md-6">
+                      <label for="resale_max_age">Maximum Age (Months)</label>
+                      <input type="number" class="form-control-advanced" id="resale_max_age" 
+                             value="24" min="6" max="60" step="1">
+                    </div>
+                  </div>
+                  <div class="row mt-3">
+                    <div class="col-md-6">
+                      <label for="condition_threshold">Condition Threshold (1-10)</label>
+                      <input type="number" class="form-control-advanced" id="condition_threshold" 
+                             value="7" min="1" max="10" step="0.5">
+                    </div>
+                    <div class="col-md-6">
+                      <label for="demand_threshold">Demand Threshold</label>
+                      <div class="input-group">
+                        <input type="number" class="form-control-advanced" id="demand_threshold" 
+                               value="30" min="10" max="100" step="5">
+                        <span class="input-group-text">%</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="config-help-text">Set criteria for automated resale recommendations</div>
+                </div>
+
+                <div class="d-flex gap-3 mt-4">
+                  <button type="submit" class="btn btn-config-primary">
+                    <i class="fas fa-save me-2"></i>Save BI Configuration
+                  </button>
+                  <button type="button" class="btn btn-config-secondary" id="reset-bi">
+                    <i class="fas fa-undo me-2"></i>Reset to Defaults
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+
+          <!-- Data Integration Panel -->
+          <div class="tab-pane fade" id="integration-panel" role="tabpanel">
+            <div class="config-section">
+              <div class="section-header">
+                <h5><i class="fas fa-database"></i>Data Integration Settings</h5>
+              </div>
+              <form class="config-form" id="integration-form">
+                
+                <!-- CSV Import Settings -->
+                <div class="form-group-advanced">
+                  <label>CSV Import Schedules and Automation</label>
+                  <div class="row">
+                    <div class="col-md-6">
+                      <div class="form-check-advanced">
+                        <input class="form-check-input" type="checkbox" id="csv_auto_import">
+                        <label class="form-check-label" for="csv_auto_import">Enable Automatic Import</label>
+                      </div>
+                      <div class="mt-3">
+                        <label for="import_frequency">Import Frequency</label>
+                        <select class="form-control-advanced form-select" id="import_frequency">
+                          <option value="hourly">Hourly</option>
+                          <option value="daily" selected>Daily</option>
+                          <option value="weekly">Weekly</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div class="col-md-6">
+                      <label for="import_time">Import Time</label>
+                      <input type="time" class="form-control-advanced" id="import_time" value="02:00">
+                      <div class="mt-3">
+                        <div class="form-check-advanced">
+                          <input class="form-check-input" type="checkbox" id="csv_backup" checked>
+                          <label class="form-check-label" for="csv_backup">Backup Before Import</label>
+                        </div>
+                        <div class="form-check-advanced">
+                          <input class="form-check-input" type="checkbox" id="csv_validation" checked>
+                          <label class="form-check-label" for="csv_validation">Strict Validation</label>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="config-help-text">Configure automated CSV import schedules</div>
+                </div>
+
+                <div class="config-divider"></div>
+
+                <!-- External API Configuration -->
+                <div class="form-group-advanced">
+                  <label>External API Configurations</label>
+                  <div class="row">
+                    <div class="col-md-4">
+                      <label for="api_timeout">API Timeout</label>
+                      <div class="input-group">
+                        <input type="number" class="form-control-advanced" id="api_timeout" 
+                               value="30" min="10" max="120" step="5">
+                        <span class="input-group-text">sec</span>
+                      </div>
+                    </div>
+                    <div class="col-md-4">
+                      <label for="retry_attempts">Retry Attempts</label>
+                      <input type="number" class="form-control-advanced" id="retry_attempts" 
+                             value="3" min="1" max="10" step="1">
+                    </div>
+                    <div class="col-md-4">
+                      <div class="form-check-advanced mt-4">
+                        <input class="form-check-input" type="checkbox" id="rate_limit_enabled" checked>
+                        <label class="form-check-label" for="rate_limit_enabled">Enable Rate Limiting</label>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="row mt-3">
+                    <div class="col-md-6">
+                      <label for="rate_limit_requests">Rate Limit (requests)</label>
+                      <input type="number" class="form-control-advanced" id="rate_limit_requests" 
+                             value="100" min="10" max="1000" step="10">
+                    </div>
+                    <div class="col-md-6">
+                      <label for="rate_limit_window">Rate Limit Window</label>
+                      <div class="input-group">
+                        <input type="number" class="form-control-advanced" id="rate_limit_window" 
+                               value="3600" min="60" max="7200" step="60">
+                        <span class="input-group-text">sec</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="config-help-text">Configure external API connection and rate limiting</div>
+                </div>
+
+                <!-- Data Refresh Intervals -->
+                <div class="form-group-advanced">
+                  <label>Data Refresh Intervals</label>
+                  <div class="row">
+                    <div class="col-md-4">
+                      <div class="form-check-advanced">
+                        <input class="form-check-input" type="checkbox" id="real_time_refresh">
+                        <label class="form-check-label" for="real_time_refresh">Real-time Refresh</label>
+                      </div>
+                    </div>
+                    <div class="col-md-4">
+                      <label for="refresh_interval">Refresh Interval</label>
+                      <div class="input-group">
+                        <input type="number" class="form-control-advanced" id="refresh_interval" 
+                               value="15" min="5" max="120" step="5">
+                        <span class="input-group-text">min</span>
+                      </div>
+                    </div>
+                    <div class="col-md-4">
+                      <div class="form-check-advanced mt-4">
+                        <input class="form-check-input" type="checkbox" id="background_refresh" checked>
+                        <label class="form-check-label" for="background_refresh">Background Refresh</label>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="config-help-text">Set data refresh frequencies for real-time updates</div>
+                </div>
+
+                <div class="config-divider"></div>
+
+                <!-- Quality Check Parameters -->
+                <div class="form-group-advanced">
+                  <label>Quality Check Parameters</label>
+                  <div class="row">
+                    <div class="col-md-6">
+                      <div class="form-check-advanced">
+                        <input class="form-check-input" type="checkbox" id="quality_checks" checked>
+                        <label class="form-check-label" for="quality_checks">Enable Quality Checks</label>
+                      </div>
+                      <div class="mt-3">
+                        <label for="missing_data_threshold">Missing Data Threshold</label>
+                        <div class="input-group">
+                          <input type="number" class="form-control-advanced" id="missing_data_threshold" 
+                                 value="10" min="1" max="50" step="1">
+                          <span class="input-group-text">%</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="col-md-6">
+                      <div class="form-check-advanced">
+                        <input class="form-check-input" type="checkbox" id="outlier_detection" checked>
+                        <label class="form-check-label" for="outlier_detection">Outlier Detection</label>
+                      </div>
+                      <div class="mt-3">
+                        <label for="outlier_method">Detection Method</label>
+                        <select class="form-control-advanced form-select" id="outlier_method">
+                          <option value="iqr" selected>Interquartile Range (IQR)</option>
+                          <option value="zscore">Z-Score</option>
+                          <option value="isolation">Isolation Forest</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="config-help-text">Configure data quality validation parameters</div>
+                </div>
+
+                <div class="d-flex gap-3 mt-4">
+                  <button type="submit" class="btn btn-config-primary">
+                    <i class="fas fa-save me-2"></i>Save Integration Settings
+                  </button>
+                  <button type="button" class="btn btn-config-secondary" id="reset-integration">
+                    <i class="fas fa-undo me-2"></i>Reset to Defaults
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+
+          <!-- User Preferences Panel -->
+          <div class="tab-pane fade" id="preferences-panel" role="tabpanel">
+            <div class="config-section">
+              <div class="section-header">
+                <h5><i class="fas fa-user-cog"></i>User Preferences</h5>
+              </div>
+              <form class="config-form" id="preferences-form">
+                
+                <!-- Dashboard Layouts and Themes -->
+                <div class="form-group-advanced">
+                  <label>Dashboard Layouts and Themes</label>
+                  <div class="row">
+                    <div class="col-md-6">
+                      <label for="dashboard_theme">Dashboard Theme</label>
+                      <select class="form-control-advanced form-select" id="dashboard_theme">
+                        <option value="executive" selected>Executive</option>
+                        <option value="minimal">Minimal</option>
+                        <option value="detailed">Detailed</option>
+                      </select>
+                    </div>
+                    <div class="col-md-6">
+                      <label for="dashboard_layout">Layout Style</label>
+                      <select class="form-control-advanced form-select" id="dashboard_layout">
+                        <option value="grid" selected>Grid</option>
+                        <option value="list">List</option>
+                        <option value="cards">Cards</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="row mt-3">
+                    <div class="col-md-6">
+                      <label for="color_scheme">Chart Color Scheme</label>
+                      <select class="form-control-advanced form-select" id="color_scheme">
+                        <option value="professional" selected>Professional</option>
+                        <option value="vibrant">Vibrant</option>
+                        <option value="monochrome">Monochrome</option>
+                      </select>
+                    </div>
+                    <div class="col-md-6">
+                      <div class="form-check-advanced mt-4">
+                        <input class="form-check-input" type="checkbox" id="dark_mode">
+                        <label class="form-check-label" for="dark_mode">Enable Dark Mode</label>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="config-help-text">Customize your dashboard appearance and layout</div>
+                </div>
+
+                <div class="config-divider"></div>
+
+                <!-- Default Views and Filters -->
+                <div class="form-group-advanced">
+                  <label>Default Views and Filters</label>
+                  <div class="row">
+                    <div class="col-md-6">
+                      <label for="default_time_range">Default Time Range</label>
+                      <select class="form-control-advanced form-select" id="default_time_range">
+                        <option value="7_days">Last 7 Days</option>
+                        <option value="30_days" selected>Last 30 Days</option>
+                        <option value="90_days">Last 90 Days</option>
+                        <option value="1_year">Last Year</option>
+                      </select>
+                    </div>
+                    <div class="col-md-6">
+                      <label for="default_store">Default Store Filter</label>
+                      <select class="form-control-advanced form-select" id="default_store">
+                        <option value="all" selected>All Stores</option>
+                        <option value="store_1">Store 1</option>
+                        <option value="store_2">Store 2</option>
+                        <option value="store_3">Store 3</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="row mt-3">
+                    <div class="col-md-6">
+                      <div class="form-check-advanced">
+                        <input class="form-check-input" type="checkbox" id="auto_refresh_ui" checked>
+                        <label class="form-check-label" for="auto_refresh_ui">Auto-refresh Dashboards</label>
+                      </div>
+                    </div>
+                    <div class="col-md-6">
+                      <label for="refresh_interval_ui">Refresh Interval</label>
+                      <div class="input-group">
+                        <input type="number" class="form-control-advanced" id="refresh_interval_ui" 
+                               value="300" min="60" max="3600" step="60">
+                        <span class="input-group-text">sec</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="config-help-text">Set default dashboard views and auto-refresh preferences</div>
+                </div>
+
+                <!-- Notification Preferences -->
+                <div class="form-group-advanced">
+                  <label>Notification Preferences</label>
+                  <div class="row">
+                    <div class="col-md-4">
+                      <div class="form-check-advanced">
+                        <input class="form-check-input" type="checkbox" id="email_notifications" checked>
+                        <label class="form-check-label" for="email_notifications">Email Notifications</label>
+                      </div>
+                      <div class="form-check-advanced">
+                        <input class="form-check-input" type="checkbox" id="push_notifications">
+                        <label class="form-check-label" for="push_notifications">Push Notifications</label>
+                      </div>
+                    </div>
+                    <div class="col-md-4">
+                      <label for="alert_frequency">Alert Frequency</label>
+                      <select class="form-control-advanced form-select" id="alert_frequency">
+                        <option value="immediate" selected>Immediate</option>
+                        <option value="daily">Daily Digest</option>
+                        <option value="weekly">Weekly Summary</option>
+                      </select>
+                    </div>
+                    <div class="col-md-4">
+                      <label>Notification Types</label>
+                      <div class="form-check-advanced">
+                        <input class="form-check-input" type="checkbox" id="critical_alerts" checked>
+                        <label class="form-check-label" for="critical_alerts">Critical Alerts</label>
+                      </div>
+                      <div class="form-check-advanced">
+                        <input class="form-check-input" type="checkbox" id="warning_alerts" checked>
+                        <label class="form-check-label" for="warning_alerts">Warnings</label>
+                      </div>
+                      <div class="form-check-advanced">
+                        <input class="form-check-input" type="checkbox" id="info_alerts">
+                        <label class="form-check-label" for="info_alerts">Info Updates</label>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="config-help-text">Configure notification delivery preferences</div>
+                </div>
+
+                <div class="config-divider"></div>
+
+                <!-- Report Settings -->
+                <div class="form-group-advanced">
+                  <label>Report Formats and Scheduling</label>
+                  <div class="row">
+                    <div class="col-md-6">
+                      <label for="report_format">Default Report Format</label>
+                      <select class="form-control-advanced form-select" id="report_format">
+                        <option value="pdf" selected>PDF</option>
+                        <option value="excel">Excel</option>
+                        <option value="csv">CSV</option>
+                      </select>
+                    </div>
+                    <div class="col-md-6">
+                      <div class="form-check-advanced mt-4">
+                        <input class="form-check-input" type="checkbox" id="report_schedule">
+                        <label class="form-check-label" for="report_schedule">Enable Scheduled Reports</label>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="row mt-3">
+                    <div class="col-md-6">
+                      <label for="report_frequency">Report Frequency</label>
+                      <select class="form-control-advanced form-select" id="report_frequency">
+                        <option value="daily">Daily</option>
+                        <option value="weekly" selected>Weekly</option>
+                        <option value="monthly">Monthly</option>
+                      </select>
+                    </div>
+                    <div class="col-md-6">
+                      <label for="report_recipients">Email Recipients</label>
+                      <input type="email" class="form-control-advanced" id="report_recipients" 
+                             placeholder="recipient@example.com">
+                    </div>
+                  </div>
+                  <div class="config-help-text">Configure automated report generation and delivery</div>
+                </div>
+
+                <!-- UI/UX Preferences -->
+                <div class="form-group-advanced">
+                  <label>UI/UX Preferences</label>
+                  <div class="row">
+                    <div class="col-md-6">
+                      <div class="form-check-advanced">
+                        <input class="form-check-input" type="checkbox" id="show_tooltips" checked>
+                        <label class="form-check-label" for="show_tooltips">Show Tooltips</label>
+                      </div>
+                      <div class="form-check-advanced">
+                        <input class="form-check-input" type="checkbox" id="show_animations" checked>
+                        <label class="form-check-label" for="show_animations">Enable Animations</label>
+                      </div>
+                    </div>
+                    <div class="col-md-6">
+                      <div class="form-check-advanced">
+                        <input class="form-check-input" type="checkbox" id="compact_mode">
+                        <label class="form-check-label" for="compact_mode">Compact Mode</label>
+                      </div>
+                      <div class="form-check-advanced">
+                        <input class="form-check-input" type="checkbox" id="keyboard_shortcuts" checked>
+                        <label class="form-check-label" for="keyboard_shortcuts">Keyboard Shortcuts</label>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="config-help-text">Customize user interface behavior and accessibility</div>
+                </div>
+
+                <div class="d-flex gap-3 mt-4">
+                  <button type="submit" class="btn btn-config-primary">
+                    <i class="fas fa-save me-2"></i>Save User Preferences
+                  </button>
+                  <button type="button" class="btn btn-config-secondary" id="reset-preferences">
+                    <i class="fas fa-undo me-2"></i>Reset to Defaults
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Success/Error Modals -->
+<div class="modal fade" id="configModal" tabindex="-1" aria-labelledby="configModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="configModalLabel">Configuration Status</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" id="configModalBody">
+        <!-- Dynamic content -->
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/configuration.js?cb={{ cache_bust }}"></script>
+{% endblock %}

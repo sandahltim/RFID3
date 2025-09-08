@@ -1,0 +1,2715 @@
+{% extends "base.html" %}
+
+{% block title %}Inventory & Analytics{% endblock %}
+
+{% block extra_head %}
+  <!-- Include Chart.js for enhanced analytics -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- Load Executive Dashboard CSS for Fortune 500 styling -->
+  <link rel="stylesheet" href="/static/css/executive-dashboard.css">
+
+  <style>
+    /* Fortune 500 Analytics Dashboard Styles */
+    :root {
+      --primary-gradient: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+      --analytics-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      --success-gradient: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+      --warning-gradient: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+      --info-gradient: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+      --executive-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+      --card-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+      --hover-shadow: 0 15px 45px rgba(0, 0, 0, 0.2);
+    }
+    
+    body {
+      background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+      min-height: 100vh;
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    }
+    
+    .dashboard-card {
+      background: var(--primary-gradient);
+      border-radius: 20px;
+      color: white;
+      padding: 40px;
+      margin-bottom: 30px;
+      box-shadow: var(--executive-shadow);
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .dashboard-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+      background: linear-gradient(90deg, #00d4aa, #00a8ff, #8c7ae6, #ff9ff3);
+    }
+    
+    .dashboard-card::after {
+      content: '';
+      position: absolute;
+      top: -50%;
+      right: -20%;
+      width: 300px;
+      height: 300px;
+      background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+      border-radius: 50%;
+    }
+    
+    .dashboard-card h1 {
+      font-size: 2.6em;
+      font-weight: 700;
+      margin-bottom: 16px;
+      position: relative;
+      z-index: 2;
+    }
+    
+    .metric-card {
+      background: white;
+      border-radius: 16px;
+      padding: 28px;
+      margin-bottom: 20px;
+      box-shadow: var(--card-shadow);
+      transition: all 0.4s cubic-bezier(0.23, 1, 0.320, 1);
+      border: 1px solid rgba(255, 255, 255, 0.8);
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .metric-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: var(--analytics-gradient);
+      transform: scaleX(0);
+      transition: transform 0.3s ease;
+    }
+    
+    .metric-card:hover {
+        transform: translateY(-8px) scale(1.02);
+        box-shadow: var(--hover-shadow);
+    }
+    
+    .metric-card:hover::before {
+        transform: scaleX(1);
+    }
+    
+    .metric-value {
+        font-size: 3.2em;
+        font-weight: 700;
+        color: #1a202c;
+        margin: 8px 0 12px 0;
+        line-height: 1;
+        background: var(--analytics-gradient);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+    
+    .metric-label {
+        font-size: 0.95em;
+        color: #718096;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 1.5px;
+        margin-bottom: 8px;
+    }
+    
+    .health-score {
+        font-size: 4rem;
+        font-weight: 700;
+        text-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        position: relative;
+        z-index: 2;
+        background: linear-gradient(45deg, #ffffff, rgba(255,255,255,0.8));
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+    
+    .alert-badge {
+        display: inline-block;
+        padding: 0.25rem 0.5rem;
+        font-size: 0.75rem;
+        font-weight: 600;
+        border-radius: 0.25rem;
+        text-transform: uppercase;
+    }
+    
+    .alert-critical { background-color: #dc3545; color: white; }
+    .alert-high { background-color: #fd7e14; color: white; }
+    .alert-medium { background-color: #ffc107; color: black; }
+    
+    /* Accessibility: Icons for color-independent status identification */
+    .status-icon {
+        margin-right: 0.25rem;
+        font-size: 0.875em;
+    }
+    .alert-low { background-color: #28a745; color: white; }
+    
+    /* Accessibility: Enhanced focus indicators for keyboard navigation */
+    .nav-link:focus {
+        box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.5) !important;
+        outline: 2px solid transparent;
+        outline-offset: 2px;
+    }
+    
+    button:focus, .btn:focus {
+        box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.5) !important;
+        outline: 2px solid transparent;
+    }
+    
+    .stale-item {
+        padding: 10px;
+        border-left: 4px solid #e74c3c;
+        background-color: #fdf2f2;
+        margin-bottom: 8px;
+        border-radius: 4px;
+    }
+    
+    .loading-spinner {
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        border: 3px solid #f3f3f3;
+        border-top: 3px solid #3498db;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    }
+    
+    /* Phase 1B: Standardized Progress Loading */
+    .progress-loader {
+        text-align: center;
+        padding: 20px;
+        background: #f8f9fa;
+        border-radius: 8px;
+        border-left: 4px solid #007bff;
+        margin: 15px 0;
+    }
+    
+    .progress-loader .spinner-border {
+        width: 1.5rem;
+        height: 1.5rem;
+        margin-right: 0.5rem;
+    }
+    
+    .progress-step {
+        font-weight: 500;
+        color: #495057;
+        margin-bottom: 0.25rem;
+    }
+    
+    .progress-time {
+        font-size: 0.875rem;
+        color: #6c757d;
+        font-style: italic;
+    }
+    
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+    
+    .tab-content {
+        margin-top: 20px;
+    }
+    
+    .card {
+        border-radius: 16px;
+        box-shadow: var(--card-shadow);
+        border: 1px solid rgba(255, 255, 255, 0.8);
+        transition: all 0.3s ease;
+    }
+    
+    .card:hover {
+        transform: translateY(-4px);
+        box-shadow: var(--hover-shadow);
+    }
+    
+    .card-header {
+        background: var(--analytics-gradient);
+        color: white;
+        border-radius: 16px 16px 0 0 !important;
+        padding: 20px 25px;
+        border: none;
+    }
+    
+    .card-header h5 {
+        font-weight: 700;
+        font-size: 1.3em;
+        margin: 0;
+        display: flex;
+        align-items: center;
+    }
+    
+    .card-header h5 i {
+        margin-right: 12px;
+        font-size: 1.2em;
+    }
+    
+    .card-body {
+        padding: 25px;
+    }
+    
+    .nav-tabs {
+        border-bottom: 3px solid #e2e8f0;
+        margin-bottom: 30px;
+    }
+    
+    .nav-tabs .nav-link {
+        border: none;
+        color: #718096;
+        font-weight: 600;
+        padding: 15px 25px;
+        margin-right: 8px;
+        border-radius: 12px 12px 0 0;
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .nav-tabs .nav-link:hover {
+        color: #4a5568;
+        background: rgba(102, 126, 234, 0.1);
+    }
+    
+    .nav-tabs .nav-link.active {
+        background: var(--analytics-gradient);
+        color: white;
+        border-color: transparent;
+        box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
+    }
+    
+    .nav-tabs .nav-link.active::before {
+        content: '';
+        position: absolute;
+        bottom: -3px;
+        left: 0;
+        right: 0;
+        height: 3px;
+        background: var(--analytics-gradient);
+    }
+    
+    .btn {
+        border-radius: 12px;
+        padding: 12px 24px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        transition: all 0.3s ease;
+    }
+    
+    .btn-primary {
+        background: var(--analytics-gradient);
+        border: none;
+        box-shadow: 0 6px 20px rgba(102, 126, 234, 0.3);
+    }
+    
+    .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+    }
+    
+    .form-select {
+        border-radius: 10px;
+        border: 2px solid rgba(0,0,0,0.1);
+        padding: 10px 14px;
+        font-weight: 500;
+        transition: all 0.3s ease;
+    }
+    
+    .form-select:focus {
+        border-color: #667eea;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+    
+    .alert-info {
+        background: linear-gradient(135deg, rgba(66, 153, 225, 0.1) 0%, rgba(66, 153, 225, 0.05) 100%);
+        border-left: 4px solid #4299e1;
+        border-radius: 12px;
+        padding: 20px;
+    }
+    
+    .text-success { color: #38a169 !important; font-weight: 600; }
+    .text-primary { color: #4299e1 !important; font-weight: 600; }
+    .text-warning { color: #ed8936 !important; font-weight: 600; }
+    .text-info { color: #4fd1c7 !important; font-weight: 600; }
+    .text-muted { color: #718096 !important; font-weight: 500; }
+  </style>
+{% endblock %}
+
+{% block content %}
+  <div class="container-fluid mt-3">
+    <!-- Dashboard Header -->
+    <div class="row mb-4">
+      <div class="col-12">
+        <div class="dashboard-card text-center">
+          <h1><i class="fas fa-chart-line" aria-hidden="true"></i> Inventory & Analytics Dashboard</h1>
+          <p class="mb-0">Real-time inventory health monitoring and usage analysis</p>
+          <div class="row mt-3">
+            <div class="col-md-4">
+              <div class="health-score" id="health-score">--</div>
+              <div>Overall Health Score</div>
+            </div>
+            <div class="col-md-4">
+              <div class="health-score" id="total-items">--</div>
+              <div>Total Items</div>
+            </div>
+            <div class="col-md-4">
+              <div class="health-score" id="active-alerts">--</div>
+              <div>Active Alerts</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Key Metrics Row -->
+    <div class="row mb-4">
+      <div class="col-md-3">
+        <div class="metric-card text-center">
+          <div class="metric-value text-success" id="items-on-rent">--</div>
+          <div class="metric-label">On Rent</div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="metric-card text-center">
+          <div class="metric-value text-primary" id="items-available">--</div>
+          <div class="metric-label">Available</div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="metric-card text-center">
+          <div class="metric-value text-warning" id="items-in-service">--</div>
+          <div class="metric-label">In Service</div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="metric-card text-center">
+          <div class="metric-value text-info" id="utilization-rate">--%</div>
+          <div class="metric-label">Utilization Rate</div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Global Store and Inventory Type Filters -->
+    {% include 'global_filters.html' %}
+    
+    <!-- Tabs for Different Views -->
+    <div class="row">
+      <div class="col-12">
+            <ul class="nav nav-tabs" id="analyticsTab" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="business-intelligence-tab" data-bs-toggle="tab" data-bs-target="#business-intelligence" type="button" role="tab" aria-controls="business-intelligence" aria-selected="true" aria-label="View business intelligence and financial metrics">
+                        <i class="fas fa-chart-line"></i> Business Intelligence
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="alerts-tab" data-bs-toggle="tab" data-bs-target="#alerts" type="button" role="tab" aria-controls="alerts" aria-selected="false" aria-label="View and manage inventory health alerts">
+                        <i class="fas fa-exclamation-triangle"></i> Health Alerts
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="stale-items-tab" data-bs-toggle="tab" data-bs-target="#stale-items" type="button" role="tab" aria-controls="stale-items" aria-selected="false" aria-label="View items with limited recent activity">
+                        <i class="fas fa-clock"></i> Stale Items
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="usage-analysis-tab" data-bs-toggle="tab" data-bs-target="#usage-analysis" type="button" role="tab" aria-controls="usage-analysis" aria-selected="false" aria-label="Analyze usage patterns and data quality">
+                        <i class="fas fa-chart-bar"></i> Usage Analysis
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="resale-tracking-tab" data-bs-toggle="tab" data-bs-target="#resale-tracking" type="button" role="tab" aria-controls="resale-tracking" aria-selected="false" aria-label="Track equipment resale and lifecycle management">
+                        <i class="fas fa-shopping-cart"></i> Resale Tracking
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="configuration-tab" data-bs-toggle="tab" data-bs-target="#configuration" type="button" role="tab" aria-controls="configuration" aria-selected="false" aria-label="Configure analytics settings and preferences">
+                        <i class="fas fa-cog"></i> Configuration
+                    </button>
+                </li>
+            </ul>
+            
+            <div class="tab-content" id="analyticsTabContent">
+                <!-- Business Intelligence Tab -->
+                <div class="tab-pane fade show active" id="business-intelligence" role="tabpanel" aria-labelledby="business-intelligence-tab">
+                    <div class="row">
+                        <!-- Store Performance -->
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5><i class="fas fa-store"></i> Store Performance</h5>
+                                </div>
+                                <div class="card-body">
+                                    <canvas id="store-distribution-chart" height="200"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Inventory Type Distribution -->
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5><i class="fas fa-tags"></i> Inventory Type Distribution</h5>
+                                </div>
+                                <div class="card-body">
+                                    <canvas id="type-distribution-chart" height="200"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mt-3">
+                        <!-- Financial Insights -->
+                        <div class="col-md-8">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5><i class="fas fa-dollar-sign"></i> Financial Insights (Real POS Data)</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row">
+                                        <div class="col-md-3">
+                                            <div class="metric-card text-center">
+                                                <div class="metric-value text-success" id="total-inventory-value">$--</div>
+                                                <div class="metric-label">Total Inventory Value</div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="metric-card text-center">
+                                                <div class="metric-value text-info" id="avg-sell-price">$--</div>
+                                                <div class="metric-label">Average Sell Price</div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="metric-card text-center">
+                                                <div class="metric-value text-warning" id="total-turnover">$--</div>
+                                                <div class="metric-label">Total Turnover YTD</div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="metric-card text-center">
+                                                <div class="metric-value text-danger" id="total-repair-costs">$--</div>
+                                                <div class="metric-label">Total Repair Costs</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="row mt-3">
+                                        <div class="col-md-6">
+                                            <div class="d-flex align-items-center">
+                                                <i class="fas fa-gem text-warning me-2"></i>
+                                                <span>High Value Items (>90th percentile):</span>
+                                                <strong class="ms-2" id="high-value-count">--</strong>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="d-flex align-items-center">
+                                                <i class="fas fa-chart-area text-info me-2"></i>
+                                                <span>Items with Financial Data:</span>
+                                                <strong class="ms-2" id="items-with-data">--</strong>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Top Manufacturers -->
+                        <div class="col-md-4">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5><i class="fas fa-industry"></i> Top Manufacturers</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div id="manufacturers-list">Loading...</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mt-3">
+                        <div class="col-12">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5><i class="fas fa-info-circle"></i> Business Intelligence Summary</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="alert alert-info">
+                                        <strong><i class="fas fa-lightbulb"></i> Insights:</strong>
+                                        <ul id="business-insights" class="mb-0">
+                                            <li>Loading business intelligence insights...</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Health Alerts Tab -->
+                <div class="tab-pane fade" id="alerts" role="tabpanel" aria-labelledby="alerts-tab">
+                    <div class="row">
+                        <div class="col-md-8">
+                            <div class="card">
+                                <div class="card-header">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <h5><i class="fas fa-bell"></i> Active Health Alerts</h5>
+                                        <button class="btn btn-primary btn-sm" id="generate-alerts-btn" onclick="generateAlerts()" 
+                                                title="Scans stale items and creates health alerts based on current configuration thresholds. This creates alert records in the database for proactive inventory management.">
+                                            <i class="fas fa-sync"></i> Generate Alerts
+                                        </button>
+                                    </div>
+                                    <div class="d-flex gap-2 mt-2">
+                                        <select class="form-select form-select-sm" id="alert-category-filter" onchange="filterHealthAlerts()">
+                                            <option value="">All Categories</option>
+                                        </select>
+                                        <select class="form-select form-select-sm" id="alert-severity-filter" onchange="filterHealthAlerts()">
+                                            <option value="">All Severities</option>
+                                            <option value="critical">Critical</option>
+                                            <option value="high">High</option>
+                                            <option value="medium">Medium</option>
+                                            <option value="low">Low</option>
+                                        </select>
+                                        <select class="form-select form-select-sm" id="alert-type-filter" onchange="filterHealthAlerts()">
+                                            <option value="">All Types</option>
+                                            <option value="stale_item">Stale Items</option>
+                                            <option value="high_usage">High Usage</option>
+                                            <option value="low_usage">Low Usage</option>
+                                            <option value="missing">Missing</option>
+                                            <option value="quality_decline">Quality Decline</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="card-body">
+                                    <div id="alerts-loading" class="text-center">
+                                        <div class="loading-spinner"></div> Loading alerts...
+                                    </div>
+                                    <div id="alerts-content" style="display: none;">
+                                        <div class="d-flex justify-content-between align-items-center mb-3">
+                                            <div id="alerts-count" class="text-muted">Loading...</div>
+                                            <div class="d-flex align-items-center gap-2">
+                                                <label class="form-label mb-0">Items per page:</label>
+                                                <select class="form-select form-select-sm" id="alerts-per-page" onchange="updateAlertsPagination()" style="width: auto;">
+                                                    <option value="10">10</option>
+                                                    <option value="25" selected>25</option>
+                                                    <option value="50">50</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div id="alerts-list"></div>
+                                        <div id="alerts-pagination" class="d-flex justify-content-center mt-3"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5><i class="fas fa-chart-pie"></i> Alert Summary</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="mb-2">
+                                        <span class="alert-badge alert-critical" id="critical-count" aria-label="Critical alerts count">
+                                            <i class="fas fa-exclamation-triangle status-icon" aria-hidden="true"></i>0
+                                        </span> Critical
+                                    </div>
+                                    <div class="mb-2">
+                                        <span class="alert-badge alert-high" id="high-count" aria-label="High priority alerts count">
+                                            <i class="fas fa-exclamation-circle status-icon" aria-hidden="true"></i>0
+                                        </span> High
+                                    </div>
+                                    <div class="mb-2">
+                                        <span class="alert-badge alert-medium" id="medium-count" aria-label="Medium priority alerts count">
+                                            <i class="fas fa-info-circle status-icon" aria-hidden="true"></i>0
+                                        </span> Medium
+                                    </div>
+                                    <div class="mb-2">
+                                        <span class="alert-badge alert-low" id="low-count">0</span> Low
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Stale Items Tab -->
+                <div class="tab-pane fade" id="stale-items" role="tabpanel" aria-labelledby="stale-items-tab">
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h5><i class="fas fa-clock"></i> Items Not Recently Scanned</h5>
+                                    <small class="text-muted">Items that haven't been scanned recently based on category-specific thresholds</small>
+                                </div>
+                                <div class="d-flex gap-2">
+                                    <select class="form-select form-select-sm" id="stale-category-filter" onchange="filterStaleItems()">
+                                        <option value="">All Categories</option>
+                                    </select>
+                                    <select class="form-select form-select-sm" id="stale-subcategory-filter" onchange="filterStaleItems()">
+                                        <option value="">All Subcategories</option>
+                                    </select>
+                                    <select class="form-select form-select-sm" id="stale-days-filter" onchange="filterStaleItems()">
+                                        <option value="">All Days</option>
+                                        <option value="7">7+ Days</option>
+                                        <option value="30">30+ Days</option>
+                                        <option value="90">90+ Days</option>
+                                        <option value="180">180+ Days</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div id="stale-items-loading" class="text-center">
+                                <div class="loading-spinner"></div> Analyzing scan history...
+                            </div>
+                            <div id="stale-items-content" style="display: none;">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <div id="stale-items-count" class="text-muted">Loading...</div>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <label class="form-label mb-0">Items per page:</label>
+                                        <select class="form-select form-select-sm" id="stale-items-per-page" onchange="updateStaleItemsPagination()" style="width: auto;">
+                                            <option value="10">10</option>
+                                            <option value="25" selected>25</option>
+                                            <option value="50">50</option>
+                                            <option value="100">100</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div id="stale-items-list"></div>
+                                <div id="stale-items-pagination" class="d-flex justify-content-center mt-3"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Usage Analysis Tab -->
+                <div class="tab-pane fade" id="usage-analysis" role="tabpanel" aria-labelledby="usage-analysis-tab">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="card mb-3">
+                                <div class="card-header">
+                                    <h5><i class="fas fa-chart-line"></i> Usage Patterns</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div id="usage-patterns-loading" class="text-center">
+                                        <div class="loading-spinner"></div> Loading usage patterns...
+                                    </div>
+                                    <div id="usage-patterns-content" style="display: none;">
+                                        <div id="usage-patterns-list"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card mb-3">
+                                <div class="card-header">
+                                    <h5><i class="fas fa-exclamation-circle"></i> Data Discrepancies</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div id="discrepancies-loading" class="text-center">
+                                        <div class="loading-spinner"></div> Analyzing data discrepancies...
+                                    </div>
+                                    <div id="discrepancies-content" style="display: none;">
+                                        <div id="discrepancies-summary"></div>
+                                        <div id="discrepancies-list" class="mt-3"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="card">
+                                <div class="card-header d-flex justify-content-between align-items-center">
+                                    <h5><i class="fas fa-database"></i> Database Health Summary</h5>
+                                    <button class="btn btn-primary btn-sm" onclick="refreshAnalysisData()">
+                                        <i class="fas fa-refresh"></i> Refresh Analysis
+                                    </button>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row text-center">
+                                        <div class="col-md-3">
+                                            <div class="metric-card">
+                                                <div class="metric-value text-info" id="total-master-items">--</div>
+                                                <div class="metric-label">Items in Master</div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="metric-card">
+                                                <div class="metric-value text-success" id="items-with-transactions">--</div>
+                                                <div class="metric-label">Items with Transactions</div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="metric-card">
+                                                <div class="metric-value text-warning" id="orphaned-transactions">--</div>
+                                                <div class="metric-label">Orphaned Transactions</div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="metric-card">
+                                                <div class="metric-value text-danger" id="data-sync-issues">--</div>
+                                                <div class="metric-label">Data Sync Issues</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Resale Tracking Tab -->
+                <div class="tab-pane fade" id="resale-tracking" role="tabpanel" aria-labelledby="resale-tracking-tab">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="fas fa-shopping-cart"></i> Resale & Pack Status Tracking</h5>
+                        </div>
+                        <div class="card-body">
+                            <div id="resale-tracking-loading" class="text-center">
+                                <div class="loading-spinner"></div> Loading resale tracking data...
+                            </div>
+                            <div id="resale-tracking-content" style="display: none;">
+                                <div class="row mb-4">
+                                    <div class="col-md-12">
+                                        <div id="resale-summary-stats"></div>
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-12">
+                                        <h6>Resale Items</h6>
+                                        <div id="resale-items-table"></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div id="resale-tracking-error" style="display: none;" class="alert alert-warning">
+                                <i class="fas fa-exclamation-triangle"></i> Unable to load resale tracking data. Please try refreshing the page.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Configuration Tab -->
+                <div class="tab-pane fade" id="configuration" role="tabpanel" aria-labelledby="configuration-tab">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="fas fa-cog"></i> Inventory Analytics Configuration</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h6><i class="fas fa-bell"></i> Alert Thresholds</h6>
+                                    <div class="mb-3">
+                                        <label class="form-label">Stale Item Days (Default Categories)</label>
+                                        <input type="number" class="form-control config-input" id="stale-default" value="30" min="1" max="365">
+                                        <small class="form-text text-muted">Days without scan before item is flagged as stale</small>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Stale Item Days (Resale Categories)</label>
+                                        <input type="number" class="form-control config-input" id="stale-resale" value="7" min="1" max="90">
+                                        <small class="form-text text-muted">Shorter threshold for resale items</small>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Stale Item Days (Pack Location)</label>
+                                        <input type="number" class="form-control config-input" id="stale-pack" value="14" min="1" max="180">
+                                        <small class="form-text text-muted">Threshold for items in pack locations</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <h6><i class="fas fa-chart-line"></i> Usage Thresholds</h6>
+                                    <div class="mb-3">
+                                        <label class="form-label">High Usage Threshold</label>
+                                        <input type="number" class="form-control config-input" id="high-usage" value="0.8" min="0.1" max="1.0" step="0.1">
+                                        <small class="form-text text-muted">Utilization rate above this triggers high usage alerts</small>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Low Usage Threshold</label>
+                                        <input type="number" class="form-control config-input" id="low-usage" value="0.2" min="0.0" max="0.9" step="0.1">
+                                        <small class="form-text text-muted">Utilization rate below this triggers low usage alerts</small>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Quality Decline Threshold</label>
+                                        <input type="number" class="form-control config-input" id="quality-decline" value="2" min="1" max="5">
+                                        <small class="form-text text-muted">Grade drops triggering quality decline alerts</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row mt-3">
+                                <div class="col-12">
+                                    <h6><i class="fas fa-save"></i> Configuration Management</h6>
+                                    <div class="d-flex gap-2">
+                                        <button class="btn btn-success" id="save-config-btn" onclick="saveConfiguration()">
+                                            <i class="fas fa-save"></i> Save Configuration
+                                        </button>
+                                        <button class="btn btn-secondary" id="reset-config-btn" onclick="resetConfiguration()">
+                                            <i class="fas fa-undo"></i> Reset to Defaults
+                                        </button>
+                                        <button class="btn btn-info" id="load-config-btn" onclick="loadConfiguration()">
+                                            <i class="fas fa-refresh"></i> Reload Current
+                                        </button>
+                                    </div>
+                                    <div class="mt-2">
+                                        <div class="alert alert-info" id="config-status" style="display: none;"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+class InventoryAnalytics {
+    constructor() {
+        this.refreshInterval = null;
+        this.init();
+    }
+    
+    init() {
+        console.log('Initializing Inventory Analytics dashboard');
+        this.loadDashboardData();
+        this.setupEventHandlers();
+        this.startAutoRefresh();
+    }
+    
+    async loadDashboardData() {
+        try {
+            console.log('Loading dashboard summary data');
+            const response = await fetch(withGlobalFilters('/api/inventory/dashboard_summary'));
+            const data = await response.json();
+            
+            if (response.ok) {
+                this.updateDashboardMetrics(data);
+            } else {
+                console.error('Failed to load dashboard data:', data.error);
+                this.showError('Failed to load dashboard data');
+            }
+        } catch (error) {
+            console.error('Error loading dashboard data:', error);
+            this.showError('Error loading dashboard data');
+        }
+    }
+    
+    updateDashboardMetrics(data) {
+        const inventory = data.inventory_overview;
+        const health = data.health_metrics;
+        
+        // Update main dashboard cards
+        document.getElementById('health-score').textContent = health.health_score;
+        document.getElementById('total-items').textContent = inventory.total_items.toLocaleString();
+        document.getElementById('active-alerts').textContent = health.active_alerts;
+        
+        // Update metric cards
+        document.getElementById('items-on-rent').textContent = inventory.items_on_rent.toLocaleString();
+        document.getElementById('items-available').textContent = inventory.items_available.toLocaleString();
+        document.getElementById('items-in-service').textContent = inventory.items_in_service.toLocaleString();
+        document.getElementById('utilization-rate').textContent = inventory.utilization_rate + '%';
+        
+        // Update alert counts
+        document.getElementById('critical-count').textContent = health.critical_alerts;
+        document.getElementById('high-count').textContent = health.high_alerts;
+        document.getElementById('medium-count').textContent = health.medium_alerts;
+        document.getElementById('low-count').textContent = health.low_alerts;
+        
+        // Apply health score color coding
+        const healthScoreEl = document.getElementById('health-score');
+        if (health.health_score >= 90) {
+            healthScoreEl.style.color = '#28a745'; // Green
+        } else if (health.health_score >= 70) {
+            healthScoreEl.style.color = '#ffc107'; // Yellow
+        } else {
+            healthScoreEl.style.color = '#dc3545'; // Red
+        }
+        
+        console.log('Dashboard metrics updated successfully');
+    }
+    
+    async loadHealthAlerts() {
+        try {
+            document.getElementById('alerts-loading').style.display = 'block';
+            document.getElementById('alerts-content').style.display = 'none';
+            
+            const response = await fetch(withGlobalFilters('/api/inventory/alerts'));
+            const data = await response.json();
+            
+            if (response.ok) {
+                // Store all alerts globally
+                allHealthAlerts = data.alerts || [];
+                
+                // Populate category filter
+                const categories = [...new Set(allHealthAlerts.map(alert => alert.category).filter(Boolean))];
+                const categorySelect = document.getElementById('alert-category-filter');
+                categorySelect.innerHTML = '<option value="">All Categories</option>';
+                categories.forEach(cat => {
+                    categorySelect.innerHTML += `<option value="${cat}">${cat}</option>`;
+                });
+                
+                // Display filtered alerts
+                filterHealthAlerts();
+            } else {
+                console.error('Failed to load alerts:', data.error);
+                this.showError('Failed to load alerts', 'alerts-list');
+            }
+        } catch (error) {
+            console.error('Error loading health alerts:', error);
+            this.showError('Error loading health alerts', 'alerts-list');
+        } finally {
+            document.getElementById('alerts-loading').style.display = 'none';
+            document.getElementById('alerts-content').style.display = 'block';
+        }
+    }
+    
+    // Class method removed - using standalone function instead
+    
+    async loadStaleItems() {
+        // Redirect to standalone function
+        return loadAllStaleItems().then(() => {
+            // Populate filters after loading
+            const categories = [...new Set(allStaleItems.map(item => item.category).filter(Boolean))];
+            const categorySelect = document.getElementById('stale-category-filter');
+            categorySelect.innerHTML = '<option value="">All Categories</option>';
+            categories.forEach(cat => {
+                categorySelect.innerHTML += `<option value="${cat}">${cat}</option>`;
+            });
+            
+            const subcategories = [...new Set(allStaleItems.map(item => item.subcategory).filter(Boolean))];
+            const subcategorySelect = document.getElementById('stale-subcategory-filter');
+            subcategorySelect.innerHTML = '<option value="">All Subcategories</option>';
+            subcategories.forEach(sub => {
+                subcategorySelect.innerHTML += `<option value="${sub}">${sub}</option>`;
+            });
+            
+            filterStaleItems();
+        });
+    }
+    
+    // Class method removed - using standalone function instead
+    
+    setupEventHandlers() {
+        // Tab change handlers
+        document.addEventListener('shown.bs.tab', (event) => {
+            const targetTab = event.target.getAttribute('data-bs-target');
+            console.log('Tab changed to:', targetTab);
+            
+            if (targetTab === '#alerts') {
+                loadAllHealthAlerts();
+            } else if (targetTab === '#stale-items') {
+                loadAllStaleItems().then(() => {
+                    // Populate filters after loading
+                    const categories = [...new Set(allStaleItems.map(item => item.category).filter(Boolean))];
+                    const categorySelect = document.getElementById('stale-category-filter');
+                    categorySelect.innerHTML = '<option value="">All Categories</option>';
+                    categories.forEach(cat => {
+                        categorySelect.innerHTML += `<option value="${cat}">${cat}</option>`;
+                    });
+                    
+                    const subcategories = [...new Set(allStaleItems.map(item => item.subcategory).filter(Boolean))];
+                    const subcategorySelect = document.getElementById('stale-subcategory-filter');
+                    subcategorySelect.innerHTML = '<option value="">All Subcategories</option>';
+                    subcategories.forEach(sub => {
+                        subcategorySelect.innerHTML += `<option value="${sub}">${sub}</option>`;
+                    });
+                    
+                    filterStaleItems();
+                });
+            }
+        });
+        
+        // Alternative tab click handler for better compatibility
+        document.querySelectorAll('[data-bs-toggle="tab"]').forEach(tab => {
+            tab.addEventListener('click', (event) => {
+                const targetTab = event.target.getAttribute('data-bs-target');
+                console.log('Tab clicked:', targetTab);
+                
+                // Small delay to ensure tab is shown
+                setTimeout(() => {
+                    if (targetTab === '#alerts') {
+                        loadAllHealthAlerts();
+                    } else if (targetTab === '#stale-items') {
+                        loadAllStaleItems().then(() => {
+                            // Populate filters after loading
+                            const categories = [...new Set(allStaleItems.map(item => item.category).filter(Boolean))];
+                            const categorySelect = document.getElementById('stale-category-filter');
+                            categorySelect.innerHTML = '<option value="">All Categories</option>';
+                            categories.forEach(cat => {
+                                categorySelect.innerHTML += `<option value="${cat}">${cat}</option>`;
+                            });
+                            
+                            const subcategories = [...new Set(allStaleItems.map(item => item.subcategory).filter(Boolean))];
+                            const subcategorySelect = document.getElementById('stale-subcategory-filter');
+                            subcategorySelect.innerHTML = '<option value="">All Subcategories</option>';
+                            subcategories.forEach(sub => {
+                                subcategorySelect.innerHTML += `<option value="${sub}">${sub}</option>`;
+                            });
+                            
+                            filterStaleItems();
+                        });
+                    }
+                }, 100);
+            });
+        });
+        
+        // Alert filter change handled by HTML onchange attribute
+        
+        // Load initial tab content
+        setTimeout(() => {
+            if (document.querySelector('#alerts.show.active')) {
+                loadAllHealthAlerts();
+            }
+        }, 100);
+    }
+    
+    async generateAlerts() {
+        try {
+            const button = document.getElementById('generate-alerts-btn');
+            const originalText = button.innerHTML;
+            button.innerHTML = '<div class="loading-spinner"></div> Generating...';
+            button.disabled = true;
+            
+            const response = await fetch(withGlobalFilters('/api/inventory/generate_alerts'), {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'}
+            });
+            const data = await response.json();
+            
+            if (response.ok) {
+                console.log('Alerts generated successfully:', data);
+                // Refresh the dashboard and alerts
+                this.loadDashboardData();
+                this.loadHealthAlerts();
+                
+                // Show detailed success message
+                let message = `Alert Generation Complete: ${data.alerts_created} alerts created`;
+                if (data.stale_items_processed) {
+                    message += ` from ${data.stale_items_processed} stale items analyzed`;
+                }
+                if (data.existing_alerts_updated) {
+                    message += `, ${data.existing_alerts_updated} existing alerts updated`;
+                }
+                this.showSuccess(message);
+            } else {
+                console.error('Failed to generate alerts:', data.error);
+                this.showError('Failed to generate alerts: ' + (data.error || 'Unknown error'));
+            }
+        } catch (error) {
+            console.error('Error generating alerts:', error);
+            this.showError('Error generating alerts');
+        } finally {
+            const button = document.getElementById('generate-alerts-btn');
+            button.innerHTML = '<i class="fas fa-sync"></i> Generate Alerts';
+            button.disabled = false;
+        }
+    }
+    
+    startAutoRefresh() {
+        // Refresh dashboard data every 5 minutes
+        this.refreshInterval = setInterval(() => {
+            console.log('Auto-refreshing dashboard data');
+            this.loadDashboardData();
+        }, 5 * 60 * 1000);
+    }
+    
+    // Phase 1B: Standardized Progress Loading Utility
+    showProgressLoader(containerId, steps, currentStep = 1, expectedTime = "<1 sec") {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        
+        const stepDescriptions = {
+            'business-insights': {
+                1: "Loading store data...",
+                2: "Processing financial metrics...",
+                3: "Generating charts..."
+            },
+            'alerts-list': {
+                1: "Loading health alerts...",
+                2: "Applying filters...",
+                3: "Organizing results..."
+            },
+            'stale-items-list': {
+                1: "Analyzing scan history...",
+                2: "Identifying stale items...",
+                3: "Generating report..."
+            }
+        };
+        
+        const descriptions = stepDescriptions[containerId] || {
+            1: "Loading data...",
+            2: "Processing...",
+            3: "Finalizing..."
+        };
+        
+        const stepDescription = descriptions[currentStep] || "Loading...";
+        
+        container.innerHTML = `
+            <div class="progress-loader">
+                <div class="spinner-border text-primary" role="status" aria-hidden="true"></div>
+                <div class="progress-step">${stepDescription} (${currentStep} of ${steps})</div>
+                <div class="progress-time">Expected: ${expectedTime}</div>
+            </div>
+        `;
+    }
+    
+    hideProgressLoader(containerId) {
+        const container = document.getElementById(containerId);
+        if (container && container.querySelector('.progress-loader')) {
+            container.innerHTML = '';
+        }
+    }
+    
+    showError(message, containerId = null) {
+        const errorHtml = `<div class="alert alert-danger"><i class="fas fa-exclamation-triangle"></i> ${message}</div>`;
+        
+        if (containerId) {
+            document.getElementById(containerId).innerHTML = errorHtml;
+        } else {
+            // Show in a toast or modal
+            console.error(message);
+        }
+    }
+    
+    showSuccess(message) {
+        // Create a temporary success message
+        const successDiv = document.createElement('div');
+        successDiv.className = 'alert alert-success alert-dismissible fade show position-fixed';
+        successDiv.style.top = '20px';
+        successDiv.style.right = '20px';
+        successDiv.style.zIndex = '9999';
+        successDiv.innerHTML = `
+            <i class="fas fa-check-circle"></i> ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        document.body.appendChild(successDiv);
+        
+        // Auto-remove after 5 seconds
+        setTimeout(() => {
+            if (successDiv.parentNode) {
+                successDiv.parentNode.removeChild(successDiv);
+            }
+        }, 5000);
+    }
+}
+
+// Make generateAlerts globally available
+function generateAlerts() {
+    if (window.inventoryAnalytics) {
+        window.inventoryAnalytics.generateAlerts();
+    }
+}
+
+// Configuration management functions
+async function loadConfiguration() {
+    try {
+        const response = await fetch(withGlobalFilters('/api/inventory/configuration'));
+        if (response.ok) {
+            const config = await response.json();
+            
+            // Load alert thresholds
+            const alertThresholds = config.alert_thresholds || {};
+            document.getElementById('stale-default').value = alertThresholds.stale_item_days?.default || 30;
+            document.getElementById('stale-resale').value = alertThresholds.stale_item_days?.resale || 7;
+            document.getElementById('stale-pack').value = alertThresholds.stale_item_days?.pack || 14;
+            document.getElementById('high-usage').value = alertThresholds.high_usage_threshold || 0.8;
+            document.getElementById('low-usage').value = alertThresholds.low_usage_threshold || 0.2;
+            document.getElementById('quality-decline').value = alertThresholds.quality_decline_threshold || 2;
+            
+            showConfigStatus('Configuration loaded successfully', 'success');
+        } else {
+            showConfigStatus('Failed to load configuration', 'error');
+        }
+    } catch (error) {
+        console.error('Error loading configuration:', error);
+        showConfigStatus('Error loading configuration', 'error');
+    }
+}
+
+async function saveConfiguration() {
+    try {
+        const config = {
+            alert_thresholds: {
+                stale_item_days: {
+                    default: parseInt(document.getElementById('stale-default').value),
+                    resale: parseInt(document.getElementById('stale-resale').value),
+                    pack: parseInt(document.getElementById('stale-pack').value)
+                },
+                high_usage_threshold: parseFloat(document.getElementById('high-usage').value),
+                low_usage_threshold: parseFloat(document.getElementById('low-usage').value),
+                quality_decline_threshold: parseInt(document.getElementById('quality-decline').value)
+            }
+        };
+        
+        const response = await fetch(withGlobalFilters('/api/inventory/configuration'), {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(config)
+        });
+        
+        if (response.ok) {
+            showConfigStatus('Configuration saved successfully', 'success');
+        } else {
+            const error = await response.json();
+            showConfigStatus('Failed to save: ' + (error.message || 'Unknown error'), 'error');
+        }
+    } catch (error) {
+        console.error('Error saving configuration:', error);
+        showConfigStatus('Error saving configuration', 'error');
+    }
+}
+
+function resetConfiguration() {
+    // Reset to default values
+    document.getElementById('stale-default').value = 30;
+    document.getElementById('stale-resale').value = 7;
+    document.getElementById('stale-pack').value = 14;
+    document.getElementById('high-usage').value = 0.8;
+    document.getElementById('low-usage').value = 0.2;
+    document.getElementById('quality-decline').value = 2;
+    showConfigStatus('Configuration reset to defaults', 'info');
+}
+
+function showConfigStatus(message, type) {
+    const statusDiv = document.getElementById('config-status');
+    statusDiv.className = `alert alert-${type === 'error' ? 'danger' : type === 'success' ? 'success' : 'info'}`;
+    statusDiv.textContent = message;
+    statusDiv.style.display = 'block';
+    
+    setTimeout(() => {
+        statusDiv.style.display = 'none';
+    }, 3000);
+}
+
+// Usage Analysis functions
+async function loadUsagePatterns() {
+    try {
+        document.getElementById('usage-patterns-loading').style.display = 'block';
+        document.getElementById('usage-patterns-content').style.display = 'none';
+        
+        const response = await fetch(withGlobalFilters('/api/inventory/usage_analysis?days=30'));
+        const data = await response.json();
+        
+        if (response.ok && data.success && data.usage_analysis) {
+            displayUsagePatterns(data.usage_analysis.category_patterns || []);
+        } else {
+            document.getElementById('usage-patterns-list').innerHTML = 
+                `<div class="alert alert-danger">Error loading patterns: ${data.error || 'No usage data available'}</div>`;
+        }
+    } catch (error) {
+        console.error('Error loading usage patterns:', error);
+        document.getElementById('usage-patterns-list').innerHTML = 
+            '<div class="alert alert-danger">Error loading usage patterns</div>';
+    } finally {
+        document.getElementById('usage-patterns-loading').style.display = 'none';
+        document.getElementById('usage-patterns-content').style.display = 'block';
+    }
+}
+
+function displayUsagePatterns(patterns) {
+    let html = '';
+    if (patterns && patterns.length > 0) {
+        patterns.slice(0, 10).forEach(pattern => {
+            const percentage = (pattern.utilization_rate || 0).toFixed(1);
+            html += `
+                <div class="border-bottom pb-2 mb-2">
+                    <div class="d-flex justify-content-between">
+                        <strong>${pattern.category || 'Unknown Category'}</strong>
+                        <span class="badge bg-${percentage > 70 ? 'success' : percentage > 40 ? 'warning' : 'secondary'}">${percentage}%</span>
+                    </div>
+                    <small class="text-muted">${pattern.subcategory || ''} • Turnover: ${(pattern.turnover_rate || 0).toFixed(1)}</small>
+                    <div class="mt-1">
+                        <small>${pattern.total_items || 0} items • ${pattern.transaction_count || 0} transactions</small>
+                    </div>
+                    <div class="mt-1">
+                        <small class="text-info">Activity Score: ${(pattern.activity_score || 0).toFixed(1)}</small>
+                    </div>
+                </div>
+            `;
+        });
+    } else {
+        html = '<p class="text-muted">No usage patterns found. This may indicate limited transaction data or missing rental class assignments.</p>';
+    }
+    document.getElementById('usage-patterns-list').innerHTML = html;
+}
+
+async function loadDataDiscrepancies() {
+    try {
+        document.getElementById('discrepancies-loading').style.display = 'block';
+        document.getElementById('discrepancies-content').style.display = 'none';
+        
+        const response = await fetch(withGlobalFilters('/api/inventory/data_discrepancies'));
+        const data = await response.json();
+        
+        if (response.ok) {
+            displayDataDiscrepancies(data);
+        } else {
+            document.getElementById('discrepancies-list').innerHTML = 
+                `<div class="alert alert-danger">Error loading discrepancies: ${data.error}</div>`;
+        }
+    } catch (error) {
+        console.error('Error loading data discrepancies:', error);
+        document.getElementById('discrepancies-list').innerHTML = 
+            '<div class="alert alert-danger">Error loading data discrepancies</div>';
+    } finally {
+        document.getElementById('discrepancies-loading').style.display = 'none';
+        document.getElementById('discrepancies-content').style.display = 'block';
+    }
+}
+
+function displayDataDiscrepancies(data) {
+    // Update summary metrics
+    document.getElementById('total-master-items').textContent = data.summary?.total_master_items || '--';
+    document.getElementById('items-with-transactions').textContent = data.summary?.items_with_transactions || '--';
+    document.getElementById('orphaned-transactions').textContent = data.summary?.orphaned_transactions || '--';
+    document.getElementById('data-sync-issues').textContent = data.summary?.data_sync_issues || '--';
+    
+    // Display summary
+    let summaryHtml = '<div class="alert alert-info">';
+    summaryHtml += `<h6>Data Quality Overview</h6>`;
+    summaryHtml += `<p>Found ${data.summary?.data_sync_issues || 0} items with potential sync issues out of ${data.summary?.total_master_items || 0} total items.</p>`;
+    summaryHtml += '</div>';
+    document.getElementById('discrepancies-summary').innerHTML = summaryHtml;
+    
+    // Display discrepancy details
+    let html = '';
+    if (data.discrepancies && data.discrepancies.length > 0) {
+        html += '<h6>Top Data Discrepancies:</h6>';
+        data.discrepancies.slice(0, 5).forEach(disc => {
+            html += `
+                <div class="border-left-warning p-2 mb-2 bg-light">
+                    <div class="d-flex justify-content-between">
+                        <strong>${disc.tag_id}</strong>
+                        <span class="badge bg-warning">${disc.issue_type}</span>
+                    </div>
+                    <small class="text-muted">${disc.common_name || 'Unknown Item'}</small>
+                    <div class="mt-1">
+                        <small>Master: ${disc.master_last_scan || 'None'} • Transactions: ${disc.latest_transaction || 'None'}</small>
+                    </div>
+                </div>
+            `;
+        });
+    } else {
+        html = '<p class="text-success"><i class="fas fa-check"></i> No significant data discrepancies found.</p>';
+    }
+    document.getElementById('discrepancies-list').innerHTML = html;
+}
+
+function refreshAnalysisData() {
+    loadUsagePatterns();
+    loadDataDiscrepancies();
+}
+
+// Load resale tracking data
+async function loadResaleTrackingData() {
+    try {
+        document.getElementById('resale-tracking-loading').style.display = 'block';
+        document.getElementById('resale-tracking-content').style.display = 'none';
+        document.getElementById('resale-tracking-error').style.display = 'none';
+
+        const response = await fetch('/api/inventory/resale_tracking?days=30');
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        if (data.success && data.resale_tracking) {
+            displayResaleTrackingData(data.resale_tracking);
+        } else {
+            throw new Error('Invalid resale tracking data received');
+        }
+    } catch (error) {
+        console.error('Error loading resale tracking data:', error);
+        document.getElementById('resale-tracking-loading').style.display = 'none';
+        document.getElementById('resale-tracking-error').style.display = 'block';
+    }
+}
+
+function displayResaleTrackingData(resaleData) {
+    document.getElementById('resale-tracking-loading').style.display = 'none';
+    document.getElementById('resale-tracking-content').style.display = 'block';
+    
+    // Display summary stats
+    const summaryHtml = `
+        <div class="row">
+            <div class="col-md-3">
+                <div class="metric-card">
+                    <h4>${resaleData.items ? resaleData.items.length : 0}</h4>
+                    <p>Total Resale Items</p>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="metric-card">
+                    <h4>${resaleData.summary_by_category ? resaleData.summary_by_category.length : 0}</h4>
+                    <p>Categories</p>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="metric-card">
+                    <h4>${resaleData.analysis_period_days || 30}</h4>
+                    <p>Days Analyzed</p>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="metric-card">
+                    <h4>${resaleData.total_resale_items_analyzed || 0}</h4>
+                    <p>Items Analyzed</p>
+                </div>
+            </div>
+        </div>
+    `;
+    document.getElementById('resale-summary-stats').innerHTML = summaryHtml;
+    
+    // Display resale items table
+    if (resaleData.items && resaleData.items.length > 0) {
+        let tableHtml = `
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Item Name</th>
+                            <th>Category</th>
+                            <th>Status</th>
+                            <th>Age (Days)</th>
+                            <th>Sell Price</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+        
+        resaleData.items.forEach(item => {
+            tableHtml += `
+                <tr>
+                    <td>${item.common_name || 'N/A'}</td>
+                    <td>${item.subcategory || 'General'}</td>
+                    <td><span class="badge ${item.status === 'Available' ? 'bg-success' : 'bg-secondary'}">${item.status || 'Unknown'}</span></td>
+                    <td>${item.age_days || 0}</td>
+                    <td>$${(item.sell_price || 0).toFixed(2)}</td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-primary" onclick="navigateToItem('${item.tag_id}')">
+                            <i class="fas fa-eye"></i> View
+                        </button>
+                    </td>
+                </tr>
+            `;
+        });
+        
+        tableHtml += '</tbody></table></div>';
+        document.getElementById('resale-items-table').innerHTML = tableHtml;
+    } else {
+        document.getElementById('resale-items-table').innerHTML = '<p class="text-muted">No resale items found.</p>';
+    }
+}
+
+// Global data storage and pagination state
+let allHealthAlerts = [];
+let allStaleItems = [];
+let currentAlertsPage = 1;
+let currentStaleItemsPage = 1;
+
+// Load ALL health alerts by making multiple API calls if needed
+async function loadAllHealthAlerts() {
+    try {
+        document.getElementById('alerts-loading').style.display = 'block';
+        document.getElementById('alerts-content').style.display = 'none';
+        
+        let allAlerts = [];
+        let offset = 0;
+        const limit = 200; // API max limit
+        let hasMore = true;
+        
+        while (hasMore) {
+            const response = await fetch(withGlobalFilters(`/api/inventory/alerts?limit=${limit}&offset=${offset}`));
+            const data = await response.json();
+            
+            if (response.ok && data.alerts) {
+                allAlerts = allAlerts.concat(data.alerts);
+                hasMore = data.pagination.has_more;
+                offset += limit;
+                
+                // Show progress
+                console.log(`Loaded ${allAlerts.length} alerts so far...`);
+            } else {
+                hasMore = false;
+                console.error('Failed to load alerts:', data.error);
+            }
+        }
+        
+        console.log(`Loaded ${allAlerts.length} total alerts`);
+        allHealthAlerts = allAlerts;
+        
+        // Populate category filter
+        const categories = [...new Set(allHealthAlerts.map(alert => alert.category).filter(Boolean))];
+        const categorySelect = document.getElementById('alert-category-filter');
+        categorySelect.innerHTML = '<option value="">All Categories</option>';
+        categories.forEach(cat => {
+            categorySelect.innerHTML += `<option value="${cat}">${cat}</option>`;
+        });
+        
+        // Display filtered alerts
+        filterHealthAlerts();
+        
+    } catch (error) {
+        console.error('Error loading all health alerts:', error);
+        document.getElementById('alerts-list').innerHTML = '<div class="alert alert-danger">Error loading alerts</div>';
+    } finally {
+        document.getElementById('alerts-loading').style.display = 'none';
+        document.getElementById('alerts-content').style.display = 'block';
+    }
+}
+
+// Load ALL stale items by making multiple API calls if needed
+async function loadAllStaleItems() {
+    try {
+        // Show loading state
+        document.getElementById('stale-items-loading').style.display = 'block';
+        document.getElementById('stale-items-content').style.display = 'none';
+        
+        let allItems = [];
+        let offset = 0;
+        const limit = 100; // API max limit for stale items
+        const maxItems = 2000; // Reasonable limit - load first 2000 stale items
+        let hasMore = true;
+        
+        while (hasMore && allItems.length < maxItems) {
+            const response = await fetch(withGlobalFilters(`/api/inventory/stale_items_simple?limit=${limit}&offset=${offset}`));
+            const data = await response.json();
+            
+            if (response.ok && data.items) {
+                allItems = allItems.concat(data.items);
+                hasMore = data.pagination.has_more;
+                offset += limit;
+                
+                // Show progress - but limit to avoid spam
+                if (allItems.length % 1000 === 0 || !hasMore) {
+                    console.log(`Loaded ${allItems.length} stale items so far...`);
+                }
+            } else {
+                hasMore = false;
+                console.error('Failed to load stale items:', data.error);
+            }
+        }
+        
+        console.log(`Loaded ${allItems.length} total stale items`);
+        allStaleItems = allItems;
+        
+    } catch (error) {
+        console.error('Error loading all stale items:', error);
+        allStaleItems = [];
+    } finally {
+        // Hide loading state
+        document.getElementById('stale-items-loading').style.display = 'none';
+        document.getElementById('stale-items-content').style.display = 'block';
+    }
+}
+
+// Health Alerts filtering and pagination
+// Store current filtered alerts globally for pagination
+let currentFilteredAlerts = [];
+
+function filterHealthAlerts() {
+    const categoryFilter = document.getElementById('alert-category-filter').value;
+    const severityFilter = document.getElementById('alert-severity-filter').value;
+    const typeFilter = document.getElementById('alert-type-filter').value;
+    
+    currentFilteredAlerts = allHealthAlerts.filter(alert => {
+        if (categoryFilter && alert.category !== categoryFilter) return false;
+        if (severityFilter && alert.severity !== severityFilter) return false;
+        if (typeFilter && alert.alert_type !== typeFilter) return false;
+        return true;
+    });
+    
+    currentAlertsPage = 1; // Reset to first page
+    displayHealthAlerts(currentFilteredAlerts);
+}
+
+function displayHealthAlerts(alerts) {
+    // Ensure alerts is an array
+    if (!Array.isArray(alerts)) {
+        console.error('displayHealthAlerts: alerts is not an array:', alerts);
+        alerts = [];
+    }
+    
+    // Backend now prevents duplicates with proper unique constraints and upsert logic
+    // No need for frontend deduplication - each alert should be unique
+    const uniqueAlerts = alerts;
+    
+    const perPage = parseInt(document.getElementById('alerts-per-page').value) || 25;
+    const totalPages = Math.ceil(uniqueAlerts.length / perPage);
+    const startIndex = (currentAlertsPage - 1) * perPage;
+    const endIndex = startIndex + perPage;
+    const pageAlerts = uniqueAlerts.slice(startIndex, endIndex);
+    
+    // Update count
+    document.getElementById('alerts-count').textContent = 
+        `Showing ${startIndex + 1}-${Math.min(endIndex, uniqueAlerts.length)} of ${uniqueAlerts.length} health alerts`;
+    
+    // Display alerts
+    let html = '';
+    if (pageAlerts.length > 0) {
+        pageAlerts.forEach(alert => {
+            const severityColor = {
+                'critical': 'danger',
+                'high': 'warning',
+                'medium': 'info',
+                'low': 'secondary'
+            }[alert.severity] || 'secondary';
+            
+            // Single severity badge since duplicates are prevented at backend
+            const severityBadge = `<span class="badge bg-${severityColor} me-1">${alert.severity.toUpperCase()}</span>`;
+            
+            // Single suggestion since no duplicates
+            const suggestions = alert.suggested_action || 'No action suggested';
+            
+            html += `
+                <div class="alert alert-${severityColor} d-flex justify-content-between align-items-start">
+                    <div class="flex-grow-1">
+                        <div class="d-flex align-items-center mb-1">
+                            <strong class="me-2">${alert.common_name || alert.category || 'Unknown Item'}</strong>
+                        </div>
+                        ${alert.tag_id ? `<div class="small text-muted mb-1">Tag ID: ${alert.tag_id}</div>` : ''}
+                        <div class="small text-muted mb-1">${alert.category || 'No Category'} > ${alert.subcategory || 'No Subcategory'}</div>
+                        <div class="mt-1">
+                            <small>${suggestions}</small>
+                        </div>
+                        <div class="mt-1">
+                            <small class="text-muted">
+                                Created: ${new Date(alert.created_at).toLocaleDateString()}
+                            </small>
+                        </div>
+                    </div>
+                    <div class="d-flex flex-column align-items-end">
+                        <div class="mb-2">
+                            ${severityBadge}
+                        </div>
+                        ${alert.tag_id ? `
+                            <button class="btn btn-outline-primary btn-sm" onclick="navigateToItem('${alert.tag_id}')" 
+                                    title="View item in Rental Inventory tab">
+                                <i class="fas fa-external-link-alt"></i> View Item
+                            </button>
+                        ` : ''}
+                    </div>
+                </div>
+            `;
+        });
+    } else {
+        html = '<div class="alert alert-info">No alerts match the current filters.</div>';
+    }
+    
+    document.getElementById('alerts-list').innerHTML = html;
+    
+    // Update pagination
+    console.log(`Health alerts pagination: page ${currentAlertsPage} of ${totalPages}, showing ${pageAlerts.length} alerts`);
+    updatePagination('alerts-pagination', currentAlertsPage, totalPages, (page) => {
+        console.log(`Health alerts pagination clicked: page ${page}`);
+        currentAlertsPage = page;
+        displayHealthAlerts(currentFilteredAlerts); // Display same filtered data, different page
+    });
+}
+
+function updateAlertsPagination() {
+    filterHealthAlerts(); // Refresh display with new page size
+}
+
+// Stale Items filtering and pagination  
+function filterStaleItems() {
+    const categoryFilter = document.getElementById('stale-category-filter').value;
+    const subcategoryFilter = document.getElementById('stale-subcategory-filter').value;
+    const daysFilter = parseInt(document.getElementById('stale-days-filter').value);
+    
+    let filteredItems = allStaleItems.filter(item => {
+        if (categoryFilter && item.category !== categoryFilter) return false;
+        if (subcategoryFilter && item.subcategory !== subcategoryFilter) return false;
+        if (daysFilter && item.days_since_scan < daysFilter) return false;
+        return true;
+    });
+    
+    // Update subcategory options based on selected category
+    if (categoryFilter) {
+        const subcategories = [...new Set(allStaleItems
+            .filter(item => item.category === categoryFilter)
+            .map(item => item.subcategory)
+            .filter(Boolean))];
+        
+        const subcategorySelect = document.getElementById('stale-subcategory-filter');
+        subcategorySelect.innerHTML = '<option value="">All Subcategories</option>';
+        subcategories.forEach(sub => {
+            subcategorySelect.innerHTML += `<option value="${sub}"${sub === subcategoryFilter ? ' selected' : ''}>${sub}</option>`;
+        });
+    }
+    
+    currentStaleItemsPage = 1; // Reset to first page
+    displayStaleItems(filteredItems);
+}
+
+function displayStaleItems(items) {
+    const perPage = parseInt(document.getElementById('stale-items-per-page').value) || 25;
+    const totalPages = Math.ceil(items.length / perPage);
+    const startIndex = (currentStaleItemsPage - 1) * perPage;
+    const endIndex = startIndex + perPage;
+    const pageItems = items.slice(startIndex, endIndex);
+    
+    // Update count
+    document.getElementById('stale-items-count').innerHTML = `
+        <div>Showing ${startIndex + 1}-${Math.min(endIndex, items.length)} of ${items.length} stale items</div>
+    `;
+    
+    // Display items with enhanced activity information
+    let html = '';
+    if (pageItems.length > 0) {
+        pageItems.forEach(item => {
+            // Simplified display for debugging
+            const daysStale = item.days_since_scan || 0;
+            
+            let daysBadgeColor = 'danger';
+            if (daysStale <= 7) {
+                daysBadgeColor = 'warning';
+            } else if (daysStale <= 14) {
+                daysBadgeColor = 'danger'; 
+            } else {
+                daysBadgeColor = 'dark';
+            }
+                                  
+            html += `
+                <div class="col-md-6 mb-3">
+                    <div class="stale-item border rounded p-3">
+                        <div class="d-flex justify-content-between">
+                            <div class="flex-grow-1">
+                                <strong>${item.common_name || 'Unknown Item'}</strong>
+                                <div class="text-muted small">
+                                    ${item.category || 'No Category'} > ${item.subcategory || 'No Subcategory'}
+                                </div>
+                                <div class="text-muted small">
+                                    Tag: ${item.tag_id} • Location: ${item.bin_location || 'Unknown'}
+                                </div>
+                            </div>
+                            <div class="text-end">
+                                <span class="badge bg-${daysBadgeColor}">${daysStale} days</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+    } else {
+        html = '<div class="col-12"><div class="alert alert-info">No stale items match the current filters.</div></div>';
+    }
+    
+    document.getElementById('stale-items-list').innerHTML = `<div class="row">${html}</div>`;
+    
+    // Update pagination
+    updatePagination('stale-items-pagination', currentStaleItemsPage, totalPages, (page) => {
+        currentStaleItemsPage = page;
+        displayStaleItems(items);
+    });
+}
+
+function updateStaleItemsPagination() {
+    filterStaleItems(); // Refresh display with new page size
+}
+
+// Generic pagination component
+function updatePagination(containerId, currentPage, totalPages, onPageChange) {
+    console.log(`updatePagination called: ${containerId}, page ${currentPage} of ${totalPages}`);
+    const container = document.getElementById(containerId);
+    if (!container) {
+        console.error(`Pagination container not found: ${containerId}`);
+        return;
+    }
+    if (totalPages <= 1) {
+        container.innerHTML = '';
+        return;
+    }
+    
+    let html = '<nav><ul class="pagination pagination-sm">';
+    
+    // Previous button
+    html += `<li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
+        <a class="page-link" href="#" data-page="${currentPage - 1}">Previous</a>
+    </li>`;
+    
+    // Page numbers (show max 5 pages around current)
+    const startPage = Math.max(1, currentPage - 2);
+    const endPage = Math.min(totalPages, currentPage + 2);
+    
+    if (startPage > 1) {
+        html += `<li class="page-item"><a class="page-link" href="#" data-page="1">1</a></li>`;
+        if (startPage > 2) {
+            html += '<li class="page-item disabled"><span class="page-link">...</span></li>';
+        }
+    }
+    
+    for (let page = startPage; page <= endPage; page++) {
+        html += `<li class="page-item ${page === currentPage ? 'active' : ''}">
+            <a class="page-link" href="#" data-page="${page}">${page}</a>
+        </li>`;
+    }
+    
+    if (endPage < totalPages) {
+        if (endPage < totalPages - 1) {
+            html += '<li class="page-item disabled"><span class="page-link">...</span></li>';
+        }
+        html += `<li class="page-item"><a class="page-link" href="#" data-page="${totalPages}">${totalPages}</a></li>`;
+    }
+    
+    // Next button
+    html += `<li class="page-item ${currentPage === totalPages ? 'disabled' : ''}">
+        <a class="page-link" href="#" data-page="${currentPage + 1}">Next</a>
+    </li>`;
+    
+    html += '</ul></nav>';
+    container.innerHTML = html;
+    
+    // Add event listeners to pagination links
+    container.querySelectorAll('a.page-link[data-page]').forEach(link => {
+        link.addEventListener('click', (event) => {
+            event.preventDefault();
+            const page = parseInt(link.getAttribute('data-page'));
+            if (page >= 1 && page <= totalPages && page !== currentPage) {
+                onPageChange(page);
+            }
+        });
+    });
+}
+
+// REMOVED: Duplicate initialization moved to single DOMContentLoaded handler below
+    function initializeTabs() {
+        const triggerTabList = [].slice.call(document.querySelectorAll('#analyticsTab button[data-bs-toggle="tab"]'));
+        
+        triggerTabList.forEach(function (triggerEl) {
+            triggerEl.addEventListener('click', function (event) {
+                event.preventDefault();
+                
+                // Remove active class from all tabs and content
+                document.querySelectorAll('#analyticsTab .nav-link').forEach(tab => tab.classList.remove('active'));
+                document.querySelectorAll('#analyticsTabContent .tab-pane').forEach(pane => {
+                    pane.classList.remove('show', 'active');
+                });
+                
+                // Add active class to clicked tab
+                triggerEl.classList.add('active');
+                
+                // Show corresponding content
+                const targetId = triggerEl.getAttribute('data-bs-target');
+                if (targetId) {
+                    const targetPane = document.querySelector(targetId);
+                    if (targetPane) {
+                        targetPane.classList.add('show', 'active');
+                    }
+                }
+            });
+        });
+    }
+    
+    // Initialize tabs immediately
+    initializeTabs();
+    
+    // Load configuration when configuration tab is clicked
+    document.getElementById('configuration-tab').addEventListener('click', function() {
+        loadConfiguration();
+    });
+    
+    // Load stale items when stale items tab is clicked  
+    document.getElementById('stale-items-tab').addEventListener('click', function() {
+        if (window.inventoryAnalytics) {
+            window.inventoryAnalytics.loadStaleItems();
+        }
+    });
+    
+    // Load usage analysis when usage analysis tab is clicked
+    document.getElementById('usage-analysis-tab').addEventListener('click', function() {
+        loadUsagePatterns();
+        loadDataDiscrepancies();
+    });
+    
+    // Load resale tracking when resale tracking tab is clicked
+    document.getElementById('resale-tracking-tab').addEventListener('click', function() {
+        loadResaleTrackingData();
+    });
+
+// Navigate to specific item on Tab 1 (Rental Inventory)
+function navigateToItem(tagId) {
+    try {
+        // Switch to Tab 1 (Rental Inventory)
+        const tab1Link = document.querySelector('a[data-bs-target="#tab1"], a[href="#tab1"], .nav-link[onclick*="tab1"], .nav-link[onclick*="showTab(1)"]');
+        if (tab1Link) {
+            // Trigger tab switch
+            tab1Link.click();
+            
+            // Wait for tab to load, then search for the item
+            setTimeout(() => {
+                // Try to find and scroll to the item in Tab 1
+                const itemElements = document.querySelectorAll('#tab1 [data-tag-id], #tab1 .item-row, #tab1 .inventory-item, #tab1 tr, #tab1 .card');
+                let foundItem = null;
+                
+                // Search through various possible selectors
+                itemElements.forEach(element => {
+                    const elementText = element.textContent || element.innerHTML || '';
+                    if (elementText.includes(tagId)) {
+                        foundItem = element;
+                    }
+                });
+                
+                if (foundItem) {
+                    // Scroll to the item and highlight it
+                    foundItem.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    foundItem.style.backgroundColor = '#fff3cd';
+                    foundItem.style.border = '2px solid #ffc107';
+                    
+                    // Remove highlighting after 3 seconds
+                    setTimeout(() => {
+                        foundItem.style.backgroundColor = '';
+                        foundItem.style.border = '';
+                    }, 3000);
+                } else {
+                    // If not found, show search hint
+                    alert(`Switched to Rental Inventory tab. Please search for item: ${tagId}`);
+                }
+            }, 500);
+        } else {
+            console.error('Could not find Tab 1 link');
+            alert('Could not navigate to Rental Inventory tab');
+        }
+    } catch (error) {
+        console.error('Error navigating to item:', error);
+        alert(`Error navigating to item ${tagId}`);
+    }
+}
+
+// ===== BUSINESS INTELLIGENCE FUNCTIONALITY =====
+
+let storeChart = null;
+let typeChart = null;
+
+// Helper to append global filter parameters to API requests
+function withGlobalFilters(url) {
+    try {
+        const params = window.GlobalFilters?.getUrlParams?.();
+        if (!params) return url;
+        return url.includes('?') ? `${url}&${params}` : `${url}?${params}`;
+    } catch (err) {
+        console.warn('GlobalFilters unavailable:', err);
+        return url;
+    }
+}
+
+// Refresh analytics data based on current filters
+function refreshAnalyticsData() {
+    console.log('Refreshing Analytics Tab 6 data with filters:', GlobalFilters.getApiParams());
+
+    // Update dashboard summary with filters
+    if (window.inventoryAnalytics && typeof window.inventoryAnalytics.loadDashboardData === 'function') {
+        window.inventoryAnalytics.loadDashboardData();
+    }
+
+    // Update business intelligence with filters
+    fetchBusinessIntelligence();
+}
+window.refreshAnalyticsData = refreshAnalyticsData;
+
+// Fetch business intelligence data with real POS data
+function fetchBusinessIntelligence() {
+    // Phase 1B: Progressive loading implementation
+    let params = '';
+    try {
+        if (window.GlobalFilters && typeof GlobalFilters.getUrlParams === 'function') {
+            params = GlobalFilters.getUrlParams();
+        }
+    } catch (error) {
+        console.warn('GlobalFilters not available, using default parameters:', error);
+        params = '';
+    }
+    
+    const url = `/api/inventory/business_intelligence${params ? '?' + params : ''}`;
+    
+    console.log('Fetching business intelligence from:', url);
+    
+    // Phase 1B: Start progress loading sequence
+    if (window.inventoryAnalytics) {
+        window.inventoryAnalytics.showProgressLoader('business-insights', 3, 1, '<1 sec');
+        // Simulate progressive steps for better UX
+        setTimeout(() => window.inventoryAnalytics.showProgressLoader('business-insights', 3, 2, '<1 sec'), 200);
+        setTimeout(() => window.inventoryAnalytics.showProgressLoader('business-insights', 3, 3, '<1 sec'), 400);
+    }
+    
+    fetch(url)
+        .then(response => response.json())
+        .then(data => {
+            console.log('Business intelligence data received:', data);
+            // Phase 1B: Hide progress loader before displaying results
+            if (window.inventoryAnalytics) {
+                window.inventoryAnalytics.hideProgressLoader('business-insights');
+            }
+            updateBusinessIntelligenceDisplay(data);
+        })
+        .catch(error => {
+            console.error('Error fetching business intelligence:', error);
+            // Phase 1B: Hide progress loader on error
+            if (window.inventoryAnalytics) {
+                window.inventoryAnalytics.hideProgressLoader('business-insights');
+            }
+            showBusinessIntelligenceError('Failed to load business intelligence data');
+        });
+}
+
+// Update business intelligence display with real data
+function updateBusinessIntelligenceDisplay(data) {
+    // Update financial metrics
+    const financialInsights = data.financial_insights || {};
+    document.getElementById('total-inventory-value').textContent = formatCurrency(financialInsights.total_inventory_value || 0);
+    document.getElementById('avg-sell-price').textContent = formatCurrency(financialInsights.avg_sell_price || 0);
+    document.getElementById('total-turnover').textContent = formatCurrency(financialInsights.total_turnover_ytd || 0);
+    document.getElementById('total-repair-costs').textContent = formatCurrency(financialInsights.total_repair_costs || 0);
+    document.getElementById('high-value-count').textContent = formatNumber(financialInsights.high_value_items || 0);
+    document.getElementById('items-with-data').textContent = formatNumber(financialInsights.items_with_data || 0);
+    
+    // Update store distribution chart
+    updateStoreDistributionChart(data.store_analysis?.distribution || []);
+    
+    // Update inventory type distribution chart
+    updateTypeDistributionChart(data.inventory_type_analysis?.distribution || []);
+    
+    // Update manufacturers list
+    updateManufacturersList(data.manufacturer_insights?.top_manufacturers || []);
+    
+    // Generate business insights
+    generateBusinessInsights(data);
+}
+
+// Update store distribution chart with Fortune 500 styling
+function updateStoreDistributionChart(storeData) {
+    const ctx = document.getElementById('store-distribution-chart').getContext('2d');
+    
+    // Destroy existing chart
+    if (storeChart) {
+        storeChart.destroy();
+    }
+    
+    // Map store codes to readable names
+    const storeNames = {
+        '6800': 'Brooklyn Park',
+        '3607': 'Wayzata',
+        '8101': 'Fridley',
+        '728': 'Elk River',
+        '000': 'Legacy/Unassigned',
+        'Unassigned': 'Unassigned'
+    };
+    
+    const labels = storeData.map(store => storeNames[store.store_code] || store.store_code);
+    const itemCounts = storeData.map(store => store.item_count);
+    
+    // Professional Fortune 500 color palette
+    const executiveColors = [
+        'rgba(99, 102, 241, 0.9)',  // Indigo
+        'rgba(16, 185, 129, 0.9)',  // Emerald
+        'rgba(245, 101, 101, 0.9)', // Rose
+        'rgba(251, 191, 36, 0.9)',  // Amber
+        'rgba(139, 92, 246, 0.9)',  // Purple
+        'rgba(34, 197, 94, 0.9)'    // Green
+    ];
+    
+    const hoverColors = [
+        'rgba(99, 102, 241, 1)',
+        'rgba(16, 185, 129, 1)',
+        'rgba(245, 101, 101, 1)',
+        'rgba(251, 191, 36, 1)',
+        'rgba(139, 92, 246, 1)',
+        'rgba(34, 197, 94, 1)'
+    ];
+    
+    storeChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: labels,
+            datasets: [{
+                data: itemCounts,
+                backgroundColor: executiveColors.slice(0, labels.length),
+                hoverBackgroundColor: hoverColors.slice(0, labels.length),
+                borderColor: '#ffffff',
+                borderWidth: 4,
+                hoverBorderWidth: 6,
+                borderRadius: 8,
+                hoverBorderColor: '#ffffff'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: '60%',
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        usePointStyle: true,
+                        pointStyle: 'circle',
+                        padding: 20,
+                        font: {
+                            family: "'Segoe UI', system-ui, sans-serif",
+                            size: 13,
+                            weight: '600'
+                        },
+                        color: '#4a5568',
+                        generateLabels: function(chart) {
+                            const data = chart.data;
+                            const total = data.datasets[0].data.reduce((a, b) => a + b, 0);
+                            return data.labels.map((label, index) => {
+                                const value = data.datasets[0].data[index];
+                                const percentage = ((value / total) * 100).toFixed(1);
+                                return {
+                                    text: `${label} (${percentage}%)`,
+                                    fillStyle: data.datasets[0].backgroundColor[index],
+                                    strokeStyle: data.datasets[0].borderColor,
+                                    lineWidth: data.datasets[0].borderWidth,
+                                    pointStyle: 'circle',
+                                    hidden: false,
+                                    index: index
+                                };
+                            });
+                        }
+                    }
+                },
+                tooltip: {
+                    backgroundColor: 'rgba(26, 32, 44, 0.95)',
+                    titleColor: '#ffffff',
+                    bodyColor: '#ffffff',
+                    borderColor: 'rgba(102, 126, 234, 0.8)',
+                    borderWidth: 2,
+                    cornerRadius: 12,
+                    padding: 16,
+                    displayColors: true,
+                    titleFont: {
+                        size: 14,
+                        weight: '600'
+                    },
+                    bodyFont: {
+                        size: 13,
+                        weight: '500'
+                    },
+                    callbacks: {
+                        title: function(context) {
+                            return `${context[0].label} Distribution`;
+                        },
+                        label: function(context) {
+                            const value = formatNumber(context.raw);
+                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                            const percentage = ((context.raw / total) * 100).toFixed(1);
+                            return [
+                                `Items: ${value}`,
+                                `Share: ${percentage}%`
+                            ];
+                        }
+                    }
+                }
+            },
+            animation: {
+                animateRotate: true,
+                animateScale: true,
+                duration: 1000,
+                easing: 'easeOutQuart'
+            },
+            hover: {
+                mode: 'nearest',
+                intersect: true,
+                animationDuration: 300
+            }
+        }
+    });
+    
+    // Add center text for total items
+    const centerText = {
+        id: 'centerTextStore',
+        afterDraw: function(chart) {
+            const ctx = chart.ctx;
+            const centerX = chart.chartArea.left + (chart.chartArea.right - chart.chartArea.left) / 2;
+            const centerY = chart.chartArea.top + (chart.chartArea.bottom - chart.chartArea.top) / 2;
+            const total = chart.data.datasets[0].data.reduce((a, b) => a + b, 0);
+            
+            ctx.save();
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillStyle = '#2d3748';
+            ctx.font = 'bold 16px \'Segoe UI\', system-ui, sans-serif';
+            ctx.fillText('Total Items', centerX, centerY - 12);
+            ctx.font = 'bold 20px \'Segoe UI\', system-ui, sans-serif';
+            ctx.fillText(formatNumber(total), centerX, centerY + 12);
+            ctx.restore();
+        }
+    };
+    
+    if (!Chart.registry.plugins.get('centerTextStore')) {
+        Chart.register(centerText);
+    }
+}
+
+// Update inventory type distribution chart with professional styling
+function updateTypeDistributionChart(typeData) {
+    const ctx = document.getElementById('type-distribution-chart').getContext('2d');
+    
+    // Destroy existing chart
+    if (typeChart) {
+        typeChart.destroy();
+    }
+    
+    const labels = typeData.map(type => type.type);
+    const counts = typeData.map(type => type.count);
+    
+    // Create gradient backgrounds for bars
+    const gradients = labels.map((_, index) => {
+        const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+        const colors = [
+            ['rgba(99, 102, 241, 1)', 'rgba(99, 102, 241, 0.6)'],
+            ['rgba(16, 185, 129, 1)', 'rgba(16, 185, 129, 0.6)'],
+            ['rgba(245, 101, 101, 1)', 'rgba(245, 101, 101, 0.6)'],
+            ['rgba(251, 191, 36, 1)', 'rgba(251, 191, 36, 0.6)'],
+            ['rgba(139, 92, 246, 1)', 'rgba(139, 92, 246, 0.6)'],
+            ['rgba(34, 197, 94, 1)', 'rgba(34, 197, 94, 0.6)']
+        ];
+        const colorPair = colors[index % colors.length];
+        gradient.addColorStop(0, colorPair[0]);
+        gradient.addColorStop(1, colorPair[1]);
+        return gradient;
+    });
+    
+    const borderColors = [
+        'rgba(99, 102, 241, 1)',
+        'rgba(16, 185, 129, 1)',
+        'rgba(245, 101, 101, 1)',
+        'rgba(251, 191, 36, 1)',
+        'rgba(139, 92, 246, 1)',
+        'rgba(34, 197, 94, 1)'
+    ];
+    
+    typeChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Item Count',
+                data: counts,
+                backgroundColor: gradients,
+                borderColor: borderColors.slice(0, labels.length),
+                borderWidth: 3,
+                borderRadius: 8,
+                borderSkipped: false,
+                hoverBackgroundColor: borderColors.slice(0, labels.length),
+                hoverBorderColor: '#ffffff',
+                hoverBorderWidth: 3
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    backgroundColor: 'rgba(26, 32, 44, 0.95)',
+                    titleColor: '#ffffff',
+                    bodyColor: '#ffffff',
+                    borderColor: 'rgba(102, 126, 234, 0.8)',
+                    borderWidth: 2,
+                    cornerRadius: 12,
+                    padding: 16,
+                    displayColors: true,
+                    titleFont: {
+                        size: 14,
+                        weight: '600'
+                    },
+                    bodyFont: {
+                        size: 13,
+                        weight: '500'
+                    },
+                    callbacks: {
+                        title: function(context) {
+                            return `${context[0].label} Category`;
+                        },
+                        label: function(context) {
+                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                            const percentage = ((context.raw / total) * 100).toFixed(1);
+                            return [
+                                `Items: ${formatNumber(context.raw)}`,
+                                `Share: ${percentage}%`
+                            ];
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    grid: {
+                        display: false
+                    },
+                    ticks: {
+                        font: {
+                            family: "'Segoe UI', system-ui, sans-serif",
+                            size: 12,
+                            weight: '600'
+                        },
+                        color: '#4a5568',
+                        maxRotation: 45,
+                        minRotation: 0
+                    }
+                },
+                y: {
+                    beginAtZero: true,
+                    grid: {
+                        color: 'rgba(113, 128, 150, 0.1)',
+                        drawBorder: false
+                    },
+                    ticks: {
+                        font: {
+                            family: "'Segoe UI', system-ui, sans-serif",
+                            size: 12,
+                            weight: '500'
+                        },
+                        color: '#718096',
+                        callback: function(value) {
+                            return formatNumber(value);
+                        },
+                        padding: 12
+                    }
+                }
+            },
+            animation: {
+                duration: 1000,
+                easing: 'easeOutQuart',
+                delay: function(context) {
+                    return context.dataIndex * 100;
+                }
+            },
+            hover: {
+                mode: 'nearest',
+                intersect: true,
+                animationDuration: 300
+            }
+        }
+    });
+}
+
+// Update manufacturers list
+function updateManufacturersList(manufacturers) {
+    const container = document.getElementById('manufacturers-list');
+    
+    if (manufacturers.length === 0) {
+        container.innerHTML = '<p class="text-muted"><em>No manufacturer data available</em></p>';
+        return;
+    }
+    
+    const html = manufacturers.slice(0, 8).map((mfr, index) => `
+        <div class="d-flex justify-content-between align-items-center py-1 ${index !== manufacturers.length - 1 ? 'border-bottom' : ''}">
+            <div>
+                <strong>${mfr.manufacturer}</strong>
+                <br>
+                <small class="text-muted">${formatNumber(mfr.item_count)} items</small>
+            </div>
+            <div class="text-end">
+                <span class="badge bg-primary">${formatCurrency(mfr.avg_price)}</span>
+                <br>
+                <small class="text-muted">avg price</small>
+            </div>
+        </div>
+    `).join('');
+    
+    container.innerHTML = html;
+}
+
+// Generate business insights from the data
+function generateBusinessInsights(data) {
+    const insights = [];
+    const financial = data.financial_insights || {};
+    const stores = data.store_analysis?.distribution || [];
+    const types = data.inventory_type_analysis?.distribution || [];
+    
+    // Financial insights
+    if (financial.total_inventory_value > 1000000) {
+        insights.push(`High-value inventory portfolio worth <strong>${formatCurrency(financial.total_inventory_value)}</strong>`);
+    }
+    
+    if (financial.high_value_items > 0) {
+        insights.push(`<strong>${formatNumber(financial.high_value_items)}</strong> premium items above $${formatNumber(financial.high_value_threshold)} (90th percentile)`);
+    }
+    
+    // Store insights
+    const topStore = stores.reduce((max, store) => store.item_count > max.item_count ? store : max, stores[0] || {});
+    if (topStore.store_code) {
+        const storeName = storeNames[topStore.store_code] || topStore.store_code;
+        insights.push(`<strong>${storeName}</strong> leads with ${formatNumber(topStore.item_count)} items`);
+    }
+    
+    // Type insights  
+    const topType = types.reduce((max, type) => type.count > max.count ? type : max, types[0] || {});
+    if (topType.type) {
+        insights.push(`<strong>${topType.type}</strong> inventory type dominates with ${formatNumber(topType.count)} items`);
+    }
+    
+    // Repair cost insights
+    if (financial.total_repair_costs > 0) {
+        const repairPercentage = ((financial.total_repair_costs / financial.total_inventory_value) * 100).toFixed(1);
+        insights.push(`Repair costs represent <strong>${repairPercentage}%</strong> of total inventory value`);
+    }
+    
+    // Data coverage insight
+    const totalItems = data.filter_context?.total_items_in_view || 0;
+    if (financial.items_with_data > 0 && totalItems > 0) {
+        const dataPercentage = ((financial.items_with_data / totalItems) * 100).toFixed(1);
+        insights.push(`<strong>${dataPercentage}%</strong> of items have complete financial data from POS system`);
+    }
+    
+    // Default insight if no data
+    if (insights.length === 0) {
+        insights.push('Limited business intelligence available for current filter selection');
+    }
+    
+    document.getElementById('business-insights').innerHTML = insights.map(insight => `<li>${insight}</li>`).join('');
+}
+
+// Show error message for business intelligence
+function showBusinessIntelligenceError(message) {
+    document.getElementById('business-insights').innerHTML = `<li class="text-danger"><i class="fas fa-exclamation-triangle"></i> ${message}</li>`;
+}
+
+// Utility function to format currency
+function formatCurrency(amount) {
+    if (amount === 0) return '$0';
+    if (amount < 1000) return `$${amount.toFixed(2)}`;
+    if (amount < 1000000) return `$${(amount / 1000).toFixed(1)}K`;
+    return `$${(amount / 1000000).toFixed(1)}M`;
+}
+
+// Utility function to format numbers
+function formatNumber(num) {
+    if (num === 0) return '0';
+    if (num < 1000) return num.toString();
+    if (num < 1000000) return `${(num / 1000).toFixed(1)}K`;
+    return `${(num / 1000000).toFixed(1)}M`;
+}
+
+// Global store name mapping for consistent use across all functions
+const storeNames = {
+    '6800': 'Brooklyn Park',
+    '3607': 'Wayzata', 
+    '8101': 'Fridley',
+    '728': 'Elk River',
+    '000': 'Legacy/Unassigned',
+    'Unassigned': 'Unassigned'
+};
+
+// Initialize business intelligence when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize main dashboard first
+    console.log('DOMContentLoaded: Initializing analytics dashboard');
+    window.inventoryAnalytics = new InventoryAnalytics();
+    
+    // Load business intelligence data immediately on page load
+    console.log('Loading business intelligence data immediately');
+    fetchBusinessIntelligence();
+    
+    // Refresh data when tab becomes active
+    document.getElementById('business-intelligence-tab').addEventListener('shown.bs.tab', function() {
+        console.log('Business intelligence tab activated, fetching data');
+        fetchBusinessIntelligence();
+    });
+    
+    // Initialize tab-specific data loading on tab activation
+    document.addEventListener('shown.bs.tab', function(event) {
+        const targetTab = event.target.getAttribute('data-bs-target') || event.target.getAttribute('href');
+        console.log('Tab activated:', targetTab);
+        
+        switch(targetTab) {
+            case '#health-alerts':
+                console.log('Loading health alerts for tab activation');
+                loadAllHealthAlerts();
+                break;
+            case '#stale-items':
+                console.log('Loading stale items for tab activation');
+                loadAllStaleItems();
+                break;
+            case '#usage-patterns':
+                console.log('Loading usage patterns for tab activation');
+                loadUsagePatterns();
+                break;
+            case '#data-discrepancies':
+                console.log('Loading data discrepancies for tab activation');
+                loadDataDiscrepancies();
+                break;
+        }
+    });
+});
+</script>
+
+<!-- Load Chart Utilities and Dashboard Integration -->
+<script src="/static/js/chart-utilities.js"></script>
+<script src="/static/js/dashboard-integration.js"></script>
+
+<!-- Initialize advanced chart functionality -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('🚀 ADVANCED INTEGRATION: Initializing chart utilities and dashboard integration...');
+    
+    // Initialize chart defaults for professional presentation
+    if (window.chartManager) {
+        window.chartManager.initializeChartDefaults();
+        console.log('✅ Chart utilities initialized with Fortune 500 styling');
+    }
+    
+    // Initialize dashboard integration for seamless data flow
+    if (window.dashboardIntegration) {
+        window.dashboardIntegration.init().then(() => {
+            console.log('✅ Dashboard integration manager initialized');
+            console.log('🎯 Ready for enterprise-level data visualization');
+        });
+    }
+    
+    // Enhanced data binding for inventory analytics
+    enhanceInventoryAnalytics();
+});
+
+function enhanceInventoryAnalytics() {
+    console.log('🔥 ENHANCEMENT: Upgrading inventory analytics with advanced features...');
+    
+    // Create enhanced utilization gauge for the dashboard
+    const utilizationContainer = document.querySelector('#utilization-rate');
+    if (utilizationContainer && window.chartManager) {
+        // Get current utilization rate
+        const currentRate = parseFloat(utilizationContainer.textContent.replace('%', '')) || 0;
+        
+        // Create a canvas for the gauge
+        const gaugeCanvas = document.createElement('canvas');
+        gaugeCanvas.id = 'utilizationGaugeChart';
+        gaugeCanvas.width = 200;
+        gaugeCanvas.height = 200;
+        gaugeCanvas.style.maxWidth = '150px';
+        gaugeCanvas.style.maxHeight = '150px';
+        gaugeCanvas.style.margin = '10px auto';
+        gaugeCanvas.style.display = 'block';
+        
+        // Insert the gauge after the text
+        utilizationContainer.parentNode.appendChild(gaugeCanvas);
+        
+        // Create the utilization gauge
+        window.chartManager.createUtilizationGauge('utilizationGaugeChart', currentRate, 75);
+        console.log(`📊 Created utilization gauge showing ${currentRate}% utilization`);
+    }
+    
+    // Enhance business intelligence display with charts
+    enhanceBusinessIntelligenceCharts();
+    
+    console.log('✨ Inventory analytics enhancement complete!');
+}
+
+function enhanceBusinessIntelligenceCharts() {
+    console.log('📈 CHART ENHANCEMENT: Adding business intelligence visualizations...');
+    
+    // Add chart containers to business intelligence sections
+    const biSection = document.getElementById('business-intelligence');
+    if (biSection && window.chartManager) {
+        // Add store distribution chart container
+        const storeChartContainer = document.createElement('div');
+        storeChartContainer.innerHTML = `
+            <div class="chart-container mt-4">
+                <div class="chart-header">
+                    <h5><i class="fas fa-store"></i> Store Distribution</h5>
+                    <div class="data-refresh-indicator live">
+                        <i class="fas fa-circle"></i> Live
+                    </div>
+                </div>
+                <div class="chart-body">
+                    <canvas id="storeDistributionChart" style="max-height: 300px;"></canvas>
+                </div>
+            </div>
+        `;
+        
+        // Add inventory type chart container  
+        const typeChartContainer = document.createElement('div');
+        typeChartContainer.innerHTML = `
+            <div class="chart-container mt-4">
+                <div class="chart-header">
+                    <h5><i class="fas fa-chart-pie"></i> Inventory Type Distribution</h5>
+                    <div class="data-refresh-indicator live">
+                        <i class="fas fa-circle"></i> Live
+                    </div>
+                </div>
+                <div class="chart-body">
+                    <canvas id="inventoryTypeChart" style="max-height: 300px;"></canvas>
+                </div>
+            </div>
+        `;
+        
+        // Insert at the end of business intelligence section
+        biSection.appendChild(storeChartContainer);
+        biSection.appendChild(typeChartContainer);
+        
+        console.log('📊 Added chart containers for business intelligence');
+    }
+}
+
+// Override the original business intelligence update function to include charts
+const originalUpdateBI = window.updateBusinessIntelligenceDisplay;
+window.updateBusinessIntelligenceDisplay = function(data) {
+    // Call original function first
+    if (originalUpdateBI) {
+        originalUpdateBI(data);
+    }
+    
+    // Add enhanced chart visualizations
+    updateBusinessIntelligenceCharts(data);
+};
+
+function updateBusinessIntelligenceCharts(data) {
+    if (!window.chartManager || !data) return;
+    
+    console.log('🎨 VISUALIZATION: Updating business intelligence charts with live data...');
+    
+    // Update store distribution chart
+    if (data.store_analysis && data.store_analysis.distribution) {
+        const storeData = {
+            labels: data.store_analysis.distribution.map(store => 
+                store.store_code === 'Unassigned' ? 'Unassigned' : `Store ${store.store_code}`
+            ),
+            values: data.store_analysis.distribution.map(store => store.item_count)
+        };
+        
+        window.chartManager.createStorePerformanceChart('storeDistributionChart', {
+            stores: data.store_analysis.distribution.map(store => ({ code: store.store_code })),
+            values: data.store_analysis.distribution.map(store => store.avg_sell_price || 0)
+        });
+        
+        console.log(`📈 Updated store distribution chart with ${storeData.labels.length} stores`);
+    }
+    
+    // Update inventory type chart
+    if (data.inventory_type_analysis && data.inventory_type_analysis.distribution) {
+        const typeData = {
+            labels: data.inventory_type_analysis.distribution.map(type => 
+                type.type === 'None' ? 'Untyped' : type.type
+            ),
+            values: data.inventory_type_analysis.distribution.map(type => type.count)
+        };
+        
+        window.chartManager.createInventoryDistributionChart('inventoryTypeChart', typeData, {
+            text: `${typeData.values.reduce((a, b) => a + b, 0).toLocaleString()}`,
+            subtext: 'Total Items'
+        });
+        
+        console.log(`🥧 Updated inventory type chart with ${typeData.labels.length} types`);
+    }
+    
+    console.log('✅ Business intelligence charts updated successfully');
+  }
+</script>
+<!-- Tab 6 Fixes - Usage Analysis and Resale Tracking -->
+<script src="/static/js/tab6_fixes.js"></script>
+
+{% endblock %}

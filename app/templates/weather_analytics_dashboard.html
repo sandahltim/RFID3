@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minnesota Weather Analytics Dashboard</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/date-fns@2.29.0/index.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@2.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    
+    <!-- Weather Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/weather-icons/2.0.12/css/weather-icons.min.css">
+    
+    <!-- Custom CSS -->
+    <style>
+        .weather-card {
+            background: linear-gradient(135deg, #74b9ff 0%, #0984e3 100%);
+            border-radius: 15px;
+            color: white;
+            box-shadow: 0 8px 32px rgba(116, 185, 255, 0.3);
+        }
+        
+        .analytics-card {
+            border-radius: 12px;
+            border: none;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        
+        .analytics-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+        }
+        
+        .metric-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: #2d3436;
+        }
+        
+        .metric-label {
+            font-size: 0.9rem;
+            color: #636e72;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .correlation-meter {
+            width: 100%;
+            height: 20px;
+            border-radius: 10px;
+            background: linear-gradient(90deg, #e17055 0%, #fdcb6e 50%, #00b894 100%);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .correlation-indicator {
+            position: absolute;
+            top: 0;
+            width: 4px;
+            height: 100%;
+            background: #2d3436;
+            transition: left 0.3s ease;
+        }
+        
+        .weather-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+        
+        .forecast-item {
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            border-left: 4px solid #74b9ff;
+        }
+        
+        .risk-high { border-left-color: #e17055; }
+        .risk-medium { border-left-color: #fdcb6e; }
+        .risk-low { border-left-color: #00b894; }
+        
+        .store-badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .store-wayzata { background: #e8f4fd; color: #0984e3; }
+        .store-brooklyn-park { background: #e8f5e8; color: #00b894; }
+        .store-fridley { background: #fff0e6; color: #e17055; }
+        .store-elk-river { background: #f3e8ff; color: #6c5ce7; }
+        
+        .chart-container {
+            position: relative;
+            height: 400px;
+            margin-bottom: 2rem;
+        }
+        
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(116, 185, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: #74b9ff;
+            animation: spin 1s ease-in-out infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .insight-item {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            border-radius: 10px;
+            padding: 1.25rem;
+            margin-bottom: 1rem;
+            border-left: 4px solid #74b9ff;
+        }
+        
+        .recommendation-item {
+            background: linear-gradient(135deg, #fff5f5 0%, #fed7d7 100%);
+            border-radius: 10px;
+            padding: 1.25rem;
+            margin-bottom: 1rem;
+            border-left: 4px solid #e17055;
+        }
+        
+        .nav-pills .nav-link {
+            border-radius: 25px;
+            padding: 0.75rem 1.5rem;
+            margin-right: 0.5rem;
+            font-weight: 600;
+            transition: all 0.2s ease;
+        }
+        
+        .nav-pills .nav-link.active {
+            background: linear-gradient(135deg, #74b9ff 0%, #0984e3 100%);
+            color: white;
+        }
+        
+        .weather-trend-positive { color: #00b894; }
+        .weather-trend-negative { color: #e17055; }
+        .weather-trend-neutral { color: #636e72; }
+    </style>
+</head>
+<body class="bg-light">
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark" style="background: linear-gradient(135deg, #2d3436 0%, #636e72 100%);">
+        <div class="container">
+            <a class="navbar-brand fw-bold" href="#">
+                <i class="wi wi-thermometer"></i> Minnesota Weather Analytics
+            </a>
+            <div class="navbar-nav ms-auto">
+                <span class="navbar-text me-3">
+                    <i class="wi wi-time-12"></i>
+                    <span id="current-time">--:-- --</span>
+                </span>
+                <span class="navbar-text">
+                    <i class="wi wi-refresh"></i>
+                    Last Updated: <span id="last-updated">Loading...</span>
+                </span>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid mt-4">
+        <!-- Store Selection and Current Weather -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="card analytics-card h-100">
+                    <div class="card-body">
+                        <h5 class="card-title">Store Selection</h5>
+                        <select id="store-selector" class="form-select mb-3">
+                            <option value="">All Stores</option>
+                            <option value="3607">3607 - Wayzata</option>
+                            <option value="6800">6800 - Brooklyn Park</option>
+                            <option value="728">728 - Fridley</option>
+                            <option value="8101">8101 - Elk River</option>
+                        </select>
+                        
+                        <div class="d-grid gap-2">
+                            <button id="refresh-data" class="btn btn-primary btn-sm">
+                                <i class="wi wi-refresh"></i> Refresh Data
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-9">
+                <div class="weather-card card h-100">
+                    <div class="card-body">
+                        <div class="row align-items-center">
+                            <div class="col-md-2 text-center">
+                                <i id="current-weather-icon" class="wi wi-day-sunny weather-icon"></i>
+                            </div>
+                            <div class="col-md-10">
+                                <div class="row">
+                                    <div class="col-md-3">
+                                        <div class="metric-value text-white" id="current-temp">--°F</div>
+                                        <div class="metric-label text-white-50">Temperature</div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="metric-value text-white" id="current-humidity">--%</div>
+                                        <div class="metric-label text-white-50">Humidity</div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="metric-value text-white" id="current-wind">-- mph</div>
+                                        <div class="metric-label text-white-50">Wind Speed</div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="metric-value text-white" id="current-precip">--"</div>
+                                        <div class="metric-label text-white-50">Precipitation</div>
+                                    </div>
+                                </div>
+                                <div class="mt-3">
+                                    <span class="fs-5 text-white-50">Minneapolis-St. Paul Area</span>
+                                    <br>
+                                    <span id="current-conditions" class="text-white">Loading weather conditions...</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Navigation Tabs -->
+        <ul class="nav nav-pills mb-4" id="dashboard-tabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="overview-tab" data-bs-toggle="pill" data-bs-target="#overview" type="button">
+                    Overview
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="correlations-tab" data-bs-toggle="pill" data-bs-target="#correlations" type="button">
+                    Weather Correlations
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="forecasting-tab" data-bs-toggle="pill" data-bs-target="#forecasting" type="button">
+                    Demand Forecasting
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="seasonal-tab" data-bs-toggle="pill" data-bs-target="#seasonal" type="button">
+                    Seasonal Analysis
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="inventory-tab" data-bs-toggle="pill" data-bs-target="#inventory" type="button">
+                    Inventory Mix
+                </button>
+            </li>
+        </ul>
+
+        <!-- Tab Content -->
+        <div class="tab-content" id="dashboard-content">
+            <!-- Overview Tab -->
+            <div class="tab-pane fade show active" id="overview" role="tabpanel">
+                <div class="row mb-4">
+                    <!-- Key Metrics -->
+                    <div class="col-md-3">
+                        <div class="card analytics-card">
+                            <div class="card-body text-center">
+                                <div class="metric-value" id="weather-sensitivity-score">--%</div>
+                                <div class="metric-label">Weather Sensitivity</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card analytics-card">
+                            <div class="card-body text-center">
+                                <div class="metric-value" id="significant-correlations">--</div>
+                                <div class="metric-label">Significant Correlations</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card analytics-card">
+                            <div class="card-body text-center">
+                                <div class="metric-value" id="forecast-confidence">--%</div>
+                                <div class="metric-label">Forecast Confidence</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card analytics-card">
+                            <div class="card-body text-center">
+                                <div class="metric-value" id="risk-days-count">--</div>
+                                <div class="metric-label">High Risk Days (14d)</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-8">
+                        <div class="card analytics-card">
+                            <div class="card-header">
+                                <h5 class="card-title mb-0">Weather Impact on Revenue (Last 90 Days)</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="chart-container">
+                                    <canvas id="weather-revenue-chart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-4">
+                        <div class="card analytics-card h-100">
+                            <div class="card-header">
+                                <h5 class="card-title mb-0">Key Insights</h5>
+                            </div>
+                            <div class="card-body">
+                                <div id="key-insights">
+                                    <div class="text-center p-4">
+                                        <div class="loading-spinner"></div>
+                                        <p class="mt-2 text-muted">Loading insights...</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Weather Correlations Tab -->
+            <div class="tab-pane fade" id="correlations" role="tabpanel">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="card analytics-card">
+                            <div class="card-header">
+                                <h5 class="card-title mb-0">Temperature vs Revenue Correlation</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="correlation-meter mb-3">
+                                    <div id="temp-correlation-indicator" class="correlation-indicator"></div>
+                                </div>
+                                <div class="d-flex justify-content-between">
+                                    <span class="text-danger">Strong Negative</span>
+                                    <span class="text-warning">Neutral</span>
+                                    <span class="text-success">Strong Positive</span>
+                                </div>
+                                <div class="mt-3">
+                                    <strong>Correlation: <span id="temp-correlation-value">--</span></strong>
+                                    <br>
+                                    <small class="text-muted">P-value: <span id="temp-p-value">--</span></small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <div class="card analytics-card">
+                            <div class="card-header">
+                                <h5 class="card-title mb-0">Precipitation vs Revenue Correlation</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="correlation-meter mb-3">
+                                    <div id="precip-correlation-indicator" class="correlation-indicator"></div>
+                                </div>
+                                <div class="d-flex justify-content-between">
+                                    <span class="text-danger">Strong Negative</span>
+                                    <span class="text-warning">Neutral</span>
+                                    <span class="text-success">Strong Positive</span>
+                                </div>
+                                <div class="mt-3">
+                                    <strong>Correlation: <span id="precip-correlation-value">--</span></strong>
+                                    <br>
+                                    <small class="text-muted">P-value: <span id="precip-p-value">--</span></small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row mt-4">
+                    <div class="col-12">
+                        <div class="card analytics-card">
+                            <div class="card-header">
+                                <h5 class="card-title mb-0">Correlation Matrix</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="chart-container">
+                                    <canvas id="correlation-matrix-chart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Demand Forecasting Tab -->
+            <div class="tab-pane fade" id="forecasting" role="tabpanel">
+                <div class="row mb-4">
+                    <div class="col-md-4">
+                        <div class="card analytics-card">
+                            <div class="card-body text-center">
+                                <div class="metric-value" id="forecast-total-revenue">$--</div>
+                                <div class="metric-label">14-Day Forecast Total</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card analytics-card">
+                            <div class="card-body text-center">
+                                <div class="metric-value" id="forecast-avg-daily">$--</div>
+                                <div class="metric-label">Average Daily Revenue</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card analytics-card">
+                            <div class="card-body text-center">
+                                <div class="metric-value" id="forecast-peak-day">--</div>
+                                <div class="metric-label">Peak Day</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-8">
+                        <div class="card analytics-card">
+                            <div class="card-header">
+                                <h5 class="card-title mb-0">14-Day Revenue Forecast</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="chart-container">
+                                    <canvas id="demand-forecast-chart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-4">
+                        <div class="card analytics-card h-100">
+                            <div class="card-header">
+                                <h5 class="card-title mb-0">Upcoming Forecasts</h5>
+                            </div>
+                            <div class="card-body">
+                                <div id="forecast-list">
+                                    <div class="text-center p-4">
+                                        <div class="loading-spinner"></div>
+                                        <p class="mt-2 text-muted">Loading forecasts...</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Seasonal Analysis Tab -->
+            <div class="tab-pane fade" id="seasonal" role="tabpanel">
+                <div class="row">
+                    <div class="col-md-8">
+                        <div class="card analytics-card">
+                            <div class="card-header">
+                                <h5 class="card-title mb-0">Minnesota Seasonal Patterns</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="chart-container">
+                                    <canvas id="seasonal-chart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-4">
+                        <div class="card analytics-card h-100">
+                            <div class="card-header">
+                                <h5 class="card-title mb-0">Seasonal Events</h5>
+                            </div>
+                            <div class="card-body">
+                                <div id="seasonal-events">
+                                    <div class="text-center p-4">
+                                        <div class="loading-spinner"></div>
+                                        <p class="mt-2 text-muted">Loading seasonal data...</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Inventory Mix Tab -->
+            <div class="tab-pane fade" id="inventory" role="tabpanel">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="card analytics-card">
+                            <div class="card-header">
+                                <h5 class="card-title mb-0">Industry Segment Distribution</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="chart-container">
+                                    <canvas id="inventory-mix-chart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <div class="card analytics-card">
+                            <div class="card-header">
+                                <h5 class="card-title mb-0">Weather Dependency Analysis</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="chart-container">
+                                    <canvas id="weather-dependency-chart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row mt-4">
+                    <div class="col-12">
+                        <div class="card analytics-card">
+                            <div class="card-header">
+                                <h5 class="card-title mb-0">Recommendations</h5>
+                            </div>
+                            <div class="card-body">
+                                <div id="recommendations-list">
+                                    <div class="text-center p-4">
+                                        <div class="loading-spinner"></div>
+                                        <p class="mt-2 text-muted">Loading recommendations...</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Custom JavaScript -->
+    <script src="{{ url_for('static', filename='js/weather-analytics-dashboard.js') }}"></script>
+</body>
+</html>

@@ -1,0 +1,457 @@
+{% extends "base.html" %}
+
+{% block title %}Analytics Suggestions Dashboard{% endblock %}
+
+{% block extra_css %}
+<style>
+.suggestions-hero {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 80px 0;
+    text-align: center;
+}
+
+.hero-content h1 {
+    font-size: 3.5rem;
+    font-weight: bold;
+    margin-bottom: 20px;
+}
+
+.hero-content p {
+    font-size: 1.3rem;
+    opacity: 0.9;
+    margin-bottom: 30px;
+}
+
+.hero-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 30px;
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.hero-stat {
+    background: rgba(255,255,255,0.1);
+    border-radius: 15px;
+    padding: 25px;
+    backdrop-filter: blur(10px);
+}
+
+.hero-stat h3 {
+    font-size: 2.5rem;
+    margin-bottom: 10px;
+    color: #fff;
+}
+
+.hero-stat p {
+    opacity: 0.9;
+    margin: 0;
+    font-weight: 500;
+}
+
+.suggestions-content {
+    padding: 80px 0;
+    background: #f8f9fa;
+}
+
+.category-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 30px;
+    margin-bottom: 60px;
+}
+
+.category-card {
+    background: white;
+    border-radius: 15px;
+    padding: 30px;
+    text-align: center;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+    transition: all 0.3s ease;
+    border: 3px solid transparent;
+}
+
+.category-card:hover {
+    transform: translateY(-10px);
+    border-color: #667eea;
+    box-shadow: 0 20px 40px rgba(102, 126, 234, 0.2);
+}
+
+.category-icon {
+    font-size: 4rem;
+    margin-bottom: 20px;
+    background: linear-gradient(45deg, #667eea, #764ba2);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.category-card h4 {
+    color: #2c3e50;
+    margin-bottom: 15px;
+    font-weight: 600;
+}
+
+.category-card p {
+    color: #6c757d;
+    margin-bottom: 20px;
+}
+
+.suggestion-count {
+    background: linear-gradient(45deg, #667eea, #764ba2);
+    color: white;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-weight: bold;
+    display: inline-block;
+}
+
+.recent-suggestions {
+    background: white;
+    border-radius: 15px;
+    padding: 40px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+    margin-bottom: 60px;
+}
+
+.suggestion-item {
+    border-bottom: 1px solid #e9ecef;
+    padding: 25px 0;
+    transition: all 0.3s ease;
+}
+
+.suggestion-item:last-child {
+    border-bottom: none;
+}
+
+.suggestion-item:hover {
+    background-color: #f8f9fa;
+    padding: 25px 15px;
+    margin: 0 -15px;
+    border-radius: 10px;
+}
+
+.suggestion-meta {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 10px;
+    font-size: 0.9em;
+}
+
+.meta-badge {
+    padding: 4px 12px;
+    border-radius: 15px;
+    font-weight: 600;
+    font-size: 0.8em;
+    text-transform: uppercase;
+}
+
+.status-implemented { background-color: #d4edda; color: #155724; }
+.status-validated { background-color: #cce5ff; color: #004085; }
+.status-under_review { background-color: #fff3cd; color: #856404; }
+
+.category-weather { background-color: #e3f2fd; color: #1976d2; }
+.category-seasonal { background-color: #f3e5f5; color: #7b1fa2; }
+.category-customer { background-color: #e8f5e8; color: #388e3c; }
+.category-operational { background-color: #fff3e0; color: #f57c00; }
+.category-economic { background-color: #fce4ec; color: #c2185b; }
+.category-geographic { background-color: #e0f2f1; color: #00796b; }
+
+.action-section {
+    background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+    color: white;
+    padding: 80px 0;
+    text-align: center;
+}
+
+.btn-cta {
+    background: linear-gradient(45deg, #667eea, #764ba2);
+    border: none;
+    color: white;
+    padding: 20px 40px;
+    border-radius: 30px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-size: 1.1rem;
+    margin: 10px;
+    box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+    transition: all 0.3s ease;
+}
+
+.btn-cta:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 12px 30px rgba(102, 126, 234, 0.6);
+    color: white;
+}
+
+.btn-secondary-cta {
+    background: transparent;
+    border: 2px solid white;
+    color: white;
+    padding: 18px 38px;
+    border-radius: 30px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-size: 1.1rem;
+    margin: 10px;
+    transition: all 0.3s ease;
+}
+
+.btn-secondary-cta:hover {
+    background: white;
+    color: #2c3e50;
+    transform: translateY(-3px);
+}
+
+.impact-highlight {
+    background: linear-gradient(135deg, #e8f5e8 0%, #f0f8ff 100%);
+    border-radius: 15px;
+    padding: 30px;
+    margin: 40px 0;
+    border-left: 5px solid #28a745;
+}
+
+.impact-highlight h4 {
+    color: #28a745;
+    margin-bottom: 15px;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Hero Section -->
+<div class="suggestions-hero">
+    <div class="container">
+        <div class="hero-content">
+            <h1>
+                <i class="fas fa-lightbulb"></i>
+                Analytics Suggestions
+            </h1>
+            <p class="lead">
+                Collaborate to improve our predictive analytics with your domain expertise.<br>
+                Your insights drive smarter business decisions for Minnesota equipment rentals.
+            </p>
+        </div>
+        
+        <div class="hero-stats">
+            <div class="hero-stat">
+                <h3>{{ stats.total_suggestions }}</h3>
+                <p>Total Suggestions</p>
+            </div>
+            <div class="hero-stat">
+                <h3>{{ stats.implemented }}</h3>
+                <p>Implemented</p>
+            </div>
+            <div class="hero-stat">
+                <h3>{{ stats.under_review }}</h3>
+                <p>Under Review</p>
+            </div>
+            <div class="hero-stat">
+                <h3>{{ "%.1f" | format(stats.implemented / stats.total_suggestions * 100 if stats.total_suggestions > 0 else 0) }}%</h3>
+                <p>Success Rate</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Main Content -->
+<div class="suggestions-content">
+    <div class="container">
+        <!-- Categories Section -->
+        <div class="text-center mb-5">
+            <h2 class="display-4 mb-3">Suggestion Categories</h2>
+            <p class="lead text-muted">Choose from different types of analytics improvements to suggest</p>
+        </div>
+        
+        <div class="category-grid">
+            {% for category in stats.categories %}
+            <div class="category-card" onclick="location.href='/suggestions/category/{{ category[0].value }}'">
+                <div class="category-icon">
+                    {% if category[0].value == 'WEATHER_CORRELATION' %}
+                        <i class="fas fa-cloud-rain"></i>
+                    {% elif category[0].value == 'SEASONAL_PATTERN' %}
+                        <i class="fas fa-calendar-alt"></i>
+                    {% elif category[0].value == 'CUSTOMER_BEHAVIOR' %}
+                        <i class="fas fa-users"></i>
+                    {% elif category[0].value == 'OPERATIONAL_INSIGHT' %}
+                        <i class="fas fa-cogs"></i>
+                    {% elif category[0].value == 'ECONOMIC_INDICATOR' %}
+                        <i class="fas fa-chart-line"></i>
+                    {% elif category[0].value == 'GEOGRAPHIC_PATTERN' %}
+                        <i class="fas fa-map-marked-alt"></i>
+                    {% else %}
+                        <i class="fas fa-lightbulb"></i>
+                    {% endif %}
+                </div>
+                <h4>{{ category[0].value.replace('_', ' ').title() }}</h4>
+                <p>
+                    {% if category[0].value == 'WEATHER_CORRELATION' %}
+                        Temperature, precipitation, wind patterns affecting rental demand
+                    {% elif category[0].value == 'SEASONAL_PATTERN' %}
+                        Recurring patterns throughout the year in Minnesota
+                    {% elif category[0].value == 'CUSTOMER_BEHAVIOR' %}
+                        Customer patterns and cross-selling opportunities
+                    {% elif category[0].value == 'OPERATIONAL_INSIGHT' %}
+                        Internal operations affecting performance
+                    {% elif category[0].value == 'ECONOMIC_INDICATOR' %}
+                        Economic factors predicting rental demand
+                    {% elif category[0].value == 'GEOGRAPHIC_PATTERN' %}
+                        Location-specific trends and patterns
+                    {% else %}
+                        Analytics and system improvements
+                    {% endif %}
+                </p>
+                <div class="suggestion-count">{{ category[1] }} suggestions</div>
+            </div>
+            {% endfor %}
+        </div>
+        
+        <!-- Recent Suggestions -->
+        {% if recent_suggestions %}
+        <div class="recent-suggestions">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h3><i class="fas fa-clock"></i> Recent Success Stories</h3>
+                <a href="/suggestions/leaderboard" class="btn btn-outline-primary">
+                    View Leaderboard <i class="fas fa-arrow-right"></i>
+                </a>
+            </div>
+            
+            {% for suggestion in recent_suggestions %}
+            <div class="suggestion-item" onclick="location.href='/suggestions/view/{{ suggestion.suggestion_id }}'">
+                <div class="suggestion-meta">
+                    <span class="meta-badge status-{{ suggestion.status.value.lower() }}">
+                        {{ suggestion.status.value.replace('_', ' ').title() }}
+                    </span>
+                    <span class="meta-badge category-{{ suggestion.category.value.split('_')[0].lower() }}">
+                        {{ suggestion.category.value.replace('_', ' ').title() }}
+                    </span>
+                    <span class="text-muted">
+                        <i class="fas fa-user"></i> {{ suggestion.user_name }}
+                    </span>
+                    <span class="text-muted">
+                        <i class="fas fa-calendar"></i> {{ suggestion.submitted_date.strftime('%b %d, %Y') }}
+                    </span>
+                </div>
+                <h5 class="mb-2">{{ suggestion.title }}</h5>
+                <p class="text-muted mb-2">{{ suggestion.description[:200] }}{% if suggestion.description|length > 200 %}...{% endif %}</p>
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        {% if suggestion.store_location %}
+                            <small class="text-muted">
+                                <i class="fas fa-map-marker-alt"></i> {{ suggestion.store_location }}
+                            </small>
+                        {% endif %}
+                    </div>
+                    <div>
+                        <span class="text-success">
+                            <i class="fas fa-thumbs-up"></i> {{ suggestion.upvotes or 0 }}
+                        </span>
+                        <span class="text-muted ms-2">
+                            <i class="fas fa-eye"></i> {{ suggestion.view_count or 0 }}
+                        </span>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+        
+        <!-- Impact Highlight -->
+        <div class="impact-highlight">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <h4><i class="fas fa-chart-line"></i> Real Business Impact</h4>
+                    <p class="mb-0">
+                        Our user suggestions have led to measurable improvements: better demand forecasting accuracy, 
+                        optimized inventory management, and enhanced customer satisfaction across Minnesota locations.
+                        Your domain expertise makes our analytics smarter and more relevant to real business needs.
+                    </p>
+                </div>
+                <div class="col-md-4 text-center">
+                    <div class="display-6 text-success">
+                        <i class="fas fa-dollar-sign"></i>
+                    </div>
+                    <strong>Proven ROI</strong>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Call to Action -->
+<div class="action-section">
+    <div class="container">
+        <h2 class="display-4 mb-4">Ready to Share Your Insights?</h2>
+        <p class="lead mb-5">
+            Join our community of experts improving analytics for Minnesota equipment rental success.
+        </p>
+        <div>
+            <a href="/suggestions/submit" class="btn btn-cta">
+                <i class="fas fa-plus-circle"></i>
+                Submit Suggestion
+            </a>
+            <a href="/suggestions/my-suggestions" class="btn btn-secondary-cta">
+                <i class="fas fa-list"></i>
+                My Suggestions
+            </a>
+            <a href="/suggestions/help" class="btn btn-secondary-cta">
+                <i class="fas fa-question-circle"></i>
+                How It Works
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Add hover effects and animations
+    const categoryCards = document.querySelectorAll('.category-card');
+    categoryCards.forEach(card => {
+        card.addEventListener('mouseenter', function() {
+            this.style.cursor = 'pointer';
+        });
+    });
+    
+    const suggestionItems = document.querySelectorAll('.suggestion-item');
+    suggestionItems.forEach(item => {
+        item.addEventListener('mouseenter', function() {
+            this.style.cursor = 'pointer';
+        });
+    });
+    
+    // Animate stats on scroll
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                const statNumbers = entry.target.querySelectorAll('.hero-stat h3');
+                statNumbers.forEach((stat, index) => {
+                    const finalNumber = parseInt(stat.textContent);
+                    let currentNumber = 0;
+                    const increment = finalNumber / 30; // Animate over 30 frames
+                    
+                    const timer = setInterval(() => {
+                        currentNumber += increment;
+                        if (currentNumber >= finalNumber) {
+                            stat.textContent = finalNumber + (stat.textContent.includes('%') ? '%' : '');
+                            clearInterval(timer);
+                        } else {
+                            stat.textContent = Math.floor(currentNumber) + (stat.textContent.includes('%') ? '%' : '');
+                        }
+                    }, 50);
+                });
+            }
+        });
+    });
+    
+    const heroStats = document.querySelector('.hero-stats');
+    if (heroStats) {
+        observer.observe(heroStats);
+    }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,781 @@
+{% extends "base.html" %}
+
+{% block title %}Manual CSV Import Dashboard{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="/static/css/predictive-analytics.css">
+<style>
+.import-dashboard {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.file-list {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.file-item {
+    display: flex;
+    justify-content: between;
+    align-items: center;
+    padding: 15px;
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    margin-bottom: 10px;
+    background: #f9f9f9;
+}
+
+.file-item:hover {
+    background: #f0f8ff;
+    border-color: #007bff;
+}
+
+.file-item.selected {
+    background: #e3f2fd;
+    border-color: #2196f3;
+}
+
+.file-info {
+    flex: 1;
+}
+
+.file-name {
+    font-weight: bold;
+    color: #333;
+    margin-bottom: 4px;
+}
+
+.file-details {
+    font-size: 0.9em;
+    color: #666;
+}
+
+.file-type {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.8em;
+    font-weight: bold;
+    margin-left: 10px;
+}
+
+.type-pnl { background: #e8f5e8; color: #2e7d32; }
+.type-equipment { background: #fff3e0; color: #ef6c00; }
+.type-customer { background: #e3f2fd; color: #1976d2; }
+.type-transaction { background: #f3e5f5; color: #7b1fa2; }
+.type-unknown { background: #fafafa; color: #757575; }
+
+.import-controls {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.import-results {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    padding: 20px;
+}
+
+.btn-import {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    padding: 12px 30px;
+    border-radius: 6px;
+    font-weight: bold;
+    transition: all 0.3s ease;
+}
+
+.btn-import:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+}
+
+.btn-import:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.results-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.summary-card {
+    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+    padding: 15px;
+    border-radius: 8px;
+    text-align: center;
+}
+
+.summary-number {
+    font-size: 2em;
+    font-weight: bold;
+    color: #333;
+}
+
+.summary-label {
+    color: #666;
+    font-size: 0.9em;
+}
+
+.loading-spinner {
+    display: none;
+    text-align: center;
+    margin: 20px 0;
+}
+
+.validation-panel {
+    background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+    border: 1px solid #0ea5e9;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 15px rgba(14, 165, 233, 0.1);
+}
+
+.preview-panel {
+    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+    border: 1px solid #64748b;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 15px rgba(100, 116, 139, 0.1);
+}
+
+.validation-result {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px;
+    margin-bottom: 10px;
+    border-radius: 8px;
+    border-left: 4px solid;
+    font-weight: 500;
+}
+
+.validation-pass {
+    background: #f0fdf4;
+    border-left-color: #22c55e;
+    color: #166534;
+}
+
+.validation-warning {
+    background: #fffbeb;
+    border-left-color: #f59e0b;
+    color: #92400e;
+}
+
+.validation-error {
+    background: #fef2f2;
+    border-left-color: #ef4444;
+    color: #991b1b;
+}
+
+.progress-container {
+    background: white;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    display: none;
+}
+
+.import-progress {
+    margin-bottom: 15px;
+}
+
+.progress-bar-container {
+    background: #e5e7eb;
+    height: 8px;
+    border-radius: 4px;
+    overflow: hidden;
+    position: relative;
+}
+
+.progress-bar-fill {
+    background: linear-gradient(90deg, #3b82f6 0%, #1d4ed8 100%);
+    height: 100%;
+    width: 0%;
+    transition: width 0.3s ease;
+    border-radius: 4px;
+}
+
+.progress-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.9rem;
+    color: #6b7280;
+    margin-top: 8px;
+}
+
+.store-progress {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin-top: 20px;
+}
+
+.store-progress-item {
+    background: #f8fafc;
+    padding: 15px;
+    border-radius: 10px;
+    border: 1px solid #e2e8f0;
+}
+
+.store-progress-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.store-name {
+    font-weight: 600;
+    color: #1e293b;
+}
+
+.store-status {
+    font-size: 0.8rem;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-weight: 600;
+}
+
+.status-pending {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.status-processing {
+    background: #dbeafe;
+    color: #1e40af;
+}
+
+.status-completed {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.status-error {
+    background: #fecaca;
+    color: #991b1b;
+}
+
+.data-preview-table {
+    max-height: 400px;
+    overflow: auto;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+}
+
+.data-preview-table table {
+    margin-bottom: 0;
+    font-size: 0.9rem;
+}
+
+.data-preview-table th {
+    background: #f8fafc;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    font-weight: 600;
+    color: #374151;
+}
+
+.data-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.data-stat {
+    background: white;
+    padding: 15px;
+    border-radius: 10px;
+    text-align: center;
+    border: 1px solid #e5e7eb;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.stat-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #3b82f6;
+    margin-bottom: 5px;
+}
+
+.stat-label {
+    font-size: 0.8rem;
+    color: #6b7280;
+    text-transform: uppercase;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+}
+
+.spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #667eea;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.alert {
+    padding: 15px;
+    margin-bottom: 20px;
+    border-radius: 6px;
+}
+
+.alert-success {
+    background: #d4edda;
+    border: 1px solid #c3e6cb;
+    color: #155724;
+}
+
+.alert-error {
+    background: #f8d7da;
+    border: 1px solid #f5c6cb;
+    color: #721c24;
+}
+
+.result-item {
+    padding: 10px;
+    border-left: 4px solid #007bff;
+    background: #f8f9fa;
+    margin-bottom: 10px;
+    border-radius: 0 4px 4px 0;
+}
+
+.error-item {
+    border-left-color: #dc3545;
+    background: #fff5f5;
+}
+
+@media (max-width: 768px) {
+    .validation-panel,
+    .preview-panel,
+    .progress-container {
+        margin: 10px 0;
+        padding: 15px;
+    }
+    
+    .data-stats {
+        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+        gap: 10px;
+    }
+    
+    .store-progress {
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+    
+    .data-preview-table {
+        font-size: 0.8rem;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="import-dashboard">
+    <div class="row">
+        <div class="col-12">
+            <h1 class="page-title">
+                <i class="fas fa-upload me-3"></i>Manual CSV Import Dashboard
+            </h1>
+            <p class="text-muted">Import CSV files from the shared folder with real-time progress tracking</p>
+        </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="import-controls">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h3>Quick Actions</h3>
+                    <button type="button" class="btn btn-outline-primary" id="refreshFiles">
+                        <i class="fas fa-refresh"></i> Refresh File List
+                    </button>
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-8">
+                        <div class="d-flex gap-2 flex-wrap">
+                            <button type="button" class="btn btn-success" id="quickPnLTest">
+                                <i class="fas fa-chart-line me-1"></i> Quick P&L Test
+                            </button>
+                            <button type="button" class="btn btn-info" id="scanFiles">
+                                <i class="fas fa-search me-1"></i> Scan Files
+                            </button>
+                            <button type="button" class="btn btn-warning" id="validatePnLData">
+                                <i class="fas fa-check-double me-1"></i> Validate P&L Data
+                            </button>
+                            <button type="button" class="btn btn-secondary" id="previewData">
+                                <i class="fas fa-eye me-1"></i> Preview Data
+                            </button>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="d-flex align-items-center justify-content-end gap-3">
+                            <div class="d-flex align-items-center">
+                                <label class="form-label mb-0 me-2 fw-semibold">Batch Size:</label>
+                                <input type="number" id="importLimit" class="form-control" 
+                                       style="width: 100px;" value="25000" min="100" max="100000">
+                            </div>
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="autoValidate" checked>
+                                <label class="form-check-label fw-semibold" for="autoValidate">
+                                    Auto-validate
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Available Files -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="file-list">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h3>Available CSV Files</h3>
+                    <div>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" id="selectAll">Select All</button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary ms-2" id="selectNone">Select None</button>
+                    </div>
+                </div>
+                
+                <div id="fileList" class="mb-3">
+                    <div class="text-center text-muted">
+                        <i class="fas fa-spinner fa-spin"></i> Loading files...
+                    </div>
+                </div>
+                
+                <!-- P&L Data Validation Panel -->
+                <div id="pnlValidationPanel" class="validation-panel" style="display: none;">
+                    <h6 class="fw-bold mb-3">
+                        <i class="fas fa-shield-alt me-2 text-success"></i>
+                        P&L Data Validation Results
+                    </h6>
+                    <div id="validationResults"></div>
+                </div>
+                
+                <!-- Data Preview Panel -->
+                <div id="dataPreviewPanel" class="preview-panel" style="display: none;">
+                    <h6 class="fw-bold mb-3">
+                        <i class="fas fa-table me-2 text-info"></i>
+                        Data Preview
+                    </h6>
+                    <div id="previewResults"></div>
+                </div>
+                
+                <div class="text-center">
+                    <button type="button" class="btn btn-import btn-lg" id="startImport" disabled>
+                        <i class="fas fa-upload me-2"></i>Import Selected Files
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Spinner -->
+    <div class="loading-spinner" id="loadingSpinner">
+        <div class="spinner"></div>
+        <p class="mt-3">Processing imports...</p>
+    </div>
+
+    <!-- Import Results -->
+    <div class="import-results" id="importResults" style="display: none;">
+        <h3>Import Results</h3>
+        <div class="results-summary" id="resultsSummary"></div>
+        <div id="detailedResults"></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const fileListContainer = document.getElementById('fileList');
+    const importButton = document.getElementById('startImport');
+    const loadingSpinner = document.getElementById('loadingSpinner');
+    const importResults = document.getElementById('importResults');
+    const importLimit = document.getElementById('importLimit');
+    
+    let availableFiles = [];
+    let selectedFiles = [];
+
+    // Load available files
+    function loadFiles() {
+        fetch('/api/import/status')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    availableFiles = data.available_files;
+                    renderFileList();
+                } else {
+                    showError('Failed to load files: ' + data.error);
+                }
+            })
+            .catch(error => {
+                console.error('Error loading files:', error);
+                showError('Network error loading files');
+            });
+    }
+
+    // Render file list
+    function renderFileList() {
+        if (availableFiles.length === 0) {
+            fileListContainer.innerHTML = '<div class="text-center text-muted">No CSV files found</div>';
+            return;
+        }
+
+        const html = availableFiles.map(file => `
+            <div class="file-item" data-filename="${file.filename}">
+                <div>
+                    <input type="checkbox" class="form-check-input me-3" 
+                           data-filename="${file.filename}">
+                </div>
+                <div class="file-info">
+                    <div class="file-name">
+                        ${file.filename}
+                        <span class="file-type type-${file.type}">${file.type.toUpperCase()}</span>
+                    </div>
+                    <div class="file-details">
+                        ${file.size_mb} MB • Modified: ${new Date(file.modified).toLocaleString()}
+                    </div>
+                </div>
+            </div>
+        `).join('');
+
+        fileListContainer.innerHTML = html;
+
+        // Add event listeners for checkboxes
+        document.querySelectorAll('.file-item input[type="checkbox"]').forEach(checkbox => {
+            checkbox.addEventListener('change', updateSelectedFiles);
+        });
+    }
+
+    // Update selected files
+    function updateSelectedFiles() {
+        selectedFiles = [];
+        document.querySelectorAll('.file-item input[type="checkbox"]:checked').forEach(checkbox => {
+            const filename = checkbox.dataset.filename;
+            const file = availableFiles.find(f => f.filename === filename);
+            if (file) {
+                selectedFiles.push(file);
+            }
+        });
+
+        importButton.disabled = selectedFiles.length === 0;
+        
+        // Update UI
+        document.querySelectorAll('.file-item').forEach(item => {
+            const filename = item.dataset.filename;
+            const isSelected = selectedFiles.some(f => f.filename === filename);
+            item.classList.toggle('selected', isSelected);
+        });
+    }
+
+    // Start import
+    function startImport() {
+        if (selectedFiles.length === 0) return;
+
+        loadingSpinner.style.display = 'block';
+        importResults.style.display = 'none';
+        importButton.disabled = true;
+
+        const importData = {
+            files: selectedFiles,
+            limit: parseInt(importLimit.value) || 25000
+        };
+
+        fetch('/api/import/trigger', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(importData)
+        })
+        .then(response => response.json())
+        .then(data => {
+            loadingSpinner.style.display = 'none';
+            displayResults(data);
+            importButton.disabled = false;
+        })
+        .catch(error => {
+            console.error('Import error:', error);
+            loadingSpinner.style.display = 'none';
+            showError('Import failed: ' + error.message);
+            importButton.disabled = false;
+        });
+    }
+
+    // Display import results
+    function displayResults(data) {
+        const resultsContainer = document.getElementById('detailedResults');
+        const summaryContainer = document.getElementById('resultsSummary');
+        
+        // Summary cards
+        const summary = data.summary || {};
+        summaryContainer.innerHTML = `
+            <div class="summary-card">
+                <div class="summary-number">${summary.total_files || 0}</div>
+                <div class="summary-label">Files Processed</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-number">${summary.successful || 0}</div>
+                <div class="summary-label">Successful</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-number">${summary.failed || 0}</div>
+                <div class="summary-label">Failed</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-number">${summary.total_records || 0}</div>
+                <div class="summary-label">Records Imported</div>
+            </div>
+        `;
+
+        let resultsHtml = '';
+
+        // Successful imports
+        if (data.imports && data.imports.length > 0) {
+            resultsHtml += '<h4>Successful Imports</h4>';
+            data.imports.forEach(imp => {
+                const result = imp.result || {};
+                resultsHtml += `
+                    <div class="result-item">
+                        <strong>${imp.filename}</strong> (${imp.type})
+                        <div class="text-muted">
+                            ${result.records_imported || 0} records imported
+                            ${result.duplicates_skipped ? `, ${result.duplicates_skipped} duplicates skipped` : ''}
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        // Errors
+        if (data.errors && data.errors.length > 0) {
+            resultsHtml += '<h4>Errors</h4>';
+            data.errors.forEach(error => {
+                resultsHtml += `
+                    <div class="result-item error-item">
+                        <i class="fas fa-exclamation-triangle me-2"></i>${error}
+                    </div>
+                `;
+            });
+        }
+
+        resultsContainer.innerHTML = resultsHtml;
+        importResults.style.display = 'block';
+    }
+
+    // Quick P&L test
+    function quickPnLTest() {
+        loadingSpinner.style.display = 'block';
+        importResults.style.display = 'none';
+
+        fetch('/api/import/pnl/quick-test', {
+            method: 'POST'
+        })
+        .then(response => response.json())
+        .then(data => {
+            loadingSpinner.style.display = 'none';
+            if (data.success) {
+                displayResults({
+                    success: true,
+                    summary: {
+                        total_files: 1,
+                        successful: 1,
+                        failed: 0,
+                        total_records: data.import_result?.records_imported || 0
+                    },
+                    imports: [{
+                        filename: data.test_file,
+                        type: 'pnl',
+                        result: data.import_result
+                    }],
+                    errors: []
+                });
+            } else {
+                showError('Quick P&L test failed: ' + data.error);
+            }
+        })
+        .catch(error => {
+            loadingSpinner.style.display = 'none';
+            showError('Quick test error: ' + error.message);
+        });
+    }
+
+    // Show error message
+    function showError(message) {
+        const alertHtml = `
+            <div class="alert alert-error">
+                <i class="fas fa-exclamation-triangle me-2"></i>${message}
+            </div>
+        `;
+        
+        // Insert at top of dashboard
+        const dashboard = document.querySelector('.import-dashboard');
+        const firstChild = dashboard.firstElementChild;
+        const alertDiv = document.createElement('div');
+        alertDiv.innerHTML = alertHtml;
+        dashboard.insertBefore(alertDiv, firstChild);
+        
+        // Auto-remove after 10 seconds
+        setTimeout(() => {
+            alertDiv.remove();
+        }, 10000);
+    }
+
+    // Event listeners
+    document.getElementById('refreshFiles').addEventListener('click', loadFiles);
+    document.getElementById('startImport').addEventListener('click', startImport);
+    document.getElementById('quickPnLTest').addEventListener('click', quickPnLTest);
+    document.getElementById('scanFiles').addEventListener('click', loadFiles);
+    
+    document.getElementById('selectAll').addEventListener('click', () => {
+        document.querySelectorAll('.file-item input[type="checkbox"]').forEach(cb => {
+            cb.checked = true;
+        });
+        updateSelectedFiles();
+    });
+    
+    document.getElementById('selectNone').addEventListener('click', () => {
+        document.querySelectorAll('.file-item input[type="checkbox"]').forEach(cb => {
+            cb.checked = false;
+        });
+        updateSelectedFiles();
+    });
+
+    // Load files on page load
+    loadFiles();
+});
+</script>
+{% endblock %}

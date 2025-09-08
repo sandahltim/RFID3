@@ -1,8 +1,16 @@
 # RFID Dashboard Install Guide for Newbies
-# Last Updated: March 16, 2025
+# Last Updated: August 26, 2025  
 # Made by: Tim
 
-Yo, newbie! This guide’s gonna get the RFID Dashboard app running on your Raspberry Pi (3 or newer) so you can track inventory like a pro. Follow these steps—don’t skip shit, and you’ll be golden.
+Yo, newbie! This guide's gonna get the RFID Dashboard app running on your Raspberry Pi (3 or newer) so you can track inventory like a pro AND get fancy analytics with the new Tab 6 features! Follow these steps—don't skip anything, and you'll be golden.
+
+## 🆕 NEW FEATURES: Tab 6 Analytics!
+The dashboard now includes advanced inventory analytics:
+- Health monitoring with smart alerts
+- Stale item tracking with filtering
+- Real-time configuration management  
+- Usage pattern analysis
+- Advanced pagination and search
 
 ## What You Need
 - Raspberry Pi (3, 3B+, 4, etc.) with power cord.

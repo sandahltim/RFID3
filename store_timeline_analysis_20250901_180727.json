@@ -1,0 +1,1251 @@
+{
+  "timestamp": "2025-09-01T18:07:24.526749",
+  "store_timeline": {
+    "3607": {
+      "name": "Wayzata",
+      "opened": "2008-01-01",
+      "pos_code": "1"
+    },
+    "6800": {
+      "name": "Brooklyn Park",
+      "opened": "2022-01-01",
+      "pos_code": "2"
+    },
+    "8101": {
+      "name": "Fridley",
+      "opened": "2022-01-01",
+      "pos_code": "3"
+    },
+    "728": {
+      "name": "Elk River",
+      "opened": "2024-01-01",
+      "pos_code": "4"
+    }
+  },
+  "data_quality_issues": [
+    {
+      "table": "pos_pnl",
+      "store": "6800",
+      "issue_type": "DATA_BEFORE_OPENING",
+      "details": "Data from 2021-01-01 but store opened 2022-01-01",
+      "severity": "HIGH"
+    },
+    {
+      "table": "pos_pnl",
+      "store": "8101",
+      "issue_type": "DATA_BEFORE_OPENING",
+      "details": "Data from 2021-01-01 but store opened 2022-01-01",
+      "severity": "HIGH"
+    },
+    {
+      "table": "pos_transactions",
+      "store": "3607",
+      "issue_type": "DATA_BEFORE_OPENING",
+      "details": "Data from 2000-01-07 but store opened 2008-01-01",
+      "severity": "HIGH"
+    },
+    {
+      "table": "pos_transactions",
+      "store": "6800",
+      "issue_type": "DATA_BEFORE_OPENING",
+      "details": "Data from 2021-06-08 but store opened 2022-01-01",
+      "severity": "HIGH"
+    },
+    {
+      "table": "pos_transactions",
+      "store": "8101",
+      "issue_type": "DATA_BEFORE_OPENING",
+      "details": "Data from 2002-12-06 but store opened 2022-01-01",
+      "severity": "HIGH"
+    },
+    {
+      "table": "pos_transactions",
+      "store": "8101",
+      "issue_type": "FUTURE_DATE",
+      "details": "Future date found: 2027-09-24",
+      "severity": "HIGH"
+    },
+    {
+      "table": "pos_transactions",
+      "store": "728",
+      "issue_type": "DATA_BEFORE_OPENING",
+      "details": "Data from 2014-06-28 but store opened 2024-01-01",
+      "severity": "HIGH"
+    },
+    {
+      "table": "pos_transaction_items",
+      "store": "3607",
+      "issue_type": "DATA_BEFORE_OPENING",
+      "details": "Data from 2000-12-23 but store opened 2008-01-01",
+      "severity": "HIGH"
+    },
+    {
+      "table": "pos_transaction_items",
+      "store": "6800",
+      "issue_type": "DATA_BEFORE_OPENING",
+      "details": "Data from 2021-08-03 but store opened 2022-01-01",
+      "severity": "HIGH"
+    },
+    {
+      "table": "pos_transaction_items",
+      "store": "728",
+      "issue_type": "DATA_BEFORE_OPENING",
+      "details": "Data from 2002-12-06 but store opened 2024-01-01",
+      "severity": "HIGH"
+    },
+    {
+      "table": "pos_transaction_items",
+      "store": "728",
+      "issue_type": "FUTURE_DATE",
+      "details": "Future date found: 2027-09-24",
+      "severity": "HIGH"
+    },
+    {
+      "table": "pos_transaction_items",
+      "store": "8101",
+      "issue_type": "DATA_BEFORE_OPENING",
+      "details": "Data from 2014-06-30 but store opened 2022-01-01",
+      "severity": "HIGH"
+    }
+  ],
+  "table_analysis": {
+    "bi_executive_kpis": {
+      "store_column": "best_performing_store",
+      "store_values": [
+        {
+          "best_performing_store": "3607",
+          "record_count": 2,
+          "earliest_date": "2025-08-13",
+          "latest_date": "2025-08-27"
+        },
+        {
+          "best_performing_store": "6800",
+          "record_count": 1,
+          "earliest_date": "2025-08-20",
+          "latest_date": "2025-08-20"
+        }
+      ],
+      "issues": []
+    },
+    "contract_snapshots": {
+      "store_column": "bin_location",
+      "store_values": [
+        {
+          "bin_location": "",
+          "record_count": 10,
+          "earliest_date": "2025-08-29 12:00:03",
+          "latest_date": "2025-08-29 12:00:03"
+        },
+        {
+          "bin_location": "MR1F2",
+          "record_count": 3,
+          "earliest_date": "2025-08-29 12:00:03",
+          "latest_date": "2025-08-29 12:00:03"
+        },
+        {
+          "bin_location": "MR4G2",
+          "record_count": 1,
+          "earliest_date": "2025-08-29 12:00:03",
+          "latest_date": "2025-08-29 12:00:03"
+        },
+        {
+          "bin_location": "MR4H2",
+          "record_count": 1,
+          "earliest_date": "2025-08-29 12:00:03",
+          "latest_date": "2025-08-29 12:00:03"
+        },
+        {
+          "bin_location": "MR4J2",
+          "record_count": 5,
+          "earliest_date": "2025-08-29 12:00:03",
+          "latest_date": "2025-08-29 12:00:03"
+        },
+        {
+          "bin_location": "NA",
+          "record_count": 3,
+          "earliest_date": "2025-08-29 12:00:03",
+          "latest_date": "2025-08-29 12:00:03"
+        },
+        {
+          "bin_location": "NR2x1",
+          "record_count": 7,
+          "earliest_date": "2025-08-29 12:00:03",
+          "latest_date": "2025-08-29 12:00:03"
+        },
+        {
+          "bin_location": "NR3x1",
+          "record_count": 38,
+          "earliest_date": "2025-08-24 22:22:55",
+          "latest_date": "2025-08-29 12:00:03"
+        },
+        {
+          "bin_location": "NR3x2",
+          "record_count": 29,
+          "earliest_date": "2025-08-24 22:22:55",
+          "latest_date": "2025-08-29 12:00:03"
+        },
+        {
+          "bin_location": "NR4x1",
+          "record_count": 53,
+          "earliest_date": "2025-08-24 22:22:33",
+          "latest_date": "2025-08-29 12:00:03"
+        },
+        {
+          "bin_location": "NR4x2",
+          "record_count": 10,
+          "earliest_date": "2025-08-29 12:00:03",
+          "latest_date": "2025-08-29 12:00:03"
+        },
+        {
+          "bin_location": "NR5x1",
+          "record_count": 62,
+          "earliest_date": "2025-08-24 22:22:55",
+          "latest_date": "2025-08-29 12:00:03"
+        },
+        {
+          "bin_location": "NR5x2",
+          "record_count": 62,
+          "earliest_date": "2025-08-24 22:22:33",
+          "latest_date": "2025-08-29 12:00:03"
+        },
+        {
+          "bin_location": "pack",
+          "record_count": 35,
+          "earliest_date": "2025-08-29 12:00:03",
+          "latest_date": "2025-08-29 12:00:03"
+        }
+      ],
+      "issues": []
+    },
+    "executive_payroll_trends": {
+      "store_column": "store_id",
+      "store_values": [
+        {
+          "store_id": "3607",
+          "record_count": 95,
+          "earliest_date": "2022-01-16",
+          "latest_date": "2025-08-24"
+        },
+        {
+          "store_id": "6800",
+          "record_count": 95,
+          "earliest_date": "2022-01-16",
+          "latest_date": "2025-08-24"
+        },
+        {
+          "store_id": "728",
+          "record_count": 43,
+          "earliest_date": "2024-01-14",
+          "latest_date": "2025-08-24"
+        },
+        {
+          "store_id": "8101",
+          "record_count": 95,
+          "earliest_date": "2022-01-16",
+          "latest_date": "2025-08-24"
+        }
+      ],
+      "issues": []
+    },
+    "id_item_master": {
+      "store_column": "home_store",
+      "store_values": [
+        {
+          "home_store": "000",
+          "record_count": 19572,
+          "earliest_date": null,
+          "latest_date": null
+        },
+        {
+          "home_store": "3607",
+          "record_count": 5468,
+          "earliest_date": null,
+          "latest_date": null
+        },
+        {
+          "home_store": "6800",
+          "record_count": 22358,
+          "earliest_date": null,
+          "latest_date": null
+        },
+        {
+          "home_store": "728",
+          "record_count": 3014,
+          "earliest_date": null,
+          "latest_date": null
+        },
+        {
+          "home_store": "8101",
+          "record_count": 3056,
+          "earliest_date": "2025-04-22 08:51:33",
+          "latest_date": "2025-04-22 08:51:33"
+        }
+      ],
+      "issues": []
+    },
+    "id_transactions": {
+      "store_column": "location_of_repair",
+      "store_values": [
+        {
+          "location_of_repair": "",
+          "record_count": 16790,
+          "earliest_date": "2024-12-18 10:48:14",
+          "latest_date": "2025-08-28 13:17:52"
+        },
+        {
+          "location_of_repair": "Bad sawt cushion",
+          "record_count": 3,
+          "earliest_date": "2025-07-15 10:31:46",
+          "latest_date": "2025-07-15 10:31:46"
+        },
+        {
+          "location_of_repair": "Broken hopper",
+          "record_count": 1,
+          "earliest_date": "2025-04-02 11:38:20",
+          "latest_date": "2025-04-02 11:38:20"
+        },
+        {
+          "location_of_repair": "Burnt holes ",
+          "record_count": 1,
+          "earliest_date": "2025-07-01 12:10:10",
+          "latest_date": "2025-07-01 12:10:10"
+        },
+        {
+          "location_of_repair": "Gromme",
+          "record_count": 1,
+          "earliest_date": "2024-12-16 11:59:48",
+          "latest_date": "2024-12-16 11:59:48"
+        },
+        {
+          "location_of_repair": "Hole in peak",
+          "record_count": 1,
+          "earliest_date": "2025-06-09 11:10:03",
+          "latest_date": "2025-06-09 11:10:03"
+        },
+        {
+          "location_of_repair": "Marks",
+          "record_count": 1,
+          "earliest_date": "2025-06-16 08:44:27",
+          "latest_date": "2025-06-16 08:44:27"
+        },
+        {
+          "location_of_repair": "Marks on linen",
+          "record_count": 1,
+          "earliest_date": "2025-06-23 10:09:26",
+          "latest_date": "2025-06-23 10:09:26"
+        },
+        {
+          "location_of_repair": "Replace leg grommet ",
+          "record_count": 1,
+          "earliest_date": "2025-02-18 13:02:49",
+          "latest_date": "2025-02-18 13:02:49"
+        },
+        {
+          "location_of_repair": "sold",
+          "record_count": 1,
+          "earliest_date": "2025-08-18 12:48:53",
+          "latest_date": "2025-08-18 12:48:53"
+        },
+        {
+          "location_of_repair": "Spots",
+          "record_count": 12,
+          "earliest_date": "2025-06-06 09:14:44",
+          "latest_date": "2025-07-18 10:44:08"
+        },
+        {
+          "location_of_repair": "Test",
+          "record_count": 1,
+          "earliest_date": "2025-04-23 09:30:35",
+          "latest_date": "2025-04-23 09:30:35"
+        },
+        {
+          "location_of_repair": "Torn kedar",
+          "record_count": 1,
+          "earliest_date": "2025-06-04 15:02:42",
+          "latest_date": "2025-06-04 15:02:42"
+        }
+      ],
+      "issues": []
+    },
+    "item_financials": {
+      "store_column": "store_code",
+      "store_values": [
+        {
+          "store_code": "000",
+          "record_count": 1000,
+          "earliest_date": "2025-08-28 20:01:43",
+          "latest_date": "2025-08-28 20:01:43"
+        }
+      ],
+      "issues": []
+    },
+    "payroll_trends_data": {
+      "store_column": "location_code",
+      "store_values": [
+        {
+          "location_code": "3607",
+          "record_count": 95,
+          "earliest_date": "2022-01-16",
+          "latest_date": "2025-08-24"
+        },
+        {
+          "location_code": "6800",
+          "record_count": 95,
+          "earliest_date": "2022-01-16",
+          "latest_date": "2025-08-24"
+        },
+        {
+          "location_code": "728",
+          "record_count": 43,
+          "earliest_date": "2024-01-14",
+          "latest_date": "2025-08-24"
+        },
+        {
+          "location_code": "8101",
+          "record_count": 95,
+          "earliest_date": "2022-01-16",
+          "latest_date": "2025-08-24"
+        }
+      ],
+      "issues": []
+    },
+    "pl_data": {
+      "store_column": "store_code",
+      "store_values": [
+        {
+          "store_code": "000",
+          "record_count": 1440,
+          "earliest_date": "2025-08-31 23:49:00",
+          "latest_date": "2025-08-31 23:49:06"
+        },
+        {
+          "store_code": "3607",
+          "record_count": 110,
+          "earliest_date": "2025-08-31 23:49:00",
+          "latest_date": "2025-08-31 23:49:06"
+        },
+        {
+          "store_code": "6800",
+          "record_count": 110,
+          "earliest_date": "2025-08-31 23:49:00",
+          "latest_date": "2025-08-31 23:49:06"
+        },
+        {
+          "store_code": "728",
+          "record_count": 48,
+          "earliest_date": "2025-08-31 23:49:02",
+          "latest_date": "2025-08-31 23:49:06"
+        },
+        {
+          "store_code": "8101",
+          "record_count": 110,
+          "earliest_date": "2025-08-31 23:49:00",
+          "latest_date": "2025-08-31 23:49:06"
+        }
+      ],
+      "issues": []
+    },
+    "pos_customers": {
+      "store_column": "store_code",
+      "store_values": [
+        {
+          "store_code": "000",
+          "record_count": 22421,
+          "earliest_date": "1944-12-08",
+          "latest_date": "2024-07-09"
+        }
+      ],
+      "issues": []
+    },
+    "pos_equipment": {
+      "store_column": "pos_store_code",
+      "store_values": [
+        {
+          "pos_store_code": "0",
+          "record_count": 19568,
+          "earliest_date": "2016-04-23",
+          "latest_date": "2025-08-18"
+        },
+        {
+          "pos_store_code": "1",
+          "record_count": 4346,
+          "earliest_date": "1990-05-01",
+          "latest_date": "2025-08-18"
+        },
+        {
+          "pos_store_code": "2",
+          "record_count": 22504,
+          "earliest_date": "1960-04-01",
+          "latest_date": "2025-08-20"
+        },
+        {
+          "pos_store_code": "3",
+          "record_count": 3144,
+          "earliest_date": "1950-03-30",
+          "latest_date": "2025-08-25"
+        },
+        {
+          "pos_store_code": "4",
+          "record_count": 3024,
+          "earliest_date": "2000-06-28",
+          "latest_date": "2025-08-22"
+        }
+      ],
+      "issues": []
+    },
+    "pos_equipment_contaminated_backup": {
+      "store_column": "current_store",
+      "store_values": [
+        {
+          "current_store": "",
+          "record_count": 1452
+        },
+        {
+          "current_store": "0.0",
+          "record_count": 27116
+        },
+        {
+          "current_store": "1.0",
+          "record_count": 1444
+        },
+        {
+          "current_store": "2.0",
+          "record_count": 27285
+        },
+        {
+          "current_store": "3.0",
+          "record_count": 536
+        },
+        {
+          "current_store": "4.0",
+          "record_count": 166
+        }
+      ],
+      "issues": []
+    },
+    "pos_pnl": {
+      "store_column": "store_code",
+      "store_values": [
+        {
+          "store_code": "3607",
+          "record_count": 53,
+          "earliest_date": "2021-01-01",
+          "latest_date": "2025-12-01"
+        },
+        {
+          "store_code": "6800",
+          "record_count": 53,
+          "earliest_date": "2021-01-01",
+          "latest_date": "2025-12-01"
+        },
+        {
+          "store_code": "728",
+          "record_count": 21,
+          "earliest_date": "2024-02-01",
+          "latest_date": "2025-12-01"
+        },
+        {
+          "store_code": "8101",
+          "record_count": 53,
+          "earliest_date": "2021-01-01",
+          "latest_date": "2025-12-01"
+        }
+      ],
+      "issues": [
+        {
+          "table": "pos_pnl",
+          "store": "6800",
+          "issue_type": "DATA_BEFORE_OPENING",
+          "details": "Data from 2021-01-01 but store opened 2022-01-01",
+          "severity": "HIGH"
+        },
+        {
+          "table": "pos_pnl",
+          "store": "8101",
+          "issue_type": "DATA_BEFORE_OPENING",
+          "details": "Data from 2021-01-01 but store opened 2022-01-01",
+          "severity": "HIGH"
+        }
+      ]
+    },
+    "pos_store_mapping": {
+      "store_column": "store_name",
+      "store_values": [
+        {
+          "store_name": "Brooklyn Park",
+          "record_count": 1,
+          "earliest_date": "2025-08-29 00:43:37",
+          "latest_date": "2025-08-29 00:43:37"
+        },
+        {
+          "store_name": "Elk River",
+          "record_count": 1,
+          "earliest_date": "2025-08-29 00:43:37",
+          "latest_date": "2025-08-29 00:43:37"
+        },
+        {
+          "store_name": "Fridley",
+          "record_count": 1,
+          "earliest_date": "2025-08-29 00:43:37",
+          "latest_date": "2025-08-29 00:43:37"
+        },
+        {
+          "store_name": "Legacy/Unassigned",
+          "record_count": 1,
+          "earliest_date": "2025-08-29 00:43:37",
+          "latest_date": "2025-08-29 00:43:37"
+        },
+        {
+          "store_name": "Wayzata",
+          "record_count": 1,
+          "earliest_date": "2025-08-29 00:43:37",
+          "latest_date": "2025-08-29 00:43:37"
+        }
+      ],
+      "issues": []
+    },
+    "pos_transactions": {
+      "store_column": "store_no",
+      "store_values": [
+        {
+          "store_no": "1",
+          "record_count": 199694,
+          "earliest_date": "2000-01-07 06:06:00",
+          "latest_date": "2025-10-27 07:30:00"
+        },
+        {
+          "store_no": "2",
+          "record_count": 25689,
+          "earliest_date": "2021-06-08 11:00:00",
+          "latest_date": "2025-12-04 08:42:00"
+        },
+        {
+          "store_no": "3",
+          "record_count": 13718,
+          "earliest_date": "2002-12-06 08:00:00",
+          "latest_date": "2027-09-24 08:00:00"
+        },
+        {
+          "store_no": "4",
+          "record_count": 7260,
+          "earliest_date": "2014-06-28 12:00:00",
+          "latest_date": "2025-10-21 09:00:00"
+        }
+      ],
+      "issues": [
+        {
+          "table": "pos_transactions",
+          "store": "3607",
+          "issue_type": "DATA_BEFORE_OPENING",
+          "details": "Data from 2000-01-07 but store opened 2008-01-01",
+          "severity": "HIGH"
+        },
+        {
+          "table": "pos_transactions",
+          "store": "6800",
+          "issue_type": "DATA_BEFORE_OPENING",
+          "details": "Data from 2021-06-08 but store opened 2022-01-01",
+          "severity": "HIGH"
+        },
+        {
+          "table": "pos_transactions",
+          "store": "8101",
+          "issue_type": "DATA_BEFORE_OPENING",
+          "details": "Data from 2002-12-06 but store opened 2022-01-01",
+          "severity": "HIGH"
+        },
+        {
+          "table": "pos_transactions",
+          "store": "8101",
+          "issue_type": "FUTURE_DATE",
+          "details": "Future date found: 2027-09-24",
+          "severity": "HIGH"
+        },
+        {
+          "table": "pos_transactions",
+          "store": "728",
+          "issue_type": "DATA_BEFORE_OPENING",
+          "details": "Data from 2014-06-28 but store opened 2024-01-01",
+          "severity": "HIGH"
+        }
+      ]
+    },
+    "pos_transaction_items": {
+      "store_column": "store_code",
+      "store_values": [
+        {
+          "store_code": "3607",
+          "record_count": 412392,
+          "earliest_date": "2000-12-23 18:11:00",
+          "latest_date": "2025-10-29 07:30:00"
+        },
+        {
+          "store_code": "6800",
+          "record_count": 63328,
+          "earliest_date": "2021-08-03 00:00:00",
+          "latest_date": "2025-12-04 12:42:00"
+        },
+        {
+          "store_code": "728",
+          "record_count": 107342,
+          "earliest_date": "2002-12-06 17:00:00",
+          "latest_date": "2027-09-24 08:00:00"
+        },
+        {
+          "store_code": "8101",
+          "record_count": 14306,
+          "earliest_date": "2014-06-30 12:00:00",
+          "latest_date": "2025-10-21 13:00:00"
+        }
+      ],
+      "issues": [
+        {
+          "table": "pos_transaction_items",
+          "store": "3607",
+          "issue_type": "DATA_BEFORE_OPENING",
+          "details": "Data from 2000-12-23 but store opened 2008-01-01",
+          "severity": "HIGH"
+        },
+        {
+          "table": "pos_transaction_items",
+          "store": "6800",
+          "issue_type": "DATA_BEFORE_OPENING",
+          "details": "Data from 2021-08-03 but store opened 2022-01-01",
+          "severity": "HIGH"
+        },
+        {
+          "table": "pos_transaction_items",
+          "store": "728",
+          "issue_type": "DATA_BEFORE_OPENING",
+          "details": "Data from 2002-12-06 but store opened 2024-01-01",
+          "severity": "HIGH"
+        },
+        {
+          "table": "pos_transaction_items",
+          "store": "728",
+          "issue_type": "FUTURE_DATE",
+          "details": "Future date found: 2027-09-24",
+          "severity": "HIGH"
+        },
+        {
+          "table": "pos_transaction_items",
+          "store": "8101",
+          "issue_type": "DATA_BEFORE_OPENING",
+          "details": "Data from 2014-06-30 but store opened 2022-01-01",
+          "severity": "HIGH"
+        }
+      ]
+    },
+    "prediction_parameters": {
+      "store_column": "store_specific_enabled",
+      "store_values": [
+        {
+          "store_specific_enabled": 1,
+          "record_count": 1,
+          "earliest_date": "2025-08-28 22:57:21",
+          "latest_date": "2025-08-28 22:57:21"
+        }
+      ],
+      "issues": []
+    },
+    "resale_analytics": {
+      "store_column": "store_code",
+      "store_values": [
+        {
+          "store_code": "000",
+          "record_count": 1000,
+          "earliest_date": "2025-08-28",
+          "latest_date": "2025-08-28"
+        }
+      ],
+      "issues": []
+    },
+    "seed_rental_classes": {
+      "store_column": "bin_location",
+      "store_values": [
+        {
+          "bin_location": "",
+          "record_count": 364
+        },
+        {
+          "bin_location": "MOI11",
+          "record_count": 1
+        },
+        {
+          "bin_location": "MOO11",
+          "record_count": 10
+        },
+        {
+          "bin_location": "MOU11",
+          "record_count": 2
+        },
+        {
+          "bin_location": "MR1F2",
+          "record_count": 6
+        },
+        {
+          "bin_location": "MR1H1",
+          "record_count": 2
+        },
+        {
+          "bin_location": "MR4B3",
+          "record_count": 2
+        },
+        {
+          "bin_location": "MR4B4",
+          "record_count": 1
+        },
+        {
+          "bin_location": "MR4C3",
+          "record_count": 2
+        },
+        {
+          "bin_location": "MR4C4",
+          "record_count": 1
+        },
+        {
+          "bin_location": "MR4D3",
+          "record_count": 1
+        },
+        {
+          "bin_location": "MR4D4",
+          "record_count": 1
+        },
+        {
+          "bin_location": "MR4E3",
+          "record_count": 2
+        },
+        {
+          "bin_location": "MR4F1",
+          "record_count": 2
+        },
+        {
+          "bin_location": "MR4F2",
+          "record_count": 1
+        },
+        {
+          "bin_location": "MR4F3",
+          "record_count": 2
+        },
+        {
+          "bin_location": "MR4G2",
+          "record_count": 1
+        },
+        {
+          "bin_location": "MR4G4",
+          "record_count": 2
+        },
+        {
+          "bin_location": "MR4H2",
+          "record_count": 1
+        },
+        {
+          "bin_location": "MR4H4",
+          "record_count": 1
+        },
+        {
+          "bin_location": "MR4I2",
+          "record_count": 2
+        },
+        {
+          "bin_location": "MR4I3",
+          "record_count": 3
+        },
+        {
+          "bin_location": "MR4I4",
+          "record_count": 1
+        },
+        {
+          "bin_location": "MR4J2",
+          "record_count": 1
+        },
+        {
+          "bin_location": "MR4K1",
+          "record_count": 1
+        },
+        {
+          "bin_location": "MR4K2",
+          "record_count": 1
+        },
+        {
+          "bin_location": "NA",
+          "record_count": 4
+        },
+        {
+          "bin_location": "NR2A1",
+          "record_count": 2
+        },
+        {
+          "bin_location": "NR2B2",
+          "record_count": 1
+        },
+        {
+          "bin_location": "NR2C2",
+          "record_count": 3
+        },
+        {
+          "bin_location": "NR2D2",
+          "record_count": 2
+        },
+        {
+          "bin_location": "NR2x1",
+          "record_count": 30
+        },
+        {
+          "bin_location": "NR2x2",
+          "record_count": 7
+        },
+        {
+          "bin_location": "NR3x1",
+          "record_count": 25
+        },
+        {
+          "bin_location": "NR3x2",
+          "record_count": 42
+        },
+        {
+          "bin_location": "NR4D2",
+          "record_count": 5
+        },
+        {
+          "bin_location": "NR4x1",
+          "record_count": 41
+        },
+        {
+          "bin_location": "NR4x2",
+          "record_count": 34
+        },
+        {
+          "bin_location": "NR5I1",
+          "record_count": 18
+        },
+        {
+          "bin_location": "NR5x1",
+          "record_count": 35
+        },
+        {
+          "bin_location": "NR5x2",
+          "record_count": 47
+        },
+        {
+          "bin_location": "NRSE1",
+          "record_count": 6
+        },
+        {
+          "bin_location": "null",
+          "record_count": 4
+        },
+        {
+          "bin_location": "pack",
+          "record_count": 73
+        },
+        {
+          "bin_location": "resale",
+          "record_count": 114
+        },
+        {
+          "bin_location": "tent room",
+          "record_count": 1
+        },
+        {
+          "bin_location": "TENTRACK",
+          "record_count": 1
+        }
+      ],
+      "issues": []
+    },
+    "store_correlations": {
+      "store_column": "store_name",
+      "store_values": [
+        {
+          "store_name": "Brooklyn Park",
+          "record_count": 1,
+          "earliest_date": "2025-08-29 14:31:47",
+          "latest_date": "2025-08-29 14:31:47"
+        },
+        {
+          "store_name": "Elk River",
+          "record_count": 1,
+          "earliest_date": "2025-08-29 14:31:47",
+          "latest_date": "2025-08-29 14:31:47"
+        },
+        {
+          "store_name": "Fridley RFID Test",
+          "record_count": 1,
+          "earliest_date": "2025-08-29 14:31:47",
+          "latest_date": "2025-08-29 14:31:47"
+        },
+        {
+          "store_name": "Header/System",
+          "record_count": 1,
+          "earliest_date": "2025-08-29 14:31:47",
+          "latest_date": "2025-08-29 14:31:47"
+        },
+        {
+          "store_name": "Wayzata",
+          "record_count": 1,
+          "earliest_date": "2025-08-29 14:31:47",
+          "latest_date": "2025-08-29 14:31:47"
+        }
+      ],
+      "issues": []
+    },
+    "store_mappings": {
+      "store_column": "store_name",
+      "store_values": [
+        {
+          "store_name": "Brooklyn Park",
+          "record_count": 1,
+          "earliest_date": "2025-08-27 09:06:18",
+          "latest_date": "2025-08-27 09:06:18"
+        },
+        {
+          "store_name": "Elk River",
+          "record_count": 1,
+          "earliest_date": "2025-08-27 09:06:18",
+          "latest_date": "2025-08-27 09:06:18"
+        },
+        {
+          "store_name": "Fridley",
+          "record_count": 1,
+          "earliest_date": "2025-08-27 09:06:18",
+          "latest_date": "2025-08-27 09:06:18"
+        },
+        {
+          "store_name": "Wayzata",
+          "record_count": 1,
+          "earliest_date": "2025-08-27 09:06:18",
+          "latest_date": "2025-08-27 09:06:18"
+        }
+      ],
+      "issues": []
+    },
+    "unified_store_mapping": {
+      "store_column": "store_name",
+      "store_values": [
+        {
+          "store_name": "Store 3607",
+          "record_count": 1,
+          "earliest_date": "2025-08-31 01:13:50",
+          "latest_date": "2025-08-31 01:13:50"
+        },
+        {
+          "store_name": "Store 6800",
+          "record_count": 1,
+          "earliest_date": "2025-08-31 01:13:50",
+          "latest_date": "2025-08-31 01:13:50"
+        },
+        {
+          "store_name": "Store 728",
+          "record_count": 1,
+          "earliest_date": "2025-08-31 01:13:50",
+          "latest_date": "2025-08-31 01:13:50"
+        },
+        {
+          "store_name": "Store 8101",
+          "record_count": 1,
+          "earliest_date": "2025-08-31 01:13:50",
+          "latest_date": "2025-08-31 01:13:50"
+        }
+      ],
+      "issues": []
+    },
+    "user_preferences": {
+      "store_column": "default_store_filter",
+      "store_values": [
+        {
+          "default_store_filter": "all",
+          "record_count": 1,
+          "earliest_date": "2025-08-28 22:57:37",
+          "latest_date": "2025-08-28 22:57:37"
+        }
+      ],
+      "issues": []
+    },
+    "user_rental_class_mappings": {
+      "store_column": "store_code",
+      "store_values": [
+        {
+          "store_code": "000",
+          "record_count": 909,
+          "earliest_date": "2025-08-25 16:50:56",
+          "latest_date": "2025-08-28 17:13:24"
+        }
+      ],
+      "issues": []
+    },
+    "v_store_performance": {
+      "store_column": "current_store",
+      "store_values": [
+        {
+          "current_store": "000",
+          "record_count": 1
+        },
+        {
+          "current_store": "3607",
+          "record_count": 1
+        },
+        {
+          "current_store": "6800",
+          "record_count": 1
+        },
+        {
+          "current_store": "728",
+          "record_count": 1
+        },
+        {
+          "current_store": "8101",
+          "record_count": 1
+        }
+      ],
+      "issues": []
+    },
+    "v_unified_payroll": {
+      "store_column": "store_code",
+      "store_values": [
+        {
+          "store_code": "3607",
+          "record_count": 95,
+          "earliest_date": "2022-01-16",
+          "latest_date": "2025-08-24"
+        },
+        {
+          "store_code": "6800",
+          "record_count": 95,
+          "earliest_date": "2022-01-16",
+          "latest_date": "2025-08-24"
+        },
+        {
+          "store_code": "728",
+          "record_count": 43,
+          "earliest_date": "2024-01-14",
+          "latest_date": "2025-08-24"
+        },
+        {
+          "store_code": "8101",
+          "record_count": 95,
+          "earliest_date": "2022-01-16",
+          "latest_date": "2025-08-24"
+        }
+      ],
+      "issues": []
+    }
+  },
+  "correlations": {
+    "pos_transaction_issues": {
+      "3607": [
+        {
+          "year": 2000,
+          "count": 2,
+          "issue": "Transactions from 2000 but store opened in 2008"
+        },
+        {
+          "year": 2001,
+          "count": 1,
+          "issue": "Transactions from 2001 but store opened in 2008"
+        },
+        {
+          "year": 2002,
+          "count": 5,
+          "issue": "Transactions from 2002 but store opened in 2008"
+        },
+        {
+          "year": 2003,
+          "count": 9337,
+          "issue": "Transactions from 2003 but store opened in 2008"
+        },
+        {
+          "year": 2004,
+          "count": 10225,
+          "issue": "Transactions from 2004 but store opened in 2008"
+        },
+        {
+          "year": 2005,
+          "count": 9414,
+          "issue": "Transactions from 2005 but store opened in 2008"
+        },
+        {
+          "year": 2006,
+          "count": 9418,
+          "issue": "Transactions from 2006 but store opened in 2008"
+        },
+        {
+          "year": 2007,
+          "count": 9596,
+          "issue": "Transactions from 2007 but store opened in 2008"
+        }
+      ],
+      "6800": [
+        {
+          "year": 2021,
+          "count": 83,
+          "issue": "Transactions from 2021 but store opened in 2022"
+        }
+      ],
+      "8101": [
+        {
+          "year": 2002,
+          "count": 1,
+          "issue": "Transactions from 2002 but store opened in 2022"
+        },
+        {
+          "year": 2021,
+          "count": 2,
+          "issue": "Transactions from 2021 but store opened in 2022"
+        }
+      ],
+      "728": [
+        {
+          "year": 2014,
+          "count": 1,
+          "issue": "Transactions from 2014 but store opened in 2024"
+        }
+      ]
+    },
+    "store_data_presence": [
+      {
+        "store_id": "3607",
+        "has_pos_data": false,
+        "has_payroll_data": true
+      },
+      {
+        "store_id": "6800",
+        "has_pos_data": false,
+        "has_payroll_data": true
+      },
+      {
+        "store_id": "728",
+        "has_pos_data": false,
+        "has_payroll_data": true
+      },
+      {
+        "store_id": "8101",
+        "has_pos_data": false,
+        "has_payroll_data": true
+      }
+    ]
+  },
+  "recommendations": [
+    {
+      "priority": "HIGH",
+      "category": "Data Quality",
+      "recommendation": "Clean historical POS transaction dates",
+      "details": "Found 12 date anomalies that need correction",
+      "sql": "\n                    -- Update POS transactions with incorrect dates\n                    UPDATE pos_transactions \n                    SET contract_date = DATE_ADD(contract_date, INTERVAL 10 YEAR)\n                    WHERE store_no = '1' AND YEAR(contract_date) < 2008;\n                    "
+    },
+    {
+      "priority": "MEDIUM",
+      "category": "Data Integration",
+      "recommendation": "Create unified store reference table",
+      "details": "Consolidate store mappings across all systems",
+      "sql": "\n            CREATE TABLE IF NOT EXISTS store_master (\n                store_id VARCHAR(10) PRIMARY KEY,\n                store_name VARCHAR(100),\n                location VARCHAR(100),\n                opened_date DATE,\n                pos_code VARCHAR(10),\n                gl_code VARCHAR(20),\n                is_active BOOLEAN DEFAULT TRUE\n            );\n            "
+    },
+    {
+      "priority": "HIGH",
+      "category": "Data Validation",
+      "recommendation": "Implement date validation triggers",
+      "details": "Prevent future data quality issues with database constraints",
+      "sql": "\n            -- Add check constraint for future dates\n            ALTER TABLE pos_transactions \n            ADD CONSTRAINT chk_contract_date \n            CHECK (contract_date <= DATE_ADD(CURDATE(), INTERVAL 1 YEAR));\n            "
+    }
+  ]
+}

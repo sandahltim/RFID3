@@ -1,0 +1,61 @@
+{
+  "test_suite": "RFID3 Comprehensive Test Suite",
+  "timestamp": "2025-08-31T15:51:01.741270",
+  "duration_seconds": 32.825524,
+  "total_tests": 8,
+  "passed_tests": 4,
+  "failed_tests": 4,
+  "success_rate_percent": 50.0,
+  "overall_status": "\u26a0\ufe0f NEEDS ATTENTION",
+  "recommendation": "System has significant issues that should be resolved",
+  "test_results": [
+    {
+      "name": "Flask Application Initialization",
+      "passed": true,
+      "message": "Test passed",
+      "duration": 2.536815643310547
+    },
+    {
+      "name": "Database Connectivity",
+      "passed": false,
+      "message": "Test failed",
+      "duration": 0.12221693992614746
+    },
+    {
+      "name": "Analytics Services",
+      "passed": true,
+      "message": "Test passed",
+      "duration": 3.425219774246216
+    },
+    {
+      "name": "API Endpoints",
+      "passed": true,
+      "message": "Test passed",
+      "duration": 19.644157886505127
+    },
+    {
+      "name": "Data Flow and CSV Import",
+      "passed": false,
+      "message": "Test failed",
+      "duration": 3.428302049636841
+    },
+    {
+      "name": "Performance Benchmarking",
+      "passed": true,
+      "message": "Test passed",
+      "duration": 3.482128143310547
+    },
+    {
+      "name": "Health Check System",
+      "passed": false,
+      "message": "Test failed",
+      "duration": 0.10020899772644043
+    },
+    {
+      "name": "Store Mappings Validation",
+      "passed": false,
+      "message": "Test failed",
+      "duration": 0.08621811866760254
+    }
+  ]
+}

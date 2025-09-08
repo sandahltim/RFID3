@@ -1,0 +1,767 @@
+{% extends "base.html" %}
+
+{% block title %}Feedback Analytics Dashboard - RFID DASHBOARD{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="/static/css/feedback-system.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+.dashboard-card {
+    background: #fff;
+    border: 1px solid #e3e6f0;
+    border-radius: 8px;
+    box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.15);
+    margin-bottom: 20px;
+}
+
+.dashboard-card-header {
+    background: linear-gradient(135deg, #4e73df 0%, #224abe 100%);
+    color: white;
+    padding: 15px 20px;
+    border-radius: 8px 8px 0 0;
+    border-bottom: none;
+}
+
+.dashboard-card-body {
+    padding: 20px;
+}
+
+.metric-card {
+    text-align: center;
+    padding: 20px;
+    background: #fff;
+    border: 1px solid #e3e6f0;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+    height: 100%;
+}
+
+.metric-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 0.25rem 2rem 0 rgba(58, 59, 69, 0.2);
+}
+
+.metric-value {
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin-bottom: 10px;
+    background: linear-gradient(135deg, #4e73df 0%, #224abe 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.metric-label {
+    color: #5a5c69;
+    font-weight: 600;
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.metric-change {
+    font-size: 0.8rem;
+    margin-top: 5px;
+}
+
+.metric-change.positive {
+    color: #1cc88a;
+}
+
+.metric-change.negative {
+    color: #e74a3b;
+}
+
+.chart-container {
+    position: relative;
+    height: 300px;
+    margin: 20px 0;
+}
+
+.insight-item {
+    background: #f8f9fc;
+    border-left: 4px solid #4e73df;
+    padding: 15px;
+    margin-bottom: 15px;
+    border-radius: 0 6px 6px 0;
+}
+
+.insight-title {
+    font-weight: 600;
+    color: #5a5c69;
+    margin-bottom: 5px;
+}
+
+.insight-description {
+    color: #858796;
+    font-size: 0.9rem;
+}
+
+.top-contributor {
+    display: flex;
+    justify-content: between;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid #e3e6f0;
+}
+
+.top-contributor:last-child {
+    border-bottom: none;
+}
+
+.contributor-info {
+    flex-grow: 1;
+}
+
+.contributor-name {
+    font-weight: 600;
+    color: #5a5c69;
+}
+
+.contributor-stats {
+    font-size: 0.8rem;
+    color: #858796;
+}
+
+.contributor-badge {
+    background: linear-gradient(135deg, #4e73df 0%, #224abe 100%);
+    color: white;
+    padding: 4px 12px;
+    border-radius: 15px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.loading-spinner {
+    text-align: center;
+    padding: 40px;
+    color: #858796;
+}
+
+.no-data {
+    text-align: center;
+    padding: 40px;
+    color: #858796;
+}
+
+.filter-controls {
+    background: #f8f9fc;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+}
+
+.export-controls {
+    text-align: right;
+    margin-bottom: 20px;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">
+            <i class="fas fa-chart-line"></i> Feedback Analytics Dashboard
+        </h1>
+        <div class="export-controls">
+            <button class="btn btn-primary btn-sm" onclick="exportFeedbackReport()">
+                <i class="fas fa-download"></i> Export Report
+            </button>
+        </div>
+    </div>
+
+    <!-- Filter Controls -->
+    <div class="filter-controls">
+        <div class="row">
+            <div class="col-md-3">
+                <label for="dateRange" class="form-label">Time Period:</label>
+                <select id="dateRange" class="form-select" onchange="updateDashboard()">
+                    <option value="7">Last 7 days</option>
+                    <option value="30" selected>Last 30 days</option>
+                    <option value="90">Last 90 days</option>
+                    <option value="365">Last year</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label for="feedbackType" class="form-label">Feedback Type:</label>
+                <select id="feedbackType" class="form-select" onchange="updateDashboard()">
+                    <option value="all">All Types</option>
+                    <option value="CORRELATION_RATING">Correlation Ratings</option>
+                    <option value="PREDICTION_VALIDATION">Prediction Validations</option>
+                    <option value="BUSINESS_CONTEXT">Business Context</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label for="storeFilter" class="form-label">Store:</label>
+                <select id="storeFilter" class="form-select" onchange="updateDashboard()">
+                    <option value="all">All Stores</option>
+                    <option value="POR">Portage (POR)</option>
+                    <option value="KAL">Kalamazoo (KAL)</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">&nbsp;</label>
+                <div>
+                    <button class="btn btn-outline-secondary btn-sm" onclick="refreshDashboard()">
+                        <i class="fas fa-refresh"></i> Refresh
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Key Metrics Row -->
+    <div class="row mb-4">
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="metric-card">
+                <div class="metric-value" id="totalFeedbackCount">
+                    <div class="loading-spinner">
+                        <i class="fas fa-spinner fa-spin"></i>
+                    </div>
+                </div>
+                <div class="metric-label">Total Feedback</div>
+                <div class="metric-change" id="feedbackCountChange"></div>
+            </div>
+        </div>
+        
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="metric-card">
+                <div class="metric-value" id="uniqueContributors">
+                    <div class="loading-spinner">
+                        <i class="fas fa-spinner fa-spin"></i>
+                    </div>
+                </div>
+                <div class="metric-label">Active Contributors</div>
+                <div class="metric-change" id="contributorsChange"></div>
+            </div>
+        </div>
+        
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="metric-card">
+                <div class="metric-value" id="avgUsefulness">
+                    <div class="loading-spinner">
+                        <i class="fas fa-spinner fa-spin"></i>
+                    </div>
+                </div>
+                <div class="metric-label">Avg Usefulness</div>
+                <div class="metric-change" id="usefulnessChange"></div>
+            </div>
+        </div>
+        
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="metric-card">
+                <div class="metric-value" id="predictionAccuracy">
+                    <div class="loading-spinner">
+                        <i class="fas fa-spinner fa-spin"></i>
+                    </div>
+                </div>
+                <div class="metric-label">Prediction Accuracy</div>
+                <div class="metric-change" id="accuracyChange"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Row -->
+    <div class="row mb-4">
+        <div class="col-xl-8 col-lg-7">
+            <div class="dashboard-card">
+                <div class="dashboard-card-header">
+                    <h6 class="m-0 font-weight-bold">Feedback Trends Over Time</h6>
+                </div>
+                <div class="dashboard-card-body">
+                    <div class="chart-container">
+                        <canvas id="feedbackTrendsChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-xl-4 col-lg-5">
+            <div class="dashboard-card">
+                <div class="dashboard-card-header">
+                    <h6 class="m-0 font-weight-bold">Feedback Distribution</h6>
+                </div>
+                <div class="dashboard-card-body">
+                    <div class="chart-container">
+                        <canvas id="feedbackDistributionChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Accuracy Trends and Top Contributors -->
+    <div class="row mb-4">
+        <div class="col-xl-8 col-lg-7">
+            <div class="dashboard-card">
+                <div class="dashboard-card-header">
+                    <h6 class="m-0 font-weight-bold">Prediction Accuracy Trends</h6>
+                </div>
+                <div class="dashboard-card-body">
+                    <div class="chart-container">
+                        <canvas id="accuracyTrendsChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-xl-4 col-lg-5">
+            <div class="dashboard-card">
+                <div class="dashboard-card-header">
+                    <h6 class="m-0 font-weight-bold">Top Contributors</h6>
+                </div>
+                <div class="dashboard-card-body">
+                    <div id="topContributorsList">
+                        <div class="loading-spinner">
+                            <i class="fas fa-spinner fa-spin"></i> Loading contributors...
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Insights and Suggestions -->
+    <div class="row mb-4">
+        <div class="col-xl-6 col-lg-6">
+            <div class="dashboard-card">
+                <div class="dashboard-card-header">
+                    <h6 class="m-0 font-weight-bold">Key Insights</h6>
+                </div>
+                <div class="dashboard-card-body">
+                    <div id="keyInsightsList">
+                        <div class="loading-spinner">
+                            <i class="fas fa-spinner fa-spin"></i> Generating insights...
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-xl-6 col-lg-6">
+            <div class="dashboard-card">
+                <div class="dashboard-card-header">
+                    <h6 class="m-0 font-weight-bold">Recent Suggestions</h6>
+                </div>
+                <div class="dashboard-card-body">
+                    <div id="recentSuggestionsList">
+                        <div class="loading-spinner">
+                            <i class="fas fa-spinner fa-spin"></i> Loading suggestions...
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Detailed Feedback Table -->
+    <div class="row">
+        <div class="col-12">
+            <div class="dashboard-card">
+                <div class="dashboard-card-header">
+                    <h6 class="m-0 font-weight-bold">Recent Feedback Details</h6>
+                </div>
+                <div class="dashboard-card-body">
+                    <div class="table-responsive">
+                        <table class="table table-bordered" id="feedbackDetailsTable" width="100%" cellspacing="0">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Type</th>
+                                    <th>User</th>
+                                    <th>Rating</th>
+                                    <th>Comments</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td colspan="6" class="text-center">
+                                        <i class="fas fa-spinner fa-spin"></i> Loading feedback details...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script src="/static/js/feedback-system.js"></script>
+<script>
+class FeedbackDashboard {
+    constructor() {
+        this.charts = {};
+        this.currentFilters = {
+            dateRange: 30,
+            feedbackType: 'all',
+            storeFilter: 'all'
+        };
+        this.init();
+    }
+
+    init() {
+        this.initializeCharts();
+        this.loadDashboardData();
+        
+        // Auto-refresh every 5 minutes
+        setInterval(() => {
+            this.refreshDashboard();
+        }, 5 * 60 * 1000);
+    }
+
+    initializeCharts() {
+        // Feedback Trends Chart
+        const trendsCtx = document.getElementById('feedbackTrendsChart').getContext('2d');
+        this.charts.trends = new Chart(trendsCtx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Feedback Submissions',
+                    data: [],
+                    borderColor: '#4e73df',
+                    backgroundColor: 'rgba(78, 115, 223, 0.1)',
+                    tension: 0.3,
+                    fill: true
+                }, {
+                    label: 'Unique Contributors',
+                    data: [],
+                    borderColor: '#1cc88a',
+                    backgroundColor: 'rgba(28, 200, 138, 0.1)',
+                    tension: 0.3,
+                    fill: false
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top'
+                    }
+                }
+            }
+        });
+
+        // Feedback Distribution Chart (Pie)
+        const distributionCtx = document.getElementById('feedbackDistributionChart').getContext('2d');
+        this.charts.distribution = new Chart(distributionCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Correlation Ratings', 'Prediction Validations', 'Business Context', 'Suggestions'],
+                datasets: [{
+                    data: [0, 0, 0, 0],
+                    backgroundColor: ['#4e73df', '#1cc88a', '#36b9cc', '#f6c23e'],
+                    borderWidth: 2,
+                    borderColor: '#fff'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    }
+                }
+            }
+        });
+
+        // Accuracy Trends Chart
+        const accuracyCtx = document.getElementById('accuracyTrendsChart').getContext('2d');
+        this.charts.accuracy = new Chart(accuracyCtx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Prediction Accuracy (%)',
+                    data: [],
+                    borderColor: '#e74a3b',
+                    backgroundColor: 'rgba(231, 74, 59, 0.1)',
+                    tension: 0.3,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100,
+                        ticks: {
+                            callback: function(value) {
+                                return value + '%';
+                            }
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                }
+            }
+        });
+    }
+
+    async loadDashboardData() {
+        try {
+            // Load summary data
+            const summaryResponse = await fetch(`/api/feedback/analytics/dashboard?days=${this.currentFilters.dateRange}`);
+            const summaryResult = await summaryResponse.json();
+            
+            if (summaryResult.success) {
+                this.updateMetrics(summaryResult.dashboard_data.summary);
+                this.updateCharts(summaryResult.dashboard_data);
+            }
+
+            // Load insights
+            const insightsResponse = await fetch('/api/feedback/insights');
+            const insightsResult = await insightsResponse.json();
+            
+            if (insightsResult.success) {
+                this.updateInsights(insightsResult.insights);
+            }
+
+            // Load recent suggestions
+            const suggestionsResponse = await fetch('/api/feedback/suggestions?limit=5');
+            const suggestionsResult = await suggestionsResponse.json();
+            
+            if (suggestionsResult.success) {
+                this.updateSuggestions(suggestionsResult.suggestions);
+            }
+
+            // Load recent feedback details
+            const feedbackResponse = await fetch(`/api/feedback/correlation?limit=20`);
+            const feedbackResult = await feedbackResponse.json();
+            
+            if (feedbackResult.success) {
+                this.updateFeedbackTable(feedbackResult.feedback);
+            }
+
+        } catch (error) {
+            console.error('Failed to load dashboard data:', error);
+            this.showError('Failed to load dashboard data');
+        }
+    }
+
+    updateMetrics(summary) {
+        // Update metric values
+        document.getElementById('totalFeedbackCount').textContent = summary.total_feedback_submissions || 0;
+        document.getElementById('uniqueContributors').textContent = summary.unique_contributors || 0;
+        document.getElementById('avgUsefulness').textContent = summary.rating_averages?.usefulness?.toFixed(1) || 'N/A';
+        document.getElementById('predictionAccuracy').textContent = 
+            (summary.prediction_accuracy?.average_accuracy?.toFixed(1) || 'N/A') + '%';
+
+        // Update top contributors
+        if (summary.top_contributors && summary.top_contributors.length > 0) {
+            this.updateTopContributors(summary.top_contributors);
+        }
+    }
+
+    updateCharts(dashboardData) {
+        // Update trends chart with sample data
+        const trendsData = this.generateSampleTrendsData();
+        this.charts.trends.data.labels = trendsData.labels;
+        this.charts.trends.data.datasets[0].data = trendsData.feedback;
+        this.charts.trends.data.datasets[1].data = trendsData.contributors;
+        this.charts.trends.update();
+
+        // Update distribution chart
+        const distributionData = [
+            dashboardData.summary?.total_feedback_submissions || 0,
+            dashboardData.summary?.prediction_accuracy?.total_validations || 0,
+            10, // Sample business context submissions
+            dashboardData.summary?.suggestions?.total_submitted || 0
+        ];
+        this.charts.distribution.data.datasets[0].data = distributionData;
+        this.charts.distribution.update();
+
+        // Update accuracy trends
+        const accuracyData = this.generateSampleAccuracyData();
+        this.charts.accuracy.data.labels = accuracyData.labels;
+        this.charts.accuracy.data.datasets[0].data = accuracyData.accuracy;
+        this.charts.accuracy.update();
+    }
+
+    generateSampleTrendsData() {
+        const labels = [];
+        const feedback = [];
+        const contributors = [];
+        
+        for (let i = 6; i >= 0; i--) {
+            const date = new Date();
+            date.setDate(date.getDate() - i);
+            labels.push(date.toLocaleDateString());
+            
+            // Generate realistic sample data
+            feedback.push(Math.floor(Math.random() * 15) + 5);
+            contributors.push(Math.floor(Math.random() * 8) + 3);
+        }
+        
+        return { labels, feedback, contributors };
+    }
+
+    generateSampleAccuracyData() {
+        const labels = [];
+        const accuracy = [];
+        
+        for (let i = 11; i >= 0; i--) {
+            const date = new Date();
+            date.setDate(date.getDate() - (i * 7)); // Weekly data
+            labels.push('Week of ' + date.toLocaleDateString());
+            
+            // Generate realistic accuracy data (70-95%)
+            accuracy.push(Math.floor(Math.random() * 25) + 70);
+        }
+        
+        return { labels, accuracy };
+    }
+
+    updateTopContributors(contributors) {
+        const container = document.getElementById('topContributorsList');
+        
+        if (contributors.length === 0) {
+            container.innerHTML = '<div class="no-data">No contributors yet</div>';
+            return;
+        }
+
+        container.innerHTML = contributors.map(contributor => `
+            <div class="top-contributor">
+                <div class="contributor-info">
+                    <div class="contributor-name">${contributor.user_name}</div>
+                    <div class="contributor-stats">${contributor.feedback_count} feedback submissions</div>
+                </div>
+                <div class="contributor-badge">${contributor.feedback_count}</div>
+            </div>
+        `).join('');
+    }
+
+    updateInsights(insights) {
+        const container = document.getElementById('keyInsightsList');
+        
+        if (insights.length === 0) {
+            container.innerHTML = '<div class="no-data">No insights available yet</div>';
+            return;
+        }
+
+        container.innerHTML = insights.map(insight => `
+            <div class="insight-item">
+                <div class="insight-title">${insight.title}</div>
+                <div class="insight-description">${insight.description}</div>
+            </div>
+        `).join('');
+    }
+
+    updateSuggestions(suggestions) {
+        const container = document.getElementById('recentSuggestionsList');
+        
+        if (suggestions.length === 0) {
+            container.innerHTML = '<div class="no-data">No recent suggestions</div>';
+            return;
+        }
+
+        container.innerHTML = suggestions.map(suggestion => `
+            <div class="suggestion-item mb-3">
+                <h6 class="mb-1">${suggestion.title}</h6>
+                <p class="mb-2 text-muted small">${suggestion.description.substring(0, 100)}...</p>
+                <div class="d-flex justify-content-between align-items-center">
+                    <small class="text-muted">by ${suggestion.user_name}</small>
+                    <div>
+                        <span class="badge bg-success">${suggestion.upvotes} up</span>
+                        <span class="badge bg-danger">${suggestion.downvotes} down</span>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    updateFeedbackTable(feedback) {
+        const tbody = document.querySelector('#feedbackDetailsTable tbody');
+        
+        if (feedback.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center">No feedback data available</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = feedback.map(item => `
+            <tr>
+                <td>${new Date(item.submitted_date).toLocaleDateString()}</td>
+                <td><span class="badge bg-info">${item.feedback_type?.replace('_', ' ') || 'N/A'}</span></td>
+                <td>${item.user_name || 'Anonymous'}</td>
+                <td>
+                    ${item.usefulness_rating ? 
+                        '★'.repeat(item.usefulness_rating) + '☆'.repeat(5 - item.usefulness_rating) :
+                        'No rating'
+                    }
+                </td>
+                <td>${item.comments ? item.comments.substring(0, 50) + '...' : 'No comments'}</td>
+                <td><span class="badge bg-success">Submitted</span></td>
+            </tr>
+        `).join('');
+    }
+
+    showError(message) {
+        // Show error notification
+        const notification = document.createElement('div');
+        notification.className = 'alert alert-danger alert-dismissible fade show';
+        notification.style.cssText = 'position: fixed; top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+        notification.innerHTML = `
+            <i class="fas fa-exclamation-circle"></i> ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        document.body.appendChild(notification);
+
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.parentNode.removeChild(notification);
+            }
+        }, 5000);
+    }
+}
+
+// Dashboard control functions
+function updateDashboard() {
+    const dashboard = window.feedbackDashboard;
+    if (dashboard) {
+        dashboard.currentFilters = {
+            dateRange: parseInt(document.getElementById('dateRange').value),
+            feedbackType: document.getElementById('feedbackType').value,
+            storeFilter: document.getElementById('storeFilter').value
+        };
+        dashboard.loadDashboardData();
+    }
+}
+
+function refreshDashboard() {
+    const dashboard = window.feedbackDashboard;
+    if (dashboard) {
+        dashboard.loadDashboardData();
+    }
+}
+
+function exportFeedbackReport() {
+    // In a real implementation, this would generate and download a report
+    alert('Export functionality would generate a comprehensive feedback report including all charts and data.');
+}
+
+// Initialize dashboard when page loads
+document.addEventListener('DOMContentLoaded', () => {
+    window.feedbackDashboard = new FeedbackDashboard();
+});
+</script>
+{% endblock %}

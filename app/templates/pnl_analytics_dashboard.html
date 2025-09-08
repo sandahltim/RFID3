@@ -1,0 +1,1657 @@
+{% extends "base.html" %}
+
+{% block title %}P&L Analytics Dashboard - RFID3{% endblock %}
+
+{% block extra_head %}
+<!-- Chart.js for advanced visualizations -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+<!-- Date Range Picker -->
+<script src="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.css">
+<!-- Font Awesome for icons -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+<style>
+/* Enhanced P&L Analytics Dashboard Styles */
+.pnl-dashboard {
+    background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+    min-height: 100vh;
+}
+
+.dashboard-header {
+    background: linear-gradient(135deg, #1e3a8a 0%, #3730a3 100%);
+    color: white;
+    padding: 2.5rem 0;
+    margin-bottom: 2rem;
+    position: relative;
+    overflow: hidden;
+}
+
+.dashboard-header::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    right: -10%;
+    width: 200px;
+    height: 200%;
+    background: rgba(255, 255, 255, 0.1);
+    transform: rotate(15deg);
+}
+
+.analytics-card {
+    background: white;
+    border-radius: 20px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+    border: 1px solid rgba(0, 0, 0, 0.05);
+    margin-bottom: 2rem;
+    transition: all 0.3s ease;
+    overflow: hidden;
+}
+
+.analytics-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+}
+
+.card-header-enhanced {
+    background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+    padding: 1.5rem 2rem;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    display: flex;
+    justify-content: between;
+    align-items: center;
+}
+
+.card-header-enhanced h5 {
+    font-weight: 700;
+    color: #1e40af;
+    margin: 0;
+    display: flex;
+    align-items: center;
+}
+
+.card-header-enhanced i {
+    margin-right: 0.75rem;
+    font-size: 1.2rem;
+    color: #3730a3;
+}
+
+.chart-container-enhanced {
+    position: relative;
+    padding: 2rem;
+    min-height: 400px;
+}
+
+.chart-overlay-controls {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    z-index: 10;
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.overlay-toggle {
+    background: rgba(255, 255, 255, 0.9);
+    border: 2px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 0.5rem 1rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(10px);
+}
+
+.overlay-toggle.active {
+    background: #3730a3;
+    color: white;
+    border-color: #3730a3;
+}
+
+.overlay-toggle:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.kpi-card {
+    background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+    border-radius: 16px;
+    padding: 1.5rem;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    border: 1px solid rgba(0, 0, 0, 0.05);
+    transition: all 0.3s ease;
+}
+
+.kpi-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+}
+
+.kpi-value {
+    font-size: 2.2rem;
+    font-weight: 800;
+    color: #1e40af;
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+}
+
+.kpi-label {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 1rem;
+}
+
+.kpi-change {
+    display: flex;
+    align-items: center;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.kpi-change.positive {
+    color: #10b981;
+}
+
+.kpi-change.negative {
+    color: #ef4444;
+}
+
+.kpi-change i {
+    margin-right: 0.25rem;
+}
+
+.variance-indicator {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-top: 0.5rem;
+}
+
+.variance-positive {
+    background: rgba(16, 185, 129, 0.1);
+    color: #10b981;
+    border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+.variance-negative {
+    background: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
+    border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.variance-neutral {
+    background: rgba(107, 114, 128, 0.1);
+    color: #6b7280;
+    border: 1px solid rgba(107, 114, 128, 0.2);
+}
+
+.filter-panel {
+    background: white;
+    border-radius: 16px;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.filter-controls {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    align-items: end;
+}
+
+.form-group-enhanced {
+    margin-bottom: 0;
+}
+
+.form-label-enhanced {
+    font-weight: 600;
+    color: #374151;
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+}
+
+.form-control-enhanced {
+    border: 2px solid #e5e7eb;
+    border-radius: 10px;
+    padding: 0.75rem 1rem;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    background: #fafafa;
+}
+
+.form-control-enhanced:focus {
+    border-color: #3730a3;
+    box-shadow: 0 0 0 3px rgba(55, 48, 163, 0.1);
+    background: white;
+}
+
+.btn-analytics {
+    background: linear-gradient(135deg, #3730a3 0%, #1e40af 100%);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    padding: 0.75rem 1.5rem;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(55, 48, 163, 0.3);
+}
+
+.btn-analytics:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(55, 48, 163, 0.4);
+    color: white;
+}
+
+.insight-tooltip {
+    position: absolute;
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 0.75rem 1rem;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    pointer-events: none;
+    z-index: 1000;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    max-width: 300px;
+    backdrop-filter: blur(10px);
+}
+
+.insight-tooltip.show {
+    opacity: 1;
+}
+
+.correlation-strength-bar {
+    height: 4px;
+    background: #e5e7eb;
+    border-radius: 2px;
+    margin-top: 0.5rem;
+    overflow: hidden;
+}
+
+.correlation-strength-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.5s ease;
+}
+
+.correlation-strong {
+    background: linear-gradient(90deg, #10b981 0%, #059669 100%);
+}
+
+.correlation-moderate {
+    background: linear-gradient(90deg, #f59e0b 0%, #d97706 100%);
+}
+
+.correlation-weak {
+    background: linear-gradient(90deg, #ef4444 0%, #dc2626 100%);
+}
+
+.weather-overlay-info {
+    position: absolute;
+    top: 1rem;
+    left: 1rem;
+    background: rgba(255, 255, 255, 0.95);
+    padding: 1rem;
+    border-radius: 12px;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    font-size: 0.85rem;
+    max-width: 250px;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+.economic-indicator {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.economic-indicator:last-child {
+    border-bottom: none;
+}
+
+.indicator-value {
+    font-weight: 600;
+    color: #1e40af;
+}
+
+@media (max-width: 768px) {
+    .dashboard-header {
+        padding: 1.5rem 0;
+    }
+    
+    .chart-overlay-controls {
+        position: relative;
+        top: 0;
+        right: 0;
+        margin-bottom: 1rem;
+        justify-content: flex-start;
+    }
+    
+    .kpi-grid {
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+    }
+    
+    .filter-controls {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+    
+    .analytics-card {
+        margin-bottom: 1.5rem;
+        border-radius: 16px;
+    }
+    
+    .chart-container-enhanced {
+        padding: 1rem;
+        min-height: 300px;
+    }
+    
+    .weather-overlay-info {
+        position: relative;
+        top: 0;
+        left: 0;
+        margin-bottom: 1rem;
+        max-width: 100%;
+    }
+}
+
+/* Animation for data loading */
+@keyframes dataLoading {
+    0% { opacity: 0.5; }
+    50% { opacity: 1; }
+    100% { opacity: 0.5; }
+}
+
+.data-loading {
+    animation: dataLoading 2s ease-in-out infinite;
+}
+
+/* Custom scrollbar for better UX */
+.custom-scroll::-webkit-scrollbar {
+    width: 6px;
+}
+
+.custom-scroll::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 3px;
+}
+
+.custom-scroll::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 3px;
+}
+
+.custom-scroll::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="pnl-dashboard">
+    <!-- Enhanced Dashboard Header -->
+    <div class="dashboard-header">
+        <div class="container">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <h1 class="display-6 mb-3">
+                        <i class="fas fa-chart-line me-3"></i>
+                        P&L Analytics Dashboard
+                    </h1>
+                    <p class="mb-0 opacity-90 lead">
+                        Interactive profit & loss analysis with weather correlation and predictive insights
+                    </p>
+                </div>
+                <div class="col-md-4 text-md-end">
+                    <div class="d-flex flex-column gap-2">
+                        <div class="badge bg-light text-dark px-3 py-2" style="font-size: 0.9rem;">
+                            <i class="fas fa-calendar-alt me-2"></i>
+                            <span id="currentPeriod">Last 12 Months</span>
+                        </div>
+                        <div class="badge bg-success px-3 py-2" style="font-size: 0.8rem;">
+                            <i class="fas fa-sync-alt me-2"></i>
+                            Real-time Data
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container-fluid">
+        <!-- Enhanced Filter Panel -->
+        <div class="filter-panel">
+            <div class="row">
+                <div class="col-12">
+                    <h5 class="mb-3">
+                        <i class="fas fa-filter me-2 text-primary"></i>
+                        Analysis Controls
+                    </h5>
+                </div>
+            </div>
+            <div class="filter-controls">
+                <div class="form-group-enhanced">
+                    <label class="form-label-enhanced">Date Range</label>
+                    <input type="text" id="dateRangePicker" class="form-control-enhanced" 
+                           placeholder="Select date range" readonly>
+                </div>
+                <div class="form-group-enhanced">
+                    <label class="form-label-enhanced">Store Filter</label>
+                    <select id="storeFilter" class="form-control-enhanced">
+                        <option value="all">All Stores</option>
+                        <option value="6800">Brooklyn Park (6800)</option>
+                        <option value="3607">Wayzata (3607)</option>
+                        <option value="8101">Fridley (8101)</option>
+                        <option value="728">Elk River (728)</option>
+                    </select>
+                </div>
+                <div class="form-group-enhanced">
+                    <label class="form-label-enhanced">Metric Focus</label>
+                    <select id="metricFocus" class="form-control-enhanced">
+                        <option value="revenue">Revenue Analysis</option>
+                        <option value="profit">Profit Margin</option>
+                        <option value="variance">Actual vs Projected</option>
+                        <option value="trend">Trend Analysis</option>
+                    </select>
+                </div>
+                <div class="form-group-enhanced">
+                    <label class="form-label-enhanced">External Factors</label>
+                    <select id="externalFactors" class="form-control-enhanced">
+                        <option value="none">None</option>
+                        <option value="weather">Weather Correlation</option>
+                        <option value="economic">Economic Indicators</option>
+                        <option value="seasonal">Seasonal Patterns</option>
+                        <option value="all">All Factors</option>
+                    </select>
+                </div>
+                <div class="form-group-enhanced">
+                    <button id="updateAnalysis" class="btn btn-analytics w-100">
+                        <i class="fas fa-chart-bar me-2"></i>
+                        Update Analysis
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- KPI Overview Grid -->
+        <div class="kpi-grid" id="kpiGrid">
+            <div class="kpi-card">
+                <div class="kpi-label">Total Revenue</div>
+                <div class="kpi-value" id="totalRevenue">
+                    <i class="fas fa-dollar-sign me-2"></i>
+                    $0
+                </div>
+                <div class="kpi-change" id="revenueChange">
+                    <i class="fas fa-arrow-up"></i>
+                    Loading...
+                </div>
+                <div class="variance-indicator neutral" id="revenueVariance">
+                    vs Projected: --
+                </div>
+                <div class="correlation-strength-bar">
+                    <div class="correlation-strength-fill correlation-moderate" id="revenueCorrelation" style="width: 0%;"></div>
+                </div>
+            </div>
+
+            <div class="kpi-card">
+                <div class="kpi-label">Gross Profit</div>
+                <div class="kpi-value" id="grossProfit">
+                    <i class="fas fa-chart-pie me-2"></i>
+                    $0
+                </div>
+                <div class="kpi-change" id="profitChange">
+                    <i class="fas fa-arrow-up"></i>
+                    Loading...
+                </div>
+                <div class="variance-indicator neutral" id="profitVariance">
+                    vs Projected: --
+                </div>
+                <div class="correlation-strength-bar">
+                    <div class="correlation-strength-fill correlation-strong" id="profitCorrelation" style="width: 0%;"></div>
+                </div>
+            </div>
+
+            <div class="kpi-card">
+                <div class="kpi-label">Operating Expenses</div>
+                <div class="kpi-value" id="operatingExpenses">
+                    <i class="fas fa-minus-circle me-2"></i>
+                    $0
+                </div>
+                <div class="kpi-change" id="expensesChange">
+                    <i class="fas fa-arrow-down"></i>
+                    Loading...
+                </div>
+                <div class="variance-indicator neutral" id="expensesVariance">
+                    vs Projected: --
+                </div>
+                <div class="correlation-strength-bar">
+                    <div class="correlation-strength-fill correlation-weak" id="expensesCorrelation" style="width: 0%;"></div>
+                </div>
+            </div>
+
+            <div class="kpi-card">
+                <div class="kpi-label">Net Income</div>
+                <div class="kpi-value" id="netIncome">
+                    <i class="fas fa-trophy me-2"></i>
+                    $0
+                </div>
+                <div class="kpi-change" id="incomeChange">
+                    <i class="fas fa-arrow-up"></i>
+                    Loading...
+                </div>
+                <div class="variance-indicator neutral" id="incomeVariance">
+                    vs Projected: --
+                </div>
+                <div class="correlation-strength-bar">
+                    <div class="correlation-strength-fill correlation-strong" id="incomeCorrelation" style="width: 0%;"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main P&L Chart with Weather Overlay -->
+        <div class="analytics-card">
+            <div class="card-header-enhanced">
+                <h5>
+                    <i class="fas fa-chart-line"></i>
+                    Revenue Trends with External Factor Correlation
+                </h5>
+                <div class="d-flex gap-2">
+                    <span class="badge bg-primary">Interactive</span>
+                    <span class="badge bg-success">Real-time</span>
+                </div>
+            </div>
+            <div class="chart-container-enhanced">
+                <!-- Chart Overlay Controls -->
+                <div class="chart-overlay-controls">
+                    <button class="overlay-toggle active" data-overlay="actual">
+                        <i class="fas fa-line-chart me-1"></i>Actual
+                    </button>
+                    <button class="overlay-toggle active" data-overlay="projected">
+                        <i class="fas fa-chart-line me-1"></i>Projected
+                    </button>
+                    <button class="overlay-toggle" data-overlay="weather">
+                        <i class="fas fa-cloud-sun me-1"></i>Weather
+                    </button>
+                    <button class="overlay-toggle" data-overlay="economic">
+                        <i class="fas fa-chart-bar me-1"></i>Economic
+                    </button>
+                    <button class="overlay-toggle" data-overlay="seasonal">
+                        <i class="fas fa-calendar-alt me-1"></i>Seasonal
+                    </button>
+                </div>
+
+                <!-- Weather Overlay Information Panel -->
+                <div class="weather-overlay-info" id="weatherInfo" style="display: none;">
+                    <h6 class="mb-2">
+                        <i class="fas fa-cloud-sun me-2 text-primary"></i>
+                        Weather Impact Analysis
+                    </h6>
+                    <div class="economic-indicator">
+                        <span>Temperature Correlation:</span>
+                        <span class="indicator-value" id="tempCorrelation">--</span>
+                    </div>
+                    <div class="economic-indicator">
+                        <span>Precipitation Impact:</span>
+                        <span class="indicator-value" id="precipCorrelation">--</span>
+                    </div>
+                    <div class="economic-indicator">
+                        <span>Seasonal Factor:</span>
+                        <span class="indicator-value" id="seasonalFactor">--</span>
+                    </div>
+                    <small class="text-muted mt-2 d-block">
+                        <i class="fas fa-info-circle me-1"></i>
+                        Correlation strength: <span id="overallWeatherCorr">Strong</span>
+                    </small>
+                </div>
+
+                <canvas id="pnlTrendChart" style="max-height: 400px;"></canvas>
+            </div>
+        </div>
+
+        <!-- Variance Analysis Grid -->
+        <div class="row">
+            <div class="col-lg-8">
+                <div class="analytics-card">
+                    <div class="card-header-enhanced">
+                        <h5>
+                            <i class="fas fa-balance-scale"></i>
+                            Actual vs Projected Variance Analysis
+                        </h5>
+                        <div class="badge bg-warning">
+                            <i class="fas fa-exclamation-triangle me-1"></i>
+                            Variances Detected
+                        </div>
+                    </div>
+                    <div class="chart-container-enhanced">
+                        <canvas id="varianceChart" style="max-height: 300px;"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-4">
+                <div class="analytics-card">
+                    <div class="card-header-enhanced">
+                        <h5>
+                            <i class="fas fa-lightbulb"></i>
+                            Key Insights
+                        </h5>
+                    </div>
+                    <div class="p-4">
+                        <div id="keyInsights" class="custom-scroll" style="max-height: 280px; overflow-y: auto;">
+                            <div class="text-center text-muted">
+                                <i class="fas fa-spinner fa-spin mb-2"></i>
+                                <p>Generating insights...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Store Performance Comparison -->
+        <div class="analytics-card">
+            <div class="card-header-enhanced">
+                <h5>
+                    <i class="fas fa-store"></i>
+                    Store Performance Comparison
+                </h5>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-sm btn-outline-primary" id="toggleAbsoluteRelative">
+                        <i class="fas fa-exchange-alt me-1"></i>
+                        Switch to Relative
+                    </button>
+                </div>
+            </div>
+            <div class="chart-container-enhanced">
+                <canvas id="storeComparisonChart" style="max-height: 350px;"></canvas>
+            </div>
+        </div>
+
+        <!-- Predictive Forecast Section -->
+        <div class="analytics-card">
+            <div class="card-header-enhanced">
+                <h5>
+                    <i class="fas fa-crystal-ball"></i>
+                    Predictive Revenue Forecast
+                </h5>
+                <div class="d-flex gap-2">
+                    <span class="badge bg-info">AI Powered</span>
+                    <span class="badge bg-secondary" id="confidenceLevel">90% Confidence</span>
+                </div>
+            </div>
+            <div class="chart-container-enhanced">
+                <div class="chart-overlay-controls">
+                    <button class="overlay-toggle active" data-forecast="optimistic">
+                        <i class="fas fa-arrow-up me-1"></i>Optimistic
+                    </button>
+                    <button class="overlay-toggle active" data-forecast="realistic">
+                        <i class="fas fa-equals me-1"></i>Realistic
+                    </button>
+                    <button class="overlay-toggle active" data-forecast="conservative">
+                        <i class="fas fa-arrow-down me-1"></i>Conservative
+                    </button>
+                </div>
+                <canvas id="forecastChart" style="max-height: 400px;"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Insight Tooltip -->
+<div class="insight-tooltip" id="insightTooltip"></div>
+
+<!-- Toast Container for Notifications -->
+<div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1050;">
+    <div id="successToast" class="toast align-items-center text-white bg-success border-0" role="alert">
+        <div class="d-flex">
+            <div class="toast-body">
+                <i class="fas fa-check-circle me-2"></i>
+                <span></span>
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+// Enhanced P&L Analytics Dashboard JavaScript
+class PnLAnalyticsDashboard {
+    constructor() {
+        this.charts = {};
+        this.currentData = {};
+        this.activeOverlays = new Set(['actual', 'projected']);
+        this.currentFilters = {
+            dateRange: null,
+            store: 'all',
+            metric: 'revenue',
+            factors: 'none'
+        };
+        
+        this.init();
+    }
+
+    init() {
+        this.setupDateRangePicker();
+        this.setupEventListeners();
+        this.loadInitialData();
+        this.initializeCharts();
+    }
+
+    setupDateRangePicker() {
+        $('#dateRangePicker').daterangepicker({
+            startDate: moment().subtract(12, 'months'),
+            endDate: moment(),
+            ranges: {
+                'Last 7 Days': [moment().subtract(6, 'days'), moment()],
+                'Last 30 Days': [moment().subtract(29, 'days'), moment()],
+                'Last 3 Months': [moment().subtract(3, 'months'), moment()],
+                'Last 6 Months': [moment().subtract(6, 'months'), moment()],
+                'Last 12 Months': [moment().subtract(12, 'months'), moment()],
+                'This Year': [moment().startOf('year'), moment()],
+                'Last Year': [moment().subtract(1, 'year').startOf('year'), moment().subtract(1, 'year').endOf('year')]
+            },
+            locale: {
+                format: 'MM/DD/YYYY'
+            }
+        }, (start, end, label) => {
+            this.currentFilters.dateRange = { start, end, label };
+            $('#currentPeriod').text(label);
+            this.updateAnalysis();
+        });
+
+        // Set initial date range
+        this.currentFilters.dateRange = {
+            start: moment().subtract(12, 'months'),
+            end: moment(),
+            label: 'Last 12 Months'
+        };
+    }
+
+    setupEventListeners() {
+        // Filter controls
+        $('#storeFilter, #metricFocus, #externalFactors').on('change', () => {
+            this.updateFilters();
+            this.updateAnalysis();
+        });
+
+        $('#updateAnalysis').on('click', () => {
+            this.updateAnalysis();
+        });
+
+        // Chart overlay toggles
+        $('.overlay-toggle').on('click', (e) => {
+            const toggle = $(e.currentTarget);
+            const overlay = toggle.data('overlay') || toggle.data('forecast');
+            
+            if (toggle.hasClass('active')) {
+                toggle.removeClass('active');
+                this.activeOverlays.delete(overlay);
+            } else {
+                toggle.addClass('active');
+                this.activeOverlays.add(overlay);
+            }
+            
+            this.updateChartVisibility();
+        });
+
+        // Store comparison toggle
+        $('#toggleAbsoluteRelative').on('click', () => {
+            this.toggleStoreComparisonMode();
+        });
+
+        // Responsive chart resize
+        $(window).on('resize', () => {
+            Object.values(this.charts).forEach(chart => {
+                if (chart && typeof chart.resize === 'function') {
+                    chart.resize();
+                }
+            });
+        });
+    }
+
+    updateFilters() {
+        this.currentFilters.store = $('#storeFilter').val();
+        this.currentFilters.metric = $('#metricFocus').val();
+        this.currentFilters.factors = $('#externalFactors').val();
+    }
+
+    async loadInitialData() {
+        try {
+            // Show loading state
+            this.showLoadingState();
+            
+            // Simulate API call for initial data
+            const mockData = this.generateMockPnLData();
+            this.currentData = mockData;
+            
+            await this.updateKPIs();
+            await this.updateCharts();
+            await this.updateInsights();
+            
+        } catch (error) {
+            console.error('Error loading initial data:', error);
+            this.showError('Failed to load P&L data');
+        }
+    }
+
+    generateMockPnLData() {
+        const stores = ['6800', '3607', '8101', '728'];
+        const storeNames = {
+            '6800': 'Brooklyn Park',
+            '3607': 'Wayzata', 
+            '8101': 'Fridley',
+            '728': 'Elk River'
+        };
+        
+        const months = [];
+        const current = moment().subtract(12, 'months');
+        
+        for (let i = 0; i < 12; i++) {
+            months.push(current.clone().add(i, 'months').format('YYYY-MM'));
+        }
+
+        const data = {
+            kpis: {
+                totalRevenue: 1250000,
+                revenueChange: 8.5,
+                revenueVariance: 12.3,
+                grossProfit: 875000,
+                profitChange: 5.2,
+                profitVariance: -3.1,
+                operatingExpenses: 650000,
+                expensesChange: -2.1,
+                expensesVariance: 7.8,
+                netIncome: 225000,
+                incomeChange: 15.7,
+                incomeVariance: -5.2
+            },
+            trends: {
+                months: months,
+                actual: months.map(m => 95000 + Math.random() * 30000 + (Math.sin(months.indexOf(m) * Math.PI / 6) * 15000)),
+                projected: months.map(m => 100000 + Math.random() * 20000),
+                weather: months.map(m => 50 + Math.random() * 40),
+                economic: months.map(m => 100 + Math.random() * 50),
+                seasonal: months.map(m => 0.8 + Math.random() * 0.4)
+            },
+            stores: stores.map(store => ({
+                code: store,
+                name: storeNames[store],
+                revenue: 250000 + Math.random() * 150000,
+                projected: 280000 + Math.random() * 100000,
+                variance: (Math.random() - 0.5) * 50,
+                trend: Math.random() > 0.5 ? 'up' : 'down'
+            })),
+            correlations: {
+                weather: {
+                    temperature: 0.73,
+                    precipitation: -0.41,
+                    seasonal: 0.67,
+                    overall: 'Strong'
+                }
+            },
+            insights: [
+                {
+                    type: 'alert',
+                    icon: 'fas fa-exclamation-triangle',
+                    title: 'Revenue Variance Alert',
+                    description: 'Brooklyn Park store showing 15% positive variance vs projection',
+                    impact: 'high',
+                    recommendation: 'Analyze successful factors for replication'
+                },
+                {
+                    type: 'trend',
+                    icon: 'fas fa-chart-line',
+                    title: 'Seasonal Pattern Detected',
+                    description: 'Strong correlation between temperature and revenue (r=0.73)',
+                    impact: 'medium',
+                    recommendation: 'Adjust inventory for weather-dependent demand'
+                },
+                {
+                    type: 'opportunity',
+                    icon: 'fas fa-lightbulb',
+                    title: 'Growth Opportunity',
+                    description: 'Q4 performance suggests potential for expanded operations',
+                    impact: 'high',
+                    recommendation: 'Consider strategic expansion planning'
+                }
+            ]
+        };
+
+        return data;
+    }
+
+    async updateKPIs() {
+        const data = this.currentData;
+        
+        // Update KPI values with animation
+        this.animateValue('totalRevenue', data.kpis.totalRevenue, (val) => `$${(val/1000).toFixed(0)}K`);
+        this.animateValue('grossProfit', data.kpis.grossProfit, (val) => `$${(val/1000).toFixed(0)}K`);
+        this.animateValue('operatingExpenses', data.kpis.operatingExpenses, (val) => `$${(val/1000).toFixed(0)}K`);
+        this.animateValue('netIncome', data.kpis.netIncome, (val) => `$${(val/1000).toFixed(0)}K`);
+        
+        // Update change indicators
+        this.updateChangeIndicator('revenueChange', data.kpis.revenueChange);
+        this.updateChangeIndicator('profitChange', data.kpis.profitChange);
+        this.updateChangeIndicator('expensesChange', data.kpis.expensesChange);
+        this.updateChangeIndicator('incomeChange', data.kpis.incomeChange);
+        
+        // Update variance indicators
+        this.updateVarianceIndicator('revenueVariance', data.kpis.revenueVariance);
+        this.updateVarianceIndicator('profitVariance', data.kpis.profitVariance);
+        this.updateVarianceIndicator('expensesVariance', data.kpis.expensesVariance);
+        this.updateVarianceIndicator('incomeVariance', data.kpis.incomeVariance);
+        
+        // Update correlation bars
+        this.updateCorrelationBar('revenueCorrelation', 0.73);
+        this.updateCorrelationBar('profitCorrelation', 0.85);
+        this.updateCorrelationBar('expensesCorrelation', 0.32);
+        this.updateCorrelationBar('incomeCorrelation', 0.78);
+    }
+
+    animateValue(elementId, targetValue, formatter = (v) => v.toLocaleString()) {
+        const element = $(`#${elementId}`);
+        const currentValue = parseFloat(element.text().replace(/[^0-9.-]+/g, '') || 0);
+        const increment = (targetValue - currentValue) / 30;
+        let current = currentValue;
+        
+        const timer = setInterval(() => {
+            current += increment;
+            if ((increment > 0 && current >= targetValue) || (increment < 0 && current <= targetValue)) {
+                current = targetValue;
+                clearInterval(timer);
+            }
+            element.html(element.html().replace(/\$[\d,]+[K]?/, formatter(current)));
+        }, 50);
+    }
+
+    updateChangeIndicator(elementId, value) {
+        const element = $(`#${elementId}`);
+        const isPositive = value > 0;
+        
+        element
+            .removeClass('positive negative')
+            .addClass(isPositive ? 'positive' : 'negative')
+            .find('i')
+            .removeClass('fa-arrow-up fa-arrow-down')
+            .addClass(isPositive ? 'fa-arrow-up' : 'fa-arrow-down');
+        
+        element.find('i').after(` ${Math.abs(value).toFixed(1)}%`);
+    }
+
+    updateVarianceIndicator(elementId, value) {
+        const element = $(`#${elementId}`);
+        const absValue = Math.abs(value);
+        
+        element
+            .removeClass('variance-positive variance-negative variance-neutral')
+            .addClass(value > 5 ? 'variance-positive' : value < -5 ? 'variance-negative' : 'variance-neutral')
+            .text(`vs Projected: ${value > 0 ? '+' : ''}${value.toFixed(1)}%`);
+    }
+
+    updateCorrelationBar(elementId, strength) {
+        const element = $(`#${elementId}`);
+        const percentage = Math.abs(strength) * 100;
+        
+        element
+            .removeClass('correlation-strong correlation-moderate correlation-weak')
+            .addClass(percentage > 70 ? 'correlation-strong' : percentage > 40 ? 'correlation-moderate' : 'correlation-weak')
+            .css('width', `${percentage}%`);
+    }
+
+    initializeCharts() {
+        this.createPnLTrendChart();
+        this.createVarianceChart();
+        this.createStoreComparisonChart();
+        this.createForecastChart();
+    }
+
+    createPnLTrendChart() {
+        const ctx = document.getElementById('pnlTrendChart').getContext('2d');
+        const data = this.currentData.trends;
+
+        this.charts.pnlTrend = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: data.months.map(m => moment(m).format('MMM YYYY')),
+                datasets: [
+                    {
+                        label: 'Actual Revenue',
+                        data: data.actual,
+                        borderColor: '#3730a3',
+                        backgroundColor: 'rgba(55, 48, 163, 0.1)',
+                        borderWidth: 3,
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 6,
+                        pointHoverRadius: 8,
+                        pointBackgroundColor: '#3730a3',
+                        pointBorderColor: '#ffffff',
+                        pointBorderWidth: 2
+                    },
+                    {
+                        label: 'Projected Revenue',
+                        data: data.projected,
+                        borderColor: '#10b981',
+                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                        borderWidth: 3,
+                        borderDash: [5, 5],
+                        fill: false,
+                        tension: 0.4,
+                        pointRadius: 4,
+                        pointHoverRadius: 6,
+                        pointBackgroundColor: '#10b981',
+                        pointBorderColor: '#ffffff',
+                        pointBorderWidth: 2
+                    },
+                    {
+                        label: 'Weather Factor',
+                        data: data.weather,
+                        borderColor: '#f59e0b',
+                        backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                        borderWidth: 2,
+                        fill: false,
+                        tension: 0.4,
+                        yAxisID: 'y1',
+                        hidden: true,
+                        pointRadius: 3,
+                        pointBackgroundColor: '#f59e0b'
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    mode: 'index',
+                    intersect: false,
+                },
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                        titleColor: '#ffffff',
+                        bodyColor: '#ffffff',
+                        borderColor: '#3730a3',
+                        borderWidth: 1,
+                        cornerRadius: 8,
+                        displayColors: true,
+                        callbacks: {
+                            title: function(context) {
+                                return `Period: ${context[0].label}`;
+                            },
+                            label: function(context) {
+                                const value = context.parsed.y;
+                                if (context.datasetIndex < 2) {
+                                    return `${context.dataset.label}: $${(value/1000).toFixed(1)}K`;
+                                } else {
+                                    return `${context.dataset.label}: ${value.toFixed(1)}`;
+                                }
+                            },
+                            afterBody: function(context) {
+                                const actual = context[0].parsed.y;
+                                const projected = context[1]?.parsed.y || actual;
+                                const variance = ((actual - projected) / projected * 100).toFixed(1);
+                                return [``, `Variance: ${variance > 0 ? '+' : ''}${variance}%`];
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: {
+                            display: true,
+                            color: 'rgba(0, 0, 0, 0.05)'
+                        },
+                        ticks: {
+                            color: '#6b7280',
+                            font: {
+                                weight: 500
+                            }
+                        }
+                    },
+                    y: {
+                        beginAtZero: false,
+                        grid: {
+                            color: 'rgba(0, 0, 0, 0.05)'
+                        },
+                        ticks: {
+                            color: '#6b7280',
+                            callback: function(value) {
+                                return '$' + (value / 1000).toFixed(0) + 'K';
+                            },
+                            font: {
+                                weight: 500
+                            }
+                        }
+                    },
+                    y1: {
+                        type: 'linear',
+                        display: false,
+                        position: 'right',
+                        min: 0,
+                        max: 100
+                    }
+                }
+            }
+        });
+    }
+
+    createVarianceChart() {
+        const ctx = document.getElementById('varianceChart').getContext('2d');
+        const data = this.currentData.trends;
+
+        const varianceData = data.actual.map((actual, index) => {
+            const projected = data.projected[index];
+            return ((actual - projected) / projected * 100);
+        });
+
+        this.charts.variance = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: data.months.map(m => moment(m).format('MMM')),
+                datasets: [{
+                    label: 'Variance %',
+                    data: varianceData,
+                    backgroundColor: varianceData.map(v => 
+                        v > 5 ? 'rgba(16, 185, 129, 0.8)' : 
+                        v < -5 ? 'rgba(239, 68, 68, 0.8)' : 
+                        'rgba(107, 114, 128, 0.8)'
+                    ),
+                    borderColor: varianceData.map(v => 
+                        v > 5 ? '#10b981' : 
+                        v < -5 ? '#ef4444' : 
+                        '#6b7280'
+                    ),
+                    borderWidth: 2,
+                    borderRadius: 6,
+                    borderSkipped: false
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                        callbacks: {
+                            label: function(context) {
+                                const value = context.parsed.y;
+                                return `Variance: ${value > 0 ? '+' : ''}${value.toFixed(1)}%`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: {
+                            display: false
+                        },
+                        ticks: {
+                            color: '#6b7280'
+                        }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        grid: {
+                            color: 'rgba(0, 0, 0, 0.05)'
+                        },
+                        ticks: {
+                            color: '#6b7280',
+                            callback: function(value) {
+                                return value.toFixed(0) + '%';
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    createStoreComparisonChart() {
+        const ctx = document.getElementById('storeComparisonChart').getContext('2d');
+        const stores = this.currentData.stores;
+
+        this.charts.storeComparison = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: stores.map(s => s.name),
+                datasets: [
+                    {
+                        label: 'Actual Revenue',
+                        data: stores.map(s => s.revenue),
+                        backgroundColor: 'rgba(55, 48, 163, 0.8)',
+                        borderColor: '#3730a3',
+                        borderWidth: 2,
+                        borderRadius: 8,
+                        borderSkipped: false
+                    },
+                    {
+                        label: 'Projected Revenue',
+                        data: stores.map(s => s.projected),
+                        backgroundColor: 'rgba(16, 185, 129, 0.8)',
+                        borderColor: '#10b981',
+                        borderWidth: 2,
+                        borderRadius: 8,
+                        borderSkipped: false
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                        labels: {
+                            usePointStyle: true,
+                            padding: 20,
+                            font: {
+                                weight: 600
+                            }
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                        callbacks: {
+                            title: function(context) {
+                                const store = stores[context[0].dataIndex];
+                                return `${store.name} (${store.code})`;
+                            },
+                            label: function(context) {
+                                const value = context.parsed.y;
+                                return `${context.dataset.label}: $${(value/1000).toFixed(1)}K`;
+                            },
+                            afterBody: function(context) {
+                                const store = stores[context[0].dataIndex];
+                                const variance = ((store.revenue - store.projected) / store.projected * 100).toFixed(1);
+                                return [``, `Variance: ${variance > 0 ? '+' : ''}${variance}%`];
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: {
+                            display: false
+                        },
+                        ticks: {
+                            color: '#6b7280',
+                            font: {
+                                weight: 500
+                            }
+                        }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        grid: {
+                            color: 'rgba(0, 0, 0, 0.05)'
+                        },
+                        ticks: {
+                            color: '#6b7280',
+                            callback: function(value) {
+                                return '$' + (value / 1000).toFixed(0) + 'K';
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    createForecastChart() {
+        const ctx = document.getElementById('forecastChart').getContext('2d');
+        
+        // Generate forecast data for next 6 months
+        const forecastMonths = [];
+        const current = moment();
+        
+        for (let i = 1; i <= 6; i++) {
+            forecastMonths.push(current.clone().add(i, 'months').format('YYYY-MM'));
+        }
+
+        const optimisticData = forecastMonths.map(m => 110000 + Math.random() * 25000);
+        const realisticData = forecastMonths.map(m => 100000 + Math.random() * 20000);
+        const conservativeData = forecastMonths.map(m => 90000 + Math.random() * 15000);
+
+        this.charts.forecast = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: forecastMonths.map(m => moment(m).format('MMM YYYY')),
+                datasets: [
+                    {
+                        label: 'Optimistic Forecast',
+                        data: optimisticData,
+                        borderColor: '#10b981',
+                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                        borderWidth: 3,
+                        fill: '+1',
+                        tension: 0.4,
+                        pointRadius: 5,
+                        pointBackgroundColor: '#10b981'
+                    },
+                    {
+                        label: 'Realistic Forecast',
+                        data: realisticData,
+                        borderColor: '#3730a3',
+                        backgroundColor: 'rgba(55, 48, 163, 0.1)',
+                        borderWidth: 3,
+                        fill: '+1',
+                        tension: 0.4,
+                        pointRadius: 5,
+                        pointBackgroundColor: '#3730a3'
+                    },
+                    {
+                        label: 'Conservative Forecast',
+                        data: conservativeData,
+                        borderColor: '#f59e0b',
+                        backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                        borderWidth: 3,
+                        fill: 'origin',
+                        tension: 0.4,
+                        pointRadius: 5,
+                        pointBackgroundColor: '#f59e0b'
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                        callbacks: {
+                            label: function(context) {
+                                const value = context.parsed.y;
+                                return `${context.dataset.label}: $${(value/1000).toFixed(1)}K`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: {
+                            color: 'rgba(0, 0, 0, 0.05)'
+                        },
+                        ticks: {
+                            color: '#6b7280'
+                        }
+                    },
+                    y: {
+                        beginAtZero: false,
+                        grid: {
+                            color: 'rgba(0, 0, 0, 0.05)'
+                        },
+                        ticks: {
+                            color: '#6b7280',
+                            callback: function(value) {
+                                return '$' + (value / 1000).toFixed(0) + 'K';
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    updateChartVisibility() {
+        // Update P&L trend chart datasets visibility
+        if (this.charts.pnlTrend) {
+            this.charts.pnlTrend.data.datasets.forEach((dataset, index) => {
+                const overlayMap = {
+                    0: 'actual',
+                    1: 'projected',
+                    2: 'weather'
+                };
+                const overlay = overlayMap[index];
+                if (overlay) {
+                    dataset.hidden = !this.activeOverlays.has(overlay);
+                }
+            });
+            this.charts.pnlTrend.update();
+        }
+
+        // Show/hide weather info panel
+        if (this.activeOverlays.has('weather')) {
+            $('#weatherInfo').fadeIn();
+            this.updateWeatherCorrelations();
+        } else {
+            $('#weatherInfo').fadeOut();
+        }
+
+        // Update forecast chart
+        if (this.charts.forecast) {
+            this.charts.forecast.data.datasets.forEach((dataset, index) => {
+                const forecastMap = {
+                    0: 'optimistic',
+                    1: 'realistic',
+                    2: 'conservative'
+                };
+                const forecast = forecastMap[index];
+                if (forecast) {
+                    dataset.hidden = !this.activeOverlays.has(forecast);
+                }
+            });
+            this.charts.forecast.update();
+        }
+    }
+
+    updateWeatherCorrelations() {
+        const correlations = this.currentData.correlations.weather;
+        
+        $('#tempCorrelation').text(`r = ${correlations.temperature.toFixed(2)}`);
+        $('#precipCorrelation').text(`r = ${correlations.precipitation.toFixed(2)}`);
+        $('#seasonalFactor').text(`${correlations.seasonal.toFixed(2)}`);
+        $('#overallWeatherCorr').text(correlations.overall);
+    }
+
+    async updateInsights() {
+        const insights = this.currentData.insights;
+        const container = $('#keyInsights');
+        
+        container.empty();
+        
+        insights.forEach((insight, index) => {
+            const impactClass = {
+                'high': 'border-danger',
+                'medium': 'border-warning', 
+                'low': 'border-info'
+            }[insight.impact];
+            
+            const insightHtml = `
+                <div class="insight-item p-3 mb-3 border-start border-4 ${impactClass}" 
+                     style="background: rgba(255, 255, 255, 0.9); border-radius: 0 8px 8px 0; animation-delay: ${index * 0.2}s;">
+                    <div class="d-flex align-items-start">
+                        <div class="me-3">
+                            <i class="${insight.icon}" style="color: #3730a3; font-size: 1.2rem;"></i>
+                        </div>
+                        <div class="flex-grow-1">
+                            <h6 class="mb-2 fw-bold text-dark">${insight.title}</h6>
+                            <p class="mb-2 text-muted small">${insight.description}</p>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span class="badge bg-light text-dark">${insight.impact.toUpperCase()} IMPACT</span>
+                                <button class="btn btn-sm btn-outline-primary" onclick="dashboard.showInsightDetail(${index})">
+                                    <i class="fas fa-eye me-1"></i>Details
+                                </button>
+                            </div>
+                            <div class="mt-2">
+                                <small class="text-primary"><i class="fas fa-lightbulb me-1"></i>${insight.recommendation}</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            container.append(insightHtml);
+        });
+
+        // Animate insights appearance
+        container.find('.insight-item').each(function(index) {
+            $(this).css({
+                opacity: 0,
+                transform: 'translateX(20px)'
+            }).delay(index * 200).animate({
+                opacity: 1
+            }, 500).css('transform', 'translateX(0px)');
+        });
+    }
+
+    async updateAnalysis() {
+        try {
+            // Show loading state
+            $('.kpi-card').addClass('data-loading');
+            
+            // Simulate API call with current filters
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            // Generate new data based on filters
+            this.currentData = this.generateMockPnLData();
+            
+            // Update all components
+            await this.updateKPIs();
+            await this.updateCharts();
+            await this.updateInsights();
+            
+            // Hide loading state
+            $('.kpi-card').removeClass('data-loading');
+            
+            // Show success toast
+            this.showToast('Analysis updated successfully!', 'success');
+            
+        } catch (error) {
+            console.error('Error updating analysis:', error);
+            this.showError('Failed to update analysis');
+            $('.kpi-card').removeClass('data-loading');
+        }
+    }
+
+    async updateCharts() {
+        // Update existing charts with new data
+        Object.values(this.charts).forEach(chart => {
+            if (chart && typeof chart.update === 'function') {
+                chart.update();
+            }
+        });
+    }
+
+    toggleStoreComparisonMode() {
+        const button = $('#toggleAbsoluteRelative');
+        const currentText = button.text().trim();
+        
+        if (currentText.includes('Relative')) {
+            button.html('<i class="fas fa-exchange-alt me-1"></i>Switch to Absolute');
+            // Switch to relative mode logic here
+        } else {
+            button.html('<i class="fas fa-exchange-alt me-1"></i>Switch to Relative');
+            // Switch to absolute mode logic here
+        }
+    }
+
+    showInsightDetail(index) {
+        const insight = this.currentData.insights[index];
+        
+        // Create detailed modal or expand insight
+        const modalHtml = `
+            <div class="modal fade" id="insightModal" tabindex="-1">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">
+                                <i class="${insight.icon} me-2"></i>
+                                ${insight.title}
+                            </h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="row">
+                                <div class="col-md-8">
+                                    <h6>Analysis Details</h6>
+                                    <p>${insight.description}</p>
+                                    <h6 class="mt-3">Recommended Action</h6>
+                                    <p class="text-primary">${insight.recommendation}</p>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="card">
+                                        <div class="card-body text-center">
+                                            <h6>Impact Level</h6>
+                                            <span class="badge bg-primary fs-6">${insight.impact.toUpperCase()}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                            <button type="button" class="btn btn-primary">Take Action</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // Remove existing modal and add new one
+        $('#insightModal').remove();
+        $('body').append(modalHtml);
+        $('#insightModal').modal('show');
+    }
+
+    showLoadingState() {
+        $('#kpiGrid .kpi-value').text('Loading...');
+        $('.kpi-change').text('Loading...');
+        $('.variance-indicator').removeClass('variance-positive variance-negative').addClass('variance-neutral').text('Loading...');
+    }
+
+    showToast(message, type = 'success') {
+        const toast = $(`#${type}Toast`);
+        toast.find('.toast-body span').text(message);
+        
+        const bsToast = new bootstrap.Toast(toast[0]);
+        bsToast.show();
+    }
+
+    showError(message) {
+        this.showToast(message, 'error');
+    }
+}
+
+// Initialize dashboard when page loads
+$(document).ready(function() {
+    window.dashboard = new PnLAnalyticsDashboard();
+});
+</script>
+{% endblock %}

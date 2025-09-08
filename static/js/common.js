@@ -250,7 +250,7 @@ function applyFilterToTable(table) {
             let showRow = true;
 
             const contractCell = row.querySelector('td:nth-child(1)');
-            const commonNameCell = row.querySelector('td:nth-child(2)') || row.querySelector('td:nth-child(1)');
+            const commonNameCell = row.querySelector('td:nth-child(2), td:nth-child(1)');
             const contractValue = contractCell ? contractCell.textContent.toLowerCase() : '';
             const commonNameValue = commonNameCell ? commonNameCell.textContent.toLowerCase() : '';
 
@@ -270,7 +270,7 @@ function applyFilterToTable(table) {
                     childRows.forEach(childRow => {
                         let showChildRow = true;
                         const childContractCell = childRow.querySelector('td:nth-child(1)');
-                        const childCommonNameCell = childRow.querySelector('td:nth-child(2)') || childRow.querySelector('td:nth-child(1)');
+                        const childCommonNameCell = childRow.querySelector('td:nth-child(2), td:nth-child(1)');
                         const childContractValue = childContractCell ? childContractCell.textContent.toLowerCase() : '';
                         const childCommonNameValue = childCommonNameCell ? childCommonNameCell.textContent.toLowerCase() : '';
 
@@ -332,7 +332,8 @@ function applyFilterToTable(table) {
             }
         });
     }
-
+    
+    // Update row count after DOM operations
     let rowCountDiv = table.nextElementSibling;
     while (rowCountDiv && !rowCountDiv.classList.contains('row-count') && !rowCountDiv.classList.contains('pagination-controls')) {
         rowCountDiv = rowCountDiv.nextElementSibling;
@@ -554,40 +555,69 @@ function applyFilterToAllLevelsTabs2And4() {
 }
 
 /**
- * Apply global filter function for Tabs 1, 2, 4, 5
+ * Apply global filter function for Tabs 1, 2, 4, 5 - PERFORMANCE OPTIMIZED
  * Used by: Tabs 1, 2, 4, 5
  * Dependency: sessionStorage, applyFilterToAllLevelsTabs2And4 or tab-specific filtering
  */
+let filterTimeout;
 window.applyGlobalFilter = function() {
-    // Skip global filter for Tab 3 and non-tab pages (e.g., /categories)
-    const tabNum = getCachedTabNum();
-    if (tabNum === 3 || !window.location.pathname.match(/\/tab\/\d+/)) {
-        console.log('Skipping global filter application for Tab 3 or non-tab page');
-        return;
-    }
+    // Debounce filter application to prevent excessive calls
+    clearTimeout(filterTimeout);
+    filterTimeout = setTimeout(() => {
+        // Skip global filter for Tab 3 and non-tab pages (e.g., /categories)
+        const tabNum = getCachedTabNum();
+        if (tabNum === 3 || !window.location.pathname.match(/\/tab\/\d+/)) {
+            console.log('Skipping global filter application for Tab 3 or non-tab page');
+            return;
+        }
+    
+        performGlobalFilter(tabNum);
+    }, 150); // Debounce delay
+};
+
+// Separate the actual filter logic to allow for debouncing
+function performGlobalFilter(tabNum) {
 
     const commonNameInput = document.getElementById('commonNameFilter');
     const contractNumberInput = document.getElementById('contractNumberFilter');
     const commonName = commonNameInput ? commonNameInput.value.toLowerCase().trim() : '';
     const contractNumber = contractNumberInput ? contractNumberInput.value.toLowerCase().trim() : '';
 
-    window.globalFilter = {
+    // Only update if values have actually changed
+    const newFilter = {
         commonName: commonName,
         contractNumber: contractNumber
     };
+    
+    if (JSON.stringify(window.globalFilter) === JSON.stringify(newFilter)) {
+        return; // No change, skip update
+    }
+    
+    window.globalFilter = newFilter;
 
     // Save filter state to sessionStorage
     sessionStorage.setItem('globalFilter', JSON.stringify(window.globalFilter));
 
-    // Apply filter based on the current tab
-    if (tabNum === 1 && typeof applyFilterToAllLevelsTab1 === 'function') {
-        applyFilterToAllLevelsTab1();
-    } else if (tabNum === 2 || tabNum === 4) {
-        applyFilterToAllLevelsTabs2And4();
-    } else if (tabNum === 5 && typeof applyFilterToAllLevelsTab5 === 'function') {
-        applyFilterToAllLevelsTab5();
+    // Apply filter based on the current tab with performance monitoring
+    const startTime = performance.now();
+    
+    try {
+        if (tabNum === 1 && typeof applyFilterToAllLevelsTab1 === 'function') {
+            applyFilterToAllLevelsTab1();
+        } else if (tabNum === 2 || tabNum === 4) {
+            applyFilterToAllLevelsTabs2And4();
+        } else if (tabNum === 5 && typeof applyFilterToAllLevelsTab5 === 'function') {
+            applyFilterToAllLevelsTab5();
+        }
+    } catch (error) {
+        console.error('Error applying global filter:', error);
     }
-};
+    
+    const endTime = performance.now();
+    if (endTime - startTime > 100) {
+        console.warn(`Filter application took ${endTime - startTime}ms - consider optimizing`);
+    }
+}
 
 /**
  * Clear global filter function for Tabs 1, 2, 4, 5
@@ -1327,3 +1357,61 @@ window.printFullItemList = async function printFullItemList(category, subcategor
     printWindow.document.write(printContent);
     printWindow.document.close();
 }
+// CRITICAL FIX: Force fixed navbar positioning
+function forceNavbarFixed() {
+    const navbar = document.querySelector('.navbar');
+    if (navbar) {
+        // Force fixed positioning
+        navbar.style.position = 'fixed';
+        navbar.style.top = '0';
+        navbar.style.left = '0';
+        navbar.style.right = '0';
+        navbar.style.width = '100%';
+        navbar.style.zIndex = '1030';
+        console.log('Navbar fixed positioning enforced via JavaScript');
+    }
+}
+
+// CRITICAL: Bootstrap dropdown reinitialization after content loads
+function reinitializeBootstrapDropdowns() {
+    if (typeof bootstrap !== 'undefined') {
+        const dropdownElements = document.querySelectorAll('.dropdown-toggle');
+        dropdownElements.forEach(element => {
+            // Only initialize if not already initialized
+            if (!bootstrap.Dropdown.getInstance(element)) {
+                try {
+                    new bootstrap.Dropdown(element, {
+                        autoClose: true,
+                        boundary: 'viewport'
+                    });
+                } catch (error) {
+                    console.warn('Error initializing dropdown:', error);
+                }
+            }
+        });
+        console.log('Bootstrap dropdowns reinitialized:', dropdownElements.length);
+    }
+}
+
+// Auto-run the navbar fix when this script loads
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function() {
+        forceNavbarFixed();
+        setTimeout(forceNavbarFixed, 100);
+        setTimeout(forceNavbarFixed, 500);
+        
+        // Reinitialize dropdowns after DOM is loaded
+        setTimeout(reinitializeBootstrapDropdowns, 1000);
+    });
+} else {
+    // Document already loaded
+    forceNavbarFixed();
+    setTimeout(forceNavbarFixed, 100);
+    setTimeout(forceNavbarFixed, 500);
+    
+    // Reinitialize dropdowns immediately
+    setTimeout(reinitializeBootstrapDropdowns, 100);
+}
+
+// Expose the function globally for use by other scripts
+window.reinitializeBootstrapDropdowns = reinitializeBootstrapDropdowns;

@@ -1,0 +1,376 @@
+{
+  "analysis_date": "2025-09-01T16:55:21.770790",
+  "data_summary": {
+    "total_records": 84,
+    "date_range": "2024-01-07 to 2025-08-10",
+    "weeks_analyzed": 84
+  },
+  "strong_correlations": [
+    {
+      "var1": "total_weekly_revenue",
+      "var2": "revenue_8101",
+      "correlation": 0.917
+    },
+    {
+      "var1": "total_weekly_revenue",
+      "var2": "revenue_728",
+      "correlation": 0.91
+    },
+    {
+      "var1": "new_contracts_3607",
+      "var2": "new_contracts_728",
+      "correlation": 0.9
+    },
+    {
+      "var1": "new_contracts_3607",
+      "var2": "new_contracts_6800",
+      "correlation": 0.888
+    },
+    {
+      "var1": "new_contracts_6800",
+      "var2": "new_contracts_728",
+      "correlation": 0.881
+    },
+    {
+      "var1": "reservation_next14_6800",
+      "var2": "total_reservation_6800",
+      "correlation": 0.864
+    },
+    {
+      "var1": "new_contracts_8101",
+      "var2": "total_reservation_8101",
+      "correlation": 0.847
+    },
+    {
+      "var1": "total_reservation_728",
+      "var2": "total_reservation_8101",
+      "correlation": 0.828
+    },
+    {
+      "var1": "revenue_6800",
+      "var2": "new_contracts_6800",
+      "correlation": 0.826
+    },
+    {
+      "var1": "total_weekly_revenue",
+      "var2": "new_contracts_6800",
+      "correlation": 0.82
+    }
+  ],
+  "store_analysis": {
+    "3607": {
+      "avg_revenue": 14693.49,
+      "std_revenue": 7639.81,
+      "cv_revenue": 0.52,
+      "avg_contracts": 121.1,
+      "revenue_per_contract": 121.35,
+      "data_points": 84
+    },
+    "6800": {
+      "avg_revenue": 26215.87,
+      "std_revenue": 12560.37,
+      "cv_revenue": 0.479,
+      "avg_contracts": 111.8,
+      "revenue_per_contract": 234.47,
+      "data_points": 84
+    },
+    "728": {
+      "avg_revenue": 11986.11,
+      "std_revenue": 8114.66,
+      "cv_revenue": 0.677,
+      "avg_contracts": 80.5,
+      "revenue_per_contract": 148.94,
+      "data_points": 84
+    },
+    "8101": {
+      "avg_revenue": 26845.34,
+      "std_revenue": 26914.06,
+      "cv_revenue": 1.003,
+      "avg_contracts": 63.0,
+      "revenue_per_contract": 426.04,
+      "data_points": 84
+    }
+  },
+  "store_rankings": {
+    "revenue_ranking": [
+      [
+        "8101",
+        {
+          "avg_revenue": 26845.34,
+          "std_revenue": 26914.06,
+          "cv_revenue": 1.003,
+          "avg_contracts": 63.0,
+          "revenue_per_contract": 426.04,
+          "data_points": 84
+        }
+      ],
+      [
+        "6800",
+        {
+          "avg_revenue": 26215.87,
+          "std_revenue": 12560.37,
+          "cv_revenue": 0.479,
+          "avg_contracts": 111.8,
+          "revenue_per_contract": 234.47,
+          "data_points": 84
+        }
+      ],
+      [
+        "3607",
+        {
+          "avg_revenue": 14693.49,
+          "std_revenue": 7639.81,
+          "cv_revenue": 0.52,
+          "avg_contracts": 121.1,
+          "revenue_per_contract": 121.35,
+          "data_points": 84
+        }
+      ],
+      [
+        "728",
+        {
+          "avg_revenue": 11986.11,
+          "std_revenue": 8114.66,
+          "cv_revenue": 0.677,
+          "avg_contracts": 80.5,
+          "revenue_per_contract": 148.94,
+          "data_points": 84
+        }
+      ]
+    ],
+    "stability_ranking": [
+      [
+        "6800",
+        {
+          "avg_revenue": 26215.87,
+          "std_revenue": 12560.37,
+          "cv_revenue": 0.479,
+          "avg_contracts": 111.8,
+          "revenue_per_contract": 234.47,
+          "data_points": 84
+        }
+      ],
+      [
+        "3607",
+        {
+          "avg_revenue": 14693.49,
+          "std_revenue": 7639.81,
+          "cv_revenue": 0.52,
+          "avg_contracts": 121.1,
+          "revenue_per_contract": 121.35,
+          "data_points": 84
+        }
+      ],
+      [
+        "728",
+        {
+          "avg_revenue": 11986.11,
+          "std_revenue": 8114.66,
+          "cv_revenue": 0.677,
+          "avg_contracts": 80.5,
+          "revenue_per_contract": 148.94,
+          "data_points": 84
+        }
+      ],
+      [
+        "8101",
+        {
+          "avg_revenue": 26845.34,
+          "std_revenue": 26914.06,
+          "cv_revenue": 1.003,
+          "avg_contracts": 63.0,
+          "revenue_per_contract": 426.04,
+          "data_points": 84
+        }
+      ]
+    ],
+    "efficiency_ranking": [
+      [
+        "8101",
+        {
+          "avg_revenue": 26845.34,
+          "std_revenue": 26914.06,
+          "cv_revenue": 1.003,
+          "avg_contracts": 63.0,
+          "revenue_per_contract": 426.04,
+          "data_points": 84
+        }
+      ],
+      [
+        "6800",
+        {
+          "avg_revenue": 26215.87,
+          "std_revenue": 12560.37,
+          "cv_revenue": 0.479,
+          "avg_contracts": 111.8,
+          "revenue_per_contract": 234.47,
+          "data_points": 84
+        }
+      ],
+      [
+        "728",
+        {
+          "avg_revenue": 11986.11,
+          "std_revenue": 8114.66,
+          "cv_revenue": 0.677,
+          "avg_contracts": 80.5,
+          "revenue_per_contract": 148.94,
+          "data_points": 84
+        }
+      ],
+      [
+        "3607",
+        {
+          "avg_revenue": 14693.49,
+          "std_revenue": 7639.81,
+          "cv_revenue": 0.52,
+          "avg_contracts": 121.1,
+          "revenue_per_contract": 121.35,
+          "data_points": 84
+        }
+      ]
+    ]
+  },
+  "predictive_analysis": {
+    "3607": {
+      "current_week_correlation": 0.185,
+      "1_week_lag_correlation": 0.197,
+      "2_week_lag_correlation": 0.102,
+      "total_reservation_correlation": 0.365,
+      "sample_size": 82,
+      "r2_score": 0.133,
+      "predictive_power": "Weak"
+    },
+    "6800": {
+      "current_week_correlation": 0.47,
+      "1_week_lag_correlation": 0.548,
+      "2_week_lag_correlation": 0.48,
+      "total_reservation_correlation": 0.598,
+      "sample_size": 82,
+      "r2_score": 0.362,
+      "predictive_power": "Moderate"
+    },
+    "8101": {
+      "current_week_correlation": 0.362,
+      "1_week_lag_correlation": 0.485,
+      "2_week_lag_correlation": 0.63,
+      "total_reservation_correlation": 0.385,
+      "sample_size": 82,
+      "r2_score": 0.294,
+      "predictive_power": "Weak"
+    }
+  },
+  "financial_health": {
+    "ar_revenue_correlation": -0.417,
+    "discount_revenue_correlation": 0.518,
+    "avg_ar_over_45_days": 15.1,
+    "median_ar_over_45_days": 10.0,
+    "ar_volatility": 13.0,
+    "critical_ar_threshold": 18.0,
+    "discount_as_pct_revenue": 0.47,
+    "alert_thresholds": {
+      "ar_critical": 0.31000000000000005,
+      "ar_warning": 0.18,
+      "discount_critical": 621.8000000000001,
+      "revenue_critical_low": 22703.8
+    }
+  },
+  "operational_efficiency": {
+    "contract_revenue_correlation": 0.633,
+    "delivery_revenue_correlation": 0.646,
+    "quote_contract_correlation": 0.4,
+    "avg_contracts_per_week": 73.0,
+    "avg_deliveries_per_week": 9.6,
+    "avg_open_quotes": 129.7,
+    "revenue_per_contract": 351.14,
+    "delivery_fulfillment_ratio": 0.13
+  },
+  "executive_alerts": {
+    "critical_metrics": [
+      {
+        "metric": "AR Over 45 Days",
+        "critical_threshold": "31.0%",
+        "warning_threshold": "18.0%",
+        "current_avg": "15.1%",
+        "alert_type": "financial_health"
+      }
+    ],
+    "leading_indicators": [
+      {
+        "metric": "14-Day Reservation Pipeline",
+        "description": "Strong predictor of revenue 1-2 weeks ahead",
+        "monitoring_frequency": "Weekly",
+        "alert_type": "predictive"
+      }
+    ],
+    "performance_triggers": [
+      {
+        "metric": "Contract to Revenue Conversion",
+        "optimal_range": "Correlation > 0.7",
+        "current_value": 0.633,
+        "alert_type": "operational"
+      },
+      {
+        "metric": "Weekly Revenue Volatility",
+        "critical_threshold": "64.8% change",
+        "normal_range": "\u00b132.4%",
+        "alert_type": "revenue"
+      }
+    ]
+  },
+  "executive_summary": {
+    "key_findings": [
+      "Store 8101 is the revenue leader with $26,845 weekly average",
+      "Store 6800 reservations show Moderate predictive power (R\u00b2=0.362)",
+      "AR over 45 days averages 15.1% with high volatility (\u00b113.0%)"
+    ],
+    "actionable_insights": [
+      "Implement weekly monitoring of 14-day reservation pipeline as revenue predictor",
+      "Set AR aging alerts at 75th percentile for early intervention",
+      "Focus on improving contract-to-revenue conversion in underperforming stores",
+      "Monitor quote-to-contract conversion as leading indicator"
+    ],
+    "dashboard_recommendations": [
+      {
+        "widget": "Store Performance Scorecard",
+        "metrics": [
+          "Weekly Revenue",
+          "Contract Volume",
+          "Revenue/Contract"
+        ],
+        "update_frequency": "Weekly",
+        "visualization": "Comparative bar charts with trend lines"
+      },
+      {
+        "widget": "Revenue Predictor",
+        "metrics": [
+          "14-Day Reservations",
+          "Predicted Revenue",
+          "Confidence Interval"
+        ],
+        "update_frequency": "Daily",
+        "visualization": "Time series with forecast bands"
+      },
+      {
+        "widget": "Financial Health Monitor",
+        "metrics": [
+          "AR Aging %",
+          "Discount Rate",
+          "Cash Position"
+        ],
+        "update_frequency": "Daily",
+        "visualization": "Gauge charts with alert zones"
+      },
+      {
+        "widget": "Executive Alert Panel",
+        "metrics": [
+          "Critical Thresholds",
+          "Anomaly Detection",
+          "Action Items"
+        ],
+        "update_frequency": "Real-time",
+        "visualization": "Alert cards with severity indicators"
+      }
+    ]
+  }
+}
