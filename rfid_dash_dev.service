@@ -7,7 +7,7 @@ User=tim
 Group=www-data
 WorkingDirectory=/home/tim/RFID3
 Environment="PATH=/home/tim/RFID3/venv/bin:/usr/bin"
-Environment="APP_IP=192.168.3.110"
+Environment="APP_IP=100.103.67.41"
 ExecStart=/home/tim/RFID3/venv/bin/gunicorn --workers 1 --threads 4 --timeout 600 --bind 0.0.0.0:6801 --error-logfile /home/tim/RFID3/logs/gunicorn_error.log --access-logfile /home/tim/RFID3/logs/gunicorn_access.log run:app
 ExecStop=/bin/kill -s KILL $MAINPID
 Restart=always
