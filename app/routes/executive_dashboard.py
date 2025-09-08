@@ -50,6 +50,11 @@ def executive_dashboard():
         # Get recent financial alerts
         alerts = insights_service.get_financial_alerts()
         
+        # Get dashboard display configuration
+        dashboard_config = {
+            'current_week_view_enabled': config.current_week_view_enabled
+        }
+        
         return render_template(
             "executive_dashboard.html",
             dashboard_data=dashboard_data,
@@ -57,6 +62,7 @@ def executive_dashboard():
             store_performance=store_performance,
             kpis=kpis,
             alerts=alerts,
+            dashboard_config=dashboard_config,
             company_info={
                 "name": "KVC Companies",
                 "brands": ["A1 Rent It", "Broadway Tent & Event"],
@@ -625,6 +631,7 @@ def _get_dashboard_config():
                 self.total_equipment_items = defaults['rfid_coverage']['total_equipment_items']
                 self.min_health_score = 0.0
                 self.max_health_score = 100.0
+                self.current_week_view_enabled = defaults['display']['current_week_view_enabled']
                 
             def get_store_threshold(self, store_code: str, threshold_type: str):
                 return getattr(self, threshold_type, 75.0)
@@ -652,6 +659,7 @@ def _get_dashboard_config():
                 self.default_forecast_horizon_weeks = 12
                 self.default_confidence_level = 0.95
                 self.default_analysis_period_weeks = 26
+                self.current_week_view_enabled = True
                 self.rfid_coverage_percentage = 1.78
                 self.rfid_correlated_items = 290
                 self.total_equipment_items = 16259

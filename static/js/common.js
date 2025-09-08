@@ -1372,24 +1372,38 @@ function forceNavbarFixed() {
     }
 }
 
-// CRITICAL: Bootstrap dropdown reinitialization after content loads
+// CRITICAL: Bootstrap dropdown reinitialization after content loads - FIXED VERSION
 function reinitializeBootstrapDropdowns() {
+    // Skip reinitialization on tabs 6 and 7 to prevent Chart.js conflicts
+    const currentPath = window.location.pathname;
+    if (currentPath.includes('/tab/6') || currentPath.includes('/tab/7')) {
+        console.log('Skipping dropdown reinit on tab 6/7 to prevent Chart.js conflicts');
+        return;
+    }
+    
     if (typeof bootstrap !== 'undefined') {
         const dropdownElements = document.querySelectorAll('.dropdown-toggle');
-        dropdownElements.forEach(element => {
-            // Only initialize if not already initialized
-            if (!bootstrap.Dropdown.getInstance(element)) {
-                try {
-                    new bootstrap.Dropdown(element, {
-                        autoClose: true,
-                        boundary: 'viewport'
-                    });
-                } catch (error) {
-                    console.warn('Error initializing dropdown:', error);
-                }
+        const uninitializedElements = Array.from(dropdownElements).filter(element => 
+            !bootstrap.Dropdown.getInstance(element)
+        );
+        
+        if (uninitializedElements.length === 0) {
+            // No need to reinitialize if all dropdowns are already initialized
+            return;
+        }
+        
+        uninitializedElements.forEach(element => {
+            try {
+                new bootstrap.Dropdown(element, {
+                    autoClose: true,
+                    boundary: 'viewport'
+                });
+            } catch (error) {
+                console.warn('Error initializing dropdown:', error);
             }
         });
-        console.log('Bootstrap dropdowns reinitialized:', dropdownElements.length);
+        
+        console.log(`Bootstrap dropdowns reinitialized: ${uninitializedElements.length} new dropdowns`);
     }
 }
 
@@ -1398,18 +1412,16 @@ if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', function() {
         forceNavbarFixed();
         setTimeout(forceNavbarFixed, 100);
-        setTimeout(forceNavbarFixed, 500);
         
-        // Reinitialize dropdowns after DOM is loaded
-        setTimeout(reinitializeBootstrapDropdowns, 1000);
+        // Single dropdown initialization - no excessive timeouts
+        setTimeout(reinitializeBootstrapDropdowns, 500);
     });
 } else {
     // Document already loaded
     forceNavbarFixed();
     setTimeout(forceNavbarFixed, 100);
-    setTimeout(forceNavbarFixed, 500);
     
-    // Reinitialize dropdowns immediately
+    // Single dropdown initialization - no excessive timeouts
     setTimeout(reinitializeBootstrapDropdowns, 100);
 }
 

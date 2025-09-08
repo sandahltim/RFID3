@@ -624,6 +624,9 @@ def executive_dashboard_configuration():
                         'growth_alerts': exec_config.enable_growth_alerts,
                         'frequency': exec_config.alert_frequency
                     },
+                    'display_settings': {
+                        'current_week_view_enabled': exec_config.current_week_view_enabled
+                    },
                     'metadata': {
                         'config_name': exec_config.config_name,
                         'created_at': exec_config.created_at.isoformat() if exec_config.created_at else None,
@@ -707,6 +710,10 @@ def executive_dashboard_configuration():
                 exec_config.enable_trend_alerts = alerts.get('trend_alerts', True)
                 exec_config.enable_growth_alerts = alerts.get('growth_alerts', True)
                 exec_config.alert_frequency = alerts.get('frequency', 'weekly')
+            
+            if 'display_settings' in data:
+                display = data['display_settings']
+                exec_config.current_week_view_enabled = display.get('current_week_view_enabled', True)
             
             if 'store_overrides' in data:
                 # Validate store override format

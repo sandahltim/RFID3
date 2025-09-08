@@ -684,6 +684,7 @@ class ExecutiveDashboardConfiguration(db.Model):
     enable_trend_alerts = db.Column(db.Boolean, default=True) 
     enable_growth_alerts = db.Column(db.Boolean, default=True)
     alert_frequency = db.Column(db.String(20), default='weekly')                # daily, weekly, monthly
+    current_week_view_enabled = db.Column(db.Boolean, default=True)             # Show current week column in scorecard
     
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -1016,6 +1017,9 @@ def get_default_executive_dashboard_config():
             'enable_trend_alerts': True,
             'enable_growth_alerts': True,
             'frequency': 'weekly'
+        },
+        'display': {
+            'current_week_view_enabled': True               # Show current week column in scorecard
         }
     }
 

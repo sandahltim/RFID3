@@ -4,11 +4,13 @@
  * Version: 2025-08-29
  */
 
-console.log('🔥 CONFIGURATION.JS FILE LOADED');
-console.log('🔥 Script timestamp:', new Date().toISOString());
-console.log('🔥 Document ready state at load:', document.readyState);
+alert('EMERGENCY: JavaScript file is loading! If you see this alert, the file loads.');
+console.log('🔥🔥🔥 CONFIGURATION.JS FILE LOADED - TIMESTAMP: 2025-09-07-17:57:00 🔥🔥🔥');
+console.log('🔥🔥🔥 Script loaded at:', new Date().toISOString());
+console.log('🔥🔥🔥 Document ready state:', document.readyState);
+console.log('🔥🔥🔥 THIS IS THE TOP OF THE FILE - IF YOU SEE THIS, THE FILE IS LOADING 🔥🔥🔥');
 
-console.log('🔥 About to define ConfigurationManager class');
+console.log('🔥🔥🔥 About to define ConfigurationManager class 🔥🔥🔥');
 
 // EMERGENCY TAB FIX - Direct DOM manipulation
 document.addEventListener('DOMContentLoaded', () => {

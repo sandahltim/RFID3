@@ -4,21 +4,157 @@
  * Version: 2025-08-29
  */
 
+
 class ConfigurationManager {
     constructor() {
-        this.currentConfig = {};
-        this.unsavedChanges = false;
-        this.validationRules = this.initValidationRules();
-        this.init();
+        try {
+            console.log('ConfigurationManager constructor starting...');
+            this.currentConfig = {};
+            console.log('Set currentConfig');
+            
+            this.unsavedChanges = false;
+            console.log('Set unsavedChanges');
+            
+            console.log('Calling initValidationRules...');
+            this.validationRules = this.initValidationRules();
+            console.log('initValidationRules completed');
+            
+            console.log('Calling init...');
+            this.init();
+            console.log('init completed');
+        } catch (error) {
+            console.error('FATAL ERROR in constructor:', error);
+        }
     }
 
     init() {
-        console.log('Initializing Configuration Manager...');
-        this.setupEventListeners();
-        this.loadConfigurations();
-        this.initializeSliders();
-        this.setupFormValidation();
-        this.setupAutoSave();
+        try {
+            console.log('Initializing Configuration Manager...');
+            
+            try {
+                console.log('Checking Bootstrap...');
+                console.log('Bootstrap available:', typeof bootstrap !== 'undefined');
+            } catch (e) {
+                console.error('Error checking Bootstrap:', e);
+            }
+            
+            try {
+                console.log('Checking tab elements...');
+                const tabElements = document.querySelectorAll('[data-bs-toggle="pill"]');
+                console.log('Tab elements found:', tabElements.length);
+            } catch (e) {
+                console.error('Error finding tab elements:', e);
+            }
+            
+            console.log('Step 1: initializeBootstrapTabs');
+            this.initializeBootstrapTabs();
+            
+            console.log('Step 2: setupEventListeners');
+            this.setupEventListeners();
+            
+            console.log('Step 3: loadConfigurations');
+            this.loadConfigurations();
+            
+            console.log('Step 4: initializeSliders');
+            this.initializeSliders();
+            
+            console.log('Step 5: setupFormValidation');
+            this.setupFormValidation();
+            
+            console.log('Step 6: setupAutoSave');
+            this.setupAutoSave();
+            
+            console.log('Configuration Manager initialization complete');
+        } catch (error) {
+            console.error('Error during Configuration Manager initialization:', error);
+        }
+    }
+
+    initializeBootstrapTabs() {
+        try {
+            console.log('Starting Bootstrap tabs initialization...');
+            // Initialize Bootstrap 5 tab functionality with retry logic
+            const attemptBootstrapInit = (attempt = 1) => {
+                try {
+                    console.log(`Bootstrap init attempt ${attempt}`);
+                    if (typeof bootstrap !== 'undefined') {
+                        const tabElements = document.querySelectorAll('[data-bs-toggle="pill"]');
+                        console.log('Found tab elements for Bootstrap init:', tabElements.length);
+                        tabElements.forEach(tabElement => {
+                            try {
+                                new bootstrap.Tab(tabElement);
+                            } catch (e) {
+                                console.warn('Error initializing tab:', tabElement.id, e);
+                            }
+                        });
+                        console.log('Bootstrap tabs initialized:', tabElements.length);
+                        return true;
+                    } else if (attempt < 5) {
+                        console.warn(`Bootstrap not loaded yet, retrying... (attempt ${attempt}/5)`);
+                        setTimeout(() => attemptBootstrapInit(attempt + 1), 200);
+                        return false;
+                    } else {
+                        console.error('Bootstrap failed to load after 5 attempts, using fallback tab functionality');
+                        this.initializeFallbackTabs();
+                        return false;
+                    }
+                } catch (error) {
+                    console.error('Error in attemptBootstrapInit:', error);
+                    this.initializeFallbackTabs();
+                    return false;
+                }
+            };
+            
+            attemptBootstrapInit();
+        } catch (error) {
+            console.error('Error in initializeBootstrapTabs:', error);
+            this.initializeFallbackTabs();
+        }
+    }
+
+    initializeFallbackTabs() {
+        // Fallback tab functionality if Bootstrap fails
+        const tabElements = document.querySelectorAll('[data-bs-toggle="pill"]');
+        const tabPanels = document.querySelectorAll('.tab-pane');
+        
+        tabElements.forEach(tabElement => {
+            tabElement.addEventListener('click', (event) => {
+                event.preventDefault();
+                this.switchToTab(tabElement);
+            });
+        });
+        
+        console.log('Fallback tabs initialized:', tabElements.length);
+    }
+
+    switchToTab(clickedTab) {
+        console.log('Switching to tab:', clickedTab.id);
+        
+        // Remove active class from all tabs and panels
+        const tabElements = document.querySelectorAll('[data-bs-toggle="pill"]');
+        const tabPanels = document.querySelectorAll('.tab-pane');
+        
+        tabElements.forEach(tab => tab.classList.remove('active'));
+        tabPanels.forEach(panel => panel.classList.remove('active', 'show'));
+        
+        // Add active class to clicked tab
+        clickedTab.classList.add('active');
+        
+        // Show corresponding panel
+        const targetId = clickedTab.getAttribute('data-bs-target');
+        console.log('Target panel ID:', targetId);
+        
+        if (targetId) {
+            const targetPanel = document.querySelector(targetId);
+            if (targetPanel) {
+                targetPanel.classList.add('active', 'show');
+                console.log('Panel activated:', targetPanel.id);
+            } else {
+                console.error('Target panel not found:', targetId);
+            }
+        }
+        
+        this.onTabChange(clickedTab);
     }
 
     initValidationRules() {
@@ -44,10 +180,32 @@ class ConfigurationManager {
     }
 
     setupEventListeners() {
-        // Tab navigation
-        document.querySelectorAll('[data-bs-toggle="pill"]').forEach(tab => {
+        // Tab navigation - handle both click and shown events
+        const tabElements = document.querySelectorAll('[data-bs-toggle="pill"]');
+        console.log('Setting up event listeners for', tabElements.length, 'tabs');
+        
+        tabElements.forEach((tab, index) => {
+            console.log(`Setting up tab ${index}: ${tab.id}`);
+            
+            // Handle click events for immediate response
+            tab.addEventListener('click', (event) => {
+                console.log('Tab clicked:', event.target.id, event.target);
+                event.preventDefault();
+                event.stopPropagation();
+                
+                // Manual tab switching
+                this.switchToTab(event.target);
+            });
+            
+            // Handle shown events for Bootstrap completion
             tab.addEventListener('shown.bs.tab', (event) => {
+                console.log('Tab shown:', event.target.id);
                 this.onTabChange(event.target);
+            });
+            
+            // Add mousedown for debugging
+            tab.addEventListener('mousedown', (event) => {
+                console.log('Tab mousedown:', event.target.id);
             });
         });
 
@@ -77,6 +235,16 @@ class ConfigurationManager {
             this.saveUserPreferences();
         });
 
+        document.getElementById('executive-dashboard-form')?.addEventListener('submit', (e) => {
+            e.preventDefault();
+            this.saveExecutiveDashboardConfiguration();
+        });
+
+        document.getElementById('labor-cost-form')?.addEventListener('submit', (e) => {
+            e.preventDefault();
+            this.saveLaborCostConfiguration();
+        });
+
         // Reset buttons
         document.getElementById('reset-prediction')?.addEventListener('click', () => {
             this.resetConfiguration('prediction');
@@ -96,6 +264,14 @@ class ConfigurationManager {
 
         document.getElementById('reset-preferences')?.addEventListener('click', () => {
             this.resetConfiguration('preferences');
+        });
+
+        document.getElementById('reset-executive-dashboard')?.addEventListener('click', () => {
+            this.resetConfiguration('executive-dashboard');
+        });
+
+        document.getElementById('reset-labor-cost')?.addEventListener('click', () => {
+            this.resetConfiguration('labor-cost');
         });
 
         // Change detection for unsaved changes warning
@@ -318,6 +494,8 @@ class ConfigurationManager {
         this.loadBusinessIntelligenceConfiguration();
         this.loadDataIntegrationConfiguration();
         this.loadUserPreferences();
+        this.loadExecutiveDashboardConfiguration();
+        this.loadLaborCostConfiguration();
         
         // Check for draft data
         this.checkForDraftData();
@@ -1115,6 +1293,12 @@ class ConfigurationManager {
                     case 'preferences':
                         await this.loadUserPreferences();
                         break;
+                    case 'executive-dashboard':
+                        await this.loadExecutiveDashboardConfiguration();
+                        break;
+                    case 'labor-cost':
+                        await this.loadLaborCostConfiguration();
+                        break;
                 }
                 this.unsavedChanges = false;
                 this.updateSaveButtonStates();
@@ -1158,6 +1342,12 @@ class ConfigurationManager {
                 case '#preferences-panel':
                     this.saveUserPreferences();
                     break;
+                case '#executive-dashboard-panel':
+                    this.saveExecutiveDashboardConfiguration();
+                    break;
+                case '#labor-cost-panel':
+                    this.saveLaborCostConfiguration();
+                    break;
             }
         }
     }
@@ -1168,7 +1358,9 @@ class ConfigurationManager {
             correlation: this.collectCorrelationFormData(),
             businessIntelligence: this.collectBusinessIntelligenceFormData(),
             dataIntegration: this.collectDataIntegrationFormData(),
-            userPreferences: this.collectUserPreferencesFormData()
+            userPreferences: this.collectUserPreferencesFormData(),
+            executiveDashboard: this.collectExecutiveDashboardFormData(),
+            laborCost: this.collectLaborCostFormData()
         };
     }
 
@@ -1178,6 +1370,8 @@ class ConfigurationManager {
         if (data.businessIntelligence) this.populateBusinessIntelligenceForm(data.businessIntelligence);
         if (data.dataIntegration) this.populateDataIntegrationForm(data.dataIntegration);
         if (data.userPreferences) this.populateUserPreferencesForm(data.userPreferences);
+        if (data.executiveDashboard) this.populateExecutiveDashboardForm(data.executiveDashboard);
+        if (data.laborCost) this.populateLaborCostForm(data.laborCost);
     }
 
     updateSaveButtonStates() {
@@ -1279,14 +1473,309 @@ class ConfigurationManager {
             alertContainer.innerHTML = '';
         }
     }
+
+    // Executive Dashboard Configuration Methods
+    async loadExecutiveDashboardConfiguration() {
+        try {
+            const response = await fetch('/config/api/executive-dashboard-configuration');
+            const result = await response.json();
+            
+            if (result.success) {
+                this.populateExecutiveDashboardForm(result.data);
+                this.currentConfig.executiveDashboard = result.data;
+            }
+        } catch (error) {
+            console.error('Error loading executive dashboard configuration:', error);
+        }
+    }
+
+    populateExecutiveDashboardForm(data) {
+        // Populate query limits
+        if (data.query_limits) {
+            const limits = data.query_limits;
+            document.getElementById('executive_summary_revenue_weeks').value = limits.executive_summary_revenue_weeks || 3;
+            document.getElementById('financial_kpis_current_revenue_weeks').value = limits.financial_kpis_current_revenue_weeks || 3;
+            document.getElementById('financial_kpis_debug_weeks').value = limits.financial_kpis_debug_weeks || 3;
+            document.getElementById('location_kpis_revenue_weeks').value = limits.location_kpis_revenue_weeks || 3;
+            document.getElementById('location_kpis_payroll_weeks').value = limits.location_kpis_payroll_weeks || 3;
+            document.getElementById('location_comparison_revenue_weeks').value = limits.location_comparison_revenue_weeks || 3;
+            document.getElementById('insights_profit_margin_weeks').value = limits.insights_profit_margin_weeks || 3;
+            document.getElementById('insights_trend_analysis_weeks').value = limits.insights_trend_analysis_weeks || 12;
+            document.getElementById('forecasts_historical_weeks').value = limits.forecasts_historical_weeks || 24;
+            document.getElementById('forecasting_historical_weeks').value = limits.forecasting_historical_weeks || 52;
+        }
+
+        // Populate health scoring
+        if (data.health_scoring) {
+            const health = data.health_scoring;
+            document.getElementById('base_health_score').value = health.base_health_score || 75;
+            document.getElementById('min_health_score').value = health.min_health_score || 0;
+            document.getElementById('max_health_score').value = health.max_health_score || 100;
+        }
+
+        // Populate utilization scoring
+        if (data.utilization_scoring) {
+            const util = data.utilization_scoring;
+            document.getElementById('utilization_excellent_threshold').value = util.excellent_threshold || 85.0;
+            document.getElementById('utilization_good_threshold').value = util.good_threshold || 75.0;
+            document.getElementById('utilization_fair_threshold').value = util.fair_threshold || 65.0;
+            document.getElementById('utilization_poor_threshold').value = util.poor_threshold || 50.0;
+            document.getElementById('utilization_excellent_points').value = util.excellent_points || 25;
+            document.getElementById('utilization_good_points').value = util.good_points || 20;
+            document.getElementById('utilization_fair_points').value = util.fair_points || 15;
+            document.getElementById('utilization_poor_points').value = util.poor_points || 10;
+        }
+        
+        // Populate revenue tiers
+        if (data.revenue_tiers) {
+            const tiers = data.revenue_tiers;
+            document.getElementById('revenue_tier_1_threshold').value = tiers.tier_1_threshold || 100000;
+            document.getElementById('revenue_tier_2_threshold').value = tiers.tier_2_threshold || 75000;
+            document.getElementById('revenue_tier_3_threshold').value = tiers.tier_3_threshold || 50000;
+        }
+        
+        // Populate display settings
+        if (data.display_settings) {
+            const display = data.display_settings;
+            document.getElementById('current_week_view_enabled').checked = display.current_week_view_enabled !== false;
+        }
+    }
+
+    collectExecutiveDashboardFormData() {
+        return {
+            query_limits: {
+                executive_summary_revenue_weeks: parseInt(document.getElementById('executive_summary_revenue_weeks').value) || 3,
+                financial_kpis_current_revenue_weeks: parseInt(document.getElementById('financial_kpis_current_revenue_weeks').value) || 3,
+                financial_kpis_debug_weeks: parseInt(document.getElementById('financial_kpis_debug_weeks').value) || 3,
+                location_kpis_revenue_weeks: parseInt(document.getElementById('location_kpis_revenue_weeks').value) || 3,
+                location_kpis_payroll_weeks: parseInt(document.getElementById('location_kpis_payroll_weeks').value) || 3,
+                location_comparison_revenue_weeks: parseInt(document.getElementById('location_comparison_revenue_weeks').value) || 3,
+                insights_profit_margin_weeks: parseInt(document.getElementById('insights_profit_margin_weeks').value) || 3,
+                insights_trend_analysis_weeks: parseInt(document.getElementById('insights_trend_analysis_weeks').value) || 12,
+                forecasts_historical_weeks: parseInt(document.getElementById('forecasts_historical_weeks').value) || 24,
+                forecasting_historical_weeks: parseInt(document.getElementById('forecasting_historical_weeks').value) || 52
+            },
+            health_scoring: {
+                base_health_score: parseFloat(document.getElementById('base_health_score').value) || 75,
+                min_health_score: parseFloat(document.getElementById('min_health_score').value) || 0,
+                max_health_score: parseFloat(document.getElementById('max_health_score').value) || 100
+            },
+            utilization_scoring: {
+                excellent_threshold: parseFloat(document.getElementById('utilization_excellent_threshold').value) || 85.0,
+                good_threshold: parseFloat(document.getElementById('utilization_good_threshold').value) || 75.0,
+                fair_threshold: parseFloat(document.getElementById('utilization_fair_threshold').value) || 65.0,
+                poor_threshold: parseFloat(document.getElementById('utilization_poor_threshold').value) || 50.0,
+                excellent_points: parseInt(document.getElementById('utilization_excellent_points').value) || 25,
+                good_points: parseInt(document.getElementById('utilization_good_points').value) || 20,
+                fair_points: parseInt(document.getElementById('utilization_fair_points').value) || 15,
+                poor_points: parseInt(document.getElementById('utilization_poor_points').value) || 10
+            },
+            revenue_tiers: {
+                tier_1_threshold: parseInt(document.getElementById('revenue_tier_1_threshold').value) || 100000,
+                tier_2_threshold: parseInt(document.getElementById('revenue_tier_2_threshold').value) || 75000,
+                tier_3_threshold: parseInt(document.getElementById('revenue_tier_3_threshold').value) || 50000
+            },
+            display_settings: {
+                current_week_view_enabled: document.getElementById('current_week_view_enabled').checked
+            },
+            store_overrides: this.collectStoreOverrides('executive-dashboard')
+        };
+    }
+
+    async saveExecutiveDashboardConfiguration() {
+        const formData = this.collectExecutiveDashboardFormData();
+        
+        try {
+            this.showLoadingState('executive-dashboard-form');
+            
+            const response = await fetch('/config/api/executive-dashboard-configuration', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(formData)
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                this.showNotification('success', 'Executive Dashboard configuration saved successfully');
+                this.unsavedChanges = false;
+                this.updateSaveButtonStates();
+            } else {
+                this.showNotification('error', 'Error saving executive dashboard configuration: ' + result.error);
+            }
+        } catch (error) {
+            console.error('Error saving executive dashboard configuration:', error);
+            this.showNotification('error', 'Failed to save executive dashboard configuration');
+        } finally {
+            this.hideLoadingState('executive-dashboard-form');
+        }
+    }
+
+    // Labor Cost Configuration Methods
+    async loadLaborCostConfiguration() {
+        try {
+            const response = await fetch('/config/api/labor-cost-configuration');
+            const result = await response.json();
+            
+            if (result.success) {
+                this.populateLaborCostForm(result.data);
+                this.currentConfig.laborCost = result.data;
+            }
+        } catch (error) {
+            console.error('Error loading labor cost configuration:', error);
+        }
+    }
+
+    populateLaborCostForm(data) {
+        // Populate labor cost thresholds
+        if (data.thresholds) {
+            const thresholds = data.thresholds;
+            document.getElementById('labor_cost_warning_threshold').value = Math.round((thresholds.warning_threshold || 0.15) * 100);
+            document.getElementById('labor_cost_critical_threshold').value = Math.round((thresholds.critical_threshold || 0.25) * 100);
+            document.getElementById('efficiency_target').value = Math.round((thresholds.efficiency_target || 0.85) * 100);
+            document.getElementById('overtime_threshold').value = Math.round((thresholds.overtime_threshold || 1.4) * 100);
+        }
+
+        // Populate processing settings
+        if (data.processing) {
+            const processing = data.processing;
+            document.getElementById('auto_calculate').checked = processing.auto_calculate_enabled || false;
+            document.getElementById('include_benefits').checked = processing.include_benefits || true;
+            document.getElementById('include_overtime').checked = processing.include_overtime || true;
+            document.getElementById('calculation_frequency').value = processing.frequency || 'daily';
+        }
+
+        // Populate alert settings
+        if (data.alerts) {
+            const alerts = data.alerts;
+            document.getElementById('enable_labor_alerts').checked = alerts.enabled || false;
+            document.getElementById('alert_frequency').value = alerts.frequency || 'immediate';
+            document.getElementById('escalation_enabled').checked = alerts.escalation_enabled || false;
+            document.getElementById('alert_recipients').value = (alerts.recipients || []).join(', ');
+        }
+    }
+
+    collectLaborCostFormData() {
+        // Collect alert recipients
+        const recipientsInput = document.getElementById('alert_recipients').value;
+        const recipients = recipientsInput ? recipientsInput.split(',').map(email => email.trim()) : [];
+
+        return {
+            thresholds: {
+                warning_threshold: parseFloat(document.getElementById('labor_cost_warning_threshold').value) / 100 || 0.15,
+                critical_threshold: parseFloat(document.getElementById('labor_cost_critical_threshold').value) / 100 || 0.25,
+                efficiency_target: parseFloat(document.getElementById('efficiency_target').value) / 100 || 0.85,
+                overtime_threshold: parseFloat(document.getElementById('overtime_threshold').value) / 100 || 1.4
+            },
+            processing: {
+                auto_calculate_enabled: document.getElementById('auto_calculate').checked,
+                include_benefits: document.getElementById('include_benefits').checked,
+                include_overtime: document.getElementById('include_overtime').checked,
+                frequency: document.getElementById('calculation_frequency').value
+            },
+            alerts: {
+                enabled: document.getElementById('enable_labor_alerts').checked,
+                frequency: document.getElementById('alert_frequency').value,
+                escalation_enabled: document.getElementById('escalation_enabled').checked,
+                recipients: recipients
+            },
+            store_overrides: this.collectStoreOverrides('labor-cost')
+        };
+    }
+
+    async saveLaborCostConfiguration() {
+        const formData = this.collectLaborCostFormData();
+        
+        try {
+            this.showLoadingState('labor-cost-form');
+            
+            const response = await fetch('/config/api/labor-cost-configuration', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(formData)
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                this.showNotification('success', 'Labor Cost configuration saved successfully');
+                this.unsavedChanges = false;
+                this.updateSaveButtonStates();
+            } else {
+                this.showNotification('error', 'Error saving labor cost configuration: ' + result.error);
+            }
+        } catch (error) {
+            console.error('Error saving labor cost configuration:', error);
+            this.showNotification('error', 'Failed to save labor cost configuration');
+        } finally {
+            this.hideLoadingState('labor-cost-form');
+        }
+    }
+
+    // Helper method for collecting store overrides
+    collectStoreOverrides(configType) {
+        const overrides = {};
+        const overrideTextarea = document.getElementById(`${configType}-store-overrides`);
+        
+        if (overrideTextarea && overrideTextarea.value.trim()) {
+            try {
+                const parsed = JSON.parse(overrideTextarea.value);
+                return parsed;
+            } catch (e) {
+                console.warn(`Invalid JSON in ${configType} store overrides:`, e);
+            }
+        }
+        
+        return overrides;
+    }
 }
 
 // Initialize the configuration manager when the page loads
 let configManager;
 
 document.addEventListener('DOMContentLoaded', () => {
-    configManager = new ConfigurationManager();
+    console.log('DOMContentLoaded fired - initializing configuration manager');
+    console.log('Document ready state:', document.readyState);
+    console.log('Bootstrap available at DOM ready:', typeof bootstrap !== 'undefined');
+    
+    // Wait a bit to ensure Bootstrap is fully loaded
+    setTimeout(() => {
+        try {
+            console.log('Starting configuration manager initialization');
+            console.log('About to create new ConfigurationManager...');
+            configManager = new ConfigurationManager();
+            console.log('ConfigurationManager created successfully');
+            window.configManager = configManager;
+            console.log('ConfigurationManager assigned to window');
+        } catch (error) {
+            console.error('FATAL ERROR creating ConfigurationManager:', error);
+            console.error('Error stack:', error.stack);
+        }
+    }, 100);
 });
 
-// Export for global access
-window.configManager = configManager;
+// Fallback initialization if DOMContentLoaded already fired
+if (document.readyState === 'loading') {
+    console.log('Document still loading, waiting for DOMContentLoaded');
+} else {
+    console.log('Document already loaded, initializing immediately');
+    setTimeout(() => {
+        if (!configManager) {
+            try {
+                console.log('Fallback: initializing configuration manager');
+                console.log('About to create ConfigurationManager via fallback...');
+                configManager = new ConfigurationManager();
+                console.log('Fallback ConfigurationManager created successfully');
+                window.configManager = configManager;
+                console.log('Fallback ConfigurationManager assigned to window');
+            } catch (error) {
+                console.error('FATAL ERROR in fallback initialization:', error);
+                console.error('Fallback error stack:', error.stack);
+            }
+        }
+    }, 100);
+}

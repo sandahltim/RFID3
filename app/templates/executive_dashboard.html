@@ -946,7 +946,9 @@
                                 <tr>
                                     <th width="200">Store / Manager</th>
                                     <th width="120">Previous Week</th>
+                                    {% if dashboard_config.current_week_view_enabled %}
                                     <th width="120">Current Week</th>
+                                    {% endif %}
                                     <th width="120">Previous Year</th>
                                     <th width="100">YoY Growth</th>
                                     <th width="100">Utilization</th>
@@ -964,7 +966,9 @@
                                 <tr class="store-row store-3607" data-store="3607">
                                     <td><span class="store-badge store-badge-3607">3607 - Wayzata</span><br><small class="text-muted">Tyler (Since 2008)</small></td>
                                     <td class="metric-cell" id="revenue-3607-prev">Loading...</td>
+                                    {% if dashboard_config.current_week_view_enabled %}
                                     <td class="metric-cell" id="revenue-3607-current">Loading...</td>
+                                    {% endif %}
                                     <td class="metric-cell" id="revenue-3607-prevyear">Loading...</td>
                                     <td class="metric-cell growth-cell" id="growth-3607">Loading...</td>
                                     <td class="metric-cell" id="util-3607">Loading...</td>
@@ -1335,6 +1339,10 @@
     <script>
         console.log('🎨 Enhanced Executive Dashboard Loading...');
         
+        // Dashboard configuration from backend
+        window.dashboardConfig = {{ dashboard_config | tojson }};
+        console.log('📊 Dashboard config:', window.dashboardConfig);
+        
         // Ensure visualization libraries are loaded
         document.addEventListener('DOMContentLoaded', function() {
             console.log('📊 Dashboard DOM loaded, checking visualization support...');
@@ -1357,7 +1365,40 @@
             } else {
                 console.log('✅ Leaflet loaded successfully');
             }
+            
+            // Initialize current week column visibility
+            initializeCurrentWeekVisibility();
         });
+        
+        function initializeCurrentWeekVisibility() {
+            if (!window.dashboardConfig || window.dashboardConfig.current_week_view_enabled) {
+                console.log('✅ Current week view enabled');
+                return; // Column is visible by default
+            }
+            
+            console.log('🔒 Current week view disabled - hiding column');
+            
+            // Hide the "Current Week" header
+            document.querySelectorAll('th').forEach(th => {
+                if (th.textContent.includes('Current Week')) {
+                    th.style.display = 'none';
+                }
+            });
+            
+            // Hide all current week data cells
+            document.querySelectorAll('[id$="-current"]').forEach(cell => {
+                cell.style.display = 'none';
+            });
+            
+            // Update colspan for section headers if current week is hidden
+            const sectionHeaders = document.querySelectorAll('.section-header-row td');
+            sectionHeaders.forEach(header => {
+                const currentColspan = parseInt(header.getAttribute('colspan') || '8');
+                if (currentColspan === 8) {
+                    header.setAttribute('colspan', '7');
+                }
+            });
+        }
     </script>
     
     <!-- Enhanced Visualizations -->
