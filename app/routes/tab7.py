@@ -40,7 +40,7 @@ def _get_executive_config():
         raise RuntimeError(f"Cannot load executive configuration: {e}")
 
 
-def _get_unified_revenue_kpi(session, config_weeks_attr='financial_kpis_current_revenue_weeks'):
+def _get_unified_revenue_kpi(session, config_weeks_attr='financial_kpis_current_revenue_weeks', store_filter='all'):
     """
     SINGLE SOURCE OF TRUTH for revenue KPI calculation
     Consolidated 2025-09-09 - Eliminates duplicate calculation paths
@@ -48,6 +48,7 @@ def _get_unified_revenue_kpi(session, config_weeks_attr='financial_kpis_current_
     Args:
         session: Database session
         config_weeks_attr: Config attribute name for weeks (default: financial_kpis_current_revenue_weeks)
+        store_filter: Store code filter ('all', '3607', '6800', '728', '8101')
     
     Returns:
         float: Averaged revenue excluding zero/null/future weeks
@@ -58,14 +59,26 @@ def _get_unified_revenue_kpi(session, config_weeks_attr='financial_kpis_current_
         config = _get_executive_config()
         weeks = getattr(config, config_weeks_attr, 3)  # Fallback to 3 weeks
         
-        # Unified SQL - filters zero/null/future weeks consistently
+        # Store-specific revenue column mapping
+        if store_filter == 'all':
+            revenue_column = 'total_weekly_revenue'
+        else:
+            revenue_column_map = {
+                '3607': 'revenue_3607',
+                '6800': 'revenue_6800', 
+                '728': 'revenue_728',
+                '8101': 'revenue_8101'
+            }
+            revenue_column = revenue_column_map.get(store_filter, 'total_weekly_revenue')
+        
+        # Unified SQL with store filtering - filters zero/null/future weeks consistently
         revenue_query = text(f"""
-            SELECT AVG(total_weekly_revenue) as avg_revenue
+            SELECT AVG({revenue_column}) as avg_revenue
             FROM (
-                SELECT total_weekly_revenue 
+                SELECT {revenue_column}
                 FROM scorecard_trends_data 
-                WHERE total_weekly_revenue IS NOT NULL 
-                    AND total_weekly_revenue > 0
+                WHERE {revenue_column} IS NOT NULL 
+                    AND {revenue_column} > 0
                     AND week_ending <= CURDATE()
                 ORDER BY week_ending DESC 
                 LIMIT {weeks}
@@ -73,7 +86,7 @@ def _get_unified_revenue_kpi(session, config_weeks_attr='financial_kpis_current_
         """)
         
         result = session.execute(revenue_query).scalar() or 0
-        logger.info(f"Unified revenue KPI: ${result:,.0f} ({weeks}-week avg, attr: {config_weeks_attr})")
+        logger.info(f"Unified revenue KPI: ${result:,.0f} ({weeks}-week avg, store: {store_filter}, attr: {config_weeks_attr})")
         return float(result)
         
     except Exception as e:
@@ -432,12 +445,15 @@ def get_executive_summary():
         
         scorecard_metrics = ScorecardMetricsCompat(pos_scorecard_result)
         
-        # CONSOLIDATED 2025-09-09: Use unified revenue KPI calculation (single source of truth)
-        # TODO CLEANUP 2025-09-16: Remove old POS scorecard calculation after verification
-        unified_revenue = _get_unified_revenue_kpi(session, 'executive_summary_revenue_weeks')
-        
-        # Override scorecard_metrics.total_revenue with unified calculation
-        scorecard_metrics.total_revenue = unified_revenue
+        # FIXED 2025-09-09: Removed conflicting unified revenue override
+        # Issue: Was overriding correct POS transaction revenue ($98,683) with scorecard data ($104,242)
+        # Solution: Use original POS transaction calculation (scorecard_metrics.total_revenue already set correctly)
+        # 
+        # TODO FUTURE: If unified calculation needed, integrate into original POS logic rather than override
+        # 
+        # COMMENTED OUT PROBLEMATIC OVERRIDE:
+        # unified_revenue = _get_unified_revenue_kpi(session, 'executive_summary_revenue_weeks', store_filter)
+        # scorecard_metrics.total_revenue = unified_revenue
 
         # Calculate YoY growth if we have data from last year
         last_year_start = start_date.replace(year=start_date.year - 1)
