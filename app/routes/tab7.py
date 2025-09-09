@@ -3220,33 +3220,38 @@ def financial_kpis():
             logger.info(f"  {row.week_ending}: ${row.total_weekly_revenue:,.0f}")
         logger.info(f"Calculated 3-week average: ${current_3wk_avg:,.0f} (Target: $109,955)")
         
-        # Calculate YoY growth with 3-year comparison (dynamic years based on current date)
+        # FIXED 2025-09-09: Calculate Year-to-Date YoY growth (not period-based)
+        # Compare YTD current year vs YTD last year + YTD last year vs YTD two years ago
         yoy_query = text("""
             SELECT 
-                AVG(CASE WHEN week_ending >= DATE_SUB(DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) DAY), INTERVAL 21 DAY)
-                         AND week_ending < DATE_SUB(DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) DAY), INTERVAL 0 DAY)
-                    THEN total_weekly_revenue END) as current_year,
-                AVG(CASE WHEN week_ending >= DATE_SUB(DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) DAY), INTERVAL 386 DAY)
-                         AND week_ending < DATE_SUB(DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) DAY), INTERVAL 365 DAY)
-                    THEN total_weekly_revenue END) as last_year,
-                AVG(CASE WHEN week_ending >= DATE_SUB(DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) DAY), INTERVAL 751 DAY)
-                         AND week_ending < DATE_SUB(DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) DAY), INTERVAL 730 DAY)
-                    THEN total_weekly_revenue END) as two_years_ago
+                SUM(CASE WHEN week_ending >= MAKEDATE(YEAR(CURDATE()), 1) 
+                         AND week_ending <= CURDATE()
+                         AND YEAR(week_ending) = YEAR(CURDATE())
+                    THEN total_weekly_revenue END) as current_ytd,
+                SUM(CASE WHEN week_ending >= MAKEDATE(YEAR(CURDATE()) - 1, 1)
+                         AND week_ending <= DATE_SUB(CURDATE(), INTERVAL 1 YEAR)
+                         AND YEAR(week_ending) = YEAR(CURDATE()) - 1
+                    THEN total_weekly_revenue END) as last_year_ytd,
+                SUM(CASE WHEN week_ending >= MAKEDATE(YEAR(CURDATE()) - 2, 1)
+                         AND week_ending <= DATE_SUB(CURDATE(), INTERVAL 2 YEAR)
+                         AND YEAR(week_ending) = YEAR(CURDATE()) - 2
+                    THEN total_weekly_revenue END) as two_years_ago_ytd
             FROM scorecard_trends_data 
-            WHERE total_weekly_revenue IS NOT NULL
+            WHERE total_weekly_revenue IS NOT NULL 
+                AND total_weekly_revenue > 0
         """)
         yoy_result = session.execute(yoy_query).fetchone()
         
         yoy_growth = 0
         yoy_comparison = 0
-        if yoy_result and yoy_result.current_year and yoy_result.last_year and yoy_result.last_year > 0:
-            # Main YoY: Current year vs last year
-            yoy_growth = ((yoy_result.current_year - yoy_result.last_year) / yoy_result.last_year) * 100
+        if yoy_result and yoy_result.current_ytd and yoy_result.last_year_ytd and yoy_result.last_year_ytd > 0:
+            # Main YoY: Current YTD vs Last Year YTD
+            yoy_growth = ((yoy_result.current_ytd - yoy_result.last_year_ytd) / yoy_result.last_year_ytd) * 100
             
-            # Calculate last year vs two years ago YoY for comparison
-            if yoy_result.two_years_ago and yoy_result.two_years_ago > 0:
-                last_year_yoy = ((yoy_result.last_year - yoy_result.two_years_ago) / yoy_result.two_years_ago) * 100
-                # Secondary YoY comparison: How current YoY compares to last year's YoY (percentage point difference)
+            # Calculate last year YTD vs two years ago YTD for comparison
+            if yoy_result.two_years_ago_ytd and yoy_result.two_years_ago_ytd > 0:
+                last_year_yoy = ((yoy_result.last_year_ytd - yoy_result.two_years_ago_ytd) / yoy_result.two_years_ago_ytd) * 100
+                # Secondary YoY comparison: How current YTD YoY compares to last year's YTD YoY (percentage point difference)
                 yoy_comparison = yoy_growth - last_year_yoy
         
         # Calculate equipment utilization from combined_inventory
@@ -3599,7 +3604,7 @@ def location_comparison():
             "metadata": {
                 "data_source": "scorecard_trends_data + combined_inventory + PayrollTrends",
                 "revenue_period": "3-week average",
-                "yoy_comparison": "Same 3-week period last year",
+                "yoy_comparison": "Year-to-Date vs Last Year-to-Date",
                 "utilization_period": "30-day activity rate"
             }
         })
