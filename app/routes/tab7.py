@@ -16,7 +16,7 @@ from ..models.config_models import ExecutiveDashboardConfiguration
 logger = get_logger(__name__)
 
 def _get_executive_config():
-    """Get executive dashboard configuration with fallback to defaults"""
+    """Get executive dashboard configuration from database - NO HARDCODED VALUES"""
     try:
         config = ExecutiveDashboardConfiguration.query.filter_by(
             user_id='default_user', 
@@ -24,23 +24,61 @@ def _get_executive_config():
         ).first()
         if config:
             return config
+        else:
+            # Create default configuration in database if it doesn't exist
+            logger.warning("No executive dashboard configuration found, creating default in database")
+            config = ExecutiveDashboardConfiguration(
+                user_id='default_user',
+                config_name='default'
+            )
+            db.session.add(config)
+            db.session.commit()
+            return config
     except Exception as e:
         logger.error(f"Error loading executive configuration: {e}")
+        # Return None to force error handling upstream rather than hardcoded values
+        raise RuntimeError(f"Cannot load executive configuration: {e}")
+
+
+def _get_unified_revenue_kpi(session, config_weeks_attr='financial_kpis_current_revenue_weeks'):
+    """
+    SINGLE SOURCE OF TRUTH for revenue KPI calculation
+    Consolidated 2025-09-09 - Eliminates duplicate calculation paths
     
-    # Fallback to Mock config with defaults matching database schema
-    class MockConfig:
-        executive_summary_revenue_weeks = 3
-        financial_kpis_current_revenue_weeks = 3
-        financial_kpis_debug_weeks = 3
-        location_kpis_revenue_weeks = 3
-        location_kpis_payroll_weeks = 3
-        location_comparison_revenue_weeks = 3
-        insights_profit_margin_weeks = 3
-        insights_trend_analysis_weeks = 12
-        forecasts_historical_weeks = 24
-        forecasting_historical_weeks = 52
+    Args:
+        session: Database session
+        config_weeks_attr: Config attribute name for weeks (default: financial_kpis_current_revenue_weeks)
     
-    return MockConfig()
+    Returns:
+        float: Averaged revenue excluding zero/null/future weeks
+    """
+    from sqlalchemy import text
+    
+    try:
+        config = _get_executive_config()
+        weeks = getattr(config, config_weeks_attr, 3)  # Fallback to 3 weeks
+        
+        # Unified SQL - filters zero/null/future weeks consistently
+        revenue_query = text(f"""
+            SELECT AVG(total_weekly_revenue) as avg_revenue
+            FROM (
+                SELECT total_weekly_revenue 
+                FROM scorecard_trends_data 
+                WHERE total_weekly_revenue IS NOT NULL 
+                    AND total_weekly_revenue > 0
+                    AND week_ending <= CURDATE()
+                ORDER BY week_ending DESC 
+                LIMIT {weeks}
+            ) recent_weeks
+        """)
+        
+        result = session.execute(revenue_query).scalar() or 0
+        logger.info(f"Unified revenue KPI: ${result:,.0f} ({weeks}-week avg, attr: {config_weeks_attr})")
+        return float(result)
+        
+    except Exception as e:
+        logger.error(f"Unified revenue KPI calculation failed: {e}")
+        return 0
 
 tab7_bp = Blueprint("tab7", __name__)
 executive_api_bp = Blueprint("executive_api", __name__, url_prefix='/executive')
@@ -394,28 +432,19 @@ def get_executive_summary():
         
         scorecard_metrics = ScorecardMetricsCompat(pos_scorecard_result)
         
-        # CRITICAL FIX: Get revenue from scorecard_trends_data (same as working financial-kpis endpoint)
-        # This data source actually has recent data, unlike pos_transaction_items which returns 0
-        from sqlalchemy import text as sql_text
-        config = _get_executive_config()
-        working_revenue_query = sql_text(f"""
-            SELECT AVG(total_weekly_revenue) as avg_3wk
-            FROM scorecard_trends_data 
-            WHERE total_weekly_revenue IS NOT NULL
-            ORDER BY week_ending DESC 
-            LIMIT {config.executive_summary_revenue_weeks}
-        """)
-        working_revenue_result = session.execute(working_revenue_query).fetchone()
-        working_revenue = float(working_revenue_result.avg_3wk) if working_revenue_result and working_revenue_result.avg_3wk else 0
+        # CONSOLIDATED 2025-09-09: Use unified revenue KPI calculation (single source of truth)
+        # TODO CLEANUP 2025-09-16: Remove old POS scorecard calculation after verification
+        unified_revenue = _get_unified_revenue_kpi(session, 'executive_summary_revenue_weeks')
         
-        # Override scorecard_metrics.total_revenue with working scorecard data
-        scorecard_metrics.total_revenue = working_revenue
+        # Override scorecard_metrics.total_revenue with unified calculation
+        scorecard_metrics.total_revenue = unified_revenue
 
         # Calculate YoY growth if we have data from last year
         last_year_start = start_date.replace(year=start_date.year - 1)
         last_year_end = end_date.replace(year=end_date.year - 1)
 
         # CRITICAL FIX: Get last year revenue from scorecard_trends_data (consistent with current revenue source)
+        from sqlalchemy import text as sql_text
         last_year_scorecard_query = sql_text("""
             SELECT SUM(COALESCE(revenue_3607, 0) + 
                       COALESCE(revenue_6800, 0) + 
@@ -3155,21 +3184,9 @@ def financial_kpis():
                 utilization_poor_points = 10
             config = MockConfig()
         
-        # Use total_weekly_revenue column directly (no calculation needed as per requirement)
-        config = _get_executive_config()
-        revenue_query = text(f"""
-            SELECT AVG(total_weekly_revenue) as avg_3wk
-            FROM (
-                SELECT total_weekly_revenue 
-                FROM scorecard_trends_data 
-                WHERE total_weekly_revenue IS NOT NULL 
-                    AND total_weekly_revenue > 0
-                    AND week_ending <= CURDATE()
-                ORDER BY week_ending DESC 
-                LIMIT {config.financial_kpis_current_revenue_weeks}
-            ) recent_weeks
-        """)
-        current_3wk_avg = session.execute(revenue_query).scalar() or 0
+        # CONSOLIDATED 2025-09-09: Use unified revenue KPI calculation (single source of truth)
+        # TODO CLEANUP 2025-09-16: Remove duplicate calculation logic after verification
+        current_3wk_avg = _get_unified_revenue_kpi(session, 'financial_kpis_current_revenue_weeks')
         
         # Debug: Show what weeks we're using
         debug_query = text(f"""

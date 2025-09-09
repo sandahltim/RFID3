@@ -227,6 +227,11 @@ class UserPreferences(db.Model):
     auto_refresh_enabled = db.Column(db.Boolean, default=True)
     auto_refresh_interval = db.Column(db.Integer, default=300)  # seconds
     
+    # Executive Dashboard Dual-Mode Preferences (extended 2025-09-08)
+    preferred_period = db.Column(db.Integer, default=3)  # Preferred period length in weeks
+    preferred_mode = db.Column(db.String(20), default='average')  # 'average' or 'period'
+    last_custom_period = db.Column(db.Integer, nullable=True)  # Last custom period entered
+    
     # Notification preferences
     email_notifications_enabled = db.Column(db.Boolean, default=True)
     push_notifications_enabled = db.Column(db.Boolean, default=False)
@@ -357,6 +362,7 @@ def get_default_correlation_settings():
             'weather': False
         }
     }
+
 
 
 class LaborCostConfiguration(db.Model):
@@ -685,6 +691,26 @@ class ExecutiveDashboardConfiguration(db.Model):
     enable_growth_alerts = db.Column(db.Boolean, default=True)
     alert_frequency = db.Column(db.String(20), default='weekly')                # daily, weekly, monthly
     current_week_view_enabled = db.Column(db.Boolean, default=True)             # Show current week column in scorecard
+    
+    # Dual-Mode Timeframe Support (added 2025-09-08)
+    available_periods = db.Column(db.JSON, default='["1", "3", "8", "12", "16", "26", "52"]')  # Available period options
+    default_period_weeks = db.Column(db.Integer, default=3)                     # Default period when dashboard loads
+    max_period_weeks = db.Column(db.Integer, default=52)                        # Maximum allowed period selection
+    min_period_weeks = db.Column(db.Integer, default=1)                         # Minimum allowed period selection
+    default_view_mode = db.Column(db.String(20), default='average')             # 'average' or 'period' mode
+    default_store = db.Column(db.String(10), default='all')                     # Default store selection
+    show_custom_period_input = db.Column(db.Boolean, default=True)              # Allow custom period input
+    show_comparison_mode = db.Column(db.Boolean, default=True)                  # Enable store comparison
+    auto_refresh_interval_seconds = db.Column(db.Integer, default=300)          # Auto-refresh interval (5 min)
+    max_data_points_per_chart = db.Column(db.Integer, default=26)               # Max chart data points
+    show_trend_lines = db.Column(db.Boolean, default=True)                      # Display trend lines
+    show_data_labels = db.Column(db.Boolean, default=True)                      # Show data labels
+    chart_animation_enabled = db.Column(db.Boolean, default=True)               # Enable chart animations
+    available_stores = db.Column(db.JSON, default='["all", "3607", "6800", "728", "8101"]')  # Available stores
+    store_display_names = db.Column(db.JSON, default='{"all": "All Locations", "3607": "Wayzata", "6800": "Brooklyn Park", "728": "Elk River", "8101": "Fridley"}')  # Store display names
+    show_period_labels = db.Column(db.Boolean, default=True)                    # Show period labels
+    compact_mode_enabled = db.Column(db.Boolean, default=False)                 # Compact display mode
+    show_tooltips = db.Column(db.Boolean, default=True)                         # Interactive tooltips
     
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)

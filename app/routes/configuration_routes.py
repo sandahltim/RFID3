@@ -581,6 +581,33 @@ def executive_dashboard_configuration():
             
             return jsonify({
                 'success': True,
+                'config': {
+                    # Dual-Mode Configuration Fields
+                    'available_periods': exec_config.available_periods or [1, 3, 8, 12, 16, 26, 52],
+                    'default_period_weeks': exec_config.default_period_weeks or 3,
+                    'max_period_weeks': exec_config.max_period_weeks or 52,
+                    'min_period_weeks': exec_config.min_period_weeks or 1,
+                    'default_view_mode': exec_config.default_view_mode or 'average',
+                    'default_store': exec_config.default_store or 'all',
+                    'show_custom_period_input': exec_config.show_custom_period_input if exec_config.show_custom_period_input is not None else True,
+                    'show_comparison_mode': exec_config.show_comparison_mode if exec_config.show_comparison_mode is not None else True,
+                    'auto_refresh_interval_seconds': exec_config.auto_refresh_interval_seconds or 300,
+                    'max_data_points_per_chart': exec_config.max_data_points_per_chart or 26,
+                    'show_trend_lines': exec_config.show_trend_lines if exec_config.show_trend_lines is not None else True,
+                    'show_data_labels': exec_config.show_data_labels if exec_config.show_data_labels is not None else True,
+                    'chart_animation_enabled': exec_config.chart_animation_enabled if exec_config.chart_animation_enabled is not None else True,
+                    'available_stores': exec_config.available_stores or ['all', '3607', '6800', '728', '8101'],
+                    'store_display_names': exec_config.store_display_names or {
+                        'all': 'All Locations',
+                        '3607': 'Wayzata', 
+                        '6800': 'Brooklyn Park',
+                        '728': 'Elk River',
+                        '8101': 'Fridley'
+                    },
+                    'show_period_labels': exec_config.show_period_labels if exec_config.show_period_labels is not None else True,
+                    'compact_mode_enabled': exec_config.compact_mode_enabled if exec_config.compact_mode_enabled is not None else False,
+                    'show_tooltips': exec_config.show_tooltips if exec_config.show_tooltips is not None else True
+                },
                 'data': {
                     'query_limits': {
                         'executive_summary_revenue_weeks': exec_config.executive_summary_revenue_weeks,
@@ -894,7 +921,11 @@ def user_preferences():
                         'time_range': preferences.default_time_range,
                         'store_filter': preferences.default_store_filter,
                         'auto_refresh': preferences.auto_refresh_enabled,
-                        'refresh_interval': preferences.auto_refresh_interval
+                        'refresh_interval': preferences.auto_refresh_interval,
+                        # Executive Dashboard Dual-Mode preferences (added 2025-09-08)
+                        'preferred_period': getattr(preferences, 'preferred_period', 3),
+                        'preferred_mode': getattr(preferences, 'preferred_mode', 'average'),
+                        'last_custom_period': getattr(preferences, 'last_custom_period', None)
                     },
                     'notifications': {
                         'email_enabled': preferences.email_notifications_enabled,
@@ -952,6 +983,13 @@ def user_preferences():
                 preferences.default_store_filter = defaults.get('store_filter', 'all')
                 preferences.auto_refresh_enabled = defaults.get('auto_refresh', True)
                 preferences.auto_refresh_interval = defaults.get('refresh_interval', 300)
+                # Executive Dashboard Dual-Mode preferences (added 2025-09-08)
+                if hasattr(preferences, 'preferred_period'):
+                    preferences.preferred_period = defaults.get('preferred_period', 3)
+                if hasattr(preferences, 'preferred_mode'):
+                    preferences.preferred_mode = defaults.get('preferred_mode', 'average')
+                if hasattr(preferences, 'last_custom_period'):
+                    preferences.last_custom_period = defaults.get('last_custom_period', None)
             
             if 'notifications' in data:
                 notifications = data['notifications']
@@ -1274,6 +1312,8 @@ def manual_csv_import():
             "error": str(e),
             "message": "Manual CSV import failed"
         }), 500
+
+
 
 
 # Redirect routes for common URL variations

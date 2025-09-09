@@ -1073,27 +1073,78 @@
     </div>
     
     <!-- Enhanced Store Selection Section -->
-    <div class="store-navigation-section mb-4">
-        <div class="row align-items-center">
-            <div class="col-md-8">
-                <div class="btn-group store-selector" role="group">
-                    <button type="button" class="btn btn-store active" data-store="all">
-                        <i class="fas fa-building"></i> ALL STORES
-                    </button>
-                    <button type="button" class="btn btn-store btn-tyler" data-store="3607">
-                        <i class="fas fa-store"></i> 3607-TYLER
-                    </button>
-                    <button type="button" class="btn btn-store btn-zack" data-store="6800">
-                        <i class="fas fa-store"></i> 6800-ZACK
-                    </button>
-                    <button type="button" class="btn btn-store btn-bruce" data-store="728">
-                        <i class="fas fa-store"></i> 728-BRUCE
-                    </button>
-                    <button type="button" class="btn btn-store btn-tim" data-store="8101">
-                        <i class="fas fa-store"></i> 8101-TIM
-                    </button>
+    <!-- Enhanced Dual-Mode Store + Timeframe Controls -->
+    <div class="dashboard-controls-section mb-4">
+        <div class="executive-card">
+            <div class="row align-items-center">
+                <!-- Store Selection -->
+                <div class="col-lg-5 col-md-6 mb-3">
+                    <h6 class="text-white mb-3"><i class="fas fa-building"></i> Location Selection</h6>
+                    <div class="btn-group store-selector w-100" role="group" id="storeSelector">
+                        <!-- Will be populated by configuration -->
+                    </div>
+                </div>
+                
+                <!-- View Mode Toggle -->
+                <div class="col-lg-3 col-md-6 mb-3">
+                    <h6 class="text-white mb-3"><i class="fas fa-chart-line"></i> View Mode</h6>
+                    <div class="btn-group view-mode-selector w-100" role="group">
+                        <input type="radio" class="btn-check" name="viewMode" id="averageMode" value="average" checked>
+                        <label class="btn btn-outline-light" for="averageMode">
+                            <i class="fas fa-wave-square"></i> Average
+                        </label>
+                        <input type="radio" class="btn-check" name="viewMode" id="periodMode" value="period">
+                        <label class="btn btn-outline-light" for="periodMode">
+                            <i class="fas fa-bars"></i> Period
+                        </label>
+                    </div>
+                </div>
+                
+                <!-- Timeframe Selection -->
+                <div class="col-lg-4 col-md-12 mb-3">
+                    <h6 class="text-white mb-3"><i class="fas fa-calendar-alt"></i> Timeframe</h6>
+                    <div class="row g-2">
+                        <div class="col-8">
+                            <select class="form-select" id="periodSelect" style="background: rgba(255,255,255,0.9);">
+                                <!-- Will be populated by configuration -->
+                            </select>
+                        </div>
+                        <div class="col-4" id="customPeriodContainer" style="display: none;">
+                            <input type="number" class="form-control" id="customPeriod" min="1" max="52" 
+                                   placeholder="Weeks" style="background: rgba(255,255,255,0.9);">
+                        </div>
+                    </div>
+                    <small class="text-light mt-1" id="viewModeDescription">
+                        3-week rolling average across selected location(s)
+                    </small>
                 </div>
             </div>
+            
+            <!-- Advanced Options (Collapsible) -->
+            <div class="row mt-3">
+                <div class="col-12">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="btn-group" role="group">
+                            <button type="button" class="btn btn-outline-light btn-sm" id="comparisonModeToggle">
+                                <i class="fas fa-columns"></i> Compare Stores
+                            </button>
+                            <button type="button" class="btn btn-outline-light btn-sm" id="refreshDashboard">
+                                <i class="fas fa-sync-alt"></i> Refresh
+                            </button>
+                        </div>
+                        <div class="dashboard-status">
+                            <small class="text-light">
+                                <i class="fas fa-clock"></i> Last updated: <span id="lastUpdateTime">--</span>
+                                <span class="ms-2" id="autoRefreshIndicator">
+                                    <i class="fas fa-circle text-success"></i> Auto-refresh enabled
+                                </span>
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
             <div class="col-md-4 text-end">
                 <div class="current-selection">
                     <span class="text-muted">Viewing:</span>
@@ -1729,6 +1780,292 @@
 {% block scripts %}
 {{ super() }}
 <script>
+// Dual-Mode Dashboard Configuration
+let dashboardConfig = {
+    selectedStore: 'all',
+    selectedPeriod: 3,
+    viewMode: 'average', // 'average' or 'period'
+    comparisonMode: false,
+    autoRefresh: true,
+    autoRefreshInterval: 300000, // 5 minutes
+    availablePeriods: [1, 3, 8, 12, 16, 26, 52],
+    availableStores: [],
+    storeDisplayNames: {},
+    customPeriodEnabled: true,
+    maxPeriod: 52,
+    minPeriod: 1
+};
+
+// Initialize Dashboard Configuration System
+async function initializeDashboardConfig() {
+    try {
+        // Load configuration from server
+        const response = await fetch('/config/api/executive-dashboard-configuration');
+        const configData = await response.json();
+        
+        if (configData.success && configData.config) {
+            const config = configData.config;
+            
+            // Update dashboard configuration
+            dashboardConfig.availablePeriods = config.available_periods || [1, 3, 8, 12, 16, 26, 52];
+            dashboardConfig.selectedPeriod = config.default_period_weeks || 3;
+            dashboardConfig.viewMode = config.default_view_mode || 'average';
+            dashboardConfig.selectedStore = config.default_store || 'all';
+            dashboardConfig.availableStores = config.available_stores || ['all', '3607', '6800', '728', '8101'];
+            dashboardConfig.storeDisplayNames = config.store_display_names || {
+                'all': 'All Locations',
+                '3607': 'Wayzata', 
+                '6800': 'Brooklyn Park',
+                '728': 'Elk River',
+                '8101': 'Fridley'
+            };
+            dashboardConfig.customPeriodEnabled = config.show_custom_period_input !== false;
+            dashboardConfig.maxPeriod = config.max_period_weeks || 52;
+            dashboardConfig.minPeriod = config.min_period_weeks || 1;
+            dashboardConfig.autoRefreshInterval = (config.auto_refresh_interval_seconds || 300) * 1000;
+        }
+        
+        // Load user preferences from existing endpoint
+        const prefsResponse = await fetch('/config/api/user-preferences');
+        if (prefsResponse.ok) {
+            const prefsData = await prefsResponse.json();
+            if (prefsData.success && prefsData.data && prefsData.data.defaults) {
+                const defaults = prefsData.data.defaults;
+                dashboardConfig.selectedStore = defaults.store_filter || dashboardConfig.selectedStore;
+                dashboardConfig.selectedPeriod = defaults.preferred_period || dashboardConfig.selectedPeriod;
+                dashboardConfig.viewMode = defaults.preferred_mode || dashboardConfig.viewMode;
+                dashboardConfig.autoRefresh = defaults.auto_refresh !== false;
+            }
+        }
+        
+        // Build UI components
+        buildStoreSelector();
+        buildPeriodSelector();
+        updateViewModeControls();
+        updateDescription();
+        
+        console.log('✅ Dashboard configuration initialized:', dashboardConfig);
+        
+    } catch (error) {
+        console.error('❌ Error loading dashboard configuration:', error);
+        // Use defaults and continue
+        buildStoreSelector();
+        buildPeriodSelector();
+    }
+}
+
+// Build Store Selector Buttons
+function buildStoreSelector() {
+    const container = document.getElementById('storeSelector');
+    container.innerHTML = '';
+    
+    dashboardConfig.availableStores.forEach(storeCode => {
+        const displayName = dashboardConfig.storeDisplayNames[storeCode] || storeCode;
+        const isActive = storeCode === dashboardConfig.selectedStore;
+        const storeClass = getStoreClass(storeCode);
+        
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = `btn btn-store ${storeClass} ${isActive ? 'active' : ''}`;
+        button.setAttribute('data-store', storeCode);
+        button.innerHTML = `<i class="fas ${getStoreIcon(storeCode)}"></i> ${displayName.toUpperCase()}`;
+        
+        button.addEventListener('click', () => selectStore(storeCode));
+        container.appendChild(button);
+    });
+}
+
+// Build Period Selector Options
+function buildPeriodSelector() {
+    const select = document.getElementById('periodSelect');
+    select.innerHTML = '';
+    
+    // Add predefined periods
+    dashboardConfig.availablePeriods.forEach(weeks => {
+        const option = document.createElement('option');
+        option.value = weeks;
+        option.textContent = `${weeks} Week${weeks > 1 ? 's' : ''}`;
+        if (weeks === dashboardConfig.selectedPeriod) {
+            option.selected = true;
+        }
+        select.appendChild(option);
+    });
+    
+    // Add custom option if enabled
+    if (dashboardConfig.customPeriodEnabled) {
+        const customOption = document.createElement('option');
+        customOption.value = 'custom';
+        customOption.textContent = 'Custom Period';
+        select.appendChild(customOption);
+    }
+    
+    select.addEventListener('change', handlePeriodChange);
+}
+
+// Handle Store Selection
+function selectStore(storeCode) {
+    dashboardConfig.selectedStore = storeCode;
+    
+    // Update UI
+    document.querySelectorAll('.btn-store').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    document.querySelector(`[data-store="${storeCode}"]`).classList.add('active');
+    
+    // Update description and refresh data
+    updateDescription();
+    saveUserPreferences();
+    refreshDashboardData();
+}
+
+// Handle Period Change
+function handlePeriodChange() {
+    const select = document.getElementById('periodSelect');
+    const customContainer = document.getElementById('customPeriodContainer');
+    
+    if (select.value === 'custom') {
+        customContainer.style.display = 'block';
+        const customInput = document.getElementById('customPeriod');
+        customInput.addEventListener('change', handleCustomPeriodChange);
+    } else {
+        customContainer.style.display = 'none';
+        dashboardConfig.selectedPeriod = parseInt(select.value);
+        updateDescription();
+        saveUserPreferences();
+        refreshDashboardData();
+    }
+}
+
+// Handle Custom Period Input
+function handleCustomPeriodChange() {
+    const customInput = document.getElementById('customPeriod');
+    let customPeriod = parseInt(customInput.value);
+    
+    // Validate range
+    if (customPeriod < dashboardConfig.minPeriod) {
+        customPeriod = dashboardConfig.minPeriod;
+        customInput.value = customPeriod;
+    } else if (customPeriod > dashboardConfig.maxPeriod) {
+        customPeriod = dashboardConfig.maxPeriod;
+        customInput.value = customPeriod;
+    }
+    
+    dashboardConfig.selectedPeriod = customPeriod;
+    updateDescription();
+    saveUserPreferences();
+    refreshDashboardData();
+}
+
+// Handle View Mode Change
+document.querySelectorAll('input[name="viewMode"]').forEach(radio => {
+    radio.addEventListener('change', function() {
+        dashboardConfig.viewMode = this.value;
+        updateDescription();
+        saveUserPreferences();
+        refreshDashboardData();
+    });
+});
+
+// Update View Mode Controls
+function updateViewModeControls() {
+    const averageRadio = document.getElementById('averageMode');
+    const periodRadio = document.getElementById('periodMode');
+    
+    if (dashboardConfig.viewMode === 'period') {
+        periodRadio.checked = true;
+    } else {
+        averageRadio.checked = true;
+    }
+}
+
+// Update Description Text
+function updateDescription() {
+    const description = document.getElementById('viewModeDescription');
+    const storeName = dashboardConfig.storeDisplayNames[dashboardConfig.selectedStore] || 'Selected location';
+    const period = dashboardConfig.selectedPeriod;
+    
+    let text = '';
+    if (dashboardConfig.viewMode === 'average') {
+        text = `${period}-week rolling average for ${storeName.toLowerCase()}`;
+    } else {
+        text = `Individual ${period} week${period > 1 ? 's' : ''} for ${storeName.toLowerCase()}`;
+    }
+    
+    description.textContent = text;
+}
+
+// Save User Preferences
+async function saveUserPreferences() {
+    try {
+        const response = await fetch('/config/api/user-preferences', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                defaults: {
+                    store_filter: dashboardConfig.selectedStore,
+                    preferred_period: dashboardConfig.selectedPeriod,
+                    preferred_mode: dashboardConfig.viewMode,
+                    auto_refresh: dashboardConfig.autoRefresh,
+                    last_custom_period: dashboardConfig.selectedPeriod > 52 ? dashboardConfig.selectedPeriod : null
+                }
+            })
+        });
+        
+        if (response.ok) {
+            console.log('✅ User preferences saved');
+        }
+    } catch (error) {
+        console.error('❌ Error saving preferences:', error);
+    }
+}
+
+// Refresh Dashboard Data
+async function refreshDashboardData() {
+    console.log('🔄 Refreshing dashboard data...', {
+        store: dashboardConfig.selectedStore,
+        period: dashboardConfig.selectedPeriod,
+        mode: dashboardConfig.viewMode
+    });
+    
+    // Update last refresh time
+    document.getElementById('lastUpdateTime').textContent = new Date().toLocaleTimeString();
+    
+    // TODO: Call enhanced API endpoints with new parameters
+    // This will be implemented in the next phase
+}
+
+// Get Store CSS Class
+function getStoreClass(storeCode) {
+    const classes = {
+        'all': 'btn-primary',
+        '3607': 'btn-success',
+        '6800': 'btn-info', 
+        '728': 'btn-warning',
+        '8101': 'btn-danger'
+    };
+    return classes[storeCode] || 'btn-secondary';
+}
+
+// Get Store Icon
+function getStoreIcon(storeCode) {
+    return storeCode === 'all' ? 'fa-building' : 'fa-store';
+}
+
+// Initialize on document ready
+$(document).ready(function() {
+    console.log('🚀 Initializing Dual-Mode Executive Dashboard...');
+    initializeDashboardConfig();
+    
+    // Set up refresh button
+    document.getElementById('refreshDashboard').addEventListener('click', refreshDashboardData);
+    
+    // Set up auto-refresh if enabled
+    if (dashboardConfig.autoRefresh) {
+        setInterval(refreshDashboardData, dashboardConfig.autoRefreshInterval);
+    }
+});
 // Executive Dashboard JavaScript - Enhanced Version with Week-based Filtering
 document.addEventListener('DOMContentLoaded', function() {
     let revenueChart = null;
