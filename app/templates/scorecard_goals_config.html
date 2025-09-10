@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scorecard Goals Configuration</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .store-3607 { border-left: 4px solid #3498db; }
+        .store-6800 { border-left: 4px solid #2ecc71; }
+        .store-728 { border-left: 4px solid #f1c40f; }
+        .store-8101 { border-left: 4px solid #e67e22; }
+        .store-badge {
+            padding: 2px 8px;
+            border-radius: 3px;
+            color: white;
+            font-size: 0.8em;
+            font-weight: bold;
+        }
+        .badge-3607 { background-color: #3498db; }
+        .badge-6800 { background-color: #2ecc71; }
+        .badge-728 { background-color: #f1c40f; }
+        .badge-8101 { background-color: #e67e22; }
+    </style>
+</head>
+<body>
+    <div class="container-fluid mt-4">
+        <div class="row">
+            <div class="col-12">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h1><i class="fas fa-cog me-2"></i>Scorecard Goals Configuration</h1>
+                    <a href="/executive" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left me-1"></i>Back to Dashboard
+                    </a>
+                </div>
+                
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <strong>Configuration Note:</strong> This page provides manual goal entry when CSV data has missing or incorrect goal amounts. 
+                    Changes made here will update the database configuration tables.
+                </div>
+                
+                <form method="POST" action="/executive/scorecard-goals-config/update">
+                    <div class="row">
+                        <!-- Company-wide Goals -->
+                        <div class="col-md-6">
+                            <div class="card mb-4">
+                                <div class="card-header">
+                                    <h5><i class="fas fa-building me-2"></i>Company-wide Goals</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="mb-3">
+                                        <label class="form-label">Monthly Revenue Target ($)</label>
+                                        <input type="number" class="form-control" name="revenue_target_monthly" 
+                                               value="{{ goals.revenue_target_monthly }}" step="1000">
+                                        <small class="text-muted">Weekly goal will be calculated as monthly ÷ 4.33</small>
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label class="form-label">AR Over 45 Days Threshold (%)</label>
+                                        <input type="number" class="form-control" name="ar_aging_threshold" 
+                                               value="{{ goals.ar_aging_threshold }}" step="0.1" min="0" max="100">
+                                        <small class="text-muted">Target maximum percentage for AR aging</small>
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label class="form-label">Deliveries Goal (weekly)</label>
+                                        <input type="number" class="form-control" name="deliveries_goal" 
+                                               value="{{ goals.deliveries_goal }}" min="0">
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label class="form-label">Wage Ratio Target (%)</label>
+                                        <input type="number" class="form-control" name="wage_ratio_goal" 
+                                               value="{{ goals.wage_ratio_goal }}" step="0.1" min="0" max="100">
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label class="form-label">Revenue per Hour Target ($)</label>
+                                        <input type="number" class="form-control" name="revenue_per_hour_goal" 
+                                               value="{{ goals.revenue_per_hour_goal }}" step="1" min="0">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Store-specific Goals -->
+                        <div class="col-md-6">
+                            <div class="card mb-4">
+                                <div class="card-header">
+                                    <h5><i class="fas fa-store me-2"></i>Store-specific Goals</h5>
+                                </div>
+                                <div class="card-body">
+                                    <h6 class="mb-3">Reservation Goals ($)</h6>
+                                    {% for store, amount in goals.reservation_goals.items() %}
+                                    <div class="mb-2">
+                                        <label class="form-label">
+                                            <span class="store-badge badge-{{ store }}">{{ store }}</span>
+                                            {% if store == '3607' %}Wayzata{% elif store == '6800' %}Brooklyn Park{% elif store == '728' %}Elk River{% elif store == '8101' %}Fridley{% endif %}
+                                        </label>
+                                        <input type="number" class="form-control store-{{ store }}" 
+                                               name="reservation_{{ store }}" value="{{ amount }}" step="1000">
+                                    </div>
+                                    {% endfor %}
+                                    
+                                    <h6 class="mb-3 mt-4">Contract Goals (#)</h6>
+                                    {% for store, amount in goals.contract_goals.items() %}
+                                    <div class="mb-2">
+                                        <label class="form-label">
+                                            <span class="store-badge badge-{{ store }}">{{ store }}</span>
+                                            {% if store == '3607' %}Wayzata{% elif store == '6800' %}Brooklyn Park{% elif store == '728' %}Elk River{% elif store == '8101' %}Fridley{% endif %}
+                                        </label>
+                                        <input type="number" class="form-control store-{{ store }}" 
+                                               name="contract_{{ store }}" value="{{ amount }}" min="0">
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="d-flex justify-content-between">
+                                <button type="button" class="btn btn-outline-secondary" onclick="window.history.back()">
+                                    <i class="fas fa-times me-1"></i>Cancel
+                                </button>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-save me-1"></i>Save Configuration
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://kit.fontawesome.com/your-kit-id.js"></script>
+</body>
+</html>

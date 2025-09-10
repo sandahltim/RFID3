@@ -284,6 +284,11 @@ class ConfigurationManager {
             this.saveLaborCostConfiguration();
         });
 
+        document.getElementById('store-goals-form')?.addEventListener('submit', (e) => {
+            e.preventDefault();
+            this.saveStoreGoalsConfiguration();
+        });
+
         // Reset buttons
         document.getElementById('reset-prediction')?.addEventListener('click', () => {
             this.resetConfiguration('prediction');
@@ -311,6 +316,10 @@ class ConfigurationManager {
 
         document.getElementById('reset-labor-cost')?.addEventListener('click', () => {
             this.resetConfiguration('labor-cost');
+        });
+
+        document.getElementById('reset-store-goals')?.addEventListener('click', () => {
+            this.resetConfiguration('store-goals');
         });
 
         // Change detection for unsaved changes warning
@@ -535,6 +544,7 @@ class ConfigurationManager {
         this.loadUserPreferences();
         this.loadExecutiveDashboardConfiguration();
         this.loadLaborCostConfiguration();
+        this.loadStoreGoalsConfiguration();
         
         // Check for draft data
         this.checkForDraftData();
@@ -1740,6 +1750,106 @@ class ConfigurationManager {
         }
         
         return overrides;
+    }
+
+    // Store Goals Configuration Methods
+    async loadStoreGoalsConfiguration() {
+        try {
+            const response = await fetch('/config/api/store-goals-configuration');
+            const result = await response.json();
+            
+            if (result.success) {
+                this.populateStoreGoalsForm(result.data);
+                this.currentConfig.storeGoals = result.data;
+            }
+        } catch (error) {
+            console.error('Error loading store goals configuration:', error);
+        }
+    }
+
+    populateStoreGoalsForm(data) {
+        // Populate company-wide goals
+        if (data.companyGoals) {
+            const goals = data.companyGoals;
+            document.getElementById('monthly_revenue_target').value = goals.monthly_revenue_target || 500000;
+            document.getElementById('ar_aging_threshold').value = goals.ar_aging_threshold || 15;
+            document.getElementById('deliveries_goal').value = goals.deliveries_goal || 50;
+            document.getElementById('wage_ratio_goal').value = goals.wage_ratio_goal || 25;
+            document.getElementById('revenue_per_hour_goal').value = goals.revenue_per_hour_goal || 150;
+        }
+
+        // Populate store-specific goals
+        if (data.storeGoals) {
+            const stores = ['3607', '6800', '728', '8101'];
+            stores.forEach(store => {
+                if (data.storeGoals[store]) {
+                    const storeData = data.storeGoals[store];
+                    document.getElementById(`reservation_${store}`).value = storeData.reservation_goal || 0;
+                    document.getElementById(`contract_${store}`).value = storeData.contract_goal || 0;
+                }
+            });
+        }
+    }
+
+    collectStoreGoalsFormData() {
+        return {
+            companyGoals: {
+                monthly_revenue_target: parseInt(document.getElementById('monthly_revenue_target').value) || 500000,
+                ar_aging_threshold: parseFloat(document.getElementById('ar_aging_threshold').value) || 15,
+                deliveries_goal: parseInt(document.getElementById('deliveries_goal').value) || 50,
+                wage_ratio_goal: parseFloat(document.getElementById('wage_ratio_goal').value) || 25,
+                revenue_per_hour_goal: parseInt(document.getElementById('revenue_per_hour_goal').value) || 150
+            },
+            storeGoals: {
+                '3607': {
+                    reservation_goal: parseInt(document.getElementById('reservation_3607').value) || 0,
+                    contract_goal: parseInt(document.getElementById('contract_3607').value) || 0
+                },
+                '6800': {
+                    reservation_goal: parseInt(document.getElementById('reservation_6800').value) || 0,
+                    contract_goal: parseInt(document.getElementById('contract_6800').value) || 0
+                },
+                '728': {
+                    reservation_goal: parseInt(document.getElementById('reservation_728').value) || 0,
+                    contract_goal: parseInt(document.getElementById('contract_728').value) || 0
+                },
+                '8101': {
+                    reservation_goal: parseInt(document.getElementById('reservation_8101').value) || 0,
+                    contract_goal: parseInt(document.getElementById('contract_8101').value) || 0
+                }
+            }
+        };
+    }
+
+    async saveStoreGoalsConfiguration() {
+        const formData = this.collectStoreGoalsFormData();
+        
+        try {
+            this.showLoadingState('store-goals-form');
+            
+            const response = await fetch('/config/api/store-goals-configuration', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(formData)
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                this.showNotification('success', 'Store Goals configuration saved successfully');
+                this.unsavedChanges = false;
+                this.updateSaveButtonStates();
+            } else {
+                this.showNotification('error', 'Error saving store goals configuration: ' + result.error);
+            }
+        } catch (error) {
+            console.error('Error saving store goals configuration:', error);
+            this.showNotification('error', 'Failed to save store goals configuration');
+        } finally {
+            this.hideLoadingState('store-goals-form');
+        }
     }
 }
 
