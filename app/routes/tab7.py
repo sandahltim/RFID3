@@ -3359,39 +3359,44 @@ def location_specific_kpis(store_code):
         """)
         avg_revenue = session.execute(revenue_query).scalar() or 0
         
-        # STANDARDIZED: Dynamic 3-year YoY comparison matching company total (FIXED: 3 weeks = 21 days)
+        # FIXED 2025-09-09: Store-level Year-to-Date YoY calculation (matching company total fix)
+        # Compare YTD current year vs YTD last year + YTD last year vs YTD two years ago
         yoy_query = text(f"""
             SELECT 
-                AVG(CASE WHEN week_ending >= DATE_SUB(DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) DAY), INTERVAL 21 DAY)
-                         AND week_ending < DATE_SUB(DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) DAY), INTERVAL 0 DAY)
-                    THEN revenue_{store_code} END) as current_year,
-                AVG(CASE WHEN week_ending >= DATE_SUB(DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) DAY), INTERVAL 386 DAY)
-                         AND week_ending < DATE_SUB(DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) DAY), INTERVAL 365 DAY)
-                    THEN revenue_{store_code} END) as last_year,
-                AVG(CASE WHEN week_ending >= DATE_SUB(DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) DAY), INTERVAL 751 DAY)
-                         AND week_ending < DATE_SUB(DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) DAY), INTERVAL 730 DAY)
-                    THEN revenue_{store_code} END) as two_years_ago
+                SUM(CASE WHEN week_ending >= MAKEDATE(YEAR(CURDATE()), 1) 
+                         AND week_ending <= CURDATE()
+                         AND YEAR(week_ending) = YEAR(CURDATE())
+                    THEN revenue_{store_code} END) as current_ytd,
+                SUM(CASE WHEN week_ending >= MAKEDATE(YEAR(CURDATE()) - 1, 1)
+                         AND week_ending <= DATE_SUB(CURDATE(), INTERVAL 1 YEAR)
+                         AND YEAR(week_ending) = YEAR(CURDATE()) - 1
+                    THEN revenue_{store_code} END) as last_year_ytd,
+                SUM(CASE WHEN week_ending >= MAKEDATE(YEAR(CURDATE()) - 2, 1)
+                         AND week_ending <= DATE_SUB(CURDATE(), INTERVAL 2 YEAR)
+                         AND YEAR(week_ending) = YEAR(CURDATE()) - 2
+                    THEN revenue_{store_code} END) as two_years_ago_ytd
             FROM scorecard_trends_data 
-            WHERE revenue_{store_code} IS NOT NULL
+            WHERE revenue_{store_code} IS NOT NULL 
+                AND revenue_{store_code} > 0
         """)
         yoy_result = session.execute(yoy_query).fetchone()
         
         yoy_growth = 0
         yoy_comparison = 0
-        if yoy_result and yoy_result.current_year and yoy_result.last_year and yoy_result.last_year > 0:
-            current_year = float(yoy_result.current_year)
-            last_year = float(yoy_result.last_year)
-            # Main YoY: Current year vs last year
-            yoy_growth = ((current_year - last_year) / last_year) * 100
+        if yoy_result and yoy_result.current_ytd and yoy_result.last_year_ytd and yoy_result.last_year_ytd > 0:
+            current_ytd = float(yoy_result.current_ytd)
+            last_year_ytd = float(yoy_result.last_year_ytd)
+            # Main YoY: Current YTD vs Last Year YTD
+            yoy_growth = ((current_ytd - last_year_ytd) / last_year_ytd) * 100
             
-            # Calculate last year vs two years ago YoY for comparison
-            if yoy_result.two_years_ago and yoy_result.two_years_ago > 0:
-                two_years_ago = float(yoy_result.two_years_ago)
-                last_year_yoy = ((last_year - two_years_ago) / two_years_ago) * 100
-                # Secondary YoY comparison: How current YoY compares to last year's YoY (percentage point difference)
+            # Calculate last year YTD vs two years ago YTD for comparison
+            if yoy_result.two_years_ago_ytd and yoy_result.two_years_ago_ytd > 0:
+                two_years_ago_ytd = float(yoy_result.two_years_ago_ytd)
+                last_year_yoy = ((last_year_ytd - two_years_ago_ytd) / two_years_ago_ytd) * 100
+                # Secondary YoY comparison: How current YTD YoY compares to last year's YTD YoY (percentage point difference)
                 yoy_comparison = yoy_growth - last_year_yoy
                 
-            logger.info(f"Store {store_code} Dynamic YoY: Current={current_year:,.0f}, Last={last_year:,.0f}, YoY={yoy_growth:.1f}%, Comparison={yoy_comparison:.1f}pp")
+            logger.info(f"Store {store_code} YTD YoY: Current=${current_ytd:,.0f}, Last=${last_year_ytd:,.0f}, YoY={yoy_growth:.1f}%, Comparison={yoy_comparison:.1f}pp")
         
         # Get profit margin from payroll data (with type conversion)
         profit_margin_query = session.query(PayrollTrends).filter(
@@ -3410,7 +3415,7 @@ def location_specific_kpis(store_code):
                 COUNT(CASE WHEN status IN ('fully_rented', 'partially_rented') THEN 1 END) * 100.0
                 / NULLIF(COUNT(*), 0) as utilization_rate
             FROM combined_inventory 
-            WHERE store_code = :store_code
+            WHERE store_code = :store_code AND rental_rate > 0
         """)
         utilization_result = session.execute(utilization_query, {'store_code': store_code}).fetchone()
         utilization_avg = float(utilization_result.utilization_rate or 0) if utilization_result else 0
@@ -3907,6 +3912,381 @@ def add_custom_insight():
         
     except Exception as e:
         logger.error(f"Error adding custom insight: {str(e)}", exc_info=True)
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@executive_api_bp.route("/api/comprehensive-scorecard-matrix", methods=["GET"])
+def _calculate_metric_periods(session, table_name, column_name, location_filter=None, location_value=None):
+    """
+    SYSTEMATIC REUSABLE CALCULATION FUNCTION - Based on working Total Weekly Revenue pattern
+    Calculates all time periods and trailing averages for any metric using CTE approach
+    
+    Args:
+        session: Database session
+        table_name: Source table (e.g., 'scorecard_trends_data', 'payroll_trends_data')
+        column_name: Column to calculate (e.g., 'total_weekly_revenue', 'revenue_3607')
+        location_filter: Optional column name for location filtering (e.g., 'location_code')
+        location_value: Optional value for location filtering
+    
+    Returns:
+        dict with all calculated periods and averages
+    """
+    try:
+        # Build the base query with location filtering if needed
+        where_clause = f"WHERE {column_name} IS NOT NULL"
+        params = {}
+        
+        if location_filter and location_value:
+            where_clause += f" AND {location_filter} = :location_value"
+            params['location_value'] = location_value
+        
+        # Use the proven CTE approach from Total Weekly Revenue
+        metric_query = text(f"""
+            WITH current_data AS (
+                SELECT 
+                    week_ending,
+                    {column_name} as metric_value,
+                    ROW_NUMBER() OVER (ORDER BY week_ending DESC) as week_rank
+                FROM {table_name}
+                {where_clause}
+                ORDER BY week_ending DESC 
+                LIMIT 10
+            ),
+            previous_year_data AS (
+                SELECT 
+                    week_ending,
+                    {column_name} as metric_value,
+                    ROW_NUMBER() OVER (ORDER BY week_ending DESC) as week_rank
+                FROM {table_name}
+                {where_clause}
+                AND week_ending BETWEEN DATE_SUB(CURDATE(), INTERVAL 53 WEEK) 
+                                   AND DATE_SUB(CURDATE(), INTERVAL 50 WEEK)
+                ORDER BY week_ending DESC 
+                LIMIT 10
+            )
+            SELECT 'current' as period, week_ending, metric_value, week_rank FROM current_data
+            UNION ALL
+            SELECT 'previous_year' as period, week_ending, metric_value, week_rank FROM previous_year_data
+            ORDER BY period DESC, week_rank ASC
+        """)
+        
+        metric_data = session.execute(metric_query, params).fetchall()
+        
+        # Process the data using the same logic as Total Weekly Revenue
+        periods = {}
+        trailing_3w_current = []
+        trailing_3w_prev_year = []
+        trailing_3w_prev_year_forward = []
+        
+        current_data = [row for row in metric_data if row.period == 'current']
+        prev_year_data = [row for row in metric_data if row.period == 'previous_year']
+        
+        # Process current period data
+        for row in current_data:
+            week_rank = row.week_rank
+            value = float(row.metric_value) if row.metric_value else 0
+            
+            if week_rank == 1:  # Current week
+                periods['current_week'] = value
+                trailing_3w_current.append(value)
+            elif week_rank == 2:  # Previous week  
+                periods['previous_week'] = value
+                trailing_3w_current.append(value)
+            elif week_rank == 3:  # -2 weeks
+                periods['minus_2_week'] = value
+                trailing_3w_current.append(value)
+            elif week_rank == 4:  # -3 weeks
+                periods['minus_3_week'] = value
+        
+        # Process previous year data
+        if prev_year_data:
+            # Previous year same week (closest match)
+            periods['previous_year'] = float(prev_year_data[0].metric_value) if prev_year_data[0].metric_value else 0
+            
+            # Previous year trailing 3w (weeks leading up to same period last year)
+            for row in prev_year_data[:3]:
+                if row.metric_value:
+                    trailing_3w_prev_year.append(float(row.metric_value))
+            
+            # Previous year 3w forward (weeks following same period last year)
+            for row in prev_year_data[1:4]:  # Skip first (same week), take next 3
+                if row.metric_value:
+                    trailing_3w_prev_year_forward.append(float(row.metric_value))
+        
+        return {
+            'periods': periods,
+            'current_trailing_3w_avg': round(sum(trailing_3w_current) / len(trailing_3w_current), 2) if trailing_3w_current else 0,
+            'prev_year_trailing_3w': round(sum(trailing_3w_prev_year) / len(trailing_3w_prev_year), 2) if trailing_3w_prev_year else 0,
+            'prev_year_3w_forward': round(sum(trailing_3w_prev_year_forward) / len(trailing_3w_prev_year_forward), 2) if trailing_3w_prev_year_forward else 0
+        }
+        
+    except Exception as e:
+        logger.error(f"Error in _calculate_metric_periods for {column_name}: {str(e)}")
+        return {
+            'periods': {'current_week': 0, 'previous_week': 0, 'minus_2_week': 0, 'minus_3_week': 0, 'previous_year': 0},
+            'current_trailing_3w_avg': 0,
+            'prev_year_trailing_3w': 0,
+            'prev_year_3w_forward': 0
+        }
+
+def comprehensive_scorecard_matrix():
+    """
+    ADDED 2025-09-09: Comprehensive Executive Scorecard Matrix
+    All datapoints: -3, -2, Previous Week, Current Week, Previous Year, Plus/Minus Goal,
+    Current Trailing 3w average, Prev Year Trailing 3w, Prev Year 3w Forward
+    
+    UPDATED 2025-09-10: Systematic calculation using reusable function for ALL metrics
+    """
+    try:
+        session = db.session
+        
+        # Get current week and calculate periods
+        current_date = datetime.now()
+        
+        # Define weeks relative to current week
+        periods = {
+            'current_week': 0,
+            'previous_week': 1, 
+            'minus_2_week': 2,
+            'minus_3_week': 3,
+            'previous_year': 52  # 52 weeks ago
+        }
+        
+        # Initialize comprehensive matrix
+        scorecard_matrix = {
+            "metadata": {
+                "generated_at": current_date.isoformat(),
+                "current_week_ending": None,
+                "data_freshness": "real_time"
+            },
+            "metrics": {}
+        }
+        
+        # Get the most recent week ending for reference
+        week_query = text("""
+            SELECT week_ending FROM scorecard_trends_data 
+            WHERE total_weekly_revenue IS NOT NULL 
+            ORDER BY week_ending DESC LIMIT 1
+        """)
+        latest_week = session.execute(week_query).fetchone()
+        if latest_week:
+            scorecard_matrix["metadata"]["current_week_ending"] = latest_week.week_ending.isoformat()
+        
+        # METRIC 1: Total Weekly Revenue - Using systematic calculation function
+        total_revenue_calc = _calculate_metric_periods(session, 'scorecard_trends_data', 'total_weekly_revenue')
+        
+        scorecard_matrix["metrics"]["Total Weekly Revenue"] = {
+            "minus_3": total_revenue_calc['periods'].get('minus_3_week', 0),
+            "minus_2": total_revenue_calc['periods'].get('minus_2_week', 0), 
+            "previous_week": total_revenue_calc['periods'].get('previous_week', 0),
+            "current_week": total_revenue_calc['periods'].get('current_week', 0),
+            "previous_year": total_revenue_calc['periods'].get('previous_year', 0),
+            "plus_minus_goal": 100000,  # Goal value - make configurable later
+            "current_trailing_3w_avg": round(total_revenue_calc['current_trailing_3w_avg'], 0),
+            "prev_year_trailing_3w": round(total_revenue_calc['prev_year_trailing_3w'], 0),
+            "prev_year_3w_forward": round(total_revenue_calc['prev_year_3w_forward'], 0),
+            "format": "currency",
+            "units": "$"
+        }
+        
+        # METRIC 2: % of Total AR ($) over 45 days - Using systematic calculation function
+        ar_calc = _calculate_metric_periods(session, 'scorecard_trends_data', 'ar_over_45_days_percent')
+        
+        scorecard_matrix["metrics"]["% of Total AR ($) over 45 days (all stores)"] = {
+            "minus_3": ar_calc['periods'].get('minus_3_week', 0),
+            "minus_2": ar_calc['periods'].get('minus_2_week', 0),
+            "previous_week": ar_calc['periods'].get('previous_week', 0),
+            "current_week": ar_calc['periods'].get('current_week', 0), 
+            "previous_year": ar_calc['periods'].get('previous_year', 0),
+            "plus_minus_goal": 15,  # Goal: keep under 15%
+            "current_trailing_3w_avg": round(ar_calc['current_trailing_3w_avg'], 1),
+            "prev_year_trailing_3w": round(ar_calc['prev_year_trailing_3w'], 1),
+            "prev_year_3w_forward": round(ar_calc['prev_year_3w_forward'], 1),
+            "format": "percentage",
+            "units": "%"
+        }
+        
+        # METRICS 3-6: Store-specific reservations and contracts - Using systematic calculation function
+        stores = ['3607', '6800', '728', '8101']
+        store_names = {'3607': 'Wayzata', '6800': 'Brooklyn Park', '728': 'Elk River', '8101': 'Fridley'}
+        
+        for store in stores:
+            store_name = store_names[store]
+            
+            # Reservations - Using systematic calculation
+            reservation_calc = _calculate_metric_periods(session, 'scorecard_trends_data', f'total_reservation_{store}')
+            reservation_goals = {'3607': 10000, '6800': 15000, '728': 2000, '8101': 250000}
+            
+            scorecard_matrix["metrics"][f"Total $ on Reservation {store}"] = {
+                "minus_3": reservation_calc['periods'].get('minus_3_week', 0),
+                "minus_2": reservation_calc['periods'].get('minus_2_week', 0),
+                "previous_week": reservation_calc['periods'].get('previous_week', 0),
+                "current_week": reservation_calc['periods'].get('current_week', 0),
+                "previous_year": reservation_calc['periods'].get('previous_year', 0),
+                "plus_minus_goal": reservation_goals[store],
+                "current_trailing_3w_avg": round(reservation_calc['current_trailing_3w_avg'], 0),
+                "prev_year_trailing_3w": round(reservation_calc['prev_year_trailing_3w'], 0),
+                "prev_year_3w_forward": round(reservation_calc['prev_year_3w_forward'], 0),
+                "format": "currency", 
+                "units": "$",
+                "store_name": store_name
+            }
+            
+            # New Contracts - Using systematic calculation
+            contract_calc = _calculate_metric_periods(session, 'scorecard_trends_data', f'new_contracts_{store}')
+            contract_goals = {'3607': 150, '6800': 140, '728': 85, '8101': 65}
+            
+            scorecard_matrix["metrics"][f"# New Open Contracts {store}"] = {
+                "minus_3": contract_calc['periods'].get('minus_3_week', 0),
+                "minus_2": contract_calc['periods'].get('minus_2_week', 0),
+                "previous_week": contract_calc['periods'].get('previous_week', 0),
+                "current_week": contract_calc['periods'].get('current_week', 0),
+                "previous_year": contract_calc['periods'].get('previous_year', 0),
+                "plus_minus_goal": contract_goals[store],
+                "current_trailing_3w_avg": round(contract_calc['current_trailing_3w_avg'], 0),
+                "prev_year_trailing_3w": round(contract_calc['prev_year_trailing_3w'], 0),
+                "prev_year_3w_forward": round(contract_calc['prev_year_3w_forward'], 0),
+                "format": "integer",
+                "units": "#",
+                "store_name": store_name
+            }
+        
+        # Delivery scheduling for 8101 (Fridley) - Using systematic calculation
+        delivery_calc = _calculate_metric_periods(session, 'scorecard_trends_data', 'deliveries_scheduled_8101')
+        
+        scorecard_matrix["metrics"]["# Deliveries Scheduled next 7 days Weds-Tues 8101"] = {
+            "minus_3": delivery_calc['periods'].get('minus_3_week', 0),
+            "minus_2": delivery_calc['periods'].get('minus_2_week', 0),
+            "previous_week": delivery_calc['periods'].get('previous_week', 0),
+            "current_week": delivery_calc['periods'].get('current_week', 0),
+            "previous_year": delivery_calc['periods'].get('previous_year', 0),
+            "plus_minus_goal": 12,  # Goal: 12 deliveries scheduled
+            "current_trailing_3w_avg": round(delivery_calc['current_trailing_3w_avg'], 0),
+            "prev_year_trailing_3w": round(delivery_calc['prev_year_trailing_3w'], 0),
+            "prev_year_3w_forward": round(delivery_calc['prev_year_3w_forward'], 0),
+            "format": "integer",
+            "units": "#"
+        }
+        
+        # PAYROLL INTEGRATION: Revenue and Wage Metrics by Store - Using systematic calculation function  
+        for store in stores:
+            store_name = store_names[store]
+            location_code = store  # Use store code as location code
+            
+            # Revenue from scorecard - Using systematic calculation
+            store_revenue_calc = _calculate_metric_periods(session, 'scorecard_trends_data', f'revenue_{store}')
+            
+            # Payroll data - Using systematic calculation with location filtering
+            payroll_calc = _calculate_metric_periods(session, 'payroll_trends_data', 'payroll_amount', 'location_code', location_code)
+            wage_hours_calc = _calculate_metric_periods(session, 'payroll_trends_data', 'wage_hours', 'location_code', location_code)
+            
+            # Revenue metrics
+            scorecard_matrix["metrics"][f"Revenue {store}"] = {
+                "minus_3": store_revenue_calc['periods'].get('minus_3_week', 0),
+                "minus_2": store_revenue_calc['periods'].get('minus_2_week', 0),
+                "previous_week": store_revenue_calc['periods'].get('previous_week', 0),
+                "current_week": store_revenue_calc['periods'].get('current_week', 0),
+                "previous_year": store_revenue_calc['periods'].get('previous_year', 0),
+                "plus_minus_goal": 0,  # No specific goal yet
+                "current_trailing_3w_avg": round(store_revenue_calc['current_trailing_3w_avg'], 0),
+                "prev_year_trailing_3w": round(store_revenue_calc['prev_year_trailing_3w'], 0),
+                "prev_year_3w_forward": round(store_revenue_calc['prev_year_3w_forward'], 0),
+                "format": "currency",
+                "units": "$",
+                "store_name": store_name
+            }
+            
+            # Wage metrics  
+            scorecard_matrix["metrics"][f"Wages {store}"] = {
+                "minus_3": payroll_calc['periods'].get('minus_3_week', 0),
+                "minus_2": payroll_calc['periods'].get('minus_2_week', 0),
+                "previous_week": payroll_calc['periods'].get('previous_week', 0),
+                "current_week": payroll_calc['periods'].get('current_week', 0),
+                "previous_year": payroll_calc['periods'].get('previous_year', 0),
+                "plus_minus_goal": 0,  # Set target later
+                "current_trailing_3w_avg": round(payroll_calc['current_trailing_3w_avg'], 0),
+                "prev_year_trailing_3w": round(payroll_calc['prev_year_trailing_3w'], 0),
+                "prev_year_3w_forward": round(payroll_calc['prev_year_3w_forward'], 0),
+                "format": "currency", 
+                "units": "$",
+                "store_name": store_name
+            }
+            
+            # Calculate wage vs rental revenue % using systematic data
+            wage_pct_periods = {}
+            wage_pct_trailing = []
+            wage_pct_prev_year_trailing = []
+            wage_pct_prev_year_forward = []
+            
+            for period in ['minus_3_week', 'minus_2_week', 'previous_week', 'current_week']:
+                revenue = store_revenue_calc['periods'].get(period, 0)
+                wages = payroll_calc['periods'].get(period, 0)
+                if revenue > 0:
+                    wage_pct = round((wages / revenue) * 100, 1)
+                    wage_pct_periods[period] = wage_pct
+                    if period != 'minus_3_week':  # Include in trailing 3w
+                        wage_pct_trailing.append(wage_pct)
+                else:
+                    wage_pct_periods[period] = 0
+            
+            # Calculate previous year wage percentages for trailing averages
+            prev_year_revenue = store_revenue_calc['periods'].get('previous_year', 0)
+            prev_year_wages = payroll_calc['periods'].get('previous_year', 0)
+            prev_year_wage_pct = round((prev_year_wages / prev_year_revenue) * 100, 1) if prev_year_revenue > 0 else 0
+            
+            scorecard_matrix["metrics"][f"Wage vs Rental Rev {store}"] = {
+                "minus_3": wage_pct_periods.get('minus_3_week', 0),
+                "minus_2": wage_pct_periods.get('minus_2_week', 0),
+                "previous_week": wage_pct_periods.get('previous_week', 0),
+                "current_week": wage_pct_periods.get('current_week', 0),
+                "previous_year": prev_year_wage_pct,
+                "plus_minus_goal": 25,  # Target: 25% wage ratio
+                "current_trailing_3w_avg": round(sum(wage_pct_trailing) / len(wage_pct_trailing), 1) if wage_pct_trailing else 0,
+                "prev_year_trailing_3w": prev_year_wage_pct,  # Use single prev year value for now
+                "prev_year_3w_forward": prev_year_wage_pct,  # Use single prev year value for now
+                "format": "percentage",
+                "units": "%",
+                "store_name": store_name
+            }
+            
+            # Calculate revenue per hour using systematic data
+            rev_per_hour_periods = {}
+            rev_per_hour_trailing = []
+            
+            for period in ['minus_3_week', 'minus_2_week', 'previous_week', 'current_week']:
+                revenue = store_revenue_calc['periods'].get(period, 0)
+                hours = wage_hours_calc['periods'].get(period, 0)
+                if hours > 0:
+                    rev_per_hour = round(revenue / hours, 2)
+                    rev_per_hour_periods[period] = rev_per_hour
+                    if period != 'minus_3_week':  # Include in trailing 3w
+                        rev_per_hour_trailing.append(rev_per_hour)
+                else:
+                    rev_per_hour_periods[period] = 0
+            
+            # Calculate previous year revenue per hour
+            prev_year_hours = wage_hours_calc['periods'].get('previous_year', 0)
+            prev_year_rev_per_hour = round(prev_year_revenue / prev_year_hours, 2) if prev_year_hours > 0 else 0
+            
+            scorecard_matrix["metrics"][f"Rev per Hr {store}"] = {
+                "minus_3": rev_per_hour_periods.get('minus_3_week', 0),
+                "minus_2": rev_per_hour_periods.get('minus_2_week', 0),
+                "previous_week": rev_per_hour_periods.get('previous_week', 0),
+                "current_week": rev_per_hour_periods.get('current_week', 0),
+                "previous_year": prev_year_rev_per_hour,
+                "plus_minus_goal": 85,  # Target: $85/hour
+                "current_trailing_3w_avg": round(sum(rev_per_hour_trailing) / len(rev_per_hour_trailing), 2) if rev_per_hour_trailing else 0,
+                "prev_year_trailing_3w": prev_year_rev_per_hour,  # Use single prev year value for now
+                "prev_year_3w_forward": prev_year_rev_per_hour,  # Use single prev year value for now
+                "format": "currency",
+                "units": "$/hr",
+                "store_name": store_name
+            }
+        
+        logger.info("Comprehensive scorecard matrix generated successfully")
+        return jsonify(scorecard_matrix)
+        
+    except Exception as e:
+        logger.error(f"Error in comprehensive scorecard matrix: {str(e)}", exc_info=True)
         return jsonify({"success": False, "error": str(e)}), 500
 
 # Register the executive blueprint
