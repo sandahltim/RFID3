@@ -833,3 +833,15 @@ h4 {
         display: none !important;
     }
 }
+
+/* Fix for Labor Cost and Store Goals panels - override Bootstrap fade transition */
+#labor-cost-panel.fade,
+#store-goals-panel.fade {
+    opacity: 1 !important;
+    transition: none !important;
+}
+
+#labor-cost-panel.fade.show,
+#store-goals-panel.fade.show {
+    opacity: 1 !important;
+}

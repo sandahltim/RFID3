@@ -1,0 +1,28 @@
+{
+  "timestamp": "20250907_210522",
+  "results": {
+    "function_definition": "PASS",
+    "function_call": "PASS",
+    "config_window_dashboardConfig": "PASS",
+    "config_config_access": "PASS",
+    "config_config_check": "PASS",
+    "dom_querySelector_usage": "PASS",
+    "dom_header_selection": "PASS",
+    "dom_style_hiding": "PASS",
+    "dom_text_content_check": "PASS",
+    "dom_current_week_text": "PASS",
+    "template_if_statement": "PASS",
+    "template_endif_statement": "PASS",
+    "template_current_week_header": "PASS",
+    "template_current_week_cell": "FAIL",
+    "template_balance": "PASS",
+    "simulation": "FAIL",
+    "test_page_creation": "PASS"
+  },
+  "summary": {
+    "total": 17,
+    "passed": 15,
+    "failed": 2,
+    "success_rate": 88.23529411764706
+  }
+}

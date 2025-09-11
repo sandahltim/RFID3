@@ -4,6 +4,41 @@
  * Version: 2025-08-29
  */
 
+console.log('Configuration.js loaded at:', new Date().toISOString());
+
+// ConfigurationManager class definition
+
+// EMERGENCY TAB FIX - Direct DOM manipulation
+document.addEventListener('DOMContentLoaded', () => {
+    console.log('🚨 EMERGENCY TAB FIX LOADED');
+    setTimeout(() => {
+        const tabs = document.querySelectorAll('[data-bs-toggle="pill"]');
+        const panels = document.querySelectorAll('.tab-pane');
+        console.log('🚨 Found tabs:', tabs.length, 'panels:', panels.length);
+        
+        tabs.forEach(tab => {
+            tab.addEventListener('click', (e) => {
+                console.log('🚨 EMERGENCY: Tab clicked:', tab.id);
+                e.preventDefault();
+                
+                // Remove active from all tabs and panels
+                tabs.forEach(t => t.classList.remove('active'));
+                panels.forEach(p => p.classList.remove('active', 'show'));
+                
+                // Add active to clicked tab
+                tab.classList.add('active');
+                
+                // Show target panel
+                const targetId = tab.getAttribute('data-bs-target');
+                const targetPanel = document.querySelector(targetId);
+                if (targetPanel) {
+                    targetPanel.classList.add('active', 'show');
+                    console.log('🚨 EMERGENCY: Panel activated:', targetPanel.id);
+                }
+            });
+        });
+    }, 500);
+});
 
 class ConfigurationManager {
     constructor() {
@@ -148,6 +183,7 @@ class ConfigurationManager {
             const targetPanel = document.querySelector(targetId);
             if (targetPanel) {
                 targetPanel.classList.add('active', 'show');
+                
                 console.log('Panel activated:', targetPanel.id);
             } else {
                 console.error('Target panel not found:', targetId);
@@ -200,6 +236,26 @@ class ConfigurationManager {
             // Handle shown events for Bootstrap completion
             tab.addEventListener('shown.bs.tab', (event) => {
                 console.log('Tab shown:', event.target.id);
+                
+                // Reload configuration when specific tabs are shown
+                console.log('🔧 Checking tab ID for configuration reload:', event.target.id);
+                if (event.target.id === 'labor-cost-tab') {
+                    console.log('🔧 Triggering Labor Cost configuration reload...');
+                    setTimeout(() => {
+                        this.loadLaborCostConfiguration();
+                    }, 100);
+                } else if (event.target.id === 'executive-dashboard-tab') {
+                    console.log('🔧 Triggering Executive Dashboard configuration reload...');
+                    setTimeout(() => {
+                        this.loadExecutiveDashboardConfiguration();
+                    }, 100);
+                } else if (event.target.id === 'store-goals-tab') {
+                    console.log('🔧 Triggering Store Goals configuration reload...');
+                    setTimeout(() => {
+                        this.loadStoreGoalsConfiguration();
+                    }, 100);
+                }
+                
                 this.onTabChange(event.target);
             });
             
@@ -245,6 +301,11 @@ class ConfigurationManager {
             this.saveLaborCostConfiguration();
         });
 
+        document.getElementById('store-goals-form')?.addEventListener('submit', (e) => {
+            e.preventDefault();
+            this.saveStoreGoalsConfiguration();
+        });
+
         // Reset buttons
         document.getElementById('reset-prediction')?.addEventListener('click', () => {
             this.resetConfiguration('prediction');
@@ -272,6 +333,10 @@ class ConfigurationManager {
 
         document.getElementById('reset-labor-cost')?.addEventListener('click', () => {
             this.resetConfiguration('labor-cost');
+        });
+
+        document.getElementById('reset-store-goals')?.addEventListener('click', () => {
+            this.resetConfiguration('store-goals');
         });
 
         // Change detection for unsaved changes warning
@@ -496,6 +561,7 @@ class ConfigurationManager {
         this.loadUserPreferences();
         this.loadExecutiveDashboardConfiguration();
         this.loadLaborCostConfiguration();
+        this.loadStoreGoalsConfiguration();
         
         // Check for draft data
         this.checkForDraftData();
@@ -824,11 +890,14 @@ class ConfigurationManager {
             document.getElementById('dark_mode').checked = dashboard.dark_mode;
         }
 
-        // Populate defaults
+        // Populate defaults (updated field names)
         if (data.defaults) {
             const defaults = data.defaults;
-            document.getElementById('default_time_range').value = defaults.time_range;
-            document.getElementById('default_store').value = defaults.store_filter;
+            const chartRangeEl = document.getElementById('default_chart_display_range');
+            const storeViewEl = document.getElementById('default_store_view');
+            
+            if (chartRangeEl) chartRangeEl.value = defaults.time_range || '30_days';
+            if (storeViewEl) storeViewEl.value = defaults.store_filter || 'all';
             document.getElementById('auto_refresh_ui').checked = defaults.auto_refresh;
             document.getElementById('refresh_interval_ui').value = defaults.refresh_interval;
         }
@@ -1236,8 +1305,8 @@ class ConfigurationManager {
                 dark_mode: document.getElementById('dark_mode').checked
             },
             defaults: {
-                time_range: document.getElementById('default_time_range').value,
-                store_filter: document.getElementById('default_store').value,
+                time_range: document.getElementById('default_chart_display_range')?.value || '30_days',
+                store_filter: document.getElementById('default_store_view')?.value || 'all',
                 auto_refresh: document.getElementById('auto_refresh_ui').checked,
                 refresh_interval: parseInt(document.getElementById('refresh_interval_ui').value)
             },
@@ -1312,14 +1381,41 @@ class ConfigurationManager {
     }
 
     onTabChange(tab) {
-        const targetId = tab.getAttribute('data-bs-target');
-        console.log('Tab changed to:', targetId);
-        
-        // Update URL hash without triggering page reload
-        const hashName = targetId.replace('#', '').replace('-panel', '');
-        history.replaceState(null, null, `#${hashName}`);
-        
-        // Any tab-specific initialization can go here
+        try {
+            const targetId = tab.getAttribute('data-bs-target');
+            console.log('Tab changed to:', targetId);
+            console.log('🔧 onTabChange DEBUG - tab object:', tab);
+            console.log('🔧 onTabChange DEBUG - tab.id:', tab.id);
+            
+            // Update URL hash without triggering page reload
+            if (targetId) {
+                const hashName = targetId.replace('#', '').replace('-panel', '');
+                history.replaceState(null, null, `#${hashName}`);
+                console.log('🔧 Updated hash to:', hashName);
+            }
+            
+            // Tab-specific configuration loading
+            console.log('🔧 onTabChange triggered for:', tab.id);
+            if (tab.id === 'labor-cost-tab') {
+                console.log('🔧 Loading Labor Cost configuration via onTabChange...');
+                setTimeout(() => {
+                    this.loadLaborCostConfiguration();
+                }, 200);
+            } else if (tab.id === 'store-goals-tab') {
+                console.log('🔧 Loading Store Goals configuration via onTabChange...');
+                setTimeout(() => {
+                    this.loadStoreGoalsConfiguration();
+                }, 200);
+            } else if (tab.id === 'executive-dashboard-tab') {
+                console.log('🔧 Loading Executive Dashboard configuration via onTabChange...');
+                setTimeout(() => {
+                    this.loadExecutiveDashboardConfiguration();
+                }, 200);
+            }
+            console.log('🔧 onTabChange completed successfully');
+        } catch (error) {
+            console.error('❌ Error in onTabChange:', error);
+        }
     }
 
     saveCurrentConfiguration() {
@@ -1506,38 +1602,31 @@ class ConfigurationManager {
         }
 
         // Populate health scoring
-        if (data.health_scoring) {
-            const health = data.health_scoring;
-            document.getElementById('base_health_score').value = health.base_health_score || 75;
-            document.getElementById('min_health_score').value = health.min_health_score || 0;
-            document.getElementById('max_health_score').value = health.max_health_score || 100;
-        }
-
-        // Populate utilization scoring
+        // Health thresholds are actually in utilization_scoring, not health_scoring
         if (data.utilization_scoring) {
             const util = data.utilization_scoring;
-            document.getElementById('utilization_excellent_threshold').value = util.excellent_threshold || 85.0;
-            document.getElementById('utilization_good_threshold').value = util.good_threshold || 75.0;
-            document.getElementById('utilization_fair_threshold').value = util.fair_threshold || 65.0;
-            document.getElementById('utilization_poor_threshold').value = util.poor_threshold || 50.0;
-            document.getElementById('utilization_excellent_points').value = util.excellent_points || 25;
-            document.getElementById('utilization_good_points').value = util.good_points || 20;
-            document.getElementById('utilization_fair_points').value = util.fair_points || 15;
-            document.getElementById('utilization_poor_points').value = util.poor_points || 10;
+            const excellentEl = document.getElementById('health_excellent_threshold');
+            const goodEl = document.getElementById('health_good_threshold');
+            const fairEl = document.getElementById('health_fair_threshold');
+            
+            if (excellentEl) excellentEl.value = Math.round((util.excellent_threshold || 0.9) * 100);
+            if (goodEl) goodEl.value = Math.round((util.good_threshold || 0.75) * 100);
+            if (fairEl) fairEl.value = Math.round((util.fair_threshold || 0.5) * 100);
         }
         
+        // Predictive health is placeholder - not yet implemented
+        const predictiveEl = document.getElementById('enable_predictive_health');
+        if (predictiveEl) {
+            predictiveEl.checked = false; // Placeholder - always false until implemented
+            predictiveEl.disabled = true; // Keep disabled as placeholder
+        }
+
         // Populate revenue tiers
         if (data.revenue_tiers) {
             const tiers = data.revenue_tiers;
-            document.getElementById('revenue_tier_1_threshold').value = tiers.tier_1_threshold || 100000;
-            document.getElementById('revenue_tier_2_threshold').value = tiers.tier_2_threshold || 75000;
-            document.getElementById('revenue_tier_3_threshold').value = tiers.tier_3_threshold || 50000;
-        }
-        
-        // Populate display settings
-        if (data.display_settings) {
-            const display = data.display_settings;
-            document.getElementById('current_week_view_enabled').checked = display.current_week_view_enabled !== false;
+            document.getElementById('tier_1_threshold').value = tiers.tier_1_threshold || 10000;
+            document.getElementById('tier_2_threshold').value = tiers.tier_2_threshold || 50000;
+            document.getElementById('tier_3_threshold').value = tiers.tier_3_threshold || 100000;
         }
     }
 
@@ -1556,27 +1645,15 @@ class ConfigurationManager {
                 forecasting_historical_weeks: parseInt(document.getElementById('forecasting_historical_weeks').value) || 52
             },
             health_scoring: {
-                base_health_score: parseFloat(document.getElementById('base_health_score').value) || 75,
-                min_health_score: parseFloat(document.getElementById('min_health_score').value) || 0,
-                max_health_score: parseFloat(document.getElementById('max_health_score').value) || 100
-            },
-            utilization_scoring: {
-                excellent_threshold: parseFloat(document.getElementById('utilization_excellent_threshold').value) || 85.0,
-                good_threshold: parseFloat(document.getElementById('utilization_good_threshold').value) || 75.0,
-                fair_threshold: parseFloat(document.getElementById('utilization_fair_threshold').value) || 65.0,
-                poor_threshold: parseFloat(document.getElementById('utilization_poor_threshold').value) || 50.0,
-                excellent_points: parseInt(document.getElementById('utilization_excellent_points').value) || 25,
-                good_points: parseInt(document.getElementById('utilization_good_points').value) || 20,
-                fair_points: parseInt(document.getElementById('utilization_fair_points').value) || 15,
-                poor_points: parseInt(document.getElementById('utilization_poor_points').value) || 10
+                excellent_threshold: parseFloat(document.getElementById('health_excellent_threshold').value) / 100 || 0.9,
+                good_threshold: parseFloat(document.getElementById('health_good_threshold').value) / 100 || 0.75,
+                fair_threshold: parseFloat(document.getElementById('health_fair_threshold').value) / 100 || 0.5,
+                enable_predictive: document.getElementById('enable_predictive_health').checked
             },
             revenue_tiers: {
-                tier_1_threshold: parseInt(document.getElementById('revenue_tier_1_threshold').value) || 100000,
-                tier_2_threshold: parseInt(document.getElementById('revenue_tier_2_threshold').value) || 75000,
-                tier_3_threshold: parseInt(document.getElementById('revenue_tier_3_threshold').value) || 50000
-            },
-            display_settings: {
-                current_week_view_enabled: document.getElementById('current_week_view_enabled').checked
+                tier_1_threshold: parseInt(document.getElementById('tier_1_threshold').value) || 10000,
+                tier_2_threshold: parseInt(document.getElementById('tier_2_threshold').value) || 50000,
+                tier_3_threshold: parseInt(document.getElementById('tier_3_threshold').value) || 100000
             },
             store_overrides: this.collectStoreOverrides('executive-dashboard')
         };
@@ -1616,44 +1693,95 @@ class ConfigurationManager {
     // Labor Cost Configuration Methods
     async loadLaborCostConfiguration() {
         try {
+            console.log('🔧 Loading labor cost configuration...');
             const response = await fetch('/config/api/labor-cost-configuration');
             const result = await response.json();
             
+            console.log('🔧 Labor cost API response:', result);
+            
             if (result.success) {
-                this.populateLaborCostForm(result.data);
+                // Ensure DOM is ready before populating
+                if (document.readyState === 'complete') {
+                    this.populateLaborCostForm(result.data);
+                } else {
+                    // Wait for DOM to be ready
+                    window.addEventListener('load', () => {
+                        this.populateLaborCostForm(result.data);
+                    });
+                }
                 this.currentConfig.laborCost = result.data;
+                console.log('✅ Labor cost configuration loaded successfully');
+            } else {
+                console.error('❌ Labor cost API returned error:', result.error);
             }
         } catch (error) {
-            console.error('Error loading labor cost configuration:', error);
+            console.error('❌ Error loading labor cost configuration:', error);
         }
     }
 
     populateLaborCostForm(data) {
-        // Populate labor cost thresholds
-        if (data.thresholds) {
-            const thresholds = data.thresholds;
-            document.getElementById('labor_cost_warning_threshold').value = Math.round((thresholds.warning_threshold || 0.15) * 100);
-            document.getElementById('labor_cost_critical_threshold').value = Math.round((thresholds.critical_threshold || 0.25) * 100);
-            document.getElementById('efficiency_target').value = Math.round((thresholds.efficiency_target || 0.85) * 100);
-            document.getElementById('overtime_threshold').value = Math.round((thresholds.overtime_threshold || 1.4) * 100);
+        console.log('🔧 Populating Labor Cost form with data:', data);
+        
+        // Check if form elements exist
+        const warningEl = document.getElementById('labor_cost_warning_threshold');
+        const criticalEl = document.getElementById('labor_cost_critical_threshold');
+        const efficiencyEl = document.getElementById('efficiency_target');
+        
+        console.log('🔧 Form elements found:', {
+            warning: !!warningEl,
+            critical: !!criticalEl,
+            efficiency: !!efficiencyEl
+        });
+        
+        // Populate labor cost thresholds using API structure
+        if (data.global_thresholds) {
+            const thresholds = data.global_thresholds;
+            console.log('🔧 Setting threshold values:', thresholds);
+            
+            if (warningEl) {
+                warningEl.value = thresholds.warning_level || 30;
+                console.log('✅ Set warning threshold:', warningEl.value);
+            }
+            if (criticalEl) {
+                criticalEl.value = thresholds.high_cost_threshold || 35;
+                console.log('✅ Set critical threshold:', criticalEl.value);
+            }
+            if (efficiencyEl) {
+                efficiencyEl.value = thresholds.efficiency_baseline || 100;
+                console.log('✅ Set efficiency target:', efficiencyEl.value);
+            }
+        } else {
+            console.warn('⚠️ No global_thresholds data found:', data);
         }
 
-        // Populate processing settings
-        if (data.processing) {
-            const processing = data.processing;
-            document.getElementById('auto_calculate').checked = processing.auto_calculate_enabled || false;
-            document.getElementById('include_benefits').checked = processing.include_benefits || true;
-            document.getElementById('include_overtime').checked = processing.include_overtime || true;
-            document.getElementById('calculation_frequency').value = processing.frequency || 'daily';
+        // Populate processing settings using API structure
+        if (data.processing_settings) {
+            const processing = data.processing_settings;
+            document.getElementById('overtime_threshold').value = processing.query_timeout || 30;
+        }
+        
+        // Use analysis settings for calculation options
+        if (data.analysis_settings) {
+            const analysis = data.analysis_settings;
+            document.getElementById('calculation_frequency').value = 'daily'; // Static for now, could be configurable
+            document.getElementById('auto_calculate').checked = analysis.cost_control_weight > 0; // Use weight as indicator
+            document.getElementById('include_benefits').checked = analysis.efficiency_weight > 0; // Use weight as indicator  
+            document.getElementById('include_overtime').checked = analysis.minimum_hours <= 1; // Use hours as indicator
+        } else {
+            // Fallback to API-based defaults instead of hardcoded
+            document.getElementById('calculation_frequency').value = 'daily';
+            document.getElementById('auto_calculate').checked = true;
+            document.getElementById('include_benefits').checked = true;
+            document.getElementById('include_overtime').checked = true;
         }
 
-        // Populate alert settings
-        if (data.alerts) {
-            const alerts = data.alerts;
-            document.getElementById('enable_labor_alerts').checked = alerts.enabled || false;
+        // Populate alert settings using API structure
+        if (data.alert_settings) {
+            const alerts = data.alert_settings;
+            document.getElementById('enable_labor_alerts').checked = alerts.high_cost_alerts || false;
             document.getElementById('alert_frequency').value = alerts.frequency || 'immediate';
-            document.getElementById('escalation_enabled').checked = alerts.escalation_enabled || false;
-            document.getElementById('alert_recipients').value = (alerts.recipients || []).join(', ');
+            document.getElementById('escalation_enabled').checked = alerts.trend_alerts || false;
+            document.getElementById('alert_recipients').value = ''; // Not in current API
         }
     }
 
@@ -1731,6 +1859,106 @@ class ConfigurationManager {
         }
         
         return overrides;
+    }
+
+    // Store Goals Configuration Methods
+    async loadStoreGoalsConfiguration() {
+        try {
+            const response = await fetch('/config/api/store-goals-configuration');
+            const result = await response.json();
+            
+            if (result.success) {
+                this.populateStoreGoalsForm(result.data);
+                this.currentConfig.storeGoals = result.data;
+            }
+        } catch (error) {
+            console.error('Error loading store goals configuration:', error);
+        }
+    }
+
+    populateStoreGoalsForm(data) {
+        // Populate company-wide goals
+        if (data.companyGoals) {
+            const goals = data.companyGoals;
+            document.getElementById('monthly_revenue_target').value = goals.monthly_revenue_target || 500000;
+            document.getElementById('ar_aging_threshold').value = goals.ar_aging_threshold || 15;
+            document.getElementById('deliveries_goal').value = goals.deliveries_goal || 50;
+            document.getElementById('wage_ratio_goal').value = goals.wage_ratio_goal || 25;
+            document.getElementById('revenue_per_hour_goal').value = goals.revenue_per_hour_goal || 150;
+        }
+
+        // Populate store-specific goals
+        if (data.storeGoals) {
+            const stores = ['3607', '6800', '728', '8101'];
+            stores.forEach(store => {
+                if (data.storeGoals[store]) {
+                    const storeData = data.storeGoals[store];
+                    document.getElementById(`reservation_${store}`).value = storeData.reservation_goal || 0;
+                    document.getElementById(`contract_${store}`).value = storeData.contract_goal || 0;
+                }
+            });
+        }
+    }
+
+    collectStoreGoalsFormData() {
+        return {
+            companyGoals: {
+                monthly_revenue_target: parseInt(document.getElementById('monthly_revenue_target').value) || 500000,
+                ar_aging_threshold: parseFloat(document.getElementById('ar_aging_threshold').value) || 15,
+                deliveries_goal: parseInt(document.getElementById('deliveries_goal').value) || 50,
+                wage_ratio_goal: parseFloat(document.getElementById('wage_ratio_goal').value) || 25,
+                revenue_per_hour_goal: parseInt(document.getElementById('revenue_per_hour_goal').value) || 150
+            },
+            storeGoals: {
+                '3607': {
+                    reservation_goal: parseInt(document.getElementById('reservation_3607').value) || 0,
+                    contract_goal: parseInt(document.getElementById('contract_3607').value) || 0
+                },
+                '6800': {
+                    reservation_goal: parseInt(document.getElementById('reservation_6800').value) || 0,
+                    contract_goal: parseInt(document.getElementById('contract_6800').value) || 0
+                },
+                '728': {
+                    reservation_goal: parseInt(document.getElementById('reservation_728').value) || 0,
+                    contract_goal: parseInt(document.getElementById('contract_728').value) || 0
+                },
+                '8101': {
+                    reservation_goal: parseInt(document.getElementById('reservation_8101').value) || 0,
+                    contract_goal: parseInt(document.getElementById('contract_8101').value) || 0
+                }
+            }
+        };
+    }
+
+    async saveStoreGoalsConfiguration() {
+        const formData = this.collectStoreGoalsFormData();
+        
+        try {
+            this.showLoadingState('store-goals-form');
+            
+            const response = await fetch('/config/api/store-goals-configuration', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(formData)
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                this.showNotification('success', 'Store Goals configuration saved successfully');
+                this.unsavedChanges = false;
+                this.updateSaveButtonStates();
+            } else {
+                this.showNotification('error', 'Error saving store goals configuration: ' + result.error);
+            }
+        } catch (error) {
+            console.error('Error saving store goals configuration:', error);
+            this.showNotification('error', 'Failed to save store goals configuration');
+        } finally {
+            this.hideLoadingState('store-goals-form');
+        }
     }
 }
 

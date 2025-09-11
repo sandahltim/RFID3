@@ -26,6 +26,19 @@
 - ✅ Executive dashboard (/tab/7) accessible and using configurable parameters
 - ✅ API endpoints returning configurable query limits (verified forecasting: "historical_weeks":52)
 
+### **✅ CONFIGURATION UI FIXES (2025-09-11) - COMPLETE**
+**Issues Resolved:**
+- ✅ Fixed HTML structure: Labor Cost and Store Goals panels were positioned outside tab-content container
+- ✅ Removed JavaScript alert popup causing "java fire" messages
+- ✅ Fixed executive dashboard configuration null errors by mapping to correct API fields
+- ✅ Added proper placeholders for predictive features with "NOT YET IMPLEMENTED" labels
+- ✅ Cleaned up dual static file directories - removed duplicate /app/static/, kept /static/ as single source
+
+**Root Causes Fixed:**
+- Tab-content container was closing prematurely, leaving 3 panels positioned thousands of pixels off-screen
+- JavaScript expected `health_scoring.excellent_threshold` but API returns `utilization_scoring.excellent_threshold`
+- Nginx served from `/static/` while Flask used `/app/static/` causing file sync confusion
+
 ## 🚨 CRITICAL DATABASE MIGRATIONS NEEDED
 
 ### **1. labor_cost_configuration Table - COMPLETED**
@@ -183,6 +196,23 @@ CREATE TABLE executive_dashboard_configuration (
 - 📈 **Already Resolved**: 100+ values (financial analytics rolling windows, health scoring)
 
 ## 🛠 AGENT SIDE QUESTS
+
+### **Priority G: Documentation System Overhaul** *(NEW - CRITICAL)*
+**Status:** ❌ HIGH PRIORITY - 119 scattered .md files affecting maintainability  
+**Impact:** Developer productivity, user onboarding, system maintainability  
+**Timeline:** 4 weeks (can run parallel with other priorities)
+
+#### **Phase 1: Emergency Consolidation** *(Week 1)*
+- ❌ **Consolidate API Documentation** (5 duplicate files → 1 master)
+- ❌ **Create Master Executive Dashboard Guide** (6 files → 1 comprehensive guide)  
+- ❌ **Archive Root-Level Documentation Sprawl** (79 → 10 essential files)
+
+#### **Phase 2: Quality and Navigation** *(Week 2-4)*
+- ❌ **README Rationalization** (11 files → strategic placement)
+- ❌ **Create Master Documentation Index**
+- ❌ **Standardize Documentation Templates**
+
+**Metrics:** 119 files → ~30 organized files (70% reduction in maintenance overhead)
 
 ### **general-purpose Agent:**
 - **PRIORITY:** Systematic hardcode audit across all 60+ files identified

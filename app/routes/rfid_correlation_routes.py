@@ -9,6 +9,7 @@ from app import db
 from sqlalchemy import text, func, case, and_, or_
 from datetime import datetime, timedelta
 import json
+from app.models.config_models import ManagerDashboardConfiguration
 
 rfid_correlation_bp = Blueprint('rfid_correlation', __name__, url_prefix='/api/rfid-correlation')
 
@@ -165,7 +166,14 @@ def get_dashboard_data():
             })
         
         # Get recent RFID activity (only for Fridley)
-        activity_query = """
+        # Use configured activity limit instead of hardcoded value
+        try:
+            config = ManagerDashboardConfiguration.query.filter_by(user_id='default_user').first()
+            activity_limit = config.default_activity_limit if config else 30
+        except Exception:
+            activity_limit = 30  # Fallback to previous default
+        
+        activity_query = f"""
         SELECT 
             DATE(im.date_updated) as activity_date,
             COUNT(*) as items_updated
@@ -175,7 +183,7 @@ def get_dashboard_data():
             AND im.date_updated >= DATE_SUB(CURRENT_DATE, INTERVAL 30 DAY)
         GROUP BY DATE(im.date_updated)
         ORDER BY activity_date DESC
-        LIMIT 30
+        LIMIT {activity_limit}
         """
         
         activity_result = db.session.execute(text(activity_query))

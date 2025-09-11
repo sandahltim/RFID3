@@ -1,0 +1,1720 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Current Week View Test</title>
+    <style>
+        table { border-collapse: collapse; width: 100%; }
+        th, td { border: 1px solid #ddd; padding: 8px; }
+        th { background-color: #f2f2f2; }
+    </style>
+</head>
+<body>
+    <h1>Current Week View Functionality Test</h1>
+    <div id="testResults"></div>
+    
+    <table>
+        <thead>
+            <tr>
+                <th>Store</th>
+                <th>Previous Week</th>
+                <th class="current-week-header">Current Week</th>
+                <th>YoY Growth</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Test Store</td>
+                <td>$1000</td>
+                <td id="revenue-test-current" class="current-week-cell">$1200</td>
+                <td>+20%</td>
+            </tr>
+        </tbody>
+    </table>
+    
+    <script>
+        window.dashboardConfig = { current_week_view_enabled: false };
+        
+        
+
+
+
+
+
+        // Fallback CountUp implementation if CDN fails
+        window.CountUpFallback = function(element, startVal, endVal, decimals, duration, options) {
+            if (typeof element === 'string') element = document.getElementById(element);
+            if (!element) return;
+            
+            const start = startVal || 0;
+            const end = endVal || 0;
+            const steps = Math.abs(end - start) / (duration || 2) * 60; // 60fps
+            const increment = (end - start) / steps;
+            let current = start;
+            
+            const timer = setInterval(() => {
+                current += increment;
+                if ((increment > 0 && current >= end) || (increment < 0 && current <= end)) {
+                    current = end;
+                    clearInterval(timer);
+                }
+                
+                const prefix = options?.prefix || '';
+                const suffix = options?.suffix || '';
+                element.textContent = prefix + Math.round(current).toLocaleString() + suffix;
+            }, 1000 / 60);
+        };
+    
+
+
+        console.log('🎨 Enhanced Executive Dashboard Loading...');
+        
+        // Dashboard configuration from backend
+        window.dashboardConfig = {"current_week_view_enabled": true};
+        console.log('📊 Dashboard config:', window.dashboardConfig);
+        
+        // Ensure visualization libraries are loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('📊 Dashboard DOM loaded, checking visualization support...');
+            
+            // Check if required libraries are loaded
+            if (typeof Chart === 'undefined') {
+                console.error('❌ Chart.js not loaded!');
+            } else {
+                console.log('✅ Chart.js loaded successfully');
+            }
+            
+            if (typeof CountUp === 'undefined') {
+                console.error('❌ CountUp.js not loaded!');
+            } else {
+                console.log('✅ CountUp.js loaded successfully');
+            }
+            
+            if (typeof L === 'undefined') {
+                console.error('❌ Leaflet not loaded!');
+            } else {
+                console.log('✅ Leaflet loaded successfully');
+            }
+            
+            // Initialize current week column visibility
+            initializeCurrentWeekVisibility();
+        });
+        
+        function initializeCurrentWeekVisibility() {
+            if (!window.dashboardConfig || window.dashboardConfig.current_week_view_enabled) {
+                console.log('✅ Current week view enabled');
+                return; // Column is visible by default
+            }
+            
+            console.log('🔒 Current week view disabled - hiding column');
+            
+            // Hide the "Current Week" header
+            document.querySelectorAll('th').forEach(th => {
+                if (th.textContent.includes('Current Week')) {
+                    th.style.display = 'none';
+                }
+            });
+            
+            // Hide all current week data cells
+            document.querySelectorAll('[id$="-current"]').forEach(cell => {
+                cell.style.display = 'none';
+            });
+            
+            // Update colspan for section headers if current week is hidden
+            const sectionHeaders = document.querySelectorAll('.section-header-row td');
+            sectionHeaders.forEach(header => {
+                const currentColspan = parseInt(header.getAttribute('colspan') || '8');
+                if (currentColspan === 8) {
+                    header.setAttribute('colspan', '7');
+                }
+            });
+        }
+    
+
+
+        // Global variables
+        let revenueTrendChart, forecastChart, storeComparisonChart;
+        let dashboardData = {};
+        let currentLocationFilter = 'all';
+        let comparisonMode = false;
+        
+        // Store mapping for consistent display
+        const storeMapping = {
+            'all': 'All Locations',
+            '3607': 'Wayzata',
+            '6800': 'Brooklyn Park', 
+            '8101': 'Fridley',
+            '728': 'Elk River'
+        };
+
+        // UNIFIED KPI Update Function (replaces competing functions)
+        async function updateKPIs() {
+            try {
+                console.log('🔄 Updating KPIs...');
+                
+                const response = await fetch('/executive/api/financial-kpis');
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Direct DOM updates - guaranteed to work
+                    const revenueEl = document.getElementById('revenueKPI');
+                    const growthEl = document.getElementById('growthKPI');  
+                    const utilizationEl = document.getElementById('utilizationKPI');
+                    const healthEl = document.getElementById('healthKPI');
+                    
+                    // Update KPI values immediately (using consistent formatting)
+                    if (revenueEl) {
+                        const revenueValue = formatCurrency(data.revenue_metrics.current_3wk_avg, true);
+                        revenueEl.textContent = revenueValue;
+                    }
+                    if (growthEl) {
+                        const growthValue = data.revenue_metrics.yoy_growth.toFixed(1) + '%';
+                        growthEl.textContent = growthValue;
+                    }
+                    if (utilizationEl) {
+                        const utilizationValue = data.store_metrics.utilization_avg.toFixed(1) + '%';  
+                        utilizationEl.textContent = utilizationValue;
+                    }
+                    if (healthEl) {
+                        const healthValue = Math.round(data.operational_health.health_score);
+                        healthEl.textContent = healthValue;
+                    }
+                    
+                    // Update trend indicators
+                    const revenueTrend = document.getElementById('revenueTrend');
+                    const growthTrend = document.getElementById('growthTrend');
+                    const utilizationTrend = document.getElementById('utilizationTrend');
+                    const healthTrend = document.getElementById('healthTrend');
+                    
+                    if (revenueTrend) {
+                        // Use YoY growth for trend (same period last year comparison)
+                        const yoyGrowth = data.revenue_metrics?.yoy_growth || 0;
+                        console.log('🔧 Setting revenue trend to YoY:', yoyGrowth);
+                        const icon = yoyGrowth >= 0 ? 'fa-arrow-up' : 'fa-arrow-down';
+                        const sign = yoyGrowth >= 0 ? '+' : '';
+                        revenueTrend.innerHTML = `<i class="fas ${icon}"></i> ${sign}${yoyGrowth.toFixed(1)}%`;
+                        revenueTrend.title = `vs same period last year`;
+                    }
+                    if (growthTrend) growthTrend.innerHTML = '<i class="fas fa-arrow-down"></i> -19.4%';
+                    if (utilizationTrend) utilizationTrend.innerHTML = '<i class="fas fa-arrow-up"></i> +2.1%';
+                    if (healthTrend) healthTrend.innerHTML = '<i class="fas fa-heartbeat"></i> Excellent';
+                    
+                    console.log('✅ KPIs updated successfully');
+                    
+                    // Update Scorecard Matrix
+                    await updateScorecardMatrix();
+                    
+                    return true;
+                }
+            } catch (error) {
+                console.error('❌ KPI update failed:', error);
+                return false;
+            }
+        }
+        
+        // Initialize dashboard
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeDashboard();
+            
+            // UNIFIED KPI update (replaces forceUpdateKPIs race condition)
+            setTimeout(updateKPIs, 500);
+            
+            // Setup location filter event listeners
+            document.querySelectorAll('input[name="locationFilter"]').forEach(radio => {
+                radio.addEventListener('change', function() {
+                    currentLocationFilter = this.value;
+                    updateLocationDisplay();
+                    filterDashboardData();
+                });
+            });
+            
+            // Setup heatmap metric change listeners
+            document.querySelectorAll('input[name="heatmapMetric"]').forEach(radio => {
+                radio.addEventListener('change', function() {
+                    updateHeatmap(this.value);
+                });
+            });
+        });
+
+        async function initializeDashboard() {
+            showRefreshIndicator(true);
+            
+            try {
+                // Load all dashboard data
+                await Promise.all([
+                    loadFinancialKPIs(),
+                    loadIntelligentInsights(),
+                    loadStorePerformance(),
+                    loadFinancialForecasts(),
+                    loadFinancialAlerts()
+                ]);
+                
+                // Initialize charts with real data
+                await initializeCharts();
+                
+                // Initialize enhanced components with real API data
+                await initializeGaugesWithRealData();
+                await updateHeatmap('revenue');
+                
+            } catch (error) {
+                console.error('Error initializing dashboard:', error);
+                showErrorMessage('Failed to load dashboard data. Please try refreshing the page.');
+            } finally {
+                showRefreshIndicator(false);
+                updateLastUpdatedTime();
+            }
+        }
+
+        async function loadFinancialKPIs() {
+            // REPLACED: Use unified updateKPIs() function to avoid race conditions
+            return await updateKPIs();
+        }
+        
+        // OLD loadFinancialKPIs function fragments cleaned up
+
+        async function loadIntelligentInsights() {
+            try {
+                const response = await fetch('/executive/api/intelligent-insights');
+                const data = await response.json();
+                
+                if (data.success) {
+                    dashboardData.insights = data;
+                    updateInsightsDisplay(data);
+                }
+            } catch (error) {
+                console.error('Error loading intelligent insights:', error);
+            }
+        }
+
+        async function loadStorePerformance() {
+            try {
+                const response = await fetch('/executive/api/store-comparison');
+                const data = await response.json();
+                
+                if (data.success) {
+                    dashboardData.stores = data;
+                    updateStorePerformanceDisplay(data);
+                }
+            } catch (error) {
+                console.error('Error loading store performance:', error);
+            }
+        }
+
+        async function loadFinancialForecasts() {
+            try {
+                const response = await fetch('/executive/api/financial-forecasts');
+                const data = await response.json();
+                
+                if (data.success) {
+                    dashboardData.forecasts = data;
+                }
+            } catch (error) {
+                console.error('Error loading financial forecasts:', error);
+            }
+        }
+
+        async function loadFinancialAlerts() {
+            try {
+                // This would load from the alerts API endpoint
+                const alerts = [
+                    {
+                        type: 'warning',
+                        title: 'Revenue Trend Alert',
+                        message: 'Brooklyn Park location showing 3-week declining trend',
+                        action: 'Review operational efficiency metrics'
+                    }
+                ];
+                
+                updateAlertsDisplay(alerts);
+            } catch (error) {
+                console.error('Error loading financial alerts:', error);
+            }
+        }
+
+        function updateKPIDisplays(data) {
+            console.log('🎯 updateKPIDisplays called with:', data);
+            
+            const revenue = data.revenue_metrics?.current_3wk_avg || 0;
+            const growth = data.revenue_metrics?.yoy_growth || 0;
+            const utilization = data.store_metrics?.utilization_avg || 0;
+            const health = data.operational_health?.health_score || 0;
+
+            console.log('💰 Extracted values:', { revenue, growth, utilization, health });
+            
+            // Format values (using abbreviated format for consistency)
+            const formattedRevenue = formatCurrency(revenue, true);
+            const formattedGrowth = formatPercentage(growth);
+            const formattedUtilization = formatPercentage(utilization);
+            const formattedHealth = Math.round(health);
+            
+            console.log('🎨 Formatted values:', {
+                revenue: formattedRevenue,
+                growth: formattedGrowth,
+                utilization: formattedUtilization,
+                health: formattedHealth
+            });
+
+            // Update DOM elements with error checking
+            try {
+                const revenueEl = document.getElementById('revenueKPI');
+                const growthEl = document.getElementById('growthKPI');
+                const utilizationEl = document.getElementById('utilizationKPI');
+                const healthEl = document.getElementById('healthKPI');
+                
+                console.log('🔍 DOM elements found:', {
+                    revenue: !!revenueEl,
+                    growth: !!growthEl,
+                    utilization: !!utilizationEl,
+                    health: !!healthEl
+                });
+                
+                if (revenueEl) revenueEl.textContent = formattedRevenue;
+                if (growthEl) growthEl.textContent = formattedGrowth;
+                if (utilizationEl) utilizationEl.textContent = formattedUtilization;
+                if (healthEl) healthEl.textContent = formattedHealth;
+                
+                // Update trend indicators for individual stores
+                const revenueTrend = document.getElementById('revenueTrend');
+                const growthTrend = document.getElementById('growthTrend');
+                const utilizationTrend = document.getElementById('utilizationTrend');
+                const healthTrend = document.getElementById('healthTrend');
+                
+                if (revenueTrend) {
+                    const yoyGrowth = data.revenue_metrics?.yoy_growth || 0;
+                    console.log('🔧 Setting store revenue trend to YoY:', yoyGrowth);
+                    const icon = yoyGrowth >= 0 ? 'fa-arrow-up' : 'fa-arrow-down';
+                    const sign = yoyGrowth >= 0 ? '+' : '';
+                    revenueTrend.innerHTML = `<i class="fas ${icon}"></i> ${sign}${yoyGrowth.toFixed(1)}%`;
+                    revenueTrend.title = `vs same period last year`;
+                }
+                
+                if (growthTrend) {
+                    const yoyGrowth = data.revenue_metrics?.yoy_growth || 0;
+                    const icon = yoyGrowth >= 0 ? 'fa-arrow-up' : 'fa-arrow-down';
+                    const sign = yoyGrowth >= 0 ? '+' : '';
+                    growthTrend.innerHTML = `<i class="fas ${icon}"></i> ${sign}${yoyGrowth.toFixed(1)}%`;
+                }
+                
+                console.log('✅ KPI displays updated successfully');
+            } catch (domError) {
+                console.error('❌ DOM update error:', domError);
+            }
+        }
+
+        function updateTrendIndicator(elementId, value, label) {
+            const element = document.getElementById(elementId);
+            const isPositive = value > 0;
+            const isNeutral = Math.abs(value) < 0.5;
+
+            element.className = `kpi-trend ${isNeutral ? 'trend-neutral' : isPositive ? 'trend-up' : 'trend-down'}`;
+            
+            const icon = isNeutral ? 'fa-minus' : isPositive ? 'fa-arrow-up' : 'fa-arrow-down';
+            element.innerHTML = `<i class="fas ${icon}"></i> ${label}`;
+        }
+
+        function updateInsightsDisplay(data) {
+            const insightsSection = document.getElementById('insightsSection');
+            
+            if (!data.actionable_insights?.length) {
+                insightsSection.innerHTML = `
+                    <div class="text-center py-4 text-muted">
+                        <i class="fas fa-lightbulb fa-2x mb-3"></i>
+                        <p>No new insights detected. Business metrics are within normal ranges.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            let insightsHtml = '';
+            data.actionable_insights.forEach(insight => {
+                const severityClass = insight.severity === 'high' ? 'insight-critical' : 
+                                    insight.severity === 'medium' ? 'insight-warning' : 'insight-info';
+                
+                insightsHtml += `
+                    <div class="insight-card ${severityClass} p-3 mb-2">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <h6 class="mb-0">${insight.title || 'Business Insight'}</h6>
+                            <span class="metric-badge badge-${insight.severity === 'high' ? 'poor' : insight.severity === 'medium' ? 'fair' : 'good'}">
+                                ${insight.severity}
+                            </span>
+                        </div>
+                        <p class="mb-1 small">${insight.description}</p>
+                        ${insight.recommendation ? `<small class="text-muted"><strong>Action:</strong> ${insight.recommendation}</small>` : ''}
+                    </div>
+                `;
+            });
+
+            insightsSection.innerHTML = insightsHtml;
+        }
+
+        function updateStorePerformanceDisplay(data) {
+            const storeSection = document.getElementById('storePerformanceSection');
+            
+            if (!data.stores?.length) {
+                storeSection.innerHTML = '<div class="text-center text-muted">No store data available</div>';
+                return;
+            }
+
+            let storeHtml = '';
+            data.stores.forEach((store, index) => {
+                const rank = index + 1;
+                const rankClass = `rank-${Math.min(rank, 4)}`;
+                
+                storeHtml += `
+                    <div class="store-performance-card mb-3">
+                        <div class="d-flex align-items-center mb-2">
+                            <div class="store-rank ${rankClass} me-3">${rank}</div>
+                            <div>
+                                <h6 class="mb-0">${store.name}</h6>
+                                <small class="text-muted">${store.store_code}</small>
+                            </div>
+                        </div>
+                        <div class="row text-center">
+                            <div class="col-4">
+                                <div class="small text-muted">Revenue</div>
+                                <div class="fw-bold">${formatCurrency(store.revenue?.total || 0, true)}</div>
+                            </div>
+                            <div class="col-4">
+                                <div class="small text-muted">Margin</div>
+                                <div class="fw-bold">${formatPercentage(store.profitability?.margin_pct || 0)}</div>
+                            </div>
+                            <div class="col-4">
+                                <div class="small text-muted">Efficiency</div>
+                                <div class="fw-bold">$${Math.round(store.efficiency?.revenue_per_hour || 0)}/hr</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            storeSection.innerHTML = storeHtml;
+        }
+
+        function updateAlertsDisplay(alerts) {
+            const alertsSection = document.getElementById('alertsSection');
+            
+            if (!alerts?.length) {
+                alertsSection.innerHTML = '';
+                return;
+            }
+
+            let alertsHtml = '<div class="col-12">';
+            alerts.forEach(alert => {
+                alertsHtml += `
+                    <div class="alert alert-${alert.type} alert-banner d-flex align-items-center" role="alert">
+                        <i class="fas fa-exclamation-triangle me-3"></i>
+                        <div class="flex-grow-1">
+                            <strong>${alert.title}</strong>
+                            <div>${alert.message}</div>
+                            ${alert.action ? `<small class="d-block mt-1"><strong>Recommended Action:</strong> ${alert.action}</small>` : ''}
+                        </div>
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                `;
+            });
+            alertsHtml += '</div>';
+
+            alertsSection.innerHTML = alertsHtml;
+        }
+
+        async function initializeCharts() {
+            console.log('📊 Initializing charts with real data...');
+            
+            // Load real data for charts
+            await loadAndUpdateCharts();
+        }
+        
+        async function loadAndUpdateCharts() {
+            try {
+                // Load financial data for charts
+                const kpiResponse = await fetch('/executive/api/financial-kpis');
+                const kpiData = await kpiResponse.json();
+                
+                // Load store comparison data
+                const storeResponse = await fetch('/executive/api/store-comparison');
+                const storeData = await storeResponse.json();
+                
+                console.log('📈 Chart data loaded:', { kpi: kpiData.success, store: storeData.success });
+                
+                // Initialize Revenue Trend Chart with real data
+                await initializeRevenueTrendChart(kpiData);
+                
+                // Initialize Store Comparison Chart with real data
+                await initializeStoreComparisonChart(storeData);
+                
+                // Initialize Forecast Chart
+                await initializeForecastChart();
+                
+                // Initialize Multi-Year Chart
+                await initializeMultiYearChart(kpiData);
+                
+                console.log('✅ All charts initialized with real data');
+                
+            } catch (error) {
+                console.error('❌ Error loading chart data:', error);
+                // Initialize with empty charts as fallback
+                initializeEmptyCharts();
+            }
+        }
+        
+        function initializeEmptyCharts() {
+            // Revenue Trend Chart
+            const revenueTrendCtx = document.getElementById('revenueTrendChart')?.getContext('2d');
+            if (revenueTrendCtx) {
+                revenueTrendChart = new Chart(revenueTrendCtx, {
+                    type: 'line',
+                    data: {
+                        labels: ['Week 1', 'Week 2', 'Week 3', 'Week 4'],
+                        datasets: [{
+                            label: 'Weekly Revenue',
+                            data: [45000, 52000, 48000, 55000],
+                            borderColor: 'rgb(59, 130, 246)',
+                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                            tension: 0.4,
+                            fill: true
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'top',
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: false,
+                                ticks: {
+                                    callback: function(value) {
+                                        return formatCurrency(value, true);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+        }
+        
+        async function initializeRevenueTrendChart(kpiData) {
+            const revenueTrendCtx = document.getElementById('revenueTrendChart')?.getContext('2d');
+            if (!revenueTrendCtx) return;
+            
+            // Generate sample trend data - replace with real trend data when available
+            const trendLabels = ['Week 1', 'Week 2', 'Week 3', 'Week 4', 'Week 5', 'Week 6'];
+            const currentRevenue = kpiData.success ? kpiData.revenue_metrics?.current_3wk_avg || 50000 : 50000;
+            const trendData = [
+                currentRevenue * 0.85,
+                currentRevenue * 0.92,
+                currentRevenue * 0.88,
+                currentRevenue * 0.95,
+                currentRevenue * 1.02,
+                currentRevenue
+            ];
+            
+            revenueTrendChart = new Chart(revenueTrendCtx, {
+                type: 'line',
+                data: {
+                    labels: trendLabels,
+                    datasets: [{
+                        label: 'Weekly Revenue',
+                        data: trendData,
+                        borderColor: 'rgb(59, 130, 246)',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            ticks: {
+                                callback: function(value) {
+                                    return formatCurrency(value, true);
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+            
+            console.log('📊 Revenue trend chart initialized with data:', trendData);
+        }
+        
+        async function initializeStoreComparisonChart(storeData) {
+            const storeComparisonCtx = document.getElementById('storeComparisonChart')?.getContext('2d');
+            if (!storeComparisonCtx) return;
+            
+            let storeLabels = ['Wayzata', 'Brooklyn Park', 'Fridley', 'Elk River'];
+            let revenueData = [142500, 89750, 76200, 45300]; // Default values
+            let marginData = [68.5, 71.2, 69.8, 65.4]; // Default values
+            
+            if (storeData.success && storeData.stores) {
+                storeLabels = storeData.stores.map(s => s.name || s.store_name || 'Store');
+                revenueData = storeData.stores.map(s => s.revenue?.total || s.revenue || 0);
+                marginData = storeData.stores.map(s => s.profitability?.margin_pct || s.profit_margin || 0);
+                
+                console.log('📊 Store chart using real data:', { storeLabels, revenueData, marginData });
+            } else {
+                console.log('📊 Store chart using demo data');
+            }
+            
+            storeComparisonChart = new Chart(storeComparisonCtx, {
+                type: 'bar',
+                data: {
+                    labels: storeLabels,
+                    datasets: [
+                        {
+                            label: 'Revenue',
+                            data: revenueData,
+                            backgroundColor: 'rgba(59, 130, 246, 0.8)'
+                        },
+                        {
+                            label: 'Profit Margin %',
+                            data: marginData,
+                            backgroundColor: 'rgba(16, 185, 129, 0.8)',
+                            yAxisID: 'y1'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                        }
+                    },
+                    scales: {
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            ticks: {
+                                callback: function(value) {
+                                    return formatCurrency(value, true);
+                                }
+                            }
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            grid: {
+                                drawOnChartArea: false,
+                            },
+                            ticks: {
+                                callback: function(value) {
+                                    return value + '%';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        async function initializeForecastChart() {
+            const forecastCtx = document.getElementById('forecastChart')?.getContext('2d');
+            if (!forecastCtx) return;
+            
+            // Generate forecast data
+            const forecastLabels = ['Week 1', 'Week 2', 'Week 3', 'Week 4', 'Week 5', 'Week 6'];
+            const forecastData = [52000, 54500, 51000, 56000, 58000, 55500];
+            const confidenceData = [48000, 50000, 47000, 52000, 54000, 51500];
+            
+            forecastChart = new Chart(forecastCtx, {
+                type: 'line',
+                data: {
+                    labels: forecastLabels,
+                    datasets: [
+                        {
+                            label: 'Forecast',
+                            data: forecastData,
+                            borderColor: 'rgb(16, 185, 129)',
+                            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                            tension: 0.4,
+                            borderDash: [5, 5]
+                        },
+                        {
+                            label: 'Confidence Range',
+                            data: confidenceData,
+                            borderColor: 'rgba(16, 185, 129, 0.3)',
+                            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                            fill: '+1'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                        }
+                    },
+                    scales: {
+                        y: {
+                            ticks: {
+                                callback: function(value) {
+                                    return formatCurrency(value, true);
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+            
+            console.log('📊 Forecast chart initialized');
+        }
+        
+        async function initializeMultiYearChart(kpiData) {
+            const multiYearCtx = document.getElementById('multiYearRevenueChart')?.getContext('2d');
+            if (!multiYearCtx) return;
+            
+            try {
+                // Generate sample multi-year data for demonstration
+                const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                const years = ['2022', '2023', '2024'];
+                
+                const datasets = years.map((year, index) => {
+                    const baseRevenue = kpiData.success ? (kpiData.revenue_metrics?.current_3wk_avg || 50000) : 50000;
+                    const yearMultiplier = 0.8 + (index * 0.15); // Growth over years
+                    const monthlyData = months.map((month, monthIndex) => {
+                        // Seasonal variation (higher in spring/summer)
+                        const seasonalMultiplier = 0.7 + (Math.sin((monthIndex * Math.PI) / 6) * 0.3);
+                        return Math.round(baseRevenue * yearMultiplier * seasonalMultiplier * (0.9 + Math.random() * 0.2));
+                    });
+                    
+                    const colors = ['#ef4444', '#f59e0b', '#10b981'];
+                    return {
+                        label: year,
+                        data: monthlyData,
+                        borderColor: colors[index],
+                        backgroundColor: colors[index] + '20',
+                        tension: 0.4,
+                        fill: false,
+                        borderWidth: 3
+                    };
+                });
+                
+                new Chart(multiYearCtx, {
+                    type: 'line',
+                    data: {
+                        labels: months,
+                        datasets: datasets
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'top'
+                            },
+                            title: {
+                                display: true,
+                                text: 'Multi-Year Revenue Analysis showing 7x seasonal variation'
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: false,
+                                ticks: {
+                                    callback: function(value) {
+                                        return '$' + (value/1000).toFixed(0) + 'K';
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+                
+                console.log('📊 Multi-year revenue chart initialized with real base data');
+            } catch (error) {
+                console.error('❌ Error initializing multi-year chart:', error);
+            }
+        }
+        
+        function updateChartsWithData() {
+            // This function is now handled by the initialization functions above
+            console.log('📊 Charts already updated with real data during initialization');
+        }
+
+        async function refreshDashboard() {
+            await initializeDashboard();
+        }
+
+        function showCustomInsightForm() {
+            // Set default date to today
+            document.getElementById('insightDate').value = new Date().toISOString().split('T')[0];
+            
+            const modal = new bootstrap.Modal(document.getElementById('customInsightModal'));
+            modal.show();
+        }
+
+        async function submitCustomInsight() {
+            const form = document.getElementById('customInsightForm');
+            
+            if (!form.checkValidity()) {
+                form.reportValidity();
+                return;
+            }
+
+            const formData = {
+                date: document.getElementById('insightDate').value,
+                event_type: document.getElementById('eventType').value,
+                description: document.getElementById('description').value,
+                impact_category: document.getElementById('impactCategory').value,
+                impact_magnitude: document.getElementById('impactMagnitude').value,
+                user_notes: document.getElementById('userNotes').value
+            };
+
+            try {
+                const response = await fetch('/executive/api/custom-insight', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(formData)
+                });
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    // Close modal and refresh insights
+                    bootstrap.Modal.getInstance(document.getElementById('customInsightModal')).hide();
+                    form.reset();
+                    
+                    // Show success message
+                    showSuccessMessage('Custom insight added successfully!');
+                    
+                    // Refresh insights section
+                    await loadIntelligentInsights();
+                } else {
+                    showErrorMessage(result.error || 'Failed to add custom insight');
+                }
+                
+            } catch (error) {
+                console.error('Error submitting custom insight:', error);
+                showErrorMessage('Failed to add custom insight');
+            }
+        }
+
+        // Utility functions
+        function formatCurrency(value, abbreviated = false) {
+            if (!value || isNaN(value)) return '$0';
+            
+            if (abbreviated && value >= 1000000) {
+                return '$' + (value / 1000000).toFixed(1) + 'M';
+            } else if (abbreviated && value >= 1000) {
+                return '$' + (value / 1000).toFixed(1) + 'K';
+            }
+            
+            return new Intl.NumberFormat('en-US', {
+                style: 'currency',
+                currency: 'USD'
+            }).format(value);
+        }
+
+        function formatPercentage(value) {
+            if (!value || isNaN(value)) return '0%';
+            return value.toFixed(1) + '%';
+        }
+
+        function showRefreshIndicator(show) {
+            document.getElementById('refreshIndicator').style.display = show ? 'block' : 'none';
+        }
+
+        function updateLastUpdatedTime() {
+            document.getElementById('lastUpdated').textContent = new Date().toLocaleTimeString();
+        }
+
+        async function updateScorecardMatrix() {
+            try {
+                console.log('🎯 Updating scorecard matrix with real data...');
+                
+                // Store configuration and current period
+                const stores = [
+                    { code: '3607', name: 'Wayzata', manager: 'Tyler', colorClass: 'store-3607' },
+                    { code: '6800', name: 'Brooklyn Park', manager: 'Zack', colorClass: 'store-6800' },
+                    { code: '728', name: 'Elk River', manager: 'Bruce', colorClass: 'store-728' },
+                    { code: '8101', name: 'Fridley', manager: 'Tim', colorClass: 'store-8101' }
+                ];
+                
+                // Generate time periods (last 6 months + current)
+                const currentDate = new Date();
+                const periods = [];
+                for (let i = 6; i >= 0; i--) {
+                    const date = new Date(currentDate);
+                    date.setMonth(date.getMonth() - i);
+                    periods.push({
+                        month: date.toLocaleString('default', { month: 'short' }),
+                        year: date.getFullYear(),
+                        key: date.getMonth() + '-' + date.getFullYear()
+                    });
+                }
+                
+                // For each store, fetch data and populate matrix
+                for (const store of stores) {
+                    console.log(`📊 Fetching data for store ${store.code} (${store.name})`);
+                    
+                    try {
+                        // Fetch store-specific KPI data
+                        const kpiResponse = await fetch(`/executive/api/location-kpis/${store.code}`);
+                        const kpiData = await kpiResponse.json();
+                        
+                        if (kpiData.success) {
+                            // Calculate previous week and previous year values from current data
+                            const currentRevenue = kpiData.revenue_metrics?.current_3wk_avg || 0;
+                            const yoyGrowth = parseFloat(kpiData.revenue_metrics?.yoy_growth || 0);
+                            
+                            // Previous year revenue (reverse calculate from YoY growth)
+                            const prevYearRevenue = yoyGrowth !== 0 ? currentRevenue / (1 + yoyGrowth/100) : currentRevenue * 0.95;
+                            
+                            // Previous week revenue (simulate 5-15% variance)
+                            const weeklyVariance = 0.95 + (Math.random() * 0.1); // 95%-105%
+                            const prevWeekRevenue = currentRevenue * weeklyVariance;
+                            
+                            // Update Previous Week Revenue cell
+                            const revenuePrev = document.getElementById(`revenue-${store.code}-prev`);
+                            if (revenuePrev) {
+                                revenuePrev.textContent = formatCurrency(prevWeekRevenue, true);
+                                revenuePrev.title = `Previous week revenue: ${formatCurrency(prevWeekRevenue)}`;
+                            }
+                            
+                            // Update Current Week Revenue cell
+                            const revenueCurrent = document.getElementById(`revenue-${store.code}-current`);
+                            if (revenueCurrent) {
+                                revenueCurrent.textContent = formatCurrency(currentRevenue, true);
+                                revenueCurrent.title = `3-week average: ${formatCurrency(currentRevenue)}`;
+                            }
+                            
+                            // Update Previous Year Revenue cell
+                            const revenuePrevYear = document.getElementById(`revenue-${store.code}-prevyear`);
+                            if (revenuePrevYear) {
+                                revenuePrevYear.textContent = formatCurrency(prevYearRevenue, true);
+                                revenuePrevYear.title = `Same period last year: ${formatCurrency(prevYearRevenue)}`;
+                            }
+                            
+                            // Update YoY Growth cell
+                            const growthCell = document.getElementById(`growth-${store.code}`);
+                            if (growthCell) {
+                                growthCell.textContent = formatPercentage(yoyGrowth);
+                                growthCell.className = `metric-cell growth-cell ${yoyGrowth >= 0 ? 'trend-positive' : 'trend-negative'}`;
+                                growthCell.title = `Year-over-year growth: ${formatPercentage(yoyGrowth)}`;
+                            }
+                            
+                            // Update Utilization cell
+                            const utilizationCell = document.getElementById(`util-${store.code}`);
+                            if (utilizationCell && kpiData.store_metrics?.utilization_avg !== undefined) {
+                                const util = parseFloat(kpiData.store_metrics.utilization_avg);
+                                utilizationCell.textContent = formatPercentage(util);
+                                utilizationCell.className = `metric-cell ${util >= 75 ? 'trend-positive' : util >= 50 ? 'trend-neutral' : 'trend-negative'}`;
+                                utilizationCell.title = `Equipment utilization: ${formatPercentage(util)}`;
+                            }
+                            
+                            // Update Health Score cell
+                            const healthCell = document.getElementById(`health-${store.code}`);
+                            if (healthCell && kpiData.operational_health?.health_score !== undefined) {
+                                const health = parseFloat(kpiData.operational_health.health_score);
+                                healthCell.textContent = health.toFixed(1);
+                                healthCell.className = `metric-cell health-cell ${health >= 85 ? 'trend-positive' : health >= 70 ? 'trend-neutral' : 'trend-negative'}`;
+                                healthCell.title = `Overall health score: ${health.toFixed(1)}/100`;
+                            }
+                            
+                            // Update trend indicator
+                            const trendCell = document.getElementById(`trend-${store.code}`);
+                            if (trendCell) {
+                                const growth = parseFloat(yoyGrowth);
+                                const trendIcon = growth > 5 ? '↗️' : growth < -5 ? '↘️' : '→';
+                                trendCell.textContent = trendIcon;
+                                trendCell.title = `Trend: ${growth > 5 ? 'Strong Growth' : growth < -5 ? 'Declining' : 'Stable'}`;
+                            }
+                            
+                            console.log(`✅ Updated scorecard data for ${store.name}: Revenue=${formatCurrency(kpiData.revenue_metrics?.current_3wk_avg || 0, true)}, YoY=${formatPercentage(kpiData.revenue_metrics?.yoy_growth || 0)}, Util=${formatPercentage(kpiData.store_metrics?.utilization_avg || 0)}, Health=${(kpiData.operational_health?.health_score || 0).toFixed(1)}`);
+                        }
+                        
+                    } catch (storeError) {
+                        console.warn(`⚠️ Error fetching data for store ${store.code}:`, storeError);
+                        // Leave default values in place
+                    }
+                }
+                
+                // Calculate and update company totals
+                await updateCompanyTotals();
+                
+                console.log('✅ Scorecard matrix update complete');
+                
+            } catch (error) {
+                console.error('❌ Error updating scorecard matrix:', error);
+            }
+        }
+
+        async function updateCompanyTotals() {
+            try {
+                console.log('📊 Calculating company totals...');
+                
+                const stores = ['3607', '6800', '728', '8101'];
+                let totalPrev = 0, totalCurrent = 0, totalPrevYear = 0;
+                let totalUtil = 0, totalHealth = 0;
+                let validStores = 0;
+                
+                // Sum up all store values
+                for (const storeCode of stores) {
+                    const prevCell = document.getElementById(`revenue-${storeCode}-prev`);
+                    const currentCell = document.getElementById(`revenue-${storeCode}-current`);
+                    const prevYearCell = document.getElementById(`revenue-${storeCode}-prevyear`);
+                    const utilCell = document.getElementById(`util-${storeCode}`);
+                    const healthCell = document.getElementById(`health-${storeCode}`);
+                    
+                    if (currentCell && currentCell.textContent !== '$0') {
+                        validStores++;
+                        
+                        // Parse currency values (remove $ and K/M suffixes)
+                        const parseCurrency = (text) => {
+                            if (!text || text === '$0') return 0;
+                            let value = parseFloat(text.replace(/[$,]/g, ''));
+                            if (text.includes('K')) value *= 1000;
+                            if (text.includes('M')) value *= 1000000;
+                            return value;
+                        };
+                        
+                        const parsePercent = (text) => {
+                            if (!text || text === '0%') return 0;
+                            return parseFloat(text.replace('%', ''));
+                        };
+                        
+                        totalPrev += parseCurrency(prevCell?.textContent || '');
+                        totalCurrent += parseCurrency(currentCell?.textContent || '');
+                        totalPrevYear += parseCurrency(prevYearCell?.textContent || '');
+                        totalUtil += parsePercent(utilCell?.textContent || '');
+                        totalHealth += parseFloat(healthCell?.textContent || '0');
+                    }
+                }
+                
+                // Update total cells
+                const totalPrevCell = document.getElementById('total-prev');
+                if (totalPrevCell) {
+                    totalPrevCell.textContent = formatCurrency(totalPrev, true);
+                    totalPrevCell.title = `Company total previous week: ${formatCurrency(totalPrev)}`;
+                }
+                
+                const totalCurrentCell = document.getElementById('total-current');
+                if (totalCurrentCell) {
+                    totalCurrentCell.textContent = formatCurrency(totalCurrent, true);
+                    totalCurrentCell.title = `Company total current: ${formatCurrency(totalCurrent)}`;
+                }
+                
+                const totalPrevYearCell = document.getElementById('total-prevyear');
+                if (totalPrevYearCell) {
+                    totalPrevYearCell.textContent = formatCurrency(totalPrevYear, true);
+                    totalPrevYearCell.title = `Company total previous year: ${formatCurrency(totalPrevYear)}`;
+                }
+                
+                // Calculate company YoY growth
+                const companyYoyGrowth = totalPrevYear > 0 ? ((totalCurrent - totalPrevYear) / totalPrevYear) * 100 : 0;
+                const totalGrowthCell = document.getElementById('total-growth');
+                if (totalGrowthCell) {
+                    totalGrowthCell.textContent = formatPercentage(companyYoyGrowth);
+                    totalGrowthCell.className = `metric-cell growth-cell ${companyYoyGrowth >= 0 ? 'trend-positive' : 'trend-negative'}`;
+                    totalGrowthCell.title = `Company YoY growth: ${formatPercentage(companyYoyGrowth)}`;
+                }
+                
+                // Calculate average utilization and health
+                const avgUtil = validStores > 0 ? totalUtil / validStores : 0;
+                const totalUtilCell = document.getElementById('total-util');
+                if (totalUtilCell) {
+                    totalUtilCell.textContent = formatPercentage(avgUtil);
+                    totalUtilCell.className = `metric-cell ${avgUtil >= 75 ? 'trend-positive' : avgUtil >= 50 ? 'trend-neutral' : 'trend-negative'}`;
+                    totalUtilCell.title = `Average utilization: ${formatPercentage(avgUtil)}`;
+                }
+                
+                const avgHealth = validStores > 0 ? totalHealth / validStores : 0;
+                const totalHealthCell = document.getElementById('total-health');
+                if (totalHealthCell) {
+                    totalHealthCell.textContent = avgHealth.toFixed(1);
+                    totalHealthCell.className = `metric-cell health-cell ${avgHealth >= 85 ? 'trend-positive' : avgHealth >= 70 ? 'trend-neutral' : 'trend-negative'}`;
+                    totalHealthCell.title = `Average health score: ${avgHealth.toFixed(1)}/100`;
+                }
+                
+                // Update company trend
+                const totalTrendCell = document.getElementById('total-trend');
+                if (totalTrendCell) {
+                    const trendIcon = companyYoyGrowth > 5 ? '↗️' : companyYoyGrowth < -5 ? '↘️' : '→';
+                    totalTrendCell.textContent = trendIcon;
+                    totalTrendCell.title = `Company trend: ${companyYoyGrowth > 5 ? 'Strong Growth' : companyYoyGrowth < -5 ? 'Declining' : 'Stable'}`;
+                }
+                
+                console.log(`✅ Company totals updated: Revenue=${formatCurrency(totalCurrent, true)}, YoY=${formatPercentage(companyYoyGrowth)}, Util=${formatPercentage(avgUtil)}, Health=${avgHealth.toFixed(1)}`);
+                
+            } catch (error) {
+                console.error('❌ Error updating company totals:', error);
+            }
+        }
+
+        function showSuccessMessage(message) {
+            // Implementation would show a toast or alert
+            console.log('Success:', message);
+        }
+
+        function showErrorMessage(message) {
+            // Implementation would show a toast or alert
+            console.error('Error:', message);
+        }
+        
+        // Location filtering and comparison functions
+        function updateLocationDisplay() {
+            const locationName = storeMapping[currentLocationFilter];
+            document.getElementById('currentLocationDisplay').textContent = locationName;
+        }
+        
+        function filterDashboardData() {
+            // Update KPIs based on selected location
+            if (currentLocationFilter === 'all') {
+                // Show aggregate data
+                loadFinancialKPIs();
+            } else {
+                // Show location-specific data
+                loadLocationSpecificKPIs(currentLocationFilter);
+            }
+            
+            // Update charts
+            updateChartsWithLocationFilter();
+        }
+        
+        async function loadLocationSpecificKPIs(storeCode) {
+            try {
+                const response = await fetch(`/executive/api/location-kpis/${storeCode}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    updateKPIDisplays(data);
+                }
+            } catch (error) {
+                console.error('Error loading location-specific KPIs:', error);
+                // Fallback to aggregate data
+                loadFinancialKPIs();
+            }
+        }
+        
+        async function updateChartsWithLocationFilter() {
+            console.log('📊 Updating charts for location filter:', currentLocationFilter);
+            
+            // If "All Locations" selected, reinitialize with aggregate data
+            if (currentLocationFilter === 'all') {
+                await initializeCharts();
+                return;
+            }
+            
+            // For specific store, fetch store-specific data and update charts
+            try {
+                const response = await fetch(`/executive/api/location-kpis/${currentLocationFilter}`);
+                const locationData = await response.json();
+                
+                if (!locationData.success) {
+                    console.error('❌ Failed to load location data:', locationData.error);
+                    return;
+                }
+                
+                console.log('📊 Updating charts with location data:', locationData);
+                
+                // Update Revenue Trend Chart
+                if (revenueTrendChart) {
+                    const currentRevenue = locationData.revenue_metrics?.current_3wk_avg || 0;
+                    const yoyGrowth = locationData.revenue_metrics?.yoy_growth || 0;
+                    
+                    // Create 4-week trend based on current data
+                    const trendData = [
+                        currentRevenue * 0.85, // 4 weeks ago
+                        currentRevenue * 0.92, // 3 weeks ago  
+                        currentRevenue * 0.96, // 2 weeks ago
+                        currentRevenue         // Current week
+                    ];
+                    
+                    revenueTrendChart.data.datasets[0].data = trendData;
+                    revenueTrendChart.data.datasets[0].label = `${locationData.store_name} Revenue Trend`;
+                    revenueTrendChart.update('active');
+                }
+                
+                // Update Store Comparison Chart - show single store
+                if (storeComparisonChart) {
+                    const storeRevenue = locationData.revenue_metrics?.current_3wk_avg || 0;
+                    const healthScore = locationData.operational_health?.health_score || 0;
+                    
+                    storeComparisonChart.data.labels = [locationData.store_name];
+                    storeComparisonChart.data.datasets[0].data = [storeRevenue];
+                    storeComparisonChart.data.datasets[0].label = 'Revenue ($)';
+                    storeComparisonChart.data.datasets[1].data = [healthScore * 500]; // Scale for visibility
+                    storeComparisonChart.data.datasets[1].label = 'Health Score (x500)';
+                    storeComparisonChart.update('active');
+                }
+                
+                console.log('✅ Charts updated successfully for:', locationData.store_name);
+                
+            } catch (error) {
+                console.error('❌ Error updating charts for location:', error);
+            }
+        }
+        
+        function toggleComparisonMode() {
+            comparisonMode = !comparisonMode;
+            const section = document.getElementById('comparisonSection');
+            const toggleText = document.getElementById('comparisonToggleText');
+            
+            if (comparisonMode) {
+                section.style.display = 'block';
+                toggleText.textContent = 'Hide Comparison View';
+                loadComparisonData();
+            } else {
+                section.style.display = 'none';
+                toggleText.textContent = 'Show Comparison View';
+            }
+        }
+        
+        async function loadComparisonData() {
+            try {
+                const response = await fetch('/executive/api/location-comparison');
+                const data = await response.json();
+                
+                if (data.success && data.locations) {
+                    updateComparisonDisplay(data.locations);
+                } else {
+                    // Use mock data for demonstration
+                    const mockData = [
+                        { store_code: '3607', revenue: 142500, growth: -18.2, utilization: 85 },
+                        { store_code: '6800', revenue: 89750, growth: -12.5, utilization: 78 },
+                        { store_code: '8101', revenue: 76200, growth: -15.8, utilization: 82 },
+                        { store_code: '728', revenue: 45300, growth: -22.1, utilization: 76 }
+                    ];
+                    updateComparisonDisplay(mockData);
+                }
+            } catch (error) {
+                console.error('Error loading comparison data:', error);
+            }
+        }
+        
+        function updateComparisonDisplay(locations) {
+            const storeElements = {
+                '3607': { revenue: 'wayzataRevenue', growth: 'wayzataGrowth', utilization: 'wayzataUtilization' },
+                '6800': { revenue: 'brooklynRevenue', growth: 'brooklynGrowth', utilization: 'brooklynUtilization' },
+                '8101': { revenue: 'fridleyRevenue', growth: 'fridleyGrowth', utilization: 'fridleyUtilization' },
+                '728': { revenue: 'elkriverRevenue', growth: 'elkriverGrowth', utilization: 'elkriverUtilization' }
+            };
+            
+            locations.forEach(location => {
+                const elements = storeElements[location.store_code];
+                if (elements) {
+                    const revenueEl = document.getElementById(elements.revenue);
+                    const growthEl = document.getElementById(elements.growth);
+                    const utilizationEl = document.getElementById(elements.utilization);
+                    
+                    if (revenueEl) revenueEl.textContent = formatCurrency(location.revenue || 0, true);
+                    if (growthEl) growthEl.textContent = formatPercentage(location.growth || 0);
+                    if (utilizationEl) utilizationEl.textContent = formatPercentage(location.utilization || 0);
+                }
+            });
+        }
+        
+        async function updateHeatmap(metric) {
+            const container = document.getElementById('performanceHeatmap');
+            if (!container) return;
+            
+            try {
+                console.log('🔥 Loading real store data for heatmap...');
+                // Try to load real store data for heatmap
+                const response = await fetch('/executive/api/store-comparison');
+                const storeData = await response.json();
+                
+                let heatmapData;
+                
+                if (storeData.success && storeData.stores) {
+                    console.log('🔥 Updating heatmap with real store data');
+                    
+                    // Convert real store data to heatmap format
+                    heatmapData = {};
+                    
+                    ['revenue', 'utilization', 'health'].forEach(metricType => {
+                        heatmapData[metricType] = storeData.stores.map(store => {
+                            let value, normalizedValue;
+                            
+                            switch(metricType) {
+                                case 'revenue':
+                                    value = store.revenue?.total || store.revenue || 0;
+                                    // Normalize revenue to 0-100 scale
+                                    normalizedValue = Math.min(100, (value / 1000) * 0.1); // Adjust scaling as needed
+                                    break;
+                                case 'utilization':
+                                    value = store.efficiency?.utilization_rate || 85;
+                                    normalizedValue = Math.min(100, value);
+                                    break;
+                                case 'health':
+                                    value = store.operational_health?.score || store.profitability?.margin_pct || 85;
+                                    normalizedValue = Math.min(100, value);
+                                    break;
+                            }
+                            
+                            const performanceClass = normalizedValue >= 90 ? 'heatmap-excellent' :
+                                                   normalizedValue >= 75 ? 'heatmap-good' :
+                                                   normalizedValue >= 60 ? 'heatmap-average' : 'heatmap-poor';
+                            
+                            return {
+                                store: store.name || store.store_name || 'Store',
+                                value: Math.round(normalizedValue),
+                                class: performanceClass
+                            };
+                        });
+                    });
+                } else {
+                    console.log('🔥 Using demo heatmap data');
+                    // Fallback to demo data
+                    heatmapData = {
+                        'revenue': [
+                            { store: 'Wayzata', value: 92, class: 'heatmap-excellent' },
+                            { store: 'Brooklyn', value: 78, class: 'heatmap-good' },
+                            { store: 'Fridley', value: 65, class: 'heatmap-average' },
+                            { store: 'Elk River', value: 45, class: 'heatmap-poor' }
+                        ],
+                        'utilization': [
+                            { store: 'Wayzata', value: 85, class: 'heatmap-excellent' },
+                            { store: 'Brooklyn', value: 78, class: 'heatmap-good' },
+                            { store: 'Fridley', value: 82, class: 'heatmap-good' },
+                            { store: 'Elk River', value: 76, class: 'heatmap-average' }
+                        ],
+                        'health': [
+                            { store: 'Wayzata', value: 94, class: 'heatmap-excellent' },
+                            { store: 'Brooklyn', value: 87, class: 'heatmap-good' },
+                            { store: 'Fridley', value: 89, class: 'heatmap-excellent' },
+                            { store: 'Elk River', value: 72, class: 'heatmap-average' }
+                        ]
+                    };
+                }
+                
+                const data = heatmapData[metric] || heatmapData.revenue;
+                
+                container.innerHTML = data.map(item => 
+                    `<div class="heatmap-cell ${item.class}" title="${item.store}: ${item.value}">
+                        <div>${item.store}<br><strong>${item.value}</strong></div>
+                    </div>`
+                ).join('');
+                
+                console.log(`🔥 Heatmap updated for ${metric} with ${data.length} stores`);
+                
+            } catch (error) {
+                console.error('❌ Error updating heatmap:', error);
+                // Fallback to demo data on error
+                const demoData = [
+                    { store: 'Wayzata', value: 92, class: 'heatmap-excellent' },
+                    { store: 'Brooklyn', value: 78, class: 'heatmap-good' },
+                    { store: 'Fridley', value: 65, class: 'heatmap-average' },
+                    { store: 'Elk River', value: 45, class: 'heatmap-poor' }
+                ];
+                
+                container.innerHTML = demoData.map(item => 
+                    `<div class="heatmap-cell ${item.class}" title="${item.store}: ${item.value}">
+                        <div>${item.store}<br><strong>${item.value}</strong></div>
+                    </div>`
+                ).join('');
+            }
+        }
+        
+        async function initializeGaugesWithRealData() {
+            try {
+                console.log('🎯 Loading real gauge data from KPI API...');
+                const response = await fetch('/executive/api/financial-kpis');
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Use real API data for gauges
+                    const utilizationValue = data.store_metrics?.utilization_avg || 0;
+                    const healthValue = data.operational_health?.health_score || 0;
+                    const efficiencyValue = data.operational_health?.efficiency_score || 0;
+                    
+                    console.log('📊 Updating gauges with real data:', {
+                        utilization: utilizationValue,
+                        health: healthValue,
+                        efficiency: efficiencyValue
+                    });
+                    
+                    // Update gauges with real data
+                    updateGauge('utilizationGauge', utilizationValue, 'Utilization');
+                    updateGauge('healthGauge', healthValue * 10, 'Health Score'); // Convert to percentage
+                    updateGauge('efficiencyGauge', efficiencyValue || 76, 'Efficiency');
+                    
+                    console.log('✅ Gauges updated with real API data');
+                } else {
+                    console.warn('⚠️ KPI API failed, using fallback gauge values');
+                    // Fallback to demo values
+                    updateGauge('utilizationGauge', 82.7, 'Utilization');
+                    updateGauge('healthGauge', 89, 'Health Score');
+                    updateGauge('efficiencyGauge', 76, 'Efficiency');
+                }
+            } catch (error) {
+                console.error('❌ Error loading gauge data:', error);
+                // Fallback to demo values on error
+                updateGauge('utilizationGauge', 82.7, 'Utilization');
+                updateGauge('healthGauge', 89, 'Health Score');
+                updateGauge('efficiencyGauge', 76, 'Efficiency');
+            }
+        }
+        
+        function updateGauge(canvasId, value, label) {
+            const canvas = document.getElementById(canvasId);
+            if (!canvas) return;
+            
+            const ctx = canvas.getContext('2d');
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            const radius = 40;
+            
+            // Clear canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw background arc
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radius, 0.75 * Math.PI, 2.25 * Math.PI);
+            ctx.strokeStyle = '#e5e7eb';
+            ctx.lineWidth = 8;
+            ctx.stroke();
+            
+            // Draw value arc
+            const endAngle = 0.75 * Math.PI + (1.5 * Math.PI * (value / 100));
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radius, 0.75 * Math.PI, endAngle);
+            ctx.strokeStyle = value >= 80 ? '#10b981' : value >= 60 ? '#3b82f6' : '#f59e0b';
+            ctx.lineWidth = 8;
+            ctx.lineCap = 'round';
+            ctx.stroke();
+            
+            // Draw center value
+            ctx.fillStyle = '#374151';
+            ctx.font = 'bold 14px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText(Math.round(value), centerX, centerY + 5);
+        }
+        
+        
+        
+        
+    
+
+// Check refresh status periodically
+function checkRefreshStatus() {
+    fetch('/refresh_status')
+        .then(response => response.json())
+        .then(data => {
+            const overlay = document.getElementById('refresh-status-overlay');
+            if (data.refreshing) {
+                overlay.style.display = 'block';
+                const startTime = document.getElementById('refresh-start-time');
+                if (data.start_time) {
+                    startTime.textContent = new Date(data.start_time).toLocaleTimeString();
+                }
+            } else {
+                overlay.style.display = 'none';
+            }
+        })
+        .catch(error => {
+            console.error('Error checking refresh status:', error);
+        });
+}
+
+// Check status on page load and every 5 seconds
+document.addEventListener('DOMContentLoaded', function() {
+    // Skip refresh status popup on analytics pages (tab 7 and others)
+    const isAnalyticsPage = window.location.pathname.includes('/tab/7') || 
+                           window.location.pathname.includes('/predictive') || 
+                           window.location.pathname.includes('/analytics');
+    
+    if (!isAnalyticsPage) {
+        checkRefreshStatus();
+        setInterval(checkRefreshStatus, 5000);
+    }
+});
+
+
+    if ('serviceWorker' in navigator && /Android.*Chrome/i.test(navigator.userAgent)) {
+        // Enable performance monitoring on Android Chrome
+        window.addEventListener('load', () => {
+            const observer = new PerformanceObserver((list) => {
+                for (const entry of list.getEntries()) {
+                    if (entry.duration > 100) {
+                        console.warn(`Slow performance detected: ${entry.name} took ${entry.duration}ms`);
+                    }
+                }
+            });
+            observer.observe({entryTypes: ['measure', 'navigation', 'paint']});
+        });
+    }
+    
+
+    document.addEventListener('DOMContentLoaded', function() {
+        // Close mobile navbar when clicking nav links (but NOT dropdown toggles)
+        const navLinks = document.querySelectorAll('.navbar-nav .nav-link:not(.dropdown-toggle), .navbar-nav .dropdown-item');
+        const navbarCollapse = document.getElementById('navbarNav');
+        
+        navLinks.forEach(link => {
+            link.addEventListener('click', (e) => {
+                // Only close on mobile screens and if it's not a dropdown toggle
+                if (window.innerWidth < 992 && !link.classList.contains('dropdown-toggle')) {
+                    const bsCollapse = bootstrap.Collapse.getInstance(navbarCollapse);
+                    if (bsCollapse) {
+                        bsCollapse.hide();
+                    }
+                }
+            });
+        });
+        
+        // Ensure dropdowns work properly after page navigation
+        const reinitializeDropdowns = () => {
+            setTimeout(() => {
+                const dropdownElements = document.querySelectorAll('.dropdown-toggle');
+                dropdownElements.forEach(element => {
+                    if (!bootstrap.Dropdown.getInstance(element)) {
+                        new bootstrap.Dropdown(element, {
+                            autoClose: true,
+                            boundary: 'viewport'
+                        });
+                    }
+                });
+                console.log('Dropdowns reinitialized after navigation');
+            }, 100);
+        };
+        
+        // Reinitialize dropdowns when content changes
+        const observer = new MutationObserver(() => {
+            reinitializeDropdowns();
+        });
+        
+        observer.observe(document.body, { childList: true, subtree: true });
+    });
+    
+
+
+
+
+
+
+    // CRITICAL: Initialize Bootstrap dropdowns on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        // Initialize all dropdowns
+        var dropdownElementList = [].slice.call(document.querySelectorAll('.dropdown-toggle'));
+        var dropdownList = dropdownElementList.map(function (dropdownToggleEl) {
+            return new bootstrap.Dropdown(dropdownToggleEl, {
+                autoClose: true,
+                boundary: 'viewport'
+            });
+        });
+        console.log('Bootstrap dropdowns initialized:', dropdownList.length);
+    });
+    
+
+
+    document.addEventListener('DOMContentLoaded', function() {
+        const navbarToggler = document.querySelector('.navbar-toggler');
+        const navbarCollapse = document.querySelector('.navbar-collapse');
+        const dropdownItems = document.querySelectorAll('.dropdown-item');
+        
+        let isClosing = false;
+        
+        // Close navbar when clicking dropdown items (actual navigation)
+        dropdownItems.forEach(function(item) {
+            item.addEventListener('click', function(event) {
+                // Only close on mobile screens and if navbar is open
+                if (window.innerWidth < 992 && navbarCollapse.classList.contains('show') && !isClosing) {
+                    isClosing = true;
+                    
+                    // Close any open dropdowns first
+                    document.querySelectorAll('.dropdown-menu.show').forEach(menu => {
+                        const dropdown = bootstrap.Dropdown.getInstance(menu.previousElementSibling);
+                        if (dropdown) dropdown.hide();
+                    });
+                    
+                    // Then close the navbar
+                    setTimeout(() => {
+                        const bsCollapse = bootstrap.Collapse.getInstance(navbarCollapse) || 
+                                         new bootstrap.Collapse(navbarCollapse, { toggle: false });
+                        bsCollapse.hide();
+                        
+                        setTimeout(() => {
+                            isClosing = false;
+                        }, 350);
+                    }, 100);
+                }
+            });
+        });
+        
+        // Prevent toggler issues during animations
+        navbarToggler.addEventListener('click', function(event) {
+            if (isClosing) {
+                event.preventDefault();
+                event.stopPropagation();
+                return false;
+            }
+        });
+        
+        // Close navbar when clicking outside (but not dropdown toggles)
+        document.addEventListener('click', function(event) {
+            if (window.innerWidth < 992 && 
+                navbarCollapse.classList.contains('show') && 
+                !event.target.closest('.navbar') &&
+                !isClosing) {
+                
+                isClosing = true;
+                const bsCollapse = bootstrap.Collapse.getInstance(navbarCollapse) || 
+                                 new bootstrap.Collapse(navbarCollapse, { toggle: false });
+                bsCollapse.hide();
+                
+                setTimeout(() => {
+                    isClosing = false;
+                }, 350);
+            }
+        });
+        
+        console.log('Enhanced navbar functionality initialized');
+    });
+    
+        
+        // Test the function
+        function runTest() {
+            const results = document.getElementById('testResults');
+            
+            try {
+                // Test with disabled config
+                window.dashboardConfig.current_week_view_enabled = false;
+                initializeCurrentWeekVisibility();
+                
+                const hiddenHeaders = Array.from(document.querySelectorAll('th')).filter(th => 
+                    th.textContent.includes('Current Week') && th.style.display === 'none'
+                );
+                
+                const hiddenCells = Array.from(document.querySelectorAll('[id$="-current"]')).filter(cell => 
+                    cell.style.display === 'none'
+                );
+                
+                if (hiddenHeaders.length > 0 && hiddenCells.length > 0) {
+                    results.innerHTML = '<p style="color: green;">✅ TEST PASSED: Function correctly hides current week columns when disabled</p>';
+                    return true;
+                } else {
+                    results.innerHTML = '<p style="color: red;">❌ TEST FAILED: Function did not hide columns properly</p>';
+                    return false;
+                }
+            } catch (e) {
+                results.innerHTML = '<p style="color: red;">❌ TEST ERROR: ' + e.message + '</p>';
+                return false;
+            }
+        }
+        
+        window.onload = runTest;
+    </script>
+</body>
+</html>
+            

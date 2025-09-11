@@ -47,8 +47,13 @@
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
-    <!-- Executive Dashboard Styles -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/executive-dashboard.css') }}">
+    <!-- Executive Dashboard Styles with cache-busting -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/executive-dashboard.css') }}?v={{ moment().strftime('%Y%m%d_%H%M%S') if moment else '20250910_140000' }}">
+    
+    <!-- Cache busting meta tags -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     
     <style>
         :root {
@@ -781,6 +786,150 @@
                 padding: 2px 6px;
             }
         }
+
+        /* Comprehensive Scorecard Matrix Styles - ADDED 2025-09-09 */
+        .comprehensive-scorecard-table {
+            font-size: 0.75rem;
+            background: white;
+            border: 1px solid #dee2e6;
+        }
+        
+        .comprehensive-scorecard-table th {
+            background: linear-gradient(135deg, #2c3e50, #34495e) !important;
+            color: white !important;
+            font-weight: 600;
+            font-size: 0.7rem;
+            text-align: center;
+            vertical-align: middle;
+            border: 1px solid #34495e;
+        }
+        
+        .comprehensive-scorecard-table td {
+            text-align: center;
+            vertical-align: middle;
+            border: 1px solid #e9ecef;
+            padding: 6px 4px;
+            position: relative;
+        }
+        
+        .comprehensive-scorecard-table .metric-name {
+            text-align: left;
+            font-weight: 600;
+            color: #2c3e50;
+            background: #f8f9fa;
+            padding-left: 12px;
+        }
+        
+        .comprehensive-scorecard-table .metric-row {
+            transition: background-color 0.2s ease;
+        }
+        
+        .comprehensive-scorecard-table .metric-row:hover {
+            background-color: rgba(52, 152, 219, 0.05);
+        }
+        
+        .comprehensive-scorecard-table .store-section-header {
+            background: linear-gradient(90deg, #e9ecef, #f8f9fa);
+            font-weight: bold;
+            color: #495057;
+        }
+        
+        .comprehensive-scorecard-table .revenue-cell {
+            color: #27ae60;
+            font-weight: 600;
+        }
+        
+        .comprehensive-scorecard-table .percentage-cell {
+            color: #3498db;
+        }
+        
+        .comprehensive-scorecard-table .currency-cell {
+            color: #27ae60;
+        }
+        
+        /* Enhanced goal-based colors with higher specificity */
+        .comprehensive-scorecard-table td.goal-met,
+        .comprehensive-scorecard-table .goal-met {
+            background-color: rgba(39, 174, 96, 0.2) !important;
+            color: #27ae60 !important;
+            font-weight: 600 !important;
+        }
+        
+        .comprehensive-scorecard-table td.goal-missed,
+        .comprehensive-scorecard-table .goal-missed {
+            background-color: rgba(231, 76, 60, 0.2) !important;
+            color: #e74c3c !important;
+            font-weight: 600 !important;
+        }
+        
+        .comprehensive-scorecard-table td.goal-warning,
+        .comprehensive-scorecard-table .goal-warning {
+            background-color: rgba(243, 156, 18, 0.2) !important;
+            color: #f39c12 !important;
+            font-weight: 600 !important;
+        }
+        
+        /* Store-specific row highlighting */
+        .comprehensive-scorecard-table .store-3607-row {
+            border-left: 4px solid #3498db;
+        }
+        
+        .comprehensive-scorecard-table .store-6800-row {
+            border-left: 4px solid #2ecc71;
+        }
+        
+        .comprehensive-scorecard-table .store-728-row {
+            border-left: 4px solid #f1c40f;
+        }
+        
+        .comprehensive-scorecard-table .store-8101-row {
+            border-left: 4px solid #e67e22;
+        }
+        
+        /* Store-colored borders for goal cells */
+        .comprehensive-scorecard-table .store-3607-row-border {
+            border: 2px solid #3498db !important;
+            box-shadow: 0 0 3px rgba(52, 152, 219, 0.3);
+        }
+        
+        .comprehensive-scorecard-table .store-6800-row-border {
+            border: 2px solid #2ecc71 !important;
+            box-shadow: 0 0 3px rgba(46, 204, 113, 0.3);
+        }
+        
+        .comprehensive-scorecard-table .store-728-row-border {
+            border: 2px solid #f1c40f !important;
+            box-shadow: 0 0 3px rgba(241, 196, 15, 0.3);
+        }
+        
+        .comprehensive-scorecard-table .store-8101-row-border {
+            border: 2px solid #e67e22 !important;
+            box-shadow: 0 0 3px rgba(230, 126, 34, 0.3);
+        }
+        
+        /* Loading state */
+        .comprehensive-scorecard-table .loading-row td {
+            padding: 20px;
+            font-style: italic;
+        }
+        
+        /* Responsive adjustments for comprehensive scorecard */
+        @media (max-width: 1200px) {
+            .comprehensive-scorecard-table {
+                font-size: 0.65rem;
+            }
+            
+            .comprehensive-scorecard-table th,
+            .comprehensive-scorecard-table td {
+                padding: 4px 2px;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .comprehensive-scorecard-table {
+                font-size: 0.6rem;
+            }
+        }
     </style>
 {% endblock %}
 
@@ -945,11 +1094,11 @@
                             <thead class="table-dark">
                                 <tr>
                                     <th width="200">Store / Manager</th>
-                                    <th width="120">Previous Week</th>
+                                    <th width="120" id="exec-header-previous-week">Previous Week</th>
                                     {% if dashboard_config.current_week_view_enabled %}
-                                    <th width="120">Current Week</th>
+                                    <th width="120" id="exec-header-current-week">Current Week</th>
                                     {% endif %}
-                                    <th width="120">Previous Year</th>
+                                    <th width="120" id="exec-header-previous-year">Previous Year</th>
                                     <th width="100">YoY Growth</th>
                                     <th width="100">Utilization</th>
                                     <th width="100">Health Score</th>
@@ -1023,6 +1172,56 @@
                             </tbody>
                         </table>
                     </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- COMPREHENSIVE EXECUTIVE SCORECARD MATRIX - ALL METRICS -->
+        <div class="row mb-5">
+            <div class="col-12">
+                <h3 class="section-header">📊 Comprehensive Executive Scorecard Matrix</h3>
+                <p class="text-muted mb-3">Complete operational dashboard with historical periods: -3, -2, Previous Week, Current Week, Previous Year, Goals, and 3-week trailing averages</p>
+                
+                <div class="scorecard-container">
+                    <div class="table-responsive">
+                        <table class="table table-sm comprehensive-scorecard-table">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th width="300">Measurable</th>
+                                    <th width="100" id="header-minus-3">-3</th>
+                                    <th width="100" id="header-minus-2">-2</th>
+                                    <th width="120" id="header-previous-week">Previous Week</th>
+                                    <th width="120" id="header-current-week">Current Week</th>
+                                    <th width="120" id="header-previous-year">Previous Year</th>
+                                    <th width="120">Plus/Minus Goal</th>
+                                    <th width="150" id="header-current-trailing">Current Trailing 3w Avg</th>
+                                    <th width="150" id="header-prev-year-trailing">Prev Year Trailing 3w</th>
+                                    <th width="150" id="header-prev-year-forward">Prev Year 3w Forward</th>
+                                </tr>
+                            </thead>
+                            <tbody id="comprehensiveScorecardBody">
+                                <tr class="loading-row">
+                                    <td colspan="10" class="text-center text-muted">
+                                        <i class="fas fa-spinner fa-spin me-2"></i>Loading comprehensive scorecard data...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <!-- Scorecard Controls -->
+                <div class="mt-3">
+                    <button class="btn btn-sm btn-outline-primary" onclick="refreshComprehensiveScorecard()">
+                        <i class="fas fa-sync-alt me-1"></i>Refresh Data
+                    </button>
+                    <button class="btn btn-sm btn-outline-secondary ms-2" onclick="exportScorecardData()">
+                        <i class="fas fa-download me-1"></i>Export Data
+                    </button>
+                    <small class="text-muted ms-3">
+                        <i class="fas fa-info-circle me-1"></i>
+                        Last updated: <span id="scorecardLastUpdated">Loading...</span>
+                    </small>
                 </div>
             </div>
         </div>
@@ -1929,8 +2128,13 @@
             if (!storeComparisonCtx) return;
             
             let storeLabels = ['Wayzata', 'Brooklyn Park', 'Fridley', 'Elk River'];
-            let revenueData = [142500, 89750, 76200, 45300]; // Default values
-            let marginData = [68.5, 71.2, 69.8, 65.4]; // Default values
+            
+            // Get configurable default values instead of hardcoded ones
+            const defaultRevenue = await getConfigurableDefault('revenue', 50000);
+            const defaultMargin = await getConfigurableDefault('margin', 70);
+            
+            let revenueData = [defaultRevenue * 2.85, defaultRevenue * 1.8, defaultRevenue * 1.5, defaultRevenue * 0.9]; // Proportional defaults
+            let marginData = [defaultMargin * 0.98, defaultMargin * 1.02, defaultMargin * 0.995, defaultMargin * 0.93]; // Proportional defaults
             
             if (storeData.success && storeData.stores) {
                 storeLabels = storeData.stores.map(s => s.name || s.store_name || 'Store');
@@ -2287,12 +2491,15 @@
                                 growthCell.title = `Year-over-year growth: ${formatPercentage(yoyGrowth)}`;
                             }
                             
-                            // Update Utilization cell
+                            // Update Utilization cell with configurable thresholds
                             const utilizationCell = document.getElementById(`util-${store.code}`);
                             if (utilizationCell && kpiData.store_metrics?.utilization_avg !== undefined) {
                                 const util = parseFloat(kpiData.store_metrics.utilization_avg);
                                 utilizationCell.textContent = formatPercentage(util);
-                                utilizationCell.className = `metric-cell ${util >= 75 ? 'trend-positive' : util >= 50 ? 'trend-neutral' : 'trend-negative'}`;
+                                
+                                // Get configurable utilization thresholds
+                                const thresholds = await getConfigurableDefault('utilization', {excellent: 85, good: 75, fair: 65});
+                                utilizationCell.className = `metric-cell ${util >= thresholds.good ? 'trend-positive' : util >= thresholds.fair ? 'trend-neutral' : 'trend-negative'}`;
                                 utilizationCell.title = `Equipment utilization: ${formatPercentage(util)}`;
                             }
                             
@@ -2603,52 +2810,146 @@
             if (!container) return;
             
             try {
-                console.log('🔥 Loading real store data for heatmap...');
-                // Try to load real store data for heatmap
-                const response = await fetch('/executive/api/store-comparison');
-                const storeData = await response.json();
+                console.log('🔥 Loading comprehensive scorecard and config data for heatmap...');
+                
+                // Fetch both data and configuration
+                const [scorecardResponse, configResponse] = await Promise.all([
+                    fetch('/executive/api/comprehensive-scorecard-matrix'),
+                    fetch('/config/api/executive-dashboard-configuration')
+                ]);
+                
+                const scorecardData = await scorecardResponse.json();
+                const configData = await configResponse.json();
                 
                 let heatmapData;
                 
-                if (storeData.success && storeData.stores) {
-                    console.log('🔥 Updating heatmap with real store data');
+                if (scorecardData.success && scorecardData.metrics && configData.success) {
+                    console.log('🔥 Calculating performance scores using configurable parameters');
                     
-                    // Convert real store data to heatmap format
+                    // Extract configurable parameters
+                    const config = configData.data || {};
+                    const revenueTiers = config.revenue_tiers || {};
+                    const utilizationScoring = config.utilization_scoring || {};
+                    
+                    // Configurable scaling factors (with fallbacks)
+                    const revenueScaling = {
+                        baseWeight: 0.4,
+                        growthWeight: 0.3,
+                        trendWeight: 0.3,
+                        targetRevenue: revenueTiers.tier_1_threshold || 50000,
+                        scalingFactor: 0.4
+                    };
+                    
+                    const utilizationScaling = {
+                        laborWeight: 0.6,
+                        efficiencyWeight: 0.4,
+                        wageMultiplier: 2.0,
+                        revPerHourMultiplier: 0.5
+                    };
+                    
+                    const healthScoring = {
+                        revenueWeight: 0.25,
+                        laborWeight: 0.25,
+                        contractWeight: 0.25,
+                        trendWeight: 0.25,
+                        revenueDivisor: revenueTiers.tier_1_threshold ? revenueTiers.tier_1_threshold / 50 : 1000,
+                        contractDivisor: 4
+                    };
+                    
+                    const stores = [
+                        { code: '3607', name: 'Wayzata' },
+                        { code: '6800', name: 'Brooklyn Park' },
+                        { code: '728', name: 'Elk River' },
+                        { code: '8101', name: 'Fridley' }
+                    ];
+                    
                     heatmapData = {};
                     
                     ['revenue', 'utilization', 'health'].forEach(metricType => {
-                        heatmapData[metricType] = storeData.stores.map(store => {
-                            let value, normalizedValue;
+                        heatmapData[metricType] = stores.map(store => {
+                            let performanceScore = 0;
                             
-                            switch(metricType) {
-                                case 'revenue':
-                                    value = store.revenue?.total || store.revenue || 0;
-                                    // Normalize revenue to 0-100 scale
-                                    normalizedValue = Math.min(100, (value / 1000) * 0.1); // Adjust scaling as needed
-                                    break;
-                                case 'utilization':
-                                    value = store.efficiency?.utilization_rate || 85;
-                                    normalizedValue = Math.min(100, value);
-                                    break;
-                                case 'health':
-                                    value = store.operational_health?.score || store.profitability?.margin_pct || 85;
-                                    normalizedValue = Math.min(100, value);
-                                    break;
+                            if (metricType === 'revenue') {
+                                // CONFIGURABLE REVENUE ALGORITHM
+                                const revenueData = scorecardData.metrics[`Revenue ${store.code}`];
+                                if (revenueData) {
+                                    const currentRevenue = revenueData.current_trailing_3w_avg || 0;
+                                    const revenueScore = Math.min(100, (currentRevenue / revenueScaling.targetRevenue) * 100 * revenueScaling.baseWeight);
+                                    
+                                    const prevYearRevenue = revenueData.prev_year_trailing_3w || currentRevenue;
+                                    const yoyGrowth = prevYearRevenue > 0 ? ((currentRevenue - prevYearRevenue) / prevYearRevenue) * 100 : 0;
+                                    const growthScore = Math.min(30, Math.max(-10, yoyGrowth + 10)) * revenueScaling.growthWeight;
+                                    
+                                    const minus2 = revenueData.minus_2 || 0;
+                                    const trendStability = minus2 > 0 ? 
+                                        Math.max(0, 30 - Math.abs((currentRevenue - minus2) / minus2 * 100)) * revenueScaling.trendWeight : 
+                                        20 * revenueScaling.trendWeight;
+                                    
+                                    performanceScore = revenueScore + growthScore + trendStability;
+                                }
+                                
+                            } else if (metricType === 'utilization') {
+                                // CONFIGURABLE UTILIZATION ALGORITHM
+                                const wageData = scorecardData.metrics[`Wage vs Rental Rev ${store.code}`];
+                                const revPerHourData = scorecardData.metrics[`Rev per Hr ${store.code}`];
+                                
+                                if (wageData && revPerHourData) {
+                                    const wageRatio = wageData.current_trailing_3w_avg || 50;
+                                    const laborEfficiency = Math.max(0, 100 - wageRatio * utilizationScaling.wageMultiplier);
+                                    
+                                    const revPerHour = revPerHourData.current_trailing_3w_avg || 0;
+                                    const revPerHourScore = Math.min(40, revPerHour * utilizationScaling.revPerHourMultiplier);
+                                    
+                                    performanceScore = (laborEfficiency * utilizationScaling.laborWeight) + (revPerHourScore * utilizationScaling.efficiencyWeight);
+                                }
+                                
+                            } else if (metricType === 'health') {
+                                // CONFIGURABLE HEALTH ALGORITHM
+                                const revenueData = scorecardData.metrics[`Revenue ${store.code}`];
+                                const wageData = scorecardData.metrics[`Wage vs Rental Rev ${store.code}`];
+                                const contractData = scorecardData.metrics[`# New Open Contracts ${store.code}`];
+                                
+                                if (revenueData && wageData) {
+                                    const revenueHealth = Math.min(25, (revenueData.current_trailing_3w_avg || 0) / healthScoring.revenueDivisor) * healthScoring.revenueWeight * 4;
+                                    
+                                    const laborHealth = Math.max(0, 25 - (wageData.current_trailing_3w_avg || 50) / 2) * healthScoring.laborWeight * 4;
+                                    
+                                    const contractHealth = contractData ? 
+                                        Math.min(25, (contractData.current_trailing_3w_avg || 0) / healthScoring.contractDivisor) * healthScoring.contractWeight * 4 : 
+                                        15 * healthScoring.contractWeight * 4;
+                                    
+                                    const prevYearRevenue = revenueData.prev_year_trailing_3w || 1;
+                                    const currentRevenue = revenueData.current_trailing_3w_avg || 0;
+                                    const trendHealth = currentRevenue >= prevYearRevenue ? 25 * healthScoring.trendWeight * 4 : 
+                                        Math.max(0, 25 - Math.abs((currentRevenue - prevYearRevenue) / prevYearRevenue * 50)) * healthScoring.trendWeight * 4;
+                                    
+                                    performanceScore = revenueHealth + laborHealth + contractHealth + trendHealth;
+                                }
                             }
                             
-                            const performanceClass = normalizedValue >= 90 ? 'heatmap-excellent' :
-                                                   normalizedValue >= 75 ? 'heatmap-good' :
-                                                   normalizedValue >= 60 ? 'heatmap-average' : 'heatmap-poor';
+                            // Normalize to 0-100 and determine class using configurable thresholds
+                            const normalizedScore = Math.min(100, Math.max(0, performanceScore));
+                            
+                            // Use utilization thresholds for performance classification
+                            const excellent = utilizationScoring.excellent_threshold || 85;
+                            const good = utilizationScoring.good_threshold || 75;
+                            const fair = utilizationScoring.fair_threshold || 65;
+                            
+                            const performanceClass = normalizedScore >= excellent ? 'heatmap-excellent' :
+                                                   normalizedScore >= good ? 'heatmap-good' :
+                                                   normalizedScore >= fair ? 'heatmap-average' : 'heatmap-poor';
+                            
+                            console.log(`🔥 ${store.name} ${metricType} score: ${normalizedScore.toFixed(1)}`);
                             
                             return {
-                                store: store.name || store.store_name || 'Store',
-                                value: Math.round(normalizedValue),
+                                store: store.name,
+                                value: Math.round(normalizedScore),
                                 class: performanceClass
                             };
                         });
                     });
                 } else {
-                    console.log('🔥 Using demo heatmap data');
+                    console.log('🔥 Using demo heatmap data due to API failure');
                     // Fallback to demo data
                     heatmapData = {
                         'revenue': [
@@ -2700,43 +3001,174 @@
             }
         }
         
-        async function initializeGaugesWithRealData() {
+        // Helper function to get current store filter
+        function getCurrentStoreFilter() {
+            return currentLocationFilter;
+        }
+        
+        // Helper function to get configurable default values
+        async function getConfigurableDefault(type, fallback) {
             try {
-                console.log('🎯 Loading real gauge data from KPI API...');
-                const response = await fetch('/executive/api/financial-kpis');
+                const response = await fetch('/config/api/executive-dashboard-configuration');
                 const data = await response.json();
                 
-                if (data.success) {
-                    // Use real API data for gauges
-                    const utilizationValue = data.store_metrics?.utilization_avg || 0;
-                    const healthValue = data.operational_health?.health_score || 0;
-                    const efficiencyValue = data.operational_health?.efficiency_score || 0;
+                if (data.success && data.data) {
+                    if (type === 'revenue') {
+                        return data.data.revenue_tiers?.tier_1_threshold || fallback;
+                    } else if (type === 'margin') {
+                        return data.data.utilization_scoring?.good_threshold || fallback;
+                    } else if (type === 'utilization') {
+                        return {
+                            excellent: data.data.utilization_scoring?.excellent_threshold || 85,
+                            good: data.data.utilization_scoring?.good_threshold || 75,
+                            fair: data.data.utilization_scoring?.fair_threshold || 65
+                        };
+                    }
+                }
+            } catch (error) {
+                console.warn('Could not fetch configurable defaults:', error);
+            }
+            return fallback;
+        }
+        
+        async function initializeGaugesWithRealData() {
+            try {
+                console.log('🎯 Loading gauge data from comprehensive scorecard...');
+                
+                // Get current selected store or default to all stores
+                const currentStore = getCurrentStoreFilter();
+                
+                if (currentStore && currentStore !== 'all') {
+                    // Individual store view - get store-specific data
+                    console.log(`🎯 Loading individual store data for ${currentStore}`);
+                    const response = await fetch(`/executive/api/location-kpis/${currentStore}`);
+                    const data = await response.json();
                     
-                    console.log('📊 Updating gauges with real data:', {
-                        utilization: utilizationValue,
-                        health: healthValue,
-                        efficiency: efficiencyValue
+                    if (data.success) {
+                        const utilizationValue = data.store_metrics?.utilization_avg || 0;
+                        const healthValue = data.operational_health?.health_score || 0;
+                        
+                        // Calculate Efficiency as Revenue per Labor Hour
+                        let efficiencyValue = 0;
+                        if (data.revenue_metrics && data.payroll_metrics) {
+                            const revenue = data.revenue_metrics.current_3wk_avg || 0;
+                            const laborHours = data.payroll_metrics.total_hours || 1; // Prevent division by zero
+                            efficiencyValue = revenue / laborHours; // Revenue per hour
+                        }
+                        
+                        console.log('📊 Individual store gauge values:', {
+                            store: currentStore,
+                            utilization: utilizationValue,
+                            health: healthValue,
+                            efficiency: efficiencyValue
+                        });
+                        
+                        updateGauge('utilizationGauge', utilizationValue, 'Utilization');
+                        updateGauge('healthGauge', healthValue, 'Health Score');
+                        updateGauge('efficiencyGauge', Math.min(100, efficiencyValue), 'Efficiency ($/hr)');
+                        
+                        console.log(`✅ Gauges updated with real data for store ${currentStore}`);
+                        return;
+                    }
+                }
+                
+                // All stores view - aggregate data from comprehensive scorecard
+                console.log('🎯 Loading all stores data from comprehensive scorecard');
+                const response = await fetch('/executive/api/comprehensive-scorecard-matrix');
+                const scorecardData = await response.json();
+                
+                if (scorecardData.success && scorecardData.metrics) {
+                    const stores = ['3607', '6800', '728', '8101'];
+                    let totalRevenue = 0, totalWages = 0, totalContracts = 0, totalHealth = 0;
+                    let storeCount = 0;
+                    
+                    stores.forEach(storeCode => {
+                        const revenueData = scorecardData.metrics[`Revenue ${storeCode}`];
+                        const wageData = scorecardData.metrics[`Wages ${storeCode}`];
+                        const revPerHourData = scorecardData.metrics[`Rev per Hr ${storeCode}`];
+                        const contractData = scorecardData.metrics[`# New Open Contracts ${storeCode}`];
+                        
+                        if (revenueData && wageData && revPerHourData) {
+                            totalRevenue += revenueData.current_trailing_3w_avg || 0;
+                            totalWages += wageData.current_trailing_3w_avg || 0;
+                            
+                            // Use actual Rev per Hr data for efficiency
+                            const revPerHour = revPerHourData.current_trailing_3w_avg || 0;
+                            totalHealth += revPerHour; // Will average this
+                            
+                            storeCount++;
+                        }
                     });
                     
-                    // Update gauges with real data
-                    updateGauge('utilizationGauge', utilizationValue, 'Utilization');
-                    updateGauge('healthGauge', healthValue * 10, 'Health Score'); // Convert to percentage
-                    updateGauge('efficiencyGauge', efficiencyValue || 76, 'Efficiency');
+                    // Get configuration for gauge calculations
+                    const gaugeConfigResponse = await fetch('/config/api/executive-dashboard-configuration');
+                    const gaugeConfigData = await gaugeConfigResponse.json();
+                    const gaugeConfig = gaugeConfigData.success ? gaugeConfigData.data : {};
                     
-                    console.log('✅ Gauges updated with real API data');
+                    // Use configurable target revenue instead of hardcoded 50000
+                    const targetRevenuePerStore = gaugeConfig.revenue_tiers?.tier_1_threshold || 50000;
+                    const efficiencyMultiplier = gaugeConfig.utilization_scoring?.good_threshold ? 
+                        (100 / gaugeConfig.utilization_scoring.good_threshold) : 2;
+                    
+                    // Calculate aggregated metrics using configurable values
+                    const utilizationValue = totalRevenue > 0 ? 
+                        Math.min(100, (totalRevenue / (stores.length * targetRevenuePerStore)) * 100) : 
+                        (gaugeConfig.utilization_scoring?.fair_threshold || 50);
+                    
+                    const wageRatio = totalRevenue > 0 ? (totalWages / totalRevenue) * 100 : 
+                        (gaugeConfig.utilization_scoring?.fair_threshold || 50);
+                    const healthValue = Math.max(0, 100 - wageRatio);
+                    
+                    const efficiencyValue = storeCount > 0 ? totalHealth / storeCount : 0;
+                    
+                    console.log('📊 All stores aggregated gauge values (configurable):', {
+                        utilization: utilizationValue,
+                        health: healthValue, 
+                        efficiency: efficiencyValue,
+                        targetRevenuePerStore: targetRevenuePerStore,
+                        efficiencyMultiplier: efficiencyMultiplier,
+                        totalRevenue: totalRevenue,
+                        totalWages: totalWages,
+                        wageRatio: wageRatio
+                    });
+                    
+                    updateGauge('utilizationGauge', utilizationValue, 'Utilization');
+                    updateGauge('healthGauge', healthValue, 'Health Score');
+                    updateGauge('efficiencyGauge', Math.min(100, efficiencyValue * efficiencyMultiplier), 'Efficiency ($/hr)');
+                    
+                    console.log('✅ Gauges updated with comprehensive scorecard data');
                 } else {
-                    console.warn('⚠️ KPI API failed, using fallback gauge values');
-                    // Fallback to demo values
-                    updateGauge('utilizationGauge', 82.7, 'Utilization');
-                    updateGauge('healthGauge', 89, 'Health Score');
-                    updateGauge('efficiencyGauge', 76, 'Efficiency');
+                    throw new Error('Comprehensive scorecard API failed');
                 }
             } catch (error) {
                 console.error('❌ Error loading gauge data:', error);
-                // Fallback to demo values on error
-                updateGauge('utilizationGauge', 82.7, 'Utilization');
-                updateGauge('healthGauge', 89, 'Health Score');
-                updateGauge('efficiencyGauge', 76, 'Efficiency');
+                
+                // Try to get config for fallback values
+                try {
+                    const fallbackConfigResponse = await fetch('/config/api/executive-dashboard-configuration');
+                    const fallbackConfigData = await fallbackConfigResponse.json();
+                    
+                    if (fallbackConfigData.success && fallbackConfigData.data) {
+                        const config = fallbackConfigData.data;
+                        const fallbackUtilization = config.utilization_scoring?.fair_threshold || 65;
+                        const fallbackHealth = config.health_scoring?.base_health_score || 75;
+                        const fallbackEfficiency = config.revenue_tiers?.tier_3_threshold ? 
+                            Math.round(config.revenue_tiers.tier_3_threshold / 500) : 42; // Scale down revenue to efficiency
+                        
+                        updateGauge('utilizationGauge', fallbackUtilization, 'Utilization');
+                        updateGauge('healthGauge', fallbackHealth, 'Health Score');
+                        updateGauge('efficiencyGauge', fallbackEfficiency, 'Efficiency ($/hr)');
+                        console.log('⚠️ Using configurable fallback gauge values');
+                    } else {
+                        throw new Error('Config API also failed');
+                    }
+                } catch (configError) {
+                    // Last resort: Use minimal hardcoded values
+                    updateGauge('utilizationGauge', 50, 'Utilization');
+                    updateGauge('healthGauge', 50, 'Health Score');
+                    updateGauge('efficiencyGauge', 30, 'Efficiency ($/hr)');
+                    console.log('⚠️ Using minimal fallback values - config API failed');
+                }
             }
         }
         
@@ -2774,8 +3206,398 @@
             ctx.textAlign = 'center';
             ctx.fillText(Math.round(value), centerX, centerY + 5);
         }
+
+        // COMPREHENSIVE SCORECARD MATRIX FUNCTIONS - ADDED 2025-09-09
+        async function loadComprehensiveScorecard() {
+            console.log('📊 Loading comprehensive scorecard matrix...');
+            
+            try {
+                const response = await fetch('/executive/api/comprehensive-scorecard-matrix');
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                console.log('✅ Comprehensive scorecard data loaded:', data);
+                
+                displayComprehensiveScorecard(data);
+                updateScorecardTimestamp(data.metadata?.generated_at);
+                
+            } catch (error) {
+                console.error('❌ Error loading comprehensive scorecard:', error);
+                document.getElementById('comprehensiveScorecardBody').innerHTML = `
+                    <tr class="error-row">
+                        <td colspan="10" class="text-center text-danger">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            Error loading scorecard data: ${error.message}
+                        </td>
+                    </tr>
+                `;
+            }
+        }
         
+        function updateDynamicHeaders(periodDates) {
+            // Update column headers with dynamic date information
+            if (!periodDates) return;
+            
+            // Map period keys to header element IDs
+            const headerMap = {
+                'minus_3': 'header-minus-3',
+                'minus_2': 'header-minus-2', 
+                'previous_week': 'header-previous-week',
+                'current_week': 'header-current-week',
+                'previous_year': 'header-previous-year',
+                'current_trailing_3w_avg': 'header-current-trailing',
+                'prev_year_trailing_3w': 'header-prev-year-trailing',
+                'prev_year_3w_forward': 'header-prev-year-forward'
+            };
+            
+            // Update each header with dynamic date information
+            Object.keys(headerMap).forEach(periodKey => {
+                const headerElement = document.getElementById(headerMap[periodKey]);
+                const periodInfo = periodDates[periodKey];
+                
+                if (headerElement && periodInfo && periodInfo.header) {
+                    headerElement.innerHTML = periodInfo.header.replace(/\\n/g, '<br>');
+                    headerElement.style.whiteSpace = 'normal';
+                    headerElement.style.fontSize = '0.8em';
+                    headerElement.style.lineHeight = '1.2';
+                }
+            });
+        }
+
+        async function updateExecutiveScorecardHeaders(periodDates) {
+            // Update Executive Scorecard Matrix column headers with config-based calculation periods
+            console.log('🗓️ Updating Executive Scorecard Matrix headers with config settings...');
+            
+            try {
+                // Fetch current dashboard configuration to get week settings
+                const configResponse = await fetch('/config/api/executive-dashboard-configuration');
+                const configData = await configResponse.json();
+                
+                if (!configData.success) {
+                    console.warn('⚠️ Could not fetch dashboard config, using defaults');
+                    return;
+                }
+                
+                console.log('📊 Full config response:', configData);
+                
+                // Extract config from the API response structure: data.query_limits
+                const queryLimits = configData?.data?.query_limits;
+                console.log('📊 Query limits extracted:', queryLimits);
+                
+                // Map config settings to header elements with calculation info
+                const headerMappings = [
+                    {
+                        elementId: 'exec-header-current-week',
+                        baseText: 'Current Week',
+                        compactText: 'Curr Week',
+                        configWeeks: (queryLimits?.financial_kpis_current_revenue_weeks) || 1,
+                        periodKey: 'current_week'
+                    },
+                    {
+                        elementId: 'exec-header-previous-week', 
+                        baseText: 'Previous Week',
+                        compactText: 'Prev Week', 
+                        configWeeks: (queryLimits?.location_kpis_revenue_weeks) || 1,
+                        periodKey: 'previous_week'
+                    },
+                    {
+                        elementId: 'exec-header-previous-year',
+                        baseText: 'Previous Year',
+                        compactText: 'Prev Year',
+                        configWeeks: null, // No averaging for previous year
+                        periodKey: 'previous_year'
+                    }
+                ];
+                
+                // Update each header
+                headerMappings.forEach(mapping => {
+                    const headerElement = document.getElementById(mapping.elementId);
+                    if (!headerElement) return;
+                    
+                    let headerText;
+                    if (mapping.configWeeks && mapping.configWeeks > 1) {
+                        // Show weeks averaging: "Curr Week<br>(3w avg)"
+                        headerText = `${mapping.compactText}<br>(${mapping.configWeeks}w avg)`;
+                    } else if (mapping.configWeeks === 1) {
+                        // Show single week: "Curr Week<br>(1w)"
+                        headerText = `${mapping.compactText}<br>(1w)`;
+                    } else {
+                        // No config setting (Previous Year): "Prev Year"
+                        headerText = mapping.compactText;
+                    }
+                    
+                    // Add date information if available from periodDates
+                    if (periodDates && periodDates[mapping.periodKey] && periodDates[mapping.periodKey].formatted) {
+                        const dateStr = periodDates[mapping.periodKey].formatted;
+                        headerText += `<br><small style="font-size: 0.8em; opacity: 0.8;">${dateStr}</small>`;
+                    }
+                    
+                    headerElement.innerHTML = headerText;
+                    headerElement.style.whiteSpace = 'normal';
+                    headerElement.style.fontSize = '0.75em';
+                    headerElement.style.lineHeight = '1.1';
+                    headerElement.style.textAlign = 'center';
+                    
+                    console.log(`✅ Updated ${mapping.periodKey} header: ${mapping.compactText} (${mapping.configWeeks || 'no'}w)`);
+                });
+                
+            } catch (error) {
+                console.error('❌ Error updating Executive Scorecard headers:', error);
+            }
+        }
+
+        function displayComprehensiveScorecard(data) {
+            const tbody = document.getElementById('comprehensiveScorecardBody');
+            if (!tbody) return;
+            
+            // Update dynamic headers first
+            if (data.metadata && data.metadata.period_dates) {
+                console.log('📅 Updating both scorecard headers with period_dates:', data.metadata.period_dates);
+                updateDynamicHeaders(data.metadata.period_dates);
+                // Also update Executive Scorecard Matrix headers
+                updateExecutiveScorecardHeaders(data.metadata.period_dates);
+            } else {
+                console.log('⚠️ No period_dates found in metadata:', data.metadata);
+            }
+            
+            let html = '';
+            
+            // Group metrics by category
+            const metrics = data.metrics || {};
+            const categories = [
+                {
+                    title: 'Revenue Metrics',
+                    icon: 'fas fa-dollar-sign',
+                    metrics: ['Total Weekly Revenue']
+                },
+                {
+                    title: 'Accounts Receivable',
+                    icon: 'fas fa-file-invoice-dollar',
+                    metrics: ['% of Total AR ($) over 45 days (all stores)']
+                },
+                {
+                    title: 'Reservations by Store',
+                    icon: 'fas fa-calendar-check',
+                    metrics: [
+                        'Total $ on Reservation 3607',
+                        'Total $ on Reservation 6800', 
+                        'Total $ on Reservation 728',
+                        'Total $ on Reservation 8101'
+                    ]
+                },
+                {
+                    title: 'New Contracts by Store',
+                    icon: 'fas fa-handshake',
+                    metrics: [
+                        '# New Open Contracts 3607',
+                        '# New Open Contracts 6800',
+                        '# New Open Contracts 728', 
+                        '# New Open Contracts 8101'
+                    ]
+                },
+                {
+                    title: 'Deliveries',
+                    icon: 'fas fa-truck',
+                    metrics: ['# Deliveries Scheduled next 7 days Weds-Tues 8101']
+                },
+                {
+                    title: 'Store Revenue',
+                    icon: 'fas fa-store',
+                    metrics: [
+                        'Revenue 3607',
+                        'Revenue 6800',
+                        'Revenue 728',
+                        'Revenue 8101'
+                    ]
+                },
+                {
+                    title: 'Payroll',
+                    icon: 'fas fa-users',
+                    metrics: [
+                        'Wages 3607',
+                        'Wages 6800', 
+                        'Wages 728',
+                        'Wages 8101'
+                    ]
+                },
+                {
+                    title: 'Wage Ratios',
+                    icon: 'fas fa-percentage',
+                    metrics: [
+                        'Wage vs Rental Rev 3607',
+                        'Wage vs Rental Rev 6800',
+                        'Wage vs Rental Rev 728',
+                        'Wage vs Rental Rev 8101'
+                    ]
+                },
+                {
+                    title: 'Revenue per Hour',
+                    icon: 'fas fa-clock',
+                    metrics: [
+                        'Rev per Hr 3607',
+                        'Rev per Hr 6800',
+                        'Rev per Hr 728',
+                        'Rev per Hr 8101'
+                    ]
+                }
+            ];
+            
+            categories.forEach(category => {
+                // Add category header
+                html += `
+                    <tr class="store-section-header">
+                        <td class="metric-name">
+                            <i class="${category.icon} me-2"></i>
+                            <strong>${category.title}</strong>
+                        </td>
+                        <td colspan="9" class="text-muted" style="text-align: left; padding-left: 20px;">
+                            ${category.metrics.length} metrics
+                        </td>
+                    </tr>
+                `;
+                
+                // Add metrics rows
+                category.metrics.forEach(metricKey => {
+                    const metric = metrics[metricKey];
+                    if (!metric) return;
+                    
+                    const storeClass = getStoreClassFromMetric(metricKey);
+                    const goalStatus = getGoalStatus(metric);
+                    
+                    // Create store badge for metric name if applicable
+                    const storeBadge = getStoreBadgeForMetric(metricKey, metric);
+                    
+                    
+                    // Create store-colored border for goal cell if it's a store metric
+                    const goalCellClass = storeClass ? `goal-cell ${storeClass}-border` : 'goal-cell';
+                    
+                    html += `
+                        <tr class="metric-row ${storeClass}">
+                            <td class="metric-name">${metricKey}${storeBadge}</td>
+                            <td class="${goalStatus.minus3}">${formatValue(metric.minus_3, metric.format, metric.units)}</td>
+                            <td class="${goalStatus.minus2}">${formatValue(metric.minus_2, metric.format, metric.units)}</td>
+                            <td class="${goalStatus.prev}">${formatValue(metric.previous_week, metric.format, metric.units)}</td>
+                            <td class="${goalStatus.current}">${formatValue(metric.current_week, metric.format, metric.units)}</td>
+                            <td class="${goalStatus.previousYear}">${formatValue(metric.previous_year, metric.format, metric.units)}</td>
+                            <td class="${goalCellClass}">${formatValue(metric.plus_minus_goal, metric.format, metric.units)}</td>
+                            <td class="${goalStatus.currentTrailing3w}">${formatValue(metric.current_trailing_3w_avg, metric.format, metric.units)}</td>
+                            <td class="${goalStatus.prevYearTrailing3w}">${formatValue(metric.prev_year_trailing_3w, metric.format, metric.units)}</td>
+                            <td class="${goalStatus.prevYear3wForward}">${formatValue(metric.prev_year_3w_forward, metric.format, metric.units)}</td>
+                        </tr>
+                    `;
+                });
+            });
+            
+            tbody.innerHTML = html;
+        }
         
+        function getStoreClassFromMetric(metricKey) {
+            if (metricKey.includes('3607')) return 'store-3607-row';
+            if (metricKey.includes('6800')) return 'store-6800-row';
+            if (metricKey.includes('728')) return 'store-728-row';
+            if (metricKey.includes('8101')) return 'store-8101-row';
+            return '';
+        }
+        
+        function getStoreBadgeForMetric(metricKey, metric) {
+            // Store information with matching colors from CSS
+            const storeInfo = {
+                '3607': { name: 'Wayzata', color: '#3498db' },
+                '6800': { name: 'Brooklyn Park', color: '#2ecc71' },
+                '728': { name: 'Elk River', color: '#f1c40f' },
+                '8101': { name: 'Fridley', color: '#e67e22' }
+            };
+            
+            // Check metric key for store number (expanded pattern)
+            const storeMatch = metricKey.match(/\b(3607|6800|728|8101)\b/);
+            if (storeMatch) {
+                const storeNum = storeMatch[1];
+                const store = storeInfo[storeNum];
+                if (store) {
+                    return `<br><small class="store-badge" style="background-color: ${store.color}; color: white; padding: 2px 6px; border-radius: 3px; font-size: 0.75em; font-weight: bold; white-space: nowrap;">${storeNum} - ${store.name}</small>`;
+                }
+            }
+            
+            return '';
+        }
+        
+        function getGoalStatus(metric) {
+            const goal = metric.plus_minus_goal;
+            
+            // Helper function to determine status for a specific value
+            function getStatusForValue(value, goal, format, units) {
+                if (!goal || goal === 0) return ''; // No goal set
+                
+                let status = '';
+                if (format === 'percentage' && units === '%') {
+                    // For AR% and wage ratios, lower is better
+                    if (value <= goal) status = 'goal-met';
+                    else if (value <= goal * 1.2) status = 'goal-warning';
+                    else status = 'goal-missed';
+                } else if (format === 'currency' || format === 'integer') {
+                    // For revenue, contracts, deliveries, higher is better
+                    if (value >= goal) status = 'goal-met';
+                    else if (value >= goal * 0.8) status = 'goal-warning';
+                    else status = 'goal-missed';
+                }
+                
+                
+                return status;
+            }
+            
+            return {
+                minus3: getStatusForValue(metric.minus_3, goal, metric.format, metric.units),
+                minus2: getStatusForValue(metric.minus_2, goal, metric.format, metric.units),
+                prev: getStatusForValue(metric.previous_week, goal, metric.format, metric.units),
+                current: getStatusForValue(metric.current_week, goal, metric.format, metric.units),
+                currentTrailing3w: getStatusForValue(metric.current_trailing_3w_avg, goal, metric.format, metric.units),
+                prevYearTrailing3w: getStatusForValue(metric.prev_year_trailing_3w, goal, metric.format, metric.units),
+                prevYear3wForward: getStatusForValue(metric.prev_year_3w_forward, goal, metric.format, metric.units),
+                previousYear: getStatusForValue(metric.previous_year, goal, metric.format, metric.units)
+            };
+        }
+        
+        function formatValue(value, format, units) {
+            if (value === null || value === undefined || value === 0) return '-';
+            
+            switch (format) {
+                case 'currency':
+                    return '$' + value.toLocaleString();
+                case 'percentage':
+                    return value.toFixed(1) + '%';
+                case 'integer':
+                    return value.toLocaleString();
+                default:
+                    return value.toString();
+            }
+        }
+        
+        function updateScorecardTimestamp(timestamp) {
+            const element = document.getElementById('scorecardLastUpdated');
+            if (element && timestamp) {
+                const date = new Date(timestamp);
+                element.textContent = date.toLocaleString();
+            }
+        }
+        
+        function refreshComprehensiveScorecard() {
+            console.log('🔄 Refreshing comprehensive scorecard...');
+            loadComprehensiveScorecard();
+        }
+        
+        function exportScorecardData() {
+            console.log('📁 Exporting scorecard data...');
+            // Future implementation - export to CSV/Excel
+            alert('Export functionality will be implemented in a future update.');
+        }
+        
+        // Auto-load comprehensive scorecard on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('📊 Initializing comprehensive scorecard matrix...');
+            setTimeout(loadComprehensiveScorecard, 1000); // Load after other components
+        });
         
         
     </script>

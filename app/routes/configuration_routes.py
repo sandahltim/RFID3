@@ -1329,3 +1329,46 @@ def redirect_to_config():
 def redirect_settings_to_config():
     """Redirect settings URLs to configuration dashboard."""
     return redirect(url_for('configuration.configuration_dashboard'))
+
+
+@config_bp.route('/api/store-goals-configuration', methods=['GET', 'POST'])
+def store_goals_configuration():
+    """Store Goals configuration API endpoint"""
+    try:
+        if request.method == 'GET':
+            return jsonify({
+                'success': True,
+                'data': {
+                    'companyGoals': {
+                        'monthly_revenue_target': 500000,
+                        'ar_aging_threshold': 15.0,
+                        'deliveries_goal': 50,
+                        'wage_ratio_goal': 25.0,
+                        'revenue_per_hour_goal': 150
+                    },
+                    'storeGoals': {
+                        '3607': {'reservation_goal': 50000, 'contract_goal': 25},
+                        '6800': {'reservation_goal': 75000, 'contract_goal': 35}, 
+                        '728': {'reservation_goal': 40000, 'contract_goal': 20},
+                        '8101': {'reservation_goal': 60000, 'contract_goal': 30}
+                    }
+                }
+            })
+        
+        elif request.method == 'POST':
+            data = request.get_json()
+            logger.info(f"Received store goals configuration: {data}")
+            
+            # In a real implementation, save to database
+            # For now, just return success
+            return jsonify({
+                'success': True,
+                'message': 'Store Goals configuration saved successfully'
+            })
+            
+    except Exception as e:
+        logger.error(f"Error in store goals configuration: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500

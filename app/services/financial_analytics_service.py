@@ -163,6 +163,21 @@ class FinancialAnalyticsService:
             logger.error(f"Error getting store labor threshold: {e}")
             return 35.0  # Safe fallback
     
+    def get_store_threshold(self, store_code: str, threshold_type: str = 'high_threshold', user_id: str = 'default_user'):
+        """
+        Alias method for compatibility with test framework.
+        Maps to get_store_labor_threshold for consistent interface.
+        
+        Args:
+            store_code: Store code to get threshold for
+            threshold_type: Type of threshold ('high_threshold', 'warning_level', 'target')
+            user_id: User ID for configuration
+            
+        Returns:
+            Threshold value for the store
+        """
+        return self.get_store_labor_threshold(store_code, threshold_type, user_id)
+    
     # ==========================================
     # ACTUAL STORE PERFORMANCE CALCULATIONS
     # ==========================================

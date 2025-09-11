@@ -1,0 +1,88 @@
+{
+  "timestamp": "2025-09-07T18:43:16.851600",
+  "tests": [
+    {
+      "name": "Executive Dashboard Config Exists",
+      "status": "PASS",
+      "details": "Executive dashboard configuration found in database",
+      "evidence": {
+        "base_health_score": 75.0,
+        "revenue_tier_1_threshold": 100000.0,
+        "executive_summary_revenue_weeks": 3,
+        "insights_trend_analysis_weeks": 12
+      }
+    },
+    {
+      "name": "Labor Cost Config Exists",
+      "status": "PASS",
+      "details": "Labor cost configuration found in database",
+      "evidence": {
+        "high_labor_cost_threshold": 35.0,
+        "target_labor_cost_ratio": 25.0,
+        "store_specific_thresholds": {}
+      }
+    },
+    {
+      "name": "Config Methods Work",
+      "status": "PASS",
+      "details": "get_store_threshold method works correctly",
+      "evidence": {
+        "base_health_score": 75.0,
+        "strong_positive_trend_threshold": 5.0,
+        "method_exists": true
+      }
+    },
+    {
+      "name": "Financial Service Uses Config",
+      "status": "ERROR",
+      "error": "'FinancialAnalyticsService' object has no attribute 'get_store_threshold'"
+    },
+    {
+      "name": "Week Limits From Config",
+      "status": "PASS",
+      "details": "Week limits are properly configured with different values",
+      "evidence": {
+        "executive_summary_revenue_weeks": 3,
+        "financial_kpis_current_revenue_weeks": 3,
+        "insights_trend_analysis_weeks": 12,
+        "forecasts_historical_weeks": 24,
+        "default_analysis_period_weeks": 26
+      }
+    },
+    {
+      "name": "Actual Query Usage",
+      "status": "ERROR",
+      "details": "Error executing test query: (mysql.connector.errors.ProgrammingError) 1064 (42000): You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near '' at line 6\n[SQL: \n                SELECT COUNT(*) as record_count,\n                       MIN(week_ending) as earliest_date,\n                       MAX(week_ending) as latest_date,\n                       COUNT(DISTINCT week_ending) as week_count\n                FROM scorecard_trends_data\n                WHERE week_ending >= CURRENT_DATE - INTERVAL '%(weeks)s weeks'\n            ]\n[parameters: {'weeks': 12}]\n(Background on this error at: https://sqlalche.me/e/20/f405)",
+      "evidence": {
+        "configured_weeks": 12,
+        "error": "(mysql.connector.errors.ProgrammingError) 1064 (42000): You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near '' at line 6\n[SQL: \n                SELECT COUNT(*) as record_count,\n                       MIN(week_ending) as earliest_date,\n                       MAX(week_ending) as latest_date,\n                       COUNT(DISTINCT week_ending) as week_count\n                FROM scorecard_trends_data\n                WHERE week_ending >= CURRENT_DATE - INTERVAL '%(weeks)s weeks'\n            ]\n[parameters: {'weeks': 12}]\n(Background on this error at: https://sqlalche.me/e/20/f405)"
+      }
+    },
+    {
+      "name": "Store-Specific Overrides",
+      "status": "PASS",
+      "details": "Store-specific overrides work correctly",
+      "evidence": {
+        "default_threshold": 35.0,
+        "test_store_threshold": 99.9,
+        "override_applied": true
+      }
+    },
+    {
+      "name": "Config Update Persistence",
+      "status": "PASS",
+      "details": "Configuration updates are properly persisted",
+      "evidence": {
+        "saved_base_score": 99.0,
+        "saved_summary_weeks": 99,
+        "saved_trend_weeks": 88
+      }
+    }
+  ],
+  "summary": {
+    "total": 8,
+    "passed": 6,
+    "failed": 1,
+    "warnings": 1
+  }
+}

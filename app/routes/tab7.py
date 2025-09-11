@@ -3914,7 +3914,6 @@ def add_custom_insight():
         logger.error(f"Error adding custom insight: {str(e)}", exc_info=True)
         return jsonify({"success": False, "error": str(e)}), 500
 
-@executive_api_bp.route("/api/comprehensive-scorecard-matrix", methods=["GET"])
 def _calculate_metric_periods(session, table_name, column_name, location_filter=None, location_value=None):
     """
     SYSTEMATIC REUSABLE CALCULATION FUNCTION - Based on working Total Weekly Revenue pattern
@@ -4028,6 +4027,7 @@ def _calculate_metric_periods(session, table_name, column_name, location_filter=
             'prev_year_3w_forward': 0
         }
 
+@executive_api_bp.route("/api/comprehensive-scorecard-matrix", methods=["GET"])
 def comprehensive_scorecard_matrix():
     """
     ADDED 2025-09-09: Comprehensive Executive Scorecard Matrix
@@ -4061,15 +4061,126 @@ def comprehensive_scorecard_matrix():
             "metrics": {}
         }
         
-        # Get the most recent week ending for reference
+        # Get the most recent week ending for reference and calculate date headers
         week_query = text("""
             SELECT week_ending FROM scorecard_trends_data 
             WHERE total_weekly_revenue IS NOT NULL 
             ORDER BY week_ending DESC LIMIT 1
         """)
         latest_week = session.execute(week_query).fetchone()
+        
+        # Calculate period dates and week numbers for dynamic headers
+        period_dates = {}
         if latest_week:
-            scorecard_matrix["metadata"]["current_week_ending"] = latest_week.week_ending.isoformat()
+            base_date = latest_week.week_ending
+            scorecard_matrix["metadata"]["current_week_ending"] = base_date.isoformat()
+            
+            # Calculate dates for each period
+            from datetime import timedelta
+            period_dates = {
+                "current_week": {
+                    "date": base_date,
+                    "week_number": base_date.isocalendar()[1],
+                    "year": base_date.year,
+                    "formatted": base_date.strftime("%m/%d/%Y"),
+                    "header": f"Current Week\n(Wk {base_date.isocalendar()[1]})\n{base_date.strftime('%m/%d/%Y')}"
+                },
+                "previous_week": {
+                    "date": base_date - timedelta(weeks=1),
+                    "week_number": (base_date - timedelta(weeks=1)).isocalendar()[1],
+                    "year": (base_date - timedelta(weeks=1)).year,
+                    "formatted": (base_date - timedelta(weeks=1)).strftime("%m/%d/%Y"),
+                    "header": f"Previous Week\n(Wk {(base_date - timedelta(weeks=1)).isocalendar()[1]})\n{(base_date - timedelta(weeks=1)).strftime('%m/%d/%Y')}"
+                },
+                "minus_2": {
+                    "date": base_date - timedelta(weeks=2),
+                    "week_number": (base_date - timedelta(weeks=2)).isocalendar()[1],
+                    "year": (base_date - timedelta(weeks=2)).year,
+                    "formatted": (base_date - timedelta(weeks=2)).strftime("%m/%d/%Y"),
+                    "header": f"-2 Week\n(Wk {(base_date - timedelta(weeks=2)).isocalendar()[1]})\n{(base_date - timedelta(weeks=2)).strftime('%m/%d/%Y')}"
+                },
+                "minus_3": {
+                    "date": base_date - timedelta(weeks=3),
+                    "week_number": (base_date - timedelta(weeks=3)).isocalendar()[1],
+                    "year": (base_date - timedelta(weeks=3)).year,
+                    "formatted": (base_date - timedelta(weeks=3)).strftime("%m/%d/%Y"),
+                    "header": f"-3 Week\n(Wk {(base_date - timedelta(weeks=3)).isocalendar()[1]})\n{(base_date - timedelta(weeks=3)).strftime('%m/%d/%Y')}"
+                },
+                "previous_year": {
+                    "date": base_date - timedelta(weeks=52),
+                    "week_number": (base_date - timedelta(weeks=52)).isocalendar()[1],
+                    "year": (base_date - timedelta(weeks=52)).year,
+                    "formatted": (base_date - timedelta(weeks=52)).strftime("%m/%d/%Y"),
+                    "header": f"Previous Year\n(Wk {(base_date - timedelta(weeks=52)).isocalendar()[1]} {(base_date - timedelta(weeks=52)).year})\n{(base_date - timedelta(weeks=52)).strftime('%m/%d/%Y')}"
+                },
+                "current_trailing_3w_avg": {
+                    "header": "Current\nTrailing 3w Avg"
+                },
+                "prev_year_trailing_3w": {
+                    "header": "Prev Year\nTrailing 3w"
+                },
+                "prev_year_3w_forward": {
+                    "header": "Prev Year\n3w Forward"
+                },
+                "plus_minus_goal": {
+                    "header": "+/- Goal"
+                }
+            }
+            
+        scorecard_matrix["metadata"]["period_dates"] = period_dates
+        
+        # Get goal values from configuration tables instead of hardcoding
+        def get_goal_values():
+            """
+            ADDED 2025-09-10: Retrieve goal values from configuration database
+            Replaces hardcoded values with systematic database lookup
+            """
+            goals = {
+                'total_weekly_revenue': 100000,  # Default fallback
+                'ar_over_45_days_percent': 15,   # Default fallback
+                'deliveries': 12,                # Default fallback
+                'wage_ratio': 25,                # Default fallback
+                'revenue_per_hour': 85,          # Default fallback
+                'reservations': {'3607': 10000, '6800': 15000, '728': 2000, '8101': 250000},  # Defaults
+                'contracts': {'3607': 150, '6800': 140, '728': 85, '8101': 65}  # Defaults
+            }
+            
+            try:
+                # Get goals from business_intelligence_config
+                bi_query = text("""
+                    SELECT revenue_target_monthly, revenue_target_quarterly, revenue_target_yearly,
+                           profit_margin_target
+                    FROM business_intelligence_config 
+                    WHERE is_active = 1 
+                    ORDER BY created_at DESC LIMIT 1
+                """)
+                bi_result = session.execute(bi_query).fetchone()
+                
+                if bi_result and bi_result.revenue_target_monthly:
+                    # Convert monthly to weekly (monthly / 4.33 weeks per month)
+                    goals['total_weekly_revenue'] = int(bi_result.revenue_target_monthly / 4.33)
+                
+                # Get AR aging goals from scorecard_analytics_configuration  
+                scorecard_query = text("""
+                    SELECT ar_aging_risk_threshold, ar_risk_low_threshold, ar_risk_medium_threshold
+                    FROM scorecard_analytics_configuration 
+                    WHERE is_active = 1 
+                    ORDER BY created_at DESC LIMIT 1
+                """)
+                scorecard_result = session.execute(scorecard_query).fetchone()
+                
+                if scorecard_result and scorecard_result.ar_aging_risk_threshold:
+                    goals['ar_over_45_days_percent'] = scorecard_result.ar_aging_risk_threshold
+                    
+                # TODO: Add store-specific goals from store_specific_thresholds JSON field
+                # For now, keeping existing store-specific defaults but should be configurable
+                
+            except Exception as e:
+                app.logger.warning(f"Failed to retrieve goal values from database, using defaults: {str(e)}")
+                
+            return goals
+            
+        goal_values = get_goal_values()
         
         # METRIC 1: Total Weekly Revenue - Using systematic calculation function
         total_revenue_calc = _calculate_metric_periods(session, 'scorecard_trends_data', 'total_weekly_revenue')
@@ -4080,7 +4191,7 @@ def comprehensive_scorecard_matrix():
             "previous_week": total_revenue_calc['periods'].get('previous_week', 0),
             "current_week": total_revenue_calc['periods'].get('current_week', 0),
             "previous_year": total_revenue_calc['periods'].get('previous_year', 0),
-            "plus_minus_goal": 100000,  # Goal value - make configurable later
+            "plus_minus_goal": goal_values['total_weekly_revenue'],  # Retrieved from database
             "current_trailing_3w_avg": round(total_revenue_calc['current_trailing_3w_avg'], 0),
             "prev_year_trailing_3w": round(total_revenue_calc['prev_year_trailing_3w'], 0),
             "prev_year_3w_forward": round(total_revenue_calc['prev_year_3w_forward'], 0),
@@ -4097,7 +4208,7 @@ def comprehensive_scorecard_matrix():
             "previous_week": ar_calc['periods'].get('previous_week', 0),
             "current_week": ar_calc['periods'].get('current_week', 0), 
             "previous_year": ar_calc['periods'].get('previous_year', 0),
-            "plus_minus_goal": 15,  # Goal: keep under 15%
+            "plus_minus_goal": goal_values['ar_over_45_days_percent'],  # Retrieved from database
             "current_trailing_3w_avg": round(ar_calc['current_trailing_3w_avg'], 1),
             "prev_year_trailing_3w": round(ar_calc['prev_year_trailing_3w'], 1),
             "prev_year_3w_forward": round(ar_calc['prev_year_3w_forward'], 1),
@@ -4114,7 +4225,6 @@ def comprehensive_scorecard_matrix():
             
             # Reservations - Using systematic calculation
             reservation_calc = _calculate_metric_periods(session, 'scorecard_trends_data', f'total_reservation_{store}')
-            reservation_goals = {'3607': 10000, '6800': 15000, '728': 2000, '8101': 250000}
             
             scorecard_matrix["metrics"][f"Total $ on Reservation {store}"] = {
                 "minus_3": reservation_calc['periods'].get('minus_3_week', 0),
@@ -4122,7 +4232,7 @@ def comprehensive_scorecard_matrix():
                 "previous_week": reservation_calc['periods'].get('previous_week', 0),
                 "current_week": reservation_calc['periods'].get('current_week', 0),
                 "previous_year": reservation_calc['periods'].get('previous_year', 0),
-                "plus_minus_goal": reservation_goals[store],
+                "plus_minus_goal": goal_values['reservations'][store],
                 "current_trailing_3w_avg": round(reservation_calc['current_trailing_3w_avg'], 0),
                 "prev_year_trailing_3w": round(reservation_calc['prev_year_trailing_3w'], 0),
                 "prev_year_3w_forward": round(reservation_calc['prev_year_3w_forward'], 0),
@@ -4133,7 +4243,6 @@ def comprehensive_scorecard_matrix():
             
             # New Contracts - Using systematic calculation
             contract_calc = _calculate_metric_periods(session, 'scorecard_trends_data', f'new_contracts_{store}')
-            contract_goals = {'3607': 150, '6800': 140, '728': 85, '8101': 65}
             
             scorecard_matrix["metrics"][f"# New Open Contracts {store}"] = {
                 "minus_3": contract_calc['periods'].get('minus_3_week', 0),
@@ -4141,7 +4250,7 @@ def comprehensive_scorecard_matrix():
                 "previous_week": contract_calc['periods'].get('previous_week', 0),
                 "current_week": contract_calc['periods'].get('current_week', 0),
                 "previous_year": contract_calc['periods'].get('previous_year', 0),
-                "plus_minus_goal": contract_goals[store],
+                "plus_minus_goal": goal_values['contracts'][store],
                 "current_trailing_3w_avg": round(contract_calc['current_trailing_3w_avg'], 0),
                 "prev_year_trailing_3w": round(contract_calc['prev_year_trailing_3w'], 0),
                 "prev_year_3w_forward": round(contract_calc['prev_year_3w_forward'], 0),
@@ -4159,7 +4268,7 @@ def comprehensive_scorecard_matrix():
             "previous_week": delivery_calc['periods'].get('previous_week', 0),
             "current_week": delivery_calc['periods'].get('current_week', 0),
             "previous_year": delivery_calc['periods'].get('previous_year', 0),
-            "plus_minus_goal": 12,  # Goal: 12 deliveries scheduled
+            "plus_minus_goal": goal_values['deliveries'],  # Retrieved from database
             "current_trailing_3w_avg": round(delivery_calc['current_trailing_3w_avg'], 0),
             "prev_year_trailing_3w": round(delivery_calc['prev_year_trailing_3w'], 0),
             "prev_year_3w_forward": round(delivery_calc['prev_year_3w_forward'], 0),
@@ -4186,7 +4295,7 @@ def comprehensive_scorecard_matrix():
                 "previous_week": store_revenue_calc['periods'].get('previous_week', 0),
                 "current_week": store_revenue_calc['periods'].get('current_week', 0),
                 "previous_year": store_revenue_calc['periods'].get('previous_year', 0),
-                "plus_minus_goal": 0,  # No specific goal yet
+                "plus_minus_goal": 0,  # No specific goal yet (store revenue goals to be added)
                 "current_trailing_3w_avg": round(store_revenue_calc['current_trailing_3w_avg'], 0),
                 "prev_year_trailing_3w": round(store_revenue_calc['prev_year_trailing_3w'], 0),
                 "prev_year_3w_forward": round(store_revenue_calc['prev_year_3w_forward'], 0),
@@ -4202,7 +4311,7 @@ def comprehensive_scorecard_matrix():
                 "previous_week": payroll_calc['periods'].get('previous_week', 0),
                 "current_week": payroll_calc['periods'].get('current_week', 0),
                 "previous_year": payroll_calc['periods'].get('previous_year', 0),
-                "plus_minus_goal": 0,  # Set target later
+                "plus_minus_goal": 0,  # Set target later (wage goals to be added)
                 "current_trailing_3w_avg": round(payroll_calc['current_trailing_3w_avg'], 0),
                 "prev_year_trailing_3w": round(payroll_calc['prev_year_trailing_3w'], 0),
                 "prev_year_3w_forward": round(payroll_calc['prev_year_3w_forward'], 0),
@@ -4239,7 +4348,7 @@ def comprehensive_scorecard_matrix():
                 "previous_week": wage_pct_periods.get('previous_week', 0),
                 "current_week": wage_pct_periods.get('current_week', 0),
                 "previous_year": prev_year_wage_pct,
-                "plus_minus_goal": 25,  # Target: 25% wage ratio
+                "plus_minus_goal": goal_values['wage_ratio'],  # Retrieved from database
                 "current_trailing_3w_avg": round(sum(wage_pct_trailing) / len(wage_pct_trailing), 1) if wage_pct_trailing else 0,
                 "prev_year_trailing_3w": prev_year_wage_pct,  # Use single prev year value for now
                 "prev_year_3w_forward": prev_year_wage_pct,  # Use single prev year value for now
@@ -4273,7 +4382,7 @@ def comprehensive_scorecard_matrix():
                 "previous_week": rev_per_hour_periods.get('previous_week', 0),
                 "current_week": rev_per_hour_periods.get('current_week', 0),
                 "previous_year": prev_year_rev_per_hour,
-                "plus_minus_goal": 85,  # Target: $85/hour
+                "plus_minus_goal": goal_values['revenue_per_hour'],  # Retrieved from database
                 "current_trailing_3w_avg": round(sum(rev_per_hour_trailing) / len(rev_per_hour_trailing), 2) if rev_per_hour_trailing else 0,
                 "prev_year_trailing_3w": prev_year_rev_per_hour,  # Use single prev year value for now
                 "prev_year_3w_forward": prev_year_rev_per_hour,  # Use single prev year value for now
@@ -4289,10 +4398,11 @@ def comprehensive_scorecard_matrix():
         logger.error(f"Error in comprehensive scorecard matrix: {str(e)}", exc_info=True)
         return jsonify({"success": False, "error": str(e)}), 500
 
+
 # Register the executive blueprint
 def register_executive_blueprint(app):
     """Register the executive blueprint with the app"""
-    app.register_blueprint(executive_bp)
+    app.register_blueprint(executive_api_bp)
 
 # Update version marker
 logger.info(

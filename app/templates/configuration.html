@@ -1027,27 +1027,31 @@
 
                 <div class="config-divider"></div>
 
-                <!-- Default Views and Filters -->
+                <!-- Default UI Display Preferences -->
                 <div class="form-group-advanced">
-                  <label>Default Views and Filters</label>
+                  <label>Default UI Display Preferences</label>
+                  <small class="text-muted d-block mb-2">These settings control how dashboards appear when first loaded (UI only - does not affect calculations)</small>
                   <div class="row">
                     <div class="col-md-6">
-                      <label for="default_time_range">Default Time Range</label>
-                      <select class="form-control-advanced form-select" id="default_time_range">
-                        <option value="7_days">Last 7 Days</option>
-                        <option value="30_days" selected>Last 30 Days</option>
-                        <option value="90_days">Last 90 Days</option>
-                        <option value="1_year">Last Year</option>
+                      <label for="default_chart_display_range">Default Chart Display Range</label>
+                      <select class="form-control-advanced form-select" id="default_chart_display_range">
+                        <option value="7_days">Last 7 Days View</option>
+                        <option value="30_days" selected>Last 30 Days View</option>
+                        <option value="90_days">Last 90 Days View</option>
+                        <option value="current_period">Current Analysis Period</option>
                       </select>
+                      <small class="form-text text-muted">How much historical data to display in charts by default</small>
                     </div>
                     <div class="col-md-6">
-                      <label for="default_store">Default Store Filter</label>
-                      <select class="form-control-advanced form-select" id="default_store">
-                        <option value="all" selected>All Stores</option>
-                        <option value="store_1">Store 1</option>
-                        <option value="store_2">Store 2</option>
-                        <option value="store_3">Store 3</option>
+                      <label for="default_store_view">Default Store View</label>
+                      <select class="form-control-advanced form-select" id="default_store_view">
+                        <option value="all" selected>All Stores Summary</option>
+                        <option value="3607">Wayzata (3607)</option>
+                        <option value="6800">Brooklyn Park (6800)</option>
+                        <option value="728">Elk River (728)</option>
+                        <option value="8101">Fridley (8101)</option>
                       </select>
+                      <small class="form-text text-muted">Which store view to show when opening dashboards</small>
                     </div>
                   </div>
                   <div class="row mt-3">
@@ -1188,7 +1192,6 @@
               </form>
             </div>
           </div>
-        </div>
 
         <!-- Executive Dashboard Configuration Panel -->
         <div class="tab-pane fade" id="executive-dashboard-panel" role="tabpanel">
@@ -1429,6 +1432,56 @@
                   </div>
                 </div>
 
+                <!-- Health Scoring Section -->
+                <div class="form-group-advanced mb-4">
+                  <h6 class="form-section-title">
+                    <i class="fas fa-heartbeat me-2"></i>Health Score Thresholds
+                    <small class="text-muted">(For Predictive Analytics)</small>
+                  </h6>
+                  <div class="row">
+                    <div class="col-md-4">
+                      <label for="health_excellent_threshold" class="form-label-advanced">Excellent Threshold</label>
+                      <div class="input-group">
+                        <input type="number" class="form-control form-control-advanced" 
+                               id="health_excellent_threshold" min="80" max="100" step="1" value="90">
+                        <span class="input-group-text">%</span>
+                      </div>
+                      <small class="form-text text-muted">Score above this = Excellent health</small>
+                    </div>
+                    <div class="col-md-4">
+                      <label for="health_good_threshold" class="form-label-advanced">Good Threshold</label>
+                      <div class="input-group">
+                        <input type="number" class="form-control form-control-advanced" 
+                               id="health_good_threshold" min="60" max="90" step="1" value="75">
+                        <span class="input-group-text">%</span>
+                      </div>
+                      <small class="form-text text-muted">Score above this = Good health</small>
+                    </div>
+                    <div class="col-md-4">
+                      <label for="health_fair_threshold" class="form-label-advanced">Fair Threshold</label>
+                      <div class="input-group">
+                        <input type="number" class="form-control form-control-advanced" 
+                               id="health_fair_threshold" min="40" max="80" step="1" value="50">
+                        <span class="input-group-text">%</span>
+                      </div>
+                      <small class="form-text text-muted">Score above this = Fair health</small>
+                    </div>
+                  </div>
+                  <div class="row mt-3">
+                    <div class="col-md-12">
+                      <div class="form-check-advanced">
+                        <input class="form-check-input" type="checkbox" id="enable_predictive_health" disabled>
+                        <label class="form-check-label" for="enable_predictive_health">
+                          Enable Predictive Health Scoring <span class="badge bg-warning text-dark">PLACEHOLDER - NOT YET IMPLEMENTED</span>
+                        </label>
+                        <small class="form-text text-muted">
+                          Future feature: Use ML algorithms to predict health score trends and identify potential issues before they occur.
+                        </small>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
                 <!-- Revenue Tiers Section -->
                 <div class="form-group-advanced mb-4">
                   <h6 class="form-section-title">
@@ -1436,11 +1489,11 @@
                   </h6>
                   <div class="row">
                     <div class="col-md-6">
-                      <label for="revenue_tier_1_threshold" class="form-label-advanced">Tier 1 (Excellent) Threshold</label>
+                      <label for="tier_1_threshold" class="form-label-advanced">Tier 1 (Excellent) Threshold</label>
                       <div class="input-group">
                         <span class="input-group-text">$</span>
                         <input type="number" class="form-control form-control-advanced" 
-                               id="revenue_tier_1_threshold" min="50000" max="200000" step="1000" value="100000">
+                               id="tier_1_threshold" min="50000" max="200000" step="1000" value="100000">
                         <span class="input-group-text">
                           <span id="tier_1_points" class="badge bg-success">25 pts</span>
                         </span>
@@ -1628,7 +1681,7 @@
         </div>
 
         <!-- Labor Cost Configuration Panel -->
-        <div class="tab-pane fade" id="labor-cost-panel" role="tabpanel">
+          <div class="tab-pane fade" id="labor-cost-panel" role="tabpanel">
           <div class="config-section">
             <div class="section-header">
               <h5><i class="fas fa-users-cog"></i>Labor Cost Configuration</h5>
@@ -1800,9 +1853,10 @@
               </form>
             </div>
           </div>
+        </div>
 
-          <!-- Store Goals Panel -->
-          <div class="tab-pane fade" id="store-goals-panel" role="tabpanel">
+        <!-- Store Goals Panel -->
+        <div class="tab-pane fade" id="store-goals-panel" role="tabpanel">
             <div class="config-section">
               <div class="section-header">
                 <h5><i class="fas fa-bullseye"></i>Store Goals Configuration</h5>
@@ -1968,6 +2022,8 @@
             </div>
           </div>
         </div>
+
+        </div> <!-- Close tab-content container -->
       </div>
     </div>
   </div>

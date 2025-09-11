@@ -1,0 +1,96 @@
+{
+  "timestamp": "2025-09-07T19:00:28.009988",
+  "tests": [
+    {
+      "name": "Executive Dashboard Config Exists",
+      "status": "PASS",
+      "details": "Executive dashboard configuration found in database",
+      "evidence": {
+        "base_health_score": 75.0,
+        "revenue_tier_1_threshold": 100000.0,
+        "executive_summary_revenue_weeks": 3,
+        "insights_trend_analysis_weeks": 12
+      }
+    },
+    {
+      "name": "Labor Cost Config Exists",
+      "status": "PASS",
+      "details": "Labor cost configuration found in database",
+      "evidence": {
+        "high_labor_cost_threshold": 35.0,
+        "target_labor_cost_ratio": 25.0,
+        "store_specific_thresholds": {}
+      }
+    },
+    {
+      "name": "Config Methods Work",
+      "status": "PASS",
+      "details": "get_store_threshold method works correctly",
+      "evidence": {
+        "base_health_score": 75.0,
+        "strong_positive_trend_threshold": 5.0,
+        "method_exists": true
+      }
+    },
+    {
+      "name": "Financial Service Uses Config",
+      "status": "PASS",
+      "details": "Financial service correctly retrieves and uses configuration",
+      "evidence": {
+        "config_exists": true,
+        "threshold_3607": 35.0,
+        "threshold_6800": 35.0,
+        "config_has_method": true
+      }
+    },
+    {
+      "name": "Week Limits From Config",
+      "status": "PASS",
+      "details": "Week limits are properly configured with different values",
+      "evidence": {
+        "executive_summary_revenue_weeks": 3,
+        "financial_kpis_current_revenue_weeks": 3,
+        "insights_trend_analysis_weeks": 12,
+        "forecasts_historical_weeks": 24,
+        "default_analysis_period_weeks": 26
+      }
+    },
+    {
+      "name": "Actual Query Usage",
+      "status": "PASS",
+      "details": "Queries respect configured week limits",
+      "evidence": {
+        "configured_weeks": 12,
+        "actual_weeks_returned": 13,
+        "earliest_date": "2025-06-15 00:00:00",
+        "latest_date": "2025-09-07 00:00:00"
+      }
+    },
+    {
+      "name": "Store-Specific Overrides",
+      "status": "PASS",
+      "details": "Store-specific overrides work correctly",
+      "evidence": {
+        "default_threshold": 35.0,
+        "test_store_threshold": 99.9,
+        "override_applied": true
+      }
+    },
+    {
+      "name": "Config Update Persistence",
+      "status": "PASS",
+      "details": "Configuration updates are properly persisted",
+      "evidence": {
+        "saved_base_score": 99.0,
+        "saved_summary_weeks": 99,
+        "saved_trend_weeks": 88
+      }
+    }
+  ],
+  "summary": {
+    "total": 8,
+    "passed": 8,
+    "failed": 0,
+    "warnings": 0
+  }
+}
