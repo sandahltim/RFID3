@@ -1304,3 +1304,185 @@ def get_default_manager_dashboard_config():
             'alert_frequency': 'daily'
         }
     }
+
+
+class StoreGoalsConfiguration(db.Model):
+    """Store Goals configuration for store-specific performance targets"""
+    __tablename__ = 'store_goals_configuration'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    
+    # All goals stored as JSON for maximum flexibility
+    company_goals = db.Column(db.JSON, default=lambda: {
+        'monthly_revenue_target': 500000,
+        'ar_aging_threshold': 15.0,
+        'deliveries_goal': 50,
+        'wage_ratio_goal': 25.0,
+        'revenue_per_hour_goal': 150
+    })
+    
+    store_revenue_goals = db.Column(db.JSON, default=lambda: {
+        '3607': {'reservation_goal': 50000, 'contract_goal': 25},
+        '6800': {'reservation_goal': 75000, 'contract_goal': 35}, 
+        '728': {'reservation_goal': 40000, 'contract_goal': 20},
+        '8101': {'reservation_goal': 60000, 'contract_goal': 30}
+    })
+    
+    store_labor_goals = db.Column(db.JSON, default=lambda: {
+        '3607': {'labor_percentage': 22.0, 'revenue_per_hour': 175},
+        '6800': {'labor_percentage': 25.0, 'revenue_per_hour': 145}, 
+        '728': {'labor_percentage': 28.0, 'revenue_per_hour': 120},
+        '8101': {'labor_percentage': 26.0, 'revenue_per_hour': 160}
+    })
+    
+    store_delivery_goals = db.Column(db.JSON, default=lambda: {
+        '3607': {'weekly_deliveries': 65, 'avg_revenue_per_delivery': 450},
+        '6800': {'weekly_deliveries': 45, 'avg_revenue_per_delivery': 380}, 
+        '728': {'weekly_deliveries': 25, 'avg_revenue_per_delivery': 320},
+        '8101': {'weekly_deliveries': 35, 'avg_revenue_per_delivery': 400}
+    })
+    
+    # Extensible goals - new categories can be added easily
+    additional_goals = db.Column(db.JSON, default=dict)
+    
+    # Metadata
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_by = db.Column(db.String(50), default='system')
+    notes = db.Column(db.Text)
+    
+    def get_store_goal_value(self, store_code: str, category: str, metric_name: str, default_value=None):
+        """Get a specific goal value for a store"""
+        category_map = {
+            'labor': 'store_labor_goals',
+            'delivery': 'store_delivery_goals',
+            'revenue': 'store_revenue_goals'
+        }
+        
+        if category in category_map:
+            goals_data = getattr(self, category_map[category], {})
+            if isinstance(goals_data, dict):
+                store_goals = goals_data.get(store_code, {})
+                return store_goals.get(metric_name, default_value)
+        
+        # Check additional_goals for extensible categories
+        if self.additional_goals:
+            category_goals = self.additional_goals.get(f'store_{category}_goals', {})
+            if store_code in category_goals:
+                return category_goals[store_code].get(metric_name, default_value)
+        
+        return default_value
+    
+    def set_store_goal_value(self, store_code: str, category: str, metric_name: str, value):
+        """Set a specific goal value for a store"""
+        category_map = {
+            'labor': 'store_labor_goals',
+            'delivery': 'store_delivery_goals', 
+            'revenue': 'store_revenue_goals'
+        }
+        
+        if category in category_map:
+            attr_name = category_map[category]
+            goals_data = getattr(self, attr_name) or {}
+            if store_code not in goals_data:
+                goals_data[store_code] = {}
+            goals_data[store_code][metric_name] = value
+            setattr(self, attr_name, goals_data)
+        else:
+            # Use additional_goals for extensible categories
+            if not self.additional_goals:
+                self.additional_goals = {}
+            category_key = f'store_{category}_goals'
+            if category_key not in self.additional_goals:
+                self.additional_goals[category_key] = {}
+            if store_code not in self.additional_goals[category_key]:
+                self.additional_goals[category_key][store_code] = {}
+            self.additional_goals[category_key][store_code][metric_name] = value
+    
+    def set_company_goal(self, metric_name: str, value):
+        """Set a company-wide goal value"""
+        if not self.company_goals:
+            self.company_goals = {}
+        self.company_goals[metric_name] = value
+    
+    def to_dict(self):
+        """Convert configuration to dictionary for API response"""
+        return {
+            'companyGoals': self.company_goals or {},
+            'storeGoals': self.store_revenue_goals or {},
+            'storeLaborGoals': self.store_labor_goals or {},
+            'storeDeliveryGoals': self.store_delivery_goals or {},
+            'additionalGoals': self.additional_goals or {}
+        }
+
+
+def get_default_store_goals_config():
+    """Get default store goals configuration"""
+    config = StoreGoalsConfiguration()
+    config.company_goals = {
+        'monthly_revenue_target': 500000,
+        'ar_aging_threshold': 15.0,
+        'deliveries_goal': 50,
+        'wage_ratio_goal': 25.0,
+        'revenue_per_hour_goal': 150
+    }
+    config.store_revenue_goals = {
+        '3607': {'reservation_goal': 50000, 'contract_goal': 25},
+        '6800': {'reservation_goal': 75000, 'contract_goal': 35}, 
+        '728': {'reservation_goal': 40000, 'contract_goal': 20},
+        '8101': {'reservation_goal': 60000, 'contract_goal': 30}
+    }
+    config.store_labor_goals = {
+        '3607': {'labor_percentage': 22.0, 'revenue_per_hour': 175},
+        '6800': {'labor_percentage': 25.0, 'revenue_per_hour': 145}, 
+        '728': {'labor_percentage': 28.0, 'revenue_per_hour': 120},
+        '8101': {'labor_percentage': 26.0, 'revenue_per_hour': 160}
+    }
+    config.store_delivery_goals = {
+        '3607': {'weekly_deliveries': 65, 'avg_revenue_per_delivery': 450},
+        '6800': {'weekly_deliveries': 45, 'avg_revenue_per_delivery': 380}, 
+        '728': {'weekly_deliveries': 25, 'avg_revenue_per_delivery': 320},
+        '8101': {'weekly_deliveries': 35, 'avg_revenue_per_delivery': 400}
+    }
+    return config
+
+
+class CustomInsight(db.Model):
+    """Store user-submitted custom business insights"""
+    __tablename__ = 'custom_insights'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    date = db.Column(db.Date, nullable=False)
+    event_type = db.Column(db.String(50), nullable=False)  # weather, local_event, economic, etc.
+    description = db.Column(db.Text, nullable=False)
+    impact_category = db.Column(db.String(50), nullable=False)  # revenue, operations, customer_behavior, etc.
+    impact_magnitude = db.Column(db.String(20))  # low, medium, high, critical
+    store_code = db.Column(db.String(10))  # specific store or null for all stores
+    
+    # Metadata
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_by = db.Column(db.String(50), default='user')
+    is_active = db.Column(db.Boolean, default=True)
+    
+    # Indexes for performance
+    __table_args__ = (
+        db.Index('idx_insight_date', 'date'),
+        db.Index('idx_insight_type', 'event_type'),
+        db.Index('idx_insight_store', 'store_code'),
+        db.Index('idx_insight_active', 'is_active', 'created_at'),
+    )
+    
+    def to_dict(self):
+        """Convert to dictionary for API response"""
+        return {
+            'id': self.id,
+            'date': self.date.isoformat() if self.date else None,
+            'event_type': self.event_type,
+            'description': self.description,
+            'impact_category': self.impact_category,
+            'impact_magnitude': self.impact_magnitude,
+            'store_code': self.store_code,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'created_by': self.created_by
+        }

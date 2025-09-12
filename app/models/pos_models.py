@@ -51,6 +51,7 @@ class POSTransaction(db.Model):
     ordered_by = db.Column(db.String(255))
     
     # Delivery Info
+    delivery_requested = db.Column(db.Boolean, default=False)
     promised_delivery_date = db.Column(db.DateTime)
     actual_delivery_date = db.Column(db.DateTime)
     delivery_truck_no = db.Column(db.String(50))
@@ -61,6 +62,7 @@ class POSTransaction(db.Model):
     delivery_zipcode = db.Column(db.String(20))
     
     # Pickup Info
+    pickup_requested = db.Column(db.Boolean, default=False)
     promised_pickup_date = db.Column(db.DateTime)
     actual_pickup_date = db.Column(db.DateTime)
     pickup_truck_no = db.Column(db.String(50))
@@ -70,7 +72,97 @@ class POSTransaction(db.Model):
     # Job Info
     job_po = db.Column(db.String(100))
     job_id = db.Column(db.String(100))
+    job_site = db.Column(db.String(255))
     type = db.Column(db.String(50))
+    
+    # Operator and Management Fields
+    operator_id = db.Column(db.String(50))
+    operator_created = db.Column(db.String(100))
+    operator_assigned = db.Column(db.String(100))
+    salesman = db.Column(db.String(100))
+    current_modify_op_no = db.Column(db.String(50))
+    
+    # Transaction Status and Processing
+    secondary_status = db.Column(db.String(50))
+    cancelled = db.Column(db.Boolean, default=False)
+    review_billing = db.Column(db.Boolean, default=False)
+    archived = db.Column(db.Boolean, default=False)
+    transaction_type = db.Column(db.String(50))
+    operation = db.Column(db.String(50))
+    
+    # Financial Details
+    rent_discount = db.Column(db.DECIMAL(10, 2))
+    sale_discount = db.Column(db.DECIMAL(10, 2))
+    sale_discount_percent = db.Column(db.DECIMAL(5, 2))
+    item_percentage = db.Column(db.DECIMAL(5, 2))
+    damage_waiver_exempt = db.Column(db.Boolean, default=False)
+    item_percentage_exempt = db.Column(db.Boolean, default=False)
+    damage_waiver_tax_amount = db.Column(db.DECIMAL(10, 2))
+    item_percentage_tax_amount = db.Column(db.DECIMAL(10, 2))
+    other_tax_amount = db.Column(db.DECIMAL(10, 2))
+    tax_code = db.Column(db.String(20))
+    price_level = db.Column(db.String(20))
+    rate_engine_id = db.Column(db.String(50))
+    desired_deposit = db.Column(db.DECIMAL(12, 2))
+    
+    # Payment and Accounting
+    payment_deposit_paid = db.Column(db.DECIMAL(12, 2))
+    payment_deposit_required = db.Column(db.DECIMAL(12, 2))
+    card_swipe = db.Column(db.Boolean, default=False)
+    posted_cash = db.Column(db.Boolean, default=False)
+    posted_accrual = db.Column(db.Boolean, default=False)
+    currency_number = db.Column(db.String(10))
+    exchange_rate = db.Column(db.DECIMAL(10, 4))
+    discount_table = db.Column(db.String(50))
+    accounting_link = db.Column(db.String(100))
+    accounting_transaction_id = db.Column(db.String(100))
+    invoice_number = db.Column(db.String(100))
+    revenue_date = db.Column(db.DateTime)
+    
+    # Delivery Details Enhancement
+    delivery_confirmed = db.Column(db.Boolean, default=False)
+    delivery_trip = db.Column(db.String(50))
+    delivery_route = db.Column(db.String(100))
+    delivery_crew_count = db.Column(db.Integer)
+    delivery_setup_time = db.Column(db.Integer)  # minutes
+    delivery_setup_time_computed = db.Column(db.Integer)  # minutes
+    delivery_notes = db.Column(db.Text)
+    deliver_to_company = db.Column(db.String(255))
+    delivery_verified_address = db.Column(db.Boolean, default=False)
+    delivery_same_address = db.Column(db.Boolean, default=False)
+    
+    # Pickup Details Enhancement
+    pickup_confirmed = db.Column(db.Boolean, default=False)
+    pickup_trip = db.Column(db.String(50))
+    pickup_route = db.Column(db.String(100))
+    pickup_crew_count = db.Column(db.Integer)
+    pickup_load_time = db.Column(db.Integer)  # minutes
+    pickup_notes = db.Column(db.Text)
+    pickup_contact = db.Column(db.String(255))
+    pickup_contact_phone = db.Column(db.String(50))
+    pickup_from_company = db.Column(db.String(255))
+    pickup_verified_address = db.Column(db.Boolean, default=False)
+    pickup_same_address = db.Column(db.Boolean, default=False)
+    pickup_address = db.Column(db.String(500))
+    pickup_city = db.Column(db.String(100))
+    pickup_zipcode = db.Column(db.String(20))
+    picked_up_by_dl_no = db.Column(db.String(50))
+    auto_license = db.Column(db.String(50))
+    
+    # Event and Contract Management
+    event_end_date = db.Column(db.DateTime)
+    master_bill = db.Column(db.String(50))
+    parent_contract = db.Column(db.String(50))
+    service_seq = db.Column(db.Integer)
+    modification = db.Column(db.String(255))
+    notes = db.Column(db.Text)
+    class_id = db.Column(db.String(50))
+    
+    # Communication and Documentation
+    last_letter = db.Column(db.String(50))
+    letter_date = db.Column(db.DateTime)
+    updated_date_time = db.Column(db.DateTime)
+    created_date = db.Column(db.DateTime)
     
     # Import metadata
     import_date = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))

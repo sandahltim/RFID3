@@ -163,13 +163,28 @@ def api_store_comparison():
         store_metrics = store_data.get("store_metrics", {})
         benchmarks = store_data.get("performance_benchmarks", {})
         
+        # Get store-specific goals for comparison
+        store_goals = _get_store_goals()
+        labor_goals = store_goals.get('storeLaborGoals', {})
+        delivery_goals = store_goals.get('storeDeliveryGoals', {})
+        
         for store_name, metrics in store_metrics.items():
             financial = metrics.get("financial_metrics", {})
             operational = metrics.get("operational_metrics", {})
+            store_code = metrics.get("store_code", "")
+            
+            # Get store-specific goals
+            store_labor_goal = labor_goals.get(store_code, {})
+            store_delivery_goal = delivery_goals.get(store_code, {})
+            
+            # Calculate performance vs goals
+            revenue_per_hour_actual = operational.get("revenue_per_hour", 0)
+            revenue_per_hour_target = store_labor_goal.get("revenue_per_hour", 150)
+            labor_percentage_target = store_labor_goal.get("labor_percentage", 25.0)
             
             store_info = {
                 "name": store_name,
-                "store_code": metrics.get("store_code", ""),
+                "store_code": store_code,
                 "revenue": {
                     "total": financial.get("total_revenue", 0),
                     "weekly_avg": financial.get("avg_weekly_revenue", 0),
@@ -180,9 +195,19 @@ def api_store_comparison():
                     "margin_pct": financial.get("profit_margin", 0)
                 },
                 "efficiency": {
-                    "revenue_per_hour": operational.get("revenue_per_hour", 0),
+                    "revenue_per_hour": revenue_per_hour_actual,
+                    "revenue_per_hour_target": revenue_per_hour_target,
+                    "revenue_per_hour_performance": (revenue_per_hour_actual / revenue_per_hour_target * 100) if revenue_per_hour_target > 0 else 0,
                     "contracts_per_hour": operational.get("contracts_per_hour", 0),
                     "total_contracts": operational.get("total_contracts", 0)
+                },
+                "labor_targets": {
+                    "percentage_target": labor_percentage_target,
+                    "revenue_per_hour_target": revenue_per_hour_target
+                },
+                "delivery_targets": {
+                    "weekly_target": store_delivery_goal.get("weekly_deliveries", 50),
+                    "revenue_per_delivery_target": store_delivery_goal.get("avg_revenue_per_delivery", 400)
                 },
                 "ranking": benchmarks.get("store_rankings", {}).get(store_name, {})
             }
@@ -456,6 +481,18 @@ def api_multi_timeframe():
 
 
 # Helper functions
+def _get_store_goals():
+    """Get store-specific goals from configuration"""
+    try:
+        import requests
+        response = requests.get('http://localhost:6801/config/api/store-goals-configuration')
+        if response.status_code == 200:
+            return response.json().get('data', {})
+        return {}
+    except Exception as e:
+        logger.warning(f"Could not fetch store goals: {e}")
+        return {}
+
 def _get_executive_kpis():
     """Get high-level executive KPIs"""
     try:

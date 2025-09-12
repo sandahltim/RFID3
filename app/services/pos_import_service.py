@@ -73,6 +73,15 @@ class POSImportService:
             return False
         return value_str.upper() in ['TRUE', 'T', 'YES', 'Y', '1']
     
+    def parse_int(self, value_str: str) -> Optional[int]:
+        """Parse integer values from POS data."""
+        if not value_str or value_str.strip() == '':
+            return None
+        try:
+            return int(float(value_str))  # Handle decimals that should be ints
+        except (ValueError, TypeError):
+            return None
+    
     def import_transactions(self, file_path: str) -> Tuple[int, int, List[str]]:
         """Import POS transactions from CSV file."""
         logger.info(f"Starting transaction import from: {file_path}")
@@ -97,47 +106,153 @@ class POSImportService:
                             logger.debug(f"Transaction already exists: {row.get('Contract No')}")
                             continue
                         
-                        # Create new transaction
+                        # Create new transaction with comprehensive field mapping
                         transaction = POSTransaction(
-                            contract_no=row.get('Contract No', '').strip(),
-                            store_no=row.get('Store No', '001').strip(),
-                            customer_no=row.get('Customer No', '').strip() or None,
-                            stat=row.get('Stat', '').strip() or None,
+                            # Basic transaction info (using CSV column names)
+                            contract_no=row.get('CNTR', '').strip(),
+                            store_no=row.get('STR', '001').strip(),
+                            customer_no=row.get('CUSN', '').strip() or None,
+                            stat=row.get('STAT', '').strip() or None,
                             status=row.get('Status', '').strip() or None,
-                            contract_date=self.parse_date(row.get('Contract Date')),
-                            contract_time=row.get('Contract Time', '').strip() or None,
-                            last_modified_date=self.parse_date(row.get('Last Modified Date')),
-                            close_date=self.parse_date(row.get('Close Date')),
-                            billed_date=self.parse_date(row.get('Billed Date')),
-                            completed_date=self.parse_date(row.get('Completed Date')),
-                            rent_amt=self.parse_decimal(row.get('Rent Amt')),
-                            sale_amt=self.parse_decimal(row.get('Sale Amt')),
-                            tax_amt=self.parse_decimal(row.get('Tax Amt')),
-                            dmg_wvr_amt=self.parse_decimal(row.get('Dmg Wvr Amt')),
-                            total=self.parse_decimal(row.get('Total')),
-                            total_paid=self.parse_decimal(row.get('Total Paid')),
-                            payment_method=row.get('PaymentMethod', '').strip() or None,
-                            total_owed=self.parse_decimal(row.get('Total Owed')),
-                            deposit_paid_amt=self.parse_decimal(row.get('Deposit Paid Amt')),
+                            contract_date=self.parse_date(row.get('DATE')),
+                            contract_time=row.get('TIME', '').strip() or None,
+                            last_modified_date=self.parse_date(row.get('UpdatedDateTime')),
+                            close_date=self.parse_date(row.get('CLDT')),
+                            billed_date=self.parse_date(row.get('Billed')),
+                            completed_date=self.parse_date(row.get('Completed')),
+                            
+                            # Financial fields
+                            rent_amt=self.parse_decimal(row.get('RENT')),
+                            sale_amt=self.parse_decimal(row.get('SALE')),
+                            tax_amt=self.parse_decimal(row.get('TAX')),
+                            dmg_wvr_amt=self.parse_decimal(row.get('DMG')),
+                            total=self.parse_decimal(row.get('TOTL')),
+                            total_paid=self.parse_decimal(row.get('PAID')),
+                            payment_method=row.get('PYMT', '').strip() or None,
+                            total_owed=self.parse_decimal(row.get('TOTL')) - self.parse_decimal(row.get('PAID')) if self.parse_decimal(row.get('TOTL')) and self.parse_decimal(row.get('PAID')) else None,
+                            deposit_paid_amt=self.parse_decimal(row.get('DEPP')),
+                            
+                            # Contact info
                             contact=row.get('Contact', '').strip() or None,
-                            contact_phone=row.get('Contact Phone', '').strip() or None,
+                            contact_phone=row.get('ContactPhone', '').strip() or None,
                             ordered_by=row.get('OrderedBy', '').strip() or None,
-                            promised_delivery_date=self.parse_date(row.get('Promised Delivery Date')),
-                            actual_delivery_date=self.parse_date(row.get('Actual Delivery Date')),
-                            delivery_truck_no=row.get('Delivery Truck No', '').strip() or None,
-                            delivery_trip_no=row.get('Delivery Trip No', '').strip() or None,
-                            delivered_to=row.get('DeliveredTo', '').strip() or None,
-                            delivery_address=row.get('Delivery Address', '').strip() or None,
-                            delivery_city=row.get('Delivery City', '').strip() or None,
-                            delivery_zipcode=row.get('Delivery ZipCode', '').strip() or None,
-                            promised_pickup_date=self.parse_date(row.get('Promised Pickup Date')),
-                            actual_pickup_date=self.parse_date(row.get('Actual Pickup Date')),
-                            pickup_truck_no=row.get('Pickup Truck No', '').strip() or None,
-                            pickup_trip_no=row.get('Pickup Trip No', '').strip() or None,
+                            
+                            # Delivery info (original fields)
+                            delivery_requested=self.parse_bool(row.get('Delvr')),
+                            promised_delivery_date=self.parse_date(row.get('DeliveryDatePromised')),
+                            actual_delivery_date=self.parse_date(row.get('DeliveryDate')),
+                            delivery_truck_no=row.get('DeliveryTruckNumber', '').strip() or None,
+                            delivery_trip_no=row.get('DeliveryTrip', '').strip() or None,
+                            delivered_to=row.get('DeliverToCompany', '').strip() or None,
+                            delivery_address=row.get('DeliveryAddress', '').strip() or None,
+                            delivery_city=row.get('DeliveryCity', '').strip() or None,
+                            delivery_zipcode=row.get('DeliveryZip', '').strip() or None,
+                            
+                            # Pickup info (original fields)
+                            pickup_requested=self.parse_bool(row.get('Pickup')),
+                            promised_pickup_date=self.parse_date(row.get('PickupDatePromised')),
+                            actual_pickup_date=self.parse_date(row.get('PickupDate')),
+                            pickup_truck_no=row.get('PickupTruckNumber', '').strip() or None,
+                            pickup_trip_no=row.get('PickupTrip', '').strip() or None,
                             picked_up_by=row.get('PickedUpBy', '').strip() or None,
-                            job_po=row.get('Job PO', '').strip() or None,
-                            job_id=row.get('Job Id', '').strip() or None,
-                            type=row.get('Type', '').strip() or None,
+                            
+                            # Job info
+                            job_po=row.get('JBPO', '').strip() or None,
+                            job_id=row.get('JBID', '').strip() or None,
+                            job_site=row.get('JobSite', '').strip() or None,
+                            type=row.get('TransactionType', '').strip() or None,
+                            
+                            # NEW COMPREHENSIVE FIELDS
+                            # Operator and management
+                            operator_id=row.get('OPID', '').strip() or None,
+                            operator_created=row.get('OperatorCreated', '').strip() or None,
+                            operator_assigned=row.get('OperatorAssigned', '').strip() or None,
+                            salesman=row.get('Salesman', '').strip() or None,
+                            current_modify_op_no=row.get('CurrentModifyOpNo', '').strip() or None,
+                            
+                            # Transaction status
+                            secondary_status=row.get('SecondaryStatus', '').strip() or None,
+                            cancelled=self.parse_bool(row.get('Cancelled')),
+                            review_billing=self.parse_bool(row.get('ReviewBilling')),
+                            archived=self.parse_bool(row.get('Archived')),
+                            transaction_type=row.get('TransactionType', '').strip() or None,
+                            operation=row.get('Operation', '').strip() or None,
+                            
+                            # Financial details
+                            rent_discount=self.parse_decimal(row.get('RentDiscount')),
+                            sale_discount=self.parse_decimal(row.get('SaleDiscount')),
+                            sale_discount_percent=self.parse_decimal(row.get('Discount')),
+                            item_percentage=self.parse_decimal(row.get('ItemPercentage')),
+                            damage_waiver_exempt=self.parse_bool(row.get('DamageWaiverExempt')),
+                            item_percentage_exempt=self.parse_bool(row.get('ItemPercentageExempt')),
+                            damage_waiver_tax_amount=self.parse_decimal(row.get('DamageWaiverTaxAmount')),
+                            item_percentage_tax_amount=self.parse_decimal(row.get('ItemPercentageTaxAmount')),
+                            other_tax_amount=self.parse_decimal(row.get('OtherTaxAmount')),
+                            tax_code=row.get('TaxCode', '').strip() or None,
+                            price_level=row.get('PriceLevel', '').strip() or None,
+                            rate_engine_id=row.get('RateEngineId', '').strip() or None,
+                            desired_deposit=self.parse_decimal(row.get('DesiredDeposit')),
+                            
+                            # Payment and accounting
+                            payment_deposit_paid=self.parse_decimal(row.get('DEPP')),
+                            payment_deposit_required=self.parse_decimal(row.get('DEPR')),
+                            card_swipe=self.parse_bool(row.get('CardSwipe')),
+                            posted_cash=self.parse_bool(row.get('PostedCash')),
+                            posted_accrual=self.parse_bool(row.get('PostedAccrual')),
+                            currency_number=row.get('CurrencyNumber', '').strip() or None,
+                            exchange_rate=self.parse_decimal(row.get('ExchangeRate')),
+                            discount_table=row.get('DiscountTable', '').strip() or None,
+                            accounting_link=row.get('AccountingLink', '').strip() or None,
+                            accounting_transaction_id=row.get('AccountingTransactionId', '').strip() or None,
+                            invoice_number=row.get('InvoiceNumber', '').strip() or None,
+                            revenue_date=self.parse_date(row.get('RevenueDate')),
+                            
+                            # Enhanced delivery details
+                            delivery_confirmed=self.parse_bool(row.get('DeliveryConfirmed')),
+                            delivery_trip=row.get('DeliveryTrip', '').strip() or None,
+                            delivery_route=row.get('DeliveryRoute', '').strip() or None,
+                            delivery_crew_count=self.parse_int(row.get('DeliveryCrewCount')),
+                            delivery_setup_time=self.parse_int(row.get('DeliverySetupTime')),
+                            delivery_setup_time_computed=self.parse_int(row.get('DeliverySetupTimeComputed')),
+                            delivery_notes=row.get('DeliveryNotes', '').strip() or None,
+                            deliver_to_company=row.get('DeliverToCompany', '').strip() or None,
+                            delivery_verified_address=self.parse_bool(row.get('VerifiedAddress')),
+                            delivery_same_address=self.parse_bool(row.get('SameAddress')),
+                            
+                            # Enhanced pickup details
+                            pickup_confirmed=self.parse_bool(row.get('PickupConfirmed')),
+                            pickup_trip=row.get('PickupTrip', '').strip() or None,
+                            pickup_route=row.get('PickupRoute', '').strip() or None,
+                            pickup_crew_count=self.parse_int(row.get('PickupCrewCount')),
+                            pickup_load_time=self.parse_int(row.get('PickupLoadTime')),
+                            pickup_notes=row.get('PickupNotes', '').strip() or None,
+                            pickup_contact=row.get('PickupContact', '').strip() or None,
+                            pickup_contact_phone=row.get('PickupContactPhone', '').strip() or None,
+                            pickup_from_company=row.get('PickupFromCompany', '').strip() or None,
+                            pickup_verified_address=self.parse_bool(row.get('PickupVerifiedAddress')),
+                            pickup_same_address=self.parse_bool(row.get('PickupSameAddress')),
+                            pickup_address=row.get('PickupAddress', '').strip() or None,
+                            pickup_city=row.get('PickupCity', '').strip() or None,
+                            pickup_zipcode=row.get('PickupZip', '').strip() or None,
+                            picked_up_by_dl_no=row.get('PickedUpDlNo', '').strip() or None,
+                            auto_license=row.get('AutoLicense', '').strip() or None,
+                            
+                            # Event and contract management
+                            event_end_date=self.parse_date(row.get('EventEndDate')),
+                            master_bill=row.get('MasterBill', '').strip() or None,
+                            parent_contract=row.get('ParentContract', '').strip() or None,
+                            service_seq=self.parse_int(row.get('ServiceSeq')),
+                            modification=row.get('Modification', '').strip() or None,
+                            notes=row.get('Notes', '').strip() or None,
+                            class_id=row.get('ClassID', '').strip() or None,
+                            
+                            # Communication and documentation
+                            last_letter=row.get('LastLetter', '').strip() or None,
+                            letter_date=self.parse_date(row.get('LetterDate')),
+                            updated_date_time=self.parse_date(row.get('UpdatedDateTime')),
+                            created_date=self.parse_date(row.get('CreatedDate')),
+                            
+                            # Import metadata
                             import_batch=self.batch_id
                         )
                         

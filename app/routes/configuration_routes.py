@@ -4,12 +4,15 @@
 
 from flask import Blueprint, render_template, request, jsonify, session, redirect, url_for
 from app import db
+from sqlalchemy.orm.attributes import flag_modified
 from app.models.config_models import (
     UserConfiguration, PredictionParameters, CorrelationSettings,
     BusinessIntelligenceConfig, DataIntegrationSettings, UserPreferences,
     ConfigurationAudit, LaborCostConfiguration, ExecutiveDashboardConfiguration,
+    StoreGoalsConfiguration,
     get_user_config, set_user_config, get_default_prediction_params, 
-    get_default_correlation_settings, get_default_labor_cost_config
+    get_default_correlation_settings, get_default_labor_cost_config,
+    get_default_store_goals_config
 )
 from datetime import datetime
 import json
@@ -1336,31 +1339,51 @@ def store_goals_configuration():
     """Store Goals configuration API endpoint"""
     try:
         if request.method == 'GET':
+            # Get existing configuration or defaults
+            config = StoreGoalsConfiguration.query.first() or get_default_store_goals_config()
             return jsonify({
                 'success': True,
-                'data': {
-                    'companyGoals': {
-                        'monthly_revenue_target': 500000,
-                        'ar_aging_threshold': 15.0,
-                        'deliveries_goal': 50,
-                        'wage_ratio_goal': 25.0,
-                        'revenue_per_hour_goal': 150
-                    },
-                    'storeGoals': {
-                        '3607': {'reservation_goal': 50000, 'contract_goal': 25},
-                        '6800': {'reservation_goal': 75000, 'contract_goal': 35}, 
-                        '728': {'reservation_goal': 40000, 'contract_goal': 20},
-                        '8101': {'reservation_goal': 60000, 'contract_goal': 30}
-                    }
-                }
+                'data': config.to_dict()
             })
         
         elif request.method == 'POST':
             data = request.get_json()
             logger.info(f"Received store goals configuration: {data}")
             
-            # In a real implementation, save to database
-            # For now, just return success
+            # Get existing configuration or create new one
+            config = StoreGoalsConfiguration.query.first()
+            if not config:
+                config = StoreGoalsConfiguration()
+                db.session.add(config)
+            
+            # Update configuration with received data
+            if 'companyGoals' in data:
+                for key, value in data['companyGoals'].items():
+                    config.set_company_goal(key, value)
+                flag_modified(config, 'company_goals')
+            
+            if 'storeGoals' in data:
+                for store_code, goals in data['storeGoals'].items():
+                    for metric, value in goals.items():
+                        config.set_store_goal_value(store_code, 'revenue', metric, value)
+                flag_modified(config, 'store_revenue_goals')
+            
+            if 'storeLaborGoals' in data:
+                for store_code, goals in data['storeLaborGoals'].items():
+                    for metric, value in goals.items():
+                        config.set_store_goal_value(store_code, 'labor', metric, value)
+                flag_modified(config, 'store_labor_goals')
+            
+            if 'storeDeliveryGoals' in data:
+                for store_code, goals in data['storeDeliveryGoals'].items():
+                    for metric, value in goals.items():
+                        config.set_store_goal_value(store_code, 'delivery', metric, value)
+                flag_modified(config, 'store_delivery_goals')
+            
+            # Save to database
+            db.session.commit()
+            logger.info("Store Goals configuration saved to database")
+            
             return jsonify({
                 'success': True,
                 'message': 'Store Goals configuration saved successfully'

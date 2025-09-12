@@ -10,15 +10,15 @@ console.log('Configuration.js loaded at:', new Date().toISOString());
 
 // EMERGENCY TAB FIX - Direct DOM manipulation
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('🚨 EMERGENCY TAB FIX LOADED');
+    // Tab system initialized
     setTimeout(() => {
         const tabs = document.querySelectorAll('[data-bs-toggle="pill"]');
         const panels = document.querySelectorAll('.tab-pane');
-        console.log('🚨 Found tabs:', tabs.length, 'panels:', panels.length);
+        // Found tabs and panels
         
         tabs.forEach(tab => {
             tab.addEventListener('click', (e) => {
-                console.log('🚨 EMERGENCY: Tab clicked:', tab.id);
+                // Tab clicked
                 e.preventDefault();
                 
                 // Remove active from all tabs and panels
@@ -33,7 +33,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const targetPanel = document.querySelector(targetId);
                 if (targetPanel) {
                     targetPanel.classList.add('active', 'show');
-                    console.log('🚨 EMERGENCY: Panel activated:', targetPanel.id);
+                    // Panel activated
                 }
             });
         });
@@ -200,17 +200,17 @@ class ConfigurationManager {
                 trend_weight: { min: 0, max: 1 },
                 economic_weight: { min: 0, max: 1 },
                 promotional_weight: { min: 0, max: 1 },
-                low_stock_threshold: { min: 0.05, max: 0.5 },
-                high_stock_threshold: { min: 1.5, max: 5.0 },
-                demand_spike_threshold: { min: 1.2, max: 3.0 }
+                low_stock_threshold: { min: 0 },
+                high_stock_threshold: { min: 0 },
+                demand_spike_threshold: { min: 0 }
             },
             correlation: {
-                correlation_weak: { min: 0.1, max: 0.5 },
-                correlation_moderate: { min: 0.3, max: 0.7 },
-                correlation_strong: { min: 0.5, max: 0.9 },
-                min_lag_periods: { min: 1, max: 6 },
-                max_lag_periods: { min: 6, max: 24 },
-                default_lag_period: { min: 1, max: 12 }
+                correlation_weak: { min: 0, max: 1 },
+                correlation_moderate: { min: 0, max: 1 },
+                correlation_strong: { min: 0, max: 1 },
+                min_lag_periods: { min: 1 },
+                max_lag_periods: { min: 1 },
+                default_lag_period: { min: 1 }
             }
         };
     }
@@ -464,7 +464,8 @@ class ConfigurationManager {
         const rules = this.getValidationRules(field.id);
         
         if (rules) {
-            const isValid = value >= rules.min && value <= rules.max;
+            const hasMax = rules.hasOwnProperty('max');
+            const isValid = hasMax ? (value >= rules.min && value <= rules.max) : (value >= rules.min);
             
             if (isValid) {
                 field.classList.remove('is-invalid');
@@ -473,7 +474,8 @@ class ConfigurationManager {
             } else {
                 field.classList.remove('is-valid');
                 field.classList.add('is-invalid');
-                this.showFieldError(field, `Value must be between ${rules.min} and ${rules.max}`);
+                const errorMsg = hasMax ? `Value must be between ${rules.min} and ${rules.max}` : `Value must be at least ${rules.min}`;
+                this.showFieldError(field, errorMsg);
             }
             
             return isValid;
@@ -1888,13 +1890,42 @@ class ConfigurationManager {
         }
 
         // Populate store-specific goals
+        const stores = ['3607', '6800', '728', '8101'];
+        
         if (data.storeGoals) {
-            const stores = ['3607', '6800', '728', '8101'];
             stores.forEach(store => {
                 if (data.storeGoals[store]) {
                     const storeData = data.storeGoals[store];
-                    document.getElementById(`reservation_${store}`).value = storeData.reservation_goal || 0;
-                    document.getElementById(`contract_${store}`).value = storeData.contract_goal || 0;
+                    const reservationEl = document.getElementById(`reservation_${store}`);
+                    const contractEl = document.getElementById(`contract_${store}`);
+                    if (reservationEl) reservationEl.value = storeData.reservation_goal || 0;
+                    if (contractEl) contractEl.value = storeData.contract_goal || 0;
+                }
+            });
+        }
+        
+        // Populate store labor goals
+        if (data.storeLaborGoals) {
+            stores.forEach(store => {
+                if (data.storeLaborGoals[store]) {
+                    const laborData = data.storeLaborGoals[store];
+                    const laborPctEl = document.getElementById(`labor_percentage_${store}`);
+                    const revenueHourEl = document.getElementById(`revenue_per_hour_${store}`);
+                    if (laborPctEl) laborPctEl.value = laborData.labor_percentage || 0;
+                    if (revenueHourEl) revenueHourEl.value = laborData.revenue_per_hour || 0;
+                }
+            });
+        }
+        
+        // Populate store delivery goals
+        if (data.storeDeliveryGoals) {
+            stores.forEach(store => {
+                if (data.storeDeliveryGoals[store]) {
+                    const deliveryData = data.storeDeliveryGoals[store];
+                    const weeklyEl = document.getElementById(`deliveries_target_${store}`);
+                    const avgRevenueEl = document.getElementById(`delivery_revenue_${store}`);
+                    if (weeklyEl) weeklyEl.value = deliveryData.weekly_deliveries || 0;
+                    if (avgRevenueEl) avgRevenueEl.value = deliveryData.avg_revenue_per_delivery || 0;
                 }
             });
         }
@@ -1925,6 +1956,42 @@ class ConfigurationManager {
                 '8101': {
                     reservation_goal: parseInt(document.getElementById('reservation_8101').value) || 0,
                     contract_goal: parseInt(document.getElementById('contract_8101').value) || 0
+                }
+            },
+            storeLaborGoals: {
+                '3607': {
+                    labor_percentage: parseFloat(document.getElementById('labor_percentage_3607').value) || 0,
+                    revenue_per_hour: parseFloat(document.getElementById('revenue_per_hour_3607').value) || 0
+                },
+                '6800': {
+                    labor_percentage: parseFloat(document.getElementById('labor_percentage_6800').value) || 0,
+                    revenue_per_hour: parseFloat(document.getElementById('revenue_per_hour_6800').value) || 0
+                },
+                '728': {
+                    labor_percentage: parseFloat(document.getElementById('labor_percentage_728').value) || 0,
+                    revenue_per_hour: parseFloat(document.getElementById('revenue_per_hour_728').value) || 0
+                },
+                '8101': {
+                    labor_percentage: parseFloat(document.getElementById('labor_percentage_8101').value) || 0,
+                    revenue_per_hour: parseFloat(document.getElementById('revenue_per_hour_8101').value) || 0
+                }
+            },
+            storeDeliveryGoals: {
+                '3607': {
+                    weekly_deliveries: parseInt(document.getElementById('deliveries_target_3607').value) || 0,
+                    avg_revenue_per_delivery: parseFloat(document.getElementById('delivery_revenue_3607').value) || 0
+                },
+                '6800': {
+                    weekly_deliveries: parseInt(document.getElementById('deliveries_target_6800').value) || 0,
+                    avg_revenue_per_delivery: parseFloat(document.getElementById('delivery_revenue_6800').value) || 0
+                },
+                '728': {
+                    weekly_deliveries: parseInt(document.getElementById('deliveries_target_728').value) || 0,
+                    avg_revenue_per_delivery: parseFloat(document.getElementById('delivery_revenue_728').value) || 0
+                },
+                '8101': {
+                    weekly_deliveries: parseInt(document.getElementById('deliveries_target_8101').value) || 0,
+                    avg_revenue_per_delivery: parseFloat(document.getElementById('delivery_revenue_8101').value) || 0
                 }
             }
         };

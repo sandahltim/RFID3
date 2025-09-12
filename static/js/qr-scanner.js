@@ -60,7 +60,7 @@ class QRScanner {
             
             this.video = this.elements.video;
             this.canvas = this.elements.canvas;
-            this.context = this.canvas.getContext('2d');
+            this.context = this.canvas.getContext('2d', { willReadFrequently: true });
             
             // Set up event listeners
             this.setupEventListeners();
@@ -666,7 +666,9 @@ class QRScanner {
     }
     
     updateStatus(message) {
-        this.elements.scannerStatus.textContent = message;
+        if (this.elements.scannerStatus) {
+            this.elements.scannerStatus.textContent = message;
+        }
         console.log('Scanner status:', message);
     }
     

@@ -4,3 +4,4 @@ logs/*
 venv/
 actions-runner/
 *.xls
+shared/POR/*.csv

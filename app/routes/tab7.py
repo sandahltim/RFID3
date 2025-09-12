@@ -11,7 +11,7 @@ import json
 from decimal import Decimal
 
 from ..utils.date_ranges import get_date_range_from_params
-from ..models.config_models import ExecutiveDashboardConfiguration
+from ..models.config_models import ExecutiveDashboardConfiguration, CustomInsight
 
 logger = get_logger(__name__)
 
@@ -3901,13 +3901,32 @@ def add_custom_insight():
             if field not in data:
                 return jsonify({"success": False, "error": f"Missing field: {field}"}), 400
         
-        # Here you would save to a custom insights table
-        # For now, just return success
-        logger.info(f"Custom insight added: {data['description']}")
+        # Parse the date string to date object
+        from datetime import datetime
+        insight_date = datetime.strptime(data['date'], '%Y-%m-%d').date()
+        
+        # Create new custom insight
+        insight = CustomInsight(
+            date=insight_date,
+            event_type=data['event_type'],
+            description=data['description'],
+            impact_category=data['impact_category'],
+            impact_magnitude=data.get('impact_magnitude'),
+            store_code=data.get('store_code'),
+            created_by=data.get('created_by', 'user')
+        )
+        
+        # Save to database
+        from app import db
+        db.session.add(insight)
+        db.session.commit()
+        
+        logger.info(f"Custom insight saved to database: {data['description']}")
         
         return jsonify({
             "success": True,
-            "message": "Custom insight added successfully"
+            "message": "Custom insight added successfully",
+            "insight_id": insight.id
         })
         
     except Exception as e:

@@ -11,7 +11,7 @@ Provides sophisticated financial analysis including:
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta, date
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Any
 from sqlalchemy import text, func, and_, or_
 from decimal import Decimal
 import json
@@ -29,6 +29,7 @@ from app.config.stores import (
     get_store_opening_date, get_active_store_codes
 )
 from app.models.config_models import LaborCostConfiguration, get_default_labor_cost_config
+from app.services.store_goals_service import store_goals_service
 
 
 logger = get_logger(__name__)
@@ -134,6 +135,59 @@ class FinancialAnalyticsService:
             # Return a temporary config with defaults if database fails
             return type('DefaultConfig', (), get_default_labor_cost_config()['global_thresholds'])()
     
+    def get_store_goal_value(self, store_code: str, category: str, metric_name: str, default_value: float = 0.0) -> float:
+        """
+        Get store-specific goal value using the dynamic store goals service
+        
+        Args:
+            store_code: Store code ('3607', '6800', etc.)
+            category: Goal category ('labor', 'delivery', 'revenue', etc.)
+            metric_name: Specific metric name
+            default_value: Fallback if no goal found
+            
+        Returns:
+            Goal value for the store
+        """
+        return store_goals_service.get_store_goal_value(store_code, category, metric_name, default_value)
+    
+    def calculate_store_performance_vs_goals(self, store_code: str, actual_metrics: Dict[str, Dict[str, float]]) -> Dict[str, Any]:
+        """
+        Calculate store performance against all goal categories
+        
+        Args:
+            store_code: Store to analyze
+            actual_metrics: Dict with categories as keys, metrics as nested dicts
+                Example: {
+                    'labor': {'percentage_actual': 23.5, 'revenue_per_hour': 180},
+                    'delivery': {'weekly_deliveries': 62, 'avg_revenue_per_delivery': 460}
+                }
+        
+        Returns:
+            Comprehensive performance analysis
+        """
+        performance_results = {
+            'store_code': store_code,
+            'timestamp': datetime.now().isoformat(),
+            'categories': {},
+            'overall_health_score': 0.0
+        }
+        
+        category_scores = []
+        
+        for category, metrics in actual_metrics.items():
+            category_performance = store_goals_service.calculate_performance_score(
+                store_code, category, metrics
+            )
+            performance_results['categories'][category] = category_performance
+            
+            if 'overall_score' in category_performance:
+                category_scores.append(category_performance['overall_score'])
+        
+        if category_scores:
+            performance_results['overall_health_score'] = sum(category_scores) / len(category_scores)
+        
+        return performance_results
+
     def get_store_labor_threshold(self, store_code: str, threshold_type: str = 'high_threshold', user_id: str = 'default_user'):
         """
         Get store-specific labor cost threshold with fallback to global defaults.
