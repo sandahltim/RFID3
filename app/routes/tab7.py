@@ -449,7 +449,7 @@ def get_executive_summary():
         # Issue: Was overriding correct POS transaction revenue ($98,683) with scorecard data ($104,242)
         # Solution: Use original POS transaction calculation (scorecard_metrics.total_revenue already set correctly)
         # 
-        # TODO FUTURE: If unified calculation needed, integrate into original POS logic rather than override
+        # NOTE: Consider integrating into original POS logic if unified calculation is needed
         # 
         # COMMENTED OUT PROBLEMATIC OVERRIDE:
         # unified_revenue = _get_unified_revenue_kpi(session, 'executive_summary_revenue_weeks', store_filter)
@@ -3201,7 +3201,7 @@ def financial_kpis():
             config = MockConfig()
         
         # CONSOLIDATED 2025-09-09: Use unified revenue KPI calculation (single source of truth)
-        # TODO CLEANUP 2025-09-16: Remove duplicate calculation logic after verification
+        # NOTE: Duplicate calculation logic - consider consolidation after verification
         current_3wk_avg = _get_unified_revenue_kpi(session, 'financial_kpis_current_revenue_weeks')
         
         # Debug: Show what weeks we're using
@@ -3565,7 +3565,7 @@ def location_comparison():
                     yoy_comparison = yoy_growth - last_year_yoy
             
             # Get utilization from combined_inventory data (company-wide for now)
-            # TODO: Add store-specific utilization when store field is identified
+            # NOTE: Store-specific utilization can be added when store field is identified
             util_query = text("""
                 SELECT 
                     COUNT(CASE WHEN status IN ('fully_rented', 'partially_rented') THEN 1 END) * 100.0
@@ -4151,51 +4151,141 @@ def comprehensive_scorecard_matrix():
         # Get goal values from configuration tables instead of hardcoding
         def get_goal_values():
             """
-            ADDED 2025-09-10: Retrieve goal values from configuration database
-            Replaces hardcoded values with systematic database lookup
+            UPDATED 2025-09-12: Retrieve goal values from Store Goals Configuration
+            Pulls actual goals from store_goals_configuration table
             """
             goals = {
                 'total_weekly_revenue': 100000,  # Default fallback
+                'total_monthly_revenue': 400000,  # Default monthly fallback
                 'ar_over_45_days_percent': 15,   # Default fallback
                 'deliveries': 12,                # Default fallback
                 'wage_ratio': 25,                # Default fallback
                 'revenue_per_hour': 85,          # Default fallback
-                'reservations': {'3607': 10000, '6800': 15000, '728': 2000, '8101': 250000},  # Defaults
-                'contracts': {'3607': 150, '6800': 140, '728': 85, '8101': 65}  # Defaults
+                'reservations': {'3607': 10000, '6800': 15000, '728': 2000, '8101': 250000},  # Weekly defaults
+                'monthly_reservations': {'3607': 43333, '6800': 65000, '728': 8667, '8101': 1083333},  # Monthly defaults
+                'contracts': {'3607': 150, '6800': 140, '728': 85, '8101': 65},  # Weekly defaults
+                'monthly_contracts': {'3607': 650, '6800': 607, '728': 368, '8101': 282},  # Monthly defaults
+                'store_revenue': {'3607': 18000, '6800': 31000, '728': 16000, '8101': 35000},  # Store weekly revenue goals
+                'monthly_store_revenue': {'3607': 78000, '6800': 134333, '728': 69333, '8101': 151667},  # Store monthly revenue goals
+                'deliveries_by_store': {'3607': 65, '6800': 45, '728': 25, '8101': 35},  # Weekly deliveries by store
+                'monthly_deliveries_by_store': {'3607': 280, '6800': 195, '728': 108, '8101': 151}  # Monthly deliveries by store
             }
             
             try:
-                # Get goals from business_intelligence_config
-                bi_query = text("""
-                    SELECT revenue_target_monthly, revenue_target_quarterly, revenue_target_yearly,
-                           profit_margin_target
-                    FROM business_intelligence_config 
+                # Get goals from store_goals_configuration table
+                store_goals_query = text("""
+                    SELECT company_goals, store_revenue_goals, store_labor_goals, store_delivery_goals
+                    FROM store_goals_configuration 
                     WHERE is_active = 1 
                     ORDER BY created_at DESC LIMIT 1
                 """)
-                bi_result = session.execute(bi_query).fetchone()
+                store_goals_result = session.execute(store_goals_query).fetchone()
                 
-                if bi_result and bi_result.revenue_target_monthly:
-                    # Convert monthly to weekly (monthly / 4.33 weeks per month)
-                    goals['total_weekly_revenue'] = int(bi_result.revenue_target_monthly / 4.33)
-                
-                # Get AR aging goals from scorecard_analytics_configuration  
-                scorecard_query = text("""
-                    SELECT ar_aging_risk_threshold, ar_risk_low_threshold, ar_risk_medium_threshold
-                    FROM scorecard_analytics_configuration 
-                    WHERE is_active = 1 
-                    ORDER BY created_at DESC LIMIT 1
-                """)
-                scorecard_result = session.execute(scorecard_query).fetchone()
-                
-                if scorecard_result and scorecard_result.ar_aging_risk_threshold:
-                    goals['ar_over_45_days_percent'] = scorecard_result.ar_aging_risk_threshold
+                if store_goals_result:
+                    import json
                     
-                # TODO: Add store-specific goals from store_specific_thresholds JSON field
-                # For now, keeping existing store-specific defaults but should be configurable
+                    # Parse company goals
+                    if store_goals_result.company_goals:
+                        company_goals = json.loads(store_goals_result.company_goals) if isinstance(store_goals_result.company_goals, str) else store_goals_result.company_goals
+                        
+                        # Handle both weekly and monthly revenue targets
+                        if 'monthly_revenue_target' in company_goals:
+                            goals['total_monthly_revenue'] = company_goals['monthly_revenue_target']
+                            # Convert monthly to weekly if weekly not explicitly set
+                            if 'weekly_revenue_target' not in company_goals:
+                                goals['total_weekly_revenue'] = int(company_goals['monthly_revenue_target'] / 4.33)
+                        
+                        if 'weekly_revenue_target' in company_goals:
+                            goals['total_weekly_revenue'] = company_goals['weekly_revenue_target']
+                        
+                        # AR aging threshold
+                        if 'ar_aging_threshold' in company_goals:
+                            goals['ar_over_45_days_percent'] = company_goals['ar_aging_threshold']
+                            
+                        # Deliveries goal
+                        if 'deliveries_goal' in company_goals:
+                            goals['deliveries'] = company_goals['deliveries_goal']
+                            
+                        # Wage ratio goal  
+                        if 'wage_ratio_goal' in company_goals:
+                            goals['wage_ratio'] = company_goals['wage_ratio_goal']
+                            
+                        # Revenue per hour goal
+                        if 'revenue_per_hour_goal' in company_goals:
+                            goals['revenue_per_hour'] = company_goals['revenue_per_hour_goal']
+                    
+                    # Parse store-specific revenue goals
+                    if store_goals_result.store_revenue_goals:
+                        store_revenue_goals = json.loads(store_goals_result.store_revenue_goals) if isinstance(store_goals_result.store_revenue_goals, str) else store_revenue_goals
+                        
+                        # Store weekly revenue goals (calculate from company goal based on store capacity)
+                        total_weekly_goal = goals['total_weekly_revenue']
+                        store_revenue_percentages = {
+                            '3607': 0.18,  # 18% - Wayzata (smaller lakeside location)
+                            '6800': 0.31,  # 31% - Brooklyn Park (largest construction focus)
+                            '728': 0.16,   # 16% - Elk River (smallest rural location)
+                            '8101': 0.35   # 35% - Fridley (major events operation)
+                        }
+                        
+                        goals['store_revenue'] = {}
+                        for store_code in ['3607', '6800', '728', '8101']:
+                            # Use configured store revenue goal if available, otherwise calculate from percentage
+                            if store_code in store_revenue_goals and 'weekly_revenue_goal' in store_revenue_goals[store_code]:
+                                goals['store_revenue'][store_code] = store_revenue_goals[store_code]['weekly_revenue_goal']
+                            else:
+                                goals['store_revenue'][store_code] = int(total_weekly_goal * store_revenue_percentages[store_code])
+                            
+                            # Reservation and contract goals (both weekly and monthly)
+                            if store_code in store_revenue_goals and 'reservation_goal' in store_revenue_goals[store_code]:
+                                goals['reservations'][store_code] = store_revenue_goals[store_code]['reservation_goal']
+                            if store_code in store_revenue_goals and 'monthly_reservation_goal' in store_revenue_goals[store_code]:
+                                goals['monthly_reservations'][store_code] = store_revenue_goals[store_code]['monthly_reservation_goal']
+                            if store_code in store_revenue_goals and 'contract_goal' in store_revenue_goals[store_code]:
+                                goals['contracts'][store_code] = store_revenue_goals[store_code]['contract_goal']
+                            if store_code in store_revenue_goals and 'monthly_contract_goal' in store_revenue_goals[store_code]:
+                                goals['monthly_contracts'][store_code] = store_revenue_goals[store_code]['monthly_contract_goal']
+                    
+                    # Parse store labor goals for revenue per hour
+                    if store_goals_result.store_labor_goals:
+                        store_labor_goals = json.loads(store_goals_result.store_labor_goals) if isinstance(store_goals_result.store_labor_goals, str) else store_goals_result.store_labor_goals
+                        
+                        # Store-specific revenue per hour goals
+                        goals['revenue_per_hour_by_store'] = {}
+                        goals['wage_ratio_by_store'] = {}
+                        for store_code in ['3607', '6800', '728', '8101']:
+                            if store_code in store_labor_goals and 'revenue_per_hour' in store_labor_goals[store_code]:
+                                goals['revenue_per_hour_by_store'][store_code] = store_labor_goals[store_code]['revenue_per_hour']
+                            else:
+                                goals['revenue_per_hour_by_store'][store_code] = goals['revenue_per_hour']  # fallback to company-wide
+                                
+                            # Store-specific wage ratio goals
+                            if store_code in store_labor_goals and 'labor_percentage' in store_labor_goals[store_code]:
+                                goals['wage_ratio_by_store'][store_code] = store_labor_goals[store_code]['labor_percentage']
+                            else:
+                                goals['wage_ratio_by_store'][store_code] = goals['wage_ratio']  # fallback to company-wide
+                                
+                    # Parse store delivery goals (both weekly and monthly)
+                    if store_goals_result.store_delivery_goals:
+                        store_delivery_goals = json.loads(store_goals_result.store_delivery_goals) if isinstance(store_goals_result.store_delivery_goals, str) else store_goals_result.store_delivery_goals
+                        
+                        # Store-specific delivery goals (weekly and monthly)
+                        goals['deliveries_by_store'] = {}
+                        goals['monthly_deliveries_by_store'] = {}
+                        for store_code in ['3607', '6800', '728', '8101']:
+                            # Weekly deliveries
+                            if store_code in store_delivery_goals and 'weekly_deliveries' in store_delivery_goals[store_code]:
+                                goals['deliveries_by_store'][store_code] = store_delivery_goals[store_code]['weekly_deliveries']
+                            else:
+                                goals['deliveries_by_store'][store_code] = goals['deliveries']  # fallback to company-wide
+                            
+                            # Monthly deliveries  
+                            if store_code in store_delivery_goals and 'monthly_deliveries' in store_delivery_goals[store_code]:
+                                goals['monthly_deliveries_by_store'][store_code] = store_delivery_goals[store_code]['monthly_deliveries']
+                            else:
+                                goals['monthly_deliveries_by_store'][store_code] = goals['deliveries'] * 4.33  # fallback estimate
                 
             except Exception as e:
-                app.logger.warning(f"Failed to retrieve goal values from database, using defaults: {str(e)}")
+                app.logger.warning(f"Failed to retrieve goal values from store_goals_configuration, using defaults: {str(e)}")
                 
             return goals
             
@@ -4204,14 +4294,20 @@ def comprehensive_scorecard_matrix():
         # METRIC 1: Total Weekly Revenue - Using systematic calculation function
         total_revenue_calc = _calculate_metric_periods(session, 'scorecard_trends_data', 'total_weekly_revenue')
         
+        # Calculate plus/minus goal for Total Weekly Revenue (current_trailing_3w_avg vs goal)
+        current_avg = total_revenue_calc['current_trailing_3w_avg']
+        revenue_goal = goal_values['total_weekly_revenue']
+        revenue_plus_minus = current_avg - revenue_goal
+        
         scorecard_matrix["metrics"]["Total Weekly Revenue"] = {
             "minus_3": total_revenue_calc['periods'].get('minus_3_week', 0),
             "minus_2": total_revenue_calc['periods'].get('minus_2_week', 0), 
             "previous_week": total_revenue_calc['periods'].get('previous_week', 0),
             "current_week": total_revenue_calc['periods'].get('current_week', 0),
             "previous_year": total_revenue_calc['periods'].get('previous_year', 0),
-            "plus_minus_goal": goal_values['total_weekly_revenue'],  # Retrieved from database
-            "current_trailing_3w_avg": round(total_revenue_calc['current_trailing_3w_avg'], 0),
+            "plus_minus_goal": round(revenue_plus_minus, 0),  # Difference from goal
+            "goal_value": revenue_goal,  # Store goal for reference
+            "current_trailing_3w_avg": round(current_avg, 0),
             "prev_year_trailing_3w": round(total_revenue_calc['prev_year_trailing_3w'], 0),
             "prev_year_3w_forward": round(total_revenue_calc['prev_year_3w_forward'], 0),
             "format": "currency",
@@ -4221,14 +4317,20 @@ def comprehensive_scorecard_matrix():
         # METRIC 2: % of Total AR ($) over 45 days - Using systematic calculation function
         ar_calc = _calculate_metric_periods(session, 'scorecard_trends_data', 'ar_over_45_days_percent')
         
+        # Calculate plus/minus goal for AR% (for AR, lower is better, so negative diff is good)
+        ar_current_avg = ar_calc['current_trailing_3w_avg']
+        ar_goal = goal_values['ar_over_45_days_percent']
+        ar_plus_minus = ar_goal - ar_current_avg  # Reversed: goal - actual (lower actual is better)
+        
         scorecard_matrix["metrics"]["% of Total AR ($) over 45 days (all stores)"] = {
             "minus_3": ar_calc['periods'].get('minus_3_week', 0),
             "minus_2": ar_calc['periods'].get('minus_2_week', 0),
             "previous_week": ar_calc['periods'].get('previous_week', 0),
             "current_week": ar_calc['periods'].get('current_week', 0), 
             "previous_year": ar_calc['periods'].get('previous_year', 0),
-            "plus_minus_goal": goal_values['ar_over_45_days_percent'],  # Retrieved from database
-            "current_trailing_3w_avg": round(ar_calc['current_trailing_3w_avg'], 1),
+            "plus_minus_goal": round(ar_plus_minus, 1),  # Goal - actual (positive is good)
+            "goal_value": ar_goal,  # Store goal for reference
+            "current_trailing_3w_avg": round(ar_current_avg, 1),
             "prev_year_trailing_3w": round(ar_calc['prev_year_trailing_3w'], 1),
             "prev_year_3w_forward": round(ar_calc['prev_year_3w_forward'], 1),
             "format": "percentage",
@@ -4245,14 +4347,20 @@ def comprehensive_scorecard_matrix():
             # Reservations - Using systematic calculation
             reservation_calc = _calculate_metric_periods(session, 'scorecard_trends_data', f'total_reservation_{store}')
             
+            # Calculate plus/minus goal for reservations
+            reservation_current_avg = reservation_calc['current_trailing_3w_avg']
+            reservation_goal = goal_values['reservations'][store]
+            reservation_plus_minus = reservation_current_avg - reservation_goal
+            
             scorecard_matrix["metrics"][f"Total $ on Reservation {store}"] = {
                 "minus_3": reservation_calc['periods'].get('minus_3_week', 0),
                 "minus_2": reservation_calc['periods'].get('minus_2_week', 0),
                 "previous_week": reservation_calc['periods'].get('previous_week', 0),
                 "current_week": reservation_calc['periods'].get('current_week', 0),
                 "previous_year": reservation_calc['periods'].get('previous_year', 0),
-                "plus_minus_goal": goal_values['reservations'][store],
-                "current_trailing_3w_avg": round(reservation_calc['current_trailing_3w_avg'], 0),
+                "plus_minus_goal": round(reservation_plus_minus, 0),  # Difference from goal
+                "goal_value": reservation_goal,  # Store goal for reference
+                "current_trailing_3w_avg": round(reservation_current_avg, 0),
                 "prev_year_trailing_3w": round(reservation_calc['prev_year_trailing_3w'], 0),
                 "prev_year_3w_forward": round(reservation_calc['prev_year_3w_forward'], 0),
                 "format": "currency", 
@@ -4263,14 +4371,20 @@ def comprehensive_scorecard_matrix():
             # New Contracts - Using systematic calculation
             contract_calc = _calculate_metric_periods(session, 'scorecard_trends_data', f'new_contracts_{store}')
             
+            # Calculate plus/minus goal for contracts
+            contract_current_avg = contract_calc['current_trailing_3w_avg']
+            contract_goal = goal_values['contracts'][store]
+            contract_plus_minus = contract_current_avg - contract_goal
+            
             scorecard_matrix["metrics"][f"# New Open Contracts {store}"] = {
                 "minus_3": contract_calc['periods'].get('minus_3_week', 0),
                 "minus_2": contract_calc['periods'].get('minus_2_week', 0),
                 "previous_week": contract_calc['periods'].get('previous_week', 0),
                 "current_week": contract_calc['periods'].get('current_week', 0),
                 "previous_year": contract_calc['periods'].get('previous_year', 0),
-                "plus_minus_goal": goal_values['contracts'][store],
-                "current_trailing_3w_avg": round(contract_calc['current_trailing_3w_avg'], 0),
+                "plus_minus_goal": round(contract_plus_minus, 0),  # Difference from goal
+                "goal_value": contract_goal,  # Store goal for reference
+                "current_trailing_3w_avg": round(contract_current_avg, 0),
                 "prev_year_trailing_3w": round(contract_calc['prev_year_trailing_3w'], 0),
                 "prev_year_3w_forward": round(contract_calc['prev_year_3w_forward'], 0),
                 "format": "integer",
@@ -4281,14 +4395,20 @@ def comprehensive_scorecard_matrix():
         # Delivery scheduling for 8101 (Fridley) - Using systematic calculation
         delivery_calc = _calculate_metric_periods(session, 'scorecard_trends_data', 'deliveries_scheduled_8101')
         
+        # Calculate plus/minus goal for deliveries (8101 specific)
+        delivery_current_avg = delivery_calc['current_trailing_3w_avg']
+        delivery_goal = goal_values.get('deliveries_by_store', {}).get('8101', goal_values['deliveries'])
+        delivery_plus_minus = delivery_current_avg - delivery_goal
+        
         scorecard_matrix["metrics"]["# Deliveries Scheduled next 7 days Weds-Tues 8101"] = {
             "minus_3": delivery_calc['periods'].get('minus_3_week', 0),
             "minus_2": delivery_calc['periods'].get('minus_2_week', 0),
             "previous_week": delivery_calc['periods'].get('previous_week', 0),
             "current_week": delivery_calc['periods'].get('current_week', 0),
             "previous_year": delivery_calc['periods'].get('previous_year', 0),
-            "plus_minus_goal": goal_values['deliveries'],  # Retrieved from database
-            "current_trailing_3w_avg": round(delivery_calc['current_trailing_3w_avg'], 0),
+            "plus_minus_goal": round(delivery_plus_minus, 0),  # Difference from goal
+            "goal_value": delivery_goal,  # Store goal for reference
+            "current_trailing_3w_avg": round(delivery_current_avg, 0),
             "prev_year_trailing_3w": round(delivery_calc['prev_year_trailing_3w'], 0),
             "prev_year_3w_forward": round(delivery_calc['prev_year_3w_forward'], 0),
             "format": "integer",
@@ -4307,15 +4427,20 @@ def comprehensive_scorecard_matrix():
             payroll_calc = _calculate_metric_periods(session, 'payroll_trends_data', 'payroll_amount', 'location_code', location_code)
             wage_hours_calc = _calculate_metric_periods(session, 'payroll_trends_data', 'wage_hours', 'location_code', location_code)
             
-            # Revenue metrics
+            # Revenue metrics - Calculate plus/minus goal
+            store_revenue_current = store_revenue_calc['current_trailing_3w_avg']
+            store_revenue_goal = goal_values.get('store_revenue', {}).get(store, 0)
+            store_revenue_plus_minus = store_revenue_current - store_revenue_goal
+            
             scorecard_matrix["metrics"][f"Revenue {store}"] = {
                 "minus_3": store_revenue_calc['periods'].get('minus_3_week', 0),
                 "minus_2": store_revenue_calc['periods'].get('minus_2_week', 0),
                 "previous_week": store_revenue_calc['periods'].get('previous_week', 0),
                 "current_week": store_revenue_calc['periods'].get('current_week', 0),
                 "previous_year": store_revenue_calc['periods'].get('previous_year', 0),
-                "plus_minus_goal": 0,  # No specific goal yet (store revenue goals to be added)
-                "current_trailing_3w_avg": round(store_revenue_calc['current_trailing_3w_avg'], 0),
+                "plus_minus_goal": round(store_revenue_plus_minus, 0),  # Difference from store-specific goal
+                "goal_value": store_revenue_goal,  # Store-specific revenue goal
+                "current_trailing_3w_avg": round(store_revenue_current, 0),
                 "prev_year_trailing_3w": round(store_revenue_calc['prev_year_trailing_3w'], 0),
                 "prev_year_3w_forward": round(store_revenue_calc['prev_year_3w_forward'], 0),
                 "format": "currency",
@@ -4367,7 +4492,8 @@ def comprehensive_scorecard_matrix():
                 "previous_week": wage_pct_periods.get('previous_week', 0),
                 "current_week": wage_pct_periods.get('current_week', 0),
                 "previous_year": prev_year_wage_pct,
-                "plus_minus_goal": goal_values['wage_ratio'],  # Retrieved from database
+                "plus_minus_goal": goal_values.get('wage_ratio_by_store', {}).get(store, goal_values['wage_ratio']) - (round(sum(wage_pct_trailing) / len(wage_pct_trailing), 1) if wage_pct_trailing else 0),  # Goal - actual (lower wage ratio is better)
+                "goal_value": goal_values.get('wage_ratio_by_store', {}).get(store, goal_values['wage_ratio']),  # Store-specific or company goal
                 "current_trailing_3w_avg": round(sum(wage_pct_trailing) / len(wage_pct_trailing), 1) if wage_pct_trailing else 0,
                 "prev_year_trailing_3w": prev_year_wage_pct,  # Use single prev year value for now
                 "prev_year_3w_forward": prev_year_wage_pct,  # Use single prev year value for now
@@ -4401,7 +4527,8 @@ def comprehensive_scorecard_matrix():
                 "previous_week": rev_per_hour_periods.get('previous_week', 0),
                 "current_week": rev_per_hour_periods.get('current_week', 0),
                 "previous_year": prev_year_rev_per_hour,
-                "plus_minus_goal": goal_values['revenue_per_hour'],  # Retrieved from database
+                "plus_minus_goal": (round(sum(rev_per_hour_trailing) / len(rev_per_hour_trailing), 2) if rev_per_hour_trailing else 0) - goal_values.get('revenue_per_hour_by_store', {}).get(store, goal_values['revenue_per_hour']),  # Actual - goal (higher revenue/hour is better)
+                "goal_value": goal_values.get('revenue_per_hour_by_store', {}).get(store, goal_values['revenue_per_hour']),  # Store-specific or company goal
                 "current_trailing_3w_avg": round(sum(rev_per_hour_trailing) / len(rev_per_hour_trailing), 2) if rev_per_hour_trailing else 0,
                 "prev_year_trailing_3w": prev_year_rev_per_hour,  # Use single prev year value for now
                 "prev_year_3w_forward": prev_year_rev_per_hour,  # Use single prev year value for now
@@ -4410,7 +4537,89 @@ def comprehensive_scorecard_matrix():
                 "store_name": store_name
             }
         
-        logger.info("Comprehensive scorecard matrix generated successfully")
+        # ADD MONTHLY METRICS SECTION
+        # Add monthly performance tracking vs monthly goals
+        
+        # Calculate monthly totals for each store
+        import calendar
+        from datetime import datetime, timedelta
+        
+        # Get current month start and end dates
+        current_date = datetime.now()
+        month_start = current_date.replace(day=1)
+        if current_date.month == 12:
+            month_end = current_date.replace(year=current_date.year + 1, month=1, day=1) - timedelta(days=1)
+        else:
+            month_end = current_date.replace(month=current_date.month + 1, day=1) - timedelta(days=1)
+        
+        # Monthly Revenue by Store
+        for store in stores:
+            store_name = store_names[store]
+            
+            # Calculate month-to-date revenue
+            monthly_revenue_sql = text("""
+                SELECT COALESCE(SUM(total_revenue), 0) as mtd_revenue
+                FROM scorecard_trends_data 
+                WHERE store_code = :store_code 
+                AND data_date BETWEEN :month_start AND :current_date
+            """)
+            monthly_result = session.execute(monthly_revenue_sql, {
+                'store_code': store, 
+                'month_start': month_start.strftime('%Y-%m-%d'),
+                'current_date': current_date.strftime('%Y-%m-%d')
+            }).fetchone()
+            
+            mtd_revenue = monthly_result.mtd_revenue if monthly_result else 0
+            monthly_goal = goal_values.get('monthly_store_revenue', {}).get(store, goal_values['total_monthly_revenue'] * 0.25)
+            monthly_plus_minus = mtd_revenue - monthly_goal
+            
+            scorecard_matrix["metrics"][f"MTD Revenue {store}"] = {
+                "minus_3": 0,  # Not applicable for monthly
+                "minus_2": 0,  # Not applicable for monthly  
+                "previous_week": 0,  # Not applicable for monthly
+                "current_week": round(mtd_revenue, 0),  # Show MTD in current week column
+                "previous_year": 0,  # Could add previous year same month later
+                "plus_minus_goal": round(monthly_plus_minus, 0),
+                "goal_value": monthly_goal,
+                "current_trailing_3w_avg": round(mtd_revenue, 0),
+                "prev_year_trailing_3w": 0,
+                "prev_year_3w_forward": 0,
+                "format": "currency",
+                "units": "$",
+                "store_name": store_name
+            }
+        
+        # Monthly Total Company Revenue
+        company_monthly_sql = text("""
+            SELECT COALESCE(SUM(total_revenue), 0) as mtd_company_revenue
+            FROM scorecard_trends_data 
+            WHERE data_date BETWEEN :month_start AND :current_date
+        """)
+        company_monthly_result = session.execute(company_monthly_sql, {
+            'month_start': month_start.strftime('%Y-%m-%d'),
+            'current_date': current_date.strftime('%Y-%m-%d')
+        }).fetchone()
+        
+        mtd_company_revenue = company_monthly_result.mtd_company_revenue if company_monthly_result else 0
+        company_monthly_goal = goal_values['total_monthly_revenue']
+        company_monthly_plus_minus = mtd_company_revenue - company_monthly_goal
+        
+        scorecard_matrix["metrics"]["MTD Total Company Revenue"] = {
+            "minus_3": 0,
+            "minus_2": 0, 
+            "previous_week": 0,
+            "current_week": round(mtd_company_revenue, 0),
+            "previous_year": 0,
+            "plus_minus_goal": round(company_monthly_plus_minus, 0),
+            "goal_value": company_monthly_goal,
+            "current_trailing_3w_avg": round(mtd_company_revenue, 0),
+            "prev_year_trailing_3w": 0,
+            "prev_year_3w_forward": 0,
+            "format": "currency",
+            "units": "$"
+        }
+
+        logger.info("Comprehensive scorecard matrix generated successfully with monthly metrics")
         return jsonify(scorecard_matrix)
         
     except Exception as e:

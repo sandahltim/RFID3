@@ -79,7 +79,7 @@ class FinancialAnalyticsService:
         Returns:
             Dict with analysis configuration parameters
         """
-        # TODO: Replace with database configuration lookup
+        # NOTE: Consider moving to database configuration system for full dynamic control
         # For now, centralized configurable defaults
         return {
             'rolling_window_weeks': 3,          # Default 3-week rolling averages
@@ -743,13 +743,15 @@ class FinancialAnalyticsService:
     # ==========================================
     
     def generate_financial_forecasts(self, horizon_weeks: int = 12, 
-                                   confidence_level: float = 0.95) -> Dict:
+                                   confidence_level: float = 0.95,
+                                   include_goals: bool = True) -> Dict:
         """
         Generate predictive financial forecasts with confidence intervals
         
         Args:
             horizon_weeks: Number of weeks to forecast
             confidence_level: Confidence level for prediction intervals (0.90, 0.95, 0.99)
+            include_goals: Whether to include goal comparison in forecasts
         """
         try:
             # Get historical data for forecasting
@@ -763,7 +765,10 @@ class FinancialAnalyticsService:
                 return {"error": "Insufficient historical data for forecasting"}
             
             # Generate forecasts for different metrics
-            revenue_forecast = self._forecast_revenue(historical_data, horizon_weeks, confidence_level)
+            # Get monthly goals if requested
+            monthly_goals = self._get_monthly_goals() if include_goals else {}
+            
+            revenue_forecast = self._forecast_revenue(historical_data, horizon_weeks, confidence_level, monthly_goals)
             profitability_forecast = self._forecast_profitability(historical_data, horizon_weeks, confidence_level)
             cash_flow_forecast = self._forecast_cash_flow(historical_data, horizon_weeks, confidence_level)
             
@@ -827,8 +832,46 @@ class FinancialAnalyticsService:
             logger.error(f"Error getting forecasting data: {e}")
             return []
     
+    def _get_monthly_goals(self) -> Dict:
+        """
+        Get monthly goals from store goals configuration
+        """
+        try:
+            from app.models.config_models import StoreGoalsConfiguration
+            
+            session = db.session()
+            config = session.query(StoreGoalsConfiguration).filter(
+                StoreGoalsConfiguration.is_active == True
+            ).order_by(StoreGoalsConfiguration.created_at.desc()).first()
+            
+            if not config:
+                return {}
+            
+            goals = {
+                'company_monthly_revenue': config.company_goals.get('monthly_revenue_target', 0),
+                'company_weekly_revenue': config.company_goals.get('weekly_revenue_target', 0),
+                'store_monthly_reservations': {},
+                'store_weekly_reservations': {},
+                'store_monthly_contracts': {},
+                'store_weekly_contracts': {}
+            }
+            
+            # Extract store-specific goals
+            if config.store_revenue_goals:
+                for store_code, store_goals in config.store_revenue_goals.items():
+                    goals['store_monthly_reservations'][store_code] = store_goals.get('monthly_reservation_goal', 0)
+                    goals['store_weekly_reservations'][store_code] = store_goals.get('reservation_goal', 0)
+                    goals['store_monthly_contracts'][store_code] = store_goals.get('monthly_contract_goal', 0)
+                    goals['store_weekly_contracts'][store_code] = store_goals.get('contract_goal', 0)
+            
+            return goals
+            
+        except Exception as e:
+            logger.warning(f"Failed to get monthly goals: {e}")
+            return {}
+
     def _forecast_revenue(self, historical_data: List[Dict], horizon_weeks: int, 
-                         confidence_level: float) -> Dict:
+                         confidence_level: float, monthly_goals: Dict = None) -> Dict:
         """Generate revenue forecasts with trend analysis"""
         try:
             df = pd.DataFrame(historical_data)
@@ -880,9 +923,34 @@ class FinancialAnalyticsService:
             total_historical = sum(revenue_series[-horizon_weeks:]) if len(revenue_series) >= horizon_weeks else sum(revenue_series)
             growth_rate = ((total_forecasted - total_historical) / max(total_historical, 1)) * 100
             
+            # Goal comparison if monthly goals provided
+            goal_comparison = {}
+            if monthly_goals and 'company_monthly_revenue' in monthly_goals:
+                monthly_goal = monthly_goals['company_monthly_revenue']
+                weekly_goal = monthly_goals.get('company_weekly_revenue', monthly_goal / 4.33)
+                
+                avg_weekly_forecast = total_forecasted / horizon_weeks
+                forecasted_monthly = avg_weekly_forecast * 4.33
+                
+                goal_comparison = {
+                    "monthly_goal": monthly_goal,
+                    "weekly_goal": round(weekly_goal, 2),
+                    "avg_weekly_forecast": round(avg_weekly_forecast, 2),
+                    "forecasted_monthly_revenue": round(forecasted_monthly, 2),
+                    "goal_attainment_probability": min(100, max(0, round((forecasted_monthly / monthly_goal) * 100, 1))) if monthly_goal > 0 else 0,
+                    "weekly_gap_to_goal": round(weekly_goal - avg_weekly_forecast, 2),
+                    "monthly_gap_to_goal": round(monthly_goal - forecasted_monthly, 2),
+                    "goal_status": (
+                        "on_track" if forecasted_monthly >= monthly_goal * 0.95 
+                        else "at_risk" if forecasted_monthly >= monthly_goal * 0.8 
+                        else "critical"
+                    )
+                }
+            
             return {
                 "forecast_type": "revenue",
                 "forecasts": forecasts,
+                "goal_comparison": goal_comparison,
                 "summary": {
                     "total_forecasted": round(total_forecasted, 2),
                     "avg_weekly_forecast": round(total_forecasted / horizon_weeks, 2),

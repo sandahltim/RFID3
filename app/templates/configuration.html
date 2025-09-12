@@ -1543,127 +1543,11 @@
                   </div>
                 </div>
 
-                <!-- Scorecard Goals Configuration Section -->
+                <!-- Configuration Note -->
                 <div class="form-group-advanced mb-4">
-                  <h6 class="form-section-title">
-                    <i class="fas fa-bullseye me-2"></i>Scorecard Goals & Targets
-                    <small class="text-muted">(Manual override for CSV goal data)</small>
-                  </h6>
-                  <div class="alert alert-info">
-                    <i class="fas fa-info-circle me-2"></i>
-                    <strong>Note:</strong> These settings provide manual goal entry when CSV data has missing or incorrect goal amounts.
-                  </div>
-                  
-                  <div class="row">
-                    <div class="col-md-6">
-                      <h6 class="text-muted mb-3">Company-wide Goals</h6>
-                      
-                      <div class="mb-3">
-                        <label for="revenue_target_monthly" class="form-label-advanced">Monthly Revenue Target</label>
-                        <div class="input-group">
-                          <span class="input-group-text">$</span>
-                          <input type="number" class="form-control form-control-advanced" 
-                                 id="revenue_target_monthly" step="1000" value="100000">
-                        </div>
-                        <small class="form-text text-muted">Weekly goal calculated as monthly ÷ 4.33</small>
-                      </div>
-                      
-                      <div class="mb-3">
-                        <label for="ar_aging_threshold" class="form-label-advanced">AR Over 45 Days Threshold</label>
-                        <div class="input-group">
-                          <input type="number" class="form-control form-control-advanced" 
-                                 id="ar_aging_threshold" step="0.1" min="0" value="15">
-                          <span class="input-group-text">%</span>
-                        </div>
-                        <small class="form-text text-muted">Target maximum percentage for AR aging</small>
-                      </div>
-                      
-                      <div class="row">
-                        <div class="col-md-6">
-                          <div class="mb-3">
-                            <label for="deliveries_goal" class="form-label-advanced">Weekly Deliveries Goal</label>
-                            <input type="number" class="form-control form-control-advanced" 
-                                   id="deliveries_goal" min="0" value="12">
-                          </div>
-                        </div>
-                        <div class="col-md-6">
-                          <div class="mb-3">
-                            <label for="wage_ratio_goal" class="form-label-advanced">Wage Ratio Target</label>
-                            <div class="input-group">
-                              <input type="number" class="form-control form-control-advanced" 
-                                     id="wage_ratio_goal" step="0.1" min="0" value="25">
-                              <span class="input-group-text">%</span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                      
-                      <div class="mb-3">
-                        <label for="revenue_per_hour_goal" class="form-label-advanced">Revenue per Hour Target</label>
-                        <div class="input-group">
-                          <span class="input-group-text">$</span>
-                          <input type="number" class="form-control form-control-advanced" 
-                                 id="revenue_per_hour_goal" step="1" min="0" value="85">
-                          <span class="input-group-text">/hr</span>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div class="col-md-6">
-                      <h6 class="text-muted mb-3">Store-specific Goals</h6>
-                      
-                      <div class="mb-3">
-                        <label class="form-label-advanced">Reservation Goals ($)</label>
-                        <div class="row">
-                          <div class="col-6">
-                            <label for="reservation_3607" class="form-label text-primary">3607 - Wayzata</label>
-                            <input type="number" class="form-control form-control-advanced" 
-                                   id="reservation_3607" step="1000" value="10000">
-                          </div>
-                          <div class="col-6">
-                            <label for="reservation_6800" class="form-label text-success">6800 - Brooklyn Park</label>
-                            <input type="number" class="form-control form-control-advanced" 
-                                   id="reservation_6800" step="1000" value="15000">
-                          </div>
-                          <div class="col-6 mt-2">
-                            <label for="reservation_728" class="form-label text-warning">728 - Elk River</label>
-                            <input type="number" class="form-control form-control-advanced" 
-                                   id="reservation_728" step="1000" value="2000">
-                          </div>
-                          <div class="col-6 mt-2">
-                            <label for="reservation_8101" class="form-label text-danger">8101 - Fridley</label>
-                            <input type="number" class="form-control form-control-advanced" 
-                                   id="reservation_8101" step="1000" value="250000">
-                          </div>
-                        </div>
-                      </div>
-                      
-                      <div class="mb-3">
-                        <label class="form-label-advanced">Contract Goals (#)</label>
-                        <div class="row">
-                          <div class="col-6">
-                            <label for="contract_3607" class="form-label text-primary">3607 - Wayzata</label>
-                            <input type="number" class="form-control form-control-advanced" 
-                                   id="contract_3607" min="0" value="150">
-                          </div>
-                          <div class="col-6">
-                            <label for="contract_6800" class="form-label text-success">6800 - Brooklyn Park</label>
-                            <input type="number" class="form-control form-control-advanced" 
-                                   id="contract_6800" min="0" value="140">
-                          </div>
-                          <div class="col-6 mt-2">
-                            <label for="contract_728" class="form-label text-warning">728 - Elk River</label>
-                            <input type="number" class="form-control form-control-advanced" 
-                                   id="contract_728" min="0" value="85">
-                          </div>
-                          <div class="col-6 mt-2">
-                            <label for="contract_8101" class="form-label text-danger">8101 - Fridley</label>
-                            <input type="number" class="form-control form-control-advanced" 
-                                   id="contract_8101" min="0" value="65">
-                          </div>
-                        </div>
-                      </div>
-                    </div>
+                  <div class="alert alert-success">
+                    <i class="fas fa-lightbulb me-2"></i>
+                    <strong>Business Goals Configuration:</strong> For setting revenue targets, labor goals, and store-specific KPIs, use the <strong>"Store Goals"</strong> tab. This tab focuses on technical dashboard settings only.
                   </div>
                 </div>
 
@@ -1876,9 +1760,18 @@
                         <div class="input-group">
                           <span class="input-group-text">$</span>
                           <input type="number" class="form-control form-control-advanced" 
-                                 id="monthly_revenue_target" min="0" step="1000" value="500000">
+                                 id="monthly_revenue_target" min="0" step="100" value="500000">
                         </div>
-                        <small class="form-text text-muted">Weekly goal calculated as monthly ÷ 4.33</small>
+                        <small class="form-text text-muted">Used for monthly analytics and MTD tracking</small>
+                      </div>
+                      <div class="col-md-6">
+                        <label for="weekly_revenue_target" class="form-label-advanced">Weekly Revenue Target ($)</label>
+                        <div class="input-group">
+                          <span class="input-group-text">$</span>
+                          <input type="number" class="form-control form-control-advanced" 
+                                 id="weekly_revenue_target" min="0" step="100" value="125000">
+                        </div>
+                        <small class="form-text text-muted">Used for weekly scorecard calculations</small>
                       </div>
                       <div class="col-md-6">
                         <label for="ar_aging_threshold" class="form-label-advanced">AR Over 45 Days Threshold (%)</label>
@@ -1931,15 +1824,36 @@
                           </div>
                           <div class="card-body">
                             <div class="mb-3">
-                              <label for="reservation_3607" class="form-label">Reservation Goal ($)</label>
-                              <div class="input-group">
-                                <span class="input-group-text">$</span>
-                                <input type="number" class="form-control" id="reservation_3607" value="50000" step="1000">
+                              <label class="form-label">Reservation Goals ($)</label>
+                              <div class="row">
+                                <div class="col-6">
+                                  <label for="reservation_3607" class="form-label-sm">Weekly</label>
+                                  <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    <input type="number" class="form-control" id="reservation_3607" value="50000" step="100">
+                                  </div>
+                                </div>
+                                <div class="col-6">
+                                  <label for="monthly_reservation_3607" class="form-label-sm">Monthly</label>
+                                  <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    <input type="number" class="form-control" id="monthly_reservation_3607" value="216500" step="100">
+                                  </div>
+                                </div>
                               </div>
                             </div>
                             <div class="mb-3">
-                              <label for="contract_3607" class="form-label">Contract Goal (#)</label>
-                              <input type="number" class="form-control" id="contract_3607" value="25" min="0">
+                              <label class="form-label">Contract Goals (#)</label>
+                              <div class="row">
+                                <div class="col-6">
+                                  <label for="contract_3607" class="form-label-sm">Weekly</label>
+                                  <input type="number" class="form-control" id="contract_3607" value="25" min="0">
+                                </div>
+                                <div class="col-6">
+                                  <label for="monthly_contract_3607" class="form-label-sm">Monthly</label>
+                                  <input type="number" class="form-control" id="monthly_contract_3607" value="108" min="0">
+                                </div>
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -1954,7 +1868,7 @@
                               <label for="reservation_6800" class="form-label">Reservation Goal ($)</label>
                               <div class="input-group">
                                 <span class="input-group-text">$</span>
-                                <input type="number" class="form-control" id="reservation_6800" value="75000" step="1000">
+                                <input type="number" class="form-control" id="reservation_6800" value="75000" step="100">
                               </div>
                             </div>
                             <div class="mb-3">
@@ -1976,7 +1890,7 @@
                               <label for="reservation_728" class="form-label">Reservation Goal ($)</label>
                               <div class="input-group">
                                 <span class="input-group-text">$</span>
-                                <input type="number" class="form-control" id="reservation_728" value="40000" step="1000">
+                                <input type="number" class="form-control" id="reservation_728" value="40000" step="100">
                               </div>
                             </div>
                             <div class="mb-3">
@@ -1996,7 +1910,7 @@
                               <label for="reservation_8101" class="form-label">Reservation Goal ($)</label>
                               <div class="input-group">
                                 <span class="input-group-text">$</span>
-                                <input type="number" class="form-control" id="reservation_8101" value="60000" step="1000">
+                                <input type="number" class="form-control" id="reservation_8101" value="60000" step="100">
                               </div>
                             </div>
                             <div class="mb-3">

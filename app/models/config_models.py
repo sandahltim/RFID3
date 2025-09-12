@@ -1315,6 +1315,7 @@ class StoreGoalsConfiguration(db.Model):
     # All goals stored as JSON for maximum flexibility
     company_goals = db.Column(db.JSON, default=lambda: {
         'monthly_revenue_target': 500000,
+        'weekly_revenue_target': 125000,  # Auto-calculated from monthly (500000/4)
         'ar_aging_threshold': 15.0,
         'deliveries_goal': 50,
         'wage_ratio_goal': 25.0,
@@ -1322,10 +1323,30 @@ class StoreGoalsConfiguration(db.Model):
     })
     
     store_revenue_goals = db.Column(db.JSON, default=lambda: {
-        '3607': {'reservation_goal': 50000, 'contract_goal': 25},
-        '6800': {'reservation_goal': 75000, 'contract_goal': 35}, 
-        '728': {'reservation_goal': 40000, 'contract_goal': 20},
-        '8101': {'reservation_goal': 60000, 'contract_goal': 30}
+        '3607': {
+            'reservation_goal': 50000,  # Weekly
+            'monthly_reservation_goal': 200000,  # Monthly
+            'contract_goal': 25,  # Weekly
+            'monthly_contract_goal': 100  # Monthly
+        },
+        '6800': {
+            'reservation_goal': 75000,  # Weekly  
+            'monthly_reservation_goal': 300000,  # Monthly
+            'contract_goal': 35,  # Weekly
+            'monthly_contract_goal': 140  # Monthly
+        }, 
+        '728': {
+            'reservation_goal': 40000,  # Weekly
+            'monthly_reservation_goal': 160000,  # Monthly
+            'contract_goal': 20,  # Weekly
+            'monthly_contract_goal': 80  # Monthly
+        },
+        '8101': {
+            'reservation_goal': 60000,  # Weekly
+            'monthly_reservation_goal': 240000,  # Monthly
+            'contract_goal': 30,  # Weekly
+            'monthly_contract_goal': 120  # Monthly
+        }
     })
     
     store_labor_goals = db.Column(db.JSON, default=lambda: {
@@ -1336,10 +1357,26 @@ class StoreGoalsConfiguration(db.Model):
     })
     
     store_delivery_goals = db.Column(db.JSON, default=lambda: {
-        '3607': {'weekly_deliveries': 65, 'avg_revenue_per_delivery': 450},
-        '6800': {'weekly_deliveries': 45, 'avg_revenue_per_delivery': 380}, 
-        '728': {'weekly_deliveries': 25, 'avg_revenue_per_delivery': 320},
-        '8101': {'weekly_deliveries': 35, 'avg_revenue_per_delivery': 400}
+        '3607': {
+            'weekly_deliveries': 65, 
+            'monthly_deliveries': 280,  # ~4.3 weeks per month
+            'avg_revenue_per_delivery': 450
+        },
+        '6800': {
+            'weekly_deliveries': 45, 
+            'monthly_deliveries': 195,
+            'avg_revenue_per_delivery': 380
+        }, 
+        '728': {
+            'weekly_deliveries': 25, 
+            'monthly_deliveries': 108,
+            'avg_revenue_per_delivery': 320
+        },
+        '8101': {
+            'weekly_deliveries': 35, 
+            'monthly_deliveries': 151,
+            'avg_revenue_per_delivery': 400
+        }
     })
     
     # Extensible goals - new categories can be added easily
@@ -1418,20 +1455,41 @@ class StoreGoalsConfiguration(db.Model):
 
 
 def get_default_store_goals_config():
-    """Get default store goals configuration"""
+    """Get default store goals configuration with weekly and monthly targets"""
     config = StoreGoalsConfiguration()
     config.company_goals = {
         'monthly_revenue_target': 500000,
+        'weekly_revenue_target': 125000,  # Auto-calculated from monthly (500000/4)
         'ar_aging_threshold': 15.0,
         'deliveries_goal': 50,
         'wage_ratio_goal': 25.0,
         'revenue_per_hour_goal': 150
     }
     config.store_revenue_goals = {
-        '3607': {'reservation_goal': 50000, 'contract_goal': 25},
-        '6800': {'reservation_goal': 75000, 'contract_goal': 35}, 
-        '728': {'reservation_goal': 40000, 'contract_goal': 20},
-        '8101': {'reservation_goal': 60000, 'contract_goal': 30}
+        '3607': {
+            'reservation_goal': 50000,  # Weekly
+            'monthly_reservation_goal': 200000,  # Monthly
+            'contract_goal': 25,  # Weekly
+            'monthly_contract_goal': 100  # Monthly
+        },
+        '6800': {
+            'reservation_goal': 75000,  # Weekly  
+            'monthly_reservation_goal': 300000,  # Monthly
+            'contract_goal': 35,  # Weekly
+            'monthly_contract_goal': 140  # Monthly
+        }, 
+        '728': {
+            'reservation_goal': 40000,  # Weekly
+            'monthly_reservation_goal': 160000,  # Monthly
+            'contract_goal': 20,  # Weekly
+            'monthly_contract_goal': 80  # Monthly
+        },
+        '8101': {
+            'reservation_goal': 60000,  # Weekly
+            'monthly_reservation_goal': 240000,  # Monthly
+            'contract_goal': 30,  # Weekly
+            'monthly_contract_goal': 120  # Monthly
+        }
     }
     config.store_labor_goals = {
         '3607': {'labor_percentage': 22.0, 'revenue_per_hour': 175},
@@ -1440,10 +1498,26 @@ def get_default_store_goals_config():
         '8101': {'labor_percentage': 26.0, 'revenue_per_hour': 160}
     }
     config.store_delivery_goals = {
-        '3607': {'weekly_deliveries': 65, 'avg_revenue_per_delivery': 450},
-        '6800': {'weekly_deliveries': 45, 'avg_revenue_per_delivery': 380}, 
-        '728': {'weekly_deliveries': 25, 'avg_revenue_per_delivery': 320},
-        '8101': {'weekly_deliveries': 35, 'avg_revenue_per_delivery': 400}
+        '3607': {
+            'weekly_deliveries': 65, 
+            'monthly_deliveries': 280,  # ~4.3 weeks per month
+            'avg_revenue_per_delivery': 450
+        },
+        '6800': {
+            'weekly_deliveries': 45, 
+            'monthly_deliveries': 195,
+            'avg_revenue_per_delivery': 380
+        }, 
+        '728': {
+            'weekly_deliveries': 25, 
+            'monthly_deliveries': 108,
+            'avg_revenue_per_delivery': 320
+        },
+        '8101': {
+            'weekly_deliveries': 35, 
+            'monthly_deliveries': 151,
+            'avg_revenue_per_delivery': 400
+        }
     }
     return config
 

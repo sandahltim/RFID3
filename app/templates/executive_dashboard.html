@@ -98,6 +98,57 @@
             margin-bottom: 0.5rem;
         }
 
+        .goal-with-diff {
+            text-align: center;
+        }
+        
+        .goal-value {
+            font-weight: 600;
+            margin-bottom: 2px;
+        }
+        
+        .goal-diff {
+            line-height: 1.2;
+        }
+
+        /* Comprehensive Scorecard UX Improvements */
+        .comprehensive-scorecard-table {
+            position: relative;
+        }
+        
+        .comprehensive-scorecard-table thead th {
+            position: sticky;
+            top: 80px; /* Account for navbar */
+            background: #343a40;
+            z-index: 10;
+            border-bottom: 2px solid #495057;
+        }
+        
+        .scorecard-category-header {
+            background-color: #f8f9fa !important;
+            border-left: 4px solid var(--executive-primary);
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+        
+        .scorecard-category-header:hover {
+            background-color: #e9ecef !important;
+        }
+        
+        .category-toggle-icon {
+            transition: transform 0.2s ease;
+            margin-right: 8px;
+        }
+        
+        .category-collapsed .category-toggle-icon {
+            transform: rotate(-90deg);
+        }
+        
+        .category-metrics.collapsed {
+            display: none;
+        }
+
         /* High contrast KPI value colors */
         .kpi-value.text-primary { color: #1e3a8a !important; }
         .kpi-value.text-success { color: #059669 !important; }
@@ -1178,8 +1229,37 @@
         <!-- COMPREHENSIVE EXECUTIVE SCORECARD MATRIX - ALL METRICS -->
         <div class="row mb-5">
             <div class="col-12">
-                <h3 class="section-header">📊 Comprehensive Executive Scorecard Matrix</h3>
-                <p class="text-muted mb-3">Complete operational dashboard with historical periods: -3, -2, Previous Week, Current Week, Previous Year, Goals, and 3-week trailing averages</p>
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div>
+                        <h3 class="section-header mb-1">📊 Comprehensive Executive Scorecard Matrix</h3>
+                        <p class="text-muted mb-0">Complete operational dashboard with historical periods: -3, -2, Previous Week, Current Week, Previous Year, Goals, and 3-week trailing averages</p>
+                    </div>
+                    <div class="scorecard-controls">
+                        <div class="btn-group me-2" role="group">
+                            <button type="button" class="btn btn-sm btn-outline-info" onclick="scrollToCategory('category-0')" title="Revenue & AR">
+                                <i class="fas fa-dollar-sign"></i>
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-primary" onclick="scrollToCategory('category-1')" title="Monthly Tracking">
+                                <i class="fas fa-calendar-alt"></i>
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-success" onclick="scrollToCategory('category-3')" title="Reservations">
+                                <i class="fas fa-calendar-check"></i>
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-warning" onclick="scrollToCategory('category-5')" title="Store Revenue">
+                                <i class="fas fa-store"></i>
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-danger" onclick="scrollToCategory('category-7')" title="Labor Metrics">
+                                <i class="fas fa-users"></i>
+                            </button>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-outline-primary me-2" onclick="toggleAllScorecardCategories(true)">
+                            <i class="fas fa-expand-alt me-1"></i>Expand All
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="toggleAllScorecardCategories(false)">
+                            <i class="fas fa-compress-alt me-1"></i>Collapse All
+                        </button>
+                    </div>
+                </div>
                 
                 <div class="scorecard-container">
                     <div class="table-responsive">
@@ -1599,7 +1679,7 @@
     </script>
     
     <!-- Enhanced Visualizations -->
-    <script src="{{ url_for('static', filename='js/executive-dashboard-visualizations.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/executive-dashboard-visualizations.js') }}?cb=20250912-1420"></script>
     
 
     <script>
@@ -3371,6 +3451,11 @@
                     metrics: ['Total Weekly Revenue']
                 },
                 {
+                    title: 'Monthly Performance Tracking',
+                    icon: 'fas fa-calendar-alt',
+                    metrics: ['MTD Total Company Revenue', 'MTD Revenue 3607', 'MTD Revenue 6800', 'MTD Revenue 728', 'MTD Revenue 8101']
+                },
+                {
                     title: 'Accounts Receivable',
                     icon: 'fas fa-file-invoice-dollar',
                     metrics: ['% of Total AR ($) over 45 days (all stores)']
@@ -3442,11 +3527,16 @@
                 }
             ];
             
-            categories.forEach(category => {
-                // Add category header
+            categories.forEach((category, categoryIndex) => {
+                const categoryId = `category-${categoryIndex}`;
+                const isCollapsed = categoryIndex > 2; // Collapse categories after the first 3 by default
+                
+                // Add category header with collapse functionality
                 html += `
-                    <tr class="store-section-header">
+                    <tr class="scorecard-category-header ${isCollapsed ? 'category-collapsed' : ''}" 
+                        onclick="toggleScorecardCategory('${categoryId}', this)" data-category="${categoryId}">
                         <td class="metric-name">
+                            <i class="fas fa-chevron-down category-toggle-icon"></i>
                             <i class="${category.icon} me-2"></i>
                             <strong>${category.title}</strong>
                         </td>
@@ -3456,13 +3546,13 @@
                     </tr>
                 `;
                 
-                // Add metrics rows
+                // Add metrics rows with collapsible wrapper
                 category.metrics.forEach(metricKey => {
                     const metric = metrics[metricKey];
                     if (!metric) return;
                     
                     const storeClass = getStoreClassFromMetric(metricKey);
-                    const goalStatus = getGoalStatus(metric);
+                    const goalStatus = getGoalStatus(metric, metricKey);
                     
                     // Create store badge for metric name if applicable
                     const storeBadge = getStoreBadgeForMetric(metricKey, metric);
@@ -3472,14 +3562,14 @@
                     const goalCellClass = storeClass ? `goal-cell ${storeClass}-border` : 'goal-cell';
                     
                     html += `
-                        <tr class="metric-row ${storeClass}">
+                        <tr class="metric-row ${storeClass} category-metrics ${categoryId} ${isCollapsed ? 'collapsed' : ''}">
                             <td class="metric-name">${metricKey}${storeBadge}</td>
                             <td class="${goalStatus.minus3}">${formatValue(metric.minus_3, metric.format, metric.units)}</td>
                             <td class="${goalStatus.minus2}">${formatValue(metric.minus_2, metric.format, metric.units)}</td>
                             <td class="${goalStatus.prev}">${formatValue(metric.previous_week, metric.format, metric.units)}</td>
                             <td class="${goalStatus.current}">${formatValue(metric.current_week, metric.format, metric.units)}</td>
                             <td class="${goalStatus.previousYear}">${formatValue(metric.previous_year, metric.format, metric.units)}</td>
-                            <td class="${goalCellClass}">${formatValue(metric.plus_minus_goal, metric.format, metric.units)}</td>
+                            <td class="${goalCellClass}">${formatGoalWithDifference(metric)}</td>
                             <td class="${goalStatus.currentTrailing3w}">${formatValue(metric.current_trailing_3w_avg, metric.format, metric.units)}</td>
                             <td class="${goalStatus.prevYearTrailing3w}">${formatValue(metric.prev_year_trailing_3w, metric.format, metric.units)}</td>
                             <td class="${goalStatus.prevYear3wForward}">${formatValue(metric.prev_year_3w_forward, metric.format, metric.units)}</td>
@@ -3521,39 +3611,53 @@
             return '';
         }
         
-        function getGoalStatus(metric) {
-            const goal = metric.plus_minus_goal;
+        function getGoalStatus(metric, metricName) {
+            const goal = metric.goal_value; // Use actual goal value, not difference
             
             // Helper function to determine status for a specific value
-            function getStatusForValue(value, goal, format, units) {
+            function getStatusForValue(value, goal, format, units, metricName) {
                 if (!goal || goal === 0) return ''; // No goal set
+                if (value === null || value === undefined) return '';
                 
                 let status = '';
-                if (format === 'percentage' && units === '%') {
-                    // For AR% and wage ratios, lower is better
-                    if (value <= goal) status = 'goal-met';
-                    else if (value <= goal * 1.2) status = 'goal-warning';
-                    else status = 'goal-missed';
-                } else if (format === 'currency' || format === 'integer') {
-                    // For revenue, contracts, deliveries, higher is better
-                    if (value >= goal) status = 'goal-met';
-                    else if (value >= goal * 0.8) status = 'goal-warning';
-                    else status = 'goal-missed';
-                }
                 
+                // Determine if this is a "higher is better" or "lower is better" metric
+                const isLowerBetter = (
+                    (format === 'percentage' && units === '%') ||  // AR%, wage ratios
+                    (format === 'currency' && (
+                        metricName.toLowerCase().includes('payroll') ||
+                        metricName.toLowerCase().includes('wage') ||
+                        metricName.toLowerCase().includes('cost')
+                    ))
+                );
+                
+                if (isLowerBetter) {
+                    // For metrics where lower is better (AR%, wage ratios, costs)
+                    if (value <= goal) status = 'goal-met';
+                    else if (value <= goal * 1.15) status = 'goal-warning'; // Within 15%
+                    else status = 'goal-missed';
+                } else {
+                    // For metrics where higher is better (revenue, reservations, contracts)
+                    const percentage = value / goal;
+                    
+                    
+                    if (percentage >= 1.0) status = 'goal-met';      // 100%+ of goal
+                    else if (percentage >= 0.85) status = 'goal-warning';  // 85-99% of goal
+                    else status = 'goal-missed';                     // <85% of goal
+                }
                 
                 return status;
             }
             
             return {
-                minus3: getStatusForValue(metric.minus_3, goal, metric.format, metric.units),
-                minus2: getStatusForValue(metric.minus_2, goal, metric.format, metric.units),
-                prev: getStatusForValue(metric.previous_week, goal, metric.format, metric.units),
-                current: getStatusForValue(metric.current_week, goal, metric.format, metric.units),
-                currentTrailing3w: getStatusForValue(metric.current_trailing_3w_avg, goal, metric.format, metric.units),
-                prevYearTrailing3w: getStatusForValue(metric.prev_year_trailing_3w, goal, metric.format, metric.units),
-                prevYear3wForward: getStatusForValue(metric.prev_year_3w_forward, goal, metric.format, metric.units),
-                previousYear: getStatusForValue(metric.previous_year, goal, metric.format, metric.units)
+                minus3: getStatusForValue(metric.minus_3, goal, metric.format, metric.units, metricName),
+                minus2: getStatusForValue(metric.minus_2, goal, metric.format, metric.units, metricName),
+                prev: getStatusForValue(metric.previous_week, goal, metric.format, metric.units, metricName),
+                current: getStatusForValue(metric.current_week, goal, metric.format, metric.units, metricName),
+                currentTrailing3w: getStatusForValue(metric.current_trailing_3w_avg, goal, metric.format, metric.units, metricName),
+                prevYearTrailing3w: getStatusForValue(metric.prev_year_trailing_3w, goal, metric.format, metric.units, metricName),
+                prevYear3wForward: getStatusForValue(metric.prev_year_3w_forward, goal, metric.format, metric.units, metricName),
+                previousYear: getStatusForValue(metric.previous_year, goal, metric.format, metric.units, metricName)
             };
         }
         
@@ -3572,11 +3676,109 @@
             }
         }
         
+        function formatGoalWithDifference(metric) {
+            // If no goal value is set, return dash
+            if (!metric.goal_value || metric.goal_value === 0) return '-';
+            
+            const goalValue = metric.goal_value;
+            const plusMinus = metric.plus_minus_goal || 0;
+            const current = metric.current_trailing_3w_avg || 0;
+            
+            // Format goal value
+            const goalFormatted = formatValue(goalValue, metric.format, metric.units);
+            
+            // Calculate percentage difference
+            let percentDiff = 0;
+            if (goalValue !== 0) {
+                percentDiff = (plusMinus / goalValue) * 100;
+            }
+            
+            // Determine sign and color
+            const isPositive = plusMinus > 0;
+            const sign = isPositive ? '+' : '';
+            const color = isPositive ? 'text-success' : 'text-danger';
+            
+            // Format the difference value
+            const diffFormatted = formatValue(Math.abs(plusMinus), metric.format, metric.units);
+            
+            // Return formatted HTML with goal on top, difference below in smaller text
+            return `
+                <div class="goal-with-diff">
+                    <div class="goal-value">${goalFormatted}</div>
+                    <div class="goal-diff ${color}" style="font-size: 0.75em; font-weight: normal;">
+                        ${sign}${diffFormatted} (${sign}${percentDiff.toFixed(1)}%)
+                    </div>
+                </div>
+            `;
+        }
+        
         function updateScorecardTimestamp(timestamp) {
             const element = document.getElementById('scorecardLastUpdated');
             if (element && timestamp) {
                 const date = new Date(timestamp);
                 element.textContent = date.toLocaleString();
+            }
+        }
+        
+        function toggleScorecardCategory(categoryId, headerElement) {
+            // Find all metric rows for this category
+            const metricRows = document.querySelectorAll(`.category-metrics.${categoryId}`);
+            const toggleIcon = headerElement.querySelector('.category-toggle-icon');
+            
+            // Toggle collapsed state
+            const isCurrentlyCollapsed = headerElement.classList.contains('category-collapsed');
+            
+            if (isCurrentlyCollapsed) {
+                // Expand category
+                headerElement.classList.remove('category-collapsed');
+                metricRows.forEach(row => {
+                    row.classList.remove('collapsed');
+                });
+            } else {
+                // Collapse category
+                headerElement.classList.add('category-collapsed');
+                metricRows.forEach(row => {
+                    row.classList.add('collapsed');
+                });
+            }
+        }
+        
+        function toggleAllScorecardCategories(expand = true) {
+            const categoryHeaders = document.querySelectorAll('.scorecard-category-header');
+            categoryHeaders.forEach(header => {
+                const categoryId = header.dataset.category;
+                if (expand) {
+                    header.classList.remove('category-collapsed');
+                    document.querySelectorAll(`.category-metrics.${categoryId}`).forEach(row => {
+                        row.classList.remove('collapsed');
+                    });
+                } else {
+                    header.classList.add('category-collapsed');
+                    document.querySelectorAll(`.category-metrics.${categoryId}`).forEach(row => {
+                        row.classList.add('collapsed');
+                    });
+                }
+            });
+        }
+        
+        function scrollToCategory(categoryId) {
+            const categoryHeader = document.querySelector(`[data-category="${categoryId}"]`);
+            if (categoryHeader) {
+                // Expand the category if it's collapsed
+                if (categoryHeader.classList.contains('category-collapsed')) {
+                    toggleScorecardCategory(categoryId, categoryHeader);
+                }
+                
+                // Scroll to the category with offset for sticky header
+                const yOffset = -100; 
+                const y = categoryHeader.getBoundingClientRect().top + window.pageYOffset + yOffset;
+                window.scrollTo({top: y, behavior: 'smooth'});
+                
+                // Briefly highlight the category
+                categoryHeader.style.backgroundColor = '#fff3cd';
+                setTimeout(() => {
+                    categoryHeader.style.backgroundColor = '';
+                }, 2000);
             }
         }
         
