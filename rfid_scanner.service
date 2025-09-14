@@ -1,0 +1,37 @@
+[Unit]
+Description=RFID Mobile Scanner Application
+Documentation=https://github.com/your-org/rfid3
+After=network.target mysql.service redis-server.service
+Wants=mysql.service redis-server.service
+
+[Service]
+Type=simple
+User=tim
+Group=tim
+WorkingDirectory=/home/tim/RFID3
+Environment=FLASK_APP=scanner_app.py
+Environment=FLASK_ENV=production
+Environment=DB_PASSWORD=your_secure_password
+ExecStart=/home/tim/RFID3/venv/bin/python scanner_app.py
+Restart=always
+RestartSec=3
+KillMode=mixed
+TimeoutStopSec=5
+PrivateTmp=true
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/home/tim/RFID3/logs
+StandardOutput=append:/home/tim/RFID3/logs/scanner_app.log
+StandardError=append:/home/tim/RFID3/logs/scanner_app_error.log
+
+# Health check
+ExecReload=/bin/kill -HUP $MAINPID
+KillSignal=SIGTERM
+
+# Resource limits
+LimitNOFILE=65536
+LimitNPROC=4096
+
+[Install]
+WantedBy=multi-user.target

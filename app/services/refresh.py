@@ -14,7 +14,8 @@ from ..models.db_models import (
     RefreshState,
     UserRentalClassMapping,
 )
-from ..services.api_client import APIClient
+# DISABLED: RFIDpro API client import disabled to prevent data corruption
+# from ..services.api_client import APIClient
 from flask import Blueprint, jsonify
 from config import INCREMENTAL_LOOKBACK_SECONDS, LOG_FILE
 import time
@@ -35,14 +36,11 @@ refresh_status = {"refreshing": False, "start_time": None}
 api_client = None
 
 def get_api_client():
-    """Get APIClient instance, initialize if needed"""
+    """DISABLED: RFIDpro API client disabled to prevent data corruption"""
     global api_client
-    if api_client is None:
-        try:
-            api_client = APIClient()
-        except Exception as e:
-            logger.warning(f"APIClient initialization failed: {e}. Refresh functions may be limited.")
-            api_client = None
+    # Always return None to disable API integration
+    logger.info("RFIDpro API client disabled - returning None")
+    api_client = None
     return api_client
 
 
@@ -589,15 +587,13 @@ def full_refresh():
             )
             logger.info(f"Deleted {deleted_seed} items from seed_rental_classes")
 
-            logger.debug("Fetching data from API")
-            client = get_api_client()
-            if not client:
-                raise Exception("API client not available - check authentication settings")
-            items = client.get_item_master(since_date=None, full_refresh=True)
-            transactions = client.get_transactions(
-                since_date=None, full_refresh=True
-            )
-            seed_data = client.get_seed_data()
+            # DISABLED: RFIDpro API integration removed to prevent data corruption
+            logger.info("RFIDpro API integration disabled - preserving existing database data")
+            
+            # Use empty lists to skip API updates but maintain database structure
+            items = []
+            transactions = []
+            seed_data = []
 
             logger.info(f"Fetched {len(items)} item master records")
             logger.info(f"Fetched {len(transactions)} transaction records")
@@ -677,22 +673,14 @@ def incremental_refresh():
                     f"Checking for item master and transaction updates since: {since_date.strftime('%Y-%m-%d %H:%M:%S')}"
                 )
 
-                client = get_api_client()
-                if not client:
-                    raise Exception("API client not available - check authentication settings")
-                items = client.get_item_master(
-                    since_date=since_date, full_refresh=False
-                )
-                logger.info(f"Fetched {len(items)} item master records")
-                if not items:
-                    logger.info("No new items fetched from item master API")
-
-                transactions = client.get_transactions(
-                    since_date=since_date, full_refresh=False
-                )
-                logger.info(f"Fetched {len(transactions)} transaction records")
-                if not transactions:
-                    logger.info("No new transactions fetched from transactions API")
+                # DISABLED: RFIDpro API integration removed to prevent data corruption
+                logger.info("RFIDpro API integration disabled - skipping incremental refresh")
+                
+                # Use empty lists to skip API updates but maintain refresh cycle
+                items = []
+                transactions = []
+                
+                logger.info("Incremental refresh skipped - RFIDpro API disabled")
 
                 if not items and not transactions:
                     logger.info(

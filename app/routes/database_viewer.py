@@ -4,10 +4,11 @@ Allows users to browse database tables, verify data imports, and explore column 
 """
 
 from flask import Blueprint, render_template, request, jsonify
-from sqlalchemy import inspect, text, func
+from sqlalchemy import inspect, text, func, create_engine
 from sqlalchemy.exc import SQLAlchemyError
 import logging
 from datetime import datetime
+import mysql.connector
 
 from ..models.db_models import (
     db, ItemMaster, Transaction, RFIDTag, SeedRentalClass, InventoryHealthAlert,
@@ -23,7 +24,31 @@ logger = logging.getLogger(__name__)
 
 database_viewer_bp = Blueprint('database_viewer', __name__)
 
-# Available tables for viewing
+# Database connections - RFID Project databases only
+AVAILABLE_DATABASES = {
+    'rfid_inventory': {
+        'name': 'RFID Inventory (Primary)',
+        'description': 'Main RFID Dashboard Project database with live data',
+        'connection_params': {
+            'host': 'localhost',
+            'user': 'root',
+            'password': 'Broadway8101',
+            'database': 'rfid_inventory'
+        }
+    },
+    'rfidpro': {
+        'name': 'RFID Pro (Scanner Fallback)',
+        'description': 'Fallback database for RFID scanner operations',
+        'connection_params': {
+            'host': 'localhost',
+            'user': 'root',
+            'password': 'Broadway8101',
+            'database': 'rfidpro'
+        }
+    }
+}
+
+# Available tables for viewing (RFID databases)
 AVAILABLE_TABLES = {
     'item_master': {
         'model': ItemMaster,
@@ -122,7 +147,7 @@ AVAILABLE_TABLES = {
 @database_viewer_bp.route('/database/viewer')
 def database_viewer():
     """Main database viewer page."""
-    return render_template('database_viewer.html', tables=AVAILABLE_TABLES)
+    return render_template('database_viewer.html', tables=AVAILABLE_TABLES, databases=AVAILABLE_DATABASES)
 
 @database_viewer_bp.route('/api/database/tables')
 def get_tables():
@@ -424,4 +449,208 @@ def get_table_stats(table_key):
             'error': str(e)
         }), 500
 
-logger.info(f"Deployed database_viewer.py version: 2025-08-29-v1 at {datetime.now()}")
+@database_viewer_bp.route('/api/database/list')
+def get_databases():
+    """Get list of available databases."""
+    try:
+        return jsonify({
+            'status': 'success',
+            'databases': AVAILABLE_DATABASES,
+            'timestamp': datetime.now().isoformat()
+        })
+    except Exception as e:
+        logger.error(f"Error getting database list: {e}")
+        return jsonify({
+            'status': 'error',
+            'error': str(e)
+        }), 500
+
+@database_viewer_bp.route('/api/database/<db_key>/tables')
+def get_database_tables(db_key):
+    """Get all tables from a specific database with raw discovery."""
+    if db_key not in AVAILABLE_DATABASES:
+        return jsonify({'status': 'error', 'error': 'Database not found'}), 404
+
+    try:
+        db_config = AVAILABLE_DATABASES[db_key]['connection_params']
+
+        # Create connection to the specified database
+        connection = mysql.connector.connect(**db_config)
+        cursor = connection.cursor()
+
+        # Get all tables in database
+        cursor.execute("SHOW TABLES")
+        raw_tables = cursor.fetchall()
+
+        tables_info = {}
+        for (table_name,) in raw_tables:
+            try:
+                # Get table row count
+                cursor.execute(f"SELECT COUNT(*) FROM `{table_name}`")
+                row_count = cursor.fetchone()[0]
+
+                # Get table structure
+                cursor.execute(f"DESCRIBE `{table_name}`")
+                columns = cursor.fetchall()
+
+                # Convert column info
+                serializable_columns = []
+                for col in columns:
+                    col_info = {
+                        'name': col[0],
+                        'type': col[1],
+                        'nullable': col[2] == 'YES',
+                        'key': col[3],
+                        'default': col[4],
+                        'extra': col[5]
+                    }
+                    serializable_columns.append(col_info)
+
+                tables_info[table_name] = {
+                    'display_name': table_name.replace('_', ' ').title(),
+                    'description': f'Database table from {db_config["database"]}',
+                    'table_name': table_name,
+                    'columns': serializable_columns,
+                    'row_count': row_count,
+                    'database': db_config["database"]
+                }
+
+            except Exception as table_error:
+                logger.warning(f"Could not analyze table {table_name}: {table_error}")
+                tables_info[table_name] = {
+                    'display_name': table_name,
+                    'description': 'Could not analyze table structure',
+                    'table_name': table_name,
+                    'columns': [],
+                    'row_count': 0,
+                    'database': db_config["database"],
+                    'error': str(table_error)
+                }
+
+        cursor.close()
+        connection.close()
+
+        return jsonify({
+            'status': 'success',
+            'database': AVAILABLE_DATABASES[db_key]['name'],
+            'tables': tables_info,
+            'timestamp': datetime.now().isoformat()
+        })
+
+    except Exception as e:
+        logger.error(f"Error getting tables for database {db_key}: {e}")
+        return jsonify({
+            'status': 'error',
+            'error': str(e)
+        }), 500
+
+@database_viewer_bp.route('/api/database/<db_key>/table/<table_name>/data')
+def get_raw_table_data(db_key, table_name):
+    """Get data from any table in any database using raw SQL."""
+    if db_key not in AVAILABLE_DATABASES:
+        return jsonify({'status': 'error', 'error': 'Database not found'}), 404
+
+    try:
+        db_config = AVAILABLE_DATABASES[db_key]['connection_params']
+
+        # Get pagination parameters
+        page = int(request.args.get('page', 1))
+        per_page = min(int(request.args.get('per_page', 50)), 500)
+        search = request.args.get('search', '').strip()
+        column_filter = request.args.get('column', '')
+
+        # Create connection
+        connection = mysql.connector.connect(**db_config)
+        cursor = connection.cursor(dictionary=True)
+
+        # Build base query
+        base_query = f"SELECT * FROM `{table_name}`"
+        count_query = f"SELECT COUNT(*) as total FROM `{table_name}`"
+
+        # Build WHERE clause for search
+        where_conditions = []
+        params = []
+
+        if search:
+            if column_filter:
+                # Search in specific column
+                where_conditions.append(f"`{column_filter}` LIKE %s")
+                params.append(f'%{search}%')
+            else:
+                # Get column names first
+                cursor.execute(f"DESCRIBE `{table_name}`")
+                columns = [col['Field'] for col in cursor.fetchall()]
+
+                # Search across all text-like columns
+                search_conditions = []
+                for col in columns:
+                    search_conditions.append(f"`{col}` LIKE %s")
+                    params.append(f'%{search}%')
+
+                if search_conditions:
+                    where_conditions.append(f"({' OR '.join(search_conditions)})")
+
+        # Apply WHERE clause if we have conditions
+        if where_conditions:
+            where_clause = " WHERE " + " AND ".join(where_conditions)
+            base_query += where_clause
+            count_query += where_clause
+
+        # Get total count
+        cursor.execute(count_query, params)
+        total_count = cursor.fetchone()['total']
+
+        # Apply pagination
+        offset = (page - 1) * per_page
+        paginated_query = f"{base_query} LIMIT %s OFFSET %s"
+        pagination_params = params + [per_page, offset]
+
+        # Execute paginated query
+        cursor.execute(paginated_query, pagination_params)
+        data = cursor.fetchall()
+
+        # Convert datetime objects to strings
+        for row in data:
+            for key, value in row.items():
+                if isinstance(value, datetime):
+                    row[key] = value.isoformat()
+                elif value is None:
+                    row[key] = None
+                else:
+                    # Ensure JSON serializable
+                    try:
+                        import json
+                        json.dumps(value)
+                    except (TypeError, ValueError):
+                        row[key] = str(value)
+
+        cursor.close()
+        connection.close()
+
+        return jsonify({
+            'status': 'success',
+            'data': data,
+            'pagination': {
+                'page': page,
+                'per_page': per_page,
+                'total': total_count,
+                'pages': (total_count + per_page - 1) // per_page,
+                'has_next': (page * per_page) < total_count,
+                'has_prev': page > 1
+            },
+            'table_info': {
+                'name': table_name.replace('_', ' ').title(),
+                'description': f'Raw table data from {db_config["database"]}.{table_name}',
+                'database': db_config["database"]
+            },
+            'timestamp': datetime.now().isoformat()
+        })
+
+    except Exception as e:
+        logger.error(f"Error getting table data for {db_key}.{table_name}: {e}")
+        return jsonify({
+            'status': 'error',
+            'error': str(e)
+        }), 500
+
+logger.info(f"Deployed database_viewer.py version: 2025-09-14-v2-multi-db at {datetime.now()}")

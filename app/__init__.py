@@ -143,6 +143,7 @@ def create_app():
         from app.routes.scorecard_analytics_api import scorecard_analytics_bp
         from app.routes.manager_dashboards import manager_bp
         from app.routes.config_management import config_bp as config_mgmt_bp
+        from app.routes.mobile_api import mobile_api_bp
 
         app.register_blueprint(home_bp)
         app.register_blueprint(tab1_bp)
@@ -181,6 +182,7 @@ def create_app():
         app.register_blueprint(scorecard_analytics_bp)
         app.register_blueprint(manager_bp)
         app.register_blueprint(config_mgmt_bp)
+        app.register_blueprint(mobile_api_bp)
         app.logger.info("Blueprints registered successfully")
 
         # Set up performance monitoring middleware

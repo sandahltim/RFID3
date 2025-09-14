@@ -14,8 +14,8 @@ APP_IP = os.environ.get('APP_IP', '100.103.67.41')
 # MariaDB configuration
 DB_CONFIG = {
     'host': os.environ.get('DB_HOST', 'localhost'),
-    'user': os.environ.get('DB_USER', 'rfid_user'),
-    'password': os.environ.get('DB_PASSWORD') or 'rfid_user_password',  # default for development
+    'user': os.environ.get('DB_USER', 'root'),
+    'password': os.environ.get('DB_PASSWORD') or 'Broadway8101',  # default for development
     'database': os.environ.get('DB_DATABASE', 'rfid_inventory'),
     'charset': os.environ.get('DB_CHARSET', 'utf8mb4'),
     'collation': os.environ.get('DB_COLLATION', 'utf8mb4_unicode_ci')

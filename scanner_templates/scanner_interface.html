@@ -1,0 +1,1161 @@
+{% extends "base.html" %}
+
+{% block title %}RFID Scanner Interface{% endblock %}
+
+{% block header_title %}Scanning Mode{% endblock %}
+
+{% block header_actions %}
+<a href="{{ url_for('home') }}" class="btn btn-light btn-sm me-2">
+    <i class="fas fa-home"></i> Home
+</a>
+<button class="btn btn-outline-light btn-sm me-2" onclick="showSettingsModal()">
+    <i class="fas fa-cog"></i> Settings
+</button>
+<button class="btn btn-outline-light btn-sm" onclick="toggleManualEntry()">
+    <i class="fas fa-keyboard"></i> Manual
+</button>
+{% endblock %}
+
+{% block content %}
+<!-- Hardware Scanner Section (PRIMARY) -->
+<div class="scanner-container">
+    <h5 class="mb-3">
+        <i class="fas fa-wifi text-success me-2"></i>
+        Chainway SR160 RFID Scanner
+        <span class="badge bg-success ms-2">PRIMARY</span>
+    </h5>
+
+    <div class="alert alert-primary mb-3">
+        <h6 class="alert-heading"><i class="fas fa-bluetooth me-2"></i>Bluetooth Pairing Instructions:</h6>
+        <ol class="mb-2">
+            <li><strong>Charge Scanner:</strong> 30 minutes to 1 hour</li>
+            <li><strong>Open Bluetooth:</strong> Go to device Settings → Bluetooth</li>
+            <li><strong>Pair Device:</strong> Look for "UR-XXXX" (4 digits/letters)</li>
+            <li><strong>Connect:</strong> Tap to pair - Good to Go!</li>
+        </ol>
+        <small class="text-muted">
+            <i class="fas fa-info-circle me-1"></i>
+            Once paired, scanned RFID tags will appear automatically below
+        </small>
+    </div>
+
+    <!-- Scanner Status Indicator -->
+    <div class="mb-3">
+        <div class="d-flex align-items-center">
+            <div id="scanner-status-indicator" class="status-indicator me-3">
+                <div class="spinner-border spinner-border-sm text-primary" role="status">
+                    <span class="visually-hidden">Checking...</span>
+                </div>
+            </div>
+            <div id="scanner-status-text">
+                <strong>Scanner Status:</strong> <span id="scanner-status">Checking connection...</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Test Button -->
+    <div class="mb-3">
+        <button class="btn btn-outline-success" onclick="testHardwareScanner()">
+            <i class="fas fa-vial me-2"></i>Test Scanner Connection
+        </button>
+        <small class="form-text text-muted d-block mt-1">
+            Scan any tag or barcode to test if your Chainway SR160 is working
+        </small>
+    </div>
+
+    <!-- Hardware scanner input (hidden, receives input from paired devices) -->
+    <input type="text"
+           id="hardware-scanner-input"
+           class="form-control d-none"
+           autocomplete="off"
+           placeholder="Hardware scanner input...">
+</div>
+
+<!-- Manual Entry Section -->
+<div class="scanner-container d-none" id="manual-section">
+    <h5 class="mb-3">
+        <i class="fas fa-keyboard text-warning me-2"></i>
+        Manual Entry
+    </h5>
+
+    <div class="row">
+        <div class="col-12">
+            <div class="input-group input-group-lg mb-3">
+                <input type="text"
+                       class="form-control"
+                       id="manual-input"
+                       placeholder="Enter Tag ID or Serial Number..."
+                       autocomplete="off">
+                <button class="btn btn-primary" onclick="scanManualEntry()">
+                    <i class="fas fa-search me-2"></i>Lookup
+                </button>
+            </div>
+
+            <div class="alert alert-warning">
+                <i class="fas fa-info-circle me-2"></i>
+                <strong>Manual Entry:</strong> Type or paste the tag ID/serial number above
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Camera Scanner Section (BACKUP) -->
+<div class="scanner-container" id="camera-section">
+    <div class="row">
+        <div class="col-12">
+            <h5 class="mb-3">
+                <i class="fas fa-camera text-primary me-2"></i>
+                Camera Scanner
+            </h5>
+
+            <!-- Camera Controls -->
+            <div class="mb-3">
+                <div class="btn-group w-100" role="group">
+                    <button class="btn btn-success btn-lg" id="start-camera-btn" onclick="startCamera()">
+                        <i class="fas fa-play me-2"></i>Start Camera
+                    </button>
+                    <button class="btn btn-danger btn-lg d-none" id="stop-camera-btn" onclick="stopCamera()">
+                        <i class="fas fa-stop me-2"></i>Stop Camera
+                    </button>
+                    <button class="btn btn-outline-primary" id="switch-camera-btn" onclick="switchCamera()" style="display: none;">
+                        <i class="fas fa-sync me-2"></i>Switch
+                    </button>
+                </div>
+            </div>
+
+            <!-- Camera View -->
+            <div class="position-relative mb-3">
+                <video id="camera-video"
+                       class="w-100 rounded"
+                       style="max-height: 400px; object-fit: cover; background: #f8f9fa;"
+                       playsinline>
+                </video>
+                <canvas id="camera-canvas" class="d-none"></canvas>
+
+                <!-- Scanning Overlay -->
+                <div id="scan-overlay" class="position-absolute top-0 start-0 w-100 h-100 d-none">
+                    <div class="position-absolute top-50 start-50 translate-middle">
+                        <div class="bg-primary text-white px-3 py-2 rounded">
+                            <i class="fas fa-qrcode me-2"></i>Point at QR code or RFID tag
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Loading State -->
+                <div id="camera-loading" class="position-absolute top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center bg-light rounded">
+                    <div class="text-center">
+                        <div class="loading-spinner mb-3"></div>
+                        <div>Initializing camera...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Camera Status -->
+            <div id="camera-status" class="alert alert-info">
+                <i class="fas fa-info-circle me-2"></i>
+                Click "Start Camera" to begin scanning
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Manual Entry Section -->
+<div class="scanner-container d-none" id="manual-section">
+    <h5 class="mb-3">
+        <i class="fas fa-keyboard text-warning me-2"></i>
+        Manual Entry
+    </h5>
+
+    <div class="row">
+        <div class="col-12">
+            <div class="input-group input-group-lg mb-3">
+                <input type="text"
+                       class="form-control"
+                       id="manual-input"
+                       placeholder="Enter Tag ID or Serial Number..."
+                       autocomplete="off">
+                <button class="btn btn-primary" onclick="scanManualEntry()">
+                    <i class="fas fa-search me-2"></i>Lookup
+                </button>
+            </div>
+
+            <div class="alert alert-warning">
+                <i class="fas fa-info-circle me-2"></i>
+                <strong>Manual Entry:</strong> Type or paste the tag ID/serial number above
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Hardware Scanner Section -->
+<div class="scanner-container">
+    <h5 class="mb-3">
+        <i class="fas fa-wifi text-success me-2"></i>
+        Chainway SR160 RFID Scanner
+    </h5>
+
+    <div class="alert alert-primary mb-3">
+        <h6 class="alert-heading"><i class="fas fa-bluetooth me-2"></i>Bluetooth Pairing Instructions:</h6>
+        <ol class="mb-2">
+            <li><strong>Charge Scanner:</strong> 30 minutes to 1 hour</li>
+            <li><strong>Open Bluetooth:</strong> Go to device Settings → Bluetooth</li>
+            <li><strong>Pair Device:</strong> Look for "UR-XXXX" (4 digits/letters)</li>
+            <li><strong>Connect:</strong> Tap to pair - Good to Go!</li>
+        </ol>
+        <small class="text-muted">
+            <i class="fas fa-info-circle me-1"></i>
+            Once paired, scanned RFID tags will appear automatically below
+        </small>
+    </div>
+
+    <!-- Scanner Status Indicator -->
+    <div class="mb-3">
+        <div class="d-flex align-items-center">
+            <div id="scanner-status-indicator" class="status-indicator me-3">
+                <div class="spinner-border spinner-border-sm text-primary" role="status">
+                    <span class="visually-hidden">Checking...</span>
+                </div>
+            </div>
+            <div id="scanner-status-text">
+                <strong>Scanner Status:</strong> <span id="scanner-status">Checking connection...</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Test Button -->
+    <div class="mb-3">
+        <button class="btn btn-outline-success" onclick="testHardwareScanner()">
+            <i class="fas fa-vial me-2"></i>Test Scanner Connection
+        </button>
+        <small class="form-text text-muted d-block mt-1">
+            Scan any tag or barcode to test if your Chainway SR160 is working
+        </small>
+    </div>
+
+    <!-- Hardware scanner input (hidden, receives input from paired devices) -->
+    <input type="text"
+           id="hardware-scanner-input"
+           class="form-control d-none"
+           autocomplete="off"
+           placeholder="Hardware scanner input...">
+</div>
+
+<!-- Scan Results -->
+<div id="scan-results"></div>
+
+<!-- Employee Name Modal -->
+<div class="modal fade" id="employeeModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Employee Information</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label for="employeeName" class="form-label">Your Name (for scan logs):</label>
+                    <input type="text"
+                           class="form-control form-control-lg"
+                           id="employeeName"
+                           placeholder="Enter your name..."
+                           value="">
+                </div>
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    This helps track who performed scans for inventory management.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" onclick="saveEmployeeName()">
+                    <i class="fas fa-save me-2"></i>Save & Continue
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Scanner Settings Modal -->
+<div class="modal fade" id="scannerSettingsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-cog me-2"></i>Scanner Settings
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Chainway Scanner Settings -->
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <i class="fas fa-wifi text-primary me-2"></i>Chainway SR160 Scanner Settings
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <label for="scanner-sensitivity" class="form-label">Scanner Sensitivity</label>
+                                <select class="form-select" id="scanner-sensitivity">
+                                    <option value="low">Low (Short Range)</option>
+                                    <option value="medium" selected>Medium (Standard)</option>
+                                    <option value="high">High (Long Range)</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="scan-timeout" class="form-label">Scan Timeout (ms)</label>
+                                <input type="number" class="form-control" id="scan-timeout" value="2000" min="500" max="10000" step="500">
+                            </div>
+                        </div>
+                        <div class="row mt-3">
+                            <div class="col-md-6">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="scanner-beep" checked>
+                                    <label class="form-check-label" for="scanner-beep">Enable Beep on Scan</label>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="scanner-vibrate" checked>
+                                    <label class="form-check-label" for="scanner-vibrate">Enable Vibration</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Camera Scanner Settings -->
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <i class="fas fa-camera text-warning me-2"></i>Camera Scanner Settings
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <label for="camera-quality" class="form-label">Camera Quality</label>
+                                <select class="form-select" id="camera-quality">
+                                    <option value="low">Low (480p)</option>
+                                    <option value="medium" selected>Medium (720p)</option>
+                                    <option value="high">High (1080p)</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="scan-frequency" class="form-label">Scan Frequency (fps)</label>
+                                <input type="number" class="form-control" id="scan-frequency" value="10" min="5" max="30" step="5">
+                            </div>
+                        </div>
+                        <div class="row mt-3">
+                            <div class="col-md-6">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="auto-focus" checked>
+                                    <label class="form-check-label" for="auto-focus">Auto Focus</label>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="scan-overlay" checked>
+                                    <label class="form-check-label" for="scan-overlay">Show Scan Overlay</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Bulk Scanning Settings -->
+                <div class="card">
+                    <div class="card-header">
+                        <i class="fas fa-layer-group text-success me-2"></i>Bulk Scanning Settings
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="bulk-mode">
+                                    <label class="form-check-label" for="bulk-mode">Enable Bulk Scanning Mode</label>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="bulk-batch-size" class="form-label">Batch Size</label>
+                                <input type="number" class="form-control" id="bulk-batch-size" value="50" min="10" max="500" step="10">
+                            </div>
+                        </div>
+                        <div class="mt-3">
+                            <small class="text-muted">
+                                <i class="fas fa-info-circle me-1"></i>
+                                Bulk mode allows continuous scanning without confirmation dialogs
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveSettings()">Save Settings</button>
+                <button type="button" class="btn btn-outline-danger" onclick="resetSettings()">Reset to Defaults</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://unpkg.com/@zxing/library@latest/umd/index.min.js"></script>
+<script>
+class MobileRFIDScanner {
+    constructor() {
+        this.video = null;
+        this.canvas = null;
+        this.stream = null;
+        this.scanning = false;
+        this.cameras = [];
+        this.currentCameraIndex = 0;
+        this.employeeName = '';
+        this.codeReader = null;
+        this.lastScanTime = 0;
+        this.scanCooldown = 2000; // 2 seconds between scans
+        this.bulkMode = false;
+        this.bulkBatchSize = 50;
+        this.bulkBatch = [];
+
+        this.init();
+    }
+
+    async init() {
+        // Get DOM elements
+        this.video = document.getElementById('camera-video');
+        this.canvas = document.getElementById('camera-canvas');
+
+        // Initialize ZXing code reader
+        this.initCodeReader();
+
+        // Load employee name from storage
+        this.employeeName = localStorage.getItem('employeeName') || '';
+        if (!this.employeeName) {
+            this.showEmployeeModal();
+        }
+
+        // Set up hardware scanner input listener
+        this.setupHardwareScanner();
+
+        // Enable manual entry
+        document.getElementById('manual-input').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                this.scanManualEntry();
+            }
+        });
+
+        console.log('Mobile RFID Scanner initialized');
+    }
+
+    showEmployeeModal() {
+        const modal = new bootstrap.Modal(document.getElementById('employeeModal'));
+        modal.show();
+    }
+
+    saveEmployeeName() {
+        const name = document.getElementById('employeeName').value.trim();
+        if (name) {
+            this.employeeName = name;
+            localStorage.setItem('employeeName', name);
+            bootstrap.Modal.getInstance(document.getElementById('employeeModal')).hide();
+            showMessage(`Welcome, ${name}! You can now start scanning.`, 'success');
+        } else {
+            showMessage('Please enter your name to continue', 'warning');
+        }
+    }
+
+    initCodeReader() {
+        // Initialize ZXing code reader when library is loaded
+        if (typeof ZXing !== 'undefined') {
+            try {
+                // Create a multi-format reader that can handle QR codes, barcodes, etc.
+                this.codeReader = new ZXing.BrowserMultiFormatReader();
+                console.log('ZXing code reader initialized successfully');
+            } catch (error) {
+                console.error('Failed to initialize ZXing code reader:', error);
+                // Fallback: retry after a delay
+                setTimeout(() => this.initCodeReader(), 1000);
+            }
+        } else {
+            console.log('ZXing library not yet loaded, retrying...');
+            // Retry after library loads
+            setTimeout(() => this.initCodeReader(), 1000);
+        }
+    }
+
+    async enumerateCameras() {
+        try {
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            this.cameras = devices.filter(device => device.kind === 'videoinput');
+
+            // Use all cameras as backup (Bluetooth scanner is primary)
+            console.log(`Found ${this.cameras.length} camera(s) available as backup to Bluetooth scanner:`,
+                       this.cameras.map(c => c.label || c.deviceId));
+
+            // Sort cameras to prefer mobile/built-in over USB, but keep all as options
+            this.cameras.sort((a, b) => {
+                const aLabel = a.label.toLowerCase();
+                const bLabel = b.label.toLowerCase();
+
+                // Mobile/built-in cameras get priority over USB
+                const aMobile = aLabel.includes('back') || aLabel.includes('rear') ||
+                              aLabel.includes('environment') || !aLabel.includes('usb');
+                const bMobile = bLabel.includes('back') || bLabel.includes('rear') ||
+                              bLabel.includes('environment') || !bLabel.includes('usb');
+
+                if (aMobile && !bMobile) return -1;
+                if (!aMobile && bMobile) return 1;
+                return 0;
+            });
+
+            console.log('Camera backup priority order:', this.cameras.map(c => c.label || c.deviceId));
+
+            if (this.cameras.length > 1) {
+                document.getElementById('switch-camera-btn').style.display = 'inline-block';
+            }
+        } catch (error) {
+            console.error('Error enumerating cameras:', error);
+        }
+    }
+
+    async startCamera() {
+        try {
+            document.getElementById('camera-loading').classList.remove('d-none');
+            document.getElementById('camera-status').innerHTML = `
+                <i class="fas fa-spinner fa-spin me-2"></i>Starting camera...
+            `;
+
+            // Request camera permissions
+            await this.enumerateCameras();
+
+            let constraints;
+
+            // Try to use a specific mobile camera if available
+            if (this.cameras.length > 0) {
+                // Prefer rear camera or first available mobile camera
+                const preferredCamera = this.cameras.find(camera => {
+                    const label = camera.label.toLowerCase();
+                    return label.includes('back') || label.includes('rear') || label.includes('environment');
+                }) || this.cameras[0];
+
+                console.log('Using camera:', preferredCamera.label);
+
+                constraints = {
+                    video: {
+                        deviceId: { exact: preferredCamera.deviceId },
+                        width: { ideal: 1920 },
+                        height: { ideal: 1080 }
+                    }
+                };
+            } else {
+                // Fallback to facingMode if no specific cameras found
+                console.log('Fallback: using facingMode environment');
+                constraints = {
+                    video: {
+                        facingMode: 'environment',
+                        width: { ideal: 1920 },
+                        height: { ideal: 1080 }
+                    }
+                };
+            }
+
+            this.stream = await navigator.mediaDevices.getUserMedia(constraints);
+            this.video.srcObject = this.stream;
+
+            this.video.onloadedmetadata = () => {
+                this.video.play();
+                this.scanning = true;
+
+                // Start QR/barcode scanning loop
+                this.scanLoop();
+
+                // Update UI
+                document.getElementById('camera-loading').classList.add('d-none');
+                document.getElementById('scan-overlay').classList.remove('d-none');
+                document.getElementById('start-camera-btn').classList.add('d-none');
+                document.getElementById('stop-camera-btn').classList.remove('d-none');
+
+                document.getElementById('camera-status').innerHTML = `
+                    <i class="fas fa-check-circle text-success me-2"></i>
+                    Camera active - Point at QR codes or RFID tags
+                `;
+
+                // Start scanning loop
+                this.scanLoop();
+            };
+
+        } catch (error) {
+            console.error('Camera start error:', error);
+            document.getElementById('camera-loading').classList.add('d-none');
+
+            let errorMsg = 'Could not access camera. ';
+            if (error.name === 'NotAllowedError') {
+                errorMsg += 'Please allow camera permissions.';
+            } else if (error.name === 'NotFoundError') {
+                errorMsg += 'No camera found.';
+            } else {
+                errorMsg += error.message;
+            }
+
+            document.getElementById('camera-status').innerHTML = `
+                <i class="fas fa-exclamation-triangle text-warning me-2"></i>
+                ${errorMsg}
+                <br><small>Try manual entry instead.</small>
+            `;
+
+            this.highlightManualEntry();
+        }
+    }
+
+    stopCamera() {
+        if (this.stream) {
+            this.stream.getTracks().forEach(track => track.stop());
+            this.stream = null;
+        }
+
+        this.scanning = false;
+        this.video.srcObject = null;
+
+        // Update UI
+        document.getElementById('scan-overlay').classList.add('d-none');
+        document.getElementById('start-camera-btn').classList.remove('d-none');
+        document.getElementById('stop-camera-btn').classList.add('d-none');
+
+        document.getElementById('camera-status').innerHTML = `
+            <i class="fas fa-info-circle me-2"></i>
+            Camera stopped. Click "Start Camera" to resume scanning.
+        `;
+    }
+
+    async switchCamera() {
+        if (this.cameras.length <= 1) return;
+
+        this.stopCamera();
+        this.currentCameraIndex = (this.currentCameraIndex + 1) % this.cameras.length;
+
+        setTimeout(() => {
+            this.startCamera();
+        }, 500);
+    }
+
+    scanLoop() {
+        if (!this.scanning || !this.video || !this.canvas) return;
+
+        try {
+            // Capture frame from video
+            const context = this.canvas.getContext('2d');
+            this.canvas.width = this.video.videoWidth;
+            this.canvas.height = this.video.videoHeight;
+            context.drawImage(this.video, 0, 0, this.canvas.width, this.canvas.height);
+
+            // Get image data for ZXing
+            const imageData = context.getImageData(0, 0, this.canvas.width, this.canvas.height);
+
+            // Try to decode QR/barcode
+            if (window.ZXing && this.codeReader) {
+                this.codeReader.decodeFromImageData(imageData)
+                    .then(result => {
+                        if (result && result.text) {
+                            console.log('QR/Barcode detected:', result.text);
+                            this.processScannedCode(result.text, 'Camera Scanner');
+                            // Brief pause after successful scan
+                            setTimeout(() => {
+                                if (this.scanning) {
+                                    requestAnimationFrame(() => this.scanLoop());
+                                }
+                            }, 1000);
+                            return;
+                        }
+                    })
+                    .catch(err => {
+                        // No code found, continue scanning
+                    });
+            }
+        } catch (error) {
+            console.error('Scan loop error:', error);
+        }
+
+        // Continue scanning
+        if (this.scanning) {
+            requestAnimationFrame(() => this.scanLoop());
+        }
+    }
+
+    setupHardwareScanner() {
+        const hardwareInput = document.getElementById('hardware-scanner-input');
+
+        // Focus the hidden input to receive hardware scanner input
+        hardwareInput.focus();
+
+        // Set initial scanner status
+        this.updateScannerStatus('waiting', 'Waiting for Chainway SR160 connection...');
+
+        // Multiple event handlers for different scanner gun behaviors
+        let scannerBuffer = '';
+        let scannerTimeout = null;
+
+        // Method 1: Standard input event
+        hardwareInput.addEventListener('input', (e) => {
+            const scannedCode = e.target.value.trim();
+            console.log('Scanner input event:', scannedCode);
+            if (scannedCode) {
+                this.updateScannerStatus('connected', 'Chainway SR160 Connected & Working');
+                this.processScannedCode(scannedCode, 'Chainway SR160');
+                e.target.value = ''; // Clear input for next scan
+            }
+        });
+
+        // Method 2: Keypress event (for scanner guns that send character by character)
+        hardwareInput.addEventListener('keypress', (e) => {
+            console.log('Scanner keypress:', e.key, e.keyCode);
+
+            if (e.key === 'Enter' || e.keyCode === 13) {
+                // Scanner finished sending data
+                if (scannerBuffer.trim()) {
+                    console.log('Scanner buffer complete:', scannerBuffer);
+                    this.updateScannerStatus('connected', 'Chainway SR160 Connected & Working');
+                    this.processScannedCode(scannerBuffer.trim(), 'Chainway SR160');
+                    scannerBuffer = '';
+                }
+            } else if (e.key && e.key.length === 1) {
+                // Add character to buffer
+                scannerBuffer += e.key;
+
+                // Set timeout to process buffer if no Enter key
+                clearTimeout(scannerTimeout);
+                scannerTimeout = setTimeout(() => {
+                    if (scannerBuffer.trim()) {
+                        console.log('Scanner buffer timeout:', scannerBuffer);
+                        this.processScannedCode(scannerBuffer.trim(), 'Chainway SR160');
+                        scannerBuffer = '';
+                    }
+                }, 100);
+            }
+        });
+
+        // Method 3: Global keyboard listener for scanner gun input
+        document.addEventListener('keydown', (e) => {
+            // Check if the scanner gun is sending rapid keystrokes
+            if (!e.target.matches('input, textarea') && e.key && e.key.length === 1) {
+                console.log('Global scanner key:', e.key);
+                // Focus the hidden input and let it handle the input
+                hardwareInput.focus();
+            }
+        });
+
+        // Monitor scanner connection by checking for recent input
+        this.scannerLastInput = 0;
+        hardwareInput.addEventListener('focus', () => {
+            this.scannerLastInput = Date.now();
+        });
+
+        // Keep focus on hardware input
+        setInterval(() => {
+            if (document.activeElement !== hardwareInput &&
+                !document.querySelector('.modal.show')) {
+                hardwareInput.focus();
+            }
+
+            // Update scanner status based on activity
+            const now = Date.now();
+            if (now - this.scannerLastInput > 30000 && this.scannerLastInput > 0) {
+                this.updateScannerStatus('idle', 'Scanner paired but idle');
+            }
+        }, 1000);
+
+        // Test if scanner is already connected
+        setTimeout(() => {
+            this.checkScannerConnection();
+        }, 2000);
+    }
+
+    updateScannerStatus(status, message) {
+        const indicator = document.getElementById('scanner-status-indicator');
+        const statusText = document.getElementById('scanner-status');
+
+        // Update status text
+        statusText.textContent = message;
+
+        // Update visual indicator
+        switch(status) {
+            case 'connected':
+                indicator.innerHTML = '<i class="fas fa-check-circle text-success"></i>';
+                break;
+            case 'waiting':
+                indicator.innerHTML = '<i class="fas fa-bluetooth text-primary"></i>';
+                break;
+            case 'idle':
+                indicator.innerHTML = '<i class="fas fa-pause-circle text-warning"></i>';
+                break;
+            case 'testing':
+                indicator.innerHTML = '<div class="spinner-border spinner-border-sm text-success"></div>';
+                break;
+            case 'error':
+                indicator.innerHTML = '<i class="fas fa-exclamation-triangle text-danger"></i>';
+                break;
+            default:
+                indicator.innerHTML = '<div class="spinner-border spinner-border-sm text-primary"></div>';
+        }
+    }
+
+    checkScannerConnection() {
+        // Check if we can detect Bluetooth HID devices
+        if ('bluetooth' in navigator) {
+            navigator.bluetooth.getAvailability().then(available => {
+                if (available) {
+                    this.updateScannerStatus('waiting', 'Bluetooth available - Pair your Chainway SR160');
+                } else {
+                    this.updateScannerStatus('error', 'Bluetooth not available on this device');
+                }
+            }).catch(() => {
+                this.updateScannerStatus('waiting', 'Ready for Chainway SR160 input');
+            });
+        } else {
+            // Bluetooth API not available, but scanner may still work as HID keyboard
+            this.updateScannerStatus('waiting', 'Ready for Chainway SR160 keyboard input');
+        }
+    }
+
+    testHardwareScanner() {
+        this.updateScannerStatus('testing', 'Testing... Scan any tag now!');
+
+        const hardwareInput = document.getElementById('hardware-scanner-input');
+        hardwareInput.focus();
+
+        // Set a timeout to reset status if no input received
+        setTimeout(() => {
+            if (Date.now() - this.scannerLastInput > 8000) {
+                this.updateScannerStatus('waiting', 'No scan detected - Check scanner connection');
+                showMessage('No scan received. Make sure your Chainway SR160 is paired and try again.', 'warning');
+            }
+        }, 10000);
+
+        showMessage('Scan any RFID tag or barcode with your Chainway SR160 now...', 'info');
+    }
+
+    async processScannedCode(code, method = 'manual') {
+        const now = Date.now();
+        if (now - this.lastScanTime < this.scanCooldown) {
+            return; // Too soon since last scan
+        }
+
+        this.lastScanTime = now;
+
+        // Determine scan type based on method and code characteristics
+        const isRFIDScan = method === 'Chainway SR160';
+        const isCameraScan = method === 'Camera Scanner';
+
+        // Show scan feedback with type indication
+        const scanTypeText = isRFIDScan ? 'RFID' : (isCameraScan ? 'QR/Barcode' : 'Manual');
+
+        // Handle bulk mode
+        if (this.bulkMode) {
+            this.addToBulkBatch(code, scanTypeText, method);
+            return;
+        }
+
+        showMessage(`${scanTypeText} Scanning: ${code}`, 'info');
+
+        try {
+            // RFID scans: Search by tag_id only (current API handles this)
+            // QR/Barcode scans: Also try rental_class_num search if tag_id search fails
+            let response = await fetch(`/api/scan/${encodeURIComponent(code)}`);
+            let data = await response.json();
+
+            if (data.success) {
+                this.displayScanResult(data, method, scanTypeText);
+            } else if (isCameraScan && !isRFIDScan) {
+                // For camera scans, also try searching by rental class if tag_id failed
+                console.log('Tag ID search failed, trying rental class search...');
+                response = await fetch(`/api/search?q=${encodeURIComponent(code)}&limit=1`);
+                data = await response.json();
+
+                if (data.success && data.items && data.items.length > 0) {
+                    // Convert search result to scan result format
+                    const item = data.items[0];
+                    this.displayScanResult({
+                        success: true,
+                        message: 'Item found by rental class',
+                        item: item
+                    }, method, `${scanTypeText} (by Class)`);
+                } else {
+                    this.displayScanError(code, `No item found with tag ID or rental class: ${code}`);
+                }
+            } else {
+                this.displayScanError(code, data.message);
+            }
+
+        } catch (error) {
+            console.error('Scan error:', error);
+            this.displayScanError(code, 'Network error occurred');
+        }
+    }
+
+    displayScanResult(data, method, scanTypeText = 'Scan') {
+        const item = data.item;
+        const statusClass = item.status ?
+            `status-${item.status.toLowerCase().replace(' ', '-')}` : 'status-available';
+
+        const resultHtml = `
+            <div class="result-card">
+                <div class="d-flex justify-content-between align-items-start mb-3">
+                    <h5 class="mb-0">
+                        <i class="fas fa-check-circle text-success me-2"></i>
+                        Item Found
+                    </h5>
+                    <small class="text-muted">${scanTypeText} via ${method}</small>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-8">
+                        <table class="table table-sm">
+                            <tr>
+                                <td><strong>Tag ID:</strong></td>
+                                <td>${item.tag_id}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Serial:</strong></td>
+                                <td>${item.serial_number}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Class ID:</strong></td>
+                                <td>${item.rental_class_id}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Location:</strong></td>
+                                <td>${item.location}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Status:</strong></td>
+                                <td><span class="status-badge ${statusClass}">${item.status}</span></td>
+                            </tr>
+                        </table>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="d-grid gap-2">
+                            <button class="btn btn-primary" onclick="updateItemStatus('${item.tag_id}')">
+                                <i class="fas fa-edit me-2"></i>Update
+                            </button>
+                            <button class="btn btn-outline-secondary" onclick="clearScanResults()">
+                                <i class="fas fa-times me-2"></i>Clear
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                ${item.notes ? `
+                <div class="mt-3">
+                    <strong>Notes:</strong> ${item.notes}
+                </div>
+                ` : ''}
+            </div>
+        `;
+
+        document.getElementById('scan-results').innerHTML = resultHtml;
+
+        // Play success sound
+        this.playSound('success');
+    }
+
+    displayScanError(code, message) {
+        const errorHtml = `
+            <div class="result-card error-card">
+                <div class="d-flex align-items-start">
+                    <i class="fas fa-exclamation-triangle text-danger me-3 mt-1"></i>
+                    <div class="flex-grow-1">
+                        <h6 class="mb-1">Item Not Found</h6>
+                        <p class="mb-2">Tag ID: <code>${code}</code></p>
+                        <p class="mb-3">${message}</p>
+                        <button class="btn btn-outline-primary btn-sm" onclick="clearScanResults()">
+                            <i class="fas fa-times me-2"></i>Clear
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        document.getElementById('scan-results').innerHTML = errorHtml;
+
+        // Play error sound
+        this.playSound('error');
+    }
+
+    playSound(type) {
+        // Simple audio feedback using Web Audio API
+        try {
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+
+            if (type === 'success') {
+                oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
+                oscillator.frequency.setValueAtTime(1000, audioContext.currentTime + 0.1);
+            } else {
+                oscillator.frequency.setValueAtTime(300, audioContext.currentTime);
+            }
+
+            gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
+
+            oscillator.start(audioContext.currentTime);
+            oscillator.stop(audioContext.currentTime + 0.2);
+        } catch (e) {
+            // Audio not available or blocked
+        }
+    }
+
+    highlightManualEntry() {
+        // Highlight manual entry button with animation
+        const manualBtn = document.querySelector('button[onclick="toggleManualEntry()"]');
+        if (manualBtn) {
+            manualBtn.classList.add('btn-warning');
+            manualBtn.innerHTML = '<i class="fas fa-keyboard"></i> Try Manual!';
+
+            setTimeout(() => {
+                manualBtn.classList.remove('btn-warning');
+                manualBtn.innerHTML = '<i class="fas fa-keyboard"></i> Manual';
+            }, 3000);
+        }
+    }
+}
+
+// Initialize scanner when page loads
+let scanner = null;
+document.addEventListener('DOMContentLoaded', function() {
+    scanner = new MobileRFIDScanner();
+});
+
+// Global functions for button handlers
+function startCamera() {
+    if (scanner) scanner.startCamera();
+}
+
+function stopCamera() {
+    if (scanner) scanner.stopCamera();
+}
+
+function switchCamera() {
+    if (scanner) scanner.switchCamera();
+}
+
+function toggleManualEntry() {
+    const manual = document.getElementById('manual-section');
+    const camera = document.getElementById('camera-section');
+
+    manual.classList.toggle('d-none');
+    camera.classList.toggle('d-none');
+
+    if (!manual.classList.contains('d-none')) {
+        document.getElementById('manual-input').focus();
+    }
+}
+
+function scanManualEntry() {
+    const input = document.getElementById('manual-input');
+    const code = input.value.trim();
+
+    if (code) {
+        scanner.processScannedCode(code, 'manual');
+        input.value = '';
+    } else {
+        showMessage('Please enter a tag ID or serial number', 'warning');
+    }
+}
+
+function clearScanResults() {
+    document.getElementById('scan-results').innerHTML = '';
+}
+
+function updateItemStatus(tagId) {
+    // This would open a modal for updating item status
+    // For now, just show a placeholder
+    showMessage('Status update feature coming soon!', 'info');
+}
+
+function saveEmployeeName() {
+    if (scanner) scanner.saveEmployeeName();
+}
+
+function testHardwareScanner() {
+    if (scanner) scanner.testHardwareScanner();
+}
+
+// Settings Modal Functions
+function showSettingsModal() {
+    loadCurrentSettings();
+    const modal = new bootstrap.Modal(document.getElementById('scannerSettingsModal'));
+    modal.show();
+}
+
+function loadCurrentSettings() {
+    // Load saved settings from localStorage or use defaults
+    const settings = JSON.parse(localStorage.getItem('scannerSettings') || '{}');
+
+    document.getElementById('scanner-sensitivity').value = settings.scannerSensitivity || 'medium';
+    document.getElementById('scan-timeout').value = settings.scanTimeout || 2000;
+    document.getElementById('scanner-beep').checked = settings.scannerBeep !== false;
+    document.getElementById('scanner-vibrate').checked = settings.scannerVibrate !== false;
+
+    document.getElementById('camera-quality').value = settings.cameraQuality || 'medium';
+    document.getElementById('scan-frequency').value = settings.scanFrequency || 10;
+    document.getElementById('auto-focus').checked = settings.autoFocus !== false;
+    document.getElementById('scan-overlay').checked = settings.scanOverlay !== false;
+
+    document.getElementById('bulk-mode').checked = settings.bulkMode || false;
+    document.getElementById('bulk-batch-size').value = settings.bulkBatchSize || 50;
+
+    // Apply bulk mode state
+    toggleBulkModeUI();
+}
+
+function saveSettings() {
+    const settings = {
+        scannerSensitivity: document.getElementById('scanner-sensitivity').value,
+        scanTimeout: parseInt(document.getElementById('scan-timeout').value),
+        scannerBeep: document.getElementById('scanner-beep').checked,
+        scannerVibrate: document.getElementById('scanner-vibrate').checked,
+
+        cameraQuality: document.getElementById('camera-quality').value,
+        scanFrequency: parseInt(document.getElementById('scan-frequency').value),
+        autoFocus: document.getElementById('auto-focus').checked,
+        scanOverlay: document.getElementById('scan-overlay').checked,
+
+        bulkMode: document.getElementById('bulk-mode').checked,
+        bulkBatchSize: parseInt(document.getElementById('bulk-batch-size').value)
+    };
+
+    localStorage.setItem('scannerSettings', JSON.stringify(settings));
+
+    // Apply settings to scanner
+    if (scanner) {
+        scanner.scanCooldown = settings.scanTimeout;
+        scanner.bulkMode = settings.bulkMode;
+        scanner.bulkBatchSize = settings.bulkBatchSize;
+    }
+
+    bootstrap.Modal.getInstance(document.getElementById('scannerSettingsModal')).hide();
+    showMessage('Scanner settings saved successfully!', 'success');
+}
+
+function resetSettings() {
+    if (confirm('Are you sure you want to reset all settings to defaults?')) {
+        localStorage.removeItem('scannerSettings');
+        loadCurrentSettings();
+        showMessage('Settings reset to defaults', 'info');
+    }
+}
+
+// Bulk mode toggle function
+function toggleBulkModeUI() {
+    const bulkMode = document.getElementById('bulk-mode').checked;
+    const batchSizeInput = document.getElementById('bulk-batch-size');
+    batchSizeInput.disabled = !bulkMode;
+
+    if (bulkMode) {
+        showMessage('Bulk scanning mode enabled - scans will be processed in batches', 'info');
+    }
+}
+
+</script>
+{% endblock %}

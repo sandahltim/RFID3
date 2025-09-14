@@ -19,86 +19,35 @@
         </div>
     </div>
 
-    <!-- QR Code Scanner Section -->
+    <!-- RFID Scanner Interface Link -->
     <div class="row mb-4">
         <div class="col-md-12">
-            <div class="card">
-                <div class="card-header">
+            <div class="card border-primary">
+                <div class="card-header bg-primary text-white">
                     <div class="d-flex justify-content-between align-items-center">
-                        <span><i class="fas fa-qrcode"></i> QR Code Scanner</span>
-                        <div>
-                            <button id="toggle-scanner-btn" class="btn btn-sm btn-outline-primary">
-                                <i class="fas fa-camera"></i> Start Scanner
-                            </button>
-                            <button id="manual-entry-btn" class="btn btn-sm btn-outline-secondary">
-                                <i class="fas fa-keyboard"></i> Manual Entry
-                            </button>
-                        </div>
+                        <span><i class="fas fa-wifi"></i> RFID Scanner Interface</span>
+                        <span class="badge bg-success">New Standalone Interface</span>
                     </div>
                 </div>
-                <div class="card-body" id="scanner-container" style="display: none;">
-                    <!-- Camera Scanner Section -->
-                    <div id="camera-section">
-                        <div class="scanner-preview-container">
-                            <video id="scanner-video" autoplay playsinline muted></video>
-                            <canvas id="scanner-canvas" style="display: none;"></canvas>
-                            <div id="scanner-overlay">
-                                <div class="scanner-crosshair"></div>
-                                <div id="scanner-status" class="scanner-status">Initializing camera...</div>
-                            </div>
-                        </div>
-                        <div class="scanner-controls mt-3">
-                            <button id="switch-camera-btn" class="btn btn-sm btn-secondary" style="display: none;">
-                                <i class="fas fa-sync-alt"></i> Switch Camera
-                            </button>
-                            <div class="scanner-stats">
-                                <small class="text-muted">
-                                    <span id="fps-counter">FPS: --</span> | 
-                                    <span id="scan-attempts">Scans: 0</span>
-                                </small>
-                            </div>
-                        </div>
+                <div class="card-body text-center">
+                    <h5 class="card-title">Professional RFID Scanner</h5>
+                    <p class="card-text">
+                        Access the dedicated RFID scanner interface for rental flow management,
+                        item tracking, and inventory operations with full HTTPS support.
+                    </p>
+                    <div class="d-grid gap-2 d-md-block">
+                        <a href="https://dev.tail752777.ts.net:8443/rental" target="_blank" class="btn btn-primary btn-lg">
+                            <i class="fas fa-external-link-alt me-2"></i>Open RFID Scanner
+                        </a>
+                        <a href="https://dev.tail752777.ts.net:8443/" target="_blank" class="btn btn-outline-secondary">
+                            <i class="fas fa-home me-2"></i>Scanner Home
+                        </a>
                     </div>
-                    
-                    <!-- Manual Entry Section -->
-                    <div id="manual-section" style="display: none;">
-                        <div class="form-group">
-                            <label for="manual-qr-input">Enter QR Code or Item Number:</label>
-                            <div class="input-group">
-                                <input type="text" id="manual-qr-input" class="form-control" placeholder="Enter QR code, tag ID, or rental class number...">
-                                <div class="input-group-append">
-                                    <button id="manual-lookup-btn" class="btn btn-primary">
-                                        <i class="fas fa-search"></i> Lookup
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Results Section -->
-                    <div id="scan-results" style="display: none;">
-                        <hr>
-                        <h5>Scan Result:</h5>
-                        <div id="result-content">
-                            <!-- Dynamic content will be populated here -->
-                        </div>
-                        <div class="mt-3">
-                            <button id="clear-results-btn" class="btn btn-sm btn-secondary">Clear Results</button>
-                            <button id="scan-again-btn" class="btn btn-sm btn-primary">Scan Again</button>
-                        </div>
-                    </div>
-
-                    <!-- Error/Loading States -->
-                    <div id="scanner-error" class="alert alert-danger" style="display: none;">
-                        <strong>Scanner Error:</strong> <span id="error-message"></span>
-                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                    </div>
-                    
-                    <div id="scanner-loading" class="text-center" style="display: none;">
-                        <div class="spinner-border" role="status">
-                            <span class="sr-only">Loading...</span>
-                        </div>
-                        <p class="mt-2">Processing scan...</p>
+                    <div class="mt-3">
+                        <small class="text-muted">
+                            <i class="fas fa-info-circle me-1"></i>
+                            Secure HTTPS interface running on port 8443 with full rental flow capabilities
+                        </small>
                     </div>
                 </div>
             </div>

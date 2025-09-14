@@ -126,31 +126,37 @@
             </div>
         </div>
         
-        <!-- Table Selector -->
+        <!-- Database and Table Selector -->
         <div class="table-selector">
             <div class="row">
-                <div class="col-md-4">
-                    <label for="table-select" class="form-label fw-bold">Select Table:</label>
-                    <select id="table-select" class="form-select" onchange="loadTableData(this.value)">
-                        <option value="">Choose a table...</option>
-                        {% for key, info in tables.items() %}
-                        <option value="{{ key }}">{{ info.display_name }}</option>
+                <div class="col-md-3">
+                    <label for="database-select" class="form-label fw-bold">Database:</label>
+                    <select id="database-select" class="form-select" onchange="loadDatabaseTables(this.value)">
+                        <option value="">Choose database...</option>
+                        {% for key, info in databases.items() %}
+                        <option value="{{ key }}">{{ info.name }}</option>
                         {% endfor %}
                     </select>
                 </div>
                 <div class="col-md-3">
+                    <label for="table-select" class="form-label fw-bold">Table:</label>
+                    <select id="table-select" class="form-select" onchange="loadRawTableData(this.value)" disabled>
+                        <option value="">Choose database first...</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
                     <label for="search-input" class="form-label fw-bold">Search:</label>
                     <input type="text" id="search-input" class="form-control" placeholder="Search data..." onkeyup="handleSearch(event)">
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <label for="column-filter" class="form-label fw-bold">Search Column:</label>
                     <select id="column-filter" class="form-select">
                         <option value="">All columns</option>
                     </select>
                 </div>
                 <div class="col-md-2 d-flex align-items-end">
-                    <button class="btn btn-info btn-sm w-100" onclick="showTableSchema()" id="schema-btn" disabled>
-                        <i class="fas fa-info-circle me-1"></i>Schema
+                    <button class="btn btn-info btn-sm w-100" onclick="showTableInfo()" id="info-btn" disabled>
+                        <i class="fas fa-info-circle me-1"></i>Info
                     </button>
                 </div>
             </div>
@@ -268,9 +274,11 @@
 {{ super() }}
 <script>
 let currentTable = null;
+let currentDatabase = null;
 let currentPage = 1;
 let currentSearch = '';
 let currentColumn = '';
+let currentTables = {};
 
 class DatabaseViewer {
     constructor() {
@@ -313,12 +321,108 @@ class DatabaseViewer {
         try {
             const response = await fetch('/api/database/tables');
             const data = await response.json();
-            
+
             if (data.status === 'success') {
                 console.log('Loaded table information:', data.tables);
             }
         } catch (error) {
             console.error('Error loading table list:', error);
+        }
+    }
+
+    async loadDatabaseTables(databaseKey) {
+        if (!databaseKey) {
+            this.resetTableSelector();
+            return;
+        }
+
+        currentDatabase = databaseKey;
+
+        try {
+            const response = await fetch(`/api/database/${databaseKey}/tables`);
+            const data = await response.json();
+
+            if (data.status === 'success') {
+                currentTables = data.tables;
+                this.populateTableSelector(data.tables);
+                console.log(`Loaded ${Object.keys(data.tables).length} tables from ${data.database}`);
+            } else {
+                this.showError(data.error || 'Failed to load database tables');
+            }
+        } catch (error) {
+            console.error('Error loading database tables:', error);
+            this.showError('Error loading database tables');
+        }
+    }
+
+    populateTableSelector(tables) {
+        const select = document.getElementById('table-select');
+        select.innerHTML = '<option value="">Choose a table...</option>';
+        select.disabled = false;
+
+        Object.keys(tables).forEach(tableName => {
+            const option = document.createElement('option');
+            option.value = tableName;
+            option.textContent = `${tables[tableName].display_name} (${tables[tableName].row_count.toLocaleString()} rows)`;
+            select.appendChild(option);
+        });
+    }
+
+    resetTableSelector() {
+        const select = document.getElementById('table-select');
+        select.innerHTML = '<option value="">Choose database first...</option>';
+        select.disabled = true;
+        document.getElementById('info-btn').disabled = true;
+        this.clearData();
+    }
+
+    clearData() {
+        document.getElementById('table-overview').style.display = 'none';
+        document.getElementById('pagination-controls').style.display = 'none';
+        document.getElementById('data-container').innerHTML = `
+            <div class="text-center py-5">
+                <i class="fas fa-table fa-3x text-muted mb-3"></i>
+                <p class="text-muted">Select a database and table to view data</p>
+            </div>
+        `;
+        document.getElementById('data-title').textContent = 'Select a table to view data';
+    }
+
+    async loadRawTableData(tableName, page = 1) {
+        if (!tableName || !currentDatabase) return;
+
+        currentTable = tableName;
+        currentPage = page;
+
+        // Show loading
+        document.getElementById('loading-overlay').style.display = 'flex';
+        document.getElementById('info-btn').disabled = false;
+
+        try {
+            // Build query parameters
+            const params = new URLSearchParams({
+                page: page,
+                per_page: 50,
+                search: currentSearch,
+                column: currentColumn
+            });
+
+            const response = await fetch(`/api/database/${currentDatabase}/table/${tableName}/data?${params}`);
+            const result = await response.json();
+
+            if (result.status === 'success') {
+                this.displayTableData(result);
+                this.updateOverview(result);
+                this.updatePagination(result.pagination);
+                this.populateColumnFilter(result.data);
+            } else {
+                this.showError(result.error || 'Failed to load table data');
+            }
+        } catch (error) {
+            console.error('Error loading raw table data:', error);
+            this.showError('Error loading table data');
+        } finally {
+            document.getElementById('loading-overlay').style.display = 'none';
         }
     }
     
@@ -586,9 +690,17 @@ class DatabaseViewer {
     
     changePage(direction) {
         if (direction === 'next') {
-            this.loadTableData(currentTable, currentPage + 1);
+            if (currentDatabase) {
+                this.loadRawTableData(currentTable, currentPage + 1);
+            } else {
+                this.loadTableData(currentTable, currentPage + 1);
+            }
         } else if (direction === 'prev') {
-            this.loadTableData(currentTable, currentPage - 1);
+            if (currentDatabase) {
+                this.loadRawTableData(currentTable, currentPage - 1);
+            } else {
+                this.loadTableData(currentTable, currentPage - 1);
+            }
         }
     }
     
@@ -603,6 +715,18 @@ class DatabaseViewer {
 }
 
 // Global functions for template
+function loadDatabaseTables(databaseKey) {
+    if (window.databaseViewer) {
+        window.databaseViewer.loadDatabaseTables(databaseKey);
+    }
+}
+
+function loadRawTableData(tableName) {
+    if (window.databaseViewer) {
+        window.databaseViewer.loadRawTableData(tableName);
+    }
+}
+
 function loadTableData(tableKey) {
     if (window.databaseViewer) {
         window.databaseViewer.loadTableData(tableKey);
@@ -615,15 +739,25 @@ function changePage(direction) {
     }
 }
 
-function showTableSchema() {
+function showTableInfo() {
     if (window.databaseViewer) {
-        window.databaseViewer.showTableSchema();
+        if (currentDatabase) {
+            // Show raw table info for selected database/table
+            alert(`Table: ${currentTable}\nDatabase: ${currentDatabase}\nRows: ${currentTables[currentTable]?.row_count || 0}`);
+        } else {
+            // Show schema for legacy table viewing
+            window.databaseViewer.showTableSchema();
+        }
     }
 }
 
 function refreshCurrentTable() {
     if (currentTable && window.databaseViewer) {
-        window.databaseViewer.loadTableData(currentTable, currentPage);
+        if (currentDatabase) {
+            window.databaseViewer.loadRawTableData(currentTable, currentPage);
+        } else {
+            window.databaseViewer.loadTableData(currentTable, currentPage);
+        }
     }
 }
 
@@ -632,7 +766,11 @@ function handleSearch(event) {
         currentSearch = event.target.value.trim();
         currentPage = 1;
         if (currentTable && window.databaseViewer) {
-            window.databaseViewer.loadTableData(currentTable);
+            if (currentDatabase) {
+                window.databaseViewer.loadRawTableData(currentTable);
+            } else {
+                window.databaseViewer.loadTableData(currentTable);
+            }
         }
     }
 }
@@ -646,7 +784,11 @@ document.addEventListener('DOMContentLoaded', function() {
 window.refreshDatabaseData = function() {
     console.log('Refreshing database data with filters:', GlobalFilters?.getApiParams?.());
     if (currentTable && window.databaseViewer) {
-        window.databaseViewer.loadTableData(currentTable, 1);
+        if (currentDatabase) {
+            window.databaseViewer.loadRawTableData(currentTable, 1);
+        } else {
+            window.databaseViewer.loadTableData(currentTable, 1);
+        }
     }
 };
 </script>

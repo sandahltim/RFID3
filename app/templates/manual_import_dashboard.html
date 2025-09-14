@@ -519,8 +519,23 @@
 
 {% block extra_js %}
 <script>
+console.log('CSV Import Dashboard: JavaScript loading...');
+
+// Simple test function first
+function testJavaScript() {
+    console.log('JavaScript execution test - SUCCESS');
+    const testElement = document.getElementById('fileList');
+    console.log('Test element found:', testElement);
+}
+
+// Call test function immediately
+testJavaScript();
+
+// Main functionality
 document.addEventListener('DOMContentLoaded', function() {
+    console.log('CSV Import Dashboard: DOMContentLoaded event fired');
     const fileListContainer = document.getElementById('fileList');
+    console.log('fileListContainer found:', fileListContainer);
     const importButton = document.getElementById('startImport');
     const loadingSpinner = document.getElementById('loadingSpinner');
     const importResults = document.getElementById('importResults');
@@ -531,13 +546,20 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Load available files
     function loadFiles() {
+        console.log('loadFiles() called, fetching from /api/import/status...');
         fetch('/api/import/status')
-            .then(response => response.json())
+            .then(response => {
+                console.log('API response status:', response.status);
+                return response.json();
+            })
             .then(data => {
+                console.log('API response data:', data);
                 if (data.success) {
                     availableFiles = data.available_files;
+                    console.log('Available files loaded:', availableFiles.length);
                     renderFileList();
                 } else {
+                    console.error('API error:', data.error);
                     showError('Failed to load files: ' + data.error);
                 }
             })
@@ -549,6 +571,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Render file list
     function renderFileList() {
+        console.log('renderFileList() called with', availableFiles.length, 'files');
+        console.log('fileListContainer element:', fileListContainer);
+
         if (availableFiles.length === 0) {
             fileListContainer.innerHTML = '<div class="text-center text-muted">No CSV files found</div>';
             return;

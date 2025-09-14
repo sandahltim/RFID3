@@ -1,0 +1,2071 @@
+{% extends "base.html" %}
+
+{% block title %}Rental Flow - RFID Scanner{% endblock %}
+
+{% block header_title %}Rental Flow Manager{% endblock %}
+
+{% block header_actions %}
+<a href="{{ url_for('home') }}" class="btn btn-light btn-sm me-2">
+    <i class="fas fa-home"></i> Home
+</a>
+<button class="btn btn-outline-light btn-sm" onclick="toggleBatchMode()" id="batch-toggle">
+    <i class="fas fa-layer-group"></i> <span>Batch Mode</span>
+</button>
+{% endblock %}
+
+{% block content %}
+<!-- Bluetooth Scanner Status -->
+<div id="bluetooth-scanner-status" class="alert alert-info mb-3">
+    <div class="d-flex justify-content-between align-items-center">
+        <div>
+            <i class="fas fa-bluetooth text-primary me-2"></i>
+            <strong>Chainway Scanner Gun:</strong> <span id="scanner-status-text">Initializing...</span>
+        </div>
+        <div class="d-flex align-items-center gap-3">
+            <div class="small text-muted">
+                Primary input method • Camera backup available
+            </div>
+            <button class="btn btn-sm btn-outline-primary" onclick="toggleScannerSettings()">
+                <i class="fas fa-cog"></i> Settings
+            </button>
+        </div>
+    </div>
+
+    <!-- Scanner Settings Panel (initially hidden) -->
+    <div id="scanner-settings-panel" class="mt-3 pt-3 border-top d-none">
+        <div class="row g-3">
+            <div class="col-md-4">
+                <label for="scanner-sensitivity" class="form-label">Scanner Sensitivity</label>
+                <select class="form-select form-select-sm" id="scanner-sensitivity" onchange="updateScannerSensitivity()">
+                    <option value="low">Low (Short range)</option>
+                    <option value="medium" selected>Medium (Standard)</option>
+                    <option value="high">High (Long range)</option>
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label for="scan-timeout" class="form-label">Scan Timeout (ms)</label>
+                <input type="number" class="form-control form-control-sm" id="scan-timeout"
+                       value="100" min="50" max="1000" step="50" onchange="updateScanTimeout()">
+            </div>
+            <div class="col-md-4">
+                <label for="scanner-beep" class="form-label">Scanner Feedback</label>
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="scanner-beep" checked onchange="updateScannerBeep()">
+                    <label class="form-check-label" for="scanner-beep">
+                        Sound feedback
+                    </label>
+                </div>
+            </div>
+        </div>
+        <div class="row g-3 mt-2">
+            <div class="col-12">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div class="small text-muted">
+                        <i class="fas fa-info-circle me-1"></i>
+                        Adjust sensitivity if scanner is too sensitive or not picking up codes properly
+                    </div>
+                    <button class="btn btn-sm btn-success" onclick="testScanner()">
+                        <i class="fas fa-vial"></i> Test Scanner
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Batch Mode Indicator -->
+<div id="batch-indicator" class="alert alert-warning d-none mb-3">
+    <div class="d-flex justify-content-between align-items-center">
+        <div>
+            <i class="fas fa-layer-group me-2"></i>
+            <strong>Batch Mode:</strong> <span id="batch-count">0</span> items scanned
+        </div>
+        <div class="btn-group" role="group">
+            <button class="btn btn-sm btn-success" onclick="processBatch()">
+                <i class="fas fa-check"></i> Process
+            </button>
+            <button class="btn btn-sm btn-secondary" onclick="clearBatch()">
+                <i class="fas fa-trash"></i> Clear
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Rental Action Tabs -->
+<div class="rental-tabs mb-3">
+    <div class="btn-group w-100" role="group">
+        <button class="btn btn-primary active" data-action="checkout" onclick="switchAction('checkout')">
+            <i class="fas fa-arrow-right"></i> Check Out
+        </button>
+        <button class="btn btn-outline-primary" data-action="return" onclick="switchAction('return')">
+            <i class="fas fa-arrow-left"></i> Return
+        </button>
+        <button class="btn btn-outline-primary" data-action="inspect" onclick="switchAction('inspect')">
+            <i class="fas fa-search"></i> Inspect
+        </button>
+        <button class="btn btn-outline-primary" data-action="assign" onclick="switchAction('assign')">
+            <i class="fas fa-wifi"></i> Assign RFID
+        </button>
+        <button class="btn btn-outline-primary" data-action="laundry" onclick="switchAction('laundry')">
+            <i class="fas fa-tshirt"></i> Laundry
+        </button>
+    </div>
+</div>
+
+<!-- CHECKOUT MODE -->
+<div class="action-content active" id="checkout-mode">
+    <div class="scanner-container">
+        <h5 class="mb-3">
+            <i class="fas fa-arrow-right text-success me-2"></i>
+            Check Out Items
+        </h5>
+
+        <!-- Quick Access Sections -->
+        <div class="quick-access-sections mb-4">
+            <!-- Upcoming Reservations -->
+            <div class="access-section mb-3">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h6 class="mb-0">
+                        <i class="fas fa-calendar text-warning me-2"></i>
+                        Upcoming Reservations
+                    </h6>
+                    <button class="btn btn-sm btn-outline-primary" onclick="refreshReservations()">
+                        <i class="fas fa-sync"></i>
+                    </button>
+                </div>
+                <div id="upcoming-reservations" class="reservation-list">
+                    <div class="text-center p-2">
+                        <div class="loading-spinner me-2"></div>
+                        Loading reservations...
+                    </div>
+                </div>
+            </div>
+
+            <!-- Open Contracts -->
+            <div class="access-section mb-3">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h6 class="mb-0">
+                        <i class="fas fa-file-contract text-success me-2"></i>
+                        Open Contracts
+                    </h6>
+                    <button class="btn btn-sm btn-outline-primary" onclick="refreshContracts()">
+                        <i class="fas fa-sync"></i>
+                    </button>
+                </div>
+                <div id="open-contracts" class="contracts-list">
+                    <div class="text-center p-2">
+                        <div class="loading-spinner me-2"></div>
+                        Loading contracts...
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Contract Selection -->
+        <div class="contract-selection mb-3">
+            <div class="row g-2">
+                <div class="col-md-8">
+                    <div class="input-group">
+                        <input type="text"
+                               class="form-control"
+                               id="checkout-contract-input"
+                               placeholder="Contract # (optional for direct rental)"
+                               autocomplete="off">
+                        <button class="btn btn-outline-primary" onclick="loadContractForCheckout()">
+                            <i class="fas fa-search"></i> Load
+                        </button>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <input type="text"
+                           class="form-control"
+                           id="checkout-employee-input"
+                           placeholder="Employee name"
+                           autocomplete="off">
+                </div>
+            </div>
+        </div>
+
+        <!-- Item Scanner -->
+        <div class="item-scanner mb-3">
+            <div class="input-group">
+                <input type="text"
+                       class="form-control form-control-lg"
+                       id="checkout-scan-input"
+                       placeholder="Scan RFID tag or enter item ID..."
+                       autocomplete="off">
+                <button class="btn btn-outline-secondary" onclick="startCameraScanning('checkout')" title="Use Camera Scanner">
+                    <i class="fas fa-camera"></i>
+                </button>
+                <button class="btn btn-success btn-lg" onclick="processCheckoutScan()">
+                    <i class="fas fa-check"></i> Check Out
+                </button>
+            </div>
+            <div class="form-text">
+                <strong>Primary:</strong> Chainway Bluetooth scanner gun • <strong>Backup:</strong> Camera button for mobile QR/barcode • <strong>Manual:</strong> Type directly
+            </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="quick-actions-grid mb-3">
+            <div class="row g-2">
+                <div class="col-6">
+                    <button class="btn btn-outline-info w-100" onclick="showRecentContracts()">
+                        <i class="fas fa-clock"></i><br><small>Recent Contracts</small>
+                    </button>
+                </div>
+                <div class="col-6">
+                    <button class="btn btn-outline-warning w-100" onclick="directRental()">
+                        <i class="fas fa-bolt"></i><br><small>Direct Rental</small>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Checkout Results -->
+    <div id="checkout-results" class="mt-3"></div>
+</div>
+
+<!-- RETURN MODE -->
+<div class="action-content d-none" id="return-mode">
+    <div class="scanner-container">
+        <h5 class="mb-3">
+            <i class="fas fa-arrow-left text-warning me-2"></i>
+            Return Items
+        </h5>
+
+        <!-- Employee Selection -->
+        <div class="employee-selection mb-3">
+            <div class="input-group">
+                <span class="input-group-text">
+                    <i class="fas fa-user"></i>
+                </span>
+                <input type="text"
+                       class="form-control"
+                       id="return-employee-input"
+                       placeholder="Employee processing return"
+                       autocomplete="off">
+            </div>
+        </div>
+
+        <!-- Item Scanner -->
+        <div class="item-scanner mb-3">
+            <div class="input-group">
+                <input type="text"
+                       class="form-control form-control-lg"
+                       id="return-scan-input"
+                       placeholder="Scan returned item..."
+                       autocomplete="off">
+                <button class="btn btn-outline-secondary" onclick="startCameraScanning('return')" title="Use Camera Scanner">
+                    <i class="fas fa-camera"></i>
+                </button>
+                <button class="btn btn-warning btn-lg" onclick="processReturnScan()">
+                    <i class="fas fa-undo"></i> Process Return
+                </button>
+            </div>
+        </div>
+
+        <!-- Return Options -->
+        <div class="return-options mb-3">
+            <div class="card">
+                <div class="card-body">
+                    <h6 class="card-title">Item Condition</h6>
+                    <div class="row g-2">
+                        <div class="col-md-4">
+                            <select class="form-select" id="condition-select">
+                                <option value="Good">Good Condition</option>
+                                <option value="Fair">Fair - Minor Issues</option>
+                                <option value="Poor">Poor - Major Issues</option>
+                                <option value="Damaged">Damaged</option>
+                            </select>
+                        </div>
+                        <div class="col-md-8">
+                            <div class="form-check-container d-flex gap-3">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="needs-cleaning">
+                                    <label class="form-check-label" for="needs-cleaning">
+                                        Needs Cleaning
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="needs-repair">
+                                    <label class="form-check-label" for="needs-repair">
+                                        Needs Repair
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="needs-inspection">
+                                    <label class="form-check-label" for="needs-inspection">
+                                        Needs Inspection
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-2">
+                        <textarea class="form-control" id="return-notes" rows="2"
+                                  placeholder="Notes about condition, issues, etc..."></textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Return Results -->
+    <div id="return-results" class="mt-3"></div>
+</div>
+
+<!-- INSPECT MODE -->
+<div class="action-content d-none" id="inspect-mode">
+    <div class="scanner-container">
+        <h5 class="mb-3">
+            <i class="fas fa-search text-info me-2"></i>
+            Inspection Mode
+        </h5>
+
+        <!-- Inspector Info -->
+        <div class="inspector-info mb-3">
+            <div class="input-group">
+                <span class="input-group-text">
+                    <i class="fas fa-user-check"></i>
+                </span>
+                <input type="text"
+                       class="form-control"
+                       id="inspector-name-input"
+                       placeholder="Inspector name"
+                       autocomplete="off">
+            </div>
+        </div>
+
+        <!-- Item Scanner -->
+        <div class="item-scanner mb-3">
+            <div class="input-group">
+                <input type="text"
+                       class="form-control form-control-lg"
+                       id="inspect-scan-input"
+                       placeholder="Scan item for inspection..."
+                       autocomplete="off">
+                <button class="btn btn-outline-secondary" onclick="startCameraScanning('inspect')" title="Use Camera Scanner">
+                    <i class="fas fa-camera"></i>
+                </button>
+                <button class="btn btn-info btn-lg" onclick="processInspectionScan()">
+                    <i class="fas fa-eye"></i> Inspect
+                </button>
+            </div>
+        </div>
+
+        <!-- Inspection Quick Actions -->
+        <div class="inspection-actions mb-3">
+            <div class="row g-2">
+                <div class="col-6">
+                    <button class="btn btn-outline-success w-100" onclick="passInspection()">
+                        <i class="fas fa-check-circle"></i><br><small>Pass Inspection</small>
+                    </button>
+                </div>
+                <div class="col-6">
+                    <button class="btn btn-outline-danger w-100" onclick="failInspection()">
+                        <i class="fas fa-times-circle"></i><br><small>Fail Inspection</small>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Inspection Results -->
+    <div id="inspection-results" class="mt-3"></div>
+</div>
+
+<!-- ASSIGN RFID MODE -->
+<div class="action-content d-none" id="assign-mode">
+    <div class="scanner-container">
+        <h5 class="mb-3">
+            <i class="fas fa-wifi text-primary me-2"></i>
+            Assign RFID Tags
+        </h5>
+
+        <!-- Contract Selection -->
+        <div class="contract-selection mb-3">
+            <div class="input-group">
+                <input type="text"
+                       class="form-control"
+                       id="assign-contract-input"
+                       placeholder="Contract # (required)"
+                       autocomplete="off">
+                <button class="btn btn-outline-primary" onclick="loadContractForAssign()">
+                    <i class="fas fa-search"></i> Load Contract
+                </button>
+            </div>
+        </div>
+
+        <!-- RFID Assignment -->
+        <div class="rfid-assignment mb-3">
+            <div class="row g-2">
+                <div class="col-md-6">
+                    <div class="form-group">
+                        <label class="form-label">RFID/EPC Tag:</label>
+                        <input type="text"
+                               class="form-control form-control-lg"
+                               id="rfid-tag-input"
+                               placeholder="Scan or enter RFID tag..."
+                               autocomplete="off">
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="form-group">
+                        <label class="form-label">Serial Number:</label>
+                        <input type="text"
+                               class="form-control"
+                               id="serial-number-input"
+                               placeholder="Enter serial number..."
+                               autocomplete="off">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Item Details -->
+        <div class="item-details mb-3">
+            <div class="row g-2">
+                <div class="col-md-6">
+                    <select class="form-select" id="item-class-select">
+                        <option value="">Select rental class...</option>
+                        <option value="DRILL">DRILL - Power Drills</option>
+                        <option value="SAW">SAW - Saws & Cutting</option>
+                        <option value="COMPRESSOR">COMPRESSOR - Air Compressors</option>
+                        <option value="TENT">TENT - Event Tents</option>
+                        <option value="TABLE">TABLE - Tables & Furniture</option>
+                        <option value="CHAIR">CHAIR - Chairs & Seating</option>
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <select class="form-select" id="item-location-select">
+                        <option value="">Select location...</option>
+                        <option value="3607-A">Store 3607 - Zone A</option>
+                        <option value="3607-B">Store 3607 - Zone B</option>
+                        <option value="6800-A">Store 6800 - Zone A</option>
+                        <option value="728-A">Store 728 - Zone A</option>
+                        <option value="8101-A">Store 8101 - Zone A</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Description -->
+        <div class="description-input mb-3">
+            <input type="text"
+                   class="form-control"
+                   id="item-description-input"
+                   placeholder="Item description..."
+                   autocomplete="off">
+        </div>
+
+        <!-- Assign Button -->
+        <div class="d-grid">
+            <button class="btn btn-primary btn-lg" onclick="assignRFIDTag()">
+                <i class="fas fa-link me-2"></i>Assign RFID Tag
+            </button>
+        </div>
+    </div>
+
+    <!-- Assignment Results -->
+    <div id="assignment-results" class="mt-3"></div>
+</div>
+
+<!-- LAUNDRY MODE -->
+<div class="action-content d-none" id="laundry-mode">
+    <div class="scanner-container">
+        <h5 class="mb-3">
+            <i class="fas fa-tshirt text-info me-2"></i>
+            Laundry & Service Management
+        </h5>
+
+        <!-- Service Type Selector -->
+        <div class="service-selector mb-3">
+            <div class="btn-group w-100" role="group">
+                <button class="btn btn-outline-warning active" data-service="cleaning" onclick="switchService('cleaning')">
+                    <i class="fas fa-soap"></i> Cleaning
+                </button>
+                <button class="btn btn-outline-info" data-service="inspection" onclick="switchService('inspection')">
+                    <i class="fas fa-search-plus"></i> Quality Check
+                </button>
+                <button class="btn btn-outline-success" data-service="ready" onclick="switchService('ready')">
+                    <i class="fas fa-check-circle"></i> Ready to Rent
+                </button>
+            </div>
+        </div>
+
+        <!-- Laundry Items Queue -->
+        <div class="laundry-queue mb-4">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h6 class="mb-0">
+                    <i class="fas fa-list text-primary me-2"></i>
+                    Service Queue
+                </h6>
+                <button class="btn btn-sm btn-outline-primary" onclick="refreshLaundryQueue()">
+                    <i class="fas fa-sync"></i> Refresh
+                </button>
+            </div>
+            <div id="laundry-queue" class="service-queue">
+                <div class="text-center p-2">
+                    <div class="loading-spinner me-2"></div>
+                    Loading service items...
+                </div>
+            </div>
+        </div>
+
+        <!-- Manual Processing -->
+        <div class="manual-processing">
+            <div class="input-group">
+                <input type="text"
+                       class="form-control form-control-lg"
+                       id="laundry-scan-input"
+                       placeholder="Scan item for service processing..."
+                       autocomplete="off">
+                <button class="btn btn-info btn-lg" onclick="processLaundryItem()">
+                    <i class="fas fa-cog"></i> Process
+                </button>
+            </div>
+            <div class="form-text">
+                Scan items to update service status or add to cleaning/inspection queue
+            </div>
+        </div>
+    </div>
+
+    <!-- Laundry Results -->
+    <div id="laundry-results" class="mt-3"></div>
+</div>
+
+<!-- Batch Processing List -->
+<div id="batch-list" class="mt-4 d-none">
+    <div class="scanner-container">
+        <h6 class="mb-3">
+            <i class="fas fa-list text-primary me-2"></i>
+            Batch Queue - <span id="current-action-text">Check Out</span>
+        </h6>
+        <div id="batch-items" class="batch-items-container">
+            <!-- Batch items populated by JavaScript -->
+        </div>
+    </div>
+</div>
+
+<!-- Camera Scanner Modal -->
+<div class="modal fade" id="camera-modal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-camera me-2"></i>Camera Scanner
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="text-center mb-3">
+                    <video id="camera-video" class="w-100 rounded" style="max-height: 400px;" autoplay playsinline></video>
+                    <canvas id="camera-canvas" class="d-none"></canvas>
+                </div>
+                <div class="d-flex justify-content-center gap-2">
+                    <button class="btn btn-success" id="start-camera-btn" onclick="startCamera()">
+                        <i class="fas fa-play me-2"></i>Start Camera
+                    </button>
+                    <button class="btn btn-danger d-none" id="stop-camera-btn" onclick="stopCamera()">
+                        <i class="fas fa-stop me-2"></i>Stop Camera
+                    </button>
+                    <button class="btn btn-secondary" onclick="switchCameraDevice()" id="switch-camera-btn" style="display: none;">
+                        <i class="fas fa-sync me-2"></i>Switch Camera
+                    </button>
+                </div>
+                <div class="mt-3">
+                    <div id="camera-status" class="alert alert-info">
+                        Click "Start Camera" to begin scanning QR codes and barcodes
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+class RentalFlowManager {
+    constructor() {
+        this.currentAction = 'checkout';
+        this.batchMode = false;
+        this.batchItems = [];
+        this.scannerLastActive = null;
+        this.currentContract = null;
+        this.scannerSettings = {
+            sensitivity: 'medium',
+            timeout: 100,
+            beepEnabled: true
+        };
+
+        this.init();
+    }
+
+    init() {
+        // Set up event listeners
+        this.setupEventListeners();
+
+        // Focus on first input
+        document.getElementById('checkout-scan-input').focus();
+    }
+
+    setupEventListeners() {
+        // Enhanced scanner gun detection
+        this.setupChainwayScanner();
+
+        // Enter key handlers for scanning inputs
+        document.getElementById('checkout-scan-input').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') this.processCheckoutScan();
+        });
+
+        document.getElementById('return-scan-input').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') this.processReturnScan();
+        });
+
+        document.getElementById('inspect-scan-input').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') this.processInspectionScan();
+        });
+
+        document.getElementById('rfid-tag-input').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') this.assignRFIDTag();
+        });
+
+        // Contract loading
+        document.getElementById('checkout-contract-input').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') this.loadContractForCheckout();
+        });
+
+        document.getElementById('assign-contract-input').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') this.loadContractForAssign();
+        });
+
+        // RFID format validation
+        document.getElementById('rfid-tag-input').addEventListener('input', (e) => {
+            this.validateRFIDFormat(e.target);
+        });
+    }
+
+    switchAction(action) {
+        this.currentAction = action;
+
+        // Update tab buttons
+        document.querySelectorAll('[data-action]').forEach(btn => {
+            btn.classList.remove('active', 'btn-primary');
+            btn.classList.add('btn-outline-primary');
+        });
+        document.querySelector(`[data-action="${action}"]`).classList.add('active', 'btn-primary');
+        document.querySelector(`[data-action="${action}"]`).classList.remove('btn-outline-primary');
+
+        // Show/hide content sections
+        document.querySelectorAll('.action-content').forEach(content => {
+            content.classList.add('d-none');
+        });
+        document.getElementById(`${action}-mode`).classList.remove('d-none');
+
+        // Update batch action text
+        const actionTexts = {
+            'checkout': 'Check Out',
+            'return': 'Return',
+            'inspect': 'Inspect',
+            'assign': 'Assign RFID'
+        };
+        document.getElementById('current-action-text').textContent = actionTexts[action];
+
+        // Focus appropriate input
+        const focusInputs = {
+            'checkout': 'checkout-scan-input',
+            'return': 'return-scan-input',
+            'inspect': 'inspect-scan-input',
+            'assign': 'rfid-tag-input'
+        };
+
+        setTimeout(() => {
+            const input = document.getElementById(focusInputs[action]);
+            if (input) input.focus();
+        }, 100);
+    }
+
+    setupChainwayScanner() {
+        // Create hidden input for Chainway scanner gun
+        if (!document.getElementById('chainway-scanner-input')) {
+            const hiddenInput = document.createElement('input');
+            hiddenInput.type = 'text';
+            hiddenInput.id = 'chainway-scanner-input';
+            hiddenInput.className = 'form-control d-none';
+            hiddenInput.setAttribute('autocomplete', 'off');
+            hiddenInput.setAttribute('placeholder', 'Chainway scanner input...');
+            document.body.appendChild(hiddenInput);
+        }
+
+        const scannerInput = document.getElementById('chainway-scanner-input');
+        let scannerBuffer = '';
+        let scannerTimeout = null;
+        const currentAction = () => document.querySelector('.action-content.active')?.id?.replace('-mode', '');
+
+        // Method 1: Standard input event
+        scannerInput.addEventListener('input', (e) => {
+            const scannedCode = e.target.value.trim();
+            console.log('Chainway scanner input:', scannedCode);
+            if (scannedCode) {
+                this.handleScannerInput(scannedCode, currentAction());
+                e.target.value = ''; // Clear input for next scan
+            }
+        });
+
+        // Method 2: Keypress events for character-by-character input
+        scannerInput.addEventListener('keypress', (e) => {
+            console.log('Chainway scanner keypress:', e.key, e.keyCode);
+
+            if (e.key === 'Enter' || e.keyCode === 13) {
+                if (scannerBuffer.trim()) {
+                    console.log('Chainway scanner complete:', scannerBuffer);
+                    this.handleScannerInput(scannerBuffer.trim(), currentAction());
+                    scannerBuffer = '';
+                }
+            } else if (e.key && e.key.length === 1) {
+                scannerBuffer += e.key;
+                clearTimeout(scannerTimeout);
+                scannerTimeout = setTimeout(() => {
+                    if (scannerBuffer.trim()) {
+                        console.log('Chainway scanner timeout:', scannerBuffer);
+                        this.handleScannerInput(scannerBuffer.trim(), currentAction());
+                        scannerBuffer = '';
+                    }
+                }, 100);
+            }
+        });
+
+        // Method 3: Global keyboard listener
+        document.addEventListener('keydown', (e) => {
+            if (!e.target.matches('input, textarea') && e.key && e.key.length === 1) {
+                console.log('Global Chainway key:', e.key);
+                scannerInput.focus();
+            }
+        });
+
+        // Keep scanner input focused
+        setInterval(() => {
+            if (!document.querySelector('input:focus, textarea:focus, [contenteditable]:focus')) {
+                scannerInput.focus();
+            }
+        }, 1000);
+
+        console.log('🔫 Chainway scanner gun detection initialized - PRIMARY INPUT METHOD');
+        console.log('📱 Camera scanning available as backup via camera buttons');
+
+        // Update status indicator
+        this.updateScannerStatus('Ready - Waiting for scan');
+
+        // Test scanner connectivity after 2 seconds
+        setTimeout(() => {
+            if (!this.scannerLastActive) {
+                this.updateScannerStatus('Waiting for Chainway connection - Try scanning now');
+            }
+        }, 2000);
+    }
+
+    updateScannerStatus(message) {
+        const statusElement = document.getElementById('scanner-status-text');
+        if (statusElement) {
+            statusElement.textContent = message;
+        }
+        console.log(`Chainway Scanner Status: ${message}`);
+    }
+
+    handleScannerInput(scannedCode, action) {
+        console.log(`Processing scanner input: "${scannedCode}" for action: ${action}`);
+
+        // Mark scanner as active
+        this.scannerLastActive = Date.now();
+        this.updateScannerStatus('✅ Connected & Working');
+
+        // Route to appropriate scanner input field based on current action
+        switch (action) {
+            case 'checkout':
+                document.getElementById('checkout-scan-input').value = scannedCode;
+                this.processCheckoutScan();
+                break;
+            case 'return':
+                document.getElementById('return-scan-input').value = scannedCode;
+                this.processReturnScan();
+                break;
+            case 'inspect':
+                document.getElementById('inspect-scan-input').value = scannedCode;
+                this.processInspectionScan();
+                break;
+            case 'assign':
+                document.getElementById('rfid-tag-input').value = scannedCode;
+                this.assignRFIDTag();
+                break;
+            default:
+                console.log('Unknown action for scanner input:', action);
+                // Default to checkout mode
+                document.getElementById('checkout-scan-input').value = scannedCode;
+                this.processCheckoutScan();
+                break;
+        }
+    }
+
+    toggleBatchMode() {
+        this.batchMode = !this.batchMode;
+        const indicator = document.getElementById('batch-indicator');
+        const toggle = document.getElementById('batch-toggle');
+
+        if (this.batchMode) {
+            indicator.classList.remove('d-none');
+            toggle.classList.remove('btn-outline-light');
+            toggle.classList.add('btn-warning');
+            toggle.querySelector('span').textContent = 'Exit Batch';
+            showMessage('Batch mode activated', 'info');
+        } else {
+            indicator.classList.add('d-none');
+            toggle.classList.remove('btn-warning');
+            toggle.classList.add('btn-outline-light');
+            toggle.querySelector('span').textContent = 'Batch Mode';
+            showMessage('Batch mode deactivated', 'info');
+        }
+    }
+
+    async processCheckoutScan() {
+        const scanInput = document.getElementById('checkout-scan-input');
+        const tagId = scanInput.value.trim();
+        const contractNo = document.getElementById('checkout-contract-input').value.trim();
+        const employee = document.getElementById('checkout-employee-input').value.trim();
+
+        if (!tagId) {
+            showMessage('Please scan or enter an item ID', 'warning');
+            return;
+        }
+
+        if (this.batchMode) {
+            this.addToBatch(tagId, 'checkout', { contractNo, employee });
+            scanInput.value = '';
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/rental/checkout', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    tag_id: tagId,
+                    contract_no: contractNo,
+                    employee: employee || 'Mobile Scanner'
+                })
+            });
+
+            const data = await response.json();
+
+            if (response.ok && data.success) {
+                this.displayCheckoutResult(tagId, data, true);
+                showMessage(data.message, 'success');
+            } else {
+                this.displayCheckoutResult(tagId, data, false);
+                showMessage(data.message || 'Checkout failed', 'error');
+            }
+
+            scanInput.value = '';
+
+        } catch (error) {
+            console.error('Checkout error:', error);
+            showMessage('Checkout failed: Network error', 'error');
+        }
+    }
+
+    async processReturnScan() {
+        const scanInput = document.getElementById('return-scan-input');
+        const tagId = scanInput.value.trim();
+        const employee = document.getElementById('return-employee-input').value.trim();
+        const condition = document.getElementById('condition-select').value;
+        const needsCleaning = document.getElementById('needs-cleaning').checked;
+        const needsRepair = document.getElementById('needs-repair').checked;
+        const notes = document.getElementById('return-notes').value.trim();
+
+        if (!tagId) {
+            showMessage('Please scan or enter an item ID', 'warning');
+            return;
+        }
+
+        if (this.batchMode) {
+            this.addToBatch(tagId, 'return', { employee, condition, needsCleaning, needsRepair, notes });
+            scanInput.value = '';
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/rental/return', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    tag_id: tagId,
+                    employee: employee || 'Mobile Scanner',
+                    condition: condition,
+                    needs_cleaning: needsCleaning,
+                    needs_repair: needsRepair,
+                    notes: notes
+                })
+            });
+
+            const data = await response.json();
+
+            if (response.ok && data.success) {
+                this.displayReturnResult(tagId, data, true);
+                showMessage(data.message, 'success');
+            } else {
+                this.displayReturnResult(tagId, data, false);
+                showMessage(data.message || 'Return failed', 'error');
+            }
+
+            scanInput.value = '';
+
+        } catch (error) {
+            console.error('Return error:', error);
+            showMessage('Return failed: Network error', 'error');
+        }
+    }
+
+    async processInspectionScan() {
+        const scanInput = document.getElementById('inspect-scan-input');
+        const tagId = scanInput.value.trim();
+        const inspector = document.getElementById('inspector-name-input').value.trim();
+
+        if (!tagId) {
+            showMessage('Please scan or enter an item ID', 'warning');
+            return;
+        }
+
+        if (this.batchMode) {
+            this.addToBatch(tagId, 'inspect', { inspector });
+            scanInput.value = '';
+            return;
+        }
+
+        // First get item details
+        try {
+            const response = await fetch(`/api/scan/${encodeURIComponent(tagId)}`);
+            const data = await response.json();
+
+            if (response.ok && data.success) {
+                this.displayInspectionItem(tagId, data.item, inspector);
+                showMessage(`Item loaded for inspection: ${tagId}`, 'info');
+            } else {
+                showMessage(data.message || 'Item not found', 'error');
+            }
+
+            scanInput.value = '';
+
+        } catch (error) {
+            console.error('Inspection scan error:', error);
+            showMessage('Inspection failed: Network error', 'error');
+        }
+    }
+
+    async assignRFIDTag() {
+        const contractNo = document.getElementById('assign-contract-input').value.trim();
+        const rfidTag = document.getElementById('rfid-tag-input').value.trim();
+        const serialNumber = document.getElementById('serial-number-input').value.trim();
+        const itemClass = document.getElementById('item-class-select').value;
+        const location = document.getElementById('item-location-select').value;
+        const description = document.getElementById('item-description-input').value.trim();
+
+        if (!contractNo || !rfidTag) {
+            showMessage('Contract number and RFID tag are required', 'warning');
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/rfid/assign', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contract_no: contractNo,
+                    item_id: Date.now(), // Mock item ID
+                    rfid_tag_id: rfidTag,
+                    serial_number: serialNumber,
+                    location: location,
+                    description: description || itemClass
+                })
+            });
+
+            const data = await response.json();
+
+            if (response.ok && data.success) {
+                this.displayAssignmentResult(rfidTag, data, true);
+                showMessage(data.message, 'success');
+
+                // Clear form
+                document.getElementById('rfid-tag-input').value = '';
+                document.getElementById('serial-number-input').value = '';
+                document.getElementById('item-description-input').value = '';
+            } else {
+                this.displayAssignmentResult(rfidTag, data, false);
+                showMessage(data.message || 'Assignment failed', 'error');
+            }
+
+        } catch (error) {
+            console.error('RFID assignment error:', error);
+            showMessage('Assignment failed: Network error', 'error');
+        }
+    }
+
+    addToBatch(code, action, params = {}) {
+        this.batchItems.push({
+            code,
+            action,
+            params,
+            timestamp: new Date()
+        });
+
+        document.getElementById('batch-count').textContent = this.batchItems.length;
+        document.getElementById('batch-list').classList.remove('d-none');
+        this.updateBatchDisplay();
+
+        showMessage(`Added to batch: ${code}`, 'success');
+    }
+
+    updateBatchDisplay() {
+        const container = document.getElementById('batch-items');
+
+        if (this.batchItems.length === 0) {
+            container.innerHTML = '<div class="text-muted text-center p-3">No items in batch</div>';
+            return;
+        }
+
+        let html = '';
+        this.batchItems.forEach((item, index) => {
+            const actionIcons = {
+                'checkout': 'fas fa-arrow-right text-success',
+                'return': 'fas fa-arrow-left text-warning',
+                'inspect': 'fas fa-search text-info',
+                'assign': 'fas fa-wifi text-primary'
+            };
+
+            html += `
+                <div class="batch-item d-flex justify-content-between align-items-center p-2 border-bottom">
+                    <div>
+                        <i class="${actionIcons[item.action]} me-2"></i>
+                        <strong>${item.code}</strong>
+                        <small class="text-muted d-block">
+                            ${item.action.toUpperCase()} - ${item.timestamp.toLocaleTimeString()}
+                        </small>
+                    </div>
+                    <button class="btn btn-sm btn-outline-danger" onclick="rentalFlow.removeFromBatch(${index})">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            `;
+        });
+
+        container.innerHTML = html;
+    }
+
+    removeFromBatch(index) {
+        this.batchItems.splice(index, 1);
+        document.getElementById('batch-count').textContent = this.batchItems.length;
+        this.updateBatchDisplay();
+
+        if (this.batchItems.length === 0) {
+            document.getElementById('batch-list').classList.add('d-none');
+        }
+    }
+
+    async processBatch() {
+        if (this.batchItems.length === 0) {
+            showMessage('No items in batch to process', 'warning');
+            return;
+        }
+
+        showMessage(`Processing ${this.batchItems.length} items...`, 'info');
+
+        try {
+            const response = await fetch('/api/rental/batch-process', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    items: this.batchItems,
+                    action: this.currentAction
+                })
+            });
+
+            const data = await response.json();
+
+            if (response.ok && data.success) {
+                showMessage(`Batch processed: ${data.processed}/${this.batchItems.length} items`, 'success');
+                this.clearBatch();
+            } else {
+                showMessage(data.message || 'Batch processing failed', 'error');
+            }
+
+        } catch (error) {
+            console.error('Batch processing error:', error);
+            showMessage('Batch processing failed', 'error');
+        }
+    }
+
+    clearBatch() {
+        this.batchItems = [];
+        document.getElementById('batch-count').textContent = '0';
+        document.getElementById('batch-list').classList.add('d-none');
+        this.updateBatchDisplay();
+    }
+
+    validateRFIDFormat(input) {
+        const value = input.value.trim().toUpperCase();
+        const isValidFormat = /^[0-9A-F]+$/.test(value) && value.length >= 8;
+
+        if (isValidFormat) {
+            input.classList.remove('is-invalid');
+            input.classList.add('is-valid');
+        } else if (value.length > 0) {
+            input.classList.remove('is-valid');
+            input.classList.add('is-invalid');
+        } else {
+            input.classList.remove('is-valid', 'is-invalid');
+        }
+    }
+
+    displayCheckoutResult(tagId, data, success) {
+        const resultHtml = `
+            <div class="scanner-container">
+                <div class="alert ${success ? 'alert-success' : 'alert-danger'}">
+                    <h6 class="mb-2">
+                        <i class="fas ${success ? 'fa-check-circle' : 'fa-exclamation-triangle'} me-2"></i>
+                        ${success ? 'Checkout Successful' : 'Checkout Failed'}
+                    </h6>
+                    <p class="mb-0"><strong>Item:</strong> ${tagId}</p>
+                    <p class="mb-0">${data.message}</p>
+                </div>
+            </div>
+        `;
+        document.getElementById('checkout-results').innerHTML = resultHtml;
+    }
+
+    displayReturnResult(tagId, data, success) {
+        const resultHtml = `
+            <div class="scanner-container">
+                <div class="alert ${success ? 'alert-success' : 'alert-danger'}">
+                    <h6 class="mb-2">
+                        <i class="fas ${success ? 'fa-check-circle' : 'fa-exclamation-triangle'} me-2"></i>
+                        ${success ? 'Return Processed' : 'Return Failed'}
+                    </h6>
+                    <p class="mb-0"><strong>Item:</strong> ${tagId}</p>
+                    <p class="mb-0">${data.message}</p>
+                    ${success && data.new_status ? `<p class="mb-0"><strong>New Status:</strong> ${data.new_status}</p>` : ''}
+                </div>
+            </div>
+        `;
+        document.getElementById('return-results').innerHTML = resultHtml;
+    }
+
+    displayInspectionItem(tagId, item, inspector) {
+        const resultHtml = `
+            <div class="scanner-container">
+                <h6 class="mb-3">Inspection: ${tagId}</h6>
+                <div class="row g-3 mb-3">
+                    <div class="col-md-8">
+                        <div class="item-details">
+                            <p><strong>Tag ID:</strong> ${item.tag_id}</p>
+                            <p><strong>Class:</strong> ${item.rental_class_id || 'N/A'}</p>
+                            <p><strong>Status:</strong> <span class="badge bg-secondary">${item.status || 'Unknown'}</span></p>
+                            <p><strong>Location:</strong> ${item.location || 'Unknown'}</p>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="d-grid gap-2">
+                            <button class="btn btn-success" onclick="rentalFlow.completeInspection('${tagId}', 'pass')">
+                                <i class="fas fa-check me-2"></i>Pass
+                            </button>
+                            <button class="btn btn-danger" onclick="rentalFlow.completeInspection('${tagId}', 'fail')">
+                                <i class="fas fa-times me-2"></i>Fail
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.getElementById('inspection-results').innerHTML = resultHtml;
+    }
+
+    async completeInspection(tagId, result) {
+        const inspector = document.getElementById('inspector-name-input').value.trim();
+        const newStatus = result === 'pass' ? 'Available' : 'Needs Repair';
+
+        try {
+            const response = await fetch('/api/update/' + encodeURIComponent(tagId), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    status: newStatus,
+                    notes: `Inspection ${result.toUpperCase()} by ${inspector || 'Mobile Scanner'}`,
+                    employee: inspector || 'Mobile Scanner'
+                })
+            });
+
+            const data = await response.json();
+
+            if (response.ok && data.success) {
+                showMessage(`Inspection ${result}: ${tagId} marked as ${newStatus}`, 'success');
+                document.getElementById('inspection-results').innerHTML = '';
+            } else {
+                showMessage(data.message || 'Inspection update failed', 'error');
+            }
+
+        } catch (error) {
+            console.error('Inspection completion error:', error);
+            showMessage('Inspection update failed', 'error');
+        }
+    }
+
+    displayAssignmentResult(rfidTag, data, success) {
+        const resultHtml = `
+            <div class="scanner-container">
+                <div class="alert ${success ? 'alert-success' : 'alert-danger'}">
+                    <h6 class="mb-2">
+                        <i class="fas ${success ? 'fa-check-circle' : 'fa-exclamation-triangle'} me-2"></i>
+                        ${success ? 'RFID Assignment Successful' : 'Assignment Failed'}
+                    </h6>
+                    <p class="mb-0"><strong>RFID Tag:</strong> ${rfidTag}</p>
+                    <p class="mb-0">${data.message}</p>
+                </div>
+            </div>
+        `;
+        document.getElementById('assignment-results').innerHTML = resultHtml;
+    }
+
+    // Initialize preloaded data
+    async initializeData() {
+        await this.loadUpcomingReservations();
+        await this.loadOpenContracts();
+        if (this.currentAction === 'laundry') {
+            await this.loadLaundryQueue();
+        }
+    }
+
+    async loadUpcomingReservations() {
+        try {
+            const response = await fetch('/api/reservations/upcoming');
+            const data = await response.json();
+
+            if (response.ok && data.success) {
+                this.upcomingReservations = data.reservations;
+                this.displayUpcomingReservations();
+            } else {
+                console.error('Failed to load upcoming reservations:', data.message);
+                document.getElementById('upcoming-reservations').innerHTML =
+                    '<div class="text-muted text-center p-2">No upcoming reservations</div>';
+            }
+        } catch (error) {
+            console.error('Error loading reservations:', error);
+            document.getElementById('upcoming-reservations').innerHTML =
+                '<div class="text-muted text-center p-2">Unable to load reservations</div>';
+        }
+    }
+
+    async loadOpenContracts() {
+        try {
+            const response = await fetch('/api/contracts/open');
+            const data = await response.json();
+
+            if (response.ok && data.success) {
+                this.openContracts = data.contracts;
+                this.displayOpenContracts();
+            } else {
+                console.error('Failed to load open contracts:', data.message);
+                document.getElementById('open-contracts').innerHTML =
+                    '<div class="text-muted text-center p-2">No open contracts</div>';
+            }
+        } catch (error) {
+            console.error('Error loading contracts:', error);
+            document.getElementById('open-contracts').innerHTML =
+                '<div class="text-muted text-center p-2">Unable to load contracts</div>';
+        }
+    }
+
+    async loadLaundryQueue() {
+        try {
+            const response = await fetch('/api/laundry/queue');
+            const data = await response.json();
+
+            if (response.ok && data.success) {
+                this.laundryQueue = data.queue_items;
+                this.displayLaundryQueue(data.grouped_queue);
+            } else {
+                console.error('Failed to load laundry queue:', data.message);
+                document.getElementById('laundry-queue').innerHTML =
+                    '<div class="text-muted text-center p-2">No items requiring service</div>';
+            }
+        } catch (error) {
+            console.error('Error loading laundry queue:', error);
+            document.getElementById('laundry-queue').innerHTML =
+                '<div class="text-muted text-center p-2">Unable to load service queue</div>';
+        }
+    }
+
+    displayUpcomingReservations() {
+        const container = document.getElementById('upcoming-reservations');
+
+        if (this.upcomingReservations.length === 0) {
+            container.innerHTML = '<div class="text-muted text-center p-2">No upcoming reservations</div>';
+            return;
+        }
+
+        let html = '';
+        this.upcomingReservations.slice(0, 5).forEach(reservation => {
+            const statusClass = reservation.status === 'Upcoming' ? 'text-warning' : 'text-success';
+            html += `
+                <div class="reservation-item border rounded p-2 mb-2 cursor-pointer" onclick="rentalFlow.selectReservation('${reservation.contract_number}')">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <strong>${reservation.contract_number}</strong>
+                            <div class="text-muted small">${reservation.client_name}</div>
+                            <div class="text-muted small">${reservation.item_count} items • ${reservation.equipment_types || 'Various'}</div>
+                        </div>
+                        <div class="${statusClass}">
+                            <i class="fas fa-calendar"></i>
+                            <small>${reservation.status}</small>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+
+        container.innerHTML = html;
+    }
+
+    displayOpenContracts() {
+        const container = document.getElementById('open-contracts');
+
+        if (this.openContracts.length === 0) {
+            container.innerHTML = '<div class="text-muted text-center p-2">No open contracts</div>';
+            return;
+        }
+
+        let html = '';
+        this.openContracts.slice(0, 8).forEach(contract => {
+            const statusClass = contract.contract_status === 'All Returned' ? 'text-success' :
+                               contract.contract_status === 'All Out' ? 'text-primary' : 'text-warning';
+            html += `
+                <div class="contract-item border rounded p-2 mb-2 cursor-pointer" onclick="rentalFlow.selectContract('${contract.contract_number}')">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <strong>${contract.contract_number}</strong>
+                            <div class="text-muted small">${contract.client_name}</div>
+                            <div class="text-muted small">${contract.total_items} items • ${contract.items_out || 0} out • ${contract.items_returned || 0} returned</div>
+                        </div>
+                        <div class="${statusClass}">
+                            <small>${contract.contract_status}</small>
+                            <div class="progress-bar-mini">
+                                <div class="progress-fill" style="width: ${contract.completion_percentage}%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+
+        container.innerHTML = html;
+    }
+
+    displayLaundryQueue(groupedItems) {
+        const container = document.getElementById('laundry-queue');
+
+        if (this.laundryQueue.length === 0) {
+            container.innerHTML = '<div class="text-muted text-center p-2">No items requiring service</div>';
+            return;
+        }
+
+        let html = '';
+        Object.keys(groupedItems).forEach(serviceType => {
+            const items = groupedItems[serviceType];
+            const serviceIcon = serviceType.includes('Cleaning') ? 'fa-soap' :
+                              serviceType.includes('Quality') ? 'fa-search-plus' : 'fa-cog';
+
+            html += `
+                <div class="service-group mb-3">
+                    <h6 class="service-group-title">
+                        <i class="fas ${serviceIcon} me-2"></i>
+                        ${serviceType} (${items.length})
+                    </h6>
+            `;
+
+            items.slice(0, 5).forEach(item => {
+                html += `
+                    <div class="laundry-item border rounded p-2 mb-1" onclick="rentalFlow.processLaundryItem('${item.tag_id}')">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <strong>${item.tag_id}</strong>
+                                <div class="text-muted small">${item.rental_class_id || 'Equipment'}</div>
+                                ${item.contract_number ? `<div class="text-muted small">Contract: ${item.contract_number}</div>` : ''}
+                            </div>
+                            <div class="text-muted">
+                                ${item.days_since_return} days
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            html += '</div>';
+        });
+
+        container.innerHTML = html;
+    }
+
+    selectReservation(contractNumber) {
+        document.getElementById('checkout-contract-input').value = contractNumber;
+        showMessage(`Selected reservation: ${contractNumber}`, 'success');
+    }
+
+    selectContract(contractNumber) {
+        document.getElementById('checkout-contract-input').value = contractNumber;
+        showMessage(`Selected contract: ${contractNumber}`, 'success');
+    }
+
+    switchService(service) {
+        this.currentService = service;
+
+        // Update service buttons
+        document.querySelectorAll('[data-service]').forEach(btn => {
+            btn.classList.remove('active', 'btn-warning', 'btn-info', 'btn-success');
+            btn.classList.add('btn-outline-warning', 'btn-outline-info', 'btn-outline-success');
+        });
+
+        const activeBtn = document.querySelector(`[data-service="${service}"]`);
+        activeBtn.classList.remove('btn-outline-warning', 'btn-outline-info', 'btn-outline-success');
+
+        if (service === 'cleaning') {
+            activeBtn.classList.add('active', 'btn-warning');
+        } else if (service === 'inspection') {
+            activeBtn.classList.add('active', 'btn-info');
+        } else {
+            activeBtn.classList.add('active', 'btn-success');
+        }
+
+        this.loadLaundryQueue();
+    }
+
+    async processLaundryItem(tagId = null) {
+        if (!tagId) {
+            tagId = document.getElementById('laundry-scan-input').value.trim();
+        }
+
+        if (!tagId) {
+            showMessage('Please scan or enter an item ID', 'warning');
+            return;
+        }
+
+        let newStatus = 'Available';
+        if (this.currentService === 'cleaning') {
+            newStatus = 'In Cleaning';
+        } else if (this.currentService === 'inspection') {
+            newStatus = 'In Inspection';
+        } else if (this.currentService === 'ready') {
+            newStatus = 'Available';
+        }
+
+        try {
+            const response = await fetch(`/api/update/${encodeURIComponent(tagId)}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    status: newStatus,
+                    notes: `Service: ${this.currentService} processing`,
+                    employee: 'Laundry Service'
+                })
+            });
+
+            const data = await response.json();
+
+            if (response.ok && data.success) {
+                showMessage(`${tagId} updated to ${newStatus}`, 'success');
+                document.getElementById('laundry-scan-input').value = '';
+                this.loadLaundryQueue();
+            } else {
+                showMessage(data.message || 'Service update failed', 'error');
+            }
+
+        } catch (error) {
+            console.error('Laundry service error:', error);
+            showMessage('Service update failed', 'error');
+        }
+    }
+
+    // Refresh functions
+    async refreshReservations() {
+        await this.loadUpcomingReservations();
+        showMessage('Reservations refreshed', 'success');
+    }
+
+    async refreshContracts() {
+        await this.loadOpenContracts();
+        showMessage('Contracts refreshed', 'success');
+    }
+
+    async refreshLaundryQueue() {
+        await this.loadLaundryQueue();
+        showMessage('Service queue refreshed', 'success');
+    }
+
+    // Placeholder methods for additional functionality
+    async loadContractForCheckout() {
+        const contractNo = document.getElementById('checkout-contract-input').value.trim();
+        if (contractNo) {
+            showMessage(`Loading contract ${contractNo}...`, 'info');
+            // Could integrate with contract details API here
+        } else {
+            showMessage('Please enter a contract number first', 'warning');
+        }
+    }
+
+    async loadContractForAssign() {
+        const contractNo = document.getElementById('assign-contract-input').value.trim();
+        if (contractNo) {
+            showMessage(`Loading contract ${contractNo} for assignment...`, 'info');
+        } else {
+            showMessage('Please enter a contract number first', 'warning');
+        }
+    }
+
+    async showRecentContracts() {
+        showMessage('Showing recent contracts in left panel', 'info');
+        await this.loadOpenContracts();
+    }
+
+    async directRental() {
+        document.getElementById('checkout-contract-input').value = '';
+        showMessage('Direct rental mode - no contract required', 'success');
+    }
+
+    async passInspection() {
+        if (this.currentInspectionItem) {
+            this.completeInspection(this.currentInspectionItem, 'pass');
+        } else {
+            showMessage('No item loaded for inspection', 'warning');
+        }
+    }
+
+    async failInspection() {
+        if (this.currentInspectionItem) {
+            this.completeInspection(this.currentInspectionItem, 'fail');
+        } else {
+            showMessage('No item loaded for inspection', 'warning');
+        }
+    }
+
+    // Scanner Settings Methods
+    toggleScannerSettings() {
+        const panel = document.getElementById('scanner-settings-panel');
+        if (panel) {
+            panel.classList.toggle('d-none');
+        }
+    }
+
+    updateScannerSensitivity() {
+        const sensitivity = document.getElementById('scanner-sensitivity').value;
+        this.scannerSettings.sensitivity = sensitivity;
+        console.log(`Scanner sensitivity changed to: ${sensitivity}`);
+
+        // Update scanner timeout based on sensitivity
+        let newTimeout;
+        switch (sensitivity) {
+            case 'low':
+                newTimeout = 200;
+                break;
+            case 'medium':
+                newTimeout = 100;
+                break;
+            case 'high':
+                newTimeout = 50;
+                break;
+            default:
+                newTimeout = 100;
+        }
+
+        this.scannerSettings.timeout = newTimeout;
+        document.getElementById('scan-timeout').value = newTimeout;
+
+        this.updateScannerStatus(`Settings: ${sensitivity} sensitivity, ${newTimeout}ms timeout`);
+    }
+
+    updateScanTimeout() {
+        const timeout = parseInt(document.getElementById('scan-timeout').value) || 100;
+        this.scannerSettings.timeout = timeout;
+        console.log(`Scanner timeout changed to: ${timeout}ms`);
+        this.updateScannerStatus(`Settings: timeout ${timeout}ms`);
+    }
+
+    updateScannerBeep() {
+        const beepEnabled = document.getElementById('scanner-beep').checked;
+        this.scannerSettings.beepEnabled = beepEnabled;
+        console.log(`Scanner beep ${beepEnabled ? 'enabled' : 'disabled'}`);
+        this.updateScannerStatus(`Settings: beep ${beepEnabled ? 'enabled' : 'disabled'}`);
+    }
+
+    testScanner() {
+        this.updateScannerStatus('Testing - Please scan any item now...');
+        console.log('🧪 Scanner test initiated - Try scanning now');
+
+        // Set a timeout to reset status if no scan received
+        setTimeout(() => {
+            if (!this.scannerLastActive || (Date.now() - this.scannerLastActive) > 5000) {
+                this.updateScannerStatus('Test timeout - Check scanner connection');
+            }
+        }, 10000);
+    }
+}
+
+// Global functions for HTML onclick handlers
+function toggleScannerSettings() {
+    if (rentalFlow) rentalFlow.toggleScannerSettings();
+}
+
+function updateScannerSensitivity() {
+    if (rentalFlow) rentalFlow.updateScannerSensitivity();
+}
+
+function updateScanTimeout() {
+    if (rentalFlow) rentalFlow.updateScanTimeout();
+}
+
+function updateScannerBeep() {
+    if (rentalFlow) rentalFlow.updateScannerBeep();
+}
+
+function testScanner() {
+    if (rentalFlow) rentalFlow.testScanner();
+}
+
+// Initialize rental flow manager
+let rentalFlow = null;
+document.addEventListener('DOMContentLoaded', function() {
+    rentalFlow = new RentalFlowManager();
+
+    // Initialize preloaded data
+    setTimeout(() => {
+        if (rentalFlow) {
+            rentalFlow.initializeData();
+        }
+    }, 500);
+});
+
+// Global functions for button handlers
+function switchAction(action) {
+    if (rentalFlow) rentalFlow.switchAction(action);
+}
+
+function toggleBatchMode() {
+    if (rentalFlow) rentalFlow.toggleBatchMode();
+}
+
+function processCheckoutScan() {
+    if (rentalFlow) rentalFlow.processCheckoutScan();
+}
+
+function processReturnScan() {
+    if (rentalFlow) rentalFlow.processReturnScan();
+}
+
+function processInspectionScan() {
+    if (rentalFlow) rentalFlow.processInspectionScan();
+}
+
+function assignRFIDTag() {
+    if (rentalFlow) rentalFlow.assignRFIDTag();
+}
+
+function processBatch() {
+    if (rentalFlow) rentalFlow.processBatch();
+}
+
+function clearBatch() {
+    if (rentalFlow) rentalFlow.clearBatch();
+}
+
+function switchService(service) {
+    if (rentalFlow) rentalFlow.switchService(service);
+}
+
+function processLaundryItem() {
+    if (rentalFlow) rentalFlow.processLaundryItem();
+}
+
+function refreshReservations() {
+    if (rentalFlow) rentalFlow.refreshReservations();
+}
+
+function refreshContracts() {
+    if (rentalFlow) rentalFlow.refreshContracts();
+}
+
+function refreshLaundryQueue() {
+    if (rentalFlow) rentalFlow.refreshLaundryQueue();
+}
+
+function showRecentContracts() {
+    if (rentalFlow) rentalFlow.showRecentContracts();
+}
+
+function directRental() {
+    if (rentalFlow) rentalFlow.directRental();
+}
+
+function passInspection() {
+    if (rentalFlow) rentalFlow.passInspection();
+}
+
+function failInspection() {
+    if (rentalFlow) rentalFlow.failInspection();
+}
+
+// Camera scanning functionality
+let currentCameraTarget = null;
+let cameraStream = null;
+let cameraDevices = [];
+let currentCameraIndex = 0;
+
+function startCameraScanning(targetInput) {
+    currentCameraTarget = targetInput;
+    const modal = new bootstrap.Modal(document.getElementById('camera-modal'));
+    modal.show();
+}
+
+async function startCamera() {
+    try {
+        // Get available cameras
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const allCameras = devices.filter(device => device.kind === 'videoinput');
+
+        // Use all available cameras as backup (Bluetooth scanner is primary)
+        cameraDevices = allCameras;
+        console.log(`Found ${cameraDevices.length} camera(s) available as backup to Bluetooth scanner:`,
+                   cameraDevices.map(c => c.label || c.deviceId));
+
+        // Prefer mobile cameras if available, otherwise use any camera as backup
+        const mobileFirst = [...cameraDevices].sort((a, b) => {
+            const aLabel = a.label.toLowerCase();
+            const bLabel = b.label.toLowerCase();
+
+            // Mobile/built-in cameras get priority
+            const aMobile = aLabel.includes('back') || aLabel.includes('rear') ||
+                          aLabel.includes('environment') || !aLabel.includes('usb');
+            const bMobile = bLabel.includes('back') || bLabel.includes('rear') ||
+                          bLabel.includes('environment') || !bLabel.includes('usb');
+
+            if (aMobile && !bMobile) return -1;
+            if (!aMobile && bMobile) return 1;
+            return 0;
+        });
+
+        cameraDevices = mobileFirst;
+        console.log('Camera priority order:', cameraDevices.map(c => `${c.label || c.deviceId}`));
+
+        if (cameraDevices.length > 1) {
+            document.getElementById('switch-camera-btn').style.display = 'inline-block';
+        }
+
+        // Prefer rear/back camera for mobile devices
+        if (currentCameraIndex === 0 && cameraDevices.length > 0) {
+            const rearCamera = cameraDevices.findIndex(camera => {
+                const label = camera.label.toLowerCase();
+                return label.includes('back') || label.includes('rear') || label.includes('environment');
+            });
+            if (rearCamera !== -1) {
+                currentCameraIndex = rearCamera;
+                console.log('Using preferred rear camera:', cameraDevices[currentCameraIndex].label);
+            }
+        }
+
+        // Start camera with selected device
+        const constraints = {
+            video: {
+                deviceId: cameraDevices[currentCameraIndex] ? { exact: cameraDevices[currentCameraIndex].deviceId } : undefined,
+                facingMode: cameraDevices.length === 0 ? 'environment' : undefined,
+                width: { ideal: 1920 },
+                height: { ideal: 1080 }
+            }
+        };
+
+        console.log('Camera constraints:', constraints);
+        cameraStream = await navigator.mediaDevices.getUserMedia(constraints);
+        const video = document.getElementById('camera-video');
+        video.srcObject = cameraStream;
+
+        video.onloadedmetadata = () => {
+            video.play();
+            document.getElementById('start-camera-btn').classList.add('d-none');
+            document.getElementById('stop-camera-btn').classList.remove('d-none');
+            document.getElementById('camera-status').innerHTML = `
+                <i class="fas fa-check-circle text-success me-2"></i>
+                Camera active - Point at QR codes or barcodes
+            `;
+
+            // Start QR/barcode scanning
+            startBarcodeScanning(video);
+        };
+
+    } catch (error) {
+        console.error('Camera error:', error);
+        let errorMsg = 'Camera access failed. ';
+        if (error.name === 'NotAllowedError') {
+            errorMsg += 'Please allow camera permissions.';
+        } else if (error.name === 'NotFoundError') {
+            errorMsg += 'No camera found.';
+        } else {
+            errorMsg += error.message;
+        }
+
+        document.getElementById('camera-status').innerHTML = `
+            <i class="fas fa-exclamation-triangle text-warning me-2"></i>
+            ${errorMsg}
+        `;
+    }
+}
+
+function stopCamera() {
+    if (cameraStream) {
+        cameraStream.getTracks().forEach(track => track.stop());
+        cameraStream = null;
+    }
+
+    const video = document.getElementById('camera-video');
+    video.srcObject = null;
+
+    document.getElementById('start-camera-btn').classList.remove('d-none');
+    document.getElementById('stop-camera-btn').classList.add('d-none');
+    document.getElementById('camera-status').innerHTML = `
+        <i class="fas fa-info-circle me-2"></i>
+        Camera stopped. Click "Start Camera" to resume scanning.
+    `;
+}
+
+async function switchCameraDevice() {
+    if (cameraDevices.length <= 1) return;
+
+    stopCamera();
+    currentCameraIndex = (currentCameraIndex + 1) % cameraDevices.length;
+    setTimeout(() => startCamera(), 500);
+}
+
+function startBarcodeScanning(video) {
+    // Simple barcode/QR detection using canvas
+    const canvas = document.getElementById('camera-canvas');
+    const context = canvas.getContext('2d');
+
+    function scanFrame() {
+        if (video.readyState === video.HAVE_ENOUGH_DATA && !video.paused) {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            // Here you would typically integrate with a barcode scanning library
+            // For now, we'll provide manual input capability
+        }
+
+        if (cameraStream) {
+            requestAnimationFrame(scanFrame);
+        }
+    }
+
+    scanFrame();
+}
+
+function processCameraScan(scannedData) {
+    if (!currentCameraTarget || !scannedData) return;
+
+    // Fill the appropriate input field based on current target
+    const inputMap = {
+        'checkout': 'checkout-scan-input',
+        'return': 'return-scan-input',
+        'inspect': 'inspect-scan-input'
+    };
+
+    const inputId = inputMap[currentCameraTarget];
+    if (inputId) {
+        document.getElementById(inputId).value = scannedData;
+        showMessage(`Scanned: ${scannedData}`, 'success');
+
+        // Close camera modal
+        bootstrap.Modal.getInstance(document.getElementById('camera-modal')).hide();
+        stopCamera();
+
+        // Focus back to input for additional processing
+        document.getElementById(inputId).focus();
+    }
+}
+
+// Close camera when modal is hidden
+document.getElementById('camera-modal').addEventListener('hidden.bs.modal', function () {
+    stopCamera();
+});
+</script>
+
+<style>
+.rental-tabs .btn-group {
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.rental-tabs .btn {
+    border-radius: 0;
+    border-right: 1px solid #dee2e6;
+    padding: 0.75rem 1rem;
+}
+
+.rental-tabs .btn:last-child {
+    border-right: none;
+}
+
+.scanner-container {
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+}
+
+.quick-actions-grid .btn,
+.inspection-actions .btn {
+    padding: 0.75rem;
+    height: auto;
+    text-align: center;
+}
+
+.form-check-container {
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.batch-item {
+    background: #f8f9fa;
+    border-radius: 6px;
+    margin-bottom: 0.5rem;
+}
+
+.batch-items-container {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.return-options .card {
+    border-color: #dee2e6;
+}
+
+.item-details p {
+    margin-bottom: 0.5rem;
+}
+
+.action-content {
+    transition: all 0.2s ease;
+}
+
+.form-check-label {
+    font-size: 0.9rem;
+}
+
+/* Advanced Integration Styles */
+.quick-access-sections .access-section {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 1rem;
+}
+
+.reservation-list, .contracts-list, .service-queue {
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.reservation-item, .contract-item, .laundry-item {
+    background: white;
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+.reservation-item:hover, .contract-item:hover, .laundry-item:hover {
+    background: #f0f8ff;
+    border-color: #007bff !important;
+    transform: translateY(-1px);
+}
+
+.progress-bar-mini {
+    width: 50px;
+    height: 4px;
+    background: #e9ecef;
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #28a745, #20c997);
+    transition: width 0.3s ease;
+}
+
+.service-selector .btn-group {
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.service-group {
+    border-left: 3px solid #007bff;
+    padding-left: 1rem;
+    margin-left: 0.5rem;
+}
+
+.service-group-title {
+    color: #495057;
+    font-weight: 600;
+    margin-bottom: 0.75rem;
+}
+
+.laundry-item {
+    border-left: 3px solid transparent;
+}
+
+.laundry-item:hover {
+    border-left-color: #17a2b8;
+}
+
+.cursor-pointer {
+    cursor: pointer;
+}
+
+/* Loading states */
+.loading-spinner {
+    width: 1rem;
+    height: 1rem;
+    border: 2px solid #f3f3f3;
+    border-top: 2px solid #007bff;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Mobile responsive adjustments */
+@media (max-width: 768px) {
+    .quick-access-sections .access-section {
+        margin-bottom: 1rem;
+    }
+
+    .reservation-list, .contracts-list, .service-queue {
+        max-height: 150px;
+    }
+
+    .rental-tabs .btn-group {
+        flex-wrap: wrap;
+    }
+
+    .rental-tabs .btn {
+        flex: 1 1 calc(50% - 0.25rem);
+        margin: 0.125rem;
+    }
+}
+</style>
+{% endblock %}

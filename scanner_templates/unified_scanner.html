@@ -1,0 +1,1126 @@
+{% extends "base.html" %}
+
+{% block title %}Unified Scanner - RFID System{% endblock %}
+
+{% block header_title %}Unified Scanner{% endblock %}
+
+{% block header_actions %}
+<a href="{{ url_for('home') }}" class="btn btn-light btn-sm me-2">
+    <i class="fas fa-home"></i> Home
+</a>
+<button class="btn btn-outline-light btn-sm" onclick="toggleBatchMode()" id="batch-toggle">
+    <i class="fas fa-layer-group"></i> <span>Batch</span>
+</button>
+{% endblock %}
+
+{% block content %}
+<!-- Mode Toggle Tabs -->
+<div class="mode-tabs mb-3">
+    <div class="btn-group w-100" role="group">
+        <button class="btn btn-primary active" data-mode="scan" onclick="switchMode('scan')">
+            <i class="fas fa-qrcode"></i> Scan
+        </button>
+        <button class="btn btn-outline-primary" data-mode="find" onclick="switchMode('find')">
+            <i class="fas fa-search"></i> Find
+        </button>
+        <button class="btn btn-outline-primary" data-mode="contract" onclick="switchMode('contract')">
+            <i class="fas fa-file-contract"></i> Contract
+        </button>
+        <button class="btn btn-outline-primary" data-mode="admin" onclick="switchMode('admin')">
+            <i class="fas fa-tools"></i> Admin
+        </button>
+    </div>
+</div>
+
+<!-- Batch Mode Indicator -->
+<div id="batch-indicator" class="alert alert-warning d-none">
+    <div class="d-flex justify-content-between align-items-center">
+        <div>
+            <i class="fas fa-layer-group me-2"></i>
+            <strong>Batch Mode Active:</strong> <span id="batch-count">0</span> items scanned
+        </div>
+        <div class="btn-group" role="group">
+            <button class="btn btn-sm btn-success" onclick="processBatch()">
+                <i class="fas fa-check"></i> Process
+            </button>
+            <button class="btn btn-sm btn-secondary" onclick="clearBatch()">
+                <i class="fas fa-trash"></i> Clear
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- SCAN MODE -->
+<div class="mode-content active" id="scan-mode">
+    <div class="scanner-container">
+        <h5 class="mb-3">
+            <i class="fas fa-wifi text-success me-2"></i>
+            Multi-Scanner Interface
+        </h5>
+
+        <!-- Scanner Status -->
+        <div class="mb-3">
+            <div class="d-flex align-items-center">
+                <div id="scanner-status-indicator" class="me-3">
+                    <i class="fas fa-bluetooth text-primary"></i>
+                </div>
+                <div>
+                    <strong>Chainway SR160:</strong> <span id="scanner-status">Waiting for connection...</span>
+                </div>
+                <button class="btn btn-sm btn-outline-success ms-auto" onclick="testScanner()">
+                    <i class="fas fa-vial"></i> Test
+                </button>
+            </div>
+        </div>
+
+        <!-- Scanner Input (Hidden - receives hardware input) -->
+        <input type="text"
+               id="hardware-scanner-input"
+               class="form-control d-none"
+               autocomplete="off"
+               placeholder="Hardware scanner input...">
+
+        <!-- Manual Entry -->
+        <div class="manual-entry mb-3">
+            <div class="input-group">
+                <input type="text"
+                       class="form-control form-control-lg"
+                       id="manual-scan-input"
+                       placeholder="Scan, type, or paste RFID/QR/Barcode..."
+                       autocomplete="off">
+                <button class="btn btn-primary" onclick="processScan()">
+                    <i class="fas fa-search"></i>
+                </button>
+            </div>
+            <div class="form-text">
+                Supports: RFID EPC, QR codes, barcodes, tag IDs, serial numbers
+            </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="quick-actions mb-3">
+            <div class="row g-2">
+                <div class="col-6">
+                    <button class="btn btn-outline-info w-100" onclick="quickFind()">
+                        <i class="fas fa-search-plus"></i><br><small>Quick Find</small>
+                    </button>
+                </div>
+                <div class="col-6">
+                    <button class="btn btn-outline-warning" onclick="showCamera()" id="camera-btn">
+                        <i class="fas fa-camera"></i><br><small>Camera</small>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Camera Section -->
+        <div id="camera-section" class="camera-scanner d-none">
+            <div class="position-relative">
+                <video id="camera-video" class="w-100 rounded" style="max-height: 300px;" playsinline></video>
+                <canvas id="camera-canvas" class="d-none"></canvas>
+                <div id="camera-overlay" class="position-absolute top-0 start-0 w-100 h-100 d-none">
+                    <div class="position-absolute top-50 start-50 translate-middle">
+                        <div class="bg-primary text-white px-3 py-2 rounded">
+                            <i class="fas fa-crosshairs me-2"></i>Point at code
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="mt-2">
+                <button class="btn btn-danger btn-sm" onclick="stopCamera()">
+                    <i class="fas fa-stop"></i> Stop Camera
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scan Results -->
+    <div id="scan-results" class="mt-4"></div>
+</div>
+
+<!-- FIND MODE -->
+<div class="mode-content d-none" id="find-mode">
+    <div class="scanner-container">
+        <h5 class="mb-3">
+            <i class="fas fa-search text-info me-2"></i>
+            Find & Search
+        </h5>
+
+        <!-- Search Options -->
+        <div class="search-tabs mb-3">
+            <div class="btn-group w-100" role="group">
+                <button class="btn btn-outline-secondary active" data-search="item" onclick="switchSearch('item')">
+                    <i class="fas fa-box"></i> Items
+                </button>
+                <button class="btn btn-outline-secondary" data-search="contract" onclick="switchSearch('contract')">
+                    <i class="fas fa-file-contract"></i> Contracts
+                </button>
+                <button class="btn btn-outline-secondary" data-search="customer" onclick="switchSearch('customer')">
+                    <i class="fas fa-user"></i> Customers
+                </button>
+            </div>
+        </div>
+
+        <!-- Search Input -->
+        <div class="search-input mb-3">
+            <div class="input-group">
+                <input type="text"
+                       class="form-control form-control-lg"
+                       id="find-input"
+                       placeholder="Enter search term..."
+                       autocomplete="off">
+                <button class="btn btn-success" onclick="performSearch()">
+                    <i class="fas fa-search"></i> Search
+                </button>
+            </div>
+        </div>
+
+        <!-- Advanced Filters -->
+        <div class="advanced-filters mb-3">
+            <div class="row g-2">
+                <div class="col-md-4">
+                    <select class="form-select" id="status-filter">
+                        <option value="">All Statuses</option>
+                        <option value="available">Available</option>
+                        <option value="reserved">Reserved</option>
+                        <option value="out_with_customer">Out with Customer</option>
+                        <option value="needs_inspection">Needs Inspection</option>
+                        <option value="needs_cleaning">Needs Cleaning</option>
+                        <option value="needs_repair">Needs Repair</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <select class="form-select" id="store-filter">
+                        <option value="">All Stores</option>
+                        <option value="3607">Store 3607 - Wayzata</option>
+                        <option value="6800">Store 6800 - Brooklyn Park</option>
+                        <option value="728">Store 728 - Elk River</option>
+                        <option value="8101">Store 8101 - Fridley</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <select class="form-select" id="date-filter">
+                        <option value="">Any Date</option>
+                        <option value="today">Today</option>
+                        <option value="week">This Week</option>
+                        <option value="month">This Month</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Search Results -->
+    <div id="find-results" class="mt-3"></div>
+</div>
+
+<!-- CONTRACT MODE -->
+<div class="mode-content d-none" id="contract-mode">
+    <div class="scanner-container">
+        <h5 class="mb-3">
+            <i class="fas fa-file-contract text-success me-2"></i>
+            Contract Management
+        </h5>
+
+        <!-- Contract Search -->
+        <div class="contract-search mb-3">
+            <div class="input-group">
+                <input type="text"
+                       class="form-control"
+                       id="contract-number-input"
+                       placeholder="Contract # or Customer name..."
+                       autocomplete="off">
+                <button class="btn btn-primary" onclick="loadContract()">
+                    <i class="fas fa-search"></i> Load
+                </button>
+            </div>
+        </div>
+
+        <!-- Quick Contract Actions -->
+        <div class="contract-quick-actions mb-3">
+            <div class="row g-2">
+                <div class="col-6 col-md-3">
+                    <button class="btn btn-outline-success w-100" onclick="showActiveContracts()">
+                        <i class="fas fa-file-contract"></i><br><small>Active</small>
+                    </button>
+                </div>
+                <div class="col-6 col-md-3">
+                    <button class="btn btn-outline-warning w-100" onclick="showInspectionNeeded()">
+                        <i class="fas fa-eye"></i><br><small>Inspection</small>
+                    </button>
+                </div>
+                <div class="col-6 col-md-3">
+                    <button class="btn btn-outline-info w-100" onclick="showDeliveries()">
+                        <i class="fas fa-truck"></i><br><small>Delivery</small>
+                    </button>
+                </div>
+                <div class="col-6 col-md-3">
+                    <button class="btn btn-outline-danger w-100" onclick="showOverdue()">
+                        <i class="fas fa-exclamation-triangle"></i><br><small>Overdue</small>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Contract Details -->
+    <div id="contract-details" class="mt-3"></div>
+</div>
+
+<!-- ADMIN MODE -->
+<div class="mode-content d-none" id="admin-mode">
+    <div class="scanner-container">
+        <h5 class="mb-3">
+            <i class="fas fa-tools text-warning me-2"></i>
+            Admin Functions
+        </h5>
+
+        <!-- Admin PIN Entry -->
+        <div id="admin-pin-entry" class="pin-entry mb-4">
+            <div class="alert alert-warning">
+                <i class="fas fa-lock me-2"></i>
+                <strong>Admin access required.</strong> Enter PIN to continue.
+            </div>
+            <div class="input-group">
+                <input type="password"
+                       class="form-control form-control-lg text-center"
+                       id="admin-pin-input"
+                       placeholder="Enter Admin PIN"
+                       maxlength="6"
+                       autocomplete="off">
+                <button class="btn btn-primary" onclick="validateAdminPIN()">
+                    <i class="fas fa-unlock"></i> Unlock
+                </button>
+            </div>
+        </div>
+
+        <!-- Admin Functions (Hidden until PIN validated) -->
+        <div id="admin-functions" class="d-none">
+            <div class="admin-actions mb-4">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <div class="admin-action-card">
+                            <h6><i class="fas fa-plus text-success me-2"></i>Add New Equipment</h6>
+                            <p>Assign RFID/EPC to new inventory items</p>
+                            <button class="btn btn-success" onclick="showNewEquipmentModal()">
+                                <i class="fas fa-plus"></i> Add Equipment
+                            </button>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="admin-action-card">
+                            <h6><i class="fas fa-layer-group text-info me-2"></i>Bulk Operations</h6>
+                            <p>Batch status updates and bulk changes</p>
+                            <button class="btn btn-info" onclick="showBulkOpsModal()">
+                                <i class="fas fa-cogs"></i> Bulk Ops
+                            </button>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="admin-action-card">
+                            <h6><i class="fas fa-unlink text-warning me-2"></i>Remove RFID</h6>
+                            <p>Unassign RFID tags from items</p>
+                            <button class="btn btn-warning" onclick="showRemoveRFIDModal()">
+                                <i class="fas fa-unlink"></i> Remove RFID
+                            </button>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="admin-action-card">
+                            <h6><i class="fas fa-override text-danger me-2"></i>Status Override</h6>
+                            <p>Force status changes and corrections</p>
+                            <button class="btn btn-danger" onclick="showStatusOverrideModal()">
+                                <i class="fas fa-exclamation"></i> Override
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Admin Session Info -->
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle me-2"></i>
+                Admin session active. <span id="admin-session-timer">Session expires in 15:00</span>
+                <button class="btn btn-sm btn-outline-secondary ms-3" onclick="lockAdmin()">
+                    <i class="fas fa-lock"></i> Lock
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Batch Processing List -->
+<div id="batch-list" class="mt-4 d-none">
+    <div class="scanner-container">
+        <h6 class="mb-3">
+            <i class="fas fa-list text-primary me-2"></i>
+            Batch Processing Queue
+        </h6>
+        <div id="batch-items" class="batch-items-container">
+            <!-- Batch items will be populated here -->
+        </div>
+    </div>
+</div>
+
+<!-- Status Update Modal -->
+<div class="modal fade" id="statusUpdateModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-edit me-2"></i>Update Item Status
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Item:</label>
+                    <div id="status-item-info" class="p-3 bg-light rounded">
+                        <strong id="status-item-desc">Item info will appear here</strong>
+                        <br><small class="text-muted" id="status-item-current">Current status</small>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label for="new-status-select" class="form-label">New Status:</label>
+                    <select class="form-select form-select-lg" id="new-status-select">
+                        <option value="">Select new status...</option>
+                        <optgroup label="Available">
+                            <option value="available">Available - Ready to rent</option>
+                        </optgroup>
+                        <optgroup label="Customer Process">
+                            <option value="reserved">Reserved - Customer reserved (RX)</option>
+                            <option value="out_for_delivery">Out for Delivery - Being delivered</option>
+                            <option value="out_with_customer">Out with Customer - At customer site</option>
+                            <option value="pickup_scheduled">Pickup Scheduled - Pickup arranged</option>
+                            <option value="in_transit_return">In Transit Return - Coming back</option>
+                        </optgroup>
+                        <optgroup label="Service Required">
+                            <option value="needs_inspection">Needs Inspection - Laundry inspection required</option>
+                            <option value="needs_cleaning">Needs Cleaning - Cleaning required</option>
+                            <option value="needs_repair">Needs Repair - Repair required</option>
+                        </optgroup>
+                        <optgroup label="In Service">
+                            <option value="in_inspection">In Inspection - Being inspected</option>
+                            <option value="in_cleaning">In Cleaning - Being cleaned</option>
+                            <option value="in_repair">In Repair - Being repaired</option>
+                        </optgroup>
+                        <optgroup label="Final States">
+                            <option value="ready_to_rent">Ready to Rent - Back to available</option>
+                            <option value="out_of_service">Out of Service - Permanently offline</option>
+                            <option value="sold">Sold - Sold to customer</option>
+                        </optgroup>
+                    </select>
+                </div>
+
+                <!-- Service Details (shown conditionally) -->
+                <div id="service-details" class="mb-3 d-none">
+                    <label class="form-label">Service Details:</label>
+                    <div class="service-checkboxes">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="cleaning-required">
+                            <label class="form-check-label" for="cleaning-required">
+                                Cleaning Required
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="repair-required">
+                            <label class="form-check-label" for="repair-required">
+                                Repair Required
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="inspection-required">
+                            <label class="form-check-label" for="inspection-required">
+                                Quality Inspection Required
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Notes -->
+                <div class="mb-3">
+                    <label for="status-notes" class="form-label">Notes (Optional):</label>
+                    <textarea class="form-control" id="status-notes" rows="3"
+                              placeholder="Add notes about condition, repairs needed, etc..."></textarea>
+                </div>
+
+                <!-- Employee Assignment -->
+                <div class="mb-3">
+                    <label for="assigned-employee" class="form-label">Assign to Employee:</label>
+                    <select class="form-select" id="assigned-employee">
+                        <option value="">Select employee...</option>
+                        <option value="john_smith">John Smith</option>
+                        <option value="jane_doe">Jane Doe</option>
+                        <option value="mike_wilson">Mike Wilson</option>
+                        <option value="sarah_johnson">Sarah Johnson</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="updateItemStatus()">
+                    <i class="fas fa-save me-2"></i>Update Status
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- New Equipment Modal -->
+<div class="modal fade" id="newEquipmentModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-plus me-2"></i>Add New Equipment
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label for="new-rfid-tag" class="form-label">RFID/EPC Tag:</label>
+                        <input type="text" class="form-control" id="new-rfid-tag"
+                               placeholder="Scan or enter RFID tag..." autocomplete="off">
+                    </div>
+                    <div class="col-md-6">
+                        <label for="new-serial-number" class="form-label">Serial Number:</label>
+                        <input type="text" class="form-control" id="new-serial-number"
+                               placeholder="Enter serial number...">
+                    </div>
+                    <div class="col-md-6">
+                        <label for="new-item-class" class="form-label">Rental Class:</label>
+                        <select class="form-select" id="new-item-class">
+                            <option value="">Select class...</option>
+                            <option value="DRILL">DRILL - Power Drills</option>
+                            <option value="SAW">SAW - Saws & Cutting</option>
+                            <option value="COMPRESSOR">COMPRESSOR - Air Compressors</option>
+                            <option value="TENT">TENT - Event Tents</option>
+                            <option value="TABLE">TABLE - Tables & Furniture</option>
+                            <option value="CHAIR">CHAIR - Chairs & Seating</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label for="new-item-location" class="form-label">Home Location:</label>
+                        <select class="form-select" id="new-item-location">
+                            <option value="">Select location...</option>
+                            <option value="3607-A">Store 3607 - Zone A</option>
+                            <option value="3607-B">Store 3607 - Zone B</option>
+                            <option value="6800-A">Store 6800 - Zone A</option>
+                            <option value="728-A">Store 728 - Zone A</option>
+                            <option value="8101-A">Store 8101 - Zone A</option>
+                        </select>
+                    </div>
+                    <div class="col-12">
+                        <label for="new-item-description" class="form-label">Description:</label>
+                        <input type="text" class="form-control" id="new-item-description"
+                               placeholder="Enter item description...">
+                    </div>
+                    <div class="col-md-6">
+                        <label for="new-item-manufacturer" class="form-label">Manufacturer:</label>
+                        <input type="text" class="form-control" id="new-item-manufacturer"
+                               placeholder="Manufacturer name...">
+                    </div>
+                    <div class="col-md-6">
+                        <label for="new-item-model" class="form-label">Model:</label>
+                        <input type="text" class="form-control" id="new-item-model"
+                               placeholder="Model number...">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success" onclick="addNewEquipment()">
+                    <i class="fas fa-save me-2"></i>Add Equipment
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+class UnifiedScanner {
+    constructor() {
+        this.currentMode = 'scan';
+        this.batchMode = false;
+        this.batchItems = [];
+        this.adminUnlocked = false;
+        this.adminSessionTimer = null;
+        this.selectedItem = null;
+
+        this.init();
+    }
+
+    init() {
+        // Set up hardware scanner
+        this.setupHardwareScanner();
+
+        // Set up manual input
+        document.getElementById('manual-scan-input').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') this.processScan();
+        });
+
+        // Set up admin PIN input
+        document.getElementById('admin-pin-input').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') this.validateAdminPIN();
+        });
+
+        // Set up find input
+        document.getElementById('find-input').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') this.performSearch();
+        });
+
+        // Set up contract input
+        document.getElementById('contract-number-input').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') this.loadContract();
+        });
+
+        // Set up status change handler
+        document.getElementById('new-status-select').addEventListener('change', (e) => {
+            this.handleStatusChange(e.target.value);
+        });
+    }
+
+    setupHardwareScanner() {
+        const hardwareInput = document.getElementById('hardware-scanner-input');
+        hardwareInput.focus();
+
+        hardwareInput.addEventListener('input', (e) => {
+            const scannedCode = e.target.value.trim();
+            if (scannedCode) {
+                this.processScannedCode(scannedCode, 'Chainway SR160');
+                e.target.value = '';
+            }
+        });
+
+        // Keep focus and update status
+        setInterval(() => {
+            if (document.activeElement !== hardwareInput &&
+                !document.querySelector('.modal.show') &&
+                this.currentMode === 'scan') {
+                hardwareInput.focus();
+            }
+        }, 1000);
+    }
+
+    switchMode(mode) {
+        this.currentMode = mode;
+
+        // Update tab buttons
+        document.querySelectorAll('[data-mode]').forEach(btn => {
+            btn.classList.remove('active', 'btn-primary');
+            btn.classList.add('btn-outline-primary');
+        });
+        document.querySelector(`[data-mode="${mode}"]`).classList.add('active', 'btn-primary');
+        document.querySelector(`[data-mode="${mode}"]`).classList.remove('btn-outline-primary');
+
+        // Show/hide content sections
+        document.querySelectorAll('.mode-content').forEach(content => {
+            content.classList.add('d-none');
+        });
+        document.getElementById(`${mode}-mode`).classList.remove('d-none');
+
+        // Handle admin mode
+        if (mode === 'admin' && !this.adminUnlocked) {
+            document.getElementById('admin-pin-input').focus();
+        }
+    }
+
+    async validateAdminPIN() {
+        const pin = document.getElementById('admin-pin-input').value;
+
+        // In production, validate against server
+        if (pin === '123456') { // Demo PIN
+            this.adminUnlocked = true;
+            document.getElementById('admin-pin-entry').classList.add('d-none');
+            document.getElementById('admin-functions').classList.remove('d-none');
+            this.startAdminTimer();
+            showMessage('Admin access granted', 'success');
+        } else {
+            showMessage('Invalid PIN', 'error');
+            document.getElementById('admin-pin-input').value = '';
+        }
+    }
+
+    startAdminTimer() {
+        let timeLeft = 15 * 60; // 15 minutes
+        this.adminSessionTimer = setInterval(() => {
+            timeLeft--;
+            const minutes = Math.floor(timeLeft / 60);
+            const seconds = timeLeft % 60;
+            document.getElementById('admin-session-timer').textContent =
+                `Session expires in ${minutes}:${seconds.toString().padStart(2, '0')}`;
+
+            if (timeLeft <= 0) {
+                this.lockAdmin();
+            }
+        }, 1000);
+    }
+
+    lockAdmin() {
+        this.adminUnlocked = false;
+        document.getElementById('admin-pin-entry').classList.remove('d-none');
+        document.getElementById('admin-functions').classList.add('d-none');
+        document.getElementById('admin-pin-input').value = '';
+
+        if (this.adminSessionTimer) {
+            clearInterval(this.adminSessionTimer);
+            this.adminSessionTimer = null;
+        }
+
+        showMessage('Admin session locked', 'info');
+    }
+
+    toggleBatchMode() {
+        this.batchMode = !this.batchMode;
+        const indicator = document.getElementById('batch-indicator');
+        const toggle = document.getElementById('batch-toggle');
+
+        if (this.batchMode) {
+            indicator.classList.remove('d-none');
+            toggle.classList.remove('btn-outline-light');
+            toggle.classList.add('btn-warning');
+            toggle.querySelector('span').textContent = 'Exit Batch';
+            showMessage('Batch mode activated', 'info');
+        } else {
+            indicator.classList.add('d-none');
+            toggle.classList.remove('btn-warning');
+            toggle.classList.add('btn-outline-light');
+            toggle.querySelector('span').textContent = 'Batch';
+            showMessage('Batch mode deactivated', 'info');
+        }
+    }
+
+    async processScan() {
+        const input = document.getElementById('manual-scan-input');
+        const code = input.value.trim();
+
+        if (!code) {
+            showMessage('Please enter a code to scan', 'warning');
+            return;
+        }
+
+        await this.processScannedCode(code, 'Manual Entry');
+        input.value = '';
+    }
+
+    async processScannedCode(code, method = 'Scanner') {
+        try {
+            showMessage(`${method}: ${code}`, 'info');
+
+            if (this.batchMode) {
+                this.addToBatch(code, method);
+                return;
+            }
+
+            const response = await fetch(`/api/scan/${encodeURIComponent(code)}`);
+            const data = await response.json();
+
+            if (response.ok && data.success) {
+                this.displayScanResult(data, method);
+            } else {
+                this.displayScanError(code, data.message || 'Item not found');
+            }
+
+        } catch (error) {
+            console.error('Scan processing error:', error);
+            this.displayScanError(code, 'Network error occurred');
+        }
+    }
+
+    addToBatch(code, method) {
+        this.batchItems.push({ code, method, timestamp: new Date() });
+        document.getElementById('batch-count').textContent = this.batchItems.length;
+
+        // Show batch list if not visible
+        document.getElementById('batch-list').classList.remove('d-none');
+        this.updateBatchDisplay();
+
+        showMessage(`Added to batch: ${code}`, 'success');
+    }
+
+    updateBatchDisplay() {
+        const container = document.getElementById('batch-items');
+
+        if (this.batchItems.length === 0) {
+            container.innerHTML = '<div class="text-muted text-center p-3">No items in batch</div>';
+            return;
+        }
+
+        let html = '';
+        this.batchItems.forEach((item, index) => {
+            html += `
+                <div class="batch-item d-flex justify-content-between align-items-center p-2 border-bottom">
+                    <div>
+                        <strong>${item.code}</strong>
+                        <br><small class="text-muted">${item.method} - ${item.timestamp.toLocaleTimeString()}</small>
+                    </div>
+                    <button class="btn btn-sm btn-outline-danger" onclick="unifiedScanner.removeFromBatch(${index})">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            `;
+        });
+
+        container.innerHTML = html;
+    }
+
+    removeFromBatch(index) {
+        this.batchItems.splice(index, 1);
+        document.getElementById('batch-count').textContent = this.batchItems.length;
+        this.updateBatchDisplay();
+
+        if (this.batchItems.length === 0) {
+            document.getElementById('batch-list').classList.add('d-none');
+        }
+    }
+
+    async processBatch() {
+        if (this.batchItems.length === 0) {
+            showMessage('No items in batch to process', 'warning');
+            return;
+        }
+
+        showMessage(`Processing ${this.batchItems.length} items...`, 'info');
+
+        try {
+            const response = await fetch('/api/batch-process', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ items: this.batchItems })
+            });
+
+            const data = await response.json();
+
+            if (response.ok && data.success) {
+                showMessage(`Batch processed: ${data.processed}/${this.batchItems.length} items`, 'success');
+                this.clearBatch();
+            } else {
+                showMessage(data.message || 'Batch processing failed', 'error');
+            }
+
+        } catch (error) {
+            console.error('Batch processing error:', error);
+            showMessage('Batch processing failed', 'error');
+        }
+    }
+
+    clearBatch() {
+        this.batchItems = [];
+        document.getElementById('batch-count').textContent = '0';
+        document.getElementById('batch-list').classList.add('d-none');
+        this.updateBatchDisplay();
+    }
+
+    displayScanResult(data, method) {
+        const item = data.item;
+        const resultHtml = `
+            <div class="scanner-container">
+                <div class="d-flex justify-content-between align-items-start mb-3">
+                    <h6 class="mb-0 text-success">
+                        <i class="fas fa-check-circle me-2"></i>Item Found
+                    </h6>
+                    <small class="text-muted">${method}</small>
+                </div>
+
+                <div class="item-details mb-3">
+                    <div class="row g-3">
+                        <div class="col-md-8">
+                            <table class="table table-sm">
+                                <tr>
+                                    <td><strong>Tag ID:</strong></td>
+                                    <td>${item.tag_id}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Serial:</strong></td>
+                                    <td>${item.serial_number || 'N/A'}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Class:</strong></td>
+                                    <td>${item.rental_class_num || 'N/A'}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Location:</strong></td>
+                                    <td>${item.bin_location || 'Unknown'}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Status:</strong></td>
+                                    <td>
+                                        <span class="status-badge status-${(item.status || 'unknown').toLowerCase().replace(' ', '-')}">
+                                            ${item.status || 'Unknown'}
+                                        </span>
+                                    </td>
+                                </tr>
+                                ${item.last_contract_num ? `
+                                <tr>
+                                    <td><strong>Contract:</strong></td>
+                                    <td>${item.last_contract_num}</td>
+                                </tr>
+                                ` : ''}
+                            </table>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="d-grid gap-2">
+                                <button class="btn btn-primary" onclick="unifiedScanner.showStatusUpdate('${item.tag_id}')">
+                                    <i class="fas fa-edit me-2"></i>Update Status
+                                </button>
+                                ${item.last_contract_num ? `
+                                <button class="btn btn-outline-info" onclick="unifiedScanner.viewContract('${item.last_contract_num}')">
+                                    <i class="fas fa-file-contract me-2"></i>View Contract
+                                </button>
+                                ` : ''}
+                                <button class="btn btn-outline-secondary" onclick="unifiedScanner.clearResults()">
+                                    <i class="fas fa-times me-2"></i>Clear
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                ${item.notes ? `
+                <div class="alert alert-info">
+                    <strong>Notes:</strong> ${item.notes}
+                </div>
+                ` : ''}
+            </div>
+        `;
+
+        document.getElementById('scan-results').innerHTML = resultHtml;
+    }
+
+    displayScanError(code, message) {
+        const errorHtml = `
+            <div class="scanner-container">
+                <div class="alert alert-warning">
+                    <div class="d-flex align-items-start">
+                        <i class="fas fa-exclamation-triangle me-3 mt-1"></i>
+                        <div class="flex-grow-1">
+                            <h6 class="mb-1">Item Not Found</h6>
+                            <p class="mb-2">Code: <code>${code}</code></p>
+                            <p class="mb-3">${message}</p>
+
+                            ${this.adminUnlocked ? `
+                            <div class="d-grid gap-2 d-md-flex">
+                                <button class="btn btn-success" onclick="unifiedScanner.addAsNewEquipment('${code}')">
+                                    <i class="fas fa-plus me-2"></i>Add as New Equipment
+                                </button>
+                                <button class="btn btn-outline-primary" onclick="unifiedScanner.clearResults()">
+                                    <i class="fas fa-times me-2"></i>Clear
+                                </button>
+                            </div>
+                            ` : `
+                            <button class="btn btn-outline-primary" onclick="unifiedScanner.clearResults()">
+                                <i class="fas fa-times me-2"></i>Clear
+                            </button>
+                            `}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        document.getElementById('scan-results').innerHTML = errorHtml;
+    }
+
+    showStatusUpdate(tagId) {
+        // Load item details and show status update modal
+        this.selectedItem = { tag_id: tagId }; // Simplified for demo
+
+        document.getElementById('status-item-desc').textContent = `Tag: ${tagId}`;
+        document.getElementById('status-item-current').textContent = 'Current status will be loaded here';
+
+        const modal = new bootstrap.Modal(document.getElementById('statusUpdateModal'));
+        modal.show();
+    }
+
+    handleStatusChange(newStatus) {
+        const serviceDetails = document.getElementById('service-details');
+
+        // Show service details for certain statuses
+        const serviceStatuses = ['needs_inspection', 'needs_cleaning', 'needs_repair',
+                                'in_inspection', 'in_cleaning', 'in_repair'];
+
+        if (serviceStatuses.includes(newStatus)) {
+            serviceDetails.classList.remove('d-none');
+        } else {
+            serviceDetails.classList.add('d-none');
+        }
+    }
+
+    async updateItemStatus() {
+        const newStatus = document.getElementById('new-status-select').value;
+        const notes = document.getElementById('status-notes').value;
+        const employee = document.getElementById('assigned-employee').value;
+
+        if (!newStatus) {
+            showMessage('Please select a status', 'warning');
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/items/update-status', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    tag_id: this.selectedItem.tag_id,
+                    new_status: newStatus,
+                    notes: notes,
+                    assigned_employee: employee,
+                    cleaning_required: document.getElementById('cleaning-required').checked,
+                    repair_required: document.getElementById('repair-required').checked,
+                    inspection_required: document.getElementById('inspection-required').checked
+                })
+            });
+
+            const data = await response.json();
+
+            if (response.ok && data.success) {
+                showMessage('Status updated successfully', 'success');
+                bootstrap.Modal.getInstance(document.getElementById('statusUpdateModal')).hide();
+                this.clearResults();
+            } else {
+                showMessage(data.message || 'Status update failed', 'error');
+            }
+
+        } catch (error) {
+            console.error('Status update error:', error);
+            showMessage('Status update failed', 'error');
+        }
+    }
+
+    clearResults() {
+        document.getElementById('scan-results').innerHTML = '';
+        document.getElementById('find-results').innerHTML = '';
+    }
+
+    // Placeholder methods for additional functionality
+    async performSearch() { showMessage('Search functionality coming soon', 'info'); }
+    async loadContract() { showMessage('Contract loading coming soon', 'info'); }
+    async showActiveContracts() { showMessage('Active contracts view coming soon', 'info'); }
+    async showInspectionNeeded() { showMessage('Inspection queue coming soon', 'info'); }
+    async showDeliveries() { showMessage('Delivery schedule coming soon', 'info'); }
+    async showOverdue() { showMessage('Overdue items coming soon', 'info'); }
+    async addNewEquipment() { showMessage('Equipment addition coming soon', 'info'); }
+    async showCamera() { showMessage('Camera scanner coming soon', 'info'); }
+    async stopCamera() { showMessage('Camera stopped', 'info'); }
+    async testScanner() { showMessage('Testing scanner connection...', 'info'); }
+}
+
+// Initialize unified scanner
+let unifiedScanner = null;
+document.addEventListener('DOMContentLoaded', function() {
+    unifiedScanner = new UnifiedScanner();
+});
+
+// Global functions for button handlers
+function switchMode(mode) {
+    if (unifiedScanner) unifiedScanner.switchMode(mode);
+}
+
+function toggleBatchMode() {
+    if (unifiedScanner) unifiedScanner.toggleBatchMode();
+}
+
+function processScan() {
+    if (unifiedScanner) unifiedScanner.processScan();
+}
+
+function validateAdminPIN() {
+    if (unifiedScanner) unifiedScanner.validateAdminPIN();
+}
+
+function updateItemStatus() {
+    if (unifiedScanner) unifiedScanner.updateItemStatus();
+}
+
+function processBatch() {
+    if (unifiedScanner) unifiedScanner.processBatch();
+}
+
+function clearBatch() {
+    if (unifiedScanner) unifiedScanner.clearBatch();
+}
+</script>
+
+<style>
+.mode-tabs .btn-group {
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.mode-tabs .btn {
+    border-radius: 0;
+    border-right: 1px solid #dee2e6;
+}
+
+.mode-tabs .btn:last-child {
+    border-right: none;
+}
+
+.scanner-container {
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+}
+
+.batch-item {
+    background: #f8f9fa;
+    border-radius: 6px;
+    margin-bottom: 0.5rem;
+}
+
+.status-badge {
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.375rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.status-available { background-color: #d1edff; color: #084298; }
+.status-reserved { background-color: #fff3cd; color: #856404; }
+.status-out-with-customer { background-color: #cce5ff; color: #0a58ca; }
+.status-needs-inspection { background-color: #f8d7da; color: #721c24; }
+.status-needs-cleaning { background-color: #fff3cd; color: #856404; }
+.status-needs-repair { background-color: #f5c2c7; color: #842029; }
+.status-in-service { background-color: #cff4fc; color: #055160; }
+.status-out-of-service { background-color: #f8d7da; color: #721c24; }
+
+.admin-action-card {
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 1rem;
+    height: 100%;
+    background: #f8f9fa;
+}
+
+.admin-action-card h6 {
+    margin-bottom: 0.5rem;
+}
+
+.admin-action-card p {
+    color: #6c757d;
+    font-size: 0.9rem;
+    margin-bottom: 1rem;
+}
+
+.pin-entry input {
+    letter-spacing: 0.2em;
+    font-family: monospace;
+}
+
+.search-tabs .btn-group {
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.contract-quick-actions .btn {
+    padding: 0.75rem;
+    height: auto;
+}
+</style>
+{% endblock %}

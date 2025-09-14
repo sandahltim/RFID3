@@ -9,5 +9,8 @@ app = create_app()
 
 if __name__ == '__main__':
     port = int(os.environ.get('FLASK_RUN_PORT', 5000))
+
+    # Run HTTP only - HTTPS now handled by standalone scanner interface on port 8443
+    print("RFID3 Main Service running HTTP only - Scanner interface available on HTTPS:8443")
     app.run(host='0.0.0.0', port=port, debug=True)
 
