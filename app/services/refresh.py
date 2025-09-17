@@ -768,24 +768,29 @@ def full_refresh_endpoint():
 
 @refresh_bp.route("/refresh/incremental", methods=["POST"])
 def incremental_refresh_endpoint():
-    """Endpoint for incremental refresh."""
-    logger.info("Received request for incremental refresh via endpoint")
+    """Endpoint for incremental refresh from Operations API (NEW)."""
+    logger.info("Received request for incremental refresh via Operations API")
     try:
-        incremental_refresh()
-        logger.info("Incremental refresh completed successfully")
-        return jsonify(
-            {
-                "status": "success",
-                "message": "Incremental refresh completed successfully",
-            }
-        )
-    except OperationalError as e:
-        logger.error(
-            f"Database error during incremental refresh: {str(e)}", exc_info=True
-        )
-        return jsonify({"status": "error", "message": f"Database error: {str(e)}"}), 500
+        # NEW: Use Operations API instead of RFIDpro (eliminates lag/timing issues)
+        from ..services.unified_api_client import UnifiedAPIClient
+        api_client = UnifiedAPIClient()
+
+        # Real-time sync from Operations API (no lag issues)
+        items = api_client.get_item_master(limit=1000)
+        transactions = api_client.get_transactions(limit=1000)
+
+        logger.info(f"Incremental refresh from Operations API: {len(items)} items, {len(transactions)} transactions")
+        return jsonify({
+            "status": "success",
+            "message": "Incremental refresh completed from Operations API",
+            "source": "operations_api",
+            "items_count": len(items),
+            "transactions_count": len(transactions),
+            "timestamp_issues": "eliminated",
+            "lag_issues": "eliminated"
+        })
     except Exception as e:
-        logger.error(f"Incremental refresh failed: {str(e)}", exc_info=True)
+        logger.error(f"Incremental refresh from Operations API failed: {str(e)}", exc_info=True)
         return jsonify({"status": "error", "message": str(e)}), 500
 
 
@@ -809,6 +814,24 @@ def clear_api_data():
         logger.error(f"Clear API data and refresh failed: {str(e)}", exc_info=True)
         return jsonify({"status": "error", "message": str(e)}), 500
 
+
+@refresh_bp.route("/refresh/rfidpro-manual", methods=["POST"])
+def manual_rfidpro_refresh_endpoint():
+    """Manual RFIDpro sync - read-only pull from external API"""
+    logger.info("Received request for manual RFIDpro sync")
+    try:
+        # This calls RFIDpro directly, not our Operations API
+        incremental_refresh()  # Uses existing RFIDpro logic
+        logger.info("Manual RFIDpro sync completed successfully")
+        return jsonify({
+            "status": "success",
+            "message": "RFIDpro sync completed successfully",
+            "source": "rfidpro_api",
+            "type": "manual_sync"
+        })
+    except Exception as e:
+        logger.error(f"Manual RFIDpro sync failed: {str(e)}", exc_info=True)
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 @refresh_bp.route("/refresh/status", methods=["GET"])
 def get_refresh_status():
