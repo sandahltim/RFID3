@@ -9,7 +9,7 @@ from ..models.db_models import (
     SeedRentalClass,
     HandCountedCatalog,
 )
-from ..services.api_client import APIClient
+from ..services.unified_api_client import UnifiedAPIClient
 from ..services.logger import get_logger
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError, ProgrammingError
 from datetime import datetime
@@ -83,7 +83,7 @@ def manage_categories():
             seed_data = session.query(SeedRentalClass).all()
             if not seed_data:
                 logger.info("No seed data in database, fetching from API")
-                api_client = APIClient()
+                api_client = UnifiedAPIClient()
                 seed_data_api = api_client.get_seed_data()
                 for item in seed_data_api:
                     rental_class_id = item.get("rental_class_id")
@@ -368,7 +368,7 @@ def get_mappings():
             logger.info(f"Fetched {len(seed_data)} seed data records from database")
             if not seed_data:
                 logger.info("No seed data in database, fetching from API")
-                api_client = APIClient()
+                api_client = UnifiedAPIClient()
                 seed_data_api = api_client.get_seed_data()
                 for item in seed_data_api:
                     rental_class_id = item.get("rental_class_id")

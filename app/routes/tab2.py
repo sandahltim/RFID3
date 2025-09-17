@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, request, jsonify, current_app
 from .. import db, cache
 from ..models.db_models import Transaction, ItemMaster
-from ..services.api_client import APIClient
+from ..services.unified_api_client import UnifiedAPIClient
 from ..services.logger import get_logger
 from sqlalchemy import func, desc, asc, text
 from ..utils.filters import apply_global_filters
@@ -506,7 +506,7 @@ def update_status():
         session.commit()
 
         try:
-            api_client = APIClient()
+            api_client = UnifiedAPIClient()
             api_client.update_status(tag_id, new_status)
         except Exception as e:
             logger.error(
@@ -578,7 +578,7 @@ def bulk_update_status():
             return jsonify({"error": "No items found for the given contract"}), 404
 
         current_time = datetime.now(timezone.utc)
-        api_client = APIClient()
+        api_client = UnifiedAPIClient()
         updated = 0
         for item in items:
             item.status = new_status

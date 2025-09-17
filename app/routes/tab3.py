@@ -20,7 +20,7 @@ from ..models.db_models import (
     UserRentalClassMapping,
     SeedRentalClass,
 )
-from ..services.api_client import APIClient
+from ..services.unified_api_client import UnifiedAPIClient
 from ..services.logger import get_logger
 from sqlalchemy import text, func, or_
 from datetime import datetime, timezone
@@ -1570,7 +1570,7 @@ def update_synced_status():
         logger.info(f"Updated {updated_items} items in ItemMaster")
 
         # Batch API updates with improved error handling
-        api_client = APIClient()
+        api_client = UnifiedAPIClient()
         failed_items = []
         api_success_count = 0
 
@@ -1781,7 +1781,7 @@ def update_status():
         session.commit()
 
         try:
-            api_client = APIClient()
+            api_client = UnifiedAPIClient()
             api_client.update_status(tag_id, new_status)
             logger.info(
                 f"Successfully updated API status for tag_id {tag_id} to {new_status}"
@@ -1847,7 +1847,7 @@ def update_notes():
         session.commit()
 
         try:
-            api_client = APIClient()
+            api_client = UnifiedAPIClient()
             api_client.update_notes(tag_id, new_notes if new_notes else "")
             logger.info(f"Successfully updated API notes for tag_id {tag_id}")
             # Invalidate cache for this item
@@ -1920,7 +1920,7 @@ def update_quality():
         session.commit()
 
         try:
-            api_client = APIClient()
+            api_client = UnifiedAPIClient()
             api_client.update_quality(tag_id, new_quality if new_quality else "")
             logger.info(
                 f"Successfully updated API quality for tag_id {tag_id} to {new_quality}"
@@ -2000,7 +2000,7 @@ def update_bin_location():
         session.commit()
 
         try:
-            api_client = APIClient()
+            api_client = UnifiedAPIClient()
             api_client.update_bin_location(
                 tag_id, new_bin_location if new_bin_location else ""
             )

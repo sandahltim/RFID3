@@ -1,6 +1,6 @@
 from flask import Blueprint, jsonify, current_app
 from app import db, cache
-from app.services.api_client import APIClient
+from app.services.unified_api_client import UnifiedAPIClient
 from app.services.logger import get_logger
 from sqlalchemy.sql import text
 import redis
@@ -61,7 +61,7 @@ def health_check():
 
     # Check API
     try:
-        client = APIClient()
+        client = UnifiedAPIClient()
         ping_url = f"{client.base_url}{client.item_master_endpoint}"
         headers = {"Authorization": f"Bearer {client.token}"}
         ping_response = requests.get(

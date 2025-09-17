@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, request, jsonify, current_app, Response
 from .. import db, cache
 from ..models.db_models import ItemMaster, Transaction
-from ..services.api_client import APIClient
+from ..services.unified_api_client import UnifiedAPIClient
 from ..services.logger import get_logger
 from sqlalchemy import func, desc, or_, asc, text, case, select, and_
 from ..utils.filters import apply_global_filters
@@ -920,7 +920,7 @@ def update_bin_location():
         item.date_last_scanned = current_time
         session.commit()
 
-        api_client = APIClient()
+        api_client = UnifiedAPIClient()
         api_client.update_bin_location(tag_id, new_bin_location)
 
         logger.info(
@@ -987,7 +987,7 @@ def update_status():
         item.date_last_scanned = current_time
         session.commit()
 
-        api_client = APIClient()
+        api_client = UnifiedAPIClient()
         api_client.update_status(tag_id, new_status)
 
         logger.info(
@@ -1013,7 +1013,7 @@ def update_items_async(app, tag_ids_to_update, current_time, scheduler):
         f"Starting background update task for {len(tag_ids_to_update)} items at %s",
         datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
     )
-    api_client = APIClient()
+    api_client = UnifiedAPIClient()
     updated_items = 0
     failed_items = []
     batch_size = BULK_UPDATE_BATCH_SIZE
@@ -1440,7 +1440,7 @@ def bulk_update_common_name():
         if not items:
             return jsonify({"error": "No items found for the given criteria"}), 404
 
-        api_client = APIClient()
+        api_client = UnifiedAPIClient()
         updated_items = 0
         current_time = datetime.now()
 
@@ -1526,7 +1526,7 @@ def bulk_update_items():
         if not items:
             return jsonify({"error": "No items found for the given tag IDs"}), 404
 
-        api_client = APIClient()
+        api_client = UnifiedAPIClient()
         updated_items = 0
         current_time = datetime.now()
 

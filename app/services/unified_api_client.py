@@ -13,6 +13,7 @@ class UnifiedAPIClient:
 
     def __init__(self):
         self.use_operations_api = USE_OPERATIONS_API
+        self.base_url = "unified_api_client"  # For health check compatibility
 
         if self.use_operations_api:
             self.client = OperationsAPIClient()
