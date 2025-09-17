@@ -101,3 +101,19 @@ class UnifiedAPIClient:
                 "operations_api": {"status": "not_configured"},
                 "manual_sync_available": True
             }
+    # Compatibility methods for health check and existing code
+    @property  
+    def item_master_endpoint(self):
+        """Compatibility for health check"""
+        return "operations_api/items" if self.use_operations_api else getattr(self.rfidpro_client, 'item_master_endpoint', 'rfidpro/items')
+
+    @property
+    def transaction_endpoint(self):
+        """Compatibility for health check"""
+        return "operations_api/transactions" if self.use_operations_api else getattr(self.rfidpro_client, 'transaction_endpoint', 'rfidpro/transactions')
+    
+    @property
+    def token(self):
+        """Compatibility for health check"""
+        return "operations_api_token" if self.use_operations_api else getattr(self.rfidpro_client, "token", None)
+
