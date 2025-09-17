@@ -1,5 +1,5 @@
 # RFID Items Models - Real-time operational state
-from sqlalchemy import Column, String, Integer, Decimal, Boolean, DateTime, Text, Index, ForeignKey
+from sqlalchemy import Column, String, Integer, Boolean, DateTime, Date, Text, Index, ForeignKey, Numeric
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from app.models.base import Base
@@ -34,8 +34,8 @@ class Item(Base):
     current_store = Column(String(10), comment="Current location store")
 
     # GPS coordinates
-    longitude = Column(Decimal(9,6), comment="GPS longitude")
-    latitude = Column(Decimal(9,6), comment="GPS latitude")
+    longitude = Column(Numeric(9,6), comment="GPS longitude")
+    latitude = Column(Numeric(9,6), comment="GPS latitude")
 
     # Identification type
     identifier_type = Column(String(10), comment="RFID, QR, Sticker, Bulk")
@@ -52,7 +52,7 @@ class Item(Base):
     manufacturer = Column(String(100), comment="Equipment manufacturer")
 
     # Maintenance tracking (operations-relevant, no financial data)
-    usage_hours = Column(Decimal(10,2), comment="Total usage hours (if tracked)")
+    usage_hours = Column(Numeric(10,2), comment="Total usage hours (if tracked)")
     last_maintenance_date = Column(Date, comment="Last maintenance performed")
     next_maintenance_due = Column(Date, comment="Next scheduled maintenance")
 

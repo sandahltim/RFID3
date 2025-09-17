@@ -22,18 +22,17 @@ def main():
     ssl_keyfile = os.getenv("SSL_KEYFILE", "/etc/ssl/private/pi5-rfid3.key")
     ssl_certfile = os.getenv("SSL_CERTFILE", "/etc/ssl/certs/pi5-rfid3.crt")
 
-    print(f"🚀 Starting RFID Operations API on https://{host}:{port}")
-    print(f"📚 API Documentation: https://{host}:{port}/docs")
-    print(f"🏥 Health Check: https://{host}:{port}/health")
+    print(f"🚀 Starting RFID Operations API on http://{host}:{port}")
+    print(f"📚 API Documentation: http://{host}:{port}/docs")
+    print(f"🏥 Health Check: http://{host}:{port}/health")
+    print(f"🌐 External HTTPS Access: https://100.103.67.41:8443 (via nginx)")
 
-    # Run with SSL for HTTPS support (required for camera/mobile)
+    # Run HTTP only - SSL handled by nginx proxy
     uvicorn.run(
         "app.main:app",
         host=host,
         port=port,
         reload=reload,
-        ssl_keyfile=ssl_keyfile,
-        ssl_certfile=ssl_certfile,
         log_level="info",
         access_log=True
     )

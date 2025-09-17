@@ -1,5 +1,5 @@
 # Transactions Models - Activity logging and scan events
-from sqlalchemy import Column, String, Integer, BigInteger, Boolean, DateTime, Text, Index, ForeignKey, Decimal
+from sqlalchemy import Column, String, Integer, BigInteger, Boolean, DateTime, Text, Index, ForeignKey, Numeric
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from app.models.base import Base
@@ -29,8 +29,8 @@ class Transaction(Base):
 
     # Location information
     location_of_repair = Column(String(255), comment="Repair location if applicable")
-    longitude = Column(Decimal(9,6), comment="GPS longitude at scan")
-    latitude = Column(Decimal(9,6), comment="GPS latitude at scan")
+    longitude = Column(Numeric(9,6), comment="GPS longitude at scan")
+    latitude = Column(Numeric(9,6), comment="GPS latitude at scan")
 
     # Condition assessment (operations critical)
     dirty_or_mud = Column(Boolean, default=False, comment="Dirty or muddy condition")

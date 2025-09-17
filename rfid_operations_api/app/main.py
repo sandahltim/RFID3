@@ -134,9 +134,8 @@ if __name__ == "__main__":
     uvicorn.run(
         "main:app",
         host="0.0.0.0",
-        port=8443,
+        port=8444,
         reload=True,
-        ssl_keyfile="/etc/ssl/private/pi5-rfid3.key",
-        ssl_certfile="/etc/ssl/certs/pi5-rfid3.crt",
+        # SSL handled by nginx proxy
         log_level="info"
     )
