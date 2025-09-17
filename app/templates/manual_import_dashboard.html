@@ -534,13 +534,20 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Load available files
     function loadFiles() {
+        console.log('loadFiles() called, fetching from /api/import/status');
         fetch('/api/import/status')
-            .then(response => response.json())
+            .then(response => {
+                console.log('API response status:', response.status);
+                return response.json();
+            })
             .then(data => {
+                console.log('API response data:', data);
                 if (data.success) {
                     availableFiles = data.available_files;
+                    console.log('Set availableFiles to:', availableFiles.length, 'files');
                     renderFileList();
                 } else {
+                    console.error('API returned error:', data.error);
                     showError('Failed to load files: ' + data.error);
                 }
             })
@@ -552,6 +559,14 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Render file list
     function renderFileList() {
+        console.log('renderFileList called with', availableFiles.length, 'files');
+        const fileListContainer = document.getElementById('fileList');
+
+        if (!fileListContainer) {
+            console.error('fileList container not found!');
+            return;
+        }
+
         if (availableFiles.length === 0) {
             fileListContainer.innerHTML = '<div class="text-center text-muted">No CSV files found</div>';
             return;
