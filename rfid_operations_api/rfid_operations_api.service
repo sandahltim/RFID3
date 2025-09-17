@@ -1,0 +1,27 @@
+[Unit]
+Description=RFID Operations API Service
+After=network.target mysql.service
+Requires=mysql.service
+
+[Service]
+Type=simple
+User=tim
+Group=tim
+WorkingDirectory=/home/tim/RFID3/rfid_operations_api
+Environment=PATH=/home/tim/RFID3/rfid_operations_api/venv/bin
+ExecStart=/home/tim/RFID3/rfid_operations_api/venv/bin/python run_api.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=rfid-operations-api
+
+# Environment variables
+Environment=PYTHONPATH=/home/tim/RFID3/rfid_operations_api
+Environment=API_HOST=0.0.0.0
+Environment=API_PORT=8444
+Environment=API_RELOAD=false
+Environment=ENVIRONMENT=production
+
+[Install]
+WantedBy=multi-user.target

@@ -881,6 +881,56 @@
                       </div>
                     </div>
                   </div>
+                </div>
+
+                <!-- Manual RFIDpro Sync Section -->
+                <div class="config-divider"></div>
+                <div class="form-group-advanced">
+                  <label><i class="fas fa-sync-alt"></i> Manual Data Synchronization</label>
+                  <div class="config-help-text">Manual read-only sync from RFIDpro to update id_item_master and id_transactions</div>
+
+                  <div class="row mt-3">
+                    <div class="col-md-6">
+                      <div class="card border-primary">
+                        <div class="card-body">
+                          <h6 class="card-title"><i class="fas fa-cloud-download-alt"></i> RFIDpro Manual Sync</h6>
+                          <p class="card-text text-muted">Pull latest data from RFIDpro system (read-only)</p>
+
+                          <div class="btn-group d-grid gap-2" role="group">
+                            <button type="button" class="btn btn-primary" id="rfidpro-incremental-sync">
+                              <i class="fas fa-download"></i> Incremental Sync
+                            </button>
+                            <button type="button" class="btn btn-warning" id="rfidpro-full-sync">
+                              <i class="fas fa-refresh"></i> Full Sync
+                            </button>
+                          </div>
+
+                          <div class="mt-2">
+                            <button type="button" class="btn btn-sm btn-outline-info" id="test-rfidpro-connection">
+                              <i class="fas fa-plug"></i> Test Connection
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="col-md-6">
+                      <div class="card border-success">
+                        <div class="card-body">
+                          <h6 class="card-title"><i class="fas fa-server"></i> API Status</h6>
+                          <div id="api-status-display">
+                            <p class="text-muted">Loading API status...</p>
+                          </div>
+
+                          <div class="mt-2">
+                            <button type="button" class="btn btn-sm btn-outline-success" id="refresh-api-status">
+                              <i class="fas fa-refresh"></i> Refresh Status
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                   <div class="row mt-3">
                     <div class="col-md-6">
                       <label for="rate_limit_requests">Rate Limit (requests)</label>

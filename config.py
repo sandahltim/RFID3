@@ -24,13 +24,20 @@ DB_CONFIG = {
 # Redis configuration
 REDIS_URL = 'redis://localhost:6379/0'
 
-# API configuration - Internal use only with hardcoded credentials  
-API_USERNAME = os.environ.get("API_USERNAME") or "api"  # hardcoded for internal use
-API_PASSWORD = os.environ.get("API_PASSWORD") or "Broadway8101"  # hardcoded for internal use
+# API configuration
+API_USERNAME = os.environ.get("API_USERNAME") or "api"  # RFIDpro username
+API_PASSWORD = os.environ.get("API_PASSWORD") or "Broadway8101"  # RFIDpro password
+
+# RFIDpro API URLs (for manual sync only)
 LOGIN_URL = 'https://login.cloud.ptshome.com/api/v1/login'
 ITEM_MASTER_URL = 'https://cs.iot.ptshome.com/api/v1/data/14223767938169344381'
 TRANSACTION_URL = 'https://cs.iot.ptshome.com/api/v1/data/14223767938169346196'
 SEED_URL = 'https://cs.iot.ptshome.com/api/v1/data/14223767938169215907'
+
+# Operations API configuration (primary data source)
+OPERATIONS_API_URL = os.environ.get('OPERATIONS_API_URL', 'http://localhost:8444/api/v1')
+OPERATIONS_API_KEY = os.environ.get('OPERATIONS_API_KEY', 'executive_readonly_key')
+USE_OPERATIONS_API = os.environ.get('USE_OPERATIONS_API', 'true').lower() == 'true'
 
 # Refresh intervals (seconds)
 FULL_REFRESH_INTERVAL = 3600  # 1 hour

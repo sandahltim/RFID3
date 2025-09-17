@@ -9,7 +9,7 @@ from ..models.db_models import (
     RentalClassMapping,
     UserRentalClassMapping,
 )
-from ..services.api_client import APIClient
+from ..services.unified_api_client import UnifiedAPIClient
 from ..services.logger import get_logger
 from sqlalchemy import func, desc, or_, asc, case, select
 from time import time
@@ -895,7 +895,7 @@ def update_bin_location():
         session.commit()
 
         try:
-            api_client = APIClient()
+            api_client = UnifiedAPIClient()
             api_client.update_bin_location(
                 tag_id, new_bin_location if new_bin_location else ""
             )
@@ -993,7 +993,7 @@ def update_status():
         session.commit()
 
         try:
-            api_client = APIClient()
+            api_client = UnifiedAPIClient()
             api_client.update_status(tag_id, new_status)
             logger.info(
                 f"Successfully updated API status for tag_id {tag_id} to {new_status}"
@@ -1068,7 +1068,7 @@ def update_quality():
         session.commit()
 
         try:
-            api_client = APIClient()
+            api_client = UnifiedAPIClient()
             api_client.update_item(
                 tag_id, {"quality": new_quality if new_quality else ""}
             )
@@ -1136,7 +1136,7 @@ def update_notes():
         session.commit()
 
         try:
-            api_client = APIClient()
+            api_client = UnifiedAPIClient()
             api_client.update_notes(tag_id, new_notes if new_notes else "")
             logger.info(f"Successfully updated API notes for tag_id {tag_id}")
         except Exception as e:

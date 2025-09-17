@@ -2074,3 +2074,58 @@ if (document.readyState === 'loading') {
         }
     }, 100);
 }
+// =============================================================================
+// MANUAL RFIDPRO SYNC FUNCTIONALITY (Added 2025-09-17)
+// =============================================================================
+
+// Add sync functionality when DOM is ready
+document.addEventListener('DOMContentLoaded', function() {
+    // Manual sync button handlers
+    const incrementalBtn = document.getElementById('rfidpro-incremental-sync');
+    const fullBtn = document.getElementById('rfidpro-full-sync');
+    const testBtn = document.getElementById('test-rfidpro-connection');
+    const refreshBtn = document.getElementById('refresh-api-status');
+
+    if (incrementalBtn) incrementalBtn.addEventListener('click', () => triggerRFIDproSync('incremental'));
+    if (fullBtn) fullBtn.addEventListener('click', () => triggerRFIDproSync('full'));
+    if (testBtn) testBtn.addEventListener('click', testRFIDproConnection);
+    if (refreshBtn) refreshBtn.addEventListener('click', refreshAPIStatus);
+
+    // Load initial API status
+    setTimeout(refreshAPIStatus, 1000);
+});
+
+async function triggerRFIDproSync(syncType) {
+    const button = document.getElementById(`rfidpro-${syncType}-sync`);
+    button.disabled = true;
+    button.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Starting...`;
+
+    try {
+        const response = await fetch('/refresh/manual', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({type: syncType})
+        });
+
+        if (response.ok) {
+            showSyncToast(`${syncType} sync started`, 'success');
+        } else {
+            showSyncToast(`Failed to start ${syncType} sync`, 'error');
+        }
+
+    } catch (error) {
+        showSyncToast(`Sync error: ${error.message}`, 'error');
+    } finally {
+        button.disabled = false;
+        button.innerHTML = `<i class="fas fa-${syncType === 'full' ? 'refresh' : 'download'}"></i> ${syncType.charAt(0).toUpperCase() + syncType.slice(1)} Sync`;
+    }
+}
+
+function showSyncToast(message, type) {
+    const toast = document.createElement('div');
+    toast.className = `alert alert-${type === 'error' ? 'danger' : 'success'} position-fixed`;
+    toast.style.cssText = 'top: 20px; right: 20px; z-index: 9999;';
+    toast.innerHTML = message + '<button type="button" class="btn-close" onclick="this.parentElement.remove()"></button>';
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 4000);
+}
