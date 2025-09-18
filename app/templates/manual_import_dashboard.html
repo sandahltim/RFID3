@@ -520,10 +520,13 @@
 </div>
 {% endblock %}
 
-{% block extra_js %}
+{% block scripts %}
+{{ super() }}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    console.log('CSV Import Dashboard: DOMContentLoaded fired');
     const fileListContainer = document.getElementById('fileList');
+    console.log('FileList container found:', !!fileListContainer);
     const importButton = document.getElementById('startImport');
     const loadingSpinner = document.getElementById('loadingSpinner');
     const importResults = document.getElementById('importResults');

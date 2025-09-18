@@ -10,6 +10,8 @@ from datetime import datetime
 from flask import Blueprint, request, jsonify, render_template
 from ..services.csv_import_service import CSVImportService
 from ..services.pnl_import_service import PnLImportService
+from ..services.scorecard_csv_import_service import ScorecardCSVImportService
+from ..services.payroll_import_service import PayrollImportService
 from ..services.logger import get_logger
 from config import BASE_DIR
 import traceback
@@ -136,10 +138,20 @@ def trigger_manual_import():
                     pnl_service = PnLImportService()
                     import_result = pnl_service.import_pnl_csv_data(file_path, limit)
                     
+                elif file_type == 'scorecard':
+                    # Use scorecard import service
+                    scorecard_service = ScorecardCSVImportService()
+                    import_result = scorecard_service.import_scorecard_csv_data(file_path, limit)
+
+                elif file_type == 'payroll':
+                    # Use payroll import service
+                    payroll_service = PayrollImportService()
+                    import_result = payroll_service.import_payroll_csv_data(file_path, limit)
+
                 elif file_type in ['equipment', 'customer', 'transaction']:
                     # Use standard CSV import service
                     csv_service = CSVImportService()
-                    
+
                     if file_type == 'equipment':
                         import_result = csv_service.import_equipment_data(file_path, limit)
                     elif file_type == 'customer':
