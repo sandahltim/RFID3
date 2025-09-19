@@ -157,7 +157,7 @@ def trigger_manual_import():
                     elif file_type == 'customer':
                         import_result = csv_service.import_customer_data(file_path, limit)
                     elif file_type == 'transaction':
-                        import_result = csv_service.import_transaction_data(file_path, limit)
+                        import_result = csv_service.import_transactions_data(file_path)
                 else:
                     results["errors"].append(f"Unsupported file type: {file_type} for {filename}")
                     continue

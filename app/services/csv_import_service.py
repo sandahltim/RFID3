@@ -112,9 +112,9 @@ class CSVImportService:
         
         # CRITICAL CONTAMINATION FILTERS - Remove obsolete data
         contamination_filters = [
-            df['Category'].str.upper() == 'UNUSED',
-            df['Category'].str.upper() == 'NON CURRENT ITEMS', 
-            df['Inactive'].fillna(False).astype(bool) == True
+            df['Category'].astype(str).str.upper() == 'UNUSED',
+            df['Category'].astype(str).str.upper() == 'NON CURRENT ITEMS',
+            df['Inactive'].fillna(False).astype(str).str.upper() == 'TRUE'
         ]
         
         # Count contaminated records before removal
@@ -127,11 +127,11 @@ class CSVImportService:
         logger.info(f"After contamination filtering: {len(df)} clean records ({len(df)/(len(df)+contaminated_count)*100:.1f}% retained)")
         
         # Handle missing values and data types
-        df['ItemNum'] = df['ItemNum'].astype(str).str.strip()
+        df['ItemNum'] = df.get('ItemNum', df.get('KEY', '')).astype(str).str.strip()
         df['Name'] = df['Name'].fillna('').astype(str).str.strip()
         df['Category'] = df['Category'].fillna('').astype(str).str.strip()
-        df['Current Store'] = df['Current Store'].fillna('').astype(str).str.strip()
-        df['SerialNo'] = df['SerialNo'].fillna('').astype(str).str.strip()  # CRITICAL: Import serial numbers
+        df['Current Store'] = df.get('Current Store', df.get('CurrentStore', '')).fillna('').astype(str).str.strip()
+        df['SerialNo'] = df.get('SerialNo', df.get('SerialNumber', '')).fillna('').astype(str).str.strip()
         
         # Convert financial columns
         financial_cols = ['T/O YTD', 'T/O LTD', 'RepairCost MTD', 'RepairCost LTD', 'Sell Price']
@@ -160,18 +160,12 @@ class CSVImportService:
             for _, row in batch_df.iterrows():
                 try:
                     record = {
-                        'item_num': str(row.get('ItemNum', '')),
-                        'key_field': str(row.get('Key', ''))[:100],  # CRITICAL: Key field for identifier type classification
-                        'name': str(row.get('Name', ''))[:300],  # Truncate to field limit
+                        'item_num': str(row.get('KEY', '')),  # CSV has KEY not ItemNum
+                        'name': str(row.get('Name', ''))[:300],
                         'category': str(row.get('Category', ''))[:100],
-                        'qty': int(row.get('Qty', 0)),  # CRITICAL: Quantity for bulk/serialized classification
-                        'serial_no': str(row.get('SerialNo', ''))[:100],  # CRITICAL: Include serial number for correlation
-                        'turnover_ytd': float(row.get('T/O YTD', 0)),
-                        'turnover_ltd': float(row.get('T/O LTD', 0)),
-                        'repair_cost_ytd': float(row.get('RepairCost MTD', 0)),
-                        'sell_price': float(row.get('Sell Price', 0)),
-                        'current_store': str(row.get('Current Store', ''))[:10],
-                        'inactive': bool(row.get('Inactive', False))
+                        'home_store': str(row.get('HomeStore', ''))[:10],
+                        'current_store': str(row.get('CurrentStore', ''))[:10],
+                        'inactive': str(row.get('Inactive', 'False')).upper() == 'TRUE'
                     }
                     records.append(record)
                 except Exception as e:
@@ -524,9 +518,9 @@ class CSVImportService:
         """Clean and normalize transaction data"""
         
         # Clean contract numbers
-        df['Contract No'] = df['Contract No'].astype(str).str.strip()
-        df['Customer No'] = df['Customer No'].fillna('').astype(str).str.strip()
-        df['Store No'] = df['Store No'].fillna('').astype(str).str.strip()
+        df['Contract No'] = df.get('Contract No', df.get('CNTR', '')).astype(str).str.strip()
+        df['Customer No'] = df.get('Customer No', df.get('CUSN', '')).fillna('').astype(str).str.strip()
+        df['Store No'] = df.get('Store No', df.get('STR', '')).fillna('').astype(str).str.strip()
         
         # Convert date columns
         date_cols = ['Contract Date', 'Close Date', 'Billed Date', 'Completed Date']
@@ -570,9 +564,9 @@ class CSVImportService:
                     """)
                     
                     record = {
-                        'contract_no': str(row.get('Contract No', ''))[:50],
-                        'store_no': str(row.get('Store No', ''))[:10],
-                        'customer_no': str(row.get('Customer No', ''))[:50],
+                        'contract_no': str(row.get('CNTR', ''))[:50],
+                        'store_no': str(row.get('STR', ''))[:10],
+                        'customer_no': str(row.get('CUSN', ''))[:50],
                         'status': str(row.get('Status', ''))[:50],
                         'contract_date': row.get('Contract Date'),
                         'close_date': row.get('Close Date'),
