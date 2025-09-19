@@ -564,13 +564,13 @@ class CSVImportService:
                     """)
                     
                     record = {
-                        'contract_no': str(row.get('CNTR', ''))[:50],
+                        'contract_no': str(row.get('CNTR', ''))[:50],  # YOUR Excel: contract number
                         'store_no': str(row.get('STR', ''))[:10],
-                        'customer_no': str(row.get('CUSN', ''))[:50],
-                        'status': str(row.get('Status', ''))[:50],
-                        'contract_date': row.get('Contract Date'),
-                        'close_date': row.get('Close Date'),
-                        'rent_amt': float(row.get('Rent Amt', 0) or 0),
+                        'customer_no': str(row.get('CUSN', ''))[:50],  # YOUR Excel: customer number
+                        'status': str(row.get('STAT', ''))[:50],  # YOUR Excel: status field
+                        'contract_date': str(row.get('DATE', ''))[:50],  # YOUR Excel: transaction date
+                        'contract_time': str(row.get('TIME', ''))[:20],  # YOUR Excel: transaction time
+                        'operator_id': str(row.get('OPID', ''))[:50],  # YOUR Excel: operator id
                         'sale_amt': float(row.get('Sale Amt', 0) or 0),
                         'tax_amt': float(row.get('Tax Amt', 0) or 0),
                         'total': float(row.get('Total', 0) or 0),
@@ -608,8 +608,8 @@ class CSVImportService:
         """Clean and normalize transaction items data"""
         
         # Clean contract and item numbers
-        df['Contract No'] = df['Contract No'].astype(str).str.strip()
-        df['ItemNum'] = df['ItemNum'].fillna('').astype(str).str.strip()
+        df['Contract No'] = df.get('Contract No', df.get('CNTR', '')).astype(str).str.strip()
+        df['ItemNum'] = df.get('ItemNum', df.get('ITEM', '')).fillna('').astype(str).str.strip()  # YOUR Excel: transitems.ITEM
         
         # Convert date/time columns
         date_cols = ['Due Date', 'ConfirmedDate']
@@ -664,7 +664,7 @@ class CSVImportService:
                     
                     record = {
                         'contract_no': str(row.get('Contract No', ''))[:50],
-                        'item_num': str(row.get('ItemNum', ''))[:50],
+                        'item_num': str(row.get('ITEM', ''))[:50],  # YOUR Excel: transitems.ITEM correlates to equipment.NUM
                         'qty': float(row.get('Qty', 0) or 0),
                         'hours': float(row.get('Hours', 0) or 0),
                         'due_date': row.get('Due Date'),
