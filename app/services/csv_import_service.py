@@ -567,15 +567,14 @@ class CSVImportService:
                         'contract_no': str(row.get('CNTR', ''))[:50],  # YOUR Excel: contract number
                         'store_no': str(row.get('STR', ''))[:10],
                         'customer_no': str(row.get('CUSN', ''))[:50],  # YOUR Excel: customer number
-                        'status': str(row.get('STAT', ''))[:50],  # YOUR Excel: status field
+                        'status': 'pending',  # YOUR spec: ignore STAT field, use date logic later
                         'contract_date': str(row.get('DATE', ''))[:50],  # YOUR Excel: transaction date
                         'contract_time': str(row.get('TIME', ''))[:20],  # YOUR Excel: transaction time
                         'operator_id': str(row.get('OPID', ''))[:50],  # YOUR Excel: operator id
-                        'sale_amt': float(row.get('Sale Amt', 0) or 0),
-                        'tax_amt': float(row.get('Tax Amt', 0) or 0),
-                        'total': float(row.get('Total', 0) or 0),
-                        'total_paid': float(row.get('Total Paid', 0) or 0),
-                        'total_owed': float(row.get('Total Owed', 0) or 0)
+                        'sale_amt': self._parse_currency(row.get('SALE')),  # Logical: currency = decimal
+                        'tax_amt': self._parse_currency(row.get('TAX')),    # Logical: currency = decimal
+                        'total': self._parse_currency(row.get('TOTL')),     # Logical: currency = decimal
+                        'rent_amt': self._parse_currency(row.get('RENT'))   # Logical: currency = decimal
                     }
                     
                     # Clean record - convert pandas NaT to None for MySQL compatibility  
@@ -1681,3 +1680,11 @@ class CSVImportService:
                 "error": str(e),
                 "timestamp": datetime.now().isoformat()
             }
+    def _parse_currency(self, value):
+        '''Parse currency values logically'''
+        if not value or str(value).strip() == '':
+            return 0.00
+        try:
+            return float(str(value).replace('$', '').replace(',', '').strip())
+        except:
+            return 0.00
