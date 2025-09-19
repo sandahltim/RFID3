@@ -153,7 +153,7 @@ def trigger_manual_import():
                     csv_service = CSVImportService()
 
                     if file_type == 'equipment':
-                        import_result = csv_service.import_equipment_data(file_path, limit)
+                        import_result = csv_service.import_equipment_data(file_path)
                     elif file_type == 'customer':
                         import_result = csv_service.import_customer_data(file_path, limit)
                     elif file_type == 'transaction':
