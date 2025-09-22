@@ -1,0 +1,16 @@
+[Unit]
+Description=RFID Operations API
+After=network.target mysql.service
+
+[Service]
+Type=exec
+User=tim
+Group=tim
+WorkingDirectory=/home/tim/RFID3/operations_api
+Environment="PATH=/home/tim/RFID3/venv/bin"
+ExecStart=/home/tim/RFID3/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8442
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

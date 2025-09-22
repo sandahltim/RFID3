@@ -428,15 +428,15 @@ class CSVImportService:
         if 'No of Contracts' in df.columns:
             df['No. of Contracts'] = df['No of Contracts']
         
-        # Required columns mapping to match actual database schema
+        # Required columns mapping per YOUR Excel specifications
         column_mapping = {
-            'Key': 'key',
-            'Cnum': 'cnum', 
-            'Name': 'name',
-            'Address': 'address',
-            'City': 'city',
-            'Zip': 'zip',
-            'Phone': 'phone',
+            'KEY': 'key',     # YOUR Excel: reference key for POS system
+            'CNUM': 'cnum',   # Customer number
+            'NAME': 'name',   # YOUR Excel: account holder name
+            'Address': 'address',      # YOUR Excel: billing street address
+            'CITY': 'city',           # YOUR Excel: billing city
+            'ZIP': 'zip',             # YOUR Excel: billing zip
+            'Phone': 'phone',         # YOUR Excel: customer phone
             'Email': 'email',
             'Open Date': 'open_date',
             'Last Active Date': 'last_active_date',
@@ -569,12 +569,15 @@ class CSVImportService:
                         'customer_no': str(row.get('CUSN', ''))[:50],  # YOUR Excel: customer number
                         'status': 'pending',  # YOUR spec: ignore STAT field, use date logic later
                         'contract_date': str(row.get('DATE', ''))[:50],  # YOUR Excel: transaction date
+                        'close_date': None,  # Fix SQL parameter requirement
                         'contract_time': str(row.get('TIME', ''))[:20],  # YOUR Excel: transaction time
                         'operator_id': str(row.get('OPID', ''))[:50],  # YOUR Excel: operator id
                         'sale_amt': self._parse_currency(row.get('SALE')),  # Logical: currency = decimal
                         'tax_amt': self._parse_currency(row.get('TAX')),    # Logical: currency = decimal
                         'total': self._parse_currency(row.get('TOTL')),     # Logical: currency = decimal
-                        'rent_amt': self._parse_currency(row.get('RENT'))   # Logical: currency = decimal
+                        'rent_amt': self._parse_currency(row.get('RENT')),   # Logical: currency = decimal
+                        'total_paid': self._parse_currency(row.get('PAID')),
+                        'total_owed': 0.0  # Fix SQL parameter requirement
                     }
                     
                     # Clean record - convert pandas NaT to None for MySQL compatibility  
@@ -663,7 +666,7 @@ class CSVImportService:
                     
                     record = {
                         'contract_no': str(row.get('Contract No', ''))[:50],
-                        'item_num': str(row.get('ITEM', ''))[:50],  # YOUR Excel: transitems.ITEM correlates to equipment.NUM
+                        'item_num': str(row.get('ITEM', ''))[:50],  # YOUR Excel Row 3: transitems.ITEM → equipment.NUM
                         'qty': float(row.get('Qty', 0) or 0),
                         'hours': float(row.get('Hours', 0) or 0),
                         'due_date': row.get('Due Date'),

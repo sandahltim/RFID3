@@ -67,7 +67,8 @@ class Transaction(Base):
     ops_updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
 
     # Relationships
-    item = relationship("Item", back_populates="transactions")
+    # Note: Relationships disabled for now
+    # item = relationship("Item", back_populates="transactions")
 
     # Indexes for operations performance
     __table_args__ = (

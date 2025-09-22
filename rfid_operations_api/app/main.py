@@ -10,7 +10,7 @@ import logging
 from datetime import datetime
 
 # Import API routers (will create these)
-from app.api import equipment, items, transactions, sync, auth
+from app.api import equipment, items, transactions, sync, auth, contracts
 from app.database.connection import get_database_url, test_connection
 
 # Application metadata
@@ -28,19 +28,29 @@ app.add_middleware(
     allow_origins=[
         "https://100.103.67.41:8101",  # Manager interface
         "https://100.103.67.41:443",   # Operations UI
+        "https://100.103.67.41:3000", # Operations UI direct
         "http://localhost:3000",       # Development
+        "https://localhost:3000",      # Development HTTPS
         "http://localhost:8101",       # Development
+        "https://pi5-rfid3:3000",      # Hostname access
+        "http://pi5-rfid3:3000",       # Hostname access HTTP
     ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# Import and add categories and service routers first (more specific routes)
+from app.api import categories, service
+app.include_router(categories.router, prefix="/api/v1", tags=["categories"])
+app.include_router(service.router, prefix="/api/v1/service", tags=["service"])
+
 # Include API routers
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["authentication"])
 app.include_router(equipment.router, prefix="/api/v1/equipment", tags=["equipment"])
 app.include_router(items.router, prefix="/api/v1/items", tags=["items"])
 app.include_router(transactions.router, prefix="/api/v1/transactions", tags=["transactions"])
+app.include_router(contracts.router, prefix="/api/v1/contracts", tags=["contracts"])
 app.include_router(sync.router, prefix="/api/v1/sync", tags=["synchronization"])
 
 # Global exception handler
@@ -52,8 +62,9 @@ async def global_exception_handler(request, exc):
         content={"error": "Internal server error", "detail": str(exc)}
     )
 
-# Health check endpoint
+# Health check endpoints (both for compatibility)
 @app.get("/health")
+@app.get("/api/v1/health")
 async def health_check():
     """Health check endpoint for monitoring"""
     try:

@@ -1,12 +1,11 @@
 # RFID Items Models - Real-time operational state
-from sqlalchemy import Column, String, Integer, Boolean, DateTime, Date, Text, Index, ForeignKey, Numeric
+from sqlalchemy import Column, String, Integer, DateTime, Text, Index, Numeric, Enum
 from sqlalchemy.sql import func
-from sqlalchemy.orm import relationship
-from app.models.base import Base
+from .base import Base
 
 class Item(Base):
-    """RFID Items - mirrors id_item_master for operations"""
-    __tablename__ = "ops_items"
+    """RFID Items - directly uses id_item_master from manager database"""
+    __tablename__ = "id_item_master"
 
     # Primary identifier
     tag_id = Column(String(255), primary_key=True, comment="RFID tag identifier")
@@ -38,7 +37,7 @@ class Item(Base):
     latitude = Column(Numeric(9,6), comment="GPS latitude")
 
     # Identification type
-    identifier_type = Column(String(10), comment="RFID, QR, Sticker, Bulk")
+    identifier_type = Column(Enum('RFID','Sticker','QR','Barcode','Bulk','None'), comment="Identifier type")
 
     # Operational information
     last_scanned_by = Column(String(255), comment="Last scanner user ID")
@@ -50,26 +49,36 @@ class Item(Base):
 
     # Equipment information
     manufacturer = Column(String(100), comment="Equipment manufacturer")
+    department = Column(String(100), comment="Equipment department")
+    type_desc = Column(String(50), comment="Type description")
 
-    # Maintenance tracking (operations-relevant, no financial data)
-    usage_hours = Column(Numeric(10,2), comment="Total usage hours (if tracked)")
-    last_maintenance_date = Column(Date, comment="Last maintenance performed")
-    next_maintenance_due = Column(Date, comment="Next scheduled maintenance")
+    # Financial information
+    turnover_ytd = Column(Numeric(10,2), comment="Year to date turnover")
+    turnover_ltd = Column(Numeric(10,2), comment="Life to date turnover")
+    repair_cost_ltd = Column(Numeric(10,2), comment="Life to date repair cost")
+    sell_price = Column(Numeric(10,2), comment="Selling price")
+    retail_price = Column(Numeric(10,2), comment="Retail price")
+
+    # Inventory information
+    quantity = Column(Integer, comment="Quantity")
+    reorder_min = Column(Integer, comment="Minimum reorder level")
+    reorder_max = Column(Integer, comment="Maximum reorder level")
 
     # Timestamps
     date_created = Column(DateTime, comment="Item creation date")
     date_updated = Column(DateTime, comment="Last modification date")
+    pos_last_updated = Column(DateTime, comment="Last POS system update")
 
-    # Sync metadata
-    last_sync_from_manager = Column(DateTime, comment="Last import from manager database")
-    manager_db_id = Column(Integer, comment="Reference to manager database record")
+    # Data source tracking
+    data_source = Column(String(20), comment="Data source identifier")
 
-    # Operations metadata
-    ops_created_at = Column(DateTime, default=func.now())
-    ops_updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+    # Additional data (JSON)
+    rental_rates = Column(Text, comment="Rental rates data")
+    vendor_ids = Column(Text, comment="Vendor IDs data")
+    tag_history = Column(Text, comment="Tag history data")
 
-    # Relationships
-    transactions = relationship("Transaction", back_populates="item")
+    # Note: Relationships to transactions table disabled for now
+    # transactions = relationship("Transaction", back_populates="item")
 
     # Indexes for operations performance
     __table_args__ = (

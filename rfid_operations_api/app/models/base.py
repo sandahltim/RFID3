@@ -6,8 +6,8 @@ from typing import Any
 import os
 
 # Database configuration
-DATABASE_URL = os.getenv("DATABASE_URL", "mysql+pymysql://ops_user:ops_password@localhost/rfid_operations_db")
-MANAGER_DATABASE_URL = os.getenv("MANAGER_DATABASE_URL", "mysql+pymysql://rfid_user:rfid_password@localhost/rfid_inventory")
+DATABASE_URL = os.getenv("DATABASE_URL", "mysql+pymysql://rfid_user:rfid_user_password@localhost/rfid_inventory")
+MANAGER_DATABASE_URL = os.getenv("MANAGER_DATABASE_URL", "mysql+pymysql://rfid_user:rfid_user_password@localhost/rfid_inventory")
 
 # Create engines
 engine = create_engine(DATABASE_URL, pool_pre_ping=True, echo=False)

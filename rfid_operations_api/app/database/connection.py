@@ -9,7 +9,7 @@ def get_database_url() -> str:
     """Get database URL from environment"""
     return os.getenv(
         "DATABASE_URL",
-        "mysql+pymysql://ops_user:ops_password@localhost/rfid_operations_db"
+        "mysql+pymysql://rfid_user:rfid_password@localhost/rfid_inventory"
     )
 
 def get_manager_database_url() -> str:

@@ -8,11 +8,31 @@ from app.api.auth import verify_api_key
 router = APIRouter()
 
 @router.get("/status")
-async def get_sync_status(user_info: Dict = Depends(verify_api_key)):
-    """Get sync status"""
+async def get_sync_status():
+    """Get sync status - public endpoint"""
+    from sqlalchemy import text
+    from app.models import get_db
+
+    # Get actual record count from database
+    try:
+        db = next(get_db())
+        result = db.execute(text("SELECT COUNT(*) as count FROM id_item_master"))
+        total_records = result.fetchone()[0]
+        db.close()
+    except:
+        total_records = 0
+
     return {
         "status": "operational",
-        "last_sync": datetime.now().isoformat(),
+        "manager_db": {
+            "last_sync": datetime.now().isoformat(),
+            "total_records": total_records,
+            "status": "connected"
+        },
+        "rfidpro": {
+            "last_sync": "Managed by Executive Dashboard",
+            "status": "manual_only"
+        },
         "pending_changes": 0
     }
 
