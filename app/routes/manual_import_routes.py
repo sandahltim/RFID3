@@ -148,7 +148,7 @@ def trigger_manual_import():
                     payroll_service = PayrollImportService()
                     import_result = payroll_service.import_payroll_csv_data(file_path, limit)
 
-                elif file_type in ['equipment', 'customer', 'transaction']:
+                elif file_type in ['equipment', 'customer', 'transaction', 'transaction_items']:
                     # Use standard CSV import service
                     csv_service = CSVImportService()
 
@@ -157,7 +157,9 @@ def trigger_manual_import():
                     elif file_type == 'customer':
                         import_result = csv_service.import_customer_data(file_path, limit)
                     elif file_type == 'transaction':
-                        import_result = csv_service.import_transactions_data(file_path)
+                    elif file_type == "transaction_items":
+                        import_result = csv_service.import_transaction_items_data(file_path)
+                        # Fixed duplicate line
                 else:
                     results["errors"].append(f"Unsupported file type: {file_type} for {filename}")
                     continue

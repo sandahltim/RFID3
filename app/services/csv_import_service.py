@@ -375,17 +375,16 @@ class CSVImportService:
                             insert_sql = text("""
                                 INSERT INTO pos_customers 
                                 (`key`, cnum, name, address, city, zip, phone, email, 
-                                 ytd_payments, ltd_payments, no_of_contracts, current_balance, 
-                                 credit_limit, open_date, last_active_date, import_date)
+                                 ytd_payments, ltd_payments, no_of_contracts, current_balance,
+                                 credit_limit, import_date)
                                 VALUES 
                                 (:key, :cnum, :name, :address, :city, :zip, :phone, :email,
                                  :ytd_payments, :ltd_payments, :no_of_contracts, :current_balance,
-                                 :credit_limit, :open_date, :last_active_date, NOW())
+                                 :credit_limit, NOW())
                                 ON DUPLICATE KEY UPDATE
                                 name = VALUES(name),
                                 address = VALUES(address),
                                 ytd_payments = VALUES(ytd_payments),
-                                last_active_date = VALUES(last_active_date),
                                 import_date = NOW()
                             """)
                             
