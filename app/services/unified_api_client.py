@@ -13,7 +13,7 @@ class UnifiedAPIClient:
 
     def __init__(self):
         self.use_operations_api = USE_OPERATIONS_API
-        self.base_url = "unified_api_client"  # For health check compatibility
+        self.base_url = "http://localhost:8444/api/v1" if self.use_operations_api else "https://cs.iot.ptshome.com/api/v1/data"
 
         if self.use_operations_api:
             self.client = OperationsAPIClient()

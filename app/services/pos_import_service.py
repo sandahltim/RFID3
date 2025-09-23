@@ -97,20 +97,23 @@ class POSImportService:
                 for row_num, row in enumerate(reader, start=2):
                     try:
                         # Check if transaction already exists
+                        contract_no = row.get('CNTR', '').strip()
+                        store_no = row.get('STR', '001').strip()
+
                         existing = POSTransaction.query.filter_by(
-                            contract_no=row.get('Contract No', '').strip(),
-                            store_no=row.get('Store No', '001').strip()
+                            contract_no=contract_no,
+                            store_no=store_no
                         ).first()
-                        
+
                         if existing:
-                            logger.debug(f"Transaction already exists: {row.get('Contract No')}")
+                            logger.debug(f"Transaction already exists: {contract_no}")
                             continue
-                        
-                        # Create new transaction with comprehensive field mapping
+
+                        # Create new transaction with correct CSV column mapping
                         transaction = POSTransaction(
-                            # Basic transaction info (using CSV column names)
-                            contract_no=row.get('CNTR', '').strip(),
-                            store_no=row.get('STR', '001').strip(),
+                            # Basic transaction info (using actual CSV column names)
+                            contract_no=contract_no,
+                            store_no=store_no,
                             customer_no=row.get('CUSN', '').strip() or None,
                             stat=row.get('STAT', '').strip() or None,
                             status=row.get('Status', '').strip() or None,
@@ -296,43 +299,43 @@ class POSImportService:
                 
                 for row_num, row in enumerate(reader, start=2):
                     try:
-                        contract_no = row.get('Contract No', '').strip()
-                        line_number = int(row.get('LineNumber', 0))
-                        
+                        contract_no = row.get('CNTR', '').strip()
+                        line_number = self.parse_int(row.get('LineNumber', 0)) or self.parse_int(row.get('SUBF', 0)) or 0
+
                         # Check if item already exists
                         existing = POSTransactionItem.query.filter_by(
                             contract_no=contract_no,
                             line_number=line_number
                         ).first()
-                        
+
                         if existing:
                             logger.debug(f"Item already exists: {contract_no} line {line_number}")
                             continue
-                        
-                        # Create new item
+
+                        # Create new item with correct CSV column mapping
                         item = POSTransactionItem(
                             contract_no=contract_no,
-                            item_num=row.get('ItemNum', '').strip() or None,
-                            qty=int(row.get('Qty', 0) or 0),
-                            hours=int(row.get('Hours', 0) or 0),
-                            due_date=self.parse_date(row.get('Due Date')),
-                            due_time=row.get('Due Time', '').strip() or None,
-                            line_status=row.get('Line Status', '').strip() or None,
-                            price=self.parse_decimal(row.get('Price')),
+                            item_num=row.get('ITEM', '').strip() or None,
+                            qty=self.parse_int(row.get('QTY', 0)) or 0,
+                            hours=self.parse_int(row.get('HRSC', 0)) or 0,
+                            due_date=self.parse_date(row.get('DDT')),
+                            due_time=row.get('DTM', '').strip() or None,
+                            line_status=row.get('TXTY', '').strip() or None,
+                            price=self.parse_decimal(row.get('PRIC')),
                             desc=row.get('Desc', '').strip() or None,
                             dmg_wvr=self.parse_decimal(row.get('DmgWvr')),
                             item_percentage=self.parse_decimal(row.get('ItemPercentage')),
                             discount_percent=self.parse_decimal(row.get('DiscountPercent')),
                             nontaxable=self.parse_bool(row.get('Nontaxable')),
                             nondiscount=self.parse_bool(row.get('Nondiscount')),
-                            discount_amt=self.parse_decimal(row.get('Discount Amt')),
-                            daily_amt=self.parse_decimal(row.get('Daily Amt')),
-                            weekly_amt=self.parse_decimal(row.get('Weekly Amt')),
-                            monthly_amt=self.parse_decimal(row.get('Monthly Amt')),
-                            minimum_amt=self.parse_decimal(row.get('Minimum Amt')),
-                            meter_out=self.parse_decimal(row.get('Meter Out')),
-                            meter_in=self.parse_decimal(row.get('Meter In')),
-                            downtime_hrs=self.parse_decimal(row.get('Downtime Hrs')),
+                            discount_amt=self.parse_decimal(row.get('DiscountAmount')),
+                            daily_amt=self.parse_decimal(row.get('DailyAmount')),
+                            weekly_amt=self.parse_decimal(row.get('WeeklyAmount')),
+                            monthly_amt=self.parse_decimal(row.get('MonthlyAmount')),
+                            minimum_amt=self.parse_decimal(row.get('MinimumAmount')),
+                            meter_out=self.parse_decimal(row.get('ReadingOut')),
+                            meter_in=self.parse_decimal(row.get('ReadingIn')),
+                            downtime_hrs=self.parse_decimal(row.get('RainHours')),
                             retail_price=self.parse_decimal(row.get('RetailPrice')),
                             kit_field=row.get('KitField', '').strip() or None,
                             confirmed_date=self.parse_date(row.get('ConfirmedDate')),
@@ -379,45 +382,43 @@ class POSImportService:
                 
                 for row_num, row in enumerate(reader, start=2):
                     try:
-                        key = row.get('Key', '').strip()
-                        
+                        key = row.get('KEY', '').strip()
+
                         # Check if customer already exists
                         existing = POSCustomer.query.filter_by(key=key).first()
-                        
+
                         if existing:
                             # Update existing customer
-                            existing.name = row.get('Name', '').strip() or existing.name
+                            existing.name = row.get('NAME', '').strip() or existing.name
                             existing.address = row.get('Address', '').strip() or existing.address
-                            existing.city = row.get('City', '').strip() or existing.city
-                            existing.email = row.get('Email', '').strip() or existing.email
+                            existing.city = row.get('CITY', '').strip() or existing.city
                             existing.phone = row.get('Phone', '').strip() or existing.phone
-                            existing.current_balance = self.parse_decimal(row.get('CurrentBalance'))
-                            existing.last_active_date = self.parse_date(row.get('Last Active Date'))
+                            existing.last_active_date = self.parse_date(row.get('LastActive'))
                             logger.debug(f"Updated customer: {key}")
                         else:
-                            # Create new customer
+                            # Create new customer with correct CSV column mapping
                             customer = POSCustomer(
                                 key=key,
                                 cnum=row.get('CNUM', '').strip() or None,
-                                name=row.get('Name', '').strip() or None,
+                                name=row.get('NAME', '').strip() or None,
                                 address=row.get('Address', '').strip() or None,
                                 address2=row.get('Address2', '').strip() or None,
-                                city=row.get('City', '').strip() or None,
-                                zip=row.get('Zip', '').strip() or None,
-                                zip4=row.get('Zip4', '').strip() or None,
+                                city=row.get('CITY', '').strip() or None,
+                                zip=row.get('ZIP', '').strip() or None,
+                                zip4=row.get('ZIP4', '').strip() or None,
                                 phone=row.get('Phone', '').strip() or None,
-                                work_phone=row.get('Work Phone', '').strip() or None,
-                                mobile_phone=row.get('Mobile Phone', '').strip() or None,
-                                email=row.get('Email', '').strip() or None,
-                                credit_limit=self.parse_decimal(row.get('Credit Limit')),
-                                ytd_payments=self.parse_decimal(row.get('YTD Payments')),
-                                ltd_payments=self.parse_decimal(row.get('LTD Payments')),
-                                last_year_payments=self.parse_decimal(row.get('Last Year Payments')),
-                                no_of_contracts=int(row.get('No of Contracts', 0) or 0),
-                                current_balance=self.parse_decimal(row.get('CurrentBalance')),
-                                open_date=self.parse_date(row.get('Open Date')),
-                                last_active_date=self.parse_date(row.get('Last Active Date')),
-                                last_contract=row.get('Last Contract', '').strip() or None
+                                work_phone=row.get('WORK', '').strip() or None,
+                                mobile_phone=row.get('MOBILE', '').strip() or None,
+                                email=None,  # Not in CSV
+                                credit_limit=None,  # Not in CSV
+                                ytd_payments=None,  # Not in CSV
+                                ltd_payments=None,  # Not in CSV
+                                last_year_payments=None,  # Not in CSV
+                                no_of_contracts=0,  # Not in CSV
+                                current_balance=None,  # Not in CSV
+                                open_date=self.parse_date(row.get('OpenDate')),
+                                last_active_date=self.parse_date(row.get('LastActive')),
+                                last_contract=None  # Not in CSV
                             )
                             
                             db.session.add(customer)
@@ -461,48 +462,51 @@ class POSImportService:
                 
                 for row_num, row in enumerate(reader, start=2):
                     try:
-                        item_num = row.get('ItemNum', '').strip()
-                        
+                        item_num = row.get('KEY', '').strip()  # Equipment uses KEY as item identifier
+
                         if not item_num:
-                            logger.warning(f"Row {row_num}: Missing ItemNum, skipping")
+                            logger.warning(f"Row {row_num}: Missing KEY (item_num), skipping")
                             continue
-                        
+
                         # Check if equipment already exists
                         existing = POSEquipment.query.filter_by(item_num=item_num).first()
-                        
+
                         if existing:
                             # Update existing equipment
                             existing.name = row.get('Name', '').strip() or existing.name
                             existing.category = row.get('Category', '').strip() or existing.category
-                            existing.current_store = row.get('Current Store', '').strip() or existing.current_store
-                            existing.qty = int(row.get('Qty', 0) or 0)
-                            existing.inactive = self.parse_bool(row.get('Inactive'))
+                            existing.qty = self.parse_int(row.get('QTY', 0)) or 0
                             logger.debug(f"Updated equipment: {item_num}")
                         else:
-                            # Create new equipment
+                            # Create new equipment with correct CSV column mapping
                             equipment = POSEquipment(
                                 item_num=item_num,
-                                key_field=row.get('Key', '').strip() or None,
+                                key_field=item_num,  # KEY field
                                 name=row.get('Name', '').strip() or None,
-                                loc=row.get('Loc', '').strip() or None,
+                                loc=row.get('LOC', '').strip() or None,
                                 category=row.get('Category', '').strip() or None,
-                                department=row.get('Department', '').strip() or None,
-                                type_desc=row.get('Type Desc', '').strip() or None,
-                                qty=int(row.get('Qty', 0) or 0),
-                                home_store=row.get('Home Store', '').strip() or None,
-                                current_store=row.get('Current Store', '').strip() or None,
-                                group_field=row.get('Group', '').strip() or None,
-                                manf=row.get('MANF', '').strip() or None,
-                                model_no=row.get('ModelNo', '').strip() or None,
-                                serial_no=row.get('SerialNo', '').strip() or None,
-                                part_no=row.get('PartNo', '').strip() or None,
-                                license_no=row.get('License No', '').strip() or None,
-                                model_year=row.get('Model Year', '').strip() or None,
-                                sell_price=self.parse_decimal(row.get('Sell Price')),
-                                retail_price=self.parse_decimal(row.get('RetailPrice')),
-                                deposit=self.parse_decimal(row.get('Deposit')),
-                                inactive=self.parse_bool(row.get('Inactive')),
-                                import_batch=self.batch_id
+                                department=None,  # Not in CSV
+                                type_desc=row.get('TYPE', '').strip() or None,
+                                qty=self.parse_int(row.get('QTY', 0)) or 0,
+                                home_store=None,  # Not in CSV
+                                current_store=None,  # Not in CSV
+                                group_field=None,  # Not in CSV
+                                manf=None,  # Not in CSV
+                                model_no=None,  # Not in CSV
+                                serial_no=None,  # Not in CSV
+                                part_no=None,  # Not in CSV
+                                license_no=None,  # Not in CSV
+                                model_year=None,  # Not in CSV
+                                sell_price=self.parse_decimal(row.get('SELL')),
+                                retail_price=None,  # Not in CSV
+                                deposit=self.parse_decimal(row.get('DEP')),
+                                inactive=False,  # Not in CSV
+                                import_batch=self.batch_id,
+                                # Additional fields from CSV
+                                period_1=self.parse_decimal(row.get('PER1')),
+                                period_2=self.parse_decimal(row.get('PER2')),
+                                period_3=self.parse_decimal(row.get('PER3')),
+                                period_4=self.parse_decimal(row.get('PER4'))
                             )
                             
                             db.session.add(equipment)
@@ -558,9 +562,14 @@ class POSImportService:
         }
         
         try:
-            # Import transactions  
-            trans_file = os.path.join(base_path, 'transactionsPOS8.26.25.csv')
-            if os.path.exists(trans_file):
+            # Find the most recent CSV files dynamically
+            import glob
+
+            # Import transactions
+            trans_files = glob.glob(os.path.join(base_path, 'transactions*.csv'))
+            if trans_files:
+                trans_file = max(trans_files, key=os.path.getmtime)  # Get most recent
+                logger.info(f"Found transactions file: {trans_file}")
                 imported, failed, errors = self.import_transactions(trans_file)
                 results['transactions'] = {
                     'imported': imported,
@@ -569,10 +578,14 @@ class POSImportService:
                 }
                 results['total_imported'] += imported
                 results['total_failed'] += failed
-            
+            else:
+                logger.warning("No transactions CSV files found")
+
             # Import transaction items
-            items_file = os.path.join(base_path, 'transitemsPOS8.26.25.csv')
-            if os.path.exists(items_file):
+            items_files = glob.glob(os.path.join(base_path, 'transitems*.csv'))
+            if items_files:
+                items_file = max(items_files, key=os.path.getmtime)  # Get most recent
+                logger.info(f"Found transaction items file: {items_file}")
                 imported, failed, errors = self.import_transaction_items(items_file)
                 results['items'] = {
                     'imported': imported,
@@ -581,10 +594,14 @@ class POSImportService:
                 }
                 results['total_imported'] += imported
                 results['total_failed'] += failed
-            
+            else:
+                logger.warning("No transaction items CSV files found")
+
             # Import customers
-            cust_file = os.path.join(base_path, 'customerPOS8.26.25.csv')
-            if os.path.exists(cust_file):
+            cust_files = glob.glob(os.path.join(base_path, 'customer*.csv'))
+            if cust_files:
+                cust_file = max(cust_files, key=os.path.getmtime)  # Get most recent
+                logger.info(f"Found customer file: {cust_file}")
                 imported, failed, errors = self.import_customers(cust_file)
                 results['customers'] = {
                     'imported': imported,
@@ -593,10 +610,14 @@ class POSImportService:
                 }
                 results['total_imported'] += imported
                 results['total_failed'] += failed
-            
+            else:
+                logger.warning("No customer CSV files found")
+
             # Import equipment
-            equip_file = os.path.join(base_path, 'equipPOS8.26.25.csv')
-            if os.path.exists(equip_file):
+            equip_files = glob.glob(os.path.join(base_path, 'equip*.csv'))
+            if equip_files:
+                equip_file = max(equip_files, key=os.path.getmtime)  # Get most recent
+                logger.info(f"Found equipment file: {equip_file}")
                 imported, failed, errors = self.import_equipment(equip_file)
                 results['equipment'] = {
                     'imported': imported,
@@ -605,6 +626,8 @@ class POSImportService:
                 }
                 results['total_imported'] += imported
                 results['total_failed'] += failed
+            else:
+                logger.warning("No equipment CSV files found")
             
             # Update import log
             self.import_log.status = 'completed'

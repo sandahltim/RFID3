@@ -351,7 +351,7 @@ class CSVImportService:
             
             # Import in chunks
             chunk_size = 1000
-            session = self.Session()
+            from flask import current_app; session = db.session()
             
             try:
                 for chunk_start in range(0, total_records, chunk_size):
@@ -543,7 +543,7 @@ class CSVImportService:
     def _import_transactions_batch(self, batch_df: pd.DataFrame) -> int:
         """Import a batch of transaction records"""
         imported_count = 0
-        session = self.Session()
+        from flask import current_app; session = db.session()
         
         try:
             for _, row in batch_df.iterrows():
@@ -638,7 +638,7 @@ class CSVImportService:
     def _import_transaction_items_batch(self, batch_df: pd.DataFrame) -> int:
         """Import a batch of transaction item records"""
         imported_count = 0
-        session = self.Session()
+        from flask import current_app; session = db.session()
         
         try:
             for _, row in batch_df.iterrows():
@@ -944,7 +944,7 @@ class CSVImportService:
     def _import_scorecard_batch_fixed(self, df: pd.DataFrame) -> int:
         """Import scorecard data with proper store marker support and column mapping"""
         imported_count = 0
-        session = self.Session()
+        from flask import current_app; session = db.session()
         
         try:
             # Store mapping configuration
@@ -1290,7 +1290,7 @@ class CSVImportService:
     def _import_payroll_batch(self, df: pd.DataFrame) -> int:
         """Import payroll trends batch"""
         imported_count = 0
-        session = self.Session()
+        from flask import current_app; session = db.session()
         
         try:
             self._ensure_payroll_table_exists(session)
@@ -1531,7 +1531,7 @@ class CSVImportService:
     def _import_profit_loss_batch(self, df: pd.DataFrame) -> int:
         """Import profit & loss batch into pl_data table"""
         imported_count = 0
-        session = self.Session()
+        from flask import current_app; session = db.session()
         
         try:
             # Import into pl_data table (normalized format)

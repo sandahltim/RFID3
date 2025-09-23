@@ -8,10 +8,11 @@ import os
 import glob
 from datetime import datetime
 from flask import Blueprint, request, jsonify, render_template
-from ..services.csv_import_service import CSVImportService
+from ..services.equipment_import_service import EquipmentImportService
 from ..services.pnl_import_service import PnLImportService
 from ..services.scorecard_csv_import_service import ScorecardCSVImportService
 from ..services.payroll_import_service import PayrollImportService
+from ..services.transitems_import_service import TransitemsImportService
 from ..services.logger import get_logger
 from config import BASE_DIR
 import traceback
@@ -153,12 +154,15 @@ def trigger_manual_import():
                     csv_service = CSVImportService()
 
                     if file_type == 'equipment':
-                        import_result = csv_service.import_equipment_data(file_path)
+                        equipment_service = EquipmentImportService()
+                        import_result = equipment_service.import_equipment_csv_data(file_path)
                     elif file_type == 'customer':
                         import_result = csv_service.import_customer_data(file_path, limit)
                     elif file_type == 'transaction':
+                        import_result = csv_service.import_transactions_data(file_path)
                     elif file_type == "transaction_items":
-                        import_result = csv_service.import_transaction_items_data(file_path)
+                        transitems_service = TransitemsImportService()
+                        import_result = transitems_service.import_transitems_csv_data(file_path)
                         # Fixed duplicate line
                 else:
                     results["errors"].append(f"Unsupported file type: {file_type} for {filename}")
