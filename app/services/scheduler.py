@@ -204,9 +204,9 @@ def init_scheduler(app):
                     with acquire_lock(redis_client, csv_import_lock_key, csv_import_lock_timeout):
                         logger.info("🚀 Starting Tuesday 8am CSV imports (all POS files)")
                         
-                        from .fixed_pos_import_service import fixed_pos_import_service
+                        from .bedrock_raw_import_service import bedrock_raw_import_service
 
-                        import_results = fixed_pos_import_service.import_all_pos_data()
+                        import_results = bedrock_raw_import_service.import_all_pos_data()
                         successful = import_results.get("total_imported", 0)
                         failed = import_results.get("total_failed", 0)
                         logger.info(f"🏁 Tuesday CSV imports completed: {successful} imported, {failed} failed")

@@ -13,6 +13,7 @@ from ..services.pnl_import_service import PnLImportService
 from ..services.scorecard_csv_import_service import ScorecardCSVImportService
 from ..services.payroll_import_service import PayrollImportService
 from ..services.transitems_import_service import TransitemsImportService
+from ..services.bedrock_raw_import_service import BedrockRawImportService
 from ..services.logger import get_logger
 from config import BASE_DIR
 import traceback
@@ -142,12 +143,12 @@ def trigger_manual_import():
                 elif file_type == 'scorecard':
                     # Use scorecard import service
                     scorecard_service = ScorecardCSVImportService()
-                    import_result = scorecard_service.import_scorecard_csv_data(file_path, limit)
+                    import_result = scorecard_service.import_scorecard_data(file_path)
 
                 elif file_type == 'payroll':
                     # Use payroll import service
                     payroll_service = PayrollImportService()
-                    import_result = payroll_service.import_payroll_csv_data(file_path, limit)
+                    import_result = payroll_service.import_payroll_trends_corrected(file_path)
 
                 elif file_type in ['equipment', 'customer', 'transaction', 'transaction_items']:
                     # Use standard CSV import service
@@ -261,4 +262,28 @@ def quick_pnl_test():
         return jsonify({
             "success": False,
             "error": str(e)
+        }), 500
+
+# Add route for bedrock raw import (all 4 POS CSVs to bedrock tables)
+@manual_import_bp.route('/bedrock/import-all', methods=['POST'])
+def bedrock_import_all():
+    """Import all 4 POS CSVs to bedrock raw tables"""
+    try:
+        logger.info("Starting bedrock raw import of all POS CSVs")
+
+        bedrock_service = BedrockRawImportService()
+        result = bedrock_service.import_all_pos_data()
+
+        return jsonify({
+            "success": True,
+            "bedrock_import": result,
+            "message": f"Bedrock import completed: {result['total_imported']} total records"
+        })
+
+    except Exception as e:
+        logger.error(f"Bedrock import failed: {e}")
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "traceback": traceback.format_exc()
         }), 500
