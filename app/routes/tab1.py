@@ -1,5 +1,5 @@
 # app/routes/tab1.py
-# tab1.py version: 2025-09-24-v26-bedrock-fixed
+# tab1.py version: 2025-09-24-v27-ultra-optimized
 from datetime import datetime
 from flask import Blueprint, request, jsonify, current_app, render_template
 from .. import db
@@ -33,7 +33,7 @@ limiter = Limiter(
 VALID_QUALITIES = ["A+", "A", "A-", "B+", "B", "B-", "C+", "C", "C-", ""]
 
 # Version marker
-logger.info("Deployed tab1.py version: 2025-09-24-v26-bedrock-fixed")
+logger.info("Deployed tab1.py version: 2025-09-24-v27-ultra-optimized")
 
 from ..services.mappings_cache import get_cached_mappings
 from ..utils.filters import build_global_filters
@@ -188,17 +188,17 @@ def tab1_view():
         # Use unified dashboard service instead of direct database queries
         dashboard_service = UnifiedDashboardService()
 
-        # Build filters dictionary
+        # Build filters dictionary - include all parameters
         filters = {
             'category': filter_query if filter_query else None,
             'sort': sort,
             'status': status_filter if status_filter else None,
             'bin': bin_filter if bin_filter else None,
-            'store': store_filter if store_filter != "all" else None,
-            'type': type_filter if type_filter != "all" else None
+            'store': store_filter,  # Always pass store filter
+            'type': type_filter    # Always pass type filter
         }
 
-        # Remove None values
+        # Remove only None values, keep 'all' values
         filters = {k: v for k, v in filters.items() if v is not None}
 
         # Get category data from bedrock service
@@ -243,17 +243,17 @@ def tab1_filter():
         # Use unified dashboard service instead of direct database queries
         dashboard_service = UnifiedDashboardService()
 
-        # Build filters dictionary
+        # Build filters dictionary - include all parameters
         filters = {
             'category': filter_query if filter_query else None,
             'sort': sort,
             'status': status_filter if status_filter else None,
             'bin': bin_filter if bin_filter else None,
-            'store': store_filter if store_filter != "all" else None,
-            'type': type_filter if type_filter != "all" else None
+            'store': store_filter,  # Always pass store filter
+            'type': type_filter    # Always pass type filter
         }
 
-        # Remove None values
+        # Remove only None values, keep 'all' values
         filters = {k: v for k, v in filters.items() if v is not None}
 
         # Get category data from bedrock service
