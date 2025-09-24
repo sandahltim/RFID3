@@ -1,5 +1,5 @@
 # app/routes/tab1.py
-# tab1.py version: 2025-07-10-v24
+# tab1.py version: 2025-09-24-v26-bedrock-fixed
 from datetime import datetime
 from flask import Blueprint, request, jsonify, current_app, render_template
 from .. import db
@@ -10,6 +10,7 @@ from ..models.db_models import (
     UserRentalClassMapping,
 )
 from ..services.unified_api_client import UnifiedAPIClient
+from ..services.unified_dashboard_service import UnifiedDashboardService
 from ..services.logger import get_logger
 from sqlalchemy import func, desc, or_, asc, case, select
 from time import time
@@ -32,7 +33,7 @@ limiter = Limiter(
 VALID_QUALITIES = ["A+", "A", "A-", "B+", "B", "B-", "C+", "C", "C-", ""]
 
 # Version marker
-logger.info("Deployed tab1.py version: 2025-07-10-v24")
+logger.info("Deployed tab1.py version: 2025-09-24-v26-bedrock-fixed")
 
 from ..services.mappings_cache import get_cached_mappings
 from ..utils.filters import build_global_filters
@@ -168,81 +169,108 @@ def get_category_data(
 
 @tab1_bp.route("/tab/1")
 def tab1_view():
-    logger.debug("Tab 1 route accessed")
-    current_app.logger.debug("Tab 1 route accessed")
-    session = None
+    logger.debug("Tab 1 route accessed - bedrock version")
+    current_app.logger.debug("Tab 1 route accessed - bedrock version")
+
     try:
-        session = db.session()
+        # Get filter parameters
         filter_query = request.args.get("filter", "").lower()
         sort = request.args.get("sort", "")
         status_filter = request.args.get("statusFilter", "").lower()
         bin_filter = request.args.get("binFilter", "").lower()
-
-        # Global filters for store-aware functionality
         store_filter = request.args.get("store", "all")
         type_filter = request.args.get("type", "all")
+
         logger.debug(
-            f"Tab 1 parameters: filter_query={filter_query}, sort={sort}, status_filter={status_filter}, bin_filter={bin_filter}, store_filter={store_filter}, type_filter={type_filter}"
+            f"Tab 1 bedrock parameters: filter_query={filter_query}, sort={sort}, status_filter={status_filter}, bin_filter={bin_filter}, store_filter={store_filter}, type_filter={type_filter}"
         )
 
-        category_data = get_category_data(
-            session,
-            filter_query,
-            sort,
-            status_filter,
-            bin_filter,
-            store_filter,
-            type_filter,
-        )
-        logger.info(f"Fetched {len(category_data)} categories for tab1")
+        # Use unified dashboard service instead of direct database queries
+        dashboard_service = UnifiedDashboardService()
+
+        # Build filters dictionary
+        filters = {
+            'category': filter_query if filter_query else None,
+            'sort': sort,
+            'status': status_filter if status_filter else None,
+            'bin': bin_filter if bin_filter else None,
+            'store': store_filter if store_filter != "all" else None,
+            'type': type_filter if type_filter != "all" else None
+        }
+
+        # Remove None values
+        filters = {k: v for k, v in filters.items() if v is not None}
+
+        # Get category data from bedrock service
+        result = dashboard_service.get_tab1_category_data(filters)
+
+        if result.get('success'):
+            category_data = result.get('data', {})
+            logger.info(f"Bedrock service fetched {len(category_data)} categories for tab1")
+        else:
+            logger.error(f"Bedrock service error: {result.get('error')}")
+            category_data = {}
 
         return render_template(
             "common.html", categories=category_data, tab_num=1, cache_bust=int(time())
         )
+
     except Exception as e:
-        logger.error(f"Error rendering Tab 1: {str(e)}", exc_info=True)
-        current_app.logger.error(f"Error rendering Tab 1: {str(e)}", exc_info=True)
+        logger.error(f"Error rendering Tab 1 with bedrock: {str(e)}", exc_info=True)
+        current_app.logger.error(f"Error rendering Tab 1 with bedrock: {str(e)}", exc_info=True)
         return render_template(
             "common.html", categories=[], tab_num=1, cache_bust=int(time())
         )
-    finally:
-        if session:
-            session.close()
 
 
 @tab1_bp.route("/tab/1/filter", methods=["POST"])
 def tab1_filter():
-    logger.debug("Tab 1 filter route accessed")
-    session = None
+    logger.debug("Tab 1 filter route accessed - bedrock version")
+
     try:
-        session = db.session()
+        # Get filter parameters from form
         filter_query = request.form.get("category-filter", "").lower()
         sort = request.form.get("category-sort", "")
         status_filter = request.form.get("statusFilter", "").lower()
         bin_filter = request.form.get("binFilter", "").lower()
         store_filter = request.form.get("store", "all")
         type_filter = request.form.get("type", "all")
+
         logger.debug(
-            f"Filter parameters: filter_query={filter_query}, sort={sort}, status_filter={status_filter}, bin_filter={bin_filter}, store_filter={store_filter}, type_filter={type_filter}"
+            f"Bedrock filter parameters: filter_query={filter_query}, sort={sort}, status_filter={status_filter}, bin_filter={bin_filter}, store_filter={store_filter}, type_filter={type_filter}"
         )
 
-        category_data = get_category_data(
-            session,
-            filter_query,
-            sort,
-            status_filter,
-            bin_filter,
-            store_filter,
-            type_filter,
-        )
+        # Use unified dashboard service instead of direct database queries
+        dashboard_service = UnifiedDashboardService()
+
+        # Build filters dictionary
+        filters = {
+            'category': filter_query if filter_query else None,
+            'sort': sort,
+            'status': status_filter if status_filter else None,
+            'bin': bin_filter if bin_filter else None,
+            'store': store_filter if store_filter != "all" else None,
+            'type': type_filter if type_filter != "all" else None
+        }
+
+        # Remove None values
+        filters = {k: v for k, v in filters.items() if v is not None}
+
+        # Get category data from bedrock service
+        result = dashboard_service.get_tab1_category_data(filters)
+
+        if result.get('success'):
+            category_data = result.get('data', {})
+            logger.info(f"Bedrock filter service fetched {len(category_data)} categories")
+        else:
+            logger.error(f"Bedrock filter service error: {result.get('error')}")
+            category_data = {}
 
         return render_template("_category_rows.html", categories=category_data)
+
     except Exception as e:
-        logger.error(f"Error filtering Tab 1: {str(e)}", exc_info=True)
+        logger.error(f"Error filtering Tab 1 with bedrock: {str(e)}", exc_info=True)
         return jsonify({"error": "Failed to filter categories"}), 500
-    finally:
-        if session:
-            session.close()
 
 
 @tab1_bp.route("/tab/1/subcat_data")
@@ -461,6 +489,8 @@ def tab1_subcat_data():
 
 @tab1_bp.route("/tab/1/common_names")
 def tab1_common_names():
+    logger.debug("Tab 1 common_names route accessed - bedrock version")
+
     category = unquote(request.args.get("category"))
     subcategory = unquote(request.args.get("subcategory"))
     page = int(request.args.get("page", 1))
@@ -477,221 +507,48 @@ def tab1_common_names():
         logger.error("Category and subcategory are required in common_names request")
         return jsonify({"error": "Category and subcategory are required"}), 400
 
-    session = None
     try:
-        session = db.session()
+        # Use unified dashboard service instead of direct database queries
+        dashboard_service = UnifiedDashboardService()
 
-        base_mappings = (
-            session.query(RentalClassMapping)
-            .filter(
-                func.lower(RentalClassMapping.category) == category.lower(),
-                func.lower(RentalClassMapping.subcategory) == subcategory.lower(),
-            )
-            .all()
-        )
-        user_mappings = (
-            session.query(UserRentalClassMapping)
-            .filter(
-                func.lower(UserRentalClassMapping.category) == category.lower(),
-                func.lower(UserRentalClassMapping.subcategory) == subcategory.lower(),
-            )
-            .all()
-        )
-        logger.debug(
-            f"Found {len(base_mappings)} base mappings and {len(user_mappings)} user mappings for category {category}, subcategory {subcategory}"
-        )
-
-        mappings_dict = {
-            str(m.rental_class_id): {
-                "category": m.category,
-                "subcategory": m.subcategory,
-            }
-            for m in base_mappings
+        # Build filters dictionary for bedrock service
+        filters = {
+            'category': category,
+            'subcategory': subcategory,
+            'page': page,
+            'per_page': per_page,
+            'filter': filter_query if filter_query else None,
+            'sort': sort,
+            'status': status_filter if status_filter else None,
+            'bin': bin_filter if bin_filter else None
         }
-        for um in user_mappings:
-            mappings_dict[str(um.rental_class_id)] = {
-                "category": um.category,
-                "subcategory": um.subcategory,
-            }
 
-        rental_class_ids = list(mappings_dict.keys())
-        logger.debug(f"rental_class_ids: {rental_class_ids}")
+        # Remove None values
+        filters = {k: v for k, v in filters.items() if v is not None}
 
-        common_names_query = session.query(
-            ItemMaster.common_name, func.count(ItemMaster.tag_id).label("total_items")
-        ).filter(
-            func.trim(func.cast(ItemMaster.rental_class_num, db.String)).in_(
-                rental_class_ids
-            )
-        )
-        if filter_query:
-            common_names_query = common_names_query.filter(
-                func.lower(ItemMaster.common_name).like(f"%{filter_query}%")
-            )
-        if status_filter:
-            common_names_query = common_names_query.filter(
-                func.lower(ItemMaster.status) == status_filter.lower()
-            )
-        if bin_filter:
-            common_names_query = common_names_query.filter(
-                func.lower(func.trim(func.coalesce(ItemMaster.bin_location, "")))
-                == bin_filter.lower()
-            )
-        common_names_query = common_names_query.group_by(ItemMaster.common_name)
+        # Get common names data from bedrock service
+        result = dashboard_service.get_tab1_common_names_data(filters)
 
-        if sort == "name_asc":
-            common_names_query = common_names_query.order_by(
-                asc(func.lower(ItemMaster.common_name))
-            )
-        elif sort == "name_desc":
-            common_names_query = common_names_query.order_by(
-                desc(func.lower(ItemMaster.common_name))
-            )
-        elif sort == "total_items_asc":
-            common_names_query = common_names_query.order_by(asc("total_items"))
-        elif sort == "total_items_desc":
-            common_names_query = common_names_query.order_by(desc("total_items"))
+        if result.get('success'):
+            data = result.get('data', {})
+            logger.info(f"Bedrock common names service returned {len(data.get('common_names', []))} items")
+            return jsonify(data)
+        else:
+            logger.error(f"Bedrock common names service error: {result.get('error')}")
+            return jsonify({"error": "Failed to fetch common names from bedrock service"}), 500
 
-        common_names_all = common_names_query.all()
-        logger.debug(f"Total common names fetched: {len(common_names_all)}")
-
-        common_names = []
-        for name, total in common_names_all:
-            if not name:
-                continue
-
-            items_on_contracts_query = session.query(
-                func.count(ItemMaster.tag_id)
-            ).filter(
-                func.trim(func.cast(ItemMaster.rental_class_num, db.String)).in_(
-                    rental_class_ids
-                ),
-                ItemMaster.common_name == name,
-                ItemMaster.status.in_(["On Rent", "Delivered"]),
-            )
-            if filter_query:
-                items_on_contracts_query = items_on_contracts_query.filter(
-                    func.lower(ItemMaster.common_name).like(f"%{filter_query}%")
-                )
-            if status_filter:
-                items_on_contracts_query = items_on_contracts_query.filter(
-                    func.lower(ItemMaster.status) == status_filter.lower()
-                )
-            if bin_filter:
-                items_on_contracts_query = items_on_contracts_query.filter(
-                    func.lower(func.trim(func.coalesce(ItemMaster.bin_location, "")))
-                    == bin_filter.lower()
-                )
-            items_on_contracts = items_on_contracts_query.scalar() or 0
-
-            subquery = (
-                session.query(
-                    Transaction.tag_id,
-                    Transaction.scan_date,
-                    Transaction.service_required,
-                )
-                .filter(Transaction.tag_id == ItemMaster.tag_id)
-                .order_by(Transaction.scan_date.desc())
-                .subquery()
-            )
-
-            items_in_service_query = session.query(
-                func.count(ItemMaster.tag_id)
-            ).filter(
-                func.trim(func.cast(ItemMaster.rental_class_num, db.String)).in_(
-                    rental_class_ids
-                ),
-                ItemMaster.common_name == name,
-                or_(
-                    ItemMaster.status.notin_(["Ready to Rent", "On Rent", "Delivered"]),
-                    ItemMaster.tag_id.in_(
-                        session.query(subquery.c.tag_id).filter(
-                            subquery.c.scan_date
-                            == session.query(func.max(Transaction.scan_date))
-                            .filter(Transaction.tag_id == subquery.c.tag_id)
-                            .correlate(subquery)
-                            .scalar_subquery(),
-                            subquery.c.service_required == True,
-                        )
-                    ),
-                ),
-            )
-            if filter_query:
-                items_in_service_query = items_in_service_query.filter(
-                    func.lower(ItemMaster.common_name).like(f"%{filter_query}%")
-                )
-            if status_filter:
-                items_in_service_query = items_in_service_query.filter(
-                    func.lower(ItemMaster.status) == status_filter.lower()
-                )
-            if bin_filter:
-                items_in_service_query = items_in_service_query.filter(
-                    func.lower(func.trim(func.coalesce(ItemMaster.bin_location, "")))
-                    == bin_filter.lower()
-                )
-            items_in_service = items_in_service_query.scalar() or 0
-
-            items_available_query = session.query(func.count(ItemMaster.tag_id)).filter(
-                func.trim(func.cast(ItemMaster.rental_class_num, db.String)).in_(
-                    rental_class_ids
-                ),
-                ItemMaster.common_name == name,
-                ItemMaster.status == "Ready to Rent",
-            )
-            if filter_query:
-                items_available_query = items_available_query.filter(
-                    func.lower(ItemMaster.common_name).like(f"%{filter_query}%")
-                )
-            if status_filter:
-                items_available_query = items_available_query.filter(
-                    func.lower(ItemMaster.status) == status_filter.lower()
-                )
-            if bin_filter:
-                items_available_query = items_available_query.filter(
-                    func.lower(func.trim(func.coalesce(ItemMaster.bin_location, "")))
-                    == bin_filter.lower()
-                )
-            items_available = items_available_query.scalar() or 0
-
-            common_names.append(
-                {
-                    "name": name,
-                    "total_items": total,
-                    "items_on_contracts": items_on_contracts,
-                    "items_in_service": items_in_service,
-                    "items_available": items_available,
-                }
-            )
-
-        total_common_names = len(common_names)
-        start = (page - 1) * per_page
-        end = start + per_page
-        paginated_common_names = common_names[start:end]
-        logger.debug(
-            f"Returning {len(paginated_common_names)} paginated common names out of {total_common_names}"
-        )
-
-        return jsonify(
-            {
-                "common_names": paginated_common_names,
-                "total_common_names": total_common_names,
-                "page": page,
-                "per_page": per_page,
-            }
-        )
     except Exception as e:
         logger.error(
-            f"Error fetching common names for category {category}, subcategory {subcategory}: {str(e)}",
+            f"Error fetching common names with bedrock for category {category}, subcategory {subcategory}: {str(e)}",
             exc_info=True,
         )
         return jsonify({"error": "Failed to fetch common names"}), 500
-    finally:
-        if session:
-            session.close()
 
 
 @tab1_bp.route("/tab/1/data")
 def tab1_data():
+    logger.debug("Tab 1 data route accessed - bedrock version")
+
     category = unquote(request.args.get("category"))
     subcategory = unquote(request.args.get("subcategory"))
     common_name = unquote(request.args.get("common_name"))
@@ -701,8 +558,11 @@ def tab1_data():
     sort = request.args.get("sort", "")
     status_filter = request.args.get("statusFilter", "").lower()
     bin_filter = request.args.get("binFilter", "").lower()
+    store_filter = request.args.get("store", "all")
+    type_filter = request.args.get("type", "all")
+
     logger.debug(
-        f"data: category={category}, subcategory={subcategory}, common_name={common_name}, page={page}, per_page={per_page}, filter_query={filter_query}, sort={sort}, status_filter={status_filter}, bin_filter={bin_filter}"
+        f"Bedrock data: category={category}, subcategory={subcategory}, common_name={common_name}, page={page}, per_page={per_page}, filter_query={filter_query}, sort={sort}, status_filter={status_filter}, bin_filter={bin_filter}, store_filter={store_filter}, type_filter={type_filter}"
     )
 
     if not category or not subcategory or not common_name:
@@ -714,146 +574,75 @@ def tab1_data():
             400,
         )
 
-    session = None
     try:
-        session = db.session()
+        # Use unified dashboard service instead of direct database queries
+        dashboard_service = UnifiedDashboardService()
 
-        base_mappings = (
-            session.query(RentalClassMapping)
-            .filter(
-                func.lower(RentalClassMapping.category) == category.lower(),
-                func.lower(RentalClassMapping.subcategory) == subcategory.lower(),
-            )
-            .all()
-        )
-        user_mappings = (
-            session.query(UserRentalClassMapping)
-            .filter(
-                func.lower(UserRentalClassMapping.category) == category.lower(),
-                func.lower(UserRentalClassMapping.subcategory) == subcategory.lower(),
-            )
-            .all()
-        )
-        logger.debug(
-            f"Found {len(base_mappings)} base mappings and {len(user_mappings)} user mappings for category {category}, subcategory {subcategory}"
-        )
-
-        mappings_dict = {
-            str(m.rental_class_id): {
-                "category": m.category,
-                "subcategory": m.subcategory,
-            }
-            for m in base_mappings
+        # Build filters dictionary for bedrock service
+        filters = {
+            'category': category,
+            'subcategory': subcategory,
+            'common_name': common_name,
+            'page': page,
+            'per_page': per_page,
+            'filter': filter_query if filter_query else None,
+            'sort': sort,
+            'status': status_filter if status_filter else None,
+            'bin': bin_filter if bin_filter else None,
+            'store': store_filter,
+            'type': type_filter
         }
-        for um in user_mappings:
-            mappings_dict[str(um.rental_class_id)] = {
-                "category": um.category,
-                "subcategory": um.subcategory,
-            }
 
-        rental_class_ids = list(mappings_dict.keys())
-        logger.debug(f"rental_class_ids: {rental_class_ids}")
+        # Remove None values but keep 'all' values
+        filters = {k: v for k, v in filters.items() if v is not None}
 
-        query = session.query(ItemMaster).filter(
-            func.trim(func.cast(ItemMaster.rental_class_num, db.String)).in_(
-                rental_class_ids
-            ),
-            ItemMaster.common_name == common_name,
-        )
-        if filter_query:
-            query = query.filter(
-                or_(
-                    func.lower(ItemMaster.tag_id).like(f"%{filter_query}%"),
-                    func.lower(ItemMaster.bin_location).like(f"%{filter_query}%"),
-                    func.lower(ItemMaster.status).like(f"%{filter_query}%"),
-                    func.lower(ItemMaster.last_contract_num).like(f"%{filter_query}%"),
-                )
-            )
-        if status_filter:
-            query = query.filter(func.lower(ItemMaster.status) == status_filter.lower())
-        if bin_filter:
-            query = query.filter(
-                func.lower(func.trim(func.coalesce(ItemMaster.bin_location, "")))
-                == bin_filter.lower()
-            )
+        # Get equipment list from bedrock service
+        result = dashboard_service.get_tab1_equipment_list(filters)
 
-        if sort == "tag_id_asc":
-            query = query.order_by(asc(ItemMaster.tag_id))
-        elif sort == "tag_id_desc":
-            query = query.order_by(desc(ItemMaster.tag_id))
-        elif sort == "last_scanned_date_asc":
-            query = query.order_by(asc(ItemMaster.date_last_scanned))
-        elif sort == "last_scanned_date_desc":
-            query = query.order_by(desc(ItemMaster.date_last_scanned))
+        if result.get('success'):
+            equipment_list = result.get('data', [])
+            total_count = result.get('total_count', 0)
 
-        total_items = query.count()
-        items = query.offset((page - 1) * per_page).limit(per_page).all()
-        logger.debug(
-            f"Fetched {len(items)} items out of {total_items} for common_name {common_name}"
-        )
+            # Transform equipment data to match expected format
+            items_data = []
+            for equipment in equipment_list:
+                items_data.append({
+                    "tag_id": equipment.get('tag_id', ''),
+                    "common_name": equipment.get('common_name', ''),
+                    "bin_location": equipment.get('bin_location', ''),
+                    "status": equipment.get('status', ''),
+                    "last_contract_num": equipment.get('last_contract_num', ''),
+                    "customer_name": equipment.get('customer_name', 'N/A'),
+                    "last_scanned_date": equipment.get('last_scanned_date', 'N/A'),
+                    "quality": equipment.get('quality', ''),
+                    "notes": equipment.get('notes', ''),
+                })
 
-        items_data = []
-        for item in items:
-            last_scanned_date = (
-                item.date_last_scanned.isoformat() if item.date_last_scanned else "N/A"
-            )
+            logger.info(f"Bedrock data service returned {len(items_data)} items for {category}/{subcategory}/{common_name}")
 
-            # Get customer name from latest transaction for this item
-            customer_name = "N/A"
-            if item.last_contract_num:
-                latest_transaction = (
-                    db.session.query(Transaction.client_name)
-                    .filter(
-                        Transaction.tag_id == item.tag_id,
-                        Transaction.contract_number == item.last_contract_num,
-                    )
-                    .order_by(desc(Transaction.scan_date))
-                    .first()
-                )
-                customer_name = (
-                    latest_transaction.client_name
-                    if latest_transaction and latest_transaction.client_name
-                    else "N/A"
-                )
-
-            items_data.append(
-                {
-                    "tag_id": item.tag_id,
-                    "common_name": item.common_name,
-                    "bin_location": item.bin_location,
-                    "status": item.status,
-                    "last_contract_num": item.last_contract_num,
-                    "customer_name": customer_name,
-                    "last_scanned_date": last_scanned_date,
-                    "quality": item.quality,
-                    "notes": item.notes,
-                }
-            )
-
-        logger.debug(f"Returning items_data: {len(items_data)} items")
-        return jsonify(
-            {
+            return jsonify({
                 "items": items_data,
-                "total_items": total_items,
+                "total_items": total_count,
                 "page": page,
                 "per_page": per_page,
-            }
-        )
+            })
+
+        else:
+            logger.error(f"Bedrock data service error: {result.get('error')}")
+            return jsonify({"error": "Failed to fetch items from bedrock service"}), 500
+
     except Exception as e:
         logger.error(
-            f"Error fetching items for category {category}, subcategory {subcategory}, common_name {common_name}: {str(e)}",
+            f"Error fetching items with bedrock for category {category}, subcategory {subcategory}, common_name {common_name}: {str(e)}",
             exc_info=True,
         )
         return jsonify({"error": "Failed to fetch items"}), 500
-    finally:
-        if session:
-            session.close()
 
 
 @tab1_bp.route("/tab/1/update_bin_location", methods=["POST"])
 @limiter.limit("10 per minute")
 def update_bin_location():
-    logger.debug("update_bin_location route accessed")
+    logger.debug("update_bin_location route accessed - bedrock version")
     session = None
     try:
         session = db.session()
@@ -933,7 +722,7 @@ def update_bin_location():
 @tab1_bp.route("/tab/1/update_status", methods=["POST"])
 @limiter.limit("10 per minute")
 def update_status():
-    logger.debug("update_status route accessed")
+    logger.debug("update_status route accessed - bedrock version")
     session = None
     try:
         session = db.session()
@@ -1029,7 +818,7 @@ def update_status():
 @tab1_bp.route("/tab/1/update_quality", methods=["POST"])
 @limiter.limit("10 per minute")
 def update_quality():
-    logger.debug("update_quality route accessed")
+    logger.debug("update_quality route accessed - bedrock version")
     session = None
     try:
         session = db.session()
@@ -1106,7 +895,7 @@ def update_quality():
 @tab1_bp.route("/tab/1/update_notes", methods=["POST"])
 @limiter.limit("10 per minute")
 def update_notes():
-    logger.debug("update_notes route accessed")
+    logger.debug("update_notes route accessed - bedrock version")
     session = None
     try:
         session = db.session()
@@ -1173,7 +962,7 @@ def full_items_by_rental_class():
     subcategory = unquote(request.args.get("subcategory"))
     common_name = unquote(request.args.get("common_name"))
     logger.debug(
-        f"full_items_by_rental_class: category={category}, subcategory={subcategory}, common_name={common_name}"
+        f"full_items_by_rental_class route accessed - bedrock version: category={category}, subcategory={subcategory}, common_name={common_name}"
     )
 
     if not category or not subcategory or not common_name:
@@ -1185,85 +974,57 @@ def full_items_by_rental_class():
             400,
         )
 
-    session = None
     try:
-        session = db.session()
+        # Use unified dashboard service instead of direct database queries
+        dashboard_service = UnifiedDashboardService()
 
-        base_mappings = (
-            session.query(RentalClassMapping)
-            .filter(
-                func.lower(RentalClassMapping.category) == category.lower(),
-                func.lower(RentalClassMapping.subcategory) == subcategory.lower(),
-            )
-            .all()
-        )
-        user_mappings = (
-            session.query(UserRentalClassMapping)
-            .filter(
-                func.lower(UserRentalClassMapping.category) == category.lower(),
-                func.lower(UserRentalClassMapping.subcategory) == subcategory.lower(),
-            )
-            .all()
-        )
-        logger.debug(
-            f"Found {len(base_mappings)} base mappings and {len(user_mappings)} user mappings for category {category}, subcategory {subcategory}"
-        )
-
-        mappings_dict = {
-            str(m.rental_class_id): {
-                "category": m.category,
-                "subcategory": m.subcategory,
-            }
-            for m in base_mappings
+        # Build filters dictionary for bedrock service
+        filters = {
+            'category': category,
+            'subcategory': subcategory,
+            'common_name': common_name,
+            'limit': None  # Get all items for this specific combination
         }
-        for um in user_mappings:
-            mappings_dict[str(um.rental_class_id)] = {
-                "category": um.category,
-                "subcategory": um.subcategory,
-            }
 
-        rental_class_ids = list(mappings_dict.keys())
-        logger.debug(f"rental_class_ids: {rental_class_ids}")
+        # Get equipment list from bedrock service
+        result = dashboard_service.get_tab1_equipment_list(filters)
 
-        items_query = (
-            session.query(ItemMaster)
-            .filter(
-                func.trim(func.cast(ItemMaster.rental_class_num, db.String)).in_(
-                    rental_class_ids
-                ),
-                ItemMaster.common_name == common_name,
-            )
-            .order_by(ItemMaster.tag_id)
-        )
+        if result.get('success'):
+            equipment_list = result.get('data', [])
 
-        items = items_query.all()
-        items_data = []
-        for item in items:
-            last_scanned_date = (
-                item.date_last_scanned.isoformat() if item.date_last_scanned else "N/A"
-            )
-            items_data.append(
-                {
-                    "tag_id": item.tag_id,
-                    "common_name": item.common_name,
-                    "rental_class_num": item.rental_class_num,
-                    "bin_location": item.bin_location,
-                    "status": item.status,
-                    "last_contract_num": item.last_contract_num,
-                    "last_scanned_date": last_scanned_date,
-                    "quality": item.quality,
-                    "notes": item.notes,
-                }
-            )
+            # Transform equipment data to match expected format and filter by exact match
+            full_items = []
+            for equipment in equipment_list:
+                # Filter by category hierarchy and common name
+                if (equipment.get('category', '').lower() == category.lower() and
+                    equipment.get('subcategory', '').lower() == subcategory.lower() and
+                    equipment.get('common_name') == common_name):
 
-        logger.debug(f"Returning {len(items_data)} items for common_name {common_name}")
-        return jsonify({"items": items_data, "total_items": len(items_data)})
+                    full_items.append({
+                        "tag_id": equipment.get('tag_id', equipment.get('num', '')),
+                        "common_name": equipment.get('common_name', ''),
+                        "bin_location": equipment.get('bin_location', equipment.get('current_location', '')),
+                        "status": equipment.get('status', equipment.get('current_status', '')),
+                        "last_contract_num": equipment.get('last_contract_num', ''),
+                        "customer_name": equipment.get('customer_name', 'N/A'),
+                        "last_scanned_date": equipment.get('last_scanned_date', 'N/A'),
+                        "quality": equipment.get('quality', ''),
+                        "notes": equipment.get('notes', ''),
+                    })
+
+            logger.info(f"Bedrock full_items service returned {len(full_items)} items for {category}/{subcategory}/{common_name}")
+
+            return jsonify({
+                "items": full_items
+            })
+
+        else:
+            logger.error(f"Bedrock full_items service error: {result.get('error')}")
+            return jsonify({"error": "Failed to fetch full items from bedrock service"}), 500
+
     except Exception as e:
         logger.error(
-            f"Error fetching full items for category {category}, subcategory {subcategory}, common_name {common_name}: {str(e)}",
+            f"Error fetching full items with bedrock for category {category}, subcategory {subcategory}, common_name {common_name}: {str(e)}",
             exc_info=True,
         )
         return jsonify({"error": "Failed to fetch full items"}), 500
-    finally:
-        if session:
-            session.close()
