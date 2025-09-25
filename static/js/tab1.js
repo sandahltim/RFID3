@@ -1,17 +1,44 @@
 import { formatDate } from './utils.js';
 import { getCachedTabNum } from './state.js';
 // app/static/js/tab1.js
-// tab1.js version: 2025-07-10-v7
-console.log('tab1.js version: 2025-07-10-v7 loaded');
+// tab1.js version: 2025-09-25-v12-table-repopulation-fix
+console.log('tab1.js version: 2025-09-25-v12-table-repopulation-fix loaded');
 
 /**
- * Tab1.js: Logic for Tab 1 (Rental Inventory).
+ * Tab1.js: Logic for Tab 1 (Rental Inventory) - BEDROCK VERSION WITH GLOBALFILTERS INTEGRATION.
  * Dependencies: common.js (for formatDate, showLoading, hideLoading, collapseSection, printTable, printFullItemList).
- * Updated: 2025-07-10-v7
- * - Updated debouncedSaveEdit to include date_updated in API requests per EasyRFID API spec.
- * - Preserved subcategory retrieval fix from v6: traverse to .common-name-row and .category-row, with fallback to expand button's data-subcategory.
- * - Preserved all functionality from v6: aligned editable fields, Save/Cancel buttons, UI refresh, subcategory population, common name loading, pagination, print, collapse/expand, filters.
- * - Line count: ~900 lines (same as v6, only modified debouncedSaveEdit).
+ * Updated: 2025-09-25-v12-table-repopulation-fix
+ *
+ * CRITICAL FIX IN v12:
+ * - FIXED: Table clearing but not repopulating with filtered data
+ * - PROBLEM: After refreshDashboardData() cleared rows, loadMainCategoriesTable() wrongly assumed server-rendered data
+ * - SOLUTION: Always rebuild table rows when category data is available, removed faulty else condition
+ *
+ * PREVIOUS FIXES IN v11:
+ * - FIXED: 'tableBody is not defined' error in loadCommonNames catch block (scope issue)
+ * - FIXED: 'Cannot read properties of undefined (reading replace)' error with null item names
+ * - ADDED: Debugging for refreshDashboardData function detection in GlobalFilters
+ *
+ * PREVIOUS FIX IN v10:
+ * - FIXED: Duplicate getCurrentFilters function causing syntax error and preventing script load
+ * - RESULT: Store filtering should now work as GlobalFilters can call refreshDashboardData()
+ *
+ * MAJOR CHANGES IN v9:
+ * - FIXED: Proper GlobalFilters integration - store filtering now works correctly
+ * - ADDED: refreshDashboardData() function that GlobalFilters system calls when filters change
+ * - ADDED: getCurrentFilters() with GlobalFilters integration and legacy fallback
+ * - REMOVED: Incorrect event listeners looking for non-existent select[name="store"] elements
+ * - ARCHITECTURE: Now properly integrated with global_filters.html GlobalFilters system
+ * - BUG FIX: Store filtering dropdown changes now trigger table reload with new data
+ *
+ * PREVIOUS CHANGES IN v8:
+ * - FIXED: Updated to use new /tab/1/categories bedrock endpoint instead of old endpoints
+ * - FIXED: Store filtering now properly passes store/type parameters to API
+ * - FIXED: Common names expansion JavaScript errors (tableBody undefined at line 516)
+ * - FIXED: Store filtering synchronization with backend bedrock service
+ * - ARCHITECTURE: Now compatible with bedrock transformation service and unified dashboard
+ *
+ * This version is synchronized with tab1.py routes version 2025-09-24-v27-ultra-optimized
  */
 
 /**
@@ -48,6 +75,188 @@ function debounce(func, wait) {
         });
     };
 }
+
+// REMOVED: Old duplicate getCurrentFilters function (replaced with GlobalFilters integration version below)
+
+/**
+ * Load main categories table using bedrock /tab/1/categories endpoint
+ */
+async function loadMainCategoriesTable() {
+    console.log(`loadMainCategoriesTable: Starting at ${new Date().toISOString()}`);
+
+    try {
+        const filters = getCurrentFilters();
+        console.log(`Loading categories with filters:`, filters, `at ${new Date().toISOString()}`);
+
+        // Build query parameters
+        const params = new URLSearchParams();
+        if (filters.store && filters.store !== 'all') params.append('store', filters.store);
+        if (filters.type && filters.type !== 'all') params.append('type', filters.type);
+        if (filters.status) params.append('statusFilter', filters.status);
+        if (filters.bin) params.append('binFilter', filters.bin);
+        if (filters.search) params.append('filter', filters.search);
+
+        const url = `/tab/1/categories?${params.toString()}`;
+        console.log(`Fetching categories from: ${url} at ${new Date().toISOString()}`);
+
+        const response = await fetch(url);
+        console.log(`Categories fetch status: ${response.status} at ${new Date().toISOString()}`);
+
+        if (!response.ok) {
+            const text = await response.text();
+            throw new Error(`Categories fetch failed: ${response.status} - ${text}`);
+        }
+
+        const data = await response.json();
+        console.log(`Categories data received:`, data, `at ${new Date().toISOString()}`);
+
+        // Update the main table
+        const categoryTable = document.getElementById('category-table');
+        if (!categoryTable) {
+            console.error(`Category table not found at ${new Date().toISOString()}`);
+            return;
+        }
+
+        const tbody = categoryTable.querySelector('tbody');
+        if (!tbody) {
+            console.error(`Category table tbody not found at ${new Date().toISOString()}`);
+            return;
+        }
+
+        // Check if table already has data (server-side rendered) BEFORE clearing
+        const existingRows = tbody.querySelectorAll('.category-row');
+        const hasExistingData = existingRows.length > 0;
+
+        // Only replace table data if we're updating filters or if table is empty
+        const isInitialLoad = !hasExistingData;
+
+        if (!isInitialLoad) {
+            console.log(`Updating existing table with ${data.categories.length} categories at ${new Date().toISOString()}`);
+        }
+
+        // Populate/update table with new data
+        if (data.categories && data.categories.length > 0) {
+            // Always rebuild rows when we have category data to display
+            // Clear existing rows
+            tbody.innerHTML = '';
+
+            data.categories.forEach(category => {
+                    const categoryId = category.category.toLowerCase().replace(/[^a-z0-9]/g, '_');
+                    const row = document.createElement('tr');
+                    row.className = 'category-row';
+                    row.innerHTML = `
+                        <td>${category.category}</td>
+                        <td>
+                            <select class="subcategory-select form-control" data-category="${category.category}" onchange="tab1.loadCommonNames(this)">
+                                <option value="">Select a subcategory</option>
+                            </select>
+                            <div id="loading-subcat-${categoryId}" class="loading-indicator" style="display: none;">Loading...</div>
+                        </td>
+                        <td>${category.total_items || 0}</td>
+                        <td>${category.items_on_contracts || 0}</td>
+                        <td>${category.items_requiring_service || 0}</td>
+                        <td>${category.items_available || 0}</td>
+                        <td>
+                            <div class="btn-group">
+                                <button class="btn btn-sm btn-info print-btn"
+                                        data-print-level="Category"
+                                        data-print-id="category-table">Print</button>
+                            </div>
+                        </td>
+                    `;
+                    tbody.appendChild(row);
+
+                    // Add expansion row
+                    const expansionRow = document.createElement('tr');
+                    expansionRow.innerHTML = `
+                        <td colspan="7">
+                            <div id="common-${categoryId}" class="common-level"></div>
+                        </td>
+                    `;
+                    tbody.appendChild(expansionRow);
+                });
+
+                console.log(`Updated table with ${data.categories.length} categories at ${new Date().toISOString()}`);
+
+                // Populate subcategories for each category
+                await populateSubcategories();
+
+        } else {
+            tbody.innerHTML = '<tr><td colspan="7">No categories found with current filters</td></tr>';
+            console.warn(`No categories returned with current filters at ${new Date().toISOString()}`);
+        }
+
+    } catch (error) {
+        console.error(`Error loading main categories table: ${error.message} at ${new Date().toISOString()}`);
+        const categoryTable = document.getElementById('category-table');
+        if (categoryTable) {
+            const tbody = categoryTable.querySelector('tbody');
+            if (tbody) {
+                tbody.innerHTML = `<tr><td colspan="6">Error loading categories: ${error.message}</td></tr>`;
+            }
+        }
+    }
+}
+
+/**
+ * Get current filter values from GlobalFilters (for GlobalFilters integration)
+ */
+function getCurrentFilters() {
+    // Integration with GlobalFilters system from global_filters.html
+    if (window.GlobalFilters) {
+        const params = window.GlobalFilters.getApiParams();
+        console.log(`getCurrentFilters: Using GlobalFilters system:`, params, `at ${new Date().toISOString()}`);
+        return {
+            store: params.store,
+            type: params.type
+        };
+    } else {
+        // Fallback for manual form elements (legacy)
+        const storeSelect = document.querySelector('select[name="store"]');
+        const typeSelect = document.querySelector('select[name="type"]');
+        const statusInput = document.querySelector('input[name="statusFilter"]');
+        const binInput = document.querySelector('input[name="binFilter"]');
+        const searchInput = document.querySelector('input[name="category-filter"]');
+
+        const filters = {
+            store: storeSelect ? storeSelect.value : 'all',
+            type: typeSelect ? typeSelect.value : 'all',
+            status: statusInput ? statusInput.value : '',
+            bin: binInput ? binInput.value : '',
+            search: searchInput ? searchInput.value : ''
+        };
+        console.log(`getCurrentFilters: Using legacy form elements:`, filters, `at ${new Date().toISOString()}`);
+        return filters;
+    }
+}
+
+/**
+ * GlobalFilters integration function - called by GlobalFilters system when filters change
+ */
+window.refreshDashboardData = async function() {
+    console.log(`refreshDashboardData: Called by GlobalFilters at ${new Date().toISOString()}`);
+
+    // Clear existing table data to force reload with new filters
+    const categoryTable = document.getElementById('category-table');
+    if (categoryTable) {
+        const tbody = categoryTable.querySelector('tbody');
+        if (tbody) {
+            const existingRows = tbody.querySelectorAll('.category-row');
+            if (existingRows.length > 0) {
+                console.log(`refreshDashboardData: Clearing ${existingRows.length} existing rows for reload at ${new Date().toISOString()}`);
+                tbody.innerHTML = '';
+            }
+        }
+    }
+
+    // Reload table with current GlobalFilters
+    try {
+        await loadMainCategoriesTable();
+        console.log(`refreshDashboardData: Successfully reloaded Tab 1 data at ${new Date().toISOString()}`);
+    } catch (error) {
+        console.error(`refreshDashboardData: Error reloading Tab 1 data: ${error.message} at ${new Date().toISOString()}`);
+    }
+};
 
 /**
  * Apply filters to all levels for Tab 1
@@ -402,6 +611,10 @@ function loadCommonNames(selectElement, page = 1) {
             }
 
             const tableBody = headerRow.querySelector('tbody');
+            if (!tableBody) {
+                console.error(`Table body not found in headerRow at ${new Date().toISOString()}`);
+                return;
+            }
             tableBody.innerHTML = '';
 
             if (data.common_names && data.common_names.length > 0) {
@@ -418,34 +631,36 @@ function loadCommonNames(selectElement, page = 1) {
                 categoryRow.cells[5].textContent = totals.itemsAvailable || '0';
 
                 data.common_names.forEach(item => {
-                    const rowId = `${targetId}_${item.name.replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '')}`;
-                    const escapedName = item.name.replace(/'/g, "\\'").replace(/"/g, '\\"');
+                    // Add null checks to prevent replace errors
+                    const itemName = item.name || 'Unknown';
+                    const rowId = `${targetId}_${itemName.replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '')}`;
+                    const escapedName = itemName; // No escaping needed for data attributes
                     const commonRow = document.createElement('tr');
                     commonRow.innerHTML = `
-                        <td>${item.name}</td>
+                        <td>${itemName}</td>
                         <td>${item.total_items || '0'}</td>
                         <td>${item.items_on_contracts || '0'}</td>
                         <td>${item.items_in_service || '0'}</td>
                         <td>${item.items_available || '0'}</td>
                         <td>
                             <div class="btn-group">
-                                <button class="btn btn-sm btn-secondary expand-btn" 
-                                        data-category="${category}" 
-                                        data-subcategory="${subcategory}" 
-                                        data-common-name="${escapedName}" 
-                                        data-target-id="items-${rowId}" 
+                                <button class="btn btn-sm btn-secondary expand-btn"
+                                        data-category="${category}"
+                                        data-subcategory="${subcategory}"
+                                        data-common-name='${escapedName}'
+                                        data-target-id="items-${rowId}"
                                         data-expanded="false">Expand Items</button>
                                 <button class="btn btn-sm btn-secondary collapse-btn" 
                                         data-collapse-target="items-${rowId}" 
                                         style="display:none;">Collapse</button>
-                                <button class="btn btn-sm btn-info print-btn" 
-                                        data-print-level="Common Name" 
-                                        data-print-id="common-table-${targetId}" 
-                                        data-common-name="${escapedName}" 
-                                        data-category="${category}" 
+                                <button class="btn btn-sm btn-info print-btn"
+                                        data-print-level="Common Name"
+                                        data-print-id="common-table-${targetId}"
+                                        data-common-name='${escapedName}'
+                                        data-category="${category}"
                                         data-subcategory="${subcategory}">Print Aggregate</button>
-                                <button class="btn btn-sm btn-info print-full-btn" 
-                                        data-common-name="${escapedName}" 
+                                <button class="btn btn-sm btn-info print-full-btn"
+                                        data-common-name='${escapedName}'
                                         data-category="${category}" 
                                         data-subcategory="${subcategory}">Print Full List</button>
                             </div>
@@ -513,7 +728,19 @@ function loadCommonNames(selectElement, page = 1) {
         })
         .catch(error => {
             console.error(`Common names error: ${error.message} at ${new Date().toISOString()}`);
-            tableBody.innerHTML = `<tr><td colspan="6">Error: ${error.message}</td></tr>`;
+
+            // Find the table body to display error (tableBody was out of scope)
+            let errorHeaderRow = categoryRow.parentNode.querySelector(`tr.common-name-row[data-target-id="${targetId}"] .common-table`);
+            if (errorHeaderRow) {
+                const errorTableBody = errorHeaderRow.querySelector('tbody');
+                if (errorTableBody) {
+                    errorTableBody.innerHTML = `<tr><td colspan="6">Error: ${error.message}</td></tr>`;
+                } else {
+                    console.error(`Error table body not found for error display at ${new Date().toISOString()}`);
+                }
+            } else {
+                console.error(`Error header row not found for error display at ${new Date().toISOString()}`);
+            }
         })
         .finally(() => {
             setTimeout(() => {
@@ -675,7 +902,7 @@ async function loadItems(category, subcategory, commonName, targetId, page = 1) 
                         <button class="btn btn-sm btn-primary print-btn"
                                 data-print-level="Item"
                                 data-print-id="item-${item.tag_id}"
-                                data-common-name="${commonName.replace(/'/g, "\\'").replace(/"/g, '\\"')}"
+                                data-common-name='${commonName}'
                                 data-category="${category}">Print</button>
                     </td>
                 `;
@@ -835,14 +1062,38 @@ document.addEventListener('DOMContentLoaded', function() {
         return;
     }
 
-    console.log(`Initializing Tab 1 at ${new Date().toISOString()}`);
-    populateSubcategories().then(() => {
-        console.log(`Subcategories populated successfully at ${new Date().toISOString()}`);
-        document.removeEventListener('click', handleClick);
-        document.addEventListener('click', handleClick);
-    }).catch(error => {
-        console.error(`Error during subcategory population: ${error.message} at ${new Date().toISOString()}`);
-    });
+    console.log(`Initializing Tab 1 BEDROCK VERSION at ${new Date().toISOString()}`);
+
+    // Check if we already have server-rendered data
+    const categoryTable = document.getElementById('category-table');
+    if (categoryTable) {
+        const existingRows = categoryTable.querySelectorAll('.category-row');
+        if (existingRows.length > 0) {
+            console.log(`Found ${existingRows.length} server-rendered categories, skipping initial API load at ${new Date().toISOString()}`);
+            // Just populate subcategories for existing data
+            populateSubcategories().then(() => {
+                console.log(`Subcategories populated for existing data at ${new Date().toISOString()}`);
+            });
+        } else {
+            console.log(`No server-rendered data found, loading from API at ${new Date().toISOString()}`);
+            // Load from API
+            loadMainCategoriesTable().then(() => {
+                console.log(`Main categories table loaded from API at ${new Date().toISOString()}`);
+            }).catch(error => {
+                console.error(`Error loading main categories table: ${error.message} at ${new Date().toISOString()}`);
+            });
+        }
+    } else {
+        console.warn(`Category table not found during initialization at ${new Date().toISOString()}`);
+    }
+
+    // Set up event handlers
+    document.removeEventListener('click', handleClick);
+    document.addEventListener('click', handleClick);
+
+    // REMOVED: Old incorrect event listeners that looked for non-existent elements
+    // Store/type filtering now handled by GlobalFilters system in global_filters.html
+    // which calls refreshDashboardData() when filters change
 
     function handleClick(event) {
         console.log(`handleClick: Event triggered at ${new Date().toISOString()}`);
