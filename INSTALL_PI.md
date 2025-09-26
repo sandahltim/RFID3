@@ -1,9 +1,24 @@
 # Installing RFID Dashboard on Raspberry Pi
 
-**Last Updated:** August 26, 2025  
-**Version:** Phase 2 Complete - Advanced Inventory Analytics
+**Last Updated:** September 26, 2025
+**Version:** Bedrock Architecture - AI Agent Compatible
+**Status:** ⚠️ SUPERSEDED - See comprehensive guide below
 
-These installation steps set up the complete RFID Dashboard application under `/home/tim/RFID3`, including the new **Tab 6: Inventory & Analytics** features. The application runs Gunicorn on port **8102** and exposes Nginx on port **8101** for the web interface.
+## 🚨 IMPORTANT: Updated Installation Available
+
+**For the latest bedrock architecture with AI agent support, use:**
+- **[INSTALLATION_GUIDE_COMPLETE.md](INSTALLATION_GUIDE_COMPLETE.md)** - Complete AI agent ready guide
+- Includes bedrock services, seed data, credentials, Tailscale VPN
+- Supports both development and production deployment
+- All 11 core principles applied systematically
+
+---
+
+## Legacy Pi Installation (Pre-Bedrock)
+
+This guide covers the legacy installation method for Raspberry Pi. **For new installations, use the comprehensive guide above.**
+
+These installation steps set up the RFID Dashboard application under `/home/tim/RFID3`, including the **Tab 6: Inventory & Analytics** features. The application runs Gunicorn on port **8102** and exposes Nginx on port **8101** for the web interface.
 
 ## Features Included in This Installation
 
@@ -386,15 +401,20 @@ sudo systemctl restart rfid_dash_dev.service
 
 ---
 
-**Installation Complete!** 
+**Legacy Installation Complete!**
 
 Your RFID Dashboard with advanced analytics is now ready. Access the web interface at `http://your-pi-ip:8101` and explore the new Tab 6: Inventory & Analytics features.
 
+**⚠️ Important:** This is the legacy pre-bedrock installation. For new deployments:
+- Use **[INSTALLATION_GUIDE_COMPLETE.md](INSTALLATION_GUIDE_COMPLETE.md)** for bedrock architecture
+- Includes AI agent automation, seed data, and complete security setup
+- Better PC hardware support with production-ready configuration
+
 **Next Steps:**
 1. Configure API credentials in `config.py`
-2. Run initial data refresh from the home page  
+2. Run initial data refresh from the home page
 3. Assign categories via "Manage Categories"
 4. Explore analytics features in Tab 6
 5. Set up alert thresholds via Tab 6 → Configuration
 
-**Last Updated:** August 26, 2025
+**Last Updated:** September 26, 2025 (Legacy Guide)
