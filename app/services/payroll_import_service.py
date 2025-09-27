@@ -24,7 +24,7 @@ logger = get_logger(__name__)
 class PayrollImportService:
     """Dedicated service for importing payroll data with proper correlation handling"""
     
-    CSV_BASE_PATH = "/home/tim/RFID3/shared/POR"
+    CSV_BASE_PATH = "/home/tim/RFID3-RFID-KVC/shared/POR"
     
     def __init__(self):
         self.logger = logger

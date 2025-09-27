@@ -371,12 +371,13 @@ def update_item_master(session, items):
                 db_item.date_last_scanned = validate_date(
                     item.get("date_last_scanned"), "date_last_scanned", tag_id
                 )
-                db_item.date_created = validate_date(
-                    item.get("date_created"), "date_created", tag_id
-                )
-                db_item.date_updated = validate_date(
-                    item.get("date_updated"), "date_updated", tag_id
-                )
+
+                # RFIDpro item_master API doesn't provide date_created/date_updated
+                # Set them locally on import
+                from datetime import datetime
+                if not existing_item or not db_item.date_created:
+                    db_item.date_created = datetime.now()
+                db_item.date_updated = datetime.now()
 
                 # DO NOT overwrite POS fields:
                 # item_num, identifier_type, department, manufacturer,

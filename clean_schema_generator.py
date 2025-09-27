@@ -104,8 +104,8 @@ def get_existing_equipment_columns() -> Set[str]:
 def generate_clean_sql():
     """Generate clean, properly formatted SQL"""
 
-    excel_file = '/home/tim/RFID3/shared/POR/media/table info.xlsx'
-    output_file = '/home/tim/RFID3/clean_database_schema.sql'
+    excel_file = '/home/tim/RFID3-RFID-KVC/shared/POR/media/table info.xlsx'
+    output_file = '/home/tim/RFID3-RFID-KVC/clean_database_schema.sql'
 
     existing_equipment_cols = get_existing_equipment_columns()
 

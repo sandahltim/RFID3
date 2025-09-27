@@ -8,12 +8,11 @@ import os
 import glob
 from datetime import datetime
 from flask import Blueprint, request, jsonify, render_template
-from ..services.equipment_import_service import EquipmentImportService
+from ..services.csv_import_service import CSVImportService
 from ..services.pnl_import_service import PnLImportService
 from ..services.scorecard_csv_import_service import ScorecardCSVImportService
 from ..services.payroll_import_service import PayrollImportService
 from ..services.transitems_import_service import TransitemsImportService
-from ..services.bedrock_raw_import_service import BedrockRawImportService
 from ..services.logger import get_logger
 from config import BASE_DIR
 import traceback
@@ -151,20 +150,17 @@ def trigger_manual_import():
                     import_result = payroll_service.import_payroll_trends_corrected(file_path)
 
                 elif file_type in ['equipment', 'customer', 'transaction', 'transaction_items']:
-                    # Use standard CSV import service
+                    # Use CSVImportService for standard imports
                     csv_service = CSVImportService()
 
                     if file_type == 'equipment':
-                        equipment_service = EquipmentImportService()
-                        import_result = equipment_service.import_equipment_csv_data(file_path)
+                        import_result = csv_service.import_equipment_data(file_path)
                     elif file_type == 'customer':
                         import_result = csv_service.import_customer_data(file_path, limit)
                     elif file_type == 'transaction':
                         import_result = csv_service.import_transactions_data(file_path)
                     elif file_type == "transaction_items":
-                        transitems_service = TransitemsImportService()
-                        import_result = transitems_service.import_transitems_csv_data(file_path)
-                        # Fixed duplicate line
+                        import_result = csv_service.import_transaction_items_data(file_path)
                 else:
                     results["errors"].append(f"Unsupported file type: {file_type} for {filename}")
                     continue

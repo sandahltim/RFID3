@@ -174,8 +174,8 @@ CREATE TABLE IF NOT EXISTS {table_name} (
 def main():
     """Main function to process Excel file and generate SQL"""
 
-    excel_file = '/home/tim/RFID3/shared/POR/media/table info.xlsx'
-    output_file = '/home/tim/RFID3/complete_database_schema.sql'
+    excel_file = '/home/tim/RFID3-RFID-KVC/shared/POR/media/table info.xlsx'
+    output_file = '/home/tim/RFID3-RFID-KVC/complete_database_schema.sql'
 
     print("Reading Excel file and generating database schemas...")
 

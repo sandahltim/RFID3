@@ -19,7 +19,7 @@ DB_CONFIG = {
     'database': 'rfid_inventory'
 }
 
-CSV_BASE_PATH = "/home/tim/RFID3/shared/POR"
+CSV_BASE_PATH = "/home/tim/RFID3-RFID-KVC/shared/POR"
 MAX_RECORDS = 25000  # Limit per CSV file
 
 def create_connection():

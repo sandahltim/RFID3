@@ -16,7 +16,7 @@ import warnings
 warnings.filterwarnings('ignore')
 
 # Add project root to path
-sys.path.insert(0, '/home/tim/RFID3')
+sys.path.insert(0, '/home/tim/RFID3-RFID-KVC')
 
 from app import create_app, db
 from app.models.pos_models import (

@@ -12,11 +12,12 @@ class ItemMaster(db.Model):
         db.Index("ix_item_master_bin_location", "bin_location"),
     )
 
+    # Core RFID fields - matches actual table structure for RFIDpro import
     tag_id = db.Column(db.String(255), primary_key=True)
     uuid_accounts_fk = db.Column(db.String(255))
     serial_number = db.Column(db.String(255))
     client_name = db.Column(db.String(255))
-    rental_class_num = db.Column(db.String(255))
+    rental_class_num = db.Column(db.String(255))  # Critical: EPC correlation from RFIDpro
     common_name = db.Column(db.String(255))
     quality = db.Column(db.String(50))
     bin_location = db.Column(db.String(255))
@@ -30,16 +31,9 @@ class ItemMaster(db.Model):
     date_last_scanned = db.Column(db.DateTime)
     date_created = db.Column(db.DateTime)
     date_updated = db.Column(db.DateTime)
-    home_store = db.Column(db.String(10))
-    current_store = db.Column(db.String(10))
-    identifier_type = db.Column(db.String(10))
-    item_num = db.Column(db.Integer, unique=True)
-    turnover_ytd = db.Column(db.DECIMAL(10, 2))
-    turnover_ltd = db.Column(db.DECIMAL(10, 2))
-    repair_cost_ltd = db.Column(db.DECIMAL(10, 2))
-    sell_price = db.Column(db.DECIMAL(10, 2))
-    retail_price = db.Column(db.DECIMAL(10, 2))
-    manufacturer = db.Column(db.String(100))
+
+    # Note: POS fields (home_store, current_store, item_num, turnover, etc.)
+    # are accessed via bedrock transformation service joining with pos_equipment table
 
     def to_dict(self):
         return {

@@ -236,3 +236,4 @@ The system is undergoing RFID-KVC architectural transformation. The manager app 
 - Created web-based operations interface foundation
 
 When working with this system, always verify YOUR Excel correlation specifications in `/shared/POR/media/table info.xlsx` before making database or import changes.
+- we use the BEDROCK system, alwyas review.

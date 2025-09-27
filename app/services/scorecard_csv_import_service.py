@@ -21,7 +21,7 @@ class ScorecardCSVImportService:
     """Service for importing Scorecard Trends CSV data with proper store correlation"""
     
     def __init__(self):
-        self.csv_base_path = "/home/tim/RFID3/shared/POR"
+        self.csv_base_path = "/home/tim/RFID3-RFID-KVC/shared/POR"
         self.import_stats = {
             "records_processed": 0,
             "records_imported": 0,

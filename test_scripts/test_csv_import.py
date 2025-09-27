@@ -5,7 +5,7 @@ Test script for CSV import service
 
 import sys
 import os
-sys.path.insert(0, '/home/tim/RFID3')
+sys.path.insert(0, '/home/tim/RFID3-RFID-KVC')
 
 from app import create_app, db
 from app.services.csv_import_service import CSVImportService

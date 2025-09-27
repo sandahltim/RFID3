@@ -5,7 +5,7 @@ Tests external data fetching and correlation analysis
 """
 
 import sys
-sys.path.insert(0, '/home/tim/RFID3')
+sys.path.insert(0, '/home/tim/RFID3-RFID-KVC')
 
 import os
 os.environ['FLASK_ENV'] = 'development'

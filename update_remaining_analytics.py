@@ -9,7 +9,7 @@ from pathlib import Path
 from datetime import datetime
 
 # Configuration
-PROJECT_ROOT = Path("/home/tim/RFID3")
+PROJECT_ROOT = Path("/home/tim/RFID3-RFID-KVC")
 BACKUP_DIR = PROJECT_ROOT / "backups" / f"analytics_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
 
 # Import statement to add

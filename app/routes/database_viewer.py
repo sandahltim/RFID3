@@ -79,24 +79,34 @@ AVAILABLE_TABLES = {
         'description': 'System configuration settings for inventory management',
         'key_columns': ['config_key', 'config_value', 'updated_at']
     },
-    # POS System Tables
+    # POS System Tables - Use raw table inspection instead of models
     'pos_equipment': {
-        'model': POSEquipment,
+        'model': None,  # Use raw SQL reflection
+        'table_name': 'pos_equipment',
         'display_name': 'POS Equipment',
         'description': 'Point-of-sale equipment and inventory data',
-        'key_columns': ['item_num', 'name', 'part_no', 'serial_no', 'current_cost', 'status']
+        'key_columns': ['item_num', 'name', 'category', 'current_store', 'inactive']
     },
     'pos_transactions': {
-        'model': POSTransaction,
+        'model': None,  # Use raw SQL reflection
+        'table_name': 'pos_transactions',
         'display_name': 'POS Transactions',
         'description': 'Point-of-sale transaction records',
-        'key_columns': ['transaction_num', 'invoice_num', 'customer_id', 'transaction_date', 'total_amount']
+        'key_columns': ['contract_no', 'customer_no', 'contract_date', 'total']
     },
-    'pos_rfid_correlation': {
-        'model': POSRFIDCorrelation,
-        'display_name': 'POS-RFID Correlation',
-        'description': 'Correlation between POS items and RFID tags',
-        'key_columns': ['pos_item_num', 'rfid_tag_id', 'correlation_confidence', 'created_at']
+    'pos_customers': {
+        'model': None,  # Use raw SQL reflection
+        'table_name': 'pos_customers',
+        'display_name': 'POS Customers',
+        'description': 'Point-of-sale customer records',
+        'key_columns': ['customer_no', 'company', 'contact', 'phone']
+    },
+    'pos_transaction_items': {
+        'model': None,  # Use raw SQL reflection
+        'table_name': 'pos_transaction_items',
+        'display_name': 'POS Transaction Items',
+        'description': 'Point-of-sale transaction line items',
+        'key_columns': ['contract_no', 'item_number', 'quantity']
     },
     # Financial Data Tables
     'pl_data': {
@@ -134,14 +144,19 @@ def get_tables():
         tables_info = {}
         for table_key, table_info in AVAILABLE_TABLES.items():
             model = table_info['model']
-            
-            # Get table schema information
-            if hasattr(model, '__tablename__'):
+
+            # Get table name - either from model or direct table_name
+            if model and hasattr(model, '__tablename__'):
                 table_name = model.__tablename__
-                
-                # Get column information
+            elif 'table_name' in table_info:
+                table_name = table_info['table_name']
+            else:
+                continue
+
+            try:
+                # Get column information using inspector
                 columns = inspector.get_columns(table_name)
-                
+
                 # Convert columns to serializable format
                 serializable_columns = []
                 for col in columns:
@@ -152,27 +167,34 @@ def get_tables():
                         'default': str(col.get('default')) if col.get('default') is not None else None
                     }
                     serializable_columns.append(col_info)
-                
-                # Get row count
+
+                # Get row count using raw SQL if model is None
                 try:
-                    row_count = session.query(model).count()
+                    if model:
+                        row_count = session.query(model).count()
+                    else:
+                        result = session.execute(text(f"SELECT COUNT(*) FROM {table_name}"))
+                        row_count = result.scalar()
                 except Exception as e:
                     logger.warning(f"Could not get row count for {table_name}: {e}")
                     row_count = 0
-                
+
                 # Create serializable table info (exclude model)
                 serializable_table_info = {
                     'display_name': table_info['display_name'],
                     'description': table_info['description'],
                     'key_columns': table_info['key_columns']
                 }
-                
+
                 tables_info[table_key] = {
                     **serializable_table_info,
                     'table_name': table_name,
                     'columns': serializable_columns,
                     'row_count': row_count
                 }
+            except Exception as e:
+                logger.error(f"Error getting table information: `{table_name}` - {e}")
+                continue
         
         return jsonify({
             'status': 'success',
@@ -197,16 +219,53 @@ def get_table_data(table_key):
         session = db.session
         table_info = AVAILABLE_TABLES[table_key]
         model = table_info['model']
-        
+
         # Get pagination parameters
         page = int(request.args.get('page', 1))
         per_page = min(int(request.args.get('per_page', 50)), 500)  # Max 500 rows
-        
+
         # Get search/filter parameters
         search = request.args.get('search', '').strip()
         column_filter = request.args.get('column', '')
-        
-        # Build base query
+
+        # Handle tables without models (use raw SQL)
+        if model is None:
+            table_name = table_info['table_name']
+            offset = (page - 1) * per_page
+
+            # Get total count
+            count_result = session.execute(text(f"SELECT COUNT(*) FROM {table_name}"))
+            total_count = count_result.scalar()
+
+            # Get data with pagination
+            query_sql = f"SELECT * FROM {table_name} LIMIT :limit OFFSET :offset"
+            result = session.execute(text(query_sql), {'limit': per_page, 'offset': offset})
+
+            # Convert to list of dicts
+            columns = result.keys()
+            data = []
+            for row in result:
+                row_dict = dict(zip(columns, row))
+                # Convert non-serializable types
+                for key, value in row_dict.items():
+                    if isinstance(value, datetime):
+                        row_dict[key] = value.isoformat()
+                    elif value is not None:
+                        row_dict[key] = str(value)
+                data.append(row_dict)
+
+            return jsonify({
+                'status': 'success',
+                'data': data,
+                'pagination': {
+                    'page': page,
+                    'per_page': per_page,
+                    'total_count': total_count,
+                    'total_pages': (total_count + per_page - 1) // per_page
+                }
+            })
+
+        # Build base query for model-based tables
         query = session.query(model)
         
         # Apply global store/type filters if applicable

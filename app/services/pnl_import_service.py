@@ -20,9 +20,7 @@ from config import DB_CONFIG
 from .logger import get_logger
 
 # Import centralized store configuration
-import sys
-sys.path.append('/home/tim/RFID3/app/config')
-from stores import STORES, get_store_name, get_all_store_codes, get_active_store_codes
+from app.config.stores import STORES, get_store_name, get_all_store_codes, get_active_store_codes
 
 logger = get_logger(__name__)
 
